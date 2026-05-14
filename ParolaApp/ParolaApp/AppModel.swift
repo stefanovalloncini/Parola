@@ -202,12 +202,7 @@ final class AppModel: ObservableObject {
     @Published var youtubeSheetOpen: Bool = false
 
     func transcribeYouTube(urlString: String) {
-        guard let url = URL(string: urlString), url.isYouTubeVideo else {
-            phase = .failed(message: "That doesn't look like a YouTube URL.")
-            return
-        }
-        youtubeURLDraft = ""
-        youtubeSheetOpen = false
+        guard let url = makeYouTubeURL(urlString) else { return }
 
         Task {
             do {
@@ -229,6 +224,31 @@ final class AppModel: ObservableObject {
                 phase = .failed(message: error.localizedDescription)
             }
         }
+    }
+
+    func fetchYouTubeSubs(urlString: String) {
+        guard let url = makeYouTubeURL(urlString) else { return }
+
+        Task {
+            do {
+                phase = .transcribing(file: url)
+                let result = try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: selectedLanguage)
+                transcript = result
+                phase = .ready
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+        }
+    }
+
+    private func makeYouTubeURL(_ urlString: String) -> URL? {
+        guard let url = URL(string: urlString), url.isYouTubeVideo else {
+            phase = .failed(message: "That doesn't look like a YouTube URL.")
+            return nil
+        }
+        youtubeURLDraft = ""
+        youtubeSheetOpen = false
+        return url
     }
 
     // MARK: - Batch

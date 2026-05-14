@@ -47,6 +47,9 @@ struct Transcribe: AsyncParsableCommand {
     @Option(name: .long, help: "Also save a .parola bundle to this path (audio + transcript + manifest).")
     var save: String?
 
+    @Flag(name: .long, help: "For YouTube URLs: prefer downloading existing captions over running Whisper.")
+    var preferExistingSubs: Bool = false
+
     func run() async throws {
         guard !inputs.isEmpty else {
             throw ValidationError("At least one input file is required.")
@@ -97,6 +100,13 @@ struct Transcribe: AsyncParsableCommand {
     }
 
     private func transcribeSingle(input: ResolvedInput, options: TranscriptionOptions) async throws {
+        if case .youtube(let url) = input, preferExistingSubs {
+            stderr("Fetching captions from \(url.absoluteString)…")
+            let transcript = try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: language)
+            try emitTranscript(transcript, sourceURL: url)
+            return
+        }
+
         let session = TranscriptionSession()
         let progress = ProgressReporter(label: "downloading \(model)")
         if verbose { stderr("Loading model \(model)…") }
@@ -120,7 +130,10 @@ struct Transcribe: AsyncParsableCommand {
             downloadProgress: { p in progress.update(p) }
         )
         progress.finish()
+        try emitTranscript(transcript, sourceURL: sourceURL)
+    }
 
+    private func emitTranscript(_ transcript: Transcript, sourceURL: URL) throws {
         let rendered = try Exporters.exporter(for: format).render(transcript)
         if let output {
             let outURL = URL(fileURLWithPath: output)
@@ -131,7 +144,8 @@ struct Transcribe: AsyncParsableCommand {
         } else {
             print(rendered)
         }
-        if let savePath = save {
+        if let savePath = save,
+           FileManager.default.fileExists(atPath: sourceURL.path) {
             let bundle = try ParolaDocument.write(
                 transcript: transcript,
                 audioURL: sourceURL,

@@ -16,20 +16,26 @@ struct YouTubeURLSheet: View {
             TextField("https://www.youtube.com/watch?v=…", text: $model.youtubeURLDraft)
                 .textFieldStyle(.roundedBorder)
                 .focused($fieldFocused)
-                .onSubmit { submit() }
+                .onSubmit { submit(prefersExistingSubs: false) }
 
-            HStack {
-                Spacer()
+            HStack(spacing: DS.Spacing.small) {
                 Button("Cancel") {
                     model.youtubeSheetOpen = false
                     model.youtubeURLDraft = ""
                 }
                 .keyboardShortcut(.cancelAction)
-                Button("Transcribe") { submit() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(DS.Color.accent)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(model.youtubeURLDraft.trimmingCharacters(in: .whitespaces).isEmpty)
+                Spacer()
+                Button("Use Captions") {
+                    submit(prefersExistingSubs: true)
+                }
+                .disabled(disabled)
+                Button("Transcribe") {
+                    submit(prefersExistingSubs: false)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(DS.Color.accent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(disabled)
             }
         }
         .padding(DS.Spacing.large)
@@ -43,9 +49,17 @@ struct YouTubeURLSheet: View {
         }
     }
 
-    private func submit() {
-        let trimmed = model.youtubeURLDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+    private var disabled: Bool {
+        model.youtubeURLDraft.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines).isEmpty
+    }
+
+    private func submit(prefersExistingSubs: Bool) {
+        let trimmed = model.youtubeURLDraft.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        model.transcribeYouTube(urlString: trimmed)
+        if prefersExistingSubs {
+            model.fetchYouTubeSubs(urlString: trimmed)
+        } else {
+            model.transcribeYouTube(urlString: trimmed)
+        }
     }
 }

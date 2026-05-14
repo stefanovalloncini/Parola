@@ -1,0 +1,93 @@
+import Foundation
+import Testing
+@testable import ParolaCore
+
+@Suite("VTT importer")
+struct VttImporterTests {
+    @Test("parses a basic two-cue file")
+    func basic() {
+        let vtt = """
+        WEBVTT
+
+        00:00:00.000 --> 00:00:01.500
+        Hello world.
+
+        00:00:01.500 --> 00:00:03.000
+        Goodbye world.
+        """
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.count == 2)
+        #expect(t.segments[0].text == "Hello world.")
+        #expect(t.segments[0].start == 0.0)
+        #expect(t.segments[0].end == 1.5)
+        #expect(t.segments[1].text == "Goodbye world.")
+        #expect(t.modelName == "youtube-subs")
+    }
+
+    @Test("ignores NOTE and STYLE blocks")
+    func skipsNotes() {
+        let vtt = """
+        WEBVTT - YouTube
+
+        NOTE This is a note
+        that spans two lines
+
+        STYLE
+        ::cue { color: white }
+
+        00:00:00.500 --> 00:00:02.000
+        Real cue.
+        """
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.count == 1)
+        #expect(t.segments[0].text == "Real cue.")
+    }
+
+    @Test("ignores positioning attrs on the time line")
+    func positioning() {
+        let vtt = """
+        WEBVTT
+
+        00:00:00.000 --> 00:00:01.000 align:start position:10%
+        Tagged cue.
+        """
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.count == 1)
+        #expect(t.segments[0].text == "Tagged cue.")
+    }
+
+    @Test("strips inline tags like <v Speaker> and <i>")
+    func inlineTags() {
+        #expect(VttImporter.stripInlineTags("<v Stefano>Hello there</v>") == "Hello there")
+        #expect(VttImporter.stripInlineTags("Plain text") == "Plain text")
+        #expect(VttImporter.stripInlineTags("<i>italic</i> normal") == "italic normal")
+    }
+
+    @Test("accepts MM:SS.mmm without an hour field")
+    func shortTimestamp() {
+        let ts = VttImporter.parseTimestamp("01:30.500")
+        #expect(ts == 90.5)
+    }
+
+    @Test("CRLF endings are handled")
+    func crlf() {
+        let vtt = "WEBVTT\r\n\r\n00:00:00.000 --> 00:00:01.000\r\nHi\r\n"
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.count == 1)
+        #expect(t.segments[0].text == "Hi")
+    }
+
+    @Test("cues with optional identifier line are accepted")
+    func cueIdentifier() {
+        let vtt = """
+        WEBVTT
+
+        cue-1
+        00:00:00.000 --> 00:00:01.500
+        Hello.
+        """
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.count == 1)
+        #expect(t.segments.first?.text == "Hello.")
+    }
+}
