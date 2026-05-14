@@ -18,7 +18,7 @@ struct NewTranscriptionSheet: View {
                 case .failed:
                     VStack(spacing: 12) {
                         StatusBanner(phase: model.coordinator.phase)
-                        Button("Try again") { model.coordinator.reset() }
+                        Button("newtranscription.retry") { model.coordinator.reset() }
                     }
                 default:
                     VStack(spacing: 12) {
@@ -28,7 +28,7 @@ struct NewTranscriptionSheet: View {
                 }
             }
             .padding(.vertical)
-            .navigationTitle("New transcription")
+            .navigationTitle(Text("newtranscription.title"))
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {
@@ -60,7 +60,7 @@ struct NewTranscriptionSheet: View {
             Button {
                 pickingFile = true
             } label: {
-                Label("Pick a file", systemImage: "doc")
+                Label("newtranscription.pickfile", systemImage: "doc")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
@@ -69,7 +69,7 @@ struct NewTranscriptionSheet: View {
             Button {
                 model.coordinator.startRecording()
             } label: {
-                Label("Record", systemImage: "mic.fill")
+                Label("newtranscription.record", systemImage: "mic.fill")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
@@ -86,9 +86,9 @@ private struct LiveRecordingPane: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: "mic.fill").foregroundStyle(.red)
-                Text("Recording").font(.headline)
+                Text("newtranscription.recording").font(.headline)
                 Spacer()
-                Button("Finish") { model.coordinator.stopRecording() }
+                Button("newtranscription.finish") { model.coordinator.stopRecording() }
                     .buttonStyle(.borderedProminent)
             }
             .padding(.horizontal)

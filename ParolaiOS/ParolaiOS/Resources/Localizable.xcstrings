@@ -379,6 +379,76 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Done" } },
         "it" : { "stringUnit" : { "state" : "translated", "value" : "Fine" } }
       }
+    },
+    "library.empty.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No transcripts yet" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Nessuna trascrizione" } }
+      }
+    },
+    "library.empty.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Tap + to import a file or record one." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Tocca + per importare un file o registrarne uno." } }
+      }
+    },
+    "newtranscription.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New transcription" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Nuova trascrizione" } }
+      }
+    },
+    "newtranscription.pickfile" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pick a file" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Scegli un file" } }
+      }
+    },
+    "newtranscription.record" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Record" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Registra" } }
+      }
+    },
+    "newtranscription.recording" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recording" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Registrazione" } }
+      }
+    },
+    "newtranscription.finish" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Finish" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Termina" } }
+      }
+    },
+    "newtranscription.retry" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Try again" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Riprova" } }
+      }
+    },
+    "root.picktranscript" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pick a transcript" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Scegli una trascrizione" } }
+      }
+    },
+    "root.picktranscript.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose an entry from the sidebar, or tap + to make a new one." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Scegli una voce dalla barra laterale o tocca + per crearne una nuova." } }
+      }
     }
   }
 }

@@ -52,9 +52,9 @@ struct RootView: View {
                 TranscriptDetailView(entryID: id)
             } else {
                 ContentUnavailableView(
-                    "Pick a transcript",
+                    "root.picktranscript",
                     systemImage: "waveform",
-                    description: Text("Choose an entry from the sidebar, or tap + to make a new one.")
+                    description: Text("root.picktranscript.body")
                 )
             }
         }

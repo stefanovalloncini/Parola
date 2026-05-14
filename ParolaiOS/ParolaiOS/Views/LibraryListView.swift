@@ -43,18 +43,28 @@ struct LibraryListView: View {
 }
 
 private struct EmptyLibraryView: View {
+    @State private var pulse = false
+
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 24) {
             Spacer()
             Image(systemName: "waveform")
-                .font(.system(size: 56, weight: .light))
-                .foregroundStyle(.secondary)
-            Text("No transcripts yet")
-                .font(.title3.weight(.semibold))
-            Text("Tap + to import a file or record one.")
-                .foregroundStyle(.secondary)
+                .font(.system(size: 64, weight: .light))
+                .foregroundStyle(Color.accentColor)
+                .symbolEffect(.variableColor.iterative.reversing, options: .repeating, value: pulse)
+                .shadow(color: Color.accentColor.opacity(0.18), radius: 18, x: 0, y: 6)
+            VStack(spacing: 8) {
+                Text("library.empty.title")
+                    .font(.title3.weight(.semibold))
+                Text("library.empty.body")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 28)
+            }
             Spacer()
         }
         .frame(maxWidth: .infinity)
+        .onAppear { pulse = true }
     }
 }
