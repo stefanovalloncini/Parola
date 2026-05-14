@@ -44,6 +44,9 @@ struct Transcribe: AsyncParsableCommand {
     @Option(name: .long, help: "Hint for the diarizer: number of speakers in the audio. Omit to auto-detect.")
     var speakers: Int?
 
+    @Option(name: .long, help: "Also save a .parola bundle to this path (audio + transcript + manifest).")
+    var save: String?
+
     func run() async throws {
         guard !inputs.isEmpty else {
             throw ValidationError("At least one input file is required.")
@@ -96,6 +99,14 @@ struct Transcribe: AsyncParsableCommand {
             }
         } else {
             print(rendered)
+        }
+        if let savePath = save {
+            let bundle = try ParolaDocument.write(
+                transcript: transcript,
+                audioURL: url,
+                to: URL(fileURLWithPath: savePath)
+            )
+            stderr("Saved bundle to \(bundle.path)")
         }
     }
 

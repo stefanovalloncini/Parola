@@ -18,6 +18,9 @@ struct ParolaApp: App {
             CommandGroup(replacing: .newItem) {
                 Button("Open Audio…") { model.presentOpenPanel() }
                     .keyboardShortcut("o")
+                Button("Save As Parola Document…") { model.saveProjectDocument() }
+                    .keyboardShortcut("s")
+                    .disabled(model.transcript == nil)
             }
             CommandGroup(after: .textEditing) {
                 Button("Find…") { model.toggleFind() }

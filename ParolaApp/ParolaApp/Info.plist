@@ -32,6 +32,20 @@
 				<string>public.movie</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Parola Document</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>app.parola.document</string>
+			</array>
+			<key>LSTypeIsPackage</key>
+			<true/>
+		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
@@ -94,5 +108,26 @@
 	</array>
 	<key>NSSystemAudioCaptureUsageDescription</key>
 	<string>Parola captures system audio so it can transcribe what's playing on your Mac.</string>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>com.apple.package</string>
+				<string>public.composite-content</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Parola Document</string>
+			<key>UTTypeIdentifier</key>
+			<string>app.parola.document</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>parola</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>

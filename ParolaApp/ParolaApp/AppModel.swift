@@ -141,6 +141,10 @@ final class AppModel: ObservableObject {
     }
 
     func transcribe(fileURL: URL, translateOverride: Bool? = nil) {
+        if fileURL.pathExtension == "parola" {
+            openProjectDocument(at: fileURL)
+            return
+        }
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
 
@@ -452,6 +456,33 @@ final class AppModel: ObservableObject {
     var currentMatch: TranscriptMatch? {
         guard !matches.isEmpty else { return nil }
         return matches[currentMatchIndex]
+    }
+
+    // MARK: - Project document
+
+    func openProjectDocument(at url: URL) {
+        do {
+            let doc = try ParolaDocument.read(at: url)
+            sourceFileURL = doc.audioURL
+            transcript = doc.transcript
+            installPlayer(for: doc.audioURL)
+            phase = .ready
+            recomputeMatches()
+        } catch {
+            phase = .failed(message: "Couldn't open document: \(error.localizedDescription)")
+        }
+    }
+
+    func saveProjectDocument() {
+        guard let transcript, let sourceFileURL else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = sourceFileURL.deletingPathExtension().lastPathComponent + ".parola"
+        guard panel.runModal() == .OK, let dest = panel.url else { return }
+        do {
+            _ = try ParolaDocument.write(transcript: transcript, audioURL: sourceFileURL, to: dest)
+        } catch {
+            phase = .failed(message: "Save failed: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Export
