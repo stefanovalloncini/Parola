@@ -70,31 +70,61 @@ struct ContentView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch model.phase {
-        case .idle:
-            EmptyDropZone()
-        case .downloadingModel(let name, let progress):
-            ProgressPane(title: "Downloading \(name)", progress: progress)
-        case .loadingModel(let name):
-            ProgressPane(title: "Loading \(name)…", progress: nil)
-        case .transcribing(let file):
-            ProgressPane(title: "Transcribing \(file.lastPathComponent)…", progress: nil)
-        case .recording(let source):
-            RecordingPane(source: source)
-        case .ready:
-            TranscriptPane()
-        case .failed(let message):
-            ErrorPane(message: message)
+        if !model.batchJobs.isEmpty {
+            HSplitView {
+                BatchSidebar()
+                    .frame(minWidth: 240, idealWidth: 280)
+                if model.transcript != nil {
+                    TranscriptPane()
+                } else {
+                    ProgressPane(title: "Transcribing batch…", progress: nil)
+                }
+            }
+        } else {
+            switch model.phase {
+            case .idle:
+                EmptyDropZone()
+            case .downloadingModel(let name, let progress):
+                ProgressPane(title: "Downloading \(name)", progress: progress)
+            case .loadingModel(let name):
+                ProgressPane(title: "Loading \(name)…", progress: nil)
+            case .transcribing(let file):
+                ProgressPane(title: "Transcribing \(file.lastPathComponent)…", progress: nil)
+            case .recording(let source):
+                RecordingPane(source: source)
+            case .ready:
+                TranscriptPane()
+            case .failed(let message):
+                ErrorPane(message: message)
+            }
         }
     }
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
-        guard let provider = providers.first else { return false }
-        _ = provider.loadObject(ofClass: URL.self) { url, _ in
-            guard let url else { return }
-            Task { @MainActor in model.transcribe(fileURL: url) }
+        guard !providers.isEmpty else { return false }
+        Task { @MainActor in
+            let urls = await loadURLs(from: providers)
+            guard !urls.isEmpty else { return }
+            if urls.count == 1 {
+                model.transcribe(fileURL: urls[0])
+            } else {
+                model.startBatch(urls: urls)
+            }
         }
         return true
+    }
+
+    private func loadURLs(from providers: [NSItemProvider]) async -> [URL] {
+        var collected: [URL] = []
+        for provider in providers {
+            let url: URL? = await withCheckedContinuation { (cont: CheckedContinuation<URL?, Never>) in
+                _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                    cont.resume(returning: url)
+                }
+            }
+            if let url { collected.append(url) }
+        }
+        return collected
     }
 }
 

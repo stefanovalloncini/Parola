@@ -43,6 +43,10 @@ final class AppModel: ObservableObject {
     @Published var wordTimestamps: Bool = false
     @Published var initialPrompt: String = ""
 
+    @Published var batchJobs: [BatchJob] = []
+    @Published var selectedBatchJobID: BatchJob.ID?
+    private var batchTask: Task<Void, Never>?
+
     @Published var findIsOpen: Bool = false
     @Published var findQuery: String = "" { didSet { recomputeMatches() } }
     @Published var findCaseSensitive: Bool = false { didSet { recomputeMatches() } }
@@ -126,9 +130,12 @@ final class AppModel: ObservableObject {
     func presentOpenPanel() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.audio, .movie, .mpeg4Movie, .quickTimeMovie, .mp3, .wav, .mpeg4Audio]
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url {
-            transcribe(fileURL: url)
+        panel.allowsMultipleSelection = true
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
+        if panel.urls.count == 1 {
+            transcribe(fileURL: panel.urls[0])
+        } else {
+            startBatch(urls: panel.urls)
         }
     }
 
@@ -181,6 +188,62 @@ final class AppModel: ObservableObject {
                 self.phase = .downloadingModel(name: self.selectedModel, progress: frac)
             }
         }
+    }
+
+    // MARK: - Batch
+
+    func startBatch(urls: [URL]) {
+        batchTask?.cancel()
+        let jobs = urls.map { BatchJob(url: $0) }
+        batchJobs = jobs
+        selectedBatchJobID = jobs.first?.id
+
+        let queue = BatchQueue()
+        let opts = currentOptions
+
+        batchTask = Task { @MainActor in
+            let events = await queue.process(jobs: jobs, options: opts)
+            for await event in events {
+                handleBatchEvent(event)
+            }
+        }
+    }
+
+    private func handleBatchEvent(_ event: BatchEvent) {
+        switch event {
+        case .started(let id):
+            mutateBatchJob(id) { $0.status = .transcribing }
+            phase = .transcribing(file: batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/"))
+        case .completed(let id, let transcript):
+            mutateBatchJob(id) { $0.status = .done; $0.transcript = transcript; $0.progress = 1 }
+            if id == selectedBatchJobID { self.transcript = transcript }
+        case .failed(let id, let reason):
+            mutateBatchJob(id) { $0.status = .failed; $0.error = reason }
+        case .finished:
+            phase = .ready
+        }
+    }
+
+    private func mutateBatchJob(_ id: BatchJob.ID, _ change: (inout BatchJob) -> Void) {
+        guard let idx = batchJobs.firstIndex(where: { $0.id == id }) else { return }
+        var copy = batchJobs[idx]
+        change(&copy)
+        batchJobs[idx] = copy
+    }
+
+    func selectBatchJob(_ id: BatchJob.ID) {
+        selectedBatchJobID = id
+        if let job = batchJobs.first(where: { $0.id == id }), let t = job.transcript {
+            transcript = t
+            installPlayer(for: job.url)
+        }
+    }
+
+    func clearBatch() {
+        batchTask?.cancel()
+        batchTask = nil
+        batchJobs = []
+        selectedBatchJobID = nil
     }
 
     // MARK: - Recording
