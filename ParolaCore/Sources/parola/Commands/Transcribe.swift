@@ -8,7 +8,7 @@ struct Transcribe: AsyncParsableCommand {
         abstract: "Transcribe an audio or video file."
     )
 
-    @Argument(help: "Path to one or more audio/video files. Multiple paths require --output-dir.")
+    @Argument(help: "Path to one or more audio/video files, or a single YouTube URL. Multiple paths require --output-dir.")
     var inputs: [String]
 
     @Option(name: .shortAndLong, help: "Model variant (e.g. openai_whisper-tiny, openai_whisper-large-v3-turbo).")
@@ -52,12 +52,9 @@ struct Transcribe: AsyncParsableCommand {
             throw ValidationError("At least one input file is required.")
         }
 
-        let urls = try inputs.map { path -> URL in
-            let url = URL(fileURLWithPath: path).resolvingSymlinksInPath()
-            guard FileManager.default.fileExists(atPath: url.path) else {
-                throw ValidationError("File not found: \(url.path)")
-            }
-            return url
+        let resolved = try inputs.map(Self.resolveInput)
+        if resolved.count > 1, resolved.contains(where: { $0.isURL }) {
+            throw ValidationError("Batch mode doesn't support URLs yet. Pass URLs one at a time.")
         }
 
         let opts = TranscriptionOptions(
@@ -71,20 +68,54 @@ struct Transcribe: AsyncParsableCommand {
             expectedSpeakers: speakers
         )
 
-        if urls.count == 1 {
-            try await transcribeSingle(url: urls[0], options: opts)
+        if resolved.count == 1 {
+            try await transcribeSingle(input: resolved[0], options: opts)
         } else {
-            try await transcribeBatch(urls: urls, options: opts)
+            try await transcribeBatch(urls: resolved.map(\.url), options: opts)
         }
     }
 
-    private func transcribeSingle(url: URL, options: TranscriptionOptions) async throws {
+    private enum ResolvedInput {
+        case file(URL)
+        case youtube(URL)
+        var url: URL { switch self { case .file(let u), .youtube(let u): return u } }
+        var isURL: Bool { if case .youtube = self { return true } else { return false } }
+    }
+
+    private static func resolveInput(_ raw: String) throws -> ResolvedInput {
+        if raw.hasPrefix("http://") || raw.hasPrefix("https://") {
+            guard let url = URL(string: raw), url.isYouTubeVideo else {
+                throw ValidationError("Only YouTube URLs are supported. Got: \(raw)")
+            }
+            return .youtube(url)
+        }
+        let url = URL(fileURLWithPath: raw).resolvingSymlinksInPath()
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw ValidationError("File not found: \(url.path)")
+        }
+        return .file(url)
+    }
+
+    private func transcribeSingle(input: ResolvedInput, options: TranscriptionOptions) async throws {
         let session = TranscriptionSession()
         let progress = ProgressReporter(label: "downloading \(model)")
         if verbose { stderr("Loading model \(model)…") }
 
+        let source: any AudioSource
+        let sourceURL: URL
+        switch input {
+        case .file(let url):
+            source = FileAudioSource(url: url)
+            sourceURL = url
+        case .youtube(let url):
+            stderr("Downloading audio from \(url.absoluteString)…")
+            let yt = YouTubeAudioSource(url: url)
+            source = yt
+            sourceURL = try await yt.prepare()
+        }
+
         let transcript = try await session.transcribe(
-            source: FileAudioSource(url: url),
+            source: source,
             options: options,
             downloadProgress: { p in progress.update(p) }
         )
@@ -103,7 +134,7 @@ struct Transcribe: AsyncParsableCommand {
         if let savePath = save {
             let bundle = try ParolaDocument.write(
                 transcript: transcript,
-                audioURL: url,
+                audioURL: sourceURL,
                 to: URL(fileURLWithPath: savePath)
             )
             stderr("Saved bundle to \(bundle.path)")

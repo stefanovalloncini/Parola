@@ -40,6 +40,13 @@ struct ContentView: View {
 
             Spacer()
 
+            Button {
+                model.youtubeSheetOpen = true
+            } label: {
+                Label("YouTube URL", systemImage: "play.rectangle.on.rectangle")
+            }
+            .disabled(isBusy)
+
             Menu {
                 Button("Microphone") { model.startRecording(source: .microphone) }
                 Button("System audio") { model.startRecording(source: .systemAudio) }
@@ -57,6 +64,7 @@ struct ContentView: View {
             }
             .disabled(isBusy)
         }
+        .sheet(isPresented: $model.youtubeSheetOpen) { YouTubeURLSheet() }
     }
 
     private var isBusy: Bool {

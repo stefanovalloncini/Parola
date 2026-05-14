@@ -196,6 +196,41 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: - YouTube URL
+
+    @Published var youtubeURLDraft: String = ""
+    @Published var youtubeSheetOpen: Bool = false
+
+    func transcribeYouTube(urlString: String) {
+        guard let url = URL(string: urlString), url.isYouTubeVideo else {
+            phase = .failed(message: "That doesn't look like a YouTube URL.")
+            return
+        }
+        youtubeURLDraft = ""
+        youtubeSheetOpen = false
+
+        Task {
+            do {
+                phase = .downloadingModel(name: "youtube", progress: 0)
+                let source = YouTubeAudioSource(url: url)
+                let audioURL = try await source.prepare()
+                sourceFileURL = audioURL
+                installPlayer(for: audioURL)
+
+                phase = .transcribing(file: audioURL)
+                let result = try await session.transcribe(
+                    source: FileAudioSource(url: audioURL),
+                    options: currentOptions,
+                    downloadProgress: makeDownloadProgressHandler()
+                )
+                transcript = result
+                phase = .ready
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+        }
+    }
+
     // MARK: - Batch
 
     func startBatch(urls: [URL]) {
