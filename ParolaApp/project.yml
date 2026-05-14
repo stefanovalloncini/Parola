@@ -44,6 +44,32 @@ targets:
         NSMicrophoneUsageDescription: Parola records audio from the microphone to transcribe it locally.
         NSSystemAudioCaptureUsageDescription: Parola captures system audio so it can transcribe what's playing on your Mac.
         NSAppleEventsUsageDescription: Allow Parola to handle file actions.
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Audio
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.audio
+          - CFBundleTypeName: Movie
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - public.movie
+        NSServices:
+          - NSMessage: transcribeFile
+            NSPortName: Parola
+            NSMenuItem:
+              default: Transcribe with Parola
+            NSSendTypes:
+              - public.file-url
+              - NSFilenamesPboardType
+          - NSMessage: translateFile
+            NSPortName: Parola
+            NSMenuItem:
+              default: Translate with Parola to English
+            NSSendTypes:
+              - public.file-url
+              - NSFilenamesPboardType
     entitlements:
       path: ParolaApp/Parola.entitlements
       properties:

@@ -3,12 +3,15 @@ import SwiftUI
 @main
 struct ParolaApp: App {
     @StateObject private var model = AppModel()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
         WindowGroup("Parola") {
             ContentView()
                 .environmentObject(model)
                 .frame(minWidth: 720, minHeight: 480)
+                .onAppear { appDelegate.bind(model: model) }
+                .onOpenURL { url in model.transcribe(fileURL: url) }
         }
         .windowResizability(.contentSize)
         .commands {

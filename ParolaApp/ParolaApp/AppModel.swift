@@ -122,9 +122,11 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func transcribe(fileURL: URL) {
+    func transcribe(fileURL: URL, translateOverride: Bool? = nil) {
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
+
+        let task: TranscriptionTask = (translateOverride ?? translate) ? .translate : .transcribe
 
         Task {
             do {
@@ -136,7 +138,7 @@ final class AppModel: ObservableObject {
                 phase = .transcribing(file: fileURL)
                 let result = try await session.transcribe(
                     source: FileAudioSource(url: fileURL),
-                    options: currentOptions,
+                    options: makeOptions(task: task),
                     downloadProgress: makeDownloadProgressHandler()
                 )
                 transcript = result
@@ -149,10 +151,14 @@ final class AppModel: ObservableObject {
     }
 
     private var currentOptions: TranscriptionOptions {
+        makeOptions(task: translate ? .translate : .transcribe)
+    }
+
+    private func makeOptions(task: TranscriptionTask) -> TranscriptionOptions {
         TranscriptionOptions(
             model: selectedModel,
             language: selectedLanguage,
-            task: translate ? .translate : .transcribe
+            task: task
         )
     }
 
