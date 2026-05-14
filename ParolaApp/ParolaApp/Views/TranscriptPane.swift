@@ -6,12 +6,17 @@ struct TranscriptPane: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        HSplitView {
-            transcriptList
-                .frame(minWidth: 320)
+        VStack(spacing: 0) {
+            if model.findIsOpen {
+                FindBar()
+            }
+            HSplitView {
+                transcriptList
+                    .frame(minWidth: 320)
 
-            playerColumn
-                .frame(minWidth: 280)
+                playerColumn
+                    .frame(minWidth: 280)
+            }
         }
     }
 
@@ -109,7 +114,9 @@ struct SegmentRow: View {
 
     @ViewBuilder
     private var content: some View {
-        if isCurrent, let words = segment.words, !words.isEmpty {
+        if model.findIsOpen, !model.findQuery.isEmpty {
+            highlightedText
+        } else if isCurrent, let words = segment.words, !words.isEmpty {
             karaoke(words: words)
         } else {
             TextField(
@@ -123,6 +130,24 @@ struct SegmentRow: View {
             .textFieldStyle(.plain)
             .lineLimit(1...20)
         }
+    }
+
+    private var highlightedText: Text {
+        var attr = AttributedString(segment.text)
+        let text = segment.text
+        let currentMatchID = model.currentMatch?.id
+        for m in model.match(in: segment.id) {
+            guard
+                let stringLo = text.utf16.index(text.utf16.startIndex, offsetBy: m.range.lowerBound, limitedBy: text.utf16.endIndex),
+                let stringHi = text.utf16.index(text.utf16.startIndex, offsetBy: m.range.upperBound, limitedBy: text.utf16.endIndex),
+                let attrLo = AttributedString.Index(stringLo, within: attr),
+                let attrHi = AttributedString.Index(stringHi, within: attr)
+            else { continue }
+            let isCurrent = m.id == currentMatchID
+            attr[attrLo..<attrHi].backgroundColor = isCurrent ? Color.accentColor : Color.yellow
+            attr[attrLo..<attrHi].foregroundColor = Color.black
+        }
+        return Text(attr)
     }
 
     private func karaoke(words: [WordTiming]) -> Text {

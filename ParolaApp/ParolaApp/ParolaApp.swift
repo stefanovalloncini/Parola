@@ -19,6 +19,11 @@ struct ParolaApp: App {
                 Button("Open Audio…") { model.presentOpenPanel() }
                     .keyboardShortcut("o")
             }
+            CommandGroup(after: .textEditing) {
+                Button("Find…") { model.toggleFind() }
+                    .keyboardShortcut("f", modifiers: [.command])
+                    .disabled(model.transcript == nil)
+            }
             CommandMenu("Transcript") {
                 Button("Export as TXT…") { model.exportRequest(.txt) }
                     .keyboardShortcut("e", modifiers: [.command])

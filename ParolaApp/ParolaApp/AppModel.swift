@@ -43,6 +43,13 @@ final class AppModel: ObservableObject {
     @Published var wordTimestamps: Bool = false
     @Published var initialPrompt: String = ""
 
+    @Published var findIsOpen: Bool = false
+    @Published var findQuery: String = "" { didSet { recomputeMatches() } }
+    @Published var findCaseSensitive: Bool = false { didSet { recomputeMatches() } }
+    @Published var findReplacement: String = ""
+    @Published var matches: [TranscriptMatch] = []
+    @Published var currentMatchIndex: Int = 0
+
     @Published var selectedModel: String = "openai_whisper-tiny"
     @Published var selectedLanguage: String? = nil
     @Published var translate: Bool = false
@@ -317,6 +324,69 @@ final class AppModel: ObservableObject {
         guard let idx = t.segments.firstIndex(where: { $0.id == id }) else { return }
         t.segments[idx].text = newText
         transcript = t
+        recomputeMatches()
+    }
+
+    // MARK: - Find & replace
+
+    func toggleFind() {
+        findIsOpen.toggle()
+        if !findIsOpen {
+            findQuery = ""
+            matches = []
+            currentMatchIndex = 0
+        }
+    }
+
+    private func recomputeMatches() {
+        guard let transcript else {
+            matches = []
+            currentMatchIndex = 0
+            return
+        }
+        matches = transcript.findMatches(findQuery, caseSensitive: findCaseSensitive)
+        currentMatchIndex = min(currentMatchIndex, max(matches.count - 1, 0))
+        snapToCurrentMatch()
+    }
+
+    func goToNextMatch() {
+        guard !matches.isEmpty else { return }
+        currentMatchIndex = (currentMatchIndex + 1) % matches.count
+        snapToCurrentMatch()
+    }
+
+    func goToPreviousMatch() {
+        guard !matches.isEmpty else { return }
+        currentMatchIndex = (currentMatchIndex - 1 + matches.count) % matches.count
+        snapToCurrentMatch()
+    }
+
+    func replaceCurrentMatch() {
+        guard let transcript, !matches.isEmpty else { return }
+        let match = matches[currentMatchIndex]
+        self.transcript = transcript.applying(replacement: findReplacement, to: match)
+        recomputeMatches()
+    }
+
+    func replaceAllMatches() {
+        guard let transcript, !findQuery.isEmpty else { return }
+        self.transcript = transcript.replacingAll(findQuery, with: findReplacement, caseSensitive: findCaseSensitive)
+        recomputeMatches()
+    }
+
+    private func snapToCurrentMatch() {
+        guard !matches.isEmpty else { return }
+        let id = matches[currentMatchIndex].segmentID
+        currentSegmentID = id
+    }
+
+    func match(in segmentID: TranscriptSegment.ID) -> [TranscriptMatch] {
+        matches.filter { $0.segmentID == segmentID }
+    }
+
+    var currentMatch: TranscriptMatch? {
+        guard !matches.isEmpty else { return nil }
+        return matches[currentMatchIndex]
     }
 
     // MARK: - Export
