@@ -8,6 +8,7 @@ final class UserSettings: ObservableObject {
     @AppStorage("translate") var translate: Bool = false
     @AppStorage("wordTimestamps") var wordTimestamps: Bool = true
     @AppStorage("initialPrompt") var initialPrompt: String = ""
+    @AppStorage("onboardingComplete") var onboardingComplete: Bool = false
 
     var language: String? {
         get { languageRaw.isEmpty ? nil : languageRaw }

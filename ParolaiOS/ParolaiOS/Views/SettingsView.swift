@@ -4,6 +4,7 @@ import ParolaCore
 struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var model: AppModel
+    @State private var confirmingReset = false
 
     var body: some View {
         NavigationStack {
@@ -12,6 +13,18 @@ struct SettingsSheet: View {
                     Picker("Model", selection: $model.settings.modelName) {
                         ForEach(model.availableModels) { entry in
                             Text(entry.label).tag(entry.name)
+                        }
+                    }
+                    NavigationLink {
+                        LanguagePicker(selection: $model.settings.language, compact: false)
+                            .navigationTitle(Text("language.choose"))
+                            .navigationBarTitleDisplayMode(.inline)
+                    } label: {
+                        HStack {
+                            Text("Language")
+                            Spacer()
+                            Text(LanguageCatalog.label(for: model.settings.language))
+                                .foregroundStyle(.secondary)
                         }
                     }
                     Toggle("Translate to English", isOn: $model.settings.translate)
@@ -38,6 +51,17 @@ struct SettingsSheet: View {
                 }
 
                 Section {
+                    Button {
+                        confirmingReset = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "sparkles")
+                            Text("Show welcome screens again")
+                        }
+                    }
+                }
+
+                Section {
                     Text("Parola — on-device speech-to-text.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -48,6 +72,19 @@ struct SettingsSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .confirmationDialog(
+                Text("Show welcome screens again?"),
+                isPresented: $confirmingReset,
+                titleVisibility: .visible
+            ) {
+                Button("Show next time", role: .none) {
+                    model.settings.onboardingComplete = false
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("They'll appear the next time you open Parola.")
             }
         }
     }

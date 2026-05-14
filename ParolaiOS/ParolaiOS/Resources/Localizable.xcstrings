@@ -1,0 +1,384 @@
+{
+  "sourceLanguage" : "en",
+  "version" : "1.0",
+  "strings" : {
+    "Back" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Back" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Indietro" } }
+      }
+    },
+    "Skip" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Skip" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Salta" } }
+      }
+    },
+    "onboarding.welcome.headline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Audio, written down." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Audio, in parola." } }
+      }
+    },
+    "onboarding.welcome.body.1" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Drop in any audio. Record meetings or notes." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Trascina un audio. Registra riunioni o appunti." } }
+      }
+    },
+    "onboarding.welcome.body.2" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Read along, word by word." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Leggi parola per parola." } }
+      }
+    },
+    "onboarding.welcome.body.3" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Everything stays on this iPhone." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Tutto resta su questo iPhone." } }
+      }
+    },
+    "onboarding.welcome.cta" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Set up Parola" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Configura Parola" } }
+      }
+    },
+    "onboarding.model.headline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pick how Parola listens." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Scegli come ascolta Parola." } }
+      }
+    },
+    "onboarding.model.subhead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "More accuracy means a bigger download. You can change this later." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Più precisione significa download più grande. Puoi cambiarlo dopo." } }
+      }
+    },
+    "onboarding.model.tiny.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quick notes and clear voices." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Per appunti rapidi e voci chiare." } }
+      }
+    },
+    "onboarding.model.base.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Better with accents or noise." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Meglio con accenti o rumore." } }
+      }
+    },
+    "onboarding.model.small.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Best accuracy. Bigger download." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Massima precisione. Download più grande." } }
+      }
+    },
+    "onboarding.model.footer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Downloads start when you tap Continue." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Il download parte quando tocchi Avanti." } }
+      }
+    },
+    "onboarding.model.indicator.speed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Speed" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Velocità" } }
+      }
+    },
+    "onboarding.model.indicator.accuracy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Accuracy" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Precisione" } }
+      }
+    },
+    "onboarding.language.headline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "What language do you usually transcribe?" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Che lingua trascrivi di solito?" } }
+      }
+    },
+    "onboarding.language.subhead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Auto-detect works for most files. Setting a language helps with short or quiet clips." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Il rilevamento automatico va bene per quasi tutti i file. Impostare una lingua aiuta con clip brevi o silenziose." } }
+      }
+    },
+    "onboarding.mic.headline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Allow microphone access." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Consenti l'accesso al microfono." } }
+      }
+    },
+    "onboarding.mic.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "So you can record voice notes and meetings without leaving Parola." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Per registrare note vocali e riunioni senza uscire da Parola." } }
+      }
+    },
+    "onboarding.mic.privacy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Audio stays on this device. Nothing is uploaded." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "L'audio resta su questo dispositivo. Niente viene caricato." } }
+      }
+    },
+    "onboarding.mic.cta" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Allow microphone" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Consenti microfono" } }
+      }
+    },
+    "onboarding.mic.denied" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "You can enable it later in Settings." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Puoi attivarlo in seguito dalle Impostazioni." } }
+      }
+    },
+    "onboarding.done.headline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "You're ready." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Tutto pronto." } }
+      }
+    },
+    "onboarding.done.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Tap + to import a file or record one." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Tocca + per importare un file o registrarne uno." } }
+      }
+    },
+    "onboarding.done.cta" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Parola" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Apri Parola" } }
+      }
+    },
+    "onboarding.cta.continue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Continue" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Avanti" } }
+      }
+    },
+    "onboarding.cta.notnow" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Not now" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Non ora" } }
+      }
+    },
+    "language.auto" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Auto-detect" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Rilevamento automatico" } }
+      }
+    },
+    "language.en" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "English" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Inglese" } }
+      }
+    },
+    "language.it" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Italian" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Italiano" } }
+      }
+    },
+    "language.es" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Spanish" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Spagnolo" } }
+      }
+    },
+    "language.fr" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "French" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Francese" } }
+      }
+    },
+    "language.de" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "German" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Tedesco" } }
+      }
+    },
+    "language.pt" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Portuguese" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Portoghese" } }
+      }
+    },
+    "language.nl" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dutch" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Olandese" } }
+      }
+    },
+    "language.ru" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Russian" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Russo" } }
+      }
+    },
+    "language.pl" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Polish" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Polacco" } }
+      }
+    },
+    "language.sv" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Swedish" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Svedese" } }
+      }
+    },
+    "language.tr" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Turkish" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Turco" } }
+      }
+    },
+    "language.ar" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Arabic" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Arabo" } }
+      }
+    },
+    "language.ja" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Japanese" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Giapponese" } }
+      }
+    },
+    "language.zh" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Chinese" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Cinese" } }
+      }
+    },
+    "language.ko" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Korean" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Coreano" } }
+      }
+    },
+    "language.hi" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hindi" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Hindi" } }
+      }
+    },
+    "language.unknown" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unknown" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Sconosciuto" } }
+      }
+    },
+    "language.more" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "More languages" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Altre lingue" } }
+      }
+    },
+    "language.choose" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose a language" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Scegli una lingua" } }
+      }
+    },
+    "Language" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Language" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Lingua" } }
+      }
+    },
+    "Show welcome screens again" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show welcome screens again" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Mostra di nuovo il benvenuto" } }
+      }
+    },
+    "Show welcome screens again?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show welcome screens again?" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Mostrare di nuovo il benvenuto?" } }
+      }
+    },
+    "Show next time" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show next time" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Mostra la prossima volta" } }
+      }
+    },
+    "They'll appear the next time you open Parola." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "They'll appear the next time you open Parola." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Appariranno la prossima volta che apri Parola." } }
+      }
+    },
+    "Cancel" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cancel" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Annulla" } }
+      }
+    },
+    "Done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Done" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Fine" } }
+      }
+    }
+  }
+}
