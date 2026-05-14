@@ -31,6 +31,14 @@ private struct GeneralTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section("Custom vocabulary") {
+                TextField("Initial prompt", text: $model.initialPrompt, axis: .vertical)
+                    .lineLimit(2...6)
+                    .textFieldStyle(.roundedBorder)
+                Text("A short list of names or jargon helps Whisper get unusual words right. Plain text, comma-separated works fine. Stays under ~200 words.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
     }

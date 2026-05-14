@@ -40,6 +40,9 @@ struct Record: AsyncParsableCommand {
     @Flag(name: .long, help: "Stream partial transcription to stderr as you speak (mic only).")
     var stream: Bool = false
 
+    @Option(name: .long, help: "Initial prompt: short text that biases the decoder toward specific words.")
+    var prompt: String?
+
     func run() async throws {
         if stream {
             guard source == .mic else {
@@ -73,7 +76,8 @@ struct Record: AsyncParsableCommand {
             model: model,
             language: language,
             task: translate ? .translate : .transcribe,
-            verbose: verbose
+            verbose: verbose,
+            initialPrompt: prompt
         )
 
         let progress = ProgressReporter(label: "downloading \(model)")
@@ -98,7 +102,8 @@ struct Record: AsyncParsableCommand {
             model: model,
             language: language,
             task: translate ? .translate : .transcribe,
-            verbose: verbose
+            verbose: verbose,
+            initialPrompt: prompt
         )
 
         stderr("Streaming from mic. Press Ctrl-C to stop." + (seconds.map { " (or wait \($0)s)" } ?? ""))

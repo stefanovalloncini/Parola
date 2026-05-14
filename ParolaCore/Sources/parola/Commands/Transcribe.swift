@@ -32,6 +32,9 @@ struct Transcribe: AsyncParsableCommand {
     @Flag(name: .long, help: "Emit word-level timestamps in addition to segments. Slower; only visible in --format json.")
     var wordTimestamps: Bool = false
 
+    @Option(name: .long, help: "Initial prompt: short text that biases the decoder toward specific words (proper nouns, jargon).")
+    var prompt: String?
+
     func run() async throws {
         let inputURL = URL(fileURLWithPath: input).resolvingSymlinksInPath()
         guard FileManager.default.fileExists(atPath: inputURL.path) else {
@@ -46,7 +49,8 @@ struct Transcribe: AsyncParsableCommand {
             language: language,
             task: translate ? .translate : .transcribe,
             wordTimestamps: wordTimestamps,
-            verbose: verbose
+            verbose: verbose,
+            initialPrompt: prompt
         )
 
         // Download progress streamed to stderr so stdout stays clean for piping.

@@ -41,6 +41,7 @@ final class AppModel: ObservableObject {
     @Published var liveVoiceActive: Bool = false
     @Published var useStreaming: Bool = true
     @Published var wordTimestamps: Bool = false
+    @Published var initialPrompt: String = ""
 
     @Published var selectedModel: String = "openai_whisper-tiny"
     @Published var selectedLanguage: String? = nil
@@ -161,7 +162,8 @@ final class AppModel: ObservableObject {
             model: selectedModel,
             language: selectedLanguage,
             task: task,
-            wordTimestamps: wordTimestamps
+            wordTimestamps: wordTimestamps,
+            initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt
         )
     }
 

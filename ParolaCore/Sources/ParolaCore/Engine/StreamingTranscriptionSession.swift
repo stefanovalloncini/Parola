@@ -57,7 +57,7 @@ public actor StreamingTranscriptionSession {
             throw ParolaError.transcriptionFailed("WhisperKit tokenizer was nil after model load")
         }
 
-        let decoding = DecodingOptions(
+        var decoding = DecodingOptions(
             verbose: options.verbose,
             task: options.task == .translate ? .translate : .transcribe,
             language: options.language,
@@ -66,6 +66,10 @@ public actor StreamingTranscriptionSession {
             withoutTimestamps: false,
             wordTimestamps: options.wordTimestamps
         )
+        if let tokens = promptTokens(options.initialPrompt, tokenizer: kit.tokenizer) {
+            decoding.promptTokens = tokens
+            decoding.usePrefillPrompt = true
+        }
 
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .unbounded)
         self.continuation = cont

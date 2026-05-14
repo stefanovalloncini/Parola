@@ -46,7 +46,7 @@ actor WhisperKitTranscriber {
         guard let kit = whisperKit, let modelName = loadedModel else {
             throw ParolaError.transcriptionFailed("model not loaded")
         }
-        let decoding = DecodingOptions(
+        var decoding = DecodingOptions(
             verbose: options.verbose,
             task: options.task == .translate ? .translate : .transcribe,
             language: options.language,
@@ -55,6 +55,10 @@ actor WhisperKitTranscriber {
             wordTimestamps: options.wordTimestamps,
             chunkingStrategy: .vad
         )
+        if let tokens = promptTokens(options.initialPrompt, tokenizer: kit.tokenizer) {
+            decoding.promptTokens = tokens
+            decoding.usePrefillPrompt = true
+        }
 
         let results = await kit.transcribe(
             audioPaths: [url.path],
@@ -105,4 +109,15 @@ actor WhisperKitTranscriber {
             durationSeconds: maxEnd > 0 ? maxEnd : nil
         )
     }
+}
+
+/// Tokenizes a user-supplied prompt into the format WhisperKit's decoder expects.
+/// Returns nil when the prompt is missing, empty, or the tokenizer isn't ready.
+func promptTokens(_ prompt: String?, tokenizer: WhisperTokenizer?) -> [Int]? {
+    guard let prompt, let tokenizer else { return nil }
+    let trimmed = prompt.trimmingCharacters(in: .whitespaces)
+    guard !trimmed.isEmpty else { return nil }
+    let tokens = tokenizer.encode(text: " " + trimmed)
+        .filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+    return tokens.isEmpty ? nil : tokens
 }
