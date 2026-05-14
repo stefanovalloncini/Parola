@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 @preconcurrency import AVFoundation
 import ScreenCaptureKit
@@ -155,3 +156,4 @@ private final class AudioBufferBox: @unchecked Sendable {
     var consumed = false
     init(buffer: AVAudioPCMBuffer) { self.buffer = buffer }
 }
+#endif

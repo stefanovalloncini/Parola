@@ -5,6 +5,7 @@ let package = Package(
     name: "ParolaCore",
     platforms: [
         .macOS(.v14),
+        .iOS(.v17),
     ],
     products: [
         .library(name: "ParolaCore", targets: ["ParolaCore"]),

@@ -1,5 +1,23 @@
 import Foundation
 
+public extension URL {
+    /// True if this URL points at a YouTube video page.
+    var isYouTubeVideo: Bool {
+        guard let host = host?.lowercased() else { return false }
+        if host == "youtu.be" || host == "www.youtu.be" {
+            return !path.isEmpty && path != "/"
+        }
+        let youtubeHosts: Set<String> = ["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"]
+        guard youtubeHosts.contains(host) else { return false }
+        if path.hasPrefix("/watch") { return true }
+        if path.hasPrefix("/shorts/") { return true }
+        if path.hasPrefix("/embed/") { return true }
+        return false
+    }
+}
+
+#if os(macOS)
+
 /// Audio source that downloads a YouTube video's audio via `yt-dlp`.
 ///
 /// Requires `yt-dlp` on `$PATH`. Common install: `brew install yt-dlp`.
@@ -95,18 +113,4 @@ public final class YouTubeAudioSource: AudioSource, @unchecked Sendable {
     }
 }
 
-public extension URL {
-    /// True if this URL points at a YouTube video page.
-    var isYouTubeVideo: Bool {
-        guard let host = host?.lowercased() else { return false }
-        if host == "youtu.be" || host == "www.youtu.be" {
-            return !path.isEmpty && path != "/"
-        }
-        let youtubeHosts: Set<String> = ["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"]
-        guard youtubeHosts.contains(host) else { return false }
-        if path.hasPrefix("/watch") { return true }
-        if path.hasPrefix("/shorts/") { return true }
-        if path.hasPrefix("/embed/") { return true }
-        return false
-    }
-}
+#endif

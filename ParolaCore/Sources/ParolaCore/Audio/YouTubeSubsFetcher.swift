@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 /// Fetches existing YouTube captions via `yt-dlp` and parses them into a ``Transcript``.
@@ -84,3 +85,4 @@ public enum YouTubeSubsFetcher {
         return nil
     }
 }
+#endif

@@ -10,3 +10,4 @@ ParolaApp/ParolaApp.xcodeproj/
 # SwiftPM
 Package.resolved.lock
 .swiftpm/
+ParolaiOS/ParolaiOS.xcodeproj/

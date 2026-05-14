@@ -2,6 +2,7 @@ import Foundation
 @preconcurrency import AVFoundation
 import CoreMedia
 import CoreGraphics
+import CoreText
 import QuartzCore
 
 /// Burns transcript segments into a video as open captions using AVFoundation.
