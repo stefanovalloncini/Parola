@@ -34,11 +34,13 @@ final class AppModel: ObservableObject {
     @Published var phase: Phase = .idle
     @Published var transcript: Transcript?
     @Published var currentSegmentID: TranscriptSegment.ID?
+    @Published var currentWordID: WordTiming.ID?
 
     @Published var liveSegments: [TranscriptSegment] = []
     @Published var livePartialText: String = ""
     @Published var liveVoiceActive: Bool = false
     @Published var useStreaming: Bool = true
+    @Published var wordTimestamps: Bool = false
 
     @Published var selectedModel: String = "openai_whisper-tiny"
     @Published var selectedLanguage: String? = nil
@@ -158,7 +160,8 @@ final class AppModel: ObservableObject {
         TranscriptionOptions(
             model: selectedModel,
             language: selectedLanguage,
-            task: task
+            task: task,
+            wordTimestamps: wordTimestamps
         )
     }
 
@@ -291,6 +294,10 @@ final class AppModel: ObservableObject {
         let match = segments.first(where: { time >= $0.start && time <= $0.end })
         if currentSegmentID != match?.id {
             currentSegmentID = match?.id
+        }
+        let newWordID = match?.word(at: time)?.id
+        if currentWordID != newWordID {
+            currentWordID = newWordID
         }
     }
 

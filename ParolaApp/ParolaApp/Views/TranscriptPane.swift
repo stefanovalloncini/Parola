@@ -99,6 +99,19 @@ struct SegmentRow: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 64, alignment: .leading)
 
+            content
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(isCurrent ? Color.accentColor.opacity(0.18) : Color.clear)
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if isCurrent, let words = segment.words, !words.isEmpty {
+            karaoke(words: words)
+        } else {
             TextField(
                 "",
                 text: Binding(
@@ -110,10 +123,17 @@ struct SegmentRow: View {
             .textFieldStyle(.plain)
             .lineLimit(1...20)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(isCurrent ? Color.accentColor.opacity(0.18) : Color.clear)
-        .contentShape(Rectangle())
+    }
+
+    private func karaoke(words: [WordTiming]) -> Text {
+        words.reduce(Text("")) { acc, word in
+            let highlighted = word.id == model.currentWordID
+            var piece = Text(word.word + " ")
+            if highlighted {
+                piece = piece.bold().foregroundColor(.accentColor)
+            }
+            return acc + piece
+        }
     }
 
     private func timestamp(_ s: Double) -> String {

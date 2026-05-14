@@ -76,11 +76,21 @@ actor WhisperKitTranscriber {
         for result in outcomes {
             detectedLanguage = result.language
             for seg in result.segments {
+                let words = seg.words?.enumerated().map { idx, w in
+                    WordTiming(
+                        id: "\(nextID)-\(idx)",
+                        word: w.word.trimmingCharacters(in: .whitespaces),
+                        start: Double(w.start),
+                        end: Double(w.end),
+                        probability: Double(w.probability)
+                    )
+                }
                 segments.append(TranscriptSegment(
                     id: nextID,
                     start: Double(seg.start),
                     end: Double(seg.end),
-                    text: seg.text
+                    text: seg.text,
+                    words: words
                 ))
                 nextID += 1
                 maxEnd = max(maxEnd, Double(seg.end))

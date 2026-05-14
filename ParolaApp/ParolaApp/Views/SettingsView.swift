@@ -6,10 +6,33 @@ struct SettingsView: View {
 
     var body: some View {
         TabView {
+            GeneralTab().tabItem { Label("General", systemImage: "slider.horizontal.3") }
             ModelsTab().tabItem { Label("Models", systemImage: "cpu") }
             AboutTab().tabItem { Label("About", systemImage: "info.circle") }
         }
         .padding()
+    }
+}
+
+private struct GeneralTab: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        Form {
+            Section("Playback") {
+                Toggle("Highlight words during playback", isOn: $model.wordTimestamps)
+                Text("Word-level highlighting needs precise timestamps. Transcription is slower with this on.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section("Recording") {
+                Toggle("Stream microphone in real time", isOn: $model.useStreaming)
+                Text("When on, the transcript appears as you speak. Turn off to record first and transcribe at the end.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 
