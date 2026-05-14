@@ -1,0 +1,12 @@
+.DS_Store
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# xcodegen output — regenerate with `xcodegen generate`
+ParolaApp/ParolaApp.xcodeproj/
+
+# SwiftPM
+Package.resolved.lock
+.swiftpm/

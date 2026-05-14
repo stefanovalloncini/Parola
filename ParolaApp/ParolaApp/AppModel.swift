@@ -1,0 +1,261 @@
+import Foundation
+import SwiftUI
+import AVFoundation
+import UniformTypeIdentifiers
+import ParolaCore
+
+@MainActor
+final class AppModel: ObservableObject {
+
+    // MARK: - State
+
+    enum Phase: Equatable {
+        case idle
+        case downloadingModel(name: String, progress: Double)
+        case loadingModel(name: String)
+        case transcribing(file: URL)
+        case recording(source: RecordSource)
+        case ready
+        case failed(message: String)
+    }
+
+    enum RecordSource: String, CaseIterable, Identifiable {
+        case microphone
+        case systemAudio
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .microphone: return "Microphone"
+            case .systemAudio: return "System audio"
+            }
+        }
+    }
+
+    @Published var phase: Phase = .idle
+    @Published var transcript: Transcript?
+    @Published var currentSegmentID: TranscriptSegment.ID?
+
+    @Published var selectedModel: String = "openai_whisper-tiny"
+    @Published var selectedLanguage: String? = nil
+    @Published var translate: Bool = false
+
+    @Published var availableModels: [ModelInfo] = []
+    @Published var sourceFileURL: URL?
+
+    // Audio player for segment seek
+    @Published var player: AVPlayer?
+    private var playerTimeObserver: Any?
+
+    // Export trigger pulled by ContentView (since we can't open a save panel directly from CommandMenu actions)
+    @Published var pendingExport: ExportFormat?
+
+    // MARK: - Engine
+
+    private let session = TranscriptionSession()
+    private let store = ModelStore.shared
+
+    private var liveSource: AudioSource?
+
+    init() {
+        refreshModelList()
+    }
+
+    // Periodic time observer is released when the AVPlayer is released; nothing to clean up in deinit.
+
+    // MARK: - Model list
+
+    func refreshModelList() {
+        let curated = store.catalog()
+        let extra = (try? store.installedModels())?.filter { ent in
+            !curated.contains { $0.name == ent.name }
+        } ?? []
+        availableModels = curated + extra
+
+        // If selected model is not in list, fall back to a sensible default
+        if !availableModels.contains(where: { $0.name == selectedModel }) {
+            selectedModel = availableModels.first?.name ?? "openai_whisper-tiny"
+        }
+    }
+
+    func deleteModel(_ name: String) {
+        do {
+            try store.delete(variant: name)
+            refreshModelList()
+        } catch {
+            phase = .failed(message: "Could not delete \(name): \(error.localizedDescription)")
+        }
+    }
+
+    func downloadModel(_ name: String) {
+        Task {
+            do {
+                phase = .downloadingModel(name: name, progress: 0)
+                _ = try await store.download(variant: name, progress: { [weak self] frac in
+                    Task { @MainActor [weak self] in
+                        if case .downloadingModel(let n, _) = self?.phase, n == name {
+                            self?.phase = .downloadingModel(name: name, progress: frac)
+                        }
+                    }
+                })
+                phase = .idle
+                refreshModelList()
+            } catch {
+                phase = .failed(message: "Download failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - File transcription
+
+    func presentOpenPanel() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.audio, .movie, .mpeg4Movie, .quickTimeMovie, .mp3, .wav, .mpeg4Audio]
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url {
+            transcribe(fileURL: url)
+        }
+    }
+
+    func transcribe(fileURL: URL) {
+        sourceFileURL = fileURL
+        installPlayer(for: fileURL)
+
+        Task {
+            do {
+                phase = .loadingModel(name: selectedModel)
+                if !store.isInstalled(selectedModel) {
+                    phase = .downloadingModel(name: selectedModel, progress: 0)
+                }
+
+                let source = FileAudioSource(url: fileURL)
+                let opts = TranscriptionOptions(
+                    model: selectedModel,
+                    language: selectedLanguage,
+                    task: translate ? .translate : .transcribe
+                )
+                phase = .transcribing(file: fileURL)
+                let result = try await session.transcribe(
+                    source: source,
+                    options: opts,
+                    downloadProgress: { [weak self] frac in
+                        Task { @MainActor [weak self] in
+                            self?.phase = .downloadingModel(name: self?.selectedModel ?? "", progress: frac)
+                        }
+                    }
+                )
+                transcript = result
+                phase = .ready
+                refreshModelList()
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+        }
+    }
+
+    // MARK: - Recording
+
+    func startRecording(source: RecordSource) {
+        Task {
+            do {
+                phase = .recording(source: source)
+                switch source {
+                case .microphone:
+                    let mic = MicAudioSource()
+                    try await mic.start()
+                    liveSource = mic
+                case .systemAudio:
+                    let sys = SystemAudioSource()
+                    try await sys.start()
+                    liveSource = sys
+                }
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+        }
+    }
+
+    func stopRecordingAndTranscribe() {
+        guard let source = liveSource else { return }
+        Task {
+            do {
+                let url = try await source.prepare()
+                liveSource = nil
+                sourceFileURL = url
+                installPlayer(for: url)
+
+                phase = .transcribing(file: url)
+                let opts = TranscriptionOptions(
+                    model: selectedModel,
+                    language: selectedLanguage,
+                    task: translate ? .translate : .transcribe
+                )
+                let result = try await session.transcribe(
+                    source: FileAudioSource(url: url),
+                    options: opts
+                )
+                transcript = result
+                phase = .ready
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+        }
+    }
+
+    // MARK: - Player & seek
+
+    private func installPlayer(for url: URL) {
+        if let obs = playerTimeObserver { player?.removeTimeObserver(obs) }
+        let p = AVPlayer(url: url)
+        player = p
+        let interval = CMTime(seconds: 0.2, preferredTimescale: 600)
+        playerTimeObserver = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+            let seconds = CMTimeGetSeconds(time)
+            Task { @MainActor in self?.updateCurrentSegment(time: seconds) }
+        }
+    }
+
+    private func updateCurrentSegment(time: Double) {
+        guard let segments = transcript?.segments else { return }
+        let match = segments.first(where: { time >= $0.start && time <= $0.end })
+        if currentSegmentID != match?.id {
+            currentSegmentID = match?.id
+        }
+    }
+
+    func seek(to segment: TranscriptSegment) {
+        guard let player else { return }
+        let t = CMTime(seconds: segment.start, preferredTimescale: 600)
+        player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
+        player.play()
+    }
+
+    // MARK: - Editing
+
+    func editSegment(id: TranscriptSegment.ID, newText: String) {
+        guard var t = transcript else { return }
+        guard let idx = t.segments.firstIndex(where: { $0.id == id }) else { return }
+        t.segments[idx].text = newText
+        transcript = t
+    }
+
+    // MARK: - Export
+
+    func exportRequest(_ format: ExportFormat) {
+        guard transcript != nil else { return }
+        pendingExport = format
+    }
+
+    func performExport(_ format: ExportFormat) {
+        guard let transcript else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.plainText]
+        panel.nameFieldStringValue = "transcript.\(format.fileExtension)"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let text = try Exporters.exporter(for: format).render(transcript)
+            try text.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            phase = .failed(message: "Export failed: \(error.localizedDescription)")
+        }
+    }
+}
