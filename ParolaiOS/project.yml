@@ -61,3 +61,31 @@ targets:
     dependencies:
       - package: ParolaCore
         product: ParolaCore
+
+  ParolaiOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ParolaiOSTests
+    resources:
+      - path: ParolaiOSTests/Resources
+    dependencies:
+      - target: ParolaiOS
+      - package: ParolaCore
+    settings:
+      base:
+        PRODUCT_NAME: ParolaiOSTests
+        SWIFT_STRICT_CONCURRENCY: minimal
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Parola.app/Parola"
+
+schemes:
+  ParolaiOS:
+    build:
+      targets:
+        ParolaiOS: all
+        ParolaiOSTests: [test]
+    test:
+      targets:
+        - ParolaiOSTests

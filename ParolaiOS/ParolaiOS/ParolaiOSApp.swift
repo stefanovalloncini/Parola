@@ -6,9 +6,7 @@ struct ParolaiOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(model)
-                .onOpenURL { url in model.openFile(at: url) }
+            RootView().environmentObject(model)
         }
     }
 }
