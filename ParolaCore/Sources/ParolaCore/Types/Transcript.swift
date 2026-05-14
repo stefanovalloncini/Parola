@@ -57,19 +57,22 @@ public struct Transcript: Codable, Hashable, Sendable {
     public var modelName: String
     public var sourceURL: URL?
     public var durationSeconds: Double?
+    public var summary: Summary?
 
     public init(
         segments: [TranscriptSegment],
         language: String,
         modelName: String,
         sourceURL: URL? = nil,
-        durationSeconds: Double? = nil
+        durationSeconds: Double? = nil,
+        summary: Summary? = nil
     ) {
         self.segments = segments
         self.language = language
         self.modelName = modelName
         self.sourceURL = sourceURL
         self.durationSeconds = durationSeconds
+        self.summary = summary
     }
 
     public var text: String {

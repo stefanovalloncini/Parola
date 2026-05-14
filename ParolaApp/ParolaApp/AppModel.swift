@@ -540,6 +540,35 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: - Summary
+
+    @Published var isSummarising: Bool = false
+    @Published var summaryError: String?
+
+    func summariseTranscript() {
+        guard let transcript, !isSummarising else { return }
+        isSummarising = true
+        summaryError = nil
+        Task { @MainActor in
+            do {
+                let summary = try await SummaryService().summarise(transcript)
+                var updated = self.transcript
+                updated?.summary = summary
+                self.transcript = updated
+            } catch {
+                summaryError = error.localizedDescription
+            }
+            isSummarising = false
+        }
+    }
+
+    func seekTo(chapter: Chapter) {
+        guard let player else { return }
+        let t = CMTime(seconds: chapter.start, preferredTimescale: 600)
+        player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
+        player.play()
+    }
+
     // MARK: - Burn subtitles into video
 
     func burnSubtitlesIntoVideo() {

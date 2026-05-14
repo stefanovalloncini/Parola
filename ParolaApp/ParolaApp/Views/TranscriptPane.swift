@@ -4,6 +4,9 @@ import ParolaCore
 
 struct TranscriptPane: View {
     @EnvironmentObject var model: AppModel
+    @State private var rightTab: RightTab = .player
+
+    enum RightTab { case player, summary }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -14,8 +17,29 @@ struct TranscriptPane: View {
                 transcriptList
                     .frame(minWidth: 320)
 
-                playerColumn
-                    .frame(minWidth: 280)
+                rightColumn
+                    .frame(minWidth: 320)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var rightColumn: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $rightTab) {
+                Text("Player").tag(RightTab.player)
+                Text("Summary").tag(RightTab.summary)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, DS.Spacing.regular)
+            .padding(.top, DS.Spacing.regular)
+
+            Divider().padding(.top, DS.Spacing.small)
+
+            switch rightTab {
+            case .player: playerColumn
+            case .summary: SummaryPane()
             }
         }
     }

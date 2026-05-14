@@ -50,6 +50,9 @@ struct Transcribe: AsyncParsableCommand {
     @Flag(name: .long, help: "For YouTube URLs: prefer downloading existing captions over running Whisper.")
     var preferExistingSubs: Bool = false
 
+    @Flag(name: .long, help: "Generate a summary and chapter markers via the on-device LLM (macOS 26+ / iOS 26+).")
+    var summarise: Bool = false
+
     func run() async throws {
         guard !inputs.isEmpty else {
             throw ValidationError("At least one input file is required.")
@@ -124,12 +127,20 @@ struct Transcribe: AsyncParsableCommand {
             sourceURL = try await yt.prepare()
         }
 
-        let transcript = try await session.transcribe(
+        var transcript = try await session.transcribe(
             source: source,
             options: options,
             downloadProgress: { p in progress.update(p) }
         )
         progress.finish()
+
+        if summarise {
+            do {
+                transcript.summary = try await SummaryService().summarise(transcript)
+            } catch {
+                stderr("warning: summary skipped — \(error.localizedDescription)")
+            }
+        }
         try emitTranscript(transcript, sourceURL: sourceURL)
     }
 
