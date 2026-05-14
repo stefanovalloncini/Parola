@@ -28,12 +28,3 @@ public struct TranscriptionOptions: Sendable {
 
     public static let `default` = TranscriptionOptions()
 }
-
-public enum TranscriptionEvent: Sendable {
-    case loadingModel(name: String)
-    case modelLoaded
-    case decoding(progress: Double)
-    case segment(TranscriptSegment)
-    case finished(Transcript)
-    case error(String)
-}

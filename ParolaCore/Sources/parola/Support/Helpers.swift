@@ -53,6 +53,19 @@ final class ProgressReporter: @unchecked Sendable {
     }
 }
 
+/// Awaits SIGINT, or `seconds` elapsed if a duration was provided. Whichever fires first.
+func awaitStop(seconds: Double?) async {
+    let stop = AsyncSignalStream(signal: SIGINT)
+    let timer: Task<Void, Never>? = seconds.map { secs in
+        Task {
+            try? await Task.sleep(nanoseconds: UInt64(secs * 1_000_000_000))
+            stop.fire()
+        }
+    }
+    await stop.wait()
+    timer?.cancel()
+}
+
 /// Awaits a single delivery of a Unix signal (e.g. SIGINT) using async/await.
 final class AsyncSignalStream: @unchecked Sendable {
     private let semaphore = DispatchSemaphore(value: 0)

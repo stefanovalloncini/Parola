@@ -37,7 +37,22 @@ struct Record: AsyncParsableCommand {
     @Flag(name: .shortAndLong, help: "Verbose logging.")
     var verbose: Bool = false
 
+    @Flag(name: .long, help: "Stream partial transcription to stderr as you speak (mic only).")
+    var stream: Bool = false
+
     func run() async throws {
+        if stream {
+            guard source == .mic else {
+                throw ValidationError("--stream only works with --source mic")
+            }
+            try await runStreaming()
+            return
+        }
+
+        try await runBatch()
+    }
+
+    private func runBatch() async throws {
         let audioSource: any AudioSource
         switch source {
         case .mic:
@@ -51,16 +66,7 @@ struct Record: AsyncParsableCommand {
         }
 
         stderr("Recording from \(source.rawValue). Press Ctrl-C to stop." + (seconds.map { " (or wait \($0)s)" } ?? ""))
-
-        let stopSignal = AsyncSignalStream(signal: SIGINT)
-        let timer: Task<Void, Never>? = seconds.map { secs in
-            Task {
-                try? await Task.sleep(nanoseconds: UInt64(secs * 1_000_000_000))
-                stopSignal.fire()
-            }
-        }
-        await stopSignal.wait()
-        timer?.cancel()
+        await awaitStop(seconds: seconds)
 
         let session = TranscriptionSession()
         let opts = TranscriptionOptions(
@@ -84,5 +90,57 @@ struct Record: AsyncParsableCommand {
         } else {
             print(rendered)
         }
+    }
+
+    private func runStreaming() async throws {
+        let session = StreamingTranscriptionSession()
+        let opts = TranscriptionOptions(
+            model: model,
+            language: language,
+            task: translate ? .translate : .transcribe,
+            verbose: verbose
+        )
+
+        stderr("Streaming from mic. Press Ctrl-C to stop." + (seconds.map { " (or wait \($0)s)" } ?? ""))
+
+        let progress = ProgressReporter(label: "downloading \(model)")
+        let events = try await session.start(
+            options: opts,
+            downloadProgress: { p in progress.update(p) }
+        )
+        progress.finish()
+
+        let consumer = Task {
+            for await event in events {
+                switch event {
+                case .partial(let text):
+                    FileHandle.standardError.write(Data("\r\u{001B}[2K… \(text)".utf8))
+                case .confirmed(let segment):
+                    FileHandle.standardError.write(Data("\r\u{001B}[2K".utf8))
+                    print(segment.text.trimmingCharacters(in: .whitespaces))
+                case .voiceActivity:
+                    break
+                case .warning(let msg):
+                    stderr("\nwarning: \(msg)")
+                case .failed(let msg):
+                    stderr("\nerror: \(msg)")
+                case .finished(let transcript):
+                    // Stdout already received the live txt; only render the final transcript
+                    // when we owe the user a non-txt format or a file.
+                    let owesFinalRender = format != .txt || output != nil
+                    guard owesFinalRender else { break }
+                    let rendered = (try? Exporters.exporter(for: format).render(transcript)) ?? ""
+                    if let output {
+                        try? rendered.write(to: URL(fileURLWithPath: output), atomically: true, encoding: .utf8)
+                    } else {
+                        print(rendered)
+                    }
+                }
+            }
+        }
+
+        await awaitStop(seconds: seconds)
+        await session.stop()
+        await consumer.value
     }
 }

@@ -35,6 +35,11 @@ final class AppModel: ObservableObject {
     @Published var transcript: Transcript?
     @Published var currentSegmentID: TranscriptSegment.ID?
 
+    @Published var liveSegments: [TranscriptSegment] = []
+    @Published var livePartialText: String = ""
+    @Published var liveVoiceActive: Bool = false
+    @Published var useStreaming: Bool = true
+
     @Published var selectedModel: String = "openai_whisper-tiny"
     @Published var selectedLanguage: String? = nil
     @Published var translate: Bool = false
@@ -55,12 +60,13 @@ final class AppModel: ObservableObject {
     private let store = ModelStore.shared
 
     private var liveSource: AudioSource?
+    private var streamingSession: StreamingTranscriptionSession?
+    private var streamingConsumer: Task<Void, Never>?
 
     init() {
         refreshModelList()
     }
 
-    // Periodic time observer is released when the AVPlayer is released; nothing to clean up in deinit.
 
     // MARK: - Model list
 
@@ -127,21 +133,11 @@ final class AppModel: ObservableObject {
                     phase = .downloadingModel(name: selectedModel, progress: 0)
                 }
 
-                let source = FileAudioSource(url: fileURL)
-                let opts = TranscriptionOptions(
-                    model: selectedModel,
-                    language: selectedLanguage,
-                    task: translate ? .translate : .transcribe
-                )
                 phase = .transcribing(file: fileURL)
                 let result = try await session.transcribe(
-                    source: source,
-                    options: opts,
-                    downloadProgress: { [weak self] frac in
-                        Task { @MainActor [weak self] in
-                            self?.phase = .downloadingModel(name: self?.selectedModel ?? "", progress: frac)
-                        }
-                    }
+                    source: FileAudioSource(url: fileURL),
+                    options: currentOptions,
+                    downloadProgress: makeDownloadProgressHandler()
                 )
                 transcript = result
                 phase = .ready
@@ -152,9 +148,30 @@ final class AppModel: ObservableObject {
         }
     }
 
+    private var currentOptions: TranscriptionOptions {
+        TranscriptionOptions(
+            model: selectedModel,
+            language: selectedLanguage,
+            task: translate ? .translate : .transcribe
+        )
+    }
+
+    private func makeDownloadProgressHandler() -> @Sendable (Double) -> Void {
+        { [weak self] frac in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.phase = .downloadingModel(name: self.selectedModel, progress: frac)
+            }
+        }
+    }
+
     // MARK: - Recording
 
     func startRecording(source: RecordSource) {
+        if source == .microphone && useStreaming {
+            startStreamingMic()
+            return
+        }
         Task {
             do {
                 phase = .recording(source: source)
@@ -174,7 +191,61 @@ final class AppModel: ObservableObject {
         }
     }
 
+    private func startStreamingMic() {
+        let s = StreamingTranscriptionSession()
+        streamingSession = s
+        liveSegments = []
+        livePartialText = ""
+        liveVoiceActive = false
+        phase = .recording(source: .microphone)
+
+        let opts = currentOptions
+        let progress = makeDownloadProgressHandler()
+
+        streamingConsumer = Task { @MainActor in
+            do {
+                let events = try await s.start(options: opts, downloadProgress: progress)
+                phase = .recording(source: .microphone)
+                for await event in events {
+                    handleStreamingEvent(event)
+                }
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+        }
+    }
+
+    private func handleStreamingEvent(_ event: StreamingEvent) {
+        switch event {
+        case .partial(let text):
+            if livePartialText != text { livePartialText = text }
+        case .confirmed(let segment):
+            liveSegments.append(segment)
+            if !livePartialText.isEmpty { livePartialText = "" }
+        case .voiceActivity(let active):
+            if liveVoiceActive != active { liveVoiceActive = active }
+        case .warning:
+            break
+        case .failed(let msg):
+            phase = .failed(message: msg)
+        case .finished(let transcript):
+            self.transcript = transcript
+            self.livePartialText = ""
+            self.phase = .ready
+        }
+    }
+
     func stopRecordingAndTranscribe() {
+        if let s = streamingSession {
+            Task { @MainActor in
+                await s.stop()
+                streamingSession = nil
+                streamingConsumer?.cancel()
+                streamingConsumer = nil
+            }
+            return
+        }
+
         guard let source = liveSource else { return }
         Task {
             do {
@@ -184,14 +255,9 @@ final class AppModel: ObservableObject {
                 installPlayer(for: url)
 
                 phase = .transcribing(file: url)
-                let opts = TranscriptionOptions(
-                    model: selectedModel,
-                    language: selectedLanguage,
-                    task: translate ? .translate : .transcribe
-                )
                 let result = try await session.transcribe(
                     source: FileAudioSource(url: url),
-                    options: opts
+                    options: currentOptions
                 )
                 transcript = result
                 phase = .ready

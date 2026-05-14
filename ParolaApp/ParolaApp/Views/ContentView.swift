@@ -151,21 +151,39 @@ struct RecordingPane: View {
     @State private var elapsed: Double = 0
     @State private var startedAt: Date = Date()
 
+    private var isStreaming: Bool { source == .microphone && model.useStreaming }
+    private var stopButtonLabel: String { isStreaming ? "Finish" : "Stop and Transcribe" }
+
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "mic.fill")
-                .font(.system(size: 72))
-                .foregroundStyle(.red)
-                .symbolEffect(.pulse)
-            Text("Recording from \(source.label)")
-                .font(.headline)
-            Text(String(format: "%02d:%02d", Int(elapsed) / 60, Int(elapsed) % 60))
-                .font(.system(size: 32, weight: .light, design: .monospaced))
-            Button("Stop and Transcribe") {
-                model.stopRecordingAndTranscribe()
+        VStack(spacing: 16) {
+            HStack(spacing: 12) {
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 36))
+                    .foregroundStyle(model.liveVoiceActive ? .red : .secondary)
+                    .symbolEffect(.pulse, isActive: model.liveVoiceActive)
+                VStack(alignment: .leading) {
+                    Text("Recording from \(source.label)")
+                        .font(.headline)
+                    Text(String(format: "%02d:%02d", Int(elapsed) / 60, Int(elapsed) % 60))
+                        .font(.system(.title3, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button(stopButtonLabel) {
+                    model.stopRecordingAndTranscribe()
+                }
+                .controlSize(.large)
+                .keyboardShortcut(.return)
             }
-            .controlSize(.large)
-            .keyboardShortcut(.return)
+            .padding(.horizontal)
+            .padding(.top)
+
+            if isStreaming {
+                Divider()
+                LiveTranscriptView()
+            } else {
+                Spacer()
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
@@ -173,6 +191,39 @@ struct RecordingPane: View {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 250_000_000)
                 elapsed = Date().timeIntervalSince(startedAt)
+            }
+        }
+    }
+}
+
+struct LiveTranscriptView: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 6) {
+                    ForEach(model.liveSegments) { seg in
+                        Text(seg.text.trimmingCharacters(in: .whitespaces))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id(seg.id)
+                    }
+                    if !model.livePartialText.isEmpty {
+                        Text(model.livePartialText)
+                            .foregroundStyle(.secondary)
+                            .italic()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id("__partial")
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 24)
+            }
+            .onChange(of: model.liveSegments.count) { _, _ in
+                proxy.scrollTo("__partial", anchor: .bottom)
+            }
+            .onChange(of: model.livePartialText) { _, _ in
+                proxy.scrollTo("__partial", anchor: .bottom)
             }
         }
     }
