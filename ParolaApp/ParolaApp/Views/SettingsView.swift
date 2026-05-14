@@ -39,6 +39,12 @@ private struct GeneralTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section("Speakers") {
+                Toggle("Identify speakers", isOn: $model.diarize)
+                Text("Tags each segment with Speaker 1, Speaker 2, etc. Loads a second model on first use.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
     }

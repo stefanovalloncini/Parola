@@ -99,10 +99,17 @@ struct SegmentRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Text(timestamp(segment.start))
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(width: 64, alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(timestamp(segment.start))
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                if let speaker = segment.speaker {
+                    Text(speaker)
+                        .font(.caption2)
+                        .foregroundStyle(speakerColor(for: speaker))
+                }
+            }
+            .frame(width: 80, alignment: .leading)
 
             content
         }
@@ -159,6 +166,13 @@ struct SegmentRow: View {
             }
             return acc + piece
         }
+    }
+
+    private func speakerColor(for label: String) -> Color {
+        let palette: [Color] = [.blue, .orange, .purple, .pink, .teal, .indigo, .mint]
+        let digits = label.compactMap(\.wholeNumberValue)
+        let idx = (digits.first ?? 0) % palette.count
+        return palette[idx]
     }
 
     private func timestamp(_ s: Double) -> String {

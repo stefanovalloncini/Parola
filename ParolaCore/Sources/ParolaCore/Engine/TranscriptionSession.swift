@@ -10,6 +10,7 @@ public actor TranscriptionSession {
     public var idleTimeout: TimeInterval
 
     private let transcriber: WhisperKitTranscriber
+    private let diarizer = DiarizationService()
     private var idleTask: Task<Void, Never>?
 
     public init(modelStore: ModelStore = .shared, idleTimeout: TimeInterval = 60) {
@@ -36,7 +37,14 @@ public actor TranscriptionSession {
         cancelIdleTimer()
         try await transcriber.load(model: modelName)
         let audioURL = try await source.prepare()
-        let transcript = try await transcriber.transcribe(url: audioURL, options: options)
+        var transcript = try await transcriber.transcribe(url: audioURL, options: options)
+        if options.diarize {
+            transcript = try await diarizer.diarize(
+                transcript: transcript,
+                audioURL: audioURL,
+                numberOfSpeakers: options.expectedSpeakers
+            )
+        }
         scheduleIdleUnload()
         return transcript
     }
@@ -44,6 +52,7 @@ public actor TranscriptionSession {
     public func unloadModel() async {
         cancelIdleTimer()
         await transcriber.unload()
+        await diarizer.unload()
     }
 
     public func currentModel() async -> String? {

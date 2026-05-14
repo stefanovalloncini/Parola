@@ -42,6 +42,7 @@ final class AppModel: ObservableObject {
     @Published var useStreaming: Bool = true
     @Published var wordTimestamps: Bool = false
     @Published var initialPrompt: String = ""
+    @Published var diarize: Bool = false
 
     @Published var batchJobs: [BatchJob] = []
     @Published var selectedBatchJobID: BatchJob.ID?
@@ -177,7 +178,8 @@ final class AppModel: ObservableObject {
             language: selectedLanguage,
             task: task,
             wordTimestamps: wordTimestamps,
-            initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt
+            initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt,
+            diarize: diarize
         )
     }
 

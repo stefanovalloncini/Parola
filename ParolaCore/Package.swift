@@ -19,6 +19,7 @@ let package = Package(
             name: "ParolaCore",
             dependencies: [
                 .product(name: "WhisperKit", package: "WhisperKit"),
+                .product(name: "SpeakerKit", package: "WhisperKit"),
             ]
         ),
         .executableTarget(

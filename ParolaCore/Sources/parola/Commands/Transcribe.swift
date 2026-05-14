@@ -38,6 +38,12 @@ struct Transcribe: AsyncParsableCommand {
     @Option(name: .long, help: "Initial prompt: short text that biases the decoder toward specific words (proper nouns, jargon).")
     var prompt: String?
 
+    @Flag(name: .long, help: "Identify speakers and tag each segment (slower; loads a second model).")
+    var diarize: Bool = false
+
+    @Option(name: .long, help: "Hint for the diarizer: number of speakers in the audio. Omit to auto-detect.")
+    var speakers: Int?
+
     func run() async throws {
         guard !inputs.isEmpty else {
             throw ValidationError("At least one input file is required.")
@@ -57,7 +63,9 @@ struct Transcribe: AsyncParsableCommand {
             task: translate ? .translate : .transcribe,
             wordTimestamps: wordTimestamps,
             verbose: verbose,
-            initialPrompt: prompt
+            initialPrompt: prompt,
+            diarize: diarize,
+            expectedSpeakers: speakers
         )
 
         if urls.count == 1 {
