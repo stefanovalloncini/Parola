@@ -6,7 +6,11 @@ struct ParolaiOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView().environmentObject(model)
+            RootView()
+                .environmentObject(model)
+                .onOpenURL { url in
+                    Task { await model.handleIncoming(url: url) }
+                }
         }
     }
 }

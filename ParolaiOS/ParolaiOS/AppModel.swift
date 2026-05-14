@@ -54,3 +54,24 @@ final class AppModel: ObservableObject {
         }
     }
 }
+
+extension AppModel {
+    func handleIncoming(url: URL) async {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+
+        do {
+            if url.pathExtension.lowercased() == "parola" {
+                _ = try await library.adopt(parolaBundle: url)
+                refreshLibrary()
+            } else {
+                let copy = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("parola-incoming-\(UUID().uuidString)-\(url.lastPathComponent)")
+                try FileManager.default.copyItem(at: url, to: copy)
+                coordinator.startFileTranscription(at: copy)
+            }
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+}
