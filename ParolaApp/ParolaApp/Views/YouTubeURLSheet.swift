@@ -5,12 +5,12 @@ struct YouTubeURLSheet: View {
     @FocusState private var fieldFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             Text("Transcribe a YouTube video")
-                .font(.headline)
-            Text("Paste a YouTube URL. Parola downloads the audio via yt-dlp (`brew install yt-dlp` if it's missing).")
-                .foregroundStyle(.secondary)
-                .font(.callout)
+                .font(DS.Font.heading)
+            Text("Paste a URL. Parola downloads the audio with yt-dlp (run `brew install yt-dlp` if it's missing).")
+                .font(DS.Font.body)
+                .foregroundStyle(DS.Color.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
 
             TextField("https://www.youtube.com/watch?v=…", text: $model.youtubeURLDraft)
@@ -26,12 +26,14 @@ struct YouTubeURLSheet: View {
                 }
                 .keyboardShortcut(.cancelAction)
                 Button("Transcribe") { submit() }
+                    .buttonStyle(.borderedProminent)
+                    .tint(DS.Color.accent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(model.youtubeURLDraft.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
-        .padding(20)
-        .frame(width: 460)
+        .padding(DS.Spacing.large)
+        .frame(width: 480)
         .onAppear {
             if model.youtubeURLDraft.isEmpty, let clipboard = NSPasteboard.general.string(forType: .string),
                clipboard.hasPrefix("http"), clipboard.count < 200 {

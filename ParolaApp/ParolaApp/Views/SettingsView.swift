@@ -123,13 +123,21 @@ private struct ModelRow: View {
 
 private struct AboutTab: View {
     var body: some View {
-        VStack(spacing: 8) {
-            Text("Parola").font(.largeTitle).bold()
-            Text("Version \(Parola.version)").foregroundStyle(.secondary)
-            Text("Local speech-to-text on Apple Silicon, powered by WhisperKit.")
+        VStack(spacing: DS.Spacing.regular) {
+            Image(systemName: "waveform")
+                .font(.system(size: 48, weight: .light))
+                .foregroundStyle(DS.Color.accent)
+                .padding(.top, DS.Spacing.large)
+            Text("Parola")
+                .font(DS.Font.title)
+            Text("Version \(Parola.version)")
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.secondaryText)
+            Text("On-device speech-to-text for macOS, built on WhisperKit.")
+                .font(DS.Font.body)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .padding()
+                .foregroundStyle(DS.Color.secondaryText)
+                .padding(.horizontal, DS.Spacing.large)
             Spacer()
         }
         .padding()

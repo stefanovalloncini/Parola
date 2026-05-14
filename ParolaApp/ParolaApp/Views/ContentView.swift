@@ -141,18 +141,19 @@ struct ContentView: View {
 struct EmptyDropZone: View {
     @EnvironmentObject var model: AppModel
     var body: some View {
-        ZStack {
-            VStack(spacing: 12) {
-                Image(systemName: "waveform.badge.plus")
-                    .font(.system(size: 64))
-                    .foregroundStyle(.secondary)
-                Text("Drop an audio or video file here")
-                    .font(.title2)
-                Text("or use the toolbar to open a file or start recording.")
-                    .foregroundStyle(.secondary)
-            }
+        VStack(spacing: DS.Spacing.medium) {
+            Image(systemName: "waveform")
+                .font(.system(size: 56, weight: .light))
+                .foregroundStyle(DS.Color.secondaryText)
+            Text("Drop an audio or video file here")
+                .font(DS.Font.title)
+                .foregroundStyle(DS.Color.primaryText)
+            Text("Or use the toolbar to open a file, record, or paste a URL.")
+                .font(DS.Font.body)
+                .foregroundStyle(DS.Color.secondaryText)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(DS.Spacing.large)
     }
 }
 
@@ -162,19 +163,22 @@ struct ProgressPane: View {
     let title: String
     let progress: Double?
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: DS.Spacing.regular) {
             Text(title)
-                .font(.headline)
+                .font(DS.Font.heading)
+                .foregroundStyle(DS.Color.primaryText)
             if let progress {
                 ProgressView(value: progress)
                     .progressViewStyle(.linear)
+                    .tint(DS.Color.accent)
                     .frame(width: 280)
                 Text("\(Int(progress * 100))%")
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .font(DS.Font.captionMono)
+                    .foregroundStyle(DS.Color.secondaryText)
             } else {
                 ProgressView()
                     .progressViewStyle(.circular)
+                    .tint(DS.Color.accent)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -193,28 +197,31 @@ struct RecordingPane: View {
     private var stopButtonLabel: String { isStreaming ? "Finish" : "Stop and Transcribe" }
 
     var body: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 12) {
+        VStack(spacing: DS.Spacing.medium) {
+            HStack(spacing: DS.Spacing.regular) {
                 Image(systemName: "mic.fill")
-                    .font(.system(size: 36))
-                    .foregroundStyle(model.liveVoiceActive ? .red : .secondary)
+                    .font(.system(size: 28, weight: .regular))
+                    .foregroundStyle(model.liveVoiceActive ? DS.Color.accent : DS.Color.secondaryText)
                     .symbolEffect(.pulse, isActive: model.liveVoiceActive)
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: DS.Spacing.tight) {
                     Text("Recording from \(source.label)")
-                        .font(.headline)
+                        .font(DS.Font.heading)
                     Text(String(format: "%02d:%02d", Int(elapsed) / 60, Int(elapsed) % 60))
-                        .font(.system(.title3, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .font(DS.Font.timer)
+                        .foregroundStyle(DS.Color.secondaryText)
+                        .monospacedDigit()
                 }
                 Spacer()
                 Button(stopButtonLabel) {
                     model.stopRecordingAndTranscribe()
                 }
+                .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .tint(DS.Color.accent)
                 .keyboardShortcut(.return)
             }
-            .padding(.horizontal)
-            .padding(.top)
+            .padding(.horizontal, DS.Spacing.large)
+            .padding(.top, DS.Spacing.large)
 
             if isStreaming {
                 Divider()
@@ -240,22 +247,24 @@ struct LiveTranscriptView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 6) {
+                LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {
                     ForEach(model.liveSegments) { seg in
                         Text(seg.text.trimmingCharacters(in: .whitespaces))
+                            .font(DS.Font.transcript)
+                            .foregroundStyle(DS.Color.primaryText)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .id(seg.id)
                     }
                     if !model.livePartialText.isEmpty {
                         Text(model.livePartialText)
-                            .foregroundStyle(.secondary)
-                            .italic()
+                            .font(DS.Font.transcript)
+                            .foregroundStyle(DS.Color.secondaryText.opacity(0.7))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .id("__partial")
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 24)
+                .padding(.horizontal, DS.Spacing.large)
+                .padding(.bottom, DS.Spacing.large)
             }
             .onChange(of: model.liveSegments.count) { _, _ in
                 proxy.scrollTo("__partial", anchor: .bottom)
@@ -273,19 +282,21 @@ struct ErrorPane: View {
     let message: String
     @EnvironmentObject var model: AppModel
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(.red)
+        VStack(spacing: DS.Spacing.regular) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 40, weight: .regular))
+                .foregroundStyle(DS.Color.danger)
             Text("Something went wrong")
-                .font(.headline)
+                .font(DS.Font.heading)
             Text(message)
+                .font(DS.Font.body)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
                 .frame(maxWidth: 480)
             Button("Try again") { model.phase = .idle }
+                .buttonStyle(.bordered)
         }
-        .padding()
+        .padding(DS.Spacing.large)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

@@ -98,24 +98,25 @@ struct SegmentRow: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(alignment: .top, spacing: DS.Spacing.regular) {
+            VStack(alignment: .leading, spacing: DS.Spacing.tight) {
                 Text(timestamp(segment.start))
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .font(DS.Font.captionMono)
+                    .foregroundStyle(DS.Color.secondaryText)
                 if let speaker = segment.speaker {
                     Text(speaker)
-                        .font(.caption2)
+                        .font(DS.Font.caption)
                         .foregroundStyle(speakerColor(for: speaker))
                 }
             }
-            .frame(width: 80, alignment: .leading)
+            .frame(width: 88, alignment: .leading)
 
             content
+                .font(DS.Font.transcript)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(isCurrent ? Color.accentColor.opacity(0.18) : Color.clear)
+        .padding(.horizontal, DS.Spacing.medium)
+        .padding(.vertical, DS.Spacing.small)
+        .background(isCurrent ? DS.Color.accent.opacity(0.12) : Color.clear)
         .contentShape(Rectangle())
     }
 
@@ -169,10 +170,7 @@ struct SegmentRow: View {
     }
 
     private func speakerColor(for label: String) -> Color {
-        let palette: [Color] = [.blue, .orange, .purple, .pink, .teal, .indigo, .mint]
-        let digits = label.compactMap(\.wholeNumberValue)
-        let idx = (digits.first ?? 0) % palette.count
-        return palette[idx]
+        DS.speakerColor(for: label)
     }
 
     private func timestamp(_ s: Double) -> String {
