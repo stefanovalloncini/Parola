@@ -520,6 +520,34 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: - Burn subtitles into video
+
+    func burnSubtitlesIntoVideo() {
+        guard let transcript else { return }
+
+        let open = NSOpenPanel()
+        open.allowedContentTypes = [.movie, .mpeg4Movie, .quickTimeMovie]
+        open.allowsMultipleSelection = false
+        open.message = "Pick the video to burn subtitles into."
+        guard open.runModal() == .OK, let videoURL = open.url else { return }
+
+        let save = NSSavePanel()
+        save.allowedContentTypes = [.mpeg4Movie]
+        save.nameFieldStringValue = videoURL.deletingPathExtension().lastPathComponent + " (captioned).mp4"
+        guard save.runModal() == .OK, let outputURL = save.url else { return }
+
+        let snapshot = transcript
+        phase = .transcribing(file: outputURL)
+        Task {
+            do {
+                try await SubtitleBurner.burn(transcript: snapshot, video: videoURL, to: outputURL)
+                phase = .ready
+            } catch {
+                phase = .failed(message: "Burn failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
     // MARK: - Export
 
     func exportRequest(_ format: ExportFormat) {
