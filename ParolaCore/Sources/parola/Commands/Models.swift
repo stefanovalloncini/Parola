@@ -61,8 +61,8 @@ struct Models: AsyncParsableCommand {
             }
             stderr("Downloading \(name)…")
             let progress = ProgressReporter(label: name)
+            defer { progress.finish() }
             let url = try await store.download(variant: name, progress: { p in progress.update(p) })
-            progress.finish()
             print("Installed at \(url.path)")
         }
     }

@@ -31,14 +31,19 @@ public actor TranscriptionSession {
         downloadProgress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> Transcript {
         let modelName = options.model ?? "openai_whisper-tiny"
+        try Task.checkCancellation()
         if !modelStore.isInstalled(modelName) {
             _ = try await modelStore.download(variant: modelName, progress: downloadProgress)
         }
+        try Task.checkCancellation()
         cancelIdleTimer()
         try await transcriber.load(model: modelName)
+        try Task.checkCancellation()
         let audioURL = try await source.prepare()
+        try Task.checkCancellation()
         var transcript = try await transcriber.transcribe(url: audioURL, options: options)
         if options.diarize {
+            try Task.checkCancellation()
             transcript = try await diarizer.diarize(
                 transcript: transcript,
                 audioURL: audioURL,
@@ -63,7 +68,7 @@ public actor TranscriptionSession {
         cancelIdleTimer()
         let timeout = idleTimeout
         idleTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            try? await Task.sleep(for: .seconds(timeout))
             guard !Task.isCancelled else { return }
             await self?.transcriber.unload()
         }

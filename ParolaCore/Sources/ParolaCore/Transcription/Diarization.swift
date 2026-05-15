@@ -70,17 +70,6 @@ public actor DiarizationService {
             }
             seg.speaker = label(for: speaker)
 
-            if var words = seg.words {
-                for j in words.indices {
-                    if let w = dominantSpeaker(in: diarization.segments, start: words[j].start, end: words[j].end) {
-                        // Carry the per-word speaker as a tag on the WordTiming.word so existing
-                        // value type stays public-friendly without growing a new field.
-                        _ = w  // SpeakerSegment per word matched; could be exposed later.
-                    }
-                }
-                seg.words = words
-            }
-
             out.segments[i] = seg
         }
         return out

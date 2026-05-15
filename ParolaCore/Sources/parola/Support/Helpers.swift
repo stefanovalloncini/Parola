@@ -23,33 +23,36 @@ extension JSONEncoder {
     }
 }
 
-/// Renders a simple progress bar to stderr. Safe to call from any thread.
-final class ProgressReporter: @unchecked Sendable {
+/// Renders a simple progress bar to stderr. Drops repeated percents.
+actor ProgressReporter {
     private let label: String
-    private let queue = DispatchQueue(label: "com.parola.progress")
     private var lastPercent: Int = -1
     private var finished = false
 
     init(label: String) { self.label = label }
 
-    func update(_ fraction: Double) {
-        queue.async {
-            guard !self.finished else { return }
-            let pct = max(0, min(100, Int(fraction * 100)))
-            guard pct != self.lastPercent else { return }
-            self.lastPercent = pct
-            let bars = pct / 5
-            let bar = String(repeating: "█", count: bars) + String(repeating: "·", count: 20 - bars)
-            FileHandle.standardError.write(Data("\r\(self.label) [\(bar)] \(pct)%".utf8))
-        }
+    nonisolated func update(_ fraction: Double) {
+        Task { await self.write(fraction) }
     }
 
-    func finish() {
-        queue.sync {
-            guard !self.finished else { return }
-            self.finished = true
-            FileHandle.standardError.write(Data("\n".utf8))
-        }
+    private func write(_ fraction: Double) {
+        guard !finished else { return }
+        let pct = max(0, min(100, Int(fraction * 100)))
+        guard pct != lastPercent else { return }
+        lastPercent = pct
+        let bars = pct / 5
+        let bar = String(repeating: "█", count: bars) + String(repeating: "·", count: 20 - bars)
+        FileHandle.standardError.write(Data("\r\(label) [\(bar)] \(pct)%".utf8))
+    }
+
+    nonisolated func finish() {
+        Task { await self.finalize() }
+    }
+
+    private func finalize() {
+        guard !finished else { return }
+        finished = true
+        FileHandle.standardError.write(Data("\n".utf8))
     }
 }
 

@@ -16,8 +16,9 @@ struct ContentView: View {
 
             content
         }
-        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-            handleDrop(providers: providers)
+        .dropDestination(for: URL.self) { urls, _ in
+            handleDroppedURLs(urls)
+            return !urls.isEmpty
         }
         .onChange(of: model.pendingExport) { _, format in
             if let format {
@@ -108,52 +109,25 @@ struct ContentView: View {
         }
     }
 
-    private func handleDrop(providers: [NSItemProvider]) -> Bool {
-        guard !providers.isEmpty else { return false }
-        Task { @MainActor in
-            let urls = await loadURLs(from: providers)
-            guard !urls.isEmpty else { return }
-            if urls.count == 1 {
-                model.transcribe(fileURL: urls[0])
-            } else {
-                model.startBatch(urls: urls)
-            }
+    private func handleDroppedURLs(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        if urls.count == 1 {
+            model.transcribe(fileURL: urls[0])
+        } else {
+            model.startBatch(urls: urls)
         }
-        return true
-    }
-
-    private func loadURLs(from providers: [NSItemProvider]) async -> [URL] {
-        var collected: [URL] = []
-        for provider in providers {
-            let url: URL? = await withCheckedContinuation { (cont: CheckedContinuation<URL?, Never>) in
-                _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                    cont.resume(returning: url)
-                }
-            }
-            if let url { collected.append(url) }
-        }
-        return collected
     }
 }
 
 // MARK: - Empty state
 
 struct EmptyDropZone: View {
-    @EnvironmentObject var model: AppModel
     var body: some View {
-        VStack(spacing: DS.Spacing.medium) {
-            Image(systemName: "waveform")
-                .font(.system(size: 56, weight: .light))
-                .foregroundStyle(DS.Color.secondaryText)
-            Text("Drop an audio or video file here")
-                .font(DS.Font.title)
-                .foregroundStyle(DS.Color.primaryText)
-            Text("Or use the toolbar to open a file, record, or paste a URL.")
-                .font(DS.Font.body)
-                .foregroundStyle(DS.Color.secondaryText)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(DS.Spacing.large)
+        ContentUnavailableView(
+            "Drop an audio or video file",
+            systemImage: "waveform",
+            description: Text("Or use the toolbar to open a file, record, or paste a URL.")
+        )
     }
 }
 
@@ -190,7 +164,6 @@ struct ProgressPane: View {
 struct RecordingPane: View {
     let source: AppModel.RecordSource
     @EnvironmentObject var model: AppModel
-    @State private var elapsed: Double = 0
     @State private var startedAt: Date = Date()
 
     private var isStreaming: Bool { source == .microphone && model.useStreaming }
@@ -206,10 +179,7 @@ struct RecordingPane: View {
                 VStack(alignment: .leading, spacing: DS.Spacing.tight) {
                     Text("Recording from \(source.label)")
                         .font(DS.Font.heading)
-                    Text(String(format: "%02d:%02d", Int(elapsed) / 60, Int(elapsed) % 60))
-                        .font(DS.Font.timer)
-                        .foregroundStyle(DS.Color.secondaryText)
-                        .monospacedDigit()
+                    ElapsedTimer(startedAt: startedAt)
                 }
                 Spacer()
                 Button(stopButtonLabel) {
@@ -231,12 +201,19 @@ struct RecordingPane: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task {
-            startedAt = Date()
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 250_000_000)
-                elapsed = Date().timeIntervalSince(startedAt)
-            }
+        .onAppear { startedAt = Date() }
+    }
+}
+
+private struct ElapsedTimer: View {
+    let startedAt: Date
+    var body: some View {
+        TimelineView(.periodic(from: startedAt, by: 1)) { context in
+            let elapsed = Int(context.date.timeIntervalSince(startedAt))
+            Text(String(format: "%02d:%02d", elapsed / 60, elapsed % 60))
+                .font(DS.Font.timer)
+                .foregroundStyle(DS.Color.secondaryText)
+                .monospacedDigit()
         }
     }
 }
@@ -282,21 +259,13 @@ struct ErrorPane: View {
     let message: String
     @EnvironmentObject var model: AppModel
     var body: some View {
-        VStack(spacing: DS.Spacing.regular) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 40, weight: .regular))
-                .foregroundStyle(DS.Color.danger)
-            Text("Something went wrong")
-                .font(DS.Font.heading)
+        ContentUnavailableView {
+            Label("Something went wrong", systemImage: "exclamationmark.triangle")
+        } description: {
             Text(message)
-                .font(DS.Font.body)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(DS.Color.secondaryText)
-                .frame(maxWidth: 480)
-            Button("Try again") { model.phase = .idle }
+        } actions: {
+            Button("Try again") { model.dismissError() }
                 .buttonStyle(.bordered)
         }
-        .padding(DS.Spacing.large)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

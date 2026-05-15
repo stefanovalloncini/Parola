@@ -39,7 +39,7 @@ public struct SrtExporter: TranscriptExporter {
 
     static func srtTimestamp(_ seconds: Double) -> String {
         let clamped = max(0, seconds)
-        let total = Int(clamped * 1000)
+        let total = Int((clamped * 1000).rounded())
         let ms = total % 1000
         let s = (total / 1000) % 60
         let m = (total / 60_000) % 60
@@ -62,7 +62,7 @@ public struct VttExporter: TranscriptExporter {
 
     static func vttTimestamp(_ seconds: Double) -> String {
         let clamped = max(0, seconds)
-        let total = Int(clamped * 1000)
+        let total = Int((clamped * 1000).rounded())
         let ms = total % 1000
         let s = (total / 1000) % 60
         let m = (total / 60_000) % 60

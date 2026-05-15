@@ -32,12 +32,15 @@ struct Burn: AsyncParsableCommand {
         let style = SubtitleBurner.Style(fontName: font, fontSize: CGFloat(fontSize))
 
         let transcript: Transcript
-        if let srtPath = srt {
+        switch (srt, parola) {
+        case (let srtPath?, nil):
             transcript = try SrtImporter.parse(contentsOf: URL(fileURLWithPath: srtPath))
-        } else if let parolaPath = parola {
+        case (nil, let parolaPath?):
             transcript = try ParolaDocument.read(at: URL(fileURLWithPath: parolaPath)).transcript
-        } else {
+        case (nil, nil):
             throw ValidationError("Pass either --srt <path> or --parola <bundle>.")
+        case (_?, _?):
+            throw ValidationError("Pass --srt OR --parola, not both.")
         }
 
         try await SubtitleBurner.burn(transcript: transcript, video: videoURL, to: outputURL, style: style)

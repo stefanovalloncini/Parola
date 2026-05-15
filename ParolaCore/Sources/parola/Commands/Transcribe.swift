@@ -60,7 +60,7 @@ struct Transcribe: AsyncParsableCommand {
 
         let resolved = try inputs.map(Self.resolveInput)
         if resolved.count > 1, resolved.contains(where: { $0.isURL }) {
-            throw ValidationError("Batch mode doesn't support URLs yet. Pass URLs one at a time.")
+            throw ValidationError("Batch mode doesn't support URLs. Pass URLs one at a time.")
         }
 
         let opts = TranscriptionOptions(

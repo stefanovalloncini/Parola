@@ -130,15 +130,17 @@ struct Record: AsyncParsableCommand {
                 case .failed(let msg):
                     stderr("\nerror: \(msg)")
                 case .finished(let transcript):
-                    // Stdout already received the live txt; only render the final transcript
-                    // when we owe the user a non-txt format or a file.
                     let owesFinalRender = format != .txt || output != nil
                     guard owesFinalRender else { break }
-                    let rendered = (try? Exporters.exporter(for: format).render(transcript)) ?? ""
-                    if let output {
-                        try? rendered.write(to: URL(fileURLWithPath: output), atomically: true, encoding: .utf8)
-                    } else {
-                        print(rendered)
+                    do {
+                        let rendered = try Exporters.exporter(for: format).render(transcript)
+                        if let output {
+                            try rendered.write(to: URL(fileURLWithPath: output), atomically: true, encoding: .utf8)
+                        } else {
+                            print(rendered)
+                        }
+                    } catch {
+                        stderr("error: failed to write output — \(error.localizedDescription)")
                     }
                 }
             }

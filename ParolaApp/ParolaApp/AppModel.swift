@@ -39,25 +39,31 @@ final class AppModel: ObservableObject {
     @Published var liveSegments: [TranscriptSegment] = []
     @Published var livePartialText: String = ""
     @Published var liveVoiceActive: Bool = false
-    @Published var useStreaming: Bool = true
-    @Published var wordTimestamps: Bool = false
-    @Published var initialPrompt: String = ""
-    @Published var diarize: Bool = false
+    @AppStorage("useStreaming") var useStreaming: Bool = true
+    @AppStorage("wordTimestamps") var wordTimestamps: Bool = false
+    @AppStorage("initialPrompt") var initialPrompt: String = ""
+    @AppStorage("diarize") var diarize: Bool = false
 
     @Published var batchJobs: [BatchJob] = []
     @Published var selectedBatchJobID: BatchJob.ID?
     private var batchTask: Task<Void, Never>?
 
     @Published var findIsOpen: Bool = false
-    @Published var findQuery: String = "" { didSet { recomputeMatches() } }
-    @Published var findCaseSensitive: Bool = false { didSet { recomputeMatches() } }
+    @Published var findQuery: String = "" { didSet { scheduleRecomputeMatches() } }
+    @Published var findCaseSensitive: Bool = false { didSet { scheduleRecomputeMatches() } }
     @Published var findReplacement: String = ""
     @Published var matches: [TranscriptMatch] = []
     @Published var currentMatchIndex: Int = 0
+    private var matchesDebounce: Task<Void, Never>?
 
-    @Published var selectedModel: String = "openai_whisper-tiny"
-    @Published var selectedLanguage: String? = nil
+    @AppStorage("selectedModel") var selectedModel: String = "openai_whisper-tiny"
+    @AppStorage("selectedLanguageRaw") private var selectedLanguageRaw: String = ""
     @Published var translate: Bool = false
+
+    var selectedLanguage: String? {
+        get { selectedLanguageRaw.isEmpty ? nil : selectedLanguageRaw }
+        set { selectedLanguageRaw = newValue ?? "" }
+    }
 
     @Published var availableModels: [ModelInfo] = []
     @Published var sourceFileURL: URL?
@@ -307,6 +313,10 @@ final class AppModel: ObservableObject {
         selectedBatchJobID = nil
     }
 
+    func dismissError() {
+        phase = .idle
+    }
+
     // MARK: - Recording
 
     func startRecording(source: RecordSource) {
@@ -412,13 +422,19 @@ final class AppModel: ObservableObject {
     // MARK: - Player & seek
 
     private func installPlayer(for url: URL) {
-        if let obs = playerTimeObserver { player?.removeTimeObserver(obs) }
+        if let obs = playerTimeObserver, let player {
+            player.removeTimeObserver(obs)
+        }
+        player?.pause()
+        playerTimeObserver = nil
         let p = AVPlayer(url: url)
         player = p
         let interval = CMTime(seconds: 0.2, preferredTimescale: 600)
         playerTimeObserver = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             let seconds = CMTimeGetSeconds(time)
-            Task { @MainActor in self?.updateCurrentSegment(time: seconds) }
+            MainActor.assumeIsolated {
+                self?.updateCurrentSegment(time: seconds)
+            }
         }
     }
 
@@ -448,7 +464,7 @@ final class AppModel: ObservableObject {
         guard let idx = t.segments.firstIndex(where: { $0.id == id }) else { return }
         t.segments[idx].text = newText
         transcript = t
-        recomputeMatches()
+        if findIsOpen { scheduleRecomputeMatches() }
     }
 
     // MARK: - Find & replace
@@ -462,8 +478,17 @@ final class AppModel: ObservableObject {
         }
     }
 
+    private func scheduleRecomputeMatches() {
+        matchesDebounce?.cancel()
+        matchesDebounce = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled else { return }
+            self?.recomputeMatches()
+        }
+    }
+
     private func recomputeMatches() {
-        guard let transcript else {
+        guard findIsOpen, let transcript else {
             matches = []
             currentMatchIndex = 0
             return
@@ -544,21 +569,27 @@ final class AppModel: ObservableObject {
 
     @Published var isSummarising: Bool = false
     @Published var summaryError: String?
+    private var summaryGeneration: Int = 0
 
     func summariseTranscript() {
         guard let transcript, !isSummarising else { return }
         isSummarising = true
         summaryError = nil
-        Task { @MainActor in
+        summaryGeneration &+= 1
+        let generation = summaryGeneration
+        let snapshot = transcript
+        Task {
             do {
-                let summary = try await SummaryService().summarise(transcript)
-                var updated = self.transcript
-                updated?.summary = summary
-                self.transcript = updated
+                let summary = try await SummaryService().summarise(snapshot)
+                guard generation == summaryGeneration else { return }
+                self.transcript?.summary = summary
             } catch {
+                guard generation == summaryGeneration else { return }
                 summaryError = error.localizedDescription
             }
-            isSummarising = false
+            if generation == summaryGeneration {
+                isSummarising = false
+            }
         }
     }
 

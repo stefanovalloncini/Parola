@@ -142,6 +142,10 @@ public actor StreamingTranscriptionSession {
 // MARK: - State → event translator
 
 /// Adapts AudioStreamTranscriber's coarse state-diff callback into our finer-grained events.
+///
+/// Unchecked Sendable: WhisperKit's `AudioStreamTranscriber` delivers state callbacks serially
+/// from its own internal queue, so the mutable state inside this sink is touched by one thread
+/// at a time even without explicit locking.
 private final class EventSink: @unchecked Sendable {
     let continuation: AsyncStream<StreamingEvent>.Continuation
     var onConfirmed: (@Sendable ([TranscriptionSegment]) -> Void)?

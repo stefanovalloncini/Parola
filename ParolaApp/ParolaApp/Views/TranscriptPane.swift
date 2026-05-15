@@ -82,7 +82,7 @@ struct TranscriptPane: View {
                     Text("Model: \(t.modelName)")
                     Text("\(t.segments.count) segments")
                     if let d = t.durationSeconds {
-                        Text(String(format: "Duration: %.1fs", d))
+                        Text("Duration: \(Duration.seconds(d).formatted(.time(pattern: .hourMinuteSecond)))")
                     }
                 }
                 .font(.callout)
@@ -183,14 +183,17 @@ struct SegmentRow: View {
     }
 
     private func karaoke(words: [WordTiming]) -> Text {
-        words.reduce(Text("")) { acc, word in
-            let highlighted = word.id == model.currentWordID
-            var piece = Text(word.word + " ")
-            if highlighted {
-                piece = piece.bold().foregroundColor(.accentColor)
+        var attr = AttributedString()
+        let activeID = model.currentWordID
+        for word in words {
+            var piece = AttributedString(word.word + " ")
+            if word.id == activeID {
+                piece.foregroundColor = .accentColor
+                piece.font = .body.bold()
             }
-            return acc + piece
+            attr.append(piece)
         }
+        return Text(attr)
     }
 
     private func speakerColor(for label: String) -> Color {
@@ -198,11 +201,8 @@ struct SegmentRow: View {
     }
 
     private func timestamp(_ s: Double) -> String {
-        let total = Int(s)
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let sec = total % 60
-        if h > 0 { return String(format: "%d:%02d:%02d", h, m, sec) }
-        return String(format: "%d:%02d", m, sec)
+        Duration.seconds(s).formatted(
+            .time(pattern: s >= 3600 ? .hourMinuteSecond : .minuteSecond)
+        )
     }
 }
