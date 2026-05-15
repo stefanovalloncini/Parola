@@ -4,6 +4,7 @@ import ParolaCore
 struct TranscriptDetailView: View {
     let entryID: LibraryEntry.ID
     @EnvironmentObject var model: AppModel
+    @Environment(PlaybackController.self) private var playback
     @State private var loaded: LoadedEntry?
     @State private var loadError: String?
 
@@ -29,7 +30,7 @@ struct TranscriptDetailView: View {
             do {
                 let result = try await model.library.load(entryID)
                 loaded = result
-                model.playback.load(
+                playback.load(
                     audioURL: result.document.audioURL,
                     transcript: result.document.transcript
                 )
@@ -37,13 +38,13 @@ struct TranscriptDetailView: View {
                 loadError = error.localizedDescription
             }
         }
-        .onDisappear { model.playback.pause() }
+        .onDisappear { playback.pause() }
     }
 }
 
 private struct TranscriptScrollView: View {
     let loaded: LoadedEntry
-    @EnvironmentObject var model: AppModel
+    @Environment(PlaybackController.self) private var playback
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -52,15 +53,15 @@ private struct TranscriptScrollView: View {
                     ForEach(loaded.document.transcript.segments) { segment in
                         SegmentView(
                             segment: segment,
-                            activeSegmentID: model.playback.currentSegmentID,
-                            activeWordID: model.playback.currentWordID
+                            activeSegmentID: playback.currentSegmentID,
+                            activeWordID: playback.currentWordID
                         )
                         .id(segment.id)
                     }
                 }
                 .padding()
             }
-            .onChange(of: model.playback.currentSegmentID) { _, id in
+            .onChange(of: playback.currentSegmentID) { _, id in
                 guard let id else { return }
                 withAnimation(.easeInOut(duration: 0.2)) {
                     proxy.scrollTo(id, anchor: .center)
@@ -107,11 +108,11 @@ private struct SegmentTextView: View {
     let text: String
     let start: Double
     let isActive: Bool
-    @EnvironmentObject var model: AppModel
+    @Environment(PlaybackController.self) private var playback
 
     var body: some View {
         Text(text.trimmingCharacters(in: .whitespaces))
-            .onTapGesture { model.playback.seek(to: start) }
+            .onTapGesture { playback.seek(to: start) }
             .padding(6)
             .background(isActive ? Color.accentColor.opacity(0.15) : .clear)
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
@@ -134,7 +135,7 @@ private struct WordsView: View {
 private struct WordChip: View, Equatable {
     let word: WordTiming
     let isActive: Bool
-    @EnvironmentObject var model: AppModel
+    @Environment(PlaybackController.self) private var playback
 
     nonisolated static func == (lhs: WordChip, rhs: WordChip) -> Bool {
         lhs.word.id == rhs.word.id && lhs.isActive == rhs.isActive
@@ -145,7 +146,7 @@ private struct WordChip: View, Equatable {
             .padding(.horizontal, 4).padding(.vertical, 2)
             .background(isActive ? Color.accentColor.opacity(0.35) : .clear)
             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-            .onTapGesture { model.playback.seek(to: word.start) }
+            .onTapGesture { playback.seek(to: word.start) }
     }
 }
 

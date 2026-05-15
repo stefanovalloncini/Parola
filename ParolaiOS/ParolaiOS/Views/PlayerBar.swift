@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PlayerBar: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(PlaybackController.self) private var playback
     @State private var scrubValue: Double = 0
     @State private var isScrubbing = false
 
@@ -9,34 +9,34 @@ struct PlayerBar: View {
         VStack(spacing: 8) {
             Slider(
                 value: Binding(
-                    get: { isScrubbing ? scrubValue : model.playback.currentTime },
+                    get: { isScrubbing ? scrubValue : playback.currentTime },
                     set: { scrubValue = $0 }
                 ),
-                in: 0...max(model.playback.duration, 0.01),
+                in: 0...max(playback.duration, 0.01),
                 onEditingChanged: { editing in
                     if editing {
-                        scrubValue = model.playback.currentTime
+                        scrubValue = playback.currentTime
                         isScrubbing = true
                     } else {
-                        model.playback.seek(to: scrubValue)
+                        playback.seek(to: scrubValue)
                         isScrubbing = false
                     }
                 }
             )
 
             HStack {
-                Text(format(model.playback.currentTime))
+                Text(format(playback.currentTime))
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button {
-                    model.playback.toggle()
+                    playback.toggle()
                 } label: {
-                    Image(systemName: model.playback.isPlaying ? "pause.fill" : "play.fill")
+                    Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                         .font(.title)
                 }
                 Spacer()
-                Text(format(model.playback.duration))
+                Text(format(playback.duration))
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }

@@ -4,16 +4,17 @@ import AVFoundation
 import ParolaCore
 
 @MainActor
-final class PlaybackController: ObservableObject {
-    @Published private(set) var currentTime: TimeInterval = 0
-    @Published private(set) var isPlaying = false
-    @Published private(set) var duration: TimeInterval = 0
-    @Published private(set) var index: TranscriptIndex?
-    @Published private(set) var currentSegmentID: TranscriptSegment.ID?
-    @Published private(set) var currentWordID: WordTiming.ID?
+@Observable
+final class PlaybackController {
+    private(set) var currentTime: TimeInterval = 0
+    private(set) var isPlaying = false
+    private(set) var duration: TimeInterval = 0
+    private(set) var index: TranscriptIndex?
+    private(set) var currentSegmentID: TranscriptSegment.ID?
+    private(set) var currentWordID: WordTiming.ID?
 
-    private var player: AVPlayer?
-    private var timeObserver: Any?
+    @ObservationIgnored private var player: AVPlayer?
+    @ObservationIgnored private var timeObserver: Any?
 
     func load(audioURL: URL, transcript: Transcript) {
         tearDown()

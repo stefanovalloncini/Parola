@@ -42,7 +42,9 @@ public enum YouTubeSubsFetcher {
         do { try process.run() } catch {
             throw ParolaError.captureUnavailable("Could not launch yt-dlp: \(error.localizedDescription)")
         }
-        process.waitUntilExit()
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            process.terminationHandler = { _ in cont.resume() }
+        }
 
         if process.terminationStatus != 0 {
             let errData = stderr.fileHandleForReading.readDataToEndOfFile()

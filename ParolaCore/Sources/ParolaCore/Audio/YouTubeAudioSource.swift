@@ -78,7 +78,7 @@ public final class YouTubeAudioSource: AudioSource, @unchecked Sendable {
             throw ParolaError.captureUnavailable("Could not launch yt-dlp: \(error.localizedDescription)")
         }
 
-        process.waitUntilExit()
+        await Self.waitForExit(process)
 
         let outData = stdout.fileHandleForReading.readDataToEndOfFile()
         let errData = stderr.fileHandleForReading.readDataToEndOfFile()
@@ -94,6 +94,12 @@ public final class YouTubeAudioSource: AudioSource, @unchecked Sendable {
             throw ParolaError.captureUnavailable("yt-dlp didn't report a usable file path.")
         }
         return URL(fileURLWithPath: path)
+    }
+
+    private static func waitForExit(_ process: Process) async {
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            process.terminationHandler = { _ in cont.resume() }
+        }
     }
 
     private static func findYtDlp() -> String? {

@@ -8,6 +8,7 @@ struct ParolaiOSApp: App {
         WindowGroup {
             AppRoot()
                 .environmentObject(model)
+                .environment(model.playback)
         }
     }
 }
