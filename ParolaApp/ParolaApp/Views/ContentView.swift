@@ -244,11 +244,19 @@ struct LiveTranscriptView: View {
                 .padding(.bottom, DS.Spacing.large)
             }
             .onChange(of: model.liveSegments.count) { _, _ in
-                proxy.scrollTo("__partial", anchor: .bottom)
+                scrollToTail(proxy)
             }
             .onChange(of: model.livePartialText) { _, _ in
-                proxy.scrollTo("__partial", anchor: .bottom)
+                scrollToTail(proxy)
             }
+        }
+    }
+
+    private func scrollToTail(_ proxy: ScrollViewProxy) {
+        if !model.livePartialText.isEmpty {
+            proxy.scrollTo("__partial", anchor: .bottom)
+        } else if let last = model.liveSegments.last {
+            proxy.scrollTo(last.id, anchor: .bottom)
         }
     }
 }

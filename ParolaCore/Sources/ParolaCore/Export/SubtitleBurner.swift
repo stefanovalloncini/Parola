@@ -107,16 +107,13 @@ public enum SubtitleBurner {
         guard let export = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
             throw ParolaError.ioError("Could not create AVAssetExportSession")
         }
-        export.outputURL = output
-        export.outputFileType = .mp4
         export.videoComposition = videoComposition
         export.shouldOptimizeForNetworkUse = true
 
-        await export.export()
-
-        if export.status != .completed {
-            let detail = export.error?.localizedDescription ?? "status=\(export.status.rawValue)"
-            throw ParolaError.ioError("Export failed: \(detail)")
+        do {
+            try await export.export(to: output, as: .mp4)
+        } catch {
+            throw ParolaError.ioError("Export failed: \(error.localizedDescription)")
         }
     }
 
