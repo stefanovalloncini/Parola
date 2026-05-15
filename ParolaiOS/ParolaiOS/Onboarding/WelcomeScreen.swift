@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct WelcomeScreen: View {
+    var isActive: Bool = true
     let onContinue: () -> Void
 
     var body: some View {
@@ -13,7 +14,7 @@ struct WelcomeScreen: View {
             ],
             primaryTitle: "onboarding.welcome.cta",
             primaryAction: onContinue,
-            hero: { AnimatedWaveformView() }
+            hero: { AnimatedWaveformView(isActive: isActive) }
         )
     }
 }

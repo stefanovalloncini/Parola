@@ -1,16 +1,13 @@
 import SwiftUI
 
 struct AnimatedWaveformView: View {
+    var isActive: Bool = true
     private let barCount = 28
-    private let seeds: [Double]
-
-    init() {
-        self.seeds = (0..<28).map { _ in Double.random(in: 0...1) }
-    }
+    @State private var seeds: [Double] = (0..<28).map { _ in .random(in: 0...1) }
 
     var body: some View {
         GeometryReader { proxy in
-            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: false)) { context in
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive)) { context in
                 let t = context.date.timeIntervalSinceReferenceDate
                 Canvas { canvas, size in
                     draw(into: canvas, size: size, time: t)

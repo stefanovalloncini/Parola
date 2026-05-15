@@ -60,7 +60,7 @@ struct ModelPickScreen: View {
 
     private func startDownload(for variant: String) {
         guard !ModelStore.shared.isInstalled(variant) else { return }
-        Task.detached(priority: .utility) {
+        Task {
             _ = try? await ModelStore.shared.download(variant: variant)
         }
     }

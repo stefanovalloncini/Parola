@@ -8,7 +8,7 @@ struct LibraryEntry: Identifiable, Hashable, Sendable {
 
     var title: String {
         if !manifest.originalAudioName.isEmpty { return manifest.originalAudioName }
-        return "Recording"
+        return String(localized: "library.fallback.title")
     }
 
     var createdAt: Date { manifest.createdAt }

@@ -449,6 +449,111 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose an entry from the sidebar, or tap + to make a new one." } },
         "it" : { "stringUnit" : { "state" : "translated", "value" : "Scegli una voce dalla barra laterale o tocca + per crearne una nuova." } }
       }
+    },
+    "settings.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Settings" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Impostazioni" } }
+      }
+    },
+    "settings.section.activeModel" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Active model" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Modello attivo" } }
+      }
+    },
+    "settings.model" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Model" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Modello" } }
+      }
+    },
+    "settings.language" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Language" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Lingua" } }
+      }
+    },
+    "settings.translate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Translate to English" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Traduci in inglese" } }
+      }
+    },
+    "settings.wordTimestamps" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Word timestamps" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Timestamp delle parole" } }
+      }
+    },
+    "settings.wordTimestamps.footer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Needed for the playback highlight." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Serve per evidenziare le parole durante la riproduzione." } }
+      }
+    },
+    "settings.vocabulary.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Custom vocabulary" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Vocabolario personalizzato" } }
+      }
+    },
+    "settings.vocabulary.placeholder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Names or jargon, comma-separated" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Nomi o gergo, separati da virgola" } }
+      }
+    },
+    "settings.modelsOnDevice" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Models on device" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Modelli sul dispositivo" } }
+      }
+    },
+    "settings.showWelcomeAgain" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show welcome screens again" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Mostra di nuovo le schermate di benvenuto" } }
+      }
+    },
+    "settings.showWelcomeAgain.confirm" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show welcome screens again?" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Mostrare di nuovo le schermate di benvenuto?" } }
+      }
+    },
+    "settings.about" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Parola — on-device speech-to-text." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Parola — riconoscimento vocale sul dispositivo." } }
+      }
+    },
+    "library.fallback.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recording" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Registrazione" } }
+      }
+    },
+    "library.notfound" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Library entry not found." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Voce della libreria non trovata." } }
+      }
     }
   }
 }

@@ -8,9 +8,9 @@ struct PlayerBar: View {
     var body: some View {
         VStack(spacing: 8) {
             Slider(
-                value: isScrubbing ? $scrubValue : Binding(
-                    get: { model.playback.currentTime },
-                    set: { _ in }
+                value: Binding(
+                    get: { isScrubbing ? scrubValue : model.playback.currentTime },
+                    set: { scrubValue = $0 }
                 ),
                 in: 0...max(model.playback.duration, 0.01),
                 onEditingChanged: { editing in
@@ -48,11 +48,9 @@ struct PlayerBar: View {
 
     private func format(_ s: TimeInterval) -> String {
         guard s.isFinite, s >= 0 else { return "0:00" }
-        let total = Int(s)
-        let m = (total % 3600) / 60
-        let sec = total % 60
-        let h = total / 3600
-        if h > 0 { return String(format: "%d:%02d:%02d", h, m, sec) }
-        return String(format: "%d:%02d", m, sec)
+        let duration = Duration.seconds(s)
+        return duration.formatted(
+            .time(pattern: s >= 3600 ? .hourMinuteSecond : .minuteSecond)
+        )
     }
 }

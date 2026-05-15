@@ -12,13 +12,12 @@ struct LibraryListView: View {
             } else {
                 List(selection: $selection) {
                     ForEach(model.libraryEntries) { entry in
-                        NavigationLink(value: entry.id) {
-                            row(entry)
-                        }
+                        row(entry).tag(entry.id)
                     }
                     .onDelete { offsets in
-                        for offset in offsets {
-                            model.deleteEntry(model.libraryEntries[offset].id)
+                        let ids = offsets.map { model.libraryEntries[$0].id }
+                        for id in ids {
+                            model.deleteEntry(id)
                         }
                     }
                 }

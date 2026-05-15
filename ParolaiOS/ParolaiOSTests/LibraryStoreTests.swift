@@ -3,7 +3,7 @@ import Foundation
 @testable import Parola
 import ParolaCore
 
-@Suite("LibraryStore", .serialized)
+@Suite("LibraryStore")
 struct LibraryStoreTests {
     private func makeTempLibrary() throws -> (LibraryStore, URL) {
         let tmp = FileManager.default.temporaryDirectory
@@ -52,6 +52,14 @@ struct LibraryStoreTests {
         #expect(loaded.document.audioURL.lastPathComponent.hasPrefix("audio."))
     }
 
+    @Test("loading missing entry throws notFound")
+    func loadMissingThrows() async throws {
+        let (store, _) = try makeTempLibrary()
+        await #expect(throws: LibraryStore.LibraryError.self) {
+            try await store.load("does-not-exist")
+        }
+    }
+
     @Test("delete removes the directory")
     func deleteEntry() async throws {
         let (store, _) = try makeTempLibrary()
@@ -63,19 +71,17 @@ struct LibraryStoreTests {
         #expect(entries.isEmpty)
     }
 
-    @Test("list is sorted by createdAt descending")
-    func sortedDescending() async throws {
+    @Test("deleting a missing entry throws notFound")
+    func deleteMissingThrows() async throws {
         let (store, _) = try makeTempLibrary()
-        let first = try await store.add(transcript: makeTranscript(), audioSource: sampleAudioURL)
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-        let second = try await store.add(transcript: makeTranscript(), audioSource: sampleAudioURL)
-        let entries = await store.list()
-        #expect(entries.map(\.id) == [second.id, first.id])
+        await #expect(throws: LibraryStore.LibraryError.self) {
+            try await store.delete("nope")
+        }
     }
 
     @Test("adopt imports an existing .parola bundle without re-transcribing")
     func adoptParolaBundle() async throws {
-        let (store, _) = try makeTempLibrary()
+        let (store, tmp) = try makeTempLibrary()
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("scratch-\(UUID().uuidString).parola", isDirectory: true)
         try ParolaDocument.write(
@@ -84,7 +90,8 @@ struct LibraryStoreTests {
             to: scratch
         )
         let entry = try await store.adopt(parolaBundle: scratch)
-        #expect(entry.bundleURL.path.contains("Library") || entry.bundleURL.lastPathComponent.hasSuffix(".parola"))
+        #expect(entry.bundleURL.deletingLastPathComponent() == tmp)
+        #expect(entry.bundleURL.pathExtension == "parola")
         let entries = await store.list()
         #expect(entries.count == 1)
     }

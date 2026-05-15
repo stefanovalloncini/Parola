@@ -10,7 +10,7 @@ struct SettingsSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("Model", selection: $model.settings.modelName) {
+                    Picker("settings.model", selection: $model.settings.modelName) {
                         ForEach(model.availableModels) { entry in
                             Text(entry.label).tag(entry.name)
                         }
@@ -21,30 +21,30 @@ struct SettingsSheet: View {
                             .navigationBarTitleDisplayMode(.inline)
                     } label: {
                         HStack {
-                            Text("Language")
+                            Text("settings.language")
                             Spacer()
                             Text(LanguageCatalog.label(for: model.settings.language))
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    Toggle("Translate to English", isOn: $model.settings.translate)
-                    Toggle("Word timestamps", isOn: $model.settings.wordTimestamps)
+                    Toggle("settings.translate", isOn: $model.settings.translate)
+                    Toggle("settings.wordTimestamps", isOn: $model.settings.wordTimestamps)
                 } header: {
-                    Text("Active model")
+                    Text("settings.section.activeModel")
                 } footer: {
-                    Text("Word timestamps power playback highlighting.")
+                    Text("settings.wordTimestamps.footer")
                 }
 
-                Section("Custom vocabulary") {
+                Section("settings.vocabulary.title") {
                     TextField(
-                        "Names or jargon, comma-separated",
+                        "settings.vocabulary.placeholder",
                         text: $model.settings.initialPrompt,
                         axis: .vertical
                     )
                     .lineLimit(2...5)
                 }
 
-                Section("Models on device") {
+                Section("settings.modelsOnDevice") {
                     ForEach(model.availableModels) { entry in
                         modelRow(entry)
                     }
@@ -56,25 +56,25 @@ struct SettingsSheet: View {
                     } label: {
                         HStack {
                             Image(systemName: "sparkles")
-                            Text("Show welcome screens again")
+                            Text("settings.showWelcomeAgain")
                         }
                     }
                 }
 
                 Section {
-                    Text("Parola — on-device speech-to-text.")
+                    Text("settings.about")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle("settings.title")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                 }
             }
             .confirmationDialog(
-                Text("Show welcome screens again?"),
+                Text("settings.showWelcomeAgain.confirm"),
                 isPresented: $confirmingReset,
                 titleVisibility: .visible
             ) {
@@ -114,9 +114,7 @@ struct SettingsSheet: View {
     }
 
     private func humanBytes(_ bytes: Int) -> String {
-        let units = ["B", "KB", "MB", "GB", "TB"]
-        var value = Double(bytes); var idx = 0
-        while value >= 1024, idx < units.count - 1 { value /= 1024; idx += 1 }
-        return String(format: "%.1f %@", value, units[idx])
+        Measurement(value: Double(bytes), unit: UnitInformationStorage.bytes)
+            .formatted(.byteCount(style: .file))
     }
 }

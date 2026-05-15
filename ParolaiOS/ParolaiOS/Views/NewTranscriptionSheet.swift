@@ -5,7 +5,7 @@ struct NewTranscriptionSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var model: AppModel
     @State private var pickingFile = false
-    @State private var libraryCountAtPresent = 0
+    @State private var becameBusy = false
 
     var body: some View {
         NavigationStack {
@@ -38,9 +38,15 @@ struct NewTranscriptionSheet: View {
                     }
                 }
             }
-            .onAppear { libraryCountAtPresent = model.libraryEntries.count }
-            .onChange(of: model.libraryEntries.count) { _, newCount in
-                if newCount > libraryCountAtPresent { dismiss() }
+            .onChange(of: model.coordinator.phase) { _, phase in
+                switch phase {
+                case .idle:
+                    if becameBusy { dismiss() }
+                case .failed:
+                    break
+                default:
+                    becameBusy = true
+                }
             }
             .fileImporter(
                 isPresented: $pickingFile,
@@ -111,7 +117,9 @@ private struct LiveRecordingPane: View {
                     .padding()
                 }
                 .onChange(of: model.coordinator.liveSegments.count) { _, _ in
-                    proxy.scrollTo("__partial", anchor: .bottom)
+                    if let last = model.coordinator.liveSegments.last {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    }
                 }
             }
         }

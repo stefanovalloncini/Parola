@@ -6,10 +6,10 @@ import ParolaCore
 @Suite("Incoming URL handling")
 @MainActor
 struct URLHandlingTests {
-    private func makeModel() -> (AppModel, URL) {
+    private func makeModel() throws -> (AppModel, URL) {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-url-tests-\(UUID().uuidString)", isDirectory: true)
-        try! FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         let model = AppModel(libraryURL: tmp)
         return (model, tmp)
     }
@@ -20,7 +20,7 @@ struct URLHandlingTests {
 
     @Test("a .parola URL is adopted into the library")
     func adoptParola() async throws {
-        let (model, _) = makeModel()
+        let (model, _) = try makeModel()
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("scratch-\(UUID().uuidString).parola", isDirectory: true)
         try ParolaDocument.write(
@@ -34,7 +34,6 @@ struct URLHandlingTests {
         )
 
         await model.handleIncoming(url: scratch)
-        try await Task.sleep(nanoseconds: 200_000_000)
 
         let entries = await model.library.list()
         #expect(entries.count == 1)

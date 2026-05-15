@@ -97,12 +97,9 @@ private struct SegmentView: View, Equatable {
     }
 
     private func timestamp(_ s: Double) -> String {
-        let total = Int(s)
-        let m = (total % 3600) / 60
-        let sec = total % 60
-        let h = total / 3600
-        if h > 0 { return String(format: "%d:%02d:%02d", h, m, sec) }
-        return String(format: "%d:%02d", m, sec)
+        Duration.seconds(s).formatted(
+            .time(pattern: s >= 3600 ? .hourMinuteSecond : .minuteSecond)
+        )
     }
 }
 

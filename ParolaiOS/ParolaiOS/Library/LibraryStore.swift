@@ -7,23 +7,18 @@ actor LibraryStore {
 
         var errorDescription: String? {
             switch self {
-            case .notFound(let id): return "Library entry \(id) not found."
+            case .notFound: return String(localized: "library.notfound")
             }
         }
     }
 
     static let shared = LibraryStore()
     static var defaultLibraryURL: URL {
-        let base = try! FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        return base.appendingPathComponent("Parola/Library", isDirectory: true)
+        URL.applicationSupportDirectory.appending(path: "Parola/Library", directoryHint: .isDirectory)
     }
 
     let libraryURL: URL
+    private var cachedEntries: [LibraryEntry]?
 
     init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
         self.libraryURL = libraryURL
@@ -35,21 +30,27 @@ actor LibraryStore {
     }
 
     func list() -> [LibraryEntry] {
+        if let cachedEntries { return cachedEntries }
         let fm = FileManager.default
         guard let contents = try? fm.contentsOfDirectory(at: libraryURL, includingPropertiesForKeys: nil) else {
+            cachedEntries = []
             return []
         }
-        return contents
+        let entries = contents
             .filter { $0.pathExtension == "parola" }
             .compactMap { try? makeEntry(bundleURL: $0) }
             .sorted { $0.createdAt > $1.createdAt }
+        cachedEntries = entries
+        return entries
     }
 
     func load(_ id: LibraryEntry.ID) throws -> LoadedEntry {
-        guard let entry = list().first(where: { $0.id == id }) else {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
-        let doc = try ParolaDocument.read(at: entry.bundleURL)
+        let doc = try ParolaDocument.read(at: bundleURL)
+        let entry = try makeEntry(bundleURL: bundleURL)
         return LoadedEntry(entry: entry, document: doc)
     }
 
@@ -61,6 +62,7 @@ actor LibraryStore {
             audioURL: audioSource,
             to: bundleURL
         )
+        cachedEntries = nil
         return try makeEntry(bundleURL: bundleURL.appendingPathExtension("parola"))
     }
 
@@ -70,14 +72,17 @@ actor LibraryStore {
         let fm = FileManager.default
         if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
         try fm.copyItem(at: url, to: target)
+        cachedEntries = nil
         return try makeEntry(bundleURL: target)
     }
 
     func delete(_ id: LibraryEntry.ID) throws {
-        guard let entry = list().first(where: { $0.id == id }) else {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
-        try FileManager.default.removeItem(at: entry.bundleURL)
+        try FileManager.default.removeItem(at: bundleURL)
+        cachedEntries = nil
     }
 
     private func makeEntry(bundleURL: URL) throws -> LibraryEntry {

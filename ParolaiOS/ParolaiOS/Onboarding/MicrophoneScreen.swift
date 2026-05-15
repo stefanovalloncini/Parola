@@ -2,6 +2,7 @@ import SwiftUI
 import AVFoundation
 
 struct MicrophoneScreen: View {
+    var isActive: Bool = true
     let onContinue: () -> Void
     let onSkip: () -> Void
 
@@ -16,10 +17,10 @@ struct MicrophoneScreen: View {
                 "onboarding.mic.privacy"
             ],
             primaryTitle: "onboarding.mic.cta",
-            primaryAction: requestPermission,
+            primaryAction: { Task { await requestPermission() } },
             secondaryTitle: "onboarding.cta.notnow",
             secondaryAction: { onContinue() },
-            hero: { MicRippleView() },
+            hero: { MicRippleView(isActive: isActive) },
             footer: {
                 if let responseMessage {
                     Text(responseMessage)
@@ -32,26 +33,22 @@ struct MicrophoneScreen: View {
         .animation(.smooth, value: responseMessage)
     }
 
-    private func requestPermission() {
+    private func requestPermission() async {
         guard !requesting else { return }
-        let status = AVCaptureDevice.authorizationStatus(for: .audio)
-        switch status {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
             onContinue()
         case .denied, .restricted:
             responseMessage = "onboarding.mic.denied"
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { onContinue() }
+            try? await Task.sleep(for: .milliseconds(900))
+            onContinue()
         case .notDetermined:
             requesting = true
-            AVCaptureDevice.requestAccess(for: .audio) { granted in
-                DispatchQueue.main.async {
-                    requesting = false
-                    responseMessage = granted ? nil : "onboarding.mic.denied"
-                    DispatchQueue.main.asyncAfter(deadline: .now() + (granted ? 0.2 : 0.9)) {
-                        onContinue()
-                    }
-                }
-            }
+            let granted = await AVCaptureDevice.requestAccess(for: .audio)
+            requesting = false
+            responseMessage = granted ? nil : "onboarding.mic.denied"
+            try? await Task.sleep(for: .milliseconds(granted ? 200 : 900))
+            onContinue()
         @unknown default:
             onContinue()
         }

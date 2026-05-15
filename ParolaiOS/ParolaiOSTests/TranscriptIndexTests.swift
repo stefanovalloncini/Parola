@@ -5,50 +5,41 @@ import ParolaCore
 
 @Suite("TranscriptIndex")
 struct TranscriptIndexTests {
-    private func makeTranscript() -> Transcript {
-        let words0 = [
-            WordTiming(id: "0_0", word: "Hello", start: 0.0, end: 0.4, probability: 1),
-            WordTiming(id: "0_1", word: "world", start: 0.5, end: 0.9, probability: 1),
-        ]
-        let words1 = [
-            WordTiming(id: "1_0", word: "Goodbye", start: 1.0, end: 1.6, probability: 1),
-        ]
-        return Transcript(
-            segments: [
-                TranscriptSegment(id: 0, start: 0.0, end: 0.9, text: "Hello world", words: words0),
-                TranscriptSegment(id: 1, start: 1.0, end: 1.6, text: "Goodbye", words: words1),
-            ],
-            language: "en",
-            modelName: "test"
-        )
+    @Test(
+        "segmentID lookups",
+        arguments: [
+            (0.0, 0),
+            (0.5, 0),
+            (1.2, 1),
+            (0.95, nil),
+        ] as [(Double, TranscriptSegment.ID?)]
+    )
+    func segmentLookup(at time: Double, expected: TranscriptSegment.ID?) {
+        let index = TranscriptIndex(transcript: Fixtures.makeTranscript())
+        #expect(index.segmentID(at: time) == expected)
     }
 
-    @Test("segmentID returns the segment covering the given time")
-    func segmentIDAtTime() {
-        let index = TranscriptIndex(transcript: makeTranscript())
+    @Test(
+        "word lookups",
+        arguments: [
+            (0.2, "Hello"),
+            (0.6, "world"),
+            (1.3, "Goodbye"),
+            (0.45, nil),
+        ] as [(Double, String?)]
+    )
+    func wordLookup(at time: Double, expected: String?) {
+        let index = TranscriptIndex(transcript: Fixtures.makeTranscript())
+        #expect(index.word(at: time)?.word == expected)
+    }
+
+    @Test("segment boundaries are inclusive on both ends")
+    func segmentBoundariesInclusive() {
+        let index = TranscriptIndex(transcript: Fixtures.makeTranscript())
         #expect(index.segmentID(at: 0.0) == 0)
-        #expect(index.segmentID(at: 0.5) == 0)
-        #expect(index.segmentID(at: 1.2) == 1)
-    }
-
-    @Test("segmentID is nil between segments")
-    func segmentIDBetweenSegments() {
-        let index = TranscriptIndex(transcript: makeTranscript())
-        #expect(index.segmentID(at: 0.95) == nil)
-    }
-
-    @Test("word lookup returns the active word")
-    func wordAtTime() {
-        let index = TranscriptIndex(transcript: makeTranscript())
-        #expect(index.word(at: 0.2)?.word == "Hello")
-        #expect(index.word(at: 0.6)?.word == "world")
-        #expect(index.word(at: 1.3)?.word == "Goodbye")
-    }
-
-    @Test("word lookup is nil in the gap between words")
-    func wordInGap() {
-        let index = TranscriptIndex(transcript: makeTranscript())
-        #expect(index.word(at: 0.45) == nil)
+        #expect(index.segmentID(at: 0.9) == 0)
+        #expect(index.segmentID(at: 1.0) == 1)
+        #expect(index.segmentID(at: 1.6) == 1)
     }
 
     @Test("hasWordTimestamps is false when no segments carry words")

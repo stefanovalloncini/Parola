@@ -16,10 +16,10 @@ struct RootView: View {
             }
         }
         .sheet(isPresented: $showingSettings) {
-            SettingsSheet().environmentObject(model)
+            SettingsSheet()
         }
         .sheet(isPresented: $showingNew) {
-            NewTranscriptionSheet().environmentObject(model)
+            NewTranscriptionSheet()
         }
     }
 
@@ -32,7 +32,7 @@ struct RootView: View {
             }
             .navigationTitle("Parola")
             .toolbar { toolbarItems }
-            .navigationDestination(for: LibraryEntry.ID.self) { id in
+            .navigationDestination(item: $selectedEntry) { id in
                 TranscriptDetailView(entryID: id)
             }
         }

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct LanguagePickScreen: View {
+    var isActive: Bool = true
     let onContinue: () -> Void
     let onSkip: () -> Void
 
@@ -13,7 +14,7 @@ struct LanguagePickScreen: View {
             body: ["onboarding.language.subhead"],
             primaryTitle: "onboarding.cta.continue",
             primaryAction: onContinue,
-            hero: { RotatingGlobeView() },
+            hero: { RotatingGlobeView(isActive: isActive) },
             footer: {
                 Button {
                     showingFullList = true
