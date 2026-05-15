@@ -114,7 +114,7 @@ final class TranscriptionCoordinator: ObservableObject {
         }
     }
 
-    private func handleStreamingEvent(_ event: StreamingEvent) {
+    func handleStreamingEvent(_ event: StreamingEvent) {
         switch event {
         case .partial(let text):
             if livePartialText != text { livePartialText = text }
