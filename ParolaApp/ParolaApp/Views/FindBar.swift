@@ -18,6 +18,7 @@ struct FindBar: View {
                 Toggle("Aa", isOn: $model.findCaseSensitive)
                     .toggleStyle(.button)
                     .help("Case-sensitive")
+                    .accessibilityLabel("Case sensitive")
 
                 if !model.findQuery.isEmpty {
                     Text(matchSummary)

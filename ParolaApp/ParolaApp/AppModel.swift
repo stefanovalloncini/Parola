@@ -81,6 +81,7 @@ final class AppModel: ObservableObject {
     private var liveSource: AudioSource?
     private var streamingSession: StreamingTranscriptionSession?
     private var streamingConsumer: Task<Void, Never>?
+    private var lastDownloadPercent: Int = -1
 
     init() {
         refreshModelList()
@@ -191,10 +192,15 @@ final class AppModel: ObservableObject {
     }
 
     private func makeDownloadProgressHandler() -> @Sendable (Double) -> Void {
-        { [weak self] frac in
+        let modelName = selectedModel
+        lastDownloadPercent = -1
+        return { [weak self] frac in
+            let percent = Int(frac * 100)
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.phase = .downloadingModel(name: self.selectedModel, progress: frac)
+                guard percent != self.lastDownloadPercent else { return }
+                self.lastDownloadPercent = percent
+                self.phase = .downloadingModel(name: modelName, progress: frac)
             }
         }
     }

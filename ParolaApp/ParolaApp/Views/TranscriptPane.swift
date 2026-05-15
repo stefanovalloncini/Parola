@@ -26,7 +26,7 @@ struct TranscriptPane: View {
     @ViewBuilder
     private var rightColumn: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $rightTab) {
+            Picker("Right pane", selection: $rightTab) {
                 Text("Player").tag(RightTab.player)
                 Text("Summary").tag(RightTab.summary)
             }
