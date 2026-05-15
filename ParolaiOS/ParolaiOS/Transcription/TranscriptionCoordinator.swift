@@ -25,6 +25,7 @@ final class TranscriptionCoordinator: ObservableObject {
     private let session = TranscriptionSession()
     private var streamingSession: StreamingTranscriptionSession?
     private var streamingTask: Task<Void, Never>?
+    private var lastProgressPercent: Int = -1
 
     init(library: LibraryStore, settings: UserSettings) {
         self.library = library
@@ -38,23 +39,31 @@ final class TranscriptionCoordinator: ObservableObject {
     }
 
     func startFileTranscription(at sourceURL: URL) {
-        let scoped = sourceURL.startAccessingSecurityScopedResource()
-        let copy = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-ios-\(UUID().uuidString)-\(sourceURL.lastPathComponent)")
-        do {
-            try FileManager.default.copyItem(at: sourceURL, to: copy)
-        } catch {
-            if scoped { sourceURL.stopAccessingSecurityScopedResource() }
-            phase = .failed(message: error.localizedDescription)
-            return
+        Task {
+            let scoped = sourceURL.startAccessingSecurityScopedResource()
+            defer { if scoped { sourceURL.stopAccessingSecurityScopedResource() } }
+            let copy = FileManager.default.temporaryDirectory
+                .appendingPathComponent("parola-ios-\(UUID().uuidString)-\(sourceURL.lastPathComponent)")
+            do {
+                try await Task.detached(priority: .userInitiated) {
+                    try FileManager.default.copyItem(at: sourceURL, to: copy)
+                }.value
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+                return
+            }
+            runTranscription(audio: copy)
         }
-        if scoped { sourceURL.stopAccessingSecurityScopedResource() }
+    }
+
+    func startFileTranscriptionFromTrustedCopy(at copy: URL) {
         runTranscription(audio: copy)
     }
 
     private func runTranscription(audio: URL) {
         Task {
             do {
+                lastProgressPercent = -1
                 phase = .loadingModel(name: settings.modelName)
                 if !ModelStore.shared.isInstalled(settings.modelName) {
                     phase = .downloadingModel(name: settings.modelName, progress: 0)
@@ -82,7 +91,7 @@ final class TranscriptionCoordinator: ObservableObject {
         streamingSession = session
         phase = .recording
 
-        streamingTask = Task { @MainActor in
+        streamingTask = Task {
             do {
                 let events = try await session.start(
                     options: currentOptions,
@@ -99,11 +108,9 @@ final class TranscriptionCoordinator: ObservableObject {
 
     func stopRecording() {
         guard let session = streamingSession else { return }
-        Task { @MainActor in
+        streamingSession = nil
+        Task {
             await session.stop()
-            streamingSession = nil
-            streamingTask?.cancel()
-            streamingTask = nil
         }
     }
 
@@ -140,8 +147,12 @@ final class TranscriptionCoordinator: ObservableObject {
 
     private func configureAudioSession() {
         let audioSession = AVAudioSession.sharedInstance()
-        try? audioSession.setCategory(.record, mode: .measurement, options: [])
-        try? audioSession.setActive(true)
+        do {
+            try audioSession.setCategory(.record, mode: .measurement, options: [])
+            try audioSession.setActive(true)
+        } catch {
+            phase = .failed(message: error.localizedDescription)
+        }
     }
 
     private var currentOptions: TranscriptionOptions {
@@ -155,10 +166,14 @@ final class TranscriptionCoordinator: ObservableObject {
     }
 
     private func makeDownloadProgressHandler() -> @Sendable (Double) -> Void {
-        { [weak self] frac in
+        let modelName = settings.modelName
+        return { [weak self] frac in
+            let percent = Int(frac * 100)
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.phase = .downloadingModel(name: self.settings.modelName, progress: frac)
+                guard percent != self.lastProgressPercent else { return }
+                self.lastProgressPercent = percent
+                self.phase = .downloadingModel(name: modelName, progress: frac)
             }
         }
     }

@@ -15,7 +15,7 @@ settings:
     PRODUCT_NAME: Parola
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
-    SWIFT_STRICT_CONCURRENCY: minimal
+    SWIFT_STRICT_CONCURRENCY: complete
     TARGETED_DEVICE_FAMILY: "1,2"
     ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
 packages:
@@ -92,7 +92,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: ParolaiOSTests
-        SWIFT_STRICT_CONCURRENCY: minimal
+        SWIFT_STRICT_CONCURRENCY: complete
         GENERATE_INFOPLIST_FILE: YES
         BUNDLE_LOADER: "$(TEST_HOST)"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Parola.app/Parola"

@@ -33,17 +33,28 @@ struct PlaybackControllerTests {
         let controller = PlaybackController()
         controller.load(audioURL: sampleAudioURL, transcript: makeTranscript())
         controller._setCurrentTimeForTest(0.2)
-        #expect(controller.currentSegmentID() == 0)
+        #expect(controller.currentSegmentID == 0)
         controller._setCurrentTimeForTest(1.2)
-        #expect(controller.currentSegmentID() == 1)
+        #expect(controller.currentSegmentID == 1)
     }
 
-    @Test("currentWord follows currentTime")
+    @Test("currentWordID follows currentTime")
     func wordFollowsTime() {
         let controller = PlaybackController()
         controller.load(audioURL: sampleAudioURL, transcript: makeTranscript())
         controller._setCurrentTimeForTest(0.6)
-        #expect(controller.currentWord()?.word == "world")
+        #expect(controller.currentWordID == "0_1")
+    }
+
+    @Test("load twice resets state")
+    func loadTwiceResets() {
+        let controller = PlaybackController()
+        controller.load(audioURL: sampleAudioURL, transcript: makeTranscript())
+        controller._setCurrentTimeForTest(1.2)
+        #expect(controller.currentSegmentID == 1)
+        controller.load(audioURL: sampleAudioURL, transcript: makeTranscript())
+        #expect(controller.currentSegmentID == nil)
+        #expect(controller.currentTime == 0)
     }
 }
 

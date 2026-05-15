@@ -9,13 +9,16 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var isPlaying = false
     @Published private(set) var duration: TimeInterval = 0
     @Published private(set) var index: TranscriptIndex?
+    @Published private(set) var currentSegmentID: TranscriptSegment.ID?
+    @Published private(set) var currentWordID: WordTiming.ID?
 
     private var player: AVPlayer?
     private var timeObserver: Any?
 
     func load(audioURL: URL, transcript: Transcript) {
         tearDown()
-        index = TranscriptIndex(transcript: transcript)
+        let newIndex = TranscriptIndex(transcript: transcript)
+        index = newIndex
 
         let item = AVPlayerItem(url: audioURL)
         let player = AVPlayer(playerItem: item)
@@ -23,12 +26,14 @@ final class PlaybackController: ObservableObject {
 
         Task { [weak self] in
             let seconds = try? await item.asset.load(.duration).seconds
-            await MainActor.run { self?.duration = seconds ?? 0 }
+            self?.duration = seconds ?? 0
         }
 
-        let interval = CMTime(seconds: 0.03, preferredTimescale: 1000)
+        let interval = CMTime(seconds: 0.1, preferredTimescale: 1000)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            self?.currentTime = time.seconds.isFinite ? time.seconds : 0
+            MainActor.assumeIsolated {
+                self?.tick(to: time.seconds.isFinite ? time.seconds : 0)
+            }
         }
     }
 
@@ -47,22 +52,25 @@ final class PlaybackController: ObservableObject {
     func seek(to time: TimeInterval) {
         guard let player else { return }
         let t = CMTime(seconds: max(0, time), preferredTimescale: 1000)
-        player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
-            self?.currentTime = time
+        Task { [weak self] in
+            _ = await player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
+            self?.tick(to: time)
         }
     }
 
-    func currentSegmentID() -> TranscriptSegment.ID? {
-        index?.segmentID(at: currentTime)
+    private func tick(to time: TimeInterval) {
+        currentTime = time
+        let segID = index?.segmentID(at: time)
+        if segID != currentSegmentID { currentSegmentID = segID }
+        let wordID = index?.word(at: time)?.id
+        if wordID != currentWordID { currentWordID = wordID }
     }
 
-    func currentWord() -> WordTiming? {
-        index?.word(at: currentTime)
-    }
-
+    #if DEBUG
     func _setCurrentTimeForTest(_ value: TimeInterval) {
-        currentTime = value
+        tick(to: value)
     }
+    #endif
 
     private func tearDown() {
         if let timeObserver, let player {
@@ -74,5 +82,7 @@ final class PlaybackController: ObservableObject {
         isPlaying = false
         currentTime = 0
         duration = 0
+        currentSegmentID = nil
+        currentWordID = nil
     }
 }

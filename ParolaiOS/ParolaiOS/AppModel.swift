@@ -39,18 +39,19 @@ final class AppModel: ObservableObject {
     }
 
     func refreshLibrary() {
-        Task { [weak self] in
-            guard let self else { return }
-            let entries = await self.library.list()
-            await MainActor.run { self.libraryEntries = entries }
+        Task {
+            libraryEntries = await library.list()
         }
     }
 
     func deleteEntry(_ id: LibraryEntry.ID) {
-        Task { [weak self] in
-            guard let self else { return }
-            try? await self.library.delete(id)
-            self.refreshLibrary()
+        Task {
+            do {
+                try await library.delete(id)
+            } catch {
+                lastError = error.localizedDescription
+            }
+            refreshLibrary()
         }
     }
 }
@@ -67,11 +68,17 @@ extension AppModel {
             } else {
                 let copy = FileManager.default.temporaryDirectory
                     .appendingPathComponent("parola-incoming-\(UUID().uuidString)-\(url.lastPathComponent)")
-                try FileManager.default.copyItem(at: url, to: copy)
-                coordinator.startFileTranscription(at: copy)
+                try await Self.copyOffMainThread(from: url, to: copy)
+                coordinator.startFileTranscriptionFromTrustedCopy(at: copy)
             }
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    private static func copyOffMainThread(from source: URL, to destination: URL) async throws {
+        try await Task.detached(priority: .userInitiated) {
+            try FileManager.default.copyItem(at: source, to: destination)
+        }.value
     }
 }
