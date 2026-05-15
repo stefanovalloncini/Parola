@@ -207,7 +207,6 @@ final class AppModel: ObservableObject {
 
     // MARK: - YouTube URL
 
-    @Published var youtubeURLDraft: String = ""
     @Published var youtubeSheetOpen: Bool = false
 
     func transcribeYouTube(urlString: String) {
@@ -255,7 +254,6 @@ final class AppModel: ObservableObject {
             phase = .failed(message: "That doesn't look like a YouTube URL.")
             return nil
         }
-        youtubeURLDraft = ""
         youtubeSheetOpen = false
         return url
     }

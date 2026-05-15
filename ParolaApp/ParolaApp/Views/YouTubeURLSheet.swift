@@ -3,6 +3,8 @@ import ParolaCore
 
 struct YouTubeURLSheet: View {
     @EnvironmentObject var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var urlDraft: String = ""
     @FocusState private var fieldFocused: Bool
 
     var body: some View {
@@ -14,50 +16,43 @@ struct YouTubeURLSheet: View {
                 .foregroundStyle(DS.Color.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
 
-            TextField("https://www.youtube.com/watch?v=…", text: $model.youtubeURLDraft)
+            TextField("https://www.youtube.com/watch?v=…", text: $urlDraft)
                 .textFieldStyle(.roundedBorder)
                 .focused($fieldFocused)
                 .onSubmit { submit(prefersExistingSubs: false) }
 
             HStack(spacing: DS.Spacing.small) {
-                Button("Cancel") {
-                    model.youtubeSheetOpen = false
-                    model.youtubeURLDraft = ""
-                }
-                .keyboardShortcut(.cancelAction)
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
                 Spacer()
-                Button("Use Captions") {
-                    submit(prefersExistingSubs: true)
-                }
-                .disabled(disabled)
-                Button("Transcribe") {
-                    submit(prefersExistingSubs: false)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(DS.Color.accent)
-                .keyboardShortcut(.defaultAction)
-                .disabled(disabled)
+                Button("Use Captions") { submit(prefersExistingSubs: true) }
+                    .disabled(disabled)
+                Button("Transcribe") { submit(prefersExistingSubs: false) }
+                    .buttonStyle(.borderedProminent)
+                    .tint(DS.Color.accent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(disabled)
             }
         }
         .padding(DS.Spacing.large)
         .frame(width: 480)
         .onAppear {
-            if model.youtubeURLDraft.isEmpty,
+            if urlDraft.isEmpty,
                let clipboard = NSPasteboard.general.string(forType: .string),
                let url = URL(string: clipboard.trimmingCharacters(in: .whitespacesAndNewlines)),
                url.isYouTubeVideo {
-                model.youtubeURLDraft = url.absoluteString
+                urlDraft = url.absoluteString
             }
             fieldFocused = true
         }
     }
 
     private var disabled: Bool {
-        model.youtubeURLDraft.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines).isEmpty
+        urlDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func submit(prefersExistingSubs: Bool) {
-        let trimmed = model.youtubeURLDraft.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        let trimmed = urlDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         if prefersExistingSubs {
             model.fetchYouTubeSubs(urlString: trimmed)
