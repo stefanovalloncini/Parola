@@ -76,6 +76,9 @@ public struct Transcript: Codable, Hashable, Sendable {
     }
 
     public var text: String {
-        segments.map(\.text).joined(separator: " ")
+        segments
+            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 }
