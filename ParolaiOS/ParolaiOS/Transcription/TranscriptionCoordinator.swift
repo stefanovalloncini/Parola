@@ -131,11 +131,7 @@ final class TranscriptionCoordinator: ObservableObject {
             livePartialText = ""
             Task {
                 do {
-                    let placeholder = FileManager.default.temporaryDirectory
-                        .appendingPathComponent("parola-recording-\(UUID().uuidString).wav")
-                    try Data().write(to: placeholder)
-                    let entry = try await library.add(transcript: final, audioSource: placeholder)
-                    try? FileManager.default.removeItem(at: placeholder)
+                    let entry = try await library.add(transcript: final, audioSource: nil)
                     phase = .idle
                     onComplete?(entry)
                 } catch {

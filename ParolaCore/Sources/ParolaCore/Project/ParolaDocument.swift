@@ -1,6 +1,6 @@
 import Foundation
 
-/// `.parola` document — a directory bundle with manifest, transcript JSON, and audio.
+/// `.parola` document — a directory bundle with manifest, transcript JSON, and optional audio.
 public struct ParolaDocument: Sendable {
     public struct Manifest: Codable, Sendable, Equatable {
         public static let currentVersion = 1
@@ -27,20 +27,21 @@ public struct ParolaDocument: Sendable {
     }
 
     public var transcript: Transcript
-    public var audioURL: URL
+    public var audioURL: URL?
     public var manifest: Manifest
 
-    public init(transcript: Transcript, audioURL: URL, manifest: Manifest) {
+    public init(transcript: Transcript, audioURL: URL?, manifest: Manifest) {
         self.transcript = transcript
         self.audioURL = audioURL
         self.manifest = manifest
     }
 
     /// Writes a `.parola` bundle. If `to` doesn't end in `.parola`, the extension is appended.
+    /// Pass `audioURL: nil` for transcript-only bundles (live recordings without saved audio).
     @discardableResult
     public static func write(
         transcript: Transcript,
-        audioURL source: URL,
+        audioURL source: URL?,
         to destination: URL
     ) throws -> URL {
         let target = destination.pathExtension == "parola"
@@ -53,13 +54,16 @@ public struct ParolaDocument: Sendable {
         }
         try fm.createDirectory(at: target, withIntermediateDirectories: true)
 
-        let audioExt = source.pathExtension.isEmpty ? "wav" : source.pathExtension
-        let audioName = "audio.\(audioExt)"
-        let audioDestination = target.appendingPathComponent(audioName)
-        try fm.copyItem(at: source, to: audioDestination)
+        var originalAudioName = ""
+        if let source {
+            let audioExt = source.pathExtension.isEmpty ? "wav" : source.pathExtension
+            let audioName = "audio.\(audioExt)"
+            try fm.copyItem(at: source, to: target.appendingPathComponent(audioName))
+            originalAudioName = source.lastPathComponent
+        }
 
         let manifest = Manifest(
-            originalAudioName: source.lastPathComponent,
+            originalAudioName: originalAudioName,
             modelName: transcript.modelName,
             language: transcript.language
         )
@@ -69,7 +73,7 @@ public struct ParolaDocument: Sendable {
         return target
     }
 
-    /// Reads a `.parola` bundle.
+    /// Reads a `.parola` bundle. `audioURL` is nil for transcript-only bundles.
     public static func read(at url: URL) throws -> ParolaDocument {
         let fm = FileManager.default
         guard fm.fileExists(atPath: url.path) else {
@@ -82,9 +86,7 @@ public struct ParolaDocument: Sendable {
         let transcript: Transcript = try readJSON(at: url.appendingPathComponent("transcript.json"))
 
         let contents = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
-        guard let audioURL = contents.first(where: { $0.lastPathComponent.hasPrefix("audio.") }) else {
-            throw ParolaError.ioError("Parola document is missing its audio file.")
-        }
+        let audioURL = contents.first(where: { $0.lastPathComponent.hasPrefix("audio.") })
 
         return ParolaDocument(transcript: transcript, audioURL: audioURL, manifest: manifest)
     }

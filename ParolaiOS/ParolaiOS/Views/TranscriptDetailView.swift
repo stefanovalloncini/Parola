@@ -13,7 +13,9 @@ struct TranscriptDetailView: View {
             if let loaded {
                 VStack(spacing: 0) {
                     TranscriptScrollView(loaded: loaded)
-                    PlayerBar()
+                    if playback.hasAudio {
+                        PlayerBar()
+                    }
                 }
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {

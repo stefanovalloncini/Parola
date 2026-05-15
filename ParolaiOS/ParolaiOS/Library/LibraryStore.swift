@@ -54,7 +54,7 @@ actor LibraryStore {
         return LoadedEntry(entry: entry, document: doc)
     }
 
-    func add(transcript: Transcript, audioSource: URL) throws -> LibraryEntry {
+    func add(transcript: Transcript, audioSource: URL?) throws -> LibraryEntry {
         let name = uniqueEntryName(at: Date())
         let bundleURL = libraryURL.appendingPathComponent(name)
         try ParolaDocument.write(

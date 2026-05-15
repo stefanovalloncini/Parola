@@ -49,7 +49,16 @@ struct LibraryStoreTests {
         let entry = try await store.add(transcript: makeTranscript(), audioSource: sampleAudioURL)
         let loaded = try await store.load(entry.id)
         #expect(loaded.document.transcript.segments.first?.text == "hi")
-        #expect(loaded.document.audioURL.lastPathComponent.hasPrefix("audio."))
+        #expect(loaded.document.audioURL?.lastPathComponent.hasPrefix("audio.") == true)
+    }
+
+    @Test("add with nil audio source stores a transcript-only bundle")
+    func addWithoutAudio() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        let loaded = try await store.load(entry.id)
+        #expect(loaded.document.audioURL == nil)
+        #expect(loaded.document.transcript.segments.first?.text == "hi")
     }
 
     @Test("loading missing entry throws notFound")

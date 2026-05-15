@@ -549,7 +549,12 @@ final class AppModel: ObservableObject {
             let doc = try ParolaDocument.read(at: url)
             sourceFileURL = doc.audioURL
             transcript = doc.transcript
-            installPlayer(for: doc.audioURL)
+            if let audio = doc.audioURL {
+                installPlayer(for: audio)
+            } else {
+                player?.pause()
+                player = nil
+            }
             phase = .ready
             recomputeMatches()
         } catch {

@@ -16,10 +16,12 @@ final class PlaybackController {
     @ObservationIgnored private var player: AVPlayer?
     @ObservationIgnored private var timeObserver: Any?
 
-    func load(audioURL: URL, transcript: Transcript) {
+    var hasAudio: Bool { player != nil }
+
+    func load(audioURL: URL?, transcript: Transcript) {
         tearDown()
-        let newIndex = TranscriptIndex(transcript: transcript)
-        index = newIndex
+        index = TranscriptIndex(transcript: transcript)
+        guard let audioURL else { return }
 
         let item = AVPlayerItem(url: audioURL)
         let player = AVPlayer(playerItem: item)

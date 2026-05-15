@@ -53,8 +53,28 @@ struct ParolaDocumentTests {
         #expect(loaded.manifest.originalAudioName == "clip.wav")
         #expect(loaded.manifest.modelName == "openai_whisper-tiny")
         #expect(loaded.manifest.language == "en")
-        #expect(loaded.audioURL.lastPathComponent == "audio.wav")
-        #expect(try Data(contentsOf: loaded.audioURL) == Data("RIFFfakeaudio".utf8))
+        #expect(loaded.audioURL?.lastPathComponent == "audio.wav")
+        if let audioURL = loaded.audioURL {
+            #expect(try Data(contentsOf: audioURL) == Data("RIFFfakeaudio".utf8))
+        }
+    }
+
+    @Test("transcript-only round-trip leaves audioURL nil")
+    func transcriptOnlyRoundTrip() throws {
+        let scratch = tempDir()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let dest = scratch.appendingPathComponent("notes")
+        let bundleURL = try ParolaDocument.write(
+            transcript: sampleTranscript(),
+            audioURL: nil,
+            to: dest
+        )
+
+        let loaded = try ParolaDocument.read(at: bundleURL)
+        #expect(loaded.audioURL == nil)
+        #expect(loaded.manifest.originalAudioName == "")
+        #expect(loaded.transcript == sampleTranscript())
     }
 
     @Test("missing manifest is rejected")
@@ -64,6 +84,26 @@ struct ParolaDocumentTests {
         let bundle = scratch.appendingPathComponent("empty.parola")
         try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
         #expect(throws: Error.self) { try ParolaDocument.read(at: bundle) }
+    }
+
+    @Test("missing audio file no longer throws")
+    func missingAudioReadsAsNil() throws {
+        let scratch = tempDir()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let bundle = scratch.appendingPathComponent("no-audio.parola")
+        try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+        let manifest = """
+        { "version": 1, "createdAt": "2030-01-01T00:00:00Z", "originalAudioName": "", "modelName": "x", "language": "en" }
+        """
+        try Data(manifest.utf8).write(to: bundle.appendingPathComponent("manifest.json"))
+        let transcript = """
+        { "segments": [], "language": "en", "modelName": "x" }
+        """
+        try Data(transcript.utf8).write(to: bundle.appendingPathComponent("transcript.json"))
+
+        let loaded = try ParolaDocument.read(at: bundle)
+        #expect(loaded.audioURL == nil)
     }
 
     @Test("newer version is rejected")
