@@ -3,7 +3,8 @@ import Foundation
 /// Parses SubRip (.srt) subtitle files into a ``Transcript``.
 public enum SrtImporter {
     public static func parse(contentsOf url: URL) throws -> Transcript {
-        let raw = try String(contentsOf: url, encoding: .utf8)
+        let data = try Data(contentsOf: url)
+        let raw = String(decoding: data, as: UTF8.self)
         return parse(raw)
     }
 

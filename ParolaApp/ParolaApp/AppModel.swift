@@ -58,7 +58,7 @@ final class AppModel: ObservableObject {
 
     @AppStorage("selectedModel") var selectedModel: String = "openai_whisper-tiny"
     @AppStorage("selectedLanguageRaw") private var selectedLanguageRaw: String = ""
-    @Published var translate: Bool = false
+    @AppStorage("translate") var translate: Bool = false
 
     var selectedLanguage: String? {
         get { selectedLanguageRaw.isEmpty ? nil : selectedLanguageRaw }
@@ -313,6 +313,15 @@ final class AppModel: ObservableObject {
 
     func dismissError() {
         phase = .idle
+    }
+
+    var cacheDirectoryDisplayPath: String {
+        ModelStore.shared.directory.path
+            .replacingOccurrences(of: NSHomeDirectory(), with: "~")
+    }
+
+    func revealCacheDirectory() {
+        NSWorkspace.shared.activateFileViewerSelecting([ModelStore.shared.directory])
     }
 
     // MARK: - Recording

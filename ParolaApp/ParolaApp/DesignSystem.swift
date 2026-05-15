@@ -58,4 +58,9 @@ enum DS {
         let idx = (digits.first ?? 0) % speakerPalette.count
         return speakerPalette[idx]
     }
+
+    static func formatBytes(_ bytes: Int) -> String {
+        Measurement(value: Double(bytes), unit: UnitInformationStorage.bytes)
+            .formatted(.byteCount(style: .file))
+    }
 }

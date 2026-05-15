@@ -3,7 +3,8 @@ import Foundation
 /// Parses WebVTT (.vtt) subtitle files into a ``Transcript``.
 public enum VttImporter {
     public static func parse(contentsOf url: URL) throws -> Transcript {
-        let raw = try String(contentsOf: url, encoding: .utf8)
+        let data = try Data(contentsOf: url)
+        let raw = String(decoding: data, as: UTF8.self)
         return parse(raw)
     }
 

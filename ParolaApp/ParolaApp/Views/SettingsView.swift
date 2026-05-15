@@ -92,7 +92,7 @@ private struct ModelRow: View {
             }
             Spacer()
             if let size = entry.approximateSizeBytes {
-                Text(humanBytes(size)).font(.caption).foregroundStyle(.secondary)
+                Text(DS.formatBytes(size)).font(.caption).foregroundStyle(.secondary)
             }
             if entry.isInstalled {
                 Button(role: .destructive) {
@@ -111,13 +111,6 @@ private struct ModelRow: View {
             }
         }
         .padding(.vertical, 4)
-    }
-
-    private func humanBytes(_ bytes: Int) -> String {
-        let units = ["B", "KB", "MB", "GB", "TB"]
-        var value = Double(bytes); var idx = 0
-        while value >= 1024, idx < units.count - 1 { value /= 1024; idx += 1 }
-        return String(format: "%.1f %@", value, units[idx])
     }
 }
 
@@ -144,13 +137,3 @@ private struct AboutTab: View {
     }
 }
 
-extension AppModel {
-    var cacheDirectoryDisplayPath: String {
-        let url = ModelStore.shared.directory
-        return url.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
-    }
-
-    func revealCacheDirectory() {
-        NSWorkspace.shared.activateFileViewerSelecting([ModelStore.shared.directory])
-    }
-}
