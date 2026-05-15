@@ -59,7 +59,7 @@ struct TranscriptPane: View {
                 .padding(.vertical, 8)
             }
             .onChange(of: model.currentSegmentID) { _, id in
-                guard let id else { return }
+                guard let id, model.player?.timeControlStatus == .playing else { return }
                 withAnimation(.easeInOut(duration: 0.2)) {
                     proxy.scrollTo(id, anchor: .center)
                 }

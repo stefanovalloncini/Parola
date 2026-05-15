@@ -3,17 +3,13 @@ import Foundation
 @preconcurrency import SpeakerKit
 
 /// Loads SpeakerKit, runs diarization on an audio file, and labels a transcript's segments
-/// and word timings with speaker IDs.
-///
-/// Requires word timestamps to be present in the transcript — without them the speaker
-/// alignment can't find sub-segment boundaries. Returns the transcript unchanged if there
-/// are no segments or no word timings.
-public actor DiarizationService {
+/// with speaker IDs. Invoked by ``TranscriptionSession`` when diarization is requested.
+actor DiarizationService {
     private var speakerKit: SpeakerKit?
 
-    public init() {}
+    init() {}
 
-    public func diarize(
+    func diarize(
         transcript: Transcript,
         audioURL: URL,
         numberOfSpeakers: Int? = nil
@@ -53,7 +49,7 @@ public actor DiarizationService {
         return Self.merge(transcript: transcript, diarization: result)
     }
 
-    public func unload() async {
+    func unload() async {
         await speakerKit?.unloadModels()
         speakerKit = nil
     }
