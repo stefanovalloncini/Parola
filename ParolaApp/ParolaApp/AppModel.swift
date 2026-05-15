@@ -293,9 +293,7 @@ final class AppModel: ObservableObject {
 
     private func mutateBatchJob(_ id: BatchJob.ID, _ change: (inout BatchJob) -> Void) {
         guard let idx = batchJobs.firstIndex(where: { $0.id == id }) else { return }
-        var copy = batchJobs[idx]
-        change(&copy)
-        batchJobs[idx] = copy
+        change(&batchJobs[idx])
     }
 
     func selectBatchJob(_ id: BatchJob.ID) {

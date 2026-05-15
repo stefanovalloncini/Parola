@@ -120,6 +120,8 @@ struct SegmentRow: View {
     let isCurrent: Bool
 
     @EnvironmentObject var model: AppModel
+    @State private var draftText: String = ""
+    @FocusState private var isEditing: Bool
 
     var body: some View {
         HStack(alignment: .top, spacing: DS.Spacing.regular) {
@@ -151,16 +153,20 @@ struct SegmentRow: View {
         } else if isCurrent, let words = segment.words, !words.isEmpty {
             karaoke(words: words)
         } else {
-            TextField(
-                "",
-                text: Binding(
-                    get: { segment.text },
-                    set: { model.editSegment(id: segment.id, newText: $0) }
-                ),
-                axis: .vertical
-            )
-            .textFieldStyle(.plain)
-            .lineLimit(1...20)
+            TextField("Segment text", text: $draftText, axis: .vertical)
+                .textFieldStyle(.plain)
+                .lineLimit(1...20)
+                .focused($isEditing)
+                .labelsHidden()
+                .onAppear { draftText = segment.text }
+                .onChange(of: segment.text) { _, newValue in
+                    if !isEditing { draftText = newValue }
+                }
+                .onChange(of: isEditing) { _, focused in
+                    if !focused, draftText != segment.text {
+                        model.editSegment(id: segment.id, newText: draftText)
+                    }
+                }
         }
     }
 
