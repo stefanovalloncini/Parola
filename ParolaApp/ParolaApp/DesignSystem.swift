@@ -41,8 +41,7 @@ enum DS {
         static let danger = SwiftUI.Color.red
     }
 
-    /// Speaker label tints. Desaturated so multiple speakers in one transcript don't
-    /// look like a children's TV show.
+    /// Desaturated speaker tints.
     static let speakerPalette: [SwiftUI.Color] = [
         SwiftUI.Color(red: 0.30, green: 0.45, blue: 0.68),  // dusty blue
         SwiftUI.Color(red: 0.62, green: 0.42, blue: 0.30),  // warm tan

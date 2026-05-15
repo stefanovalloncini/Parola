@@ -68,11 +68,9 @@ final class AppModel: ObservableObject {
     @Published var availableModels: [ModelInfo] = []
     @Published var sourceFileURL: URL?
 
-    // Audio player for segment seek
     @Published var player: AVPlayer?
     private var playerTimeObserver: Any?
 
-    // Export trigger pulled by ContentView (since we can't open a save panel directly from CommandMenu actions)
     @Published var pendingExport: ExportFormat?
 
     // MARK: - Engine
@@ -98,7 +96,6 @@ final class AppModel: ObservableObject {
         } ?? []
         availableModels = curated + extra
 
-        // If selected model is not in list, fall back to a sensible default
         if !availableModels.contains(where: { $0.name == selectedModel }) {
             selectedModel = availableModels.first?.name ?? "openai_whisper-tiny"
         }

@@ -35,7 +35,7 @@ private struct GeneralTab: View {
                 TextField("Initial prompt", text: $model.initialPrompt, axis: .vertical)
                     .lineLimit(2...6)
                     .textFieldStyle(.roundedBorder)
-                Text("A short list of names or jargon helps Whisper get unusual words right. Plain text, comma-separated works fine. Stays under ~200 words.")
+                Text("A short list of names or jargon helps Whisper get unusual words right. Plain text, comma-separated.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
