@@ -7,6 +7,11 @@ import ScreenCaptureKit
 ///
 /// Requires the host process to have Screen Recording permission. The very first call
 /// will trigger the standard TCC prompt.
+///
+/// Unchecked Sendable: `stream`, `writeFile`, and `converter` are read inside the SC
+/// sample-handler queue and written from `start`/`stop` via `queue.sync`. The serial
+/// queue is the lock — outside callers wait for in-flight samples to drain before
+/// mutating these fields.
 @available(macOS 13.0, *)
 public final class SystemAudioSource: NSObject, AudioSource, SCStreamDelegate, SCStreamOutput, @unchecked Sendable {
     private var stream: SCStream?
@@ -66,14 +71,17 @@ public final class SystemAudioSource: NSObject, AudioSource, SCStreamDelegate, S
         ) else {
             throw ParolaError.captureUnavailable("could not build source audio format")
         }
-        self.converter = AVAudioConverter(from: srcFormat, to: outputFormat)
-
-        self.writeFile = try AVAudioFile(
+        let converter = AVAudioConverter(from: srcFormat, to: outputFormat)
+        let writeFile = try AVAudioFile(
             forWriting: outputURL,
             settings: outputFormat.settings,
             commonFormat: .pcmFormatFloat32,
             interleaved: false
         )
+        queue.sync {
+            self.converter = converter
+            self.writeFile = writeFile
+        }
 
         try await stream.startCapture()
         self.stream = stream
@@ -94,7 +102,10 @@ public final class SystemAudioSource: NSObject, AudioSource, SCStreamDelegate, S
             try? await stream.stopCapture()
             self.stream = nil
         }
-        writeFile = nil
+        queue.sync {
+            self.writeFile = nil
+            self.converter = nil
+        }
     }
 
     // MARK: - SCStreamOutput
