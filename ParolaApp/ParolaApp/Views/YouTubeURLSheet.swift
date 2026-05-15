@@ -1,4 +1,5 @@
 import SwiftUI
+import ParolaCore
 
 struct YouTubeURLSheet: View {
     @EnvironmentObject var model: AppModel
@@ -41,9 +42,11 @@ struct YouTubeURLSheet: View {
         .padding(DS.Spacing.large)
         .frame(width: 480)
         .onAppear {
-            if model.youtubeURLDraft.isEmpty, let clipboard = NSPasteboard.general.string(forType: .string),
-               clipboard.hasPrefix("http"), clipboard.count < 200 {
-                model.youtubeURLDraft = clipboard
+            if model.youtubeURLDraft.isEmpty,
+               let clipboard = NSPasteboard.general.string(forType: .string),
+               let url = URL(string: clipboard.trimmingCharacters(in: .whitespacesAndNewlines)),
+               url.isYouTubeVideo {
+                model.youtubeURLDraft = url.absoluteString
             }
             fieldFocused = true
         }
