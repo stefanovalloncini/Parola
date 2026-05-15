@@ -61,6 +61,17 @@ struct LibraryStoreTests {
         #expect(loaded.document.transcript.segments.first?.text == "hi")
     }
 
+    @Test("delete invalidates the loaded cache")
+    func deleteInvalidatesCache() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: sampleAudioURL)
+        _ = try await store.load(entry.id)
+        try await store.delete(entry.id)
+        await #expect(throws: LibraryStore.LibraryError.self) {
+            try await store.load(entry.id)
+        }
+    }
+
     @Test("loading missing entry throws notFound")
     func loadMissingThrows() async throws {
         let (store, _) = try makeTempLibrary()

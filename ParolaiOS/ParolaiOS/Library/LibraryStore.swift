@@ -19,6 +19,7 @@ actor LibraryStore {
 
     let libraryURL: URL
     private var cachedEntries: [LibraryEntry]?
+    private var cachedLoaded: (id: LibraryEntry.ID, value: LoadedEntry)?
 
     init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
         self.libraryURL = libraryURL
@@ -45,13 +46,18 @@ actor LibraryStore {
     }
 
     func load(_ id: LibraryEntry.ID) throws -> LoadedEntry {
+        if let cached = cachedLoaded, cached.id == id {
+            return cached.value
+        }
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
         let doc = try ParolaDocument.read(at: bundleURL)
         let entry = try makeEntry(bundleURL: bundleURL)
-        return LoadedEntry(entry: entry, document: doc)
+        let loaded = LoadedEntry(entry: entry, document: doc)
+        cachedLoaded = (id, loaded)
+        return loaded
     }
 
     func add(transcript: Transcript, audioSource: URL?) throws -> LibraryEntry {
@@ -83,6 +89,7 @@ actor LibraryStore {
         }
         try FileManager.default.removeItem(at: bundleURL)
         cachedEntries = nil
+        if cachedLoaded?.id == id { cachedLoaded = nil }
     }
 
     private func makeEntry(bundleURL: URL) throws -> LibraryEntry {
