@@ -554,6 +554,20 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Library entry not found." } },
         "it" : { "stringUnit" : { "state" : "translated", "value" : "Voce della libreria non trovata." } }
       }
+    },
+    "Something went wrong" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Something went wrong" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Qualcosa è andato storto" } }
+      }
+    },
+    "OK" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "OK" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "OK" } }
+      }
     }
   }
 }

@@ -21,6 +21,18 @@ struct RootView: View {
         .sheet(isPresented: $showingNew) {
             NewTranscriptionSheet()
         }
+        .alert(
+            "Something went wrong",
+            isPresented: Binding(
+                get: { model.lastError != nil },
+                set: { if !$0 { model.lastError = nil } }
+            ),
+            presenting: model.lastError
+        ) { _ in
+            Button("OK", role: .cancel) { model.lastError = nil }
+        } message: { error in
+            Text(error)
+        }
     }
 
     private var stackView: some View {
