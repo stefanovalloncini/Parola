@@ -18,6 +18,9 @@ public actor StreamingTranscriptionSession {
     private var whisperKit: WhisperKit?
     private var streamer: AudioStreamTranscriber?
     private var continuation: AsyncStream<StreamingEvent>.Continuation?
+    private var segmentContinuation: AsyncStream<[TranscriptionSegment]>.Continuation?
+    private var consumerTask: Task<Void, Never>?
+    private var streamerTask: Task<Void, Never>?
     private var allConfirmed: [TranscriptSegment] = []
     private var loadedModel: String?
     private var optionsForRun: TranscriptionOptions?
@@ -34,6 +37,10 @@ public actor StreamingTranscriptionSession {
         options: TranscriptionOptions,
         downloadProgress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> AsyncStream<StreamingEvent> {
+        guard streamer == nil else {
+            throw ParolaError.transcriptionFailed("session already started")
+        }
+
         let modelName = options.model ?? "openai_whisper-tiny"
         if !modelStore.isInstalled(modelName) {
             _ = try await modelStore.download(variant: modelName, progress: downloadProgress)
@@ -49,10 +56,6 @@ public actor StreamingTranscriptionSession {
             load: true,
             download: false
         )
-        self.whisperKit = kit
-        self.loadedModel = modelName
-        self.optionsForRun = options
-
         guard let tokenizer = kit.tokenizer else {
             throw ParolaError.transcriptionFailed("WhisperKit tokenizer was nil after model load")
         }
@@ -72,13 +75,10 @@ public actor StreamingTranscriptionSession {
         }
 
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .unbounded)
-        self.continuation = cont
+        let (segStream, segCont) = AsyncStream<[TranscriptionSegment]>.makeStream(bufferingPolicy: .unbounded)
 
         let sink = EventSink(continuation: cont)
-        sink.onConfirmed = { [weak self] segments in
-            guard let self else { return }
-            Task { await self.appendConfirmed(segments) }
-        }
+        sink.onConfirmed = { segments in segCont.yield(segments) }
 
         let st = AudioStreamTranscriber(
             audioEncoder: kit.audioEncoder,
@@ -92,9 +92,21 @@ public actor StreamingTranscriptionSession {
                 sink.handle(oldState: oldState, newState: newState)
             }
         )
-        self.streamer = st
 
-        Task {
+        self.whisperKit = kit
+        self.loadedModel = modelName
+        self.optionsForRun = options
+        self.streamer = st
+        self.continuation = cont
+        self.segmentContinuation = segCont
+
+        consumerTask = Task { [weak self] in
+            for await batch in segStream {
+                await self?.appendConfirmed(batch)
+            }
+        }
+
+        streamerTask = Task {
             do {
                 try await st.startStreamTranscription()
             } catch {
@@ -109,6 +121,9 @@ public actor StreamingTranscriptionSession {
     /// Stops the mic stream, flushes a final transcript, and finishes the stream.
     public func stop() async {
         await streamer?.stopStreamTranscription()
+        segmentContinuation?.finish()
+        await consumerTask?.value
+
         let finalTranscript = Transcript(
             segments: allConfirmed,
             language: optionsForRun?.language ?? "auto",
@@ -119,6 +134,9 @@ public actor StreamingTranscriptionSession {
         continuation?.yield(.finished(finalTranscript))
         continuation?.finish()
         continuation = nil
+        segmentContinuation = nil
+        consumerTask = nil
+        streamerTask = nil
         streamer = nil
         whisperKit = nil
     }
@@ -198,4 +216,3 @@ private final class EventSink: @unchecked Sendable {
         return state.currentText.trimmingCharacters(in: .whitespaces)
     }
 }
-
