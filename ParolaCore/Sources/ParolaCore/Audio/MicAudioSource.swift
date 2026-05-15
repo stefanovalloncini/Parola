@@ -5,6 +5,9 @@ import Foundation
 ///
 /// Lifecycle: `start()` to begin, `prepare()` to stop and return the file URL,
 /// or `cancel()` to stop and discard. Thread-safe via an internal serial queue.
+///
+/// Unchecked Sendable: every mutation of the stored state goes through `stateQueue`,
+/// including the AVAudioEngine tap callback. The serial queue is the lock.
 public final class MicAudioSource: AudioSource, @unchecked Sendable {
     private let engine = AVAudioEngine()
     private let stateQueue = DispatchQueue(label: "com.parola.mic")
@@ -130,6 +133,9 @@ public final class MicAudioSource: AudioSource, @unchecked Sendable {
 }
 
 /// Wraps the converter state so the closure captures a reference, not a `var`.
+///
+/// Unchecked Sendable: each box is touched only by the converter callback that owns it,
+/// inside the single `stateQueue.sync` block where it's created.
 private final class BufferBox: @unchecked Sendable {
     let buffer: AVAudioPCMBuffer
     var consumed = false

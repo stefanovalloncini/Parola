@@ -70,6 +70,9 @@ func awaitStop(seconds: Double?) async {
 }
 
 /// Awaits a single delivery of a Unix signal (e.g. SIGINT) using async/await.
+///
+/// Unchecked Sendable: the DispatchSemaphore is its own synchronization; `source` is
+/// `let`-constant and `DispatchSourceSignal` is documented as safe to share.
 final class AsyncSignalStream: @unchecked Sendable {
     private let semaphore = DispatchSemaphore(value: 0)
     private let source: DispatchSourceSignal

@@ -162,6 +162,8 @@ public final class SystemAudioSource: NSObject, AudioSource, SCStreamDelegate, S
     }
 }
 
+/// Unchecked Sendable: each box is touched only by the converter callback that owns it,
+/// inside the SC sample-handler queue where it's created.
 private final class AudioBufferBox: @unchecked Sendable {
     let buffer: AVAudioPCMBuffer
     var consumed = false

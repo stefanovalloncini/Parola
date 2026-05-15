@@ -21,6 +21,10 @@ public extension URL {
 /// Audio source that downloads a YouTube video's audio via `yt-dlp`.
 ///
 /// Requires `yt-dlp` on `$PATH`. Common install: `brew install yt-dlp`.
+///
+/// Unchecked Sendable: `downloadedURL` and `workingDir` are written once during a
+/// single `prepare()` call, which Swift's structured-concurrency rules already
+/// serialize from any one caller.
 public final class YouTubeAudioSource: AudioSource, @unchecked Sendable {
     public let url: URL
 
