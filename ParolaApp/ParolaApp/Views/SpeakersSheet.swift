@@ -9,47 +9,59 @@ struct SpeakersSheet: View {
     @State private var suggestions: [Person] = []
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Speakers").font(DS.Font.heading)
-                Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Apply") {
-                    model.applySpeakerRenames(renames)
-                    dismiss()
-                }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-            }
-            .padding(DS.Spacing.regular)
-            Divider()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: DS.Spacing.medium) {
-                    if transcript.uniqueSpeakers.isEmpty {
-                        Text("This transcript wasn't diarized — turn on Identify speakers in Settings before transcribing.")
-                            .font(DS.Font.caption)
-                            .foregroundStyle(DS.Color.secondaryText)
-                    }
-                    ForEach(transcript.uniqueSpeakers, id: \.self) { speaker in
-                        speakerRow(speaker)
-                    }
-                    if !suggestions.isEmpty {
-                        Divider()
-                        Text("Recent")
-                            .font(DS.Font.caption)
-                            .foregroundStyle(DS.Color.secondaryText)
-                        FlowChips(items: suggestions.map(\.name)) { name in
-                            applySuggestion(name)
-                        }
-                    }
-                }
-                .padding(DS.Spacing.regular)
-            }
-        }
-        .frame(minWidth: 480, minHeight: 360)
+        SheetFrame(
+            icon: "person.2.fill",
+            iconTint: DS.Color.accent,
+            title: "Speakers",
+            onClose: { dismiss() },
+            content: { contentBody },
+            footer: { footerBody }
+        )
         .task {
             suggestions = await model.peopleStore.suggestions(limit: 8)
+        }
+    }
+
+    private var contentBody: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: DS.Spacing.medium) {
+                if transcript.uniqueSpeakers.isEmpty {
+                    Text("This transcript wasn't diarized — turn on Identify speakers in Settings before transcribing.")
+                        .font(DS.Font.caption)
+                        .foregroundStyle(DS.Color.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(transcript.uniqueSpeakers, id: \.self) { speaker in
+                    speakerRow(speaker)
+                }
+                if !suggestions.isEmpty {
+                    Divider().padding(.vertical, 2)
+                    Text("Recent")
+                        .font(DS.Font.caption)
+                        .foregroundStyle(DS.Color.secondaryText)
+                    FlowChips(items: suggestions.map(\.name)) { name in
+                        applySuggestion(name)
+                    }
+                }
+            }
+            .padding(DS.Spacing.regular)
+        }
+    }
+
+    private var footerBody: some View {
+        HStack(spacing: DS.Spacing.small) {
+            Button("Cancel") { dismiss() }
+                .sheetSecondaryAction()
+                .keyboardShortcut(.cancelAction)
+
+            Spacer()
+
+            Button("Done") {
+                model.applySpeakerRenames(renames)
+                dismiss()
+            }
+            .sheetPrimaryAction()
+            .keyboardShortcut(.defaultAction)
         }
     }
 
