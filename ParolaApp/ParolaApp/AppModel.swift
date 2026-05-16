@@ -134,7 +134,7 @@ final class AppModel: ObservableObject {
 
     func presentOpenPanel() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.audio, .movie, .mpeg4Movie, .quickTimeMovie, .mp3, .wav, .mpeg4Audio]
+        panel.allowedContentTypes = [.audio, .movie]
         panel.allowsMultipleSelection = true
         guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
         if panel.urls.count == 1 {
