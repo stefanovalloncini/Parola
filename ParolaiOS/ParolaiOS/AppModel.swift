@@ -51,6 +51,23 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func generateYouTubeChapters(for transcript: Transcript) {
+        guard !isRunningPrompt else { return }
+        isRunningPrompt = true
+        promptOutput = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let model = try LanguageModelFactory.makeOnDevice()
+                let result = try await YouTubeChapters.generate(for: transcript, model: model)
+                promptOutput = PromptOutput(promptName: "YouTube Chapters", text: result)
+            } catch {
+                lastError = error.localizedDescription
+            }
+            isRunningPrompt = false
+        }
+    }
+
     private var searchTask: Task<Void, Never>?
 
     static let trashRetentionDays = 30

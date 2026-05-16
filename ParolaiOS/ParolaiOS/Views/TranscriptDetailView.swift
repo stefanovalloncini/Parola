@@ -26,6 +26,10 @@ struct TranscriptDetailView: View {
                                     model.runPrompt(prompt, on: loaded.document.transcript)
                                 }
                             }
+                            Divider()
+                            Button("YouTube Chapters") {
+                                model.generateYouTubeChapters(for: loaded.document.transcript)
+                            }
                         } label: {
                             if model.isRunningPrompt {
                                 ProgressView().controlSize(.small)

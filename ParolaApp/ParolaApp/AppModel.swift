@@ -143,6 +143,24 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func generateYouTubeChapters() {
+        guard let transcript = self.transcript else { return }
+        guard !isRunningPrompt else { return }
+        isRunningPrompt = true
+        promptOutput = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let model = try LanguageModelFactory.makeOnDevice()
+                let result = try await YouTubeChapters.generate(for: transcript, model: model)
+                promptOutput = PromptOutput(promptName: "YouTube Chapters", text: result)
+            } catch {
+                phase = .failed(message: "Chapter generation failed: \(error.localizedDescription)")
+            }
+            isRunningPrompt = false
+        }
+    }
+
     // MARK: - Chat
 
     func recordChat(history: [ChatMessage]) {

@@ -10,6 +10,8 @@ struct PromptsMenu: View {
             ForEach(Prompt.builtIns) { prompt in
                 Button(prompt.name) { model.runPrompt(prompt) }
             }
+            Divider()
+            Button("YouTube Chapters") { model.generateYouTubeChapters() }
             if !userPrompts.isEmpty {
                 Divider()
                 ForEach(userPrompts) { prompt in
