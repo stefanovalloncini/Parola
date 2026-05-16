@@ -95,7 +95,6 @@ targets:
       path: ParolaiOSKeyboard/Info.plist
       properties:
         CFBundleDisplayName: Parola
-        CFBundleIdentifier: app.parola.ParolaiOS.Keyboard
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
@@ -108,6 +107,7 @@ targets:
             RequestsOpenAccess: true
     settings:
       base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.parola.ParolaiOS.Keyboard
         PRODUCT_NAME: ParolaKeyboard
         PRODUCT_MODULE_NAME: ParolaKeyboard
         CODE_SIGN_ENTITLEMENTS: ParolaiOSKeyboard/ParolaiOSKeyboard.entitlements
