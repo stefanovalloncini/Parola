@@ -253,6 +253,24 @@ final class AppModel: ObservableObject {
         Task { await liveCaptions.toggle(options: makeOptions(task: .transcribe)) }
     }
 
+    // MARK: - Meeting detection
+
+    @Published var meetingDetectedApp: String?
+    private var pendingRecordingCategory: EntryCategory = .transcription
+    lazy var meetingDetector: MeetingDetector = MeetingDetector { [weak self] appName in
+        self?.meetingDetectedApp = appName
+    }
+
+    func startMeetingRecording() {
+        meetingDetectedApp = nil
+        pendingRecordingCategory = .meeting
+        startRecording(source: .systemAudio)
+    }
+
+    func dismissMeetingPrompt() {
+        meetingDetectedApp = nil
+    }
+
     // MARK: - Library
 
     let library = LibraryStore()
@@ -356,10 +374,16 @@ final class AppModel: ObservableObject {
     }
 
     private func persistToLibrary(_ result: Transcript, audioSource: URL?) {
+        let category = pendingRecordingCategory
+        pendingRecordingCategory = .transcription
         Task { [weak self] in
             guard let self else { return }
             do {
-                let entry = try await library.add(transcript: result, audioSource: audioSource)
+                let entry = try await library.add(
+                    transcript: result,
+                    audioSource: audioSource,
+                    category: category
+                )
                 refreshLibrary()
                 selectedEntryID = entry.id
             } catch {

@@ -90,13 +90,18 @@ public actor LibraryStore {
         return loaded
     }
 
-    public func add(transcript: Transcript, audioSource: URL?) async throws -> LibraryEntry {
+    public func add(
+        transcript: Transcript,
+        audioSource: URL?,
+        category: EntryCategory = .transcription
+    ) async throws -> LibraryEntry {
         let name = uniqueEntryName(at: Date())
         let bundleURL = libraryURL.appendingPathComponent(name)
         try ParolaDocument.write(
             transcript: transcript,
             audioURL: audioSource,
-            to: bundleURL
+            to: bundleURL,
+            category: category
         )
         invalidateListCaches()
         let entry = try makeEntry(bundleURL: bundleURL.appendingPathExtension("parola"))

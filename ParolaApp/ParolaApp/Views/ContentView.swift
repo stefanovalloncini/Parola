@@ -34,6 +34,18 @@ struct ContentView: View {
                 SpeakersSheet(transcript: transcript)
             }
         }
+        .alert(
+            "\(model.meetingDetectedApp ?? "") just launched",
+            isPresented: Binding(
+                get: { model.meetingDetectedApp != nil },
+                set: { if !$0 { model.dismissMeetingPrompt() } }
+            )
+        ) {
+            Button("Record this meeting") { model.startMeetingRecording() }
+            Button("Not now", role: .cancel) { model.dismissMeetingPrompt() }
+        } message: {
+            Text("Start a system-audio recording? The result lands in your library as a Meeting.")
+        }
         .onReceive(NotificationCenter.default.publisher(for: .parolaOpenEntry)) { note in
             if let id = note.userInfo?["id"] as? String {
                 model.selectedEntryID = id

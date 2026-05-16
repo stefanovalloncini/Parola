@@ -24,6 +24,15 @@ private struct WatchedFoldersTab: View {
     var body: some View {
         Form {
             Section {
+                Toggle("Auto-detect meeting apps", isOn: $model.meetingDetector.isEnabled)
+                Text("When on, Parola offers to record system audio whenever Zoom, Teams, Webex, or Google Meet launches.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Meetings")
+            }
+
+            Section {
                 if model.watchedFolders.folders.isEmpty {
                     Text("No watched folders yet.")
                         .foregroundStyle(.secondary)
