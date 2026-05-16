@@ -54,33 +54,11 @@ final class AppModel: ObservableObject {
 
     @Published var batchJobs: [BatchJob] = []
     @Published var selectedBatchJobID: BatchJob.ID?
-    private var batchTask: Task<Void, Never>?
+    var batchTask: Task<Void, Never>?
 
-    @AppStorage("batchExportFormats") private var batchExportFormatsRaw: String = "txt,srt"
+    @AppStorage("batchExportFormats") var batchExportFormatsRaw: String = "txt,srt"
     @AppStorage("batchExportToSourceFolder") var batchExportToSourceFolder: Bool = true
     @AppStorage("batchExportIncludeTimestamps") var batchExportIncludeTimestamps: Bool = false
-
-    var batchExportFormats: [ExportFormat] {
-        get {
-            batchExportFormatsRaw
-                .split(separator: ",")
-                .compactMap { ExportFormat(rawValue: String($0)) }
-        }
-        set {
-            batchExportFormatsRaw = newValue.map(\.rawValue).joined(separator: ",")
-        }
-    }
-
-    func addBatchExportFormat(_ format: ExportFormat) {
-        var formats = batchExportFormats
-        guard !formats.contains(format) else { return }
-        formats.append(format)
-        batchExportFormats = formats
-    }
-
-    func removeBatchExportFormat(_ format: ExportFormat) {
-        batchExportFormats = batchExportFormats.filter { $0 != format }
-    }
 
     @Published var findIsOpen: Bool = false
     @Published var findQuery: String = "" { didSet { scheduleRecomputeMatches() } }
@@ -88,7 +66,7 @@ final class AppModel: ObservableObject {
     @Published var findReplacement: String = ""
     @Published var matches: [TranscriptMatch] = []
     @Published var currentMatchIndex: Int = 0
-    private var matchesDebounce: Task<Void, Never>?
+    var matchesDebounce: Task<Void, Never>?
 
     @AppStorage("selectedModel") var selectedModel: String = "openai_whisper-tiny"
     @AppStorage("selectedLanguageRaw") private var selectedLanguageRaw: String = ""
@@ -106,9 +84,9 @@ final class AppModel: ObservableObject {
     @Published var hasVideo: Bool = false
     @Published var currentTimeSeconds: Double = 0
     @Published var isPlaying: Bool = false
-    private var playerTimeObserver: Any?
-    private var timeControlObserver: NSKeyValueObservation?
-    private var playerInstallToken: Int = 0
+    var playerTimeObserver: Any?
+    var timeControlObserver: NSKeyValueObservation?
+    var playerInstallToken: Int = 0
 
     @Published var pendingExport: ExportFormat?
 
@@ -122,54 +100,10 @@ final class AppModel: ObservableObject {
         didSet { saveFindReplaceRules() }
     }
 
-    private func loadIgnoredSegmentRules() {
-        guard let data = UserDefaults.standard.data(forKey: "ignoredSegmentRules"),
-              let rules = try? JSONDecoder().decode([IgnoredSegmentRule].self, from: data) else { return }
-        ignoredSegmentRules = rules
-    }
-
-    private func saveIgnoredSegmentRules() {
-        if let data = try? JSONEncoder().encode(ignoredSegmentRules) {
-            UserDefaults.standard.set(data, forKey: "ignoredSegmentRules")
-        }
-    }
-
-    private func loadFindReplaceRules() {
-        guard let data = UserDefaults.standard.data(forKey: "findReplaceRules"),
-              let rules = try? JSONDecoder().decode([FindReplaceRule].self, from: data) else { return }
-        findReplaceRules = rules
-    }
-
-    private func saveFindReplaceRules() {
-        if let data = try? JSONEncoder().encode(findReplaceRules) {
-            UserDefaults.standard.set(data, forKey: "findReplaceRules")
-        }
-    }
-
     // MARK: - People (speakers)
 
     let peopleStore = PeopleStore()
     @Published var showingSpeakersSheet: Bool = false
-
-    func applySpeakerRenames(_ renames: [String: String]) {
-        guard var transcript = self.transcript else { return }
-        let nonEmpty = renames.compactMapValues { name -> String? in
-            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? nil : trimmed
-        }
-        for (from, to) in nonEmpty {
-            transcript = transcript.renamingSpeaker(from, to: to)
-        }
-        self.transcript = transcript
-        if let id = selectedEntryID {
-            Task { [library] in try? await library.updateTranscript(transcript, for: id) }
-        }
-        Task { [peopleStore] in
-            for to in nonEmpty.values {
-                _ = await peopleStore.recordUsage(name: to)
-            }
-        }
-    }
 
     // MARK: - Prompt library
 
@@ -183,93 +117,10 @@ final class AppModel: ObservableObject {
         let text: String
     }
 
-    func runPrompt(_ prompt: Prompt) {
-        guard let transcript = self.transcript else { return }
-        guard !isRunningPrompt else { return }
-        isRunningPrompt = true
-        promptOutput = nil
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                let model = try LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
-                let result = try await PromptRunner.run(prompt, on: transcript.text, model: model)
-                promptOutput = PromptOutput(promptName: prompt.name, text: result)
-            } catch {
-                phase = .failed(message: "Prompt failed: \(error.localizedDescription)")
-            }
-            isRunningPrompt = false
-        }
-    }
-
-    func generateYouTubeChapters() {
-        guard let transcript = self.transcript else { return }
-        guard !isRunningPrompt else { return }
-        isRunningPrompt = true
-        promptOutput = nil
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                let model = try LanguageModelFactory.makeOnDevice()
-                let result = try await YouTubeChapters.generate(for: transcript, model: model)
-                promptOutput = PromptOutput(promptName: "YouTube Chapters", text: result)
-            } catch {
-                phase = .failed(message: "Chapter generation failed: \(error.localizedDescription)")
-            }
-            isRunningPrompt = false
-        }
-    }
-
-    // MARK: - Chat
-
-    func recordChat(history: [ChatMessage]) {
-        guard var transcript = self.transcript else { return }
-        transcript.chatHistory = history
-        self.transcript = transcript
-        guard let id = selectedEntryID else { return }
-        Task { [library] in
-            try? await library.updateTranscript(transcript, for: id)
-        }
-    }
-
-    func postProcess(_ transcript: Transcript) -> Transcript {
-        var out = transcript
-        out.segments = IgnoredSegments.apply(rules: ignoredSegmentRules, to: out.segments)
-        out.segments = GlobalFindReplace.apply(rules: findReplaceRules, to: out.segments)
-        return out
-    }
-
     // MARK: - Auto-export rules
 
     @Published var autoExportRules: [AutoExportRule] = [] {
         didSet { saveAutoExportRules() }
-    }
-
-    private func loadAutoExportRules() {
-        guard let data = UserDefaults.standard.data(forKey: "autoExportRules"),
-              let rules = try? JSONDecoder().decode([AutoExportRule].self, from: data) else { return }
-        autoExportRules = rules
-    }
-
-    private func saveAutoExportRules() {
-        if let data = try? JSONEncoder().encode(autoExportRules) {
-            UserDefaults.standard.set(data, forKey: "autoExportRules")
-        }
-    }
-
-    private func runAutoExports(transcript: Transcript, sourceURL: URL) {
-        let formats = AutoExportEngine.plannedFormats(
-            rules: autoExportRules,
-            sourceExtension: sourceURL.pathExtension
-        )
-        for format in formats {
-            do {
-                let target = sourceURL.deletingPathExtension().appendingPathExtension(format.fileExtension)
-                let data = try Exporters.exporter(for: format).render(transcript)
-                try data.write(to: target, options: .atomic)
-            } catch {
-                // Auto-export is best-effort; primary transcription already in the library.
-            }
-        }
     }
 
     // MARK: - Watched folders
@@ -319,179 +170,16 @@ final class AppModel: ObservableObject {
         ("com.apple.Notes", "Notes"),
     ]
 
-    func dictationOverridePromptID(for bundleID: String) -> String {
-        guard let data = dictationPerAppOverridesJSON.data(using: .utf8),
-              let map = try? JSONDecoder().decode([String: String].self, from: data) else {
-            return ""
-        }
-        return map[bundleID] ?? ""
-    }
-
-    func setDictationOverridePromptID(_ promptID: String, for bundleID: String) {
-        var map = (try? JSONDecoder().decode([String: String].self, from: dictationPerAppOverridesJSON.data(using: .utf8) ?? Data())) ?? [:]
-        if promptID.isEmpty {
-            map.removeValue(forKey: bundleID)
-        } else {
-            map[bundleID] = promptID
-        }
-        if let data = try? JSONEncoder().encode(map) {
-            dictationPerAppOverridesJSON = String(decoding: data, as: UTF8.self)
-        }
-    }
     @Published var dictationState: DictationCoordinator.State = .idle
-    private var dictationCoordinator: DictationCoordinator?
-    private var dictationHUD: NSPanel?
-
-    private func applyDictationEnabledChange() {
-        if dictationEnabled {
-            startDictation()
-        } else {
-            stopDictation()
-        }
-    }
-
-    private func startDictation() {
-        guard dictationCoordinator == nil else { return }
-        let hotkey = F5HotkeyMonitor()
-        let recorder = MicDictationRecorder(model: selectedModel, language: selectedLanguage)
-        let inserter = ClipboardPasteInserter()
-        let processor = currentDictationProcessor()
-        let coord = DictationCoordinator(
-            hotkey: hotkey,
-            recorder: recorder,
-            inserter: inserter,
-            postProcessor: processor
-        ) { [weak self] state in
-            await MainActor.run { self?.handleDictationState(state) }
-        }
-        dictationCoordinator = coord
-        Task { await coord.startMonitoring() }
-    }
-
-    private func currentDictationCleanupPrompt() -> Prompt? {
-        guard let uuid = UUID(uuidString: dictationCleanupPromptID) else { return nil }
-        return Prompt.builtIns.first { $0.id == uuid }
-    }
-
-    private func currentDictationOverrides() -> [String: Prompt] {
-        guard let data = dictationPerAppOverridesJSON.data(using: .utf8),
-              let map = try? JSONDecoder().decode([String: String].self, from: data) else {
-            return [:]
-        }
-        var out: [String: Prompt] = [:]
-        for (bundleID, promptID) in map {
-            if let uuid = UUID(uuidString: promptID),
-               let prompt = Prompt.builtIns.first(where: { $0.id == uuid }) {
-                out[bundleID] = prompt
-            }
-        }
-        return out
-    }
-
-    private func currentDictationProcessor() -> PromptDictationProcessor {
-        PromptDictationProcessor(
-            defaultPrompt: currentDictationCleanupPrompt(),
-            overrides: currentDictationOverrides()
-        )
-    }
-
-    private func applyDictationCleanupPromptChange() {
-        guard let coord = dictationCoordinator else { return }
-        let processor = currentDictationProcessor()
-        Task { await coord.setPostProcessor(processor) }
-    }
-
-    func startDictationFromIntent() {
-        if !dictationEnabled { dictationEnabled = true }
-        guard let coord = dictationCoordinator else { return }
-        Task { await coord.simulatePress() }
-    }
-
-    func stopDictationFromIntent() {
-        guard let coord = dictationCoordinator else { return }
-        Task { await coord.simulateRelease() }
-    }
-
-    func summarizeLatestEntry() {
-        Task { [weak self, library] in
-            guard let self else { return }
-            let entries = await library.list()
-            guard let latest = entries.first else { return }
-            do {
-                let loaded = try await library.load(latest.id)
-                self.transcript = loaded.document.transcript
-                self.selectedEntryID = latest.id
-                self.summariseTranscript()
-            } catch { }
-        }
-    }
-
-    private func stopDictation() {
-        if let coord = dictationCoordinator {
-            Task { await coord.stopMonitoring() }
-            dictationCoordinator = nil
-        }
-        hideDictationHUD()
-        dictationState = .idle
-    }
-
-    private func handleDictationState(_ state: DictationCoordinator.State) {
-        dictationState = state
-        switch state {
-        case .idle:
-            hideDictationHUD()
-        case .listening, .transcribing:
-            showDictationHUD(state: state)
-        case .failed:
-            showDictationHUD(state: state)
-            Task {
-                try? await Task.sleep(for: .seconds(3))
-                if case .failed = self.dictationState { self.hideDictationHUD() }
-            }
-        }
-    }
-
-    private func showDictationHUD(state: DictationCoordinator.State) {
-        if dictationHUD == nil {
-            dictationHUD = DictationHUD.make { [weak self] in
-                DictationView(state: self?.dictationState ?? .idle)
-            }
-        }
-        if let panel = dictationHUD {
-            if let host = panel.contentView as? NSHostingView<DictationView> {
-                host.rootView = DictationView(state: state)
-            }
-            if let screen = NSScreen.main {
-                let frame = screen.visibleFrame
-                let panelFrame = panel.frame
-                let x = frame.midX - panelFrame.width / 2
-                let y = frame.minY + 100
-                panel.setFrameOrigin(NSPoint(x: x, y: y))
-            }
-            panel.orderFrontRegardless()
-        }
-    }
-
-    private func hideDictationHUD() {
-        dictationHUD?.orderOut(nil)
-    }
+    var dictationCoordinator: DictationCoordinator?
+    var dictationHUD: NSPanel?
 
     // MARK: - Meeting detection
 
     @Published var meetingDetectedApp: String?
-    private var pendingRecordingCategory: EntryCategory = .transcription
+    var pendingRecordingCategory: EntryCategory = .transcription
     lazy var meetingDetector: MeetingDetector = MeetingDetector { [weak self] appName in
         self?.meetingDetectedApp = appName
-    }
-
-    func startMeetingRecording() {
-        meetingDetectedApp = nil
-        pendingRecordingCategory = .meeting
-        startRecording(source: .systemAudio)
-    }
-
-    func dismissMeetingPrompt() {
-        meetingDetectedApp = nil
     }
 
     // MARK: - Library
@@ -501,7 +189,7 @@ final class AppModel: ObservableObject {
     @Published var deletedEntries: [LibraryEntry] = []
     @Published var searchResults: [LibraryEntry]?
     @Published var selectedEntryID: LibraryEntry.ID?
-    private var searchTask: Task<Void, Never>?
+    var searchTask: Task<Void, Never>?
     static let trashRetentionDays = 30
 
     // MARK: - Engine
@@ -530,75 +218,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    // MARK: - Library
-
-    func refreshLibrary() {
-        Task { [weak self] in
-            guard let self else { return }
-            libraryEntries = await library.list()
-            deletedEntries = await library.listDeleted()
-        }
-    }
-
-    func deleteEntry(_ id: LibraryEntry.ID) {
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await library.delete(id)
-                if selectedEntryID == id { selectedEntryID = nil }
-            } catch {
-                phase = .failed(message: error.localizedDescription)
-            }
-            refreshLibrary()
-        }
-    }
-
-    func restoreEntry(_ id: LibraryEntry.ID) {
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await library.restore(id)
-            } catch {
-                phase = .failed(message: error.localizedDescription)
-            }
-            refreshLibrary()
-        }
-    }
-
-    func purgeEntry(_ id: LibraryEntry.ID) {
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await library.purge(id)
-                if selectedEntryID == id { selectedEntryID = nil }
-            } catch {
-                phase = .failed(message: error.localizedDescription)
-            }
-            refreshLibrary()
-        }
-    }
-
-    func loadEntry(_ id: LibraryEntry.ID) {
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                let loaded = try await library.load(id)
-                transcript = loaded.document.transcript
-                sourceFileURL = loaded.document.audioURL
-                if let audioURL = loaded.document.audioURL {
-                    installPlayer(for: audioURL)
-                } else {
-                    player?.pause()
-                    player = nil
-                }
-                phase = .ready
-            } catch {
-                phase = .failed(message: error.localizedDescription)
-            }
-        }
-    }
-
-    private func persistToLibrary(_ result: Transcript, audioSource: URL?) {
+    func persistToLibrary(_ result: Transcript, audioSource: URL?) {
         let category = pendingRecordingCategory
         pendingRecordingCategory = .transcription
         Task { [weak self] in
@@ -619,28 +239,6 @@ final class AppModel: ObservableObject {
             }
         }
     }
-
-    func search(_ query: String) {
-        searchTask?.cancel()
-        let q = query.trimmingCharacters(in: .whitespaces)
-        if q.isEmpty {
-            searchResults = nil
-            return
-        }
-        searchTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(200))
-            guard !Task.isCancelled, let self else { return }
-            let matches = await library.search(q)
-            guard !Task.isCancelled else { return }
-            let scoreByID = Dictionary(uniqueKeysWithValues: matches.map { ($0.entryID, $0.score) })
-            let active = await library.list()
-            guard !Task.isCancelled else { return }
-            searchResults = active
-                .filter { scoreByID[$0.id] != nil }
-                .sorted { (scoreByID[$0.id] ?? 0) > (scoreByID[$1.id] ?? 0) }
-        }
-    }
-
 
     // MARK: - Model list
 
@@ -732,7 +330,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private var currentOptions: TranscriptionOptions {
+    var currentOptions: TranscriptionOptions {
         makeOptions(task: translate ? .translate : .transcribe)
     }
 
@@ -916,188 +514,6 @@ final class AppModel: ObservableObject {
         return url
     }
 
-    // MARK: - Batch
-
-    func startBatch(urls: [URL]) {
-        batchTask?.cancel()
-        let jobs = urls.map { BatchJob(url: $0) }
-        batchJobs = jobs
-        selectedBatchJobID = jobs.first?.id
-
-        let queue = BatchQueue()
-        let opts = currentOptions
-
-        batchTask = Task { @MainActor in
-            let events = await queue.process(jobs: jobs, options: opts)
-            for await event in events {
-                handleBatchEvent(event)
-            }
-        }
-    }
-
-    private func handleBatchEvent(_ event: BatchEvent) {
-        switch event {
-        case .started(let id):
-            guard !isCancelled(id) else { return }
-            mutateBatchJob(id) { $0.status = .transcribing }
-            phase = .transcribing(file: batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/"))
-        case .completed(let id, let transcript):
-            guard !isCancelled(id) else { return }
-            mutateBatchJob(id) { $0.status = .done; $0.transcript = transcript; $0.progress = 1 }
-            if id == selectedBatchJobID { self.transcript = transcript }
-            if let job = batchJobs.first(where: { $0.id == id }) {
-                writeBatchExports(transcript: transcript, sourceURL: job.url)
-            }
-        case .failed(let id, let reason):
-            guard !isCancelled(id) else { return }
-            mutateBatchJob(id) { $0.status = .failed; $0.error = reason }
-        case .finished:
-            phase = .ready
-            let pending = batchJobs.filter { $0.status == .pending }
-            if !pending.isEmpty {
-                resumeBatch(pendingJobs: pending)
-            }
-        }
-    }
-
-    private func resumeBatch(pendingJobs: [BatchJob]) {
-        batchTask?.cancel()
-        let queue = BatchQueue()
-        let opts = currentOptions
-        batchTask = Task { @MainActor in
-            let events = await queue.process(jobs: pendingJobs, options: opts)
-            for await event in events {
-                handleBatchEvent(event)
-            }
-        }
-    }
-
-    private func writeBatchExports(transcript: Transcript, sourceURL: URL) {
-        let formats = batchExportFormats
-        guard !formats.isEmpty, batchExportToSourceFolder else { return }
-        Task.detached {
-            for format in formats {
-                let target = sourceURL.deletingPathExtension().appendingPathExtension(format.fileExtension)
-                do {
-                    let data = try Exporters.exporter(for: format).render(transcript)
-                    try data.write(to: target, options: .atomic)
-                } catch {
-                    // Sidecar write is best-effort; the transcript is already saved.
-                }
-            }
-        }
-    }
-
-    func addBatchFiles(_ urls: [URL]) {
-        guard !urls.isEmpty else { return }
-        if batchIsRunning {
-            batchJobs.append(contentsOf: urls.map { BatchJob(url: $0) })
-        } else if batchJobs.isEmpty {
-            startBatch(urls: urls)
-        } else {
-            let newJobs = urls.map { BatchJob(url: $0) }
-            batchJobs.append(contentsOf: newJobs)
-            resumeBatch(pendingJobs: newJobs)
-        }
-    }
-
-    var batchIsRunning: Bool {
-        batchJobs.contains { $0.status == .transcribing }
-    }
-
-    func cancelBatchJob(_ id: BatchJob.ID) {
-        guard let idx = batchJobs.firstIndex(where: { $0.id == id }) else { return }
-        let job = batchJobs[idx]
-        switch job.status {
-        case .transcribing:
-            batchTask?.cancel()
-            batchTask = nil
-            mutateBatchJob(id) { $0.status = .cancelled }
-            phase = .ready
-            let remaining = batchJobs.filter { $0.status == .pending }
-            if !remaining.isEmpty {
-                resumeBatch(pendingJobs: remaining)
-            }
-        case .pending, .done, .failed, .cancelled:
-            batchJobs.remove(at: idx)
-            if selectedBatchJobID == id { selectedBatchJobID = batchJobs.first?.id }
-        }
-    }
-
-    func presentBatchOpenPanel() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.audio, .movie]
-        panel.allowsMultipleSelection = true
-        panel.message = "Select audio or video files to transcribe."
-        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
-        addBatchFiles(panel.urls)
-    }
-
-    private func isCancelled(_ id: BatchJob.ID) -> Bool {
-        batchJobs.first(where: { $0.id == id })?.status == .cancelled
-    }
-
-    private func mutateBatchJob(_ id: BatchJob.ID, _ change: (inout BatchJob) -> Void) {
-        guard let idx = batchJobs.firstIndex(where: { $0.id == id }) else { return }
-        change(&batchJobs[idx])
-    }
-
-    func selectBatchJob(_ id: BatchJob.ID) {
-        selectedBatchJobID = id
-        if let job = batchJobs.first(where: { $0.id == id }), let t = job.transcript {
-            transcript = t
-            installPlayer(for: job.url)
-        }
-    }
-
-    func clearBatch() {
-        batchTask?.cancel()
-        batchTask = nil
-        batchJobs = []
-        selectedBatchJobID = nil
-    }
-
-    func cancelAllInFlightBatchJobs() {
-        batchTask?.cancel()
-        batchTask = nil
-        for idx in batchJobs.indices where batchJobs[idx].status == .pending || batchJobs[idx].status == .transcribing {
-            batchJobs[idx].status = .cancelled
-        }
-    }
-
-    func retryBatchJob(_ id: BatchJob.ID) {
-        guard let idx = batchJobs.firstIndex(where: { $0.id == id }) else { return }
-        batchJobs[idx].status = .pending
-        batchJobs[idx].error = nil
-        batchJobs[idx].progress = 0
-        batchJobs[idx].transcript = nil
-
-        let job = batchJobs[idx]
-        let opts = currentOptions
-        batchTask = Task { @MainActor in
-            let events = await BatchQueue().process(jobs: [job], options: opts)
-            for await event in events {
-                handleBatchEvent(event)
-            }
-        }
-    }
-
-    func clearFinishedBatchJobs() {
-        batchJobs.removeAll { $0.status == .done || $0.status == .cancelled || $0.status == .failed }
-        if let selected = selectedBatchJobID, !batchJobs.contains(where: { $0.id == selected }) {
-            selectedBatchJobID = batchJobs.first?.id
-        }
-    }
-
-    func openBatchJobTranscript(_ id: BatchJob.ID) {
-        guard let job = batchJobs.first(where: { $0.id == id }), let t = job.transcript else { return }
-        selectedBatchJobID = id
-        transcript = t
-        installPlayer(for: job.url)
-        phase = .ready
-        route = .transcript
-    }
-
     func dismissError() {
         phase = .idle
     }
@@ -1218,64 +634,6 @@ final class AppModel: ObservableObject {
         }
     }
 
-    // MARK: - Player & seek
-
-    private func installPlayer(for url: URL) {
-        if let obs = playerTimeObserver, let player {
-            player.removeTimeObserver(obs)
-        }
-        timeControlObserver?.invalidate()
-        timeControlObserver = nil
-        player?.pause()
-        playerTimeObserver = nil
-        let p = AVPlayer(url: url)
-        player = p
-        hasVideo = false
-        currentTimeSeconds = 0
-        isPlaying = false
-        playerInstallToken &+= 1
-        let token = playerInstallToken
-        let interval = CMTime(seconds: 0.2, preferredTimescale: 600)
-        playerTimeObserver = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            let seconds = CMTimeGetSeconds(time)
-            MainActor.assumeIsolated {
-                self?.currentTimeSeconds = seconds
-                self?.updateCurrentSegment(time: seconds)
-            }
-        }
-        timeControlObserver = p.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
-            let playing = player.timeControlStatus == .playing
-            Task { @MainActor in
-                self?.isPlaying = playing
-            }
-        }
-        let asset = AVURLAsset(url: url)
-        Task { [weak self] in
-            let tracks = (try? await asset.loadTracks(withMediaType: .video)) ?? []
-            guard let self, self.playerInstallToken == token else { return }
-            self.hasVideo = !tracks.isEmpty
-        }
-    }
-
-    private func updateCurrentSegment(time: Double) {
-        guard let segments = transcript?.segments else { return }
-        let match = segments.first(where: { time >= $0.start && time <= $0.end })
-        if currentSegmentID != match?.id {
-            currentSegmentID = match?.id
-        }
-        let newWordID = match?.word(at: time)?.id
-        if currentWordID != newWordID {
-            currentWordID = newWordID
-        }
-    }
-
-    func seek(to segment: TranscriptSegment) {
-        guard let player else { return }
-        let t = CMTime(seconds: segment.start, preferredTimescale: 600)
-        player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
-        player.play()
-    }
-
     // MARK: - Editing
 
     func editSegment(id: TranscriptSegment.ID, newText: String) {
@@ -1295,66 +653,6 @@ final class AppModel: ObservableObject {
             matches = []
             currentMatchIndex = 0
         }
-    }
-
-    private func scheduleRecomputeMatches() {
-        matchesDebounce?.cancel()
-        matchesDebounce = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(150))
-            guard !Task.isCancelled else { return }
-            self?.recomputeMatches()
-        }
-    }
-
-    private func recomputeMatches() {
-        guard findIsOpen, let transcript else {
-            matches = []
-            currentMatchIndex = 0
-            return
-        }
-        matches = transcript.findMatches(findQuery, caseSensitive: findCaseSensitive)
-        currentMatchIndex = min(currentMatchIndex, max(matches.count - 1, 0))
-        snapToCurrentMatch()
-    }
-
-    func goToNextMatch() {
-        guard !matches.isEmpty else { return }
-        currentMatchIndex = (currentMatchIndex + 1) % matches.count
-        snapToCurrentMatch()
-    }
-
-    func goToPreviousMatch() {
-        guard !matches.isEmpty else { return }
-        currentMatchIndex = (currentMatchIndex - 1 + matches.count) % matches.count
-        snapToCurrentMatch()
-    }
-
-    func replaceCurrentMatch() {
-        guard let transcript, !matches.isEmpty else { return }
-        let match = matches[currentMatchIndex]
-        self.transcript = transcript.applying(replacement: findReplacement, to: match)
-        recomputeMatches()
-    }
-
-    func replaceAllMatches() {
-        guard let transcript, !findQuery.isEmpty else { return }
-        self.transcript = transcript.replacingAll(findQuery, with: findReplacement, caseSensitive: findCaseSensitive)
-        recomputeMatches()
-    }
-
-    private func snapToCurrentMatch() {
-        guard !matches.isEmpty else { return }
-        let id = matches[currentMatchIndex].segmentID
-        currentSegmentID = id
-    }
-
-    func match(in segmentID: TranscriptSegment.ID) -> [TranscriptMatch] {
-        matches.filter { $0.segmentID == segmentID }
-    }
-
-    var currentMatch: TranscriptMatch? {
-        guard !matches.isEmpty else { return nil }
-        return matches[currentMatchIndex]
     }
 
     // MARK: - Project document
@@ -1415,13 +713,6 @@ final class AppModel: ObservableObject {
                 isSummarising = false
             }
         }
-    }
-
-    func seekTo(chapter: Chapter) {
-        guard let player else { return }
-        let t = CMTime(seconds: chapter.start, preferredTimescale: 600)
-        player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
-        player.play()
     }
 
     // MARK: - Burn subtitles into video
