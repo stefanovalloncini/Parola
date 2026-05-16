@@ -5,8 +5,8 @@ enum DictationHUD {
     @MainActor
     static func make<Content: View>(@ViewBuilder content: @escaping () -> Content) -> NSPanel {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 64),
-            styleMask: [.nonactivatingPanel, .hudWindow],
+            contentRect: NSRect(x: 0, y: 0, width: 228, height: 64),
+            styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered,
             defer: false
         )
@@ -18,6 +18,9 @@ enum DictationHUD {
         panel.isMovableByWindowBackground = true
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
         panel.contentView = NSHostingView(rootView: content())
         return panel
     }
