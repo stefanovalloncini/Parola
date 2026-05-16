@@ -11,9 +11,61 @@ struct SettingsView: View {
             ToolsTab().tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
             AutoExportTab().tabItem { Label("Auto-Export", systemImage: "square.and.arrow.up") }
             FiltersTab().tabItem { Label("Filters", systemImage: "line.3.horizontal.decrease.circle") }
+            WatchedFoldersTab().tabItem { Label("Watched", systemImage: "folder.badge.gearshape") }
             AboutTab().tabItem { Label("About", systemImage: "info.circle") }
         }
         .padding()
+    }
+}
+
+private struct WatchedFoldersTab: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        Form {
+            Section {
+                if model.watchedFolders.folders.isEmpty {
+                    Text("No watched folders yet.")
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 8)
+                } else {
+                    ForEach(model.watchedFolders.folders) { folder in
+                        HStack {
+                            Image(systemName: "folder")
+                                .foregroundStyle(.tint)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(folder.displayName).font(.body)
+                                Text(folder.displayPath)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                            Spacer()
+                            Button(role: .destructive) {
+                                model.watchedFolders.removeFolder(folder.id)
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+                Button {
+                    model.watchedFolders.presentAddFolderPanel()
+                } label: {
+                    Label("Add Folder…", systemImage: "plus.circle")
+                }
+            } header: {
+                Text("Watched folders")
+            } footer: {
+                Text("New audio or video files dropped into a watched folder are transcribed automatically. Existing files are ignored — only files added after the folder is being watched count.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 

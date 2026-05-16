@@ -154,6 +154,12 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: - Watched folders
+
+    lazy var watchedFolders: WatchedFoldersStore = WatchedFoldersStore { [weak self] url in
+        self?.transcribe(fileURL: url)
+    }
+
     // MARK: - Library
 
     let library = LibraryStore()
@@ -181,6 +187,7 @@ final class AppModel: ObservableObject {
         refreshModelList()
         refreshYtDlpAvailability()
         refreshLibrary()
+        _ = watchedFolders   // touch lazy var to start watchers on launch
         Task { [weak self, library] in
             await library.purgeDeletedOlderThan(days: AppModel.trashRetentionDays, now: Date())
             self?.refreshLibrary()
