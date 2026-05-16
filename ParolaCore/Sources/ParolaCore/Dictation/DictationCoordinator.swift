@@ -13,18 +13,25 @@ public actor DictationCoordinator {
     private let hotkey: any HotkeyMonitor
     private let recorder: any DictationRecorder
     private let inserter: any TextInserter
+    private var postProcessor: any TextPostProcessor
     private let onStateChange: @Sendable (State) async -> Void
 
     public init(
         hotkey: any HotkeyMonitor,
         recorder: any DictationRecorder,
         inserter: any TextInserter,
+        postProcessor: any TextPostProcessor = PassThroughPostProcessor(),
         onStateChange: @escaping @Sendable (State) async -> Void = { _ in }
     ) {
         self.hotkey = hotkey
         self.recorder = recorder
         self.inserter = inserter
+        self.postProcessor = postProcessor
         self.onStateChange = onStateChange
+    }
+
+    public func setPostProcessor(_ processor: any TextPostProcessor) {
+        postProcessor = processor
     }
 
     public func startMonitoring() async {
@@ -56,10 +63,14 @@ public actor DictationCoordinator {
             guard state == .listening else { return }
             await setState(.transcribing)
             do {
-                let text = try await recorder.stopAndTranscribe()
-                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                let raw = try await recorder.stopAndTranscribe()
+                let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {
-                    await inserter.insert(trimmed)
+                    let processed = await postProcessor.process(trimmed)
+                    let final = processed.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !final.isEmpty {
+                        await inserter.insert(final)
+                    }
                 }
                 await setState(.idle)
             } catch {

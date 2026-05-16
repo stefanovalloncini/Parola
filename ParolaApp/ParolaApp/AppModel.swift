@@ -258,6 +258,9 @@ final class AppModel: ObservableObject {
     @AppStorage("dictationEnabled") var dictationEnabled: Bool = false {
         didSet { applyDictationEnabledChange() }
     }
+    @AppStorage("dictationCleanupPromptID") var dictationCleanupPromptID: String = "" {
+        didSet { applyDictationCleanupPromptChange() }
+    }
     @Published var dictationState: DictationCoordinator.State = .idle
     private var dictationCoordinator: DictationCoordinator?
     private var dictationHUD: NSPanel?
@@ -275,15 +278,28 @@ final class AppModel: ObservableObject {
         let hotkey = F5HotkeyMonitor()
         let recorder = MicDictationRecorder(model: selectedModel, language: selectedLanguage)
         let inserter = ClipboardPasteInserter()
+        let processor = PromptDictationProcessor(prompt: currentDictationCleanupPrompt())
         let coord = DictationCoordinator(
             hotkey: hotkey,
             recorder: recorder,
-            inserter: inserter
+            inserter: inserter,
+            postProcessor: processor
         ) { [weak self] state in
             await MainActor.run { self?.handleDictationState(state) }
         }
         dictationCoordinator = coord
         Task { await coord.startMonitoring() }
+    }
+
+    private func currentDictationCleanupPrompt() -> Prompt? {
+        guard let uuid = UUID(uuidString: dictationCleanupPromptID) else { return nil }
+        return Prompt.builtIns.first { $0.id == uuid }
+    }
+
+    private func applyDictationCleanupPromptChange() {
+        guard let coord = dictationCoordinator else { return }
+        let processor = PromptDictationProcessor(prompt: currentDictationCleanupPrompt())
+        Task { await coord.setPostProcessor(processor) }
     }
 
     private func stopDictation() {

@@ -150,4 +150,48 @@ struct DictationCoordinatorTests {
         let inserted = await inserter.inserted
         #expect(inserted.isEmpty)
     }
+
+    private struct UppercasePostProcessor: TextPostProcessor {
+        func process(_ text: String) async -> String { text.uppercased() }
+    }
+
+    private struct EmptyingPostProcessor: TextPostProcessor {
+        func process(_ text: String) async -> String { "" }
+    }
+
+    @Test("post-processor transforms text before inserting")
+    func postProcessorTransforms() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .text("hello world"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(
+            hotkey: hotkey,
+            recorder: recorder,
+            inserter: inserter,
+            postProcessor: UppercasePostProcessor()
+        )
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await coord.handle(.release)
+        let inserted = await inserter.inserted
+        #expect(inserted == ["HELLO WORLD"])
+    }
+
+    @Test("post-processor that returns empty text skips insertion")
+    func postProcessorEmptyOutputSkips() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .text("hello"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(
+            hotkey: hotkey,
+            recorder: recorder,
+            inserter: inserter,
+            postProcessor: EmptyingPostProcessor()
+        )
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await coord.handle(.release)
+        let inserted = await inserter.inserted
+        #expect(inserted.isEmpty)
+    }
 }

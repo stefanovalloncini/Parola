@@ -36,6 +36,21 @@ private struct DictationTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                Picker("Cleanup mode", selection: $model.dictationCleanupPromptID) {
+                    Text("Raw (no cleanup)").tag("")
+                    ForEach(Prompt.builtIns) { prompt in
+                        Text(prompt.name).tag(prompt.id.uuidString)
+                    }
+                }
+            } header: {
+                Text("Post-processing")
+            } footer: {
+                Text("After Whisper transcribes your dictation, the selected prompt rewrites the text before it's pasted. Adds ~0.5–2s. Choose Raw for the fastest insertion.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
     }
