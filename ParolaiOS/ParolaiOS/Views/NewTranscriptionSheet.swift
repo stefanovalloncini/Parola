@@ -88,6 +88,14 @@ struct NewTranscriptionSheet: View {
 private struct LiveRecordingPane: View {
     @EnvironmentObject var model: AppModel
 
+    private func scrollToTail(_ proxy: ScrollViewProxy) {
+        if !model.coordinator.livePartialText.isEmpty {
+            proxy.scrollTo("__partial", anchor: .bottom)
+        } else if let last = model.coordinator.liveSegments.last {
+            proxy.scrollTo(last.id, anchor: .bottom)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -117,9 +125,10 @@ private struct LiveRecordingPane: View {
                     .padding()
                 }
                 .onChange(of: model.coordinator.liveSegments.count) { _, _ in
-                    if let last = model.coordinator.liveSegments.last {
-                        proxy.scrollTo(last.id, anchor: .bottom)
-                    }
+                    scrollToTail(proxy)
+                }
+                .onChange(of: model.coordinator.livePartialText) { _, _ in
+                    scrollToTail(proxy)
                 }
             }
         }
