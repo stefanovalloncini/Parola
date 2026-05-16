@@ -12,28 +12,70 @@ struct Models: AsyncParsableCommand {
     struct List: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             commandName: "list",
-            abstract: "List available and installed models."
+            abstract: "List available and installed models, grouped by category."
         )
 
         @Flag(help: "Output as JSON.")
         var json: Bool = false
 
+        @Flag(help: "Flat list, ungrouped.")
+        var flat: Bool = false
+
         func run() async throws {
             let store = ModelStore.shared
             let entries = store.catalog()
-            let extra = (try? store.installedModels())?.filter { entry in
-                !entries.contains { $0.name == entry.name }
-            } ?? []
-            let all = entries + extra
 
             if json {
-                let data = try JSONEncoder.pretty.encode(all)
+                let data = try JSONEncoder.pretty.encode(entries)
                 print(String(decoding: data, as: UTF8.self))
                 return
             }
-            let labelWidth = (all.map { $0.label.count }.max() ?? 0) + 2
-            let nameWidth = (all.map { $0.name.count }.max() ?? 0) + 2
-            for m in all {
+
+            if flat {
+                printFlat(entries)
+                return
+            }
+
+            let grouped = ModelCatalog.groupedForPicker()
+            let nameWidth = (entries.map { $0.name.count }.max() ?? 0) + 2
+
+            for (index, group) in grouped.enumerated() {
+                let (category, variants) = group
+                if index > 0 { print("") }
+                print(category.displayName.uppercased())
+                for variant in variants {
+                    let installed = entries.first { $0.name == variant.id }?.isInstalled ?? false
+                    let mark = installed ? "✓" : " "
+                    let name = variant.id.padding(toLength: nameWidth, withPad: " ", startingAt: 0)
+                    let size = humanBytes(Int(variant.sizeBytes))
+                    let langs: String
+                    switch variant.languageScope {
+                    case .some(.only(let codes)) where codes == ["en"]: langs = "English"
+                    case .some(.only): langs = "Subset"
+                    default: langs = "Multilingual"
+                    }
+                    print("\(mark)  \(name)\(variant.displayName) — \(langs), \(size)")
+                    print("      \(variant.tagline)")
+                }
+            }
+
+            let extra = (try? store.installedModels())?.filter { entry in
+                !entries.contains { $0.name == entry.name }
+            } ?? []
+            if !extra.isEmpty {
+                print("\nOTHER INSTALLED")
+                for m in extra {
+                    let name = m.name.padding(toLength: nameWidth, withPad: " ", startingAt: 0)
+                    let size = m.approximateSizeBytes.map(humanBytes) ?? "—"
+                    print("✓  \(name)\(m.label) — \(size)")
+                }
+            }
+        }
+
+        private func printFlat(_ entries: [ModelInfo]) {
+            let labelWidth = (entries.map { $0.label.count }.max() ?? 0) + 2
+            let nameWidth = (entries.map { $0.name.count }.max() ?? 0) + 2
+            for m in entries {
                 let mark = m.isInstalled ? "✓" : " "
                 let size = m.approximateSizeBytes.map(humanBytes) ?? "—"
                 let label = m.label.padding(toLength: labelWidth, withPad: " ", startingAt: 0)
