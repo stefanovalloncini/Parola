@@ -20,13 +20,20 @@ struct MacLibrarySidebar: View {
                         title: "Home",
                         systemImage: "house.fill",
                         isSelected: selectedRoute == .home
-                    ) { selectedRoute = .home }
+                    ) {
+                        selectedRoute = .home
+                        model.route = .transcript
+                    }
 
                     SidebarRow(
                         title: "Queue",
                         systemImage: "list.bullet.indent",
-                        isSelected: selectedRoute == .queue
-                    ) { selectedRoute = .queue }
+                        isSelected: selectedRoute == .queue,
+                        badge: activeQueueBadge
+                    ) {
+                        selectedRoute = .queue
+                        model.route = .queue
+                    }
 
                     SectionLabel("History").padding(.top, 14)
 
@@ -90,6 +97,11 @@ struct MacLibrarySidebar: View {
         .onChange(of: searchText) { _, newValue in model.search(newValue) }
     }
 
+    private var activeQueueBadge: Int? {
+        let n = model.batchJobs.filter { $0.status == .pending || $0.status == .transcribing }.count
+        return n > 0 ? n : nil
+    }
+
     private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
@@ -141,6 +153,7 @@ private struct SidebarRow: View {
     let title: String
     let systemImage: String
     let isSelected: Bool
+    var badge: Int? = nil
     let action: () -> Void
 
     @State private var isHovering = false
@@ -155,6 +168,20 @@ private struct SidebarRow: View {
                     .font(.subheadline)
                     .lineLimit(1)
                 Spacer(minLength: 0)
+                if let badge {
+                    Text("\(badge)")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(isSelected ? Color.white.opacity(0.9) : .secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(
+                            Capsule().fill(
+                                isSelected
+                                    ? Color.white.opacity(0.18)
+                                    : Color.primary.opacity(0.10)
+                            )
+                        )
+                }
             }
             .foregroundStyle(isSelected ? Color.white : Color.primary)
             .padding(.horizontal, 10)

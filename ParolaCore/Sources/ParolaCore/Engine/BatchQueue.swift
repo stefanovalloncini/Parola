@@ -6,6 +6,7 @@ public struct BatchJob: Identifiable, Sendable, Hashable, Codable {
         case transcribing
         case done
         case failed
+        case cancelled
     }
 
     public var id: UUID

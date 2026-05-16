@@ -239,6 +239,7 @@ private struct BatchJobRow: View {
                 : "Transcribing…"
         case .done: return "Complete"
         case .failed: return job.error ?? "Failed"
+        case .cancelled: return "Cancelled"
         }
     }
 
@@ -248,6 +249,7 @@ private struct BatchJobRow: View {
         case .transcribing: return DS.Color.accent
         case .done: return Color(red: 0.36, green: 0.66, blue: 0.46)
         case .failed: return DS.Color.danger
+        case .cancelled: return DS.Color.secondaryText
         }
     }
 
@@ -321,6 +323,11 @@ private struct BatchJobRow: View {
             ProgressView(value: 1)
                 .progressViewStyle(.linear)
                 .tint(DS.Color.danger)
+                .frame(height: 3)
+        case .cancelled:
+            ProgressView(value: job.progress)
+                .progressViewStyle(.linear)
+                .tint(DS.Color.secondaryText)
                 .frame(height: 3)
         }
     }

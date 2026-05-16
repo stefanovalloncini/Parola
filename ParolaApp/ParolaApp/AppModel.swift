@@ -31,9 +31,10 @@ final class AppModel: ObservableObject {
         }
     }
 
-    enum Route: Equatable {
+    enum Route: Hashable {
         case transcript
         case batch
+        case queue
     }
 
     @Published var route: Route = .transcript
@@ -937,15 +938,18 @@ final class AppModel: ObservableObject {
     private func handleBatchEvent(_ event: BatchEvent) {
         switch event {
         case .started(let id):
+            guard !isCancelled(id) else { return }
             mutateBatchJob(id) { $0.status = .transcribing }
             phase = .transcribing(file: batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/"))
         case .completed(let id, let transcript):
+            guard !isCancelled(id) else { return }
             mutateBatchJob(id) { $0.status = .done; $0.transcript = transcript; $0.progress = 1 }
             if id == selectedBatchJobID { self.transcript = transcript }
             if let job = batchJobs.first(where: { $0.id == id }) {
                 writeBatchExports(transcript: transcript, sourceURL: job.url)
             }
         case .failed(let id, let reason):
+            guard !isCancelled(id) else { return }
             mutateBatchJob(id) { $0.status = .failed; $0.error = reason }
         case .finished:
             phase = .ready
@@ -1008,13 +1012,13 @@ final class AppModel: ObservableObject {
         case .transcribing:
             batchTask?.cancel()
             batchTask = nil
-            mutateBatchJob(id) { $0.status = .failed; $0.error = "Cancelled" }
+            mutateBatchJob(id) { $0.status = .cancelled }
             phase = .ready
             let remaining = batchJobs.filter { $0.status == .pending }
             if !remaining.isEmpty {
                 resumeBatch(pendingJobs: remaining)
             }
-        case .pending, .done, .failed:
+        case .pending, .done, .failed, .cancelled:
             batchJobs.remove(at: idx)
             if selectedBatchJobID == id { selectedBatchJobID = batchJobs.first?.id }
         }
@@ -1027,6 +1031,10 @@ final class AppModel: ObservableObject {
         panel.message = "Select audio or video files to transcribe."
         guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
         addBatchFiles(panel.urls)
+    }
+
+    private func isCancelled(_ id: BatchJob.ID) -> Bool {
+        batchJobs.first(where: { $0.id == id })?.status == .cancelled
     }
 
     private func mutateBatchJob(_ id: BatchJob.ID, _ change: (inout BatchJob) -> Void) {
@@ -1047,6 +1055,47 @@ final class AppModel: ObservableObject {
         batchTask = nil
         batchJobs = []
         selectedBatchJobID = nil
+    }
+
+    func cancelAllInFlightBatchJobs() {
+        batchTask?.cancel()
+        batchTask = nil
+        for idx in batchJobs.indices where batchJobs[idx].status == .pending || batchJobs[idx].status == .transcribing {
+            batchJobs[idx].status = .cancelled
+        }
+    }
+
+    func retryBatchJob(_ id: BatchJob.ID) {
+        guard let idx = batchJobs.firstIndex(where: { $0.id == id }) else { return }
+        batchJobs[idx].status = .pending
+        batchJobs[idx].error = nil
+        batchJobs[idx].progress = 0
+        batchJobs[idx].transcript = nil
+
+        let job = batchJobs[idx]
+        let opts = currentOptions
+        batchTask = Task { @MainActor in
+            let events = await BatchQueue().process(jobs: [job], options: opts)
+            for await event in events {
+                handleBatchEvent(event)
+            }
+        }
+    }
+
+    func clearFinishedBatchJobs() {
+        batchJobs.removeAll { $0.status == .done || $0.status == .cancelled || $0.status == .failed }
+        if let selected = selectedBatchJobID, !batchJobs.contains(where: { $0.id == selected }) {
+            selectedBatchJobID = batchJobs.first?.id
+        }
+    }
+
+    func openBatchJobTranscript(_ id: BatchJob.ID) {
+        guard let job = batchJobs.first(where: { $0.id == id }), let t = job.transcript else { return }
+        selectedBatchJobID = id
+        transcript = t
+        installPlayer(for: job.url)
+        phase = .ready
+        route = .transcript
     }
 
     func dismissError() {
