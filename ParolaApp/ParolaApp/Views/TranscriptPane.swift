@@ -20,46 +20,99 @@ struct PlayerSurface: NSViewRepresentable {
     }
 }
 
+enum TranscriptDisplayMode: String {
+    case transcript
+    case segments
+}
+
+enum InspectorMode: String, CaseIterable, Identifiable {
+    case format
+    case info
+    var id: String { rawValue }
+}
+
 struct TranscriptPane: View {
     @EnvironmentObject var model: AppModel
-    @State private var rightTab: RightTab = .player
-
-    enum RightTab { case player, summary, chat }
+    @AppStorage("inspectorVisible") private var inspectorVisible: Bool = true
+    @AppStorage("inspectorMode") private var inspectorModeRaw: String = InspectorMode.format.rawValue
+    @State private var summarySheetOpen = false
+    @State private var chatSheetOpen = false
 
     var body: some View {
         VStack(spacing: 0) {
+            TranscriptHeaderBar(
+                title: headerTitle,
+                onAdvance: advanceToNext,
+                onOpenSummary: { summarySheetOpen = true },
+                onOpenChat: { chatSheetOpen = true }
+            )
+            Divider()
+
             if model.findIsOpen {
                 FindBar()
             }
+
             HSplitView {
-                transcriptList
+                transcriptColumn
                     .frame(minWidth: 320)
 
-                rightColumn
-                    .frame(minWidth: 320)
+                if inspectorVisible {
+                    TranscriptInspector(
+                        mode: Binding(
+                            get: { InspectorMode(rawValue: inspectorModeRaw) ?? .format },
+                            set: { inspectorModeRaw = $0.rawValue }
+                        ),
+                        inspectorVisible: $inspectorVisible
+                    )
+                    .frame(minWidth: 280, idealWidth: 300, maxWidth: 340)
+                }
             }
+        }
+        .sheet(isPresented: $summarySheetOpen) {
+            SummarySheet().environmentObject(model)
+        }
+        .sheet(isPresented: $chatSheetOpen) {
+            ChatSheet().environmentObject(model)
         }
     }
 
-    @ViewBuilder
-    private var rightColumn: some View {
+    private var headerTitle: String {
+        if let url = model.sourceFileURL {
+            return url.deletingPathExtension().lastPathComponent
+        }
+        if let entryID = model.selectedEntryID,
+           let entry = model.libraryEntries.first(where: { $0.id == entryID }) {
+            return entry.title
+        }
+        return "Untitled"
+    }
+
+    private func advanceToNext() {
+        guard let segments = model.transcript?.segments, !segments.isEmpty else { return }
+        if let current = model.currentSegmentID,
+           let idx = segments.firstIndex(where: { $0.id == current }),
+           idx + 1 < segments.count {
+            model.seek(to: segments[idx + 1])
+        } else if let first = segments.first {
+            model.seek(to: first)
+        }
+    }
+
+    private var transcriptColumn: some View {
         VStack(spacing: 0) {
-            Picker("Right pane", selection: $rightTab) {
-                Text("Player").tag(RightTab.player)
-                Text("Summary").tag(RightTab.summary)
-                Text("Chat").tag(RightTab.chat)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .padding(.horizontal, DS.Spacing.regular)
-            .padding(.top, DS.Spacing.regular)
+            transcriptList
 
-            Divider().padding(.top, DS.Spacing.small)
-
-            switch rightTab {
-            case .player: playerColumn
-            case .summary: SummaryPane()
-            case .chat: ChatPane()
+            if let player = model.player {
+                Divider()
+                if model.hasVideo {
+                    PlayerSurface(player: player)
+                        .frame(height: 200)
+                        .background(Color.black)
+                } else {
+                    AudioTransportBar()
+                        .padding(.horizontal, DS.Spacing.regular)
+                        .padding(.vertical, DS.Spacing.small)
+                }
             }
         }
     }
@@ -86,62 +139,455 @@ struct TranscriptPane: View {
             }
         }
     }
+}
 
-    @ViewBuilder
-    private var playerColumn: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.medium) {
-            if model.hasVideo, let player = model.player {
-                PlayerSurface(player: player)
-                    .frame(height: 220)
-                    .background(Color.black)
-                    .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular))
-                    .padding(.horizontal, DS.Spacing.regular)
-                    .padding(.top, DS.Spacing.regular)
-            } else if model.player != nil {
-                AudioTransportBar()
-                    .padding(.horizontal, DS.Spacing.regular)
-                    .padding(.top, DS.Spacing.regular)
+private struct TranscriptHeaderBar: View {
+    let title: String
+    let onAdvance: () -> Void
+    let onOpenSummary: () -> Void
+    let onOpenChat: () -> Void
+
+    var body: some View {
+        HStack(spacing: DS.Spacing.small) {
+            Text(title)
+                .font(DS.Font.heading)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button(action: onOpenSummary) {
+                Image(systemName: "sparkles")
             }
+            .buttonStyle(.borderless)
+            .help("Summary")
 
-            if let t = model.transcript {
-                TranscriptInfoCard(transcript: t)
-                    .padding(.horizontal, DS.Spacing.regular)
+            Button(action: onOpenChat) {
+                Image(systemName: "bubble.left.and.text.bubble.right")
             }
+            .buttonStyle(.borderless)
+            .help("Chat with this transcript")
 
-            Spacer()
-
-            HStack(spacing: DS.Spacing.small) {
-                Button {
-                    if let t = model.transcript {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(t.text, forType: .string)
-                    }
-                } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
-                }
-                Spacer()
-                Menu {
-                    Button("As Plain Text…") { model.exportRequest(.txt) }
-                    Button("As Markdown…") { model.exportRequest(.md) }
-                    Button("As HTML…") { model.exportRequest(.html) }
-                    Button("As Word (.docx)…") { model.exportRequest(.docx) }
-                    Button("As PDF…") { model.exportRequest(.pdf) }
-                    Button("As CSV…") { model.exportRequest(.csv) }
-                    Button("As SubRip (.srt)…") { model.exportRequest(.srt) }
-                    Button("As WebVTT (.vtt)…") { model.exportRequest(.vtt) }
-                    Button("As JSON…") { model.exportRequest(.json) }
-                } label: {
-                    Label("Export", systemImage: "square.and.arrow.up")
-                }
-                .menuStyle(.borderedButton)
-                .fixedSize()
+            Button(action: onAdvance) {
+                Image(systemName: "chevron.right.2")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 28, height: 22)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(DS.Color.surfaceElevated)
+                    )
             }
-            .padding(.horizontal, DS.Spacing.regular)
-            .padding(.bottom, DS.Spacing.regular)
+            .buttonStyle(.plain)
+            .help("Jump to next segment")
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.small)
     }
 }
+
+// MARK: - Inspector
+
+private struct TranscriptInspector: View {
+    @EnvironmentObject var model: AppModel
+    @Binding var mode: InspectorMode
+    @Binding var inspectorVisible: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            modeRow
+                .padding(.horizontal, DS.Spacing.regular)
+                .padding(.vertical, DS.Spacing.small)
+            Divider()
+
+            ScrollView {
+                Group {
+                    switch mode {
+                    case .format: FormatInspector()
+                    case .info: InfoInspector()
+                    }
+                }
+                .padding(DS.Spacing.regular)
+            }
+        }
+        .background(DS.Color.surface)
+    }
+
+    private var modeRow: some View {
+        HStack(spacing: DS.Spacing.tight) {
+            InspectorModeIcon(systemName: "textformat", isOn: mode == .format) { mode = .format }
+                .help("Format")
+            InspectorModeIcon(systemName: "info.circle", isOn: mode == .info) { mode = .info }
+                .help("Info")
+            Spacer()
+            InspectorModeIcon(systemName: "rectangle.righthalf.filled", isOn: false) {
+                inspectorVisible = false
+            }
+            .help("Hide inspector")
+        }
+    }
+}
+
+private struct InspectorModeIcon: View {
+    let systemName: String
+    let isOn: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 14, weight: .regular))
+                .frame(width: 32, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isOn ? DS.Color.accent.opacity(0.15) : Color.clear)
+                )
+                .foregroundStyle(isOn ? DS.Color.accent : DS.Color.primaryText)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Format inspector
+
+private struct FormatInspector: View {
+    @EnvironmentObject var model: AppModel
+    @AppStorage("transcriptDisplayMode") private var displayModeRaw: String = TranscriptDisplayMode.transcript.rawValue
+    @AppStorage("transcriptFontSize") private var fontSize: Int = 18
+    @AppStorage("transcriptFavoritesOnly") private var favoritesOnly: Bool = false
+    @AppStorage("transcriptGroupUnnamed") private var groupUnnamed: Bool = false
+    @State private var translateExpanded = false
+    @State private var newSpeaker: String = ""
+
+    private var displayMode: TranscriptDisplayMode {
+        TranscriptDisplayMode(rawValue: displayModeRaw) ?? .transcript
+    }
+
+    var body: some View {
+        VStack(spacing: DS.Spacing.medium) {
+            copyButton
+
+            displayModesCard
+
+            InspectorGroup(title: "People") {
+                TextField("Add a speaker…", text: $newSpeaker)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { commitSpeaker() }
+            }
+
+            InspectorDisclosureRow(title: "Translate to…", isExpanded: $translateExpanded) {
+                Text("Translation runs as a separate pass.")
+                    .font(DS.Font.caption)
+                    .foregroundStyle(DS.Color.secondaryText)
+            }
+
+            HStack {
+                Text("Font Size")
+                Spacer()
+                Picker("Font Size", selection: $fontSize) {
+                    ForEach([14, 16, 18, 20, 22, 24, 28], id: \.self) { size in
+                        Text("\(size)").tag(size)
+                    }
+                }
+                .labelsHidden()
+                .fixedSize()
+            }
+
+            Toggle("Favorites Only", isOn: $favoritesOnly)
+                .toggleStyle(.switch)
+
+            Toggle("Group segments without speakers", isOn: $groupUnnamed)
+                .toggleStyle(.switch)
+        }
+    }
+
+    private var copyButton: some View {
+        Button {
+            guard let t = model.transcript else { return }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(t.text, forType: .string)
+        } label: {
+            HStack(spacing: DS.Spacing.small) {
+                Image(systemName: "doc.on.doc")
+                Text("Copy")
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, DS.Spacing.small)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(DS.Color.surfaceElevated)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(model.transcript == nil)
+    }
+
+    private var displayModesCard: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            HStack(spacing: DS.Spacing.small) {
+                DisplayModeCard(
+                    title: "Transcript",
+                    icon: "text.alignleft",
+                    isSelected: displayMode == .transcript
+                ) { displayModeRaw = TranscriptDisplayMode.transcript.rawValue }
+
+                DisplayModeCard(
+                    title: "Segments",
+                    icon: "list.bullet.below.rectangle",
+                    isSelected: displayMode == .segments
+                ) { displayModeRaw = TranscriptDisplayMode.segments.rawValue }
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Display Modes")
+                    .font(DS.Font.heading)
+                Text("Toggle between transcript and segment layouts.")
+                    .font(DS.Font.caption)
+                    .foregroundStyle(DS.Color.secondaryText)
+            }
+            .padding(DS.Spacing.small)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DS.Color.surfaceElevated)
+            .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular))
+        }
+    }
+
+    private func commitSpeaker() {
+        let trimmed = newSpeaker.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        Task { [peopleStore = model.peopleStore] in
+            _ = await peopleStore.recordUsage(name: trimmed)
+        }
+        newSpeaker = ""
+    }
+}
+
+private struct DisplayModeCard: View {
+    let title: String
+    let icon: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: DS.Spacing.small) {
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .regular))
+                Text(title).font(DS.Font.caption)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, DS.Spacing.medium)
+            .background(DS.Color.surfaceElevated)
+            .overlay(
+                RoundedRectangle(cornerRadius: DS.Radius.regular)
+                    .strokeBorder(isSelected ? DS.Color.accent : Color.clear, lineWidth: 2)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct InspectorGroup<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            Text(title)
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.secondaryText)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct InspectorDisclosureRow<Content: View>: View {
+    let title: String
+    @Binding var isExpanded: Bool
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            Button { isExpanded.toggle() } label: {
+                HStack {
+                    Text(title)
+                    Spacer()
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(DS.Color.secondaryText)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                content()
+            }
+        }
+    }
+}
+
+// MARK: - Info inspector
+
+private struct InfoInspector: View {
+    @EnvironmentObject var model: AppModel
+
+    private var entry: LibraryEntry? {
+        guard let id = model.selectedEntryID else { return nil }
+        return model.libraryEntries.first { $0.id == id }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.large) {
+            InfoSection(title: "Model & Language") {
+                InfoRow(icon: "cube", label: "Model", value: model.transcript?.modelName ?? "—")
+                InfoRow(icon: "globe", label: "Language", value: languageLabel)
+            }
+
+            InfoSection(title: "Properties") {
+                InfoRow(icon: "clock", label: "Audio Duration", value: durationLabel)
+                InfoRow(icon: "calendar", label: "Created", value: dateLabel(entry?.createdAt))
+                InfoRow(icon: "calendar.badge.clock", label: "Updated", value: dateLabel(entry?.createdAt))
+            }
+
+            InfoSection(title: "Transcription Details") {
+                InfoRow(icon: "globe", label: "Model Language", value: languageLabel)
+                InfoRow(icon: "cube", label: "Model", value: model.transcript?.modelName ?? "—")
+                InfoRow(icon: "cpu", label: "Engine", value: "WhisperKit")
+                InfoRow(icon: "character", label: "Characters", value: "\(charCount)")
+                InfoRow(icon: "text.word.spacing", label: "Words", value: "\(wordCount)")
+            }
+
+            InfoSection(title: "Transcription Quality Feedback") {
+                HStack(spacing: DS.Spacing.small) {
+                    FeedbackPill(icon: "hand.thumbsup", title: "Accurate")
+                    FeedbackPill(icon: "hand.thumbsdown", title: "Not Accurate")
+                }
+            }
+        }
+    }
+
+    private var languageLabel: String {
+        guard let code = model.transcript?.language, !code.isEmpty else { return "Auto" }
+        return Locale.current.localizedString(forLanguageCode: code) ?? code.uppercased()
+    }
+
+    private var durationLabel: String {
+        guard let d = model.transcript?.durationSeconds else { return "—" }
+        return Duration.seconds(d).formatted(.time(pattern: .hourMinuteSecond))
+    }
+
+    private func dateLabel(_ date: Date?) -> String {
+        guard let date else { return "—" }
+        return date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private var charCount: Int {
+        model.transcript?.text.count ?? 0
+    }
+
+    private var wordCount: Int {
+        guard let text = model.transcript?.text else { return 0 }
+        return text.split { $0.isWhitespace || $0.isNewline }.count
+    }
+}
+
+private struct InfoSection<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            Text(title)
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.secondaryText)
+                .textCase(.uppercase)
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct InfoRow: View {
+    let icon: String
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: DS.Spacing.small) {
+            Image(systemName: icon)
+                .foregroundStyle(DS.Color.secondaryText)
+                .frame(width: 16)
+            Text(label).foregroundStyle(.primary)
+            Spacer()
+            Text(value)
+                .foregroundStyle(DS.Color.secondaryText)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .font(DS.Font.body)
+    }
+}
+
+private struct FeedbackPill: View {
+    let icon: String
+    let title: String
+
+    var body: some View {
+        Button {} label: {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                Text(title)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, DS.Spacing.small)
+            .background(DS.Color.surfaceElevated)
+            .clipShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Summary & Chat sheets
+
+private struct SummarySheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Summary").font(DS.Font.heading)
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.escape, modifiers: [])
+            }
+            .padding(DS.Spacing.regular)
+            Divider()
+            SummaryPane()
+        }
+        .frame(minWidth: 520, minHeight: 480)
+    }
+}
+
+private struct ChatSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Chat").font(DS.Font.heading)
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.escape, modifiers: [])
+            }
+            .padding(DS.Spacing.regular)
+            Divider()
+            ChatPane()
+        }
+        .frame(minWidth: 520, minHeight: 480)
+    }
+}
+
+// MARK: - Player
 
 struct TranscriptInfoCard: View {
     let transcript: Transcript
@@ -248,6 +694,7 @@ struct SegmentRow: View {
     let isCurrent: Bool
 
     @EnvironmentObject var model: AppModel
+    @AppStorage("transcriptFontSize") private var fontSize: Int = 18
     @State private var draftText: String = ""
     @FocusState private var isEditing: Bool
 
@@ -266,7 +713,7 @@ struct SegmentRow: View {
             .frame(width: 88, alignment: .leading)
 
             content
-                .font(DS.Font.transcript)
+                .font(.system(size: CGFloat(fontSize)))
         }
         .padding(.horizontal, DS.Spacing.medium)
         .padding(.vertical, DS.Spacing.small)
