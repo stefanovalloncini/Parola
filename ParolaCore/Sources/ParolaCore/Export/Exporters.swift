@@ -9,6 +9,7 @@ public enum ExportFormat: String, CaseIterable, Sendable, Codable {
     case html
     case csv
     case docx
+    case pdf
 
     public var fileExtension: String { rawValue }
 }
@@ -252,6 +253,7 @@ public enum Exporters {
         case .html: return HtmlExporter()
         case .csv:  return CsvExporter()
         case .docx: return DocxExporter()
+        case .pdf:  return PdfExporter()
         }
     }
 }

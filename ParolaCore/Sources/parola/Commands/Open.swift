@@ -11,7 +11,7 @@ struct Open: AsyncParsableCommand {
     @Argument(help: "Path to a .parola bundle.")
     var input: String
 
-    @Option(name: .shortAndLong, help: "Output format: txt | md | html | docx | csv | srt | vtt | json.")
+    @Option(name: .shortAndLong, help: "Output format: txt | md | html | docx | pdf | csv | srt | vtt | json.")
     var format: ExportFormat = .txt
 
     @Option(name: .shortAndLong, help: "Write output to this path. Defaults to stdout.")

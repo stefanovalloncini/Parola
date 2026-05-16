@@ -1,4 +1,5 @@
 import Foundation
+import PDFKit
 import Testing
 @testable import ParolaCore
 
@@ -241,5 +242,50 @@ struct ExporterTests {
     func zipCrc32Known() {
         #expect(Zip.crc32(Data()) == 0)
         #expect(Zip.crc32(Data("123456789".utf8)) == 0xCBF43926)
+    }
+
+    @Test("pdf starts with the PDF magic")
+    func pdfMagic() throws {
+        let data = try PdfExporter().render(sample())
+        let prefix = String(decoding: data.prefix(5), as: UTF8.self)
+        #expect(prefix == "%PDF-")
+    }
+
+    @Test("pdf opens with PDFKit and has at least one page")
+    func pdfOpens() throws {
+        let data = try PdfExporter().render(sample())
+        let doc = try #require(PDFDocument(data: data))
+        #expect(doc.pageCount >= 1)
+    }
+
+    @Test("pdf contains the transcript text")
+    func pdfContainsText() throws {
+        let data = try PdfExporter().render(sample())
+        let doc = try #require(PDFDocument(data: data))
+        let text = (0..<doc.pageCount).compactMap { doc.page(at: $0)?.string }.joined(separator: " ")
+        #expect(text.contains("Hello world."))
+        #expect(text.contains("Goodbye."))
+    }
+
+    @Test("pdf paginates long transcripts onto multiple pages")
+    func pdfPaginates() throws {
+        let lines = (0..<200).map { i in
+            TranscriptSegment(id: i, start: Double(i), end: Double(i) + 0.5, text: "Line number \(i) of a long transcript that should overflow a single page.")
+        }
+        let transcript = Transcript(segments: lines, language: "en", modelName: "x")
+        let data = try PdfExporter().render(transcript)
+        let doc = try #require(PDFDocument(data: data))
+        #expect(doc.pageCount > 1)
+    }
+
+    @Test("pdf is a recognized ExportFormat")
+    func pdfFormat() {
+        #expect(ExportFormat.pdf.fileExtension == "pdf")
+        #expect(Exporters.exporter(for: .pdf) is PdfExporter)
+    }
+
+    @Test("renderText throws for binary pdf")
+    func renderTextThrowsForPdf() throws {
+        #expect(throws: Error.self) { _ = try PdfExporter().renderText(sample()) }
     }
 }
