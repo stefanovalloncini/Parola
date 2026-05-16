@@ -11,10 +11,33 @@ struct SettingsView: View {
             ToolsTab().tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
             AutoExportTab().tabItem { Label("Auto-Export", systemImage: "square.and.arrow.up") }
             FiltersTab().tabItem { Label("Filters", systemImage: "line.3.horizontal.decrease.circle") }
+            DictationTab().tabItem { Label("Dictation", systemImage: "mic.and.signal.meter") }
             WatchedFoldersTab().tabItem { Label("Watched", systemImage: "folder.badge.gearshape") }
             AboutTab().tabItem { Label("About", systemImage: "info.circle") }
         }
         .padding()
+    }
+}
+
+private struct DictationTab: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Enable dictation", isOn: $model.dictationEnabled)
+                Text("Hold F5 anywhere on macOS and speak; release to insert the transcription at the cursor. Parola pastes via the clipboard and restores the previous clipboard contents after the paste.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Push-to-talk")
+            } footer: {
+                Text("Requires the Input Monitoring permission. macOS will prompt you the first time you press F5 with dictation enabled.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 
