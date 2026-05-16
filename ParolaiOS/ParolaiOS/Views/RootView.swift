@@ -1,5 +1,6 @@
 import SwiftUI
 import ParolaCore
+import Combine
 
 struct RootView: View {
     @EnvironmentObject var model: AppModel
@@ -37,6 +38,11 @@ struct RootView: View {
             Button("OK", role: .cancel) { model.lastError = nil }
         } message: { error in
             Text(error)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .parolaOpenEntry)) { note in
+            if let id = note.userInfo?["id"] as? String {
+                selectedEntry = id
+            }
         }
     }
 

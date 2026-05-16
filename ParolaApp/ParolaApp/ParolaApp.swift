@@ -1,4 +1,6 @@
 import SwiftUI
+import AppIntents
+import ParolaCore
 
 @main
 struct ParolaApp: App {
@@ -49,5 +51,19 @@ struct ParolaApp: App {
                 .environmentObject(model)
                 .frame(width: 520, height: 440)
         }
+    }
+}
+
+struct ParolaShortcuts: AppShortcutsProvider {
+    static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: OpenLastTranscriptIntent(),
+            phrases: [
+                "Open my last \(.applicationName) transcript",
+                "Show last transcript in \(.applicationName)"
+            ],
+            shortTitle: "Open Last Transcript",
+            systemImageName: "doc.text"
+        )
     }
 }

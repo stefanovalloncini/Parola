@@ -26,6 +26,11 @@ struct ContentView: View {
         }
         .sheet(isPresented: $model.youtubeSheetOpen) { YouTubeURLSheet() }
         .sheet(isPresented: $showingTrash) { MacRecentlyDeletedView() }
+        .onReceive(NotificationCenter.default.publisher(for: .parolaOpenEntry)) { note in
+            if let id = note.userInfo?["id"] as? String {
+                model.selectedEntryID = id
+            }
+        }
     }
 
     @ToolbarContentBuilder
