@@ -8,7 +8,7 @@ struct PlayerSurface: NSViewRepresentable {
     func makeNSView(context: Context) -> AVPlayerView {
         let view = AVPlayerView()
         view.player = player
-        view.controlsStyle = .inline
+        view.controlsStyle = .none
         view.showsFullScreenToggleButton = false
         return view
     }
@@ -20,9 +20,10 @@ struct PlayerSurface: NSViewRepresentable {
     }
 }
 
-enum TranscriptDisplayMode: String {
+enum TranscriptDisplayMode: String, CaseIterable, Identifiable {
     case transcript
     case segments
+    var id: String { rawValue }
 }
 
 enum InspectorMode: String, CaseIterable, Identifiable {
@@ -35,8 +36,13 @@ struct TranscriptPane: View {
     @EnvironmentObject var model: AppModel
     @AppStorage("inspectorVisible") private var inspectorVisible: Bool = true
     @AppStorage("inspectorMode") private var inspectorModeRaw: String = InspectorMode.format.rawValue
+    @AppStorage("transcriptDisplayMode") private var displayModeRaw: String = TranscriptDisplayMode.transcript.rawValue
     @State private var summarySheetOpen = false
     @State private var chatSheetOpen = false
+
+    private var displayMode: TranscriptDisplayMode {
+        TranscriptDisplayMode(rawValue: displayModeRaw) ?? .transcript
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -100,43 +106,30 @@ struct TranscriptPane: View {
 
     private var transcriptColumn: some View {
         VStack(spacing: 0) {
-            transcriptList
+            transcriptBody
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            if let player = model.player {
+            if model.hasVideo, let player = model.player {
                 Divider()
-                if model.hasVideo {
-                    PlayerSurface(player: player)
-                        .frame(height: 200)
-                        .background(Color.black)
-                } else {
-                    AudioTransportBar()
-                        .padding(.horizontal, DS.Spacing.regular)
-                        .padding(.vertical, DS.Spacing.small)
-                }
+                PlayerSurface(player: player)
+                    .frame(height: 200)
+                    .background(Color.black)
+            }
+
+            if model.player != nil {
+                Divider()
+                MediaBar()
             }
         }
     }
 
-    private var transcriptList: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    if let t = model.transcript {
-                        ForEach(t.segments) { seg in
-                            SegmentRow(segment: seg, isCurrent: seg.id == model.currentSegmentID)
-                                .id(seg.id)
-                                .onTapGesture { model.seek(to: seg) }
-                        }
-                    }
-                }
-                .padding(.vertical, 8)
-            }
-            .onChange(of: model.currentSegmentID) { _, id in
-                guard let id, model.player?.timeControlStatus == .playing else { return }
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    proxy.scrollTo(id, anchor: .center)
-                }
-            }
+    @ViewBuilder
+    private var transcriptBody: some View {
+        switch displayMode {
+        case .segments:
+            SegmentsScroll()
+        case .transcript:
+            ContinuousTranscriptView()
         }
     }
 }
@@ -587,164 +580,173 @@ private struct ChatSheet: View {
     }
 }
 
-// MARK: - Player
+// MARK: - Segments mode
 
-struct TranscriptInfoCard: View {
-    let transcript: Transcript
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.tight) {
-            row("Language", value: transcript.language.uppercased())
-            row("Model", value: transcript.modelName)
-            row("Segments", value: "\(transcript.segments.count)")
-            if let d = transcript.durationSeconds {
-                row("Duration", value: Duration.seconds(d).formatted(.time(pattern: .hourMinuteSecond)))
-            }
-        }
-        .padding(DS.Spacing.regular)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(DS.Color.surfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular))
-    }
-
-    private func row(_ label: String, value: String) -> some View {
-        HStack {
-            Text(label).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).foregroundStyle(.primary)
-        }
-        .font(.callout)
-    }
-}
-
-struct AudioTransportBar: View {
+struct SegmentsScroll: View {
     @EnvironmentObject var model: AppModel
-    @State private var scrubbingTo: Double?
 
     var body: some View {
-        let duration = model.transcript?.durationSeconds ?? 0
-        let progress = scrubbingTo ?? model.currentTimeSeconds
-
-        HStack(spacing: DS.Spacing.regular) {
-            Button(action: togglePlayPause) {
-                Image(systemName: model.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 30, weight: .regular))
-                    .foregroundStyle(DS.Color.accent)
-            }
-            .buttonStyle(.plain)
-            .help(model.isPlaying ? "Pause" : "Play")
-
-            Text(format(progress))
-                .font(DS.Font.captionMono)
-                .foregroundStyle(.secondary)
-                .frame(width: 44, alignment: .leading)
-
-            if duration > 0 {
-                Slider(
-                    value: Binding(
-                        get: { progress },
-                        set: { scrubbingTo = $0 }
-                    ),
-                    in: 0...duration,
-                    onEditingChanged: { editing in
-                        if !editing, let target = scrubbingTo {
-                            model.player?.seek(to: CMTime(seconds: target, preferredTimescale: 600))
-                            scrubbingTo = nil
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {
+                    if let t = model.transcript {
+                        ForEach(t.segments) { seg in
+                            SegmentCard(segment: seg, isCurrent: seg.id == model.currentSegmentID)
+                                .id(seg.id)
                         }
                     }
-                )
-            } else {
-                Slider(value: .constant(0), in: 0...1).disabled(true)
+                }
+                .padding(.horizontal, DS.Spacing.large)
+                .padding(.vertical, DS.Spacing.regular)
             }
-
-            Text(format(duration))
-                .font(DS.Font.captionMono)
-                .foregroundStyle(.secondary)
-                .frame(width: 44, alignment: .trailing)
-        }
-        .padding(DS.Spacing.regular)
-        .background(DS.Color.surfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular))
-    }
-
-    private func togglePlayPause() {
-        guard let player = model.player else { return }
-        if player.timeControlStatus == .playing {
-            player.pause()
-        } else {
-            let duration = model.transcript?.durationSeconds ?? 0
-            if duration > 0, model.currentTimeSeconds >= duration - 0.05 {
-                player.seek(to: .zero)
+            .onChange(of: model.currentSegmentID) { _, id in
+                guard let id, model.player?.timeControlStatus == .playing else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(id, anchor: .center)
+                }
             }
-            player.play()
         }
-    }
-
-    private func format(_ t: Double) -> String {
-        let total = Int(max(0, t.rounded()))
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
     }
 }
 
-struct SegmentRow: View {
+struct SegmentCard: View {
     let segment: TranscriptSegment
     let isCurrent: Bool
 
     @EnvironmentObject var model: AppModel
-    @AppStorage("transcriptFontSize") private var fontSize: Int = 18
+    @State private var hovering: Bool = false
+    @State private var isEditing: Bool = false
     @State private var draftText: String = ""
-    @FocusState private var isEditing: Bool
+    @FocusState private var editingFocus: Bool
+
+    private let radius: CGFloat = 12
 
     var body: some View {
-        HStack(alignment: .top, spacing: DS.Spacing.regular) {
-            VStack(alignment: .leading, spacing: DS.Spacing.tight) {
+        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            content
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.trailing, hovering && !isEditing ? 88 : 0)
+
+            HStack(spacing: DS.Spacing.small) {
                 Text(timestamp(segment.start))
                     .font(DS.Font.captionMono)
-                    .foregroundStyle(DS.Color.secondaryText)
+                    .foregroundStyle(isCurrent ? DS.Color.accent : DS.Color.secondaryText)
                 if let speaker = segment.speaker {
                     Text(speaker)
                         .font(DS.Font.caption)
-                        .foregroundStyle(speakerColor(for: speaker))
+                        .foregroundStyle(DS.speakerColor(for: speaker))
                 }
             }
-            .frame(width: 88, alignment: .leading)
-
-            content
-                .font(.system(size: CGFloat(fontSize)))
         }
-        .padding(.horizontal, DS.Spacing.medium)
-        .padding(.vertical, DS.Spacing.small)
-        .background(isCurrent ? DS.Color.accent.opacity(0.12) : Color.clear)
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.regular)
+        .background(cardBackground)
+        .overlay(alignment: .topTrailing) {
+            if hovering && !isEditing {
+                actionStrip
+                    .padding(.top, 6)
+                    .padding(.trailing, 6)
+                    .transition(.opacity)
+            }
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: radius)
+                .stroke(borderColor, lineWidth: isCurrent ? 1.5 : 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: radius))
         .contentShape(Rectangle())
+        .onHover { hover in
+            withAnimation(.easeOut(duration: 0.12)) { hovering = hover }
+        }
+        .onTapGesture {
+            if !isEditing { model.seek(to: segment) }
+        }
+    }
+
+    private var cardBackground: Color {
+        isCurrent ? DS.Color.accent.opacity(0.10) : DS.Color.surfaceElevated
+    }
+
+    private var borderColor: Color {
+        if isCurrent { return DS.Color.accent.opacity(0.55) }
+        if hovering { return DS.Color.accent.opacity(0.25) }
+        return DS.Color.separator.opacity(0.6)
     }
 
     @ViewBuilder
     private var content: some View {
-        if model.findIsOpen, !model.findQuery.isEmpty {
-            highlightedText
-        } else if isCurrent, model.karaokeHighlight, let words = segment.words, !words.isEmpty {
-            karaoke(words: words)
-        } else if isCurrent, model.karaokeHighlight, model.player != nil {
-            syntheticKaraoke
-        } else {
+        if isEditing {
             TextField("Segment text", text: $draftText, axis: .vertical)
                 .textFieldStyle(.plain)
+                .font(DS.Font.transcript)
                 .lineLimit(1...20)
-                .focused($isEditing)
-                .labelsHidden()
-                .onAppear { draftText = segment.text }
-                .onChange(of: segment.text) { _, newValue in
-                    if !isEditing { draftText = newValue }
+                .focused($editingFocus)
+                .onChange(of: editingFocus) { _, focused in
+                    if !focused { commitEdit() }
                 }
-                .onChange(of: isEditing) { _, focused in
-                    if !focused, draftText != segment.text {
-                        model.editSegment(id: segment.id, newText: draftText)
-                    }
-                }
+                .onSubmit { commitEdit() }
+        } else if model.findIsOpen, !model.findQuery.isEmpty {
+            highlightedText
+                .font(DS.Font.transcript)
+                .textSelection(.enabled)
+        } else if isCurrent, model.karaokeHighlight, let words = segment.words, !words.isEmpty {
+            karaoke(words: words)
+                .font(DS.Font.transcript)
+                .textSelection(.enabled)
+        } else if isCurrent, model.karaokeHighlight, model.player != nil {
+            syntheticKaraoke
+                .font(DS.Font.transcript)
+                .textSelection(.enabled)
+        } else {
+            Text(segment.text)
+                .font(DS.Font.transcript)
+                .textSelection(.enabled)
         }
+    }
+
+    private var actionStrip: some View {
+        HStack(spacing: 2) {
+            cardButton(systemName: "pencil", help: "Edit") { beginEditing() }
+            cardButton(systemName: "play.fill", help: "Play from here") {
+                model.seek(to: segment)
+            }
+            cardButton(systemName: "doc.on.doc", help: "Copy segment") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(segment.text, forType: .string)
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: DS.Radius.regular)
+                .fill(DS.Color.surface)
+                .shadow(color: .black.opacity(0.18), radius: 6, x: 0, y: 2)
+        )
+    }
+
+    private func cardButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .help(help)
+    }
+
+    private func beginEditing() {
+        draftText = segment.text
+        isEditing = true
+        Task { @MainActor in editingFocus = true }
+    }
+
+    private func commitEdit() {
+        if draftText != segment.text {
+            model.editSegment(id: segment.id, newText: draftText)
+        }
+        isEditing = false
     }
 
     private var syntheticKaraoke: Text {
@@ -807,13 +809,303 @@ struct SegmentRow: View {
         return Text(attr)
     }
 
-    private func speakerColor(for label: String) -> Color {
-        DS.speakerColor(for: label)
-    }
-
     private func timestamp(_ s: Double) -> String {
         Duration.seconds(s).formatted(
             .time(pattern: s >= 3600 ? .hourMinuteSecond : .minuteSecond)
         )
+    }
+}
+
+// MARK: - Continuous mode
+
+struct ContinuousTranscriptView: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        ScrollView {
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                ContinuousParagraph()
+                    .frame(maxWidth: 720, alignment: .leading)
+                    .padding(.horizontal, DS.Spacing.large)
+                    .padding(.vertical, DS.Spacing.large)
+                Spacer(minLength: 0)
+            }
+        }
+    }
+}
+
+private struct ContinuousParagraph: View {
+    @EnvironmentObject var model: AppModel
+    @State private var hovering: Bool = false
+    @State private var cursor: CGPoint = .zero
+
+    var body: some View {
+        attributedText
+            .font(.system(size: 18, weight: .regular))
+            .lineSpacing(6)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let location):
+                    hovering = true
+                    cursor = location
+                case .ended:
+                    hovering = false
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                if hovering, let seg = playTarget {
+                    Button {
+                        model.seek(to: seg)
+                    } label: {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 22, height: 22)
+                            .background(Circle().fill(DS.Color.accent))
+                            .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Play from here")
+                    .offset(x: cursor.x - 30, y: cursor.y - 11)
+                }
+            }
+    }
+
+    private var playTarget: TranscriptSegment? {
+        guard let segments = model.transcript?.segments, !segments.isEmpty else { return nil }
+        if let currentID = model.currentSegmentID,
+           let seg = segments.first(where: { $0.id == currentID }) {
+            return seg
+        }
+        return segments.first
+    }
+
+    private var attributedText: Text {
+        guard let transcript = model.transcript else { return Text("") }
+        var attr = AttributedString()
+        let currentID = model.currentSegmentID
+        let segments = transcript.segments
+
+        for (idx, seg) in segments.enumerated() {
+            let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !body.isEmpty else { continue }
+            var piece = AttributedString(body + (idx == segments.count - 1 ? "" : " "))
+            if seg.id == currentID {
+                piece.foregroundColor = DS.Color.accent
+            }
+            attr.append(piece)
+        }
+        return Text(attr)
+    }
+}
+
+// MARK: - Media bar
+
+struct MediaBar: View {
+    @EnvironmentObject var model: AppModel
+    @AppStorage("playbackRate") private var playbackRate: Double = 1.0
+    @State private var scrubbingTo: Double?
+
+    private let speeds: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+
+    var body: some View {
+        let duration = model.transcript?.durationSeconds ?? 0
+        let progress = scrubbingTo ?? model.currentTimeSeconds
+
+        HStack(spacing: DS.Spacing.regular) {
+            Button(action: togglePlayPause) {
+                Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(DS.Color.accent))
+            }
+            .buttonStyle(.plain)
+            .help(model.isPlaying ? "Pause" : "Play")
+
+            ScrubberTrack(
+                progress: progress,
+                duration: duration,
+                onScrub: { scrubbingTo = $0 },
+                onCommit: { target in
+                    model.player?.seek(to: CMTime(seconds: target, preferredTimescale: 600))
+                    scrubbingTo = nil
+                }
+            )
+            .frame(height: 18)
+
+            Text(timeLabel(current: progress, total: duration))
+                .font(.system(size: 12, design: .monospaced))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 96, alignment: .trailing)
+
+            Menu {
+                ForEach(speeds, id: \.self) { s in
+                    Button {
+                        playbackRate = s
+                        applyRate()
+                    } label: {
+                        if abs(s - playbackRate) < 0.001 {
+                            Label(speedLabel(s), systemImage: "checkmark")
+                        } else {
+                            Text(speedLabel(s))
+                        }
+                    }
+                }
+            } label: {
+                Text(speedLabel(playbackRate))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .monospacedDigit()
+                    .foregroundStyle(DS.Color.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule().fill(DS.Color.accent.opacity(0.14))
+                    )
+                    .overlay(
+                        Capsule().stroke(DS.Color.accent.opacity(0.35), lineWidth: 1)
+                    )
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Playback speed")
+        }
+        .padding(.horizontal, DS.Spacing.regular)
+        .frame(height: 52)
+        .background(DS.Color.surfaceElevated)
+        .onAppear { applyRate() }
+        .onChange(of: model.isPlaying) { _, playing in
+            if playing { applyRate() }
+        }
+    }
+
+    private func togglePlayPause() {
+        guard let player = model.player else { return }
+        if player.timeControlStatus == .playing {
+            player.pause()
+        } else {
+            let duration = model.transcript?.durationSeconds ?? 0
+            if duration > 0, model.currentTimeSeconds >= duration - 0.05 {
+                player.seek(to: .zero)
+            }
+            player.play()
+            applyRate()
+        }
+    }
+
+    private func applyRate() {
+        guard let player = model.player else { return }
+        player.defaultRate = Float(playbackRate)
+        if player.timeControlStatus == .playing {
+            player.rate = Float(playbackRate)
+        }
+    }
+
+    private func speedLabel(_ value: Double) -> String {
+        if value == floor(value) {
+            return "\(Int(value))×"
+        }
+        return "\(value)×"
+    }
+
+    private func timeLabel(current: Double, total: Double) -> String {
+        "\(format(current)) / \(format(total))"
+    }
+
+    private func format(_ t: Double) -> String {
+        let total = Int(max(0, t.rounded()))
+        let h = total / 3600
+        let m = (total % 3600) / 60
+        let s = total % 60
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%02d:%02d", m, s)
+    }
+}
+
+private struct ScrubberTrack: View {
+    let progress: Double
+    let duration: Double
+    let onScrub: (Double) -> Void
+    let onCommit: (Double) -> Void
+
+    @State private var isDragging: Bool = false
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let ratio = duration > 0 ? min(1, max(0, progress / duration)) : 0
+            let knobX = width * ratio
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(DS.Color.separator.opacity(0.5))
+                    .frame(height: 4)
+                    .frame(maxHeight: .infinity, alignment: .center)
+
+                Capsule()
+                    .fill(DS.Color.accent)
+                    .frame(width: knobX, height: 4)
+                    .frame(maxHeight: .infinity, alignment: .center)
+
+                Circle()
+                    .fill(.white)
+                    .overlay(Circle().stroke(DS.Color.accent, lineWidth: 2))
+                    .frame(width: isDragging ? 14 : 12, height: isDragging ? 14 : 12)
+                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                    .offset(x: knobX - (isDragging ? 7 : 6))
+                    .opacity(duration > 0 ? 1 : 0)
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        guard duration > 0, width > 0 else { return }
+                        isDragging = true
+                        let x = min(max(0, value.location.x), width)
+                        onScrub(Double(x / width) * duration)
+                    }
+                    .onEnded { value in
+                        guard duration > 0, width > 0 else { return }
+                        let x = min(max(0, value.location.x), width)
+                        onCommit(Double(x / width) * duration)
+                        isDragging = false
+                    }
+            )
+        }
+        .disabled(duration <= 0)
+    }
+}
+
+// MARK: - Info card
+
+struct TranscriptInfoCard: View {
+    let transcript: Transcript
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.tight) {
+            row("Language", value: transcript.language.uppercased())
+            row("Model", value: transcript.modelName)
+            row("Segments", value: "\(transcript.segments.count)")
+            if let d = transcript.durationSeconds {
+                row("Duration", value: Duration.seconds(d).formatted(.time(pattern: .hourMinuteSecond)))
+            }
+        }
+        .padding(DS.Spacing.regular)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DS.Color.surfaceElevated)
+        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular))
+    }
+
+    private func row(_ label: String, value: String) -> some View {
+        HStack {
+            Text(label).foregroundStyle(.secondary)
+            Spacer()
+            Text(value).foregroundStyle(.primary)
+        }
+        .font(.callout)
     }
 }
