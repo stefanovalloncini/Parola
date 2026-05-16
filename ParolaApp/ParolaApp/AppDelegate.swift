@@ -11,15 +11,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         provider.model = model
     }
 
-    nonisolated func applicationDidFinishLaunching(_ notification: Notification) {
-        MainActor.assumeIsolated {
-            NSApp.servicesProvider = provider
-            NSUpdateDynamicServices()
-        }
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.servicesProvider = provider
+        NSUpdateDynamicServices()
     }
 }
 
 /// `@objc` shim exposed to AppKit's Services machinery.
+@MainActor
 final class ServicesProvider: NSObject {
     weak var model: AppModel?
 
@@ -40,10 +39,8 @@ final class ServicesProvider: NSObject {
             errorPtr?.pointee = "Parola is not ready." as NSString
             return
         }
-        Task { @MainActor in
-            NSApp.activate(ignoringOtherApps: true)
-            model.transcribe(fileURL: url, translateOverride: translate)
-        }
+        NSApp.activate(ignoringOtherApps: true)
+        model.transcribe(fileURL: url, translateOverride: translate)
     }
 
     /// Returns the first file URL on the pasteboard, accepting either modern `URL` items
