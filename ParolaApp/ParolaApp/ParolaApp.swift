@@ -34,6 +34,8 @@ struct ParolaApp: App {
                 Button("Export as TXT…") { model.exportRequest(.txt) }
                     .keyboardShortcut("e", modifiers: [.command])
                     .disabled(model.transcript == nil)
+                Button("Export as Markdown…") { model.exportRequest(.md) }
+                    .disabled(model.transcript == nil)
                 Button("Export as SRT…") { model.exportRequest(.srt) }
                     .disabled(model.transcript == nil)
                 Button("Export as VTT…") { model.exportRequest(.vtt) }

@@ -55,4 +55,51 @@ struct ExporterTests {
         #expect(SrtExporter.srtTimestamp(3661.25) == "01:01:01,250")
         #expect(SrtExporter.srtTimestamp(-1) == "00:00:00,000")
     }
+
+    private func sampleWithSpeakers() -> Transcript {
+        Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0.0, end: 1.5, text: "Hello world.", speaker: "Speaker 1"),
+                TranscriptSegment(id: 1, start: 1.5, end: 4.0, text: " This is Parola.", speaker: "Speaker 2"),
+            ],
+            language: "en",
+            modelName: "openai_whisper-tiny"
+        )
+    }
+
+    @Test("markdown default: paragraphs only, no timestamps, no speakers")
+    func markdownDefault() throws {
+        let out = try MarkdownExporter().render(sample())
+        #expect(out == "Hello world.\n\nThis is Parola.\n\nGoodbye.\n")
+    }
+
+    @Test("markdown with timestamps adds italic [HH:MM:SS] prefix")
+    func markdownTimestamps() throws {
+        let exporter = MarkdownExporter(options: MarkdownOptions(showTimestamps: true))
+        let out = try exporter.render(sample())
+        #expect(out.contains("*[00:00:00]* Hello world."))
+        #expect(out.contains("*[00:00:01]* This is Parola."))
+        #expect(out.contains("*[00:00:04]* Goodbye."))
+    }
+
+    @Test("markdown with speakers adds bold prefix")
+    func markdownSpeakers() throws {
+        let out = try MarkdownExporter().render(sampleWithSpeakers())
+        #expect(out.contains("**Speaker 1:** Hello world."))
+        #expect(out.contains("**Speaker 2:** This is Parola."))
+    }
+
+    @Test("markdown with speakers + timestamps combines both prefixes")
+    func markdownBoth() throws {
+        let exporter = MarkdownExporter(options: MarkdownOptions(showTimestamps: true))
+        let out = try exporter.render(sampleWithSpeakers())
+        #expect(out.contains("**Speaker 1** *[00:00:00]*: Hello world."))
+        #expect(out.contains("**Speaker 2** *[00:00:01]*: This is Parola."))
+    }
+
+    @Test("md is a recognized ExportFormat with .md extension")
+    func mdFormat() {
+        #expect(ExportFormat.md.fileExtension == "md")
+        #expect(Exporters.exporter(for: .md) is MarkdownExporter)
+    }
 }

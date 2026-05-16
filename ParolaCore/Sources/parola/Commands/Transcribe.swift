@@ -20,7 +20,7 @@ struct Transcribe: AsyncParsableCommand {
     @Flag(help: "Translate to English instead of transcribing in source language.")
     var translate: Bool = false
 
-    @Option(name: .shortAndLong, help: "Output format: txt | srt | vtt | json.")
+    @Option(name: .shortAndLong, help: "Output format: txt | md | srt | vtt | json.")
     var format: ExportFormat = .txt
 
     @Option(name: .shortAndLong, help: "Write output to this path. Defaults to stdout. Ignored when multiple inputs are given.")
