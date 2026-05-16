@@ -70,14 +70,18 @@ struct ContentView: View {
         ToolbarItemGroup(placement: .navigation) {
             ModelPickerView()
             LanguagePickerView()
-            Toggle(isOn: $model.translate) {
-                HStack(spacing: 4) {
-                    Image(systemName: "character.bubble")
-                    Text("Translate")
+                .disabled(selectedModelIsEnglishOnly)
+                .help(selectedModelIsEnglishOnly ? "This model is English-only." : "")
+            if selectedModelSupportsTranslate {
+                Toggle(isOn: $model.translate) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "character.bubble")
+                        Text("Translate")
+                    }
                 }
+                .toggleStyle(.button)
+                .help("Translate to English instead of transcribing in the source language.")
             }
-            .toggleStyle(.button)
-            .help("Translate to English instead of transcribing in the source language.")
         }
         ToolbarItemGroup(placement: .primaryAction) {
             if !model.deletedEntries.isEmpty {
@@ -114,6 +118,16 @@ struct ContentView: View {
             .disabled(isBusy)
             .help("Open an audio or video file.")
         }
+    }
+
+    private var selectedModelCapabilities: EngineCapabilities {
+        ModelCatalog.staticCapabilities(forID: model.selectedModel) ?? .whisperKitDefaults
+    }
+    private var selectedModelIsEnglishOnly: Bool {
+        selectedModelCapabilities.supportedLanguages.isEnglishOnly
+    }
+    private var selectedModelSupportsTranslate: Bool {
+        selectedModelCapabilities.supportsTranslate
     }
 
     private var isBusy: Bool {

@@ -15,33 +15,56 @@ struct SettingsSheet: View {
                             Text(entry.label).tag(entry.name)
                         }
                     }
-                    NavigationLink {
-                        LanguagePicker(selection: $model.settings.language, compact: false)
-                            .navigationTitle(Text("language.choose"))
-                            .navigationBarTitleDisplayMode(.inline)
-                    } label: {
+                    .onChange(of: model.settings.modelName) {
+                        if isEnglishOnlyModel { model.settings.language = "en" }
+                        if !supportsTranslate { model.settings.translate = false }
+                    }
+                    if isEnglishOnlyModel {
                         HStack {
                             Text("settings.language")
                             Spacer()
-                            Text(LanguageCatalog.label(for: model.settings.language))
-                                .foregroundStyle(.secondary)
+                            Text("English").foregroundStyle(.secondary)
+                            Image(systemName: "lock.fill")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    } else {
+                        NavigationLink {
+                            LanguagePicker(selection: $model.settings.language, compact: false)
+                                .navigationTitle(Text("language.choose"))
+                                .navigationBarTitleDisplayMode(.inline)
+                        } label: {
+                            HStack {
+                                Text("settings.language")
+                                Spacer()
+                                Text(LanguageCatalog.label(for: model.settings.language))
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
-                    Toggle("settings.translate", isOn: $model.settings.translate)
+                    if supportsTranslate {
+                        Toggle("settings.translate", isOn: $model.settings.translate)
+                    }
                     Toggle("settings.wordTimestamps", isOn: $model.settings.wordTimestamps)
                 } header: {
                     Text("settings.section.activeModel")
                 } footer: {
-                    Text("settings.wordTimestamps.footer")
+                    if isEnglishOnlyModel {
+                        Text("This model is English-only. Pick a multilingual model to transcribe other languages.")
+                    } else {
+                        Text("settings.wordTimestamps.footer")
+                    }
                 }
 
-                Section("settings.vocabulary.title") {
-                    TextField(
-                        "settings.vocabulary.placeholder",
-                        text: $model.settings.initialPrompt,
-                        axis: .vertical
-                    )
-                    .lineLimit(2...5)
+                if supportsInitialPrompt {
+                    Section("settings.vocabulary.title") {
+                        TextField(
+                            "settings.vocabulary.placeholder",
+                            text: $model.settings.initialPrompt,
+                            axis: .vertical
+                        )
+                        .lineLimit(2...5)
+                    }
                 }
 
                 Section("settings.modelsOnDevice") {
@@ -133,6 +156,18 @@ struct SettingsSheet: View {
             }
         }
     }
+
+    private var capabilities: EngineCapabilities {
+        ModelCatalog.staticCapabilities(forID: model.settings.modelName)
+            ?? .whisperKitDefaults
+    }
+
+    private var isEnglishOnlyModel: Bool {
+        capabilities.supportedLanguages.isEnglishOnly
+    }
+
+    private var supportsTranslate: Bool { capabilities.supportsTranslate }
+    private var supportsInitialPrompt: Bool { capabilities.supportsInitialPrompt }
 
     @ViewBuilder
     private func modelRow(_ entry: ModelInfo) -> some View {
