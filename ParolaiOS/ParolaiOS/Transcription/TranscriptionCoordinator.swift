@@ -86,6 +86,7 @@ final class TranscriptionCoordinator: ObservableObject {
     }
 
     func startRecording() {
+        guard streamingSession == nil else { return }
         configureAudioSession()
         liveSegments = []
         livePartialText = ""
