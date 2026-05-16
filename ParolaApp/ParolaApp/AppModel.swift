@@ -365,6 +365,20 @@ final class AppModel: ObservableObject {
         Task { await coord.simulateRelease() }
     }
 
+    func summarizeLatestEntry() {
+        Task { [weak self, library] in
+            guard let self else { return }
+            let entries = await library.list()
+            guard let latest = entries.first else { return }
+            do {
+                let loaded = try await library.load(latest.id)
+                self.transcript = loaded.document.transcript
+                self.selectedEntryID = latest.id
+                self.summariseTranscript()
+            } catch { }
+        }
+    }
+
     private func stopDictation() {
         if let coord = dictationCoordinator {
             Task { await coord.stopMonitoring() }

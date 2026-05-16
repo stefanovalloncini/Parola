@@ -99,5 +99,17 @@ struct ParolaShortcuts: AppShortcutsProvider {
             shortTitle: "Stop Dictation",
             systemImageName: "stop.fill"
         )
+        AppShortcut(
+            intent: StartRecordingIntent(),
+            phrases: ["Start recording in \(.applicationName)"],
+            shortTitle: "Start Recording",
+            systemImageName: "record.circle"
+        )
+        AppShortcut(
+            intent: SummarizeLastTranscriptIntent(),
+            phrases: ["Summarize my last \(.applicationName) transcript"],
+            shortTitle: "Summarize Last Transcript",
+            systemImageName: "text.alignleft"
+        )
     }
 }
