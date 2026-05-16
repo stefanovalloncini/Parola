@@ -13,6 +13,8 @@ struct LibraryEntry: Identifiable, Hashable, Sendable {
     }
 
     var createdAt: Date { manifest.createdAt }
+    var category: EntryCategory { manifest.category }
+    var deletedAt: Date? { manifest.deletedAt }
 
     static func == (lhs: LibraryEntry, rhs: LibraryEntry) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }

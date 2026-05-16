@@ -115,6 +115,14 @@ struct LibraryStoreTests {
         let entries = await store.list()
         #expect(entries.count == 1)
     }
+
+    @Test("default add stores transcription category and nil deletedAt")
+    func addsDefaultCategory() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        #expect(entry.category == .transcription)
+        #expect(entry.deletedAt == nil)
+    }
 }
 
 private final class BundleAnchor {}

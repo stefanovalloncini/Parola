@@ -10,19 +10,36 @@ public struct ParolaDocument: Sendable {
         public var originalAudioName: String
         public var modelName: String
         public var language: String
+        public var category: EntryCategory
+        public var deletedAt: Date?
 
         public init(
             version: Int = Manifest.currentVersion,
             createdAt: Date = Date(),
             originalAudioName: String,
             modelName: String,
-            language: String
+            language: String,
+            category: EntryCategory = .transcription,
+            deletedAt: Date? = nil
         ) {
             self.version = version
             self.createdAt = createdAt
             self.originalAudioName = originalAudioName
             self.modelName = modelName
             self.language = language
+            self.category = category
+            self.deletedAt = deletedAt
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            version = try c.decode(Int.self, forKey: .version)
+            createdAt = try c.decode(Date.self, forKey: .createdAt)
+            originalAudioName = try c.decode(String.self, forKey: .originalAudioName)
+            modelName = try c.decode(String.self, forKey: .modelName)
+            language = try c.decode(String.self, forKey: .language)
+            category = try c.decodeIfPresent(EntryCategory.self, forKey: .category) ?? .transcription
+            deletedAt = try c.decodeIfPresent(Date.self, forKey: .deletedAt)
         }
     }
 
@@ -42,7 +59,9 @@ public struct ParolaDocument: Sendable {
     public static func write(
         transcript: Transcript,
         audioURL source: URL?,
-        to destination: URL
+        to destination: URL,
+        category: EntryCategory = .transcription,
+        deletedAt: Date? = nil
     ) throws -> URL {
         let target = destination.pathExtension == "parola"
             ? destination
@@ -65,7 +84,9 @@ public struct ParolaDocument: Sendable {
         let manifest = Manifest(
             originalAudioName: originalAudioName,
             modelName: transcript.modelName,
-            language: transcript.language
+            language: transcript.language,
+            category: category,
+            deletedAt: deletedAt
         )
         try writeJSON(manifest, to: target.appendingPathComponent("manifest.json"))
         try writeJSON(transcript, to: target.appendingPathComponent("transcript.json"))

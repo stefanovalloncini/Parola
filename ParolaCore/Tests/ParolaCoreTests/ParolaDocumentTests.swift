@@ -136,4 +136,52 @@ struct ParolaDocumentTests {
         let bundle = try ParolaDocument.write(transcript: sampleTranscript(), audioURL: fakeAudio, to: dest)
         #expect(bundle.lastPathComponent == "no-extension.parola")
     }
+
+    @Test("old manifest decodes with default category and nil deletedAt")
+    func oldManifestBackCompat() throws {
+        let oldManifest = """
+        { "version": 1, "createdAt": "2030-01-01T00:00:00Z", "originalAudioName": "x.wav", "modelName": "x", "language": "en" }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let manifest = try decoder.decode(ParolaDocument.Manifest.self, from: Data(oldManifest.utf8))
+        #expect(manifest.category == .transcription)
+        #expect(manifest.deletedAt == nil)
+    }
+
+    @Test("manifest category and deletedAt survive write and read")
+    func categoryAndDeletedAtRoundTrip() throws {
+        let scratch = tempDir()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let dest = scratch.appendingPathComponent("meeting")
+        let bundleURL = try ParolaDocument.write(
+            transcript: sampleTranscript(),
+            audioURL: nil,
+            to: dest,
+            category: .meeting,
+            deletedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+
+        let loaded = try ParolaDocument.read(at: bundleURL)
+        #expect(loaded.manifest.category == .meeting)
+        #expect(loaded.manifest.deletedAt == Date(timeIntervalSince1970: 1_700_000_000))
+    }
+
+    @Test("default write produces transcription category and nil deletedAt")
+    func defaultCategory() throws {
+        let scratch = tempDir()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let dest = scratch.appendingPathComponent("standard")
+        let bundleURL = try ParolaDocument.write(
+            transcript: sampleTranscript(),
+            audioURL: nil,
+            to: dest
+        )
+
+        let loaded = try ParolaDocument.read(at: bundleURL)
+        #expect(loaded.manifest.category == .transcription)
+        #expect(loaded.manifest.deletedAt == nil)
+    }
 }
