@@ -25,6 +25,7 @@ final class TranscriptionCoordinator: ObservableObject {
     private let session = TranscriptionSession()
     private var streamingSession: StreamingTranscriptionSession?
     private var streamingTask: Task<Void, Never>?
+    private var transcribeTask: Task<Void, Never>?
     private var recordingGeneration: Int = 0
     private var cancelledGeneration: Int = -1
     private var lastProgressPercent: Int = -1
@@ -63,7 +64,8 @@ final class TranscriptionCoordinator: ObservableObject {
     }
 
     private func runTranscription(audio: URL) {
-        Task {
+        transcribeTask?.cancel()
+        transcribeTask = Task {
             do {
                 lastProgressPercent = -1
                 phase = .loadingModel(name: settings.modelName)
@@ -76,13 +78,21 @@ final class TranscriptionCoordinator: ObservableObject {
                     options: currentOptions,
                     downloadProgress: makeDownloadProgressHandler()
                 )
+                try Task.checkCancellation()
                 let entry = try await library.add(transcript: result, audioSource: audio)
                 phase = .idle
                 onComplete?(entry)
+            } catch is CancellationError {
+                phase = .idle
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
         }
+    }
+
+    func cancelFileTranscription() {
+        transcribeTask?.cancel()
+        transcribeTask = nil
     }
 
     func startRecording() {
