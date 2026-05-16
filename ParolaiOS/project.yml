@@ -75,9 +75,41 @@ targets:
               public.filename-extension:
                 - parola
         LSSupportsOpeningDocumentsInPlace: NO
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: ParolaiOS/ParolaiOS.entitlements
     dependencies:
       - package: ParolaCore
         product: ParolaCore
+      - target: ParolaiOSKeyboard
+        embed: true
+
+  ParolaiOSKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ParolaiOSKeyboard
+    info:
+      path: ParolaiOSKeyboard/Info.plist
+      properties:
+        CFBundleDisplayName: Parola
+        CFBundleIdentifier: app.parola.ParolaiOS.Keyboard
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.keyboard-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).KeyboardViewController
+          NSExtensionAttributes:
+            IsASCIICapable: false
+            PrefersRightToLeft: false
+            PrimaryLanguage: en-US
+            RequestsOpenAccess: true
+    settings:
+      base:
+        PRODUCT_NAME: ParolaKeyboard
+        PRODUCT_MODULE_NAME: ParolaKeyboard
+        CODE_SIGN_ENTITLEMENTS: ParolaiOSKeyboard/ParolaiOSKeyboard.entitlements
+        INFOPLIST_KEY_CFBundleDisplayName: Parola
 
   ParolaiOSTests:
     type: bundle.unit-test
