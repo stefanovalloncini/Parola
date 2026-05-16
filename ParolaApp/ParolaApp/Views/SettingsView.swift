@@ -239,7 +239,9 @@ private struct SettingsDetail: View {
         case .microphone: MicrophonePane()
         case .liveCaptions: LiveCaptionsPane()
         case .dictation: DictationPane()
-        case .localModels, .cloudModels:
+        case .localModels:
+            ModelsSettingsPane()
+        case .cloudModels:
             Text("Models pane — see Unit 5b").foregroundStyle(.secondary)
         case .people: PeoplePane()
         case .translation: TranslationPane()
