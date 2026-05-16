@@ -19,22 +19,19 @@ struct OnboardingFlow: View {
                 .tag(OnboardingStep.welcome)
 
                 ModelPickScreen(
-                    onContinue: { advance(from: .model) },
-                    onSkip: { skip() }
+                    onContinue: { advance(from: .model) }
                 )
                 .tag(OnboardingStep.model)
 
                 LanguagePickScreen(
                     isActive: step == .language,
-                    onContinue: { advance(from: .language) },
-                    onSkip: { skip() }
+                    onContinue: { advance(from: .language) }
                 )
                 .tag(OnboardingStep.language)
 
                 MicrophoneScreen(
                     isActive: step == .microphone,
-                    onContinue: { advance(from: .microphone) },
-                    onSkip: { skip() }
+                    onContinue: { advance(from: .microphone) }
                 )
                 .tag(OnboardingStep.microphone)
 
@@ -66,10 +63,6 @@ struct OnboardingFlow: View {
         } else {
             finish()
         }
-    }
-
-    private func skip() {
-        step = .done
     }
 
     private func finish() {

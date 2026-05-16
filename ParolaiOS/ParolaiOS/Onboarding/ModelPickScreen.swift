@@ -3,7 +3,6 @@ import ParolaCore
 
 struct ModelPickScreen: View {
     let onContinue: () -> Void
-    let onSkip: () -> Void
 
     @EnvironmentObject private var model: AppModel
 

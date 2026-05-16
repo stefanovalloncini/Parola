@@ -4,7 +4,6 @@ import AVFoundation
 struct MicrophoneScreen: View {
     var isActive: Bool = true
     let onContinue: () -> Void
-    let onSkip: () -> Void
 
     @State private var requesting = false
     @State private var responseMessage: LocalizedStringKey?

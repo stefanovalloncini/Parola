@@ -3,7 +3,6 @@ import SwiftUI
 struct LanguagePickScreen: View {
     var isActive: Bool = true
     let onContinue: () -> Void
-    let onSkip: () -> Void
 
     @EnvironmentObject private var model: AppModel
     @State private var showingFullList = false
