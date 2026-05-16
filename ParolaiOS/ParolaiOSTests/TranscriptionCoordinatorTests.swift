@@ -67,7 +67,7 @@ struct TranscriptionCoordinatorTests {
             language: "en",
             modelName: "openai_whisper-tiny"
         )
-        coord.handleStreamingEvent(.finished(transcript))
+        coord.handleStreamingEvent(.finished(transcript), generation: 0)
 
         try await Task.sleep(for: .milliseconds(100))
         #expect(observed == nil)

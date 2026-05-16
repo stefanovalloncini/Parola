@@ -25,7 +25,8 @@ final class TranscriptionCoordinator: ObservableObject {
     private let session = TranscriptionSession()
     private var streamingSession: StreamingTranscriptionSession?
     private var streamingTask: Task<Void, Never>?
-    private var discardingRecording = false
+    private var recordingGeneration: Int = 0
+    private var cancelledGeneration: Int = -1
     private var lastProgressPercent: Int = -1
 
     init(library: LibraryStore, settings: UserSettings) {
@@ -88,7 +89,8 @@ final class TranscriptionCoordinator: ObservableObject {
         configureAudioSession()
         liveSegments = []
         livePartialText = ""
-        discardingRecording = false
+        recordingGeneration &+= 1
+        let generation = recordingGeneration
         let session = StreamingTranscriptionSession()
         streamingSession = session
         phase = .recording
@@ -100,7 +102,7 @@ final class TranscriptionCoordinator: ObservableObject {
                     downloadProgress: makeDownloadProgressHandler()
                 )
                 for await event in events {
-                    handleStreamingEvent(event)
+                    handleStreamingEvent(event, generation: generation)
                 }
             } catch {
                 phase = .failed(message: error.localizedDescription)
@@ -117,7 +119,7 @@ final class TranscriptionCoordinator: ObservableObject {
     }
 
     func cancelRecording() {
-        discardingRecording = true
+        cancelledGeneration = recordingGeneration
         guard let session = streamingSession else { return }
         streamingSession = nil
         Task {
@@ -125,7 +127,7 @@ final class TranscriptionCoordinator: ObservableObject {
         }
     }
 
-    func handleStreamingEvent(_ event: StreamingEvent) {
+    func handleStreamingEvent(_ event: StreamingEvent, generation: Int = 0) {
         switch event {
         case .partial(let text):
             if livePartialText != text { livePartialText = text }
@@ -140,8 +142,7 @@ final class TranscriptionCoordinator: ObservableObject {
             phase = .failed(message: msg)
         case .finished(let final):
             livePartialText = ""
-            if discardingRecording {
-                discardingRecording = false
+            if generation == cancelledGeneration {
                 phase = .idle
                 return
             }
