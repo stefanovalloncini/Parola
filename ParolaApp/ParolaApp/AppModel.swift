@@ -41,6 +41,7 @@ final class AppModel: ObservableObject {
     @Published var liveVoiceActive: Bool = false
     @AppStorage("useStreaming") var useStreaming: Bool = true
     @AppStorage("wordTimestamps") var wordTimestamps: Bool = false
+    @AppStorage("karaokeHighlight") var karaokeHighlight: Bool = true
     @AppStorage("initialPrompt") var initialPrompt: String = ""
     @AppStorage("diarize") var diarize: Bool = false
 
@@ -69,7 +70,12 @@ final class AppModel: ObservableObject {
     @Published var sourceFileURL: URL?
 
     @Published var player: AVPlayer?
+    @Published var hasVideo: Bool = false
+    @Published var currentTimeSeconds: Double = 0
+    @Published var isPlaying: Bool = false
     private var playerTimeObserver: Any?
+    private var timeControlObserver: NSKeyValueObservation?
+    private var playerInstallToken: Int = 0
 
     @Published var pendingExport: ExportFormat?
 
@@ -85,6 +91,7 @@ final class AppModel: ObservableObject {
 
     init() {
         refreshModelList()
+        refreshYtDlpAvailability()
     }
 
 
@@ -208,6 +215,103 @@ final class AppModel: ObservableObject {
     // MARK: - YouTube URL
 
     @Published var youtubeSheetOpen: Bool = false
+    @Published var ytDlpAvailable: Bool = false
+    @Published var ytDlpInstalling: Bool = false
+    @Published var ytDlpInstallError: String?
+
+    func refreshYtDlpAvailability() {
+        ytDlpAvailable = Self.findYtDlp() != nil
+    }
+
+    func installYtDlpViaBrew() {
+        guard !ytDlpInstalling else { return }
+        guard let brew = Self.findBrew() else {
+            ytDlpInstallError = "Homebrew isn't installed. Install it from https://brew.sh, then try again."
+            return
+        }
+        ytDlpInstalling = true
+        ytDlpInstallError = nil
+        Task { [weak self] in
+            let outcome = await Self.runBrewInstall(brewPath: brew, formula: "yt-dlp")
+            guard let self else { return }
+            self.ytDlpInstalling = false
+            switch outcome {
+            case .success:
+                self.refreshYtDlpAvailability()
+                if !self.ytDlpAvailable {
+                    self.ytDlpInstallError = "Homebrew finished, but yt-dlp still isn't on the expected path."
+                }
+            case .failure(let message):
+                self.ytDlpInstallError = message
+            }
+        }
+    }
+
+    private enum BrewOutcome {
+        case success
+        case failure(String)
+    }
+
+    private static func runBrewInstall(brewPath: String, formula: String) async -> BrewOutcome {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: brewPath)
+        proc.arguments = ["install", formula]
+        var env = ProcessInfo.processInfo.environment
+        env["HOMEBREW_NO_AUTO_UPDATE"] = "1"
+        env["HOMEBREW_NO_ANALYTICS"] = "1"
+        proc.environment = env
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = pipe
+
+        let buffer = ProcessOutputBuffer()
+        pipe.fileHandleForReading.readabilityHandler = { fh in
+            let chunk = fh.availableData
+            if chunk.isEmpty {
+                fh.readabilityHandler = nil
+            } else {
+                buffer.append(chunk)
+            }
+        }
+
+        do {
+            try proc.run()
+        } catch {
+            pipe.fileHandleForReading.readabilityHandler = nil
+            return .failure("Could not launch brew: \(error.localizedDescription)")
+        }
+        return await withCheckedContinuation { cont in
+            proc.terminationHandler = { p in
+                pipe.fileHandleForReading.readabilityHandler = nil
+                let output = buffer.string()
+                if p.terminationStatus == 0 {
+                    cont.resume(returning: .success)
+                } else {
+                    let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                    cont.resume(returning: .failure(detail.isEmpty ? "brew exited with status \(p.terminationStatus)." : detail))
+                }
+            }
+        }
+    }
+
+    private static func findYtDlp() -> String? {
+        for path in ["/opt/homebrew/bin/yt-dlp", "/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"] {
+            if FileManager.default.isExecutableFile(atPath: path) { return path }
+        }
+        let env = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        for dir in env.split(separator: ":") {
+            let candidate = "\(dir)/yt-dlp"
+            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
+        }
+        return nil
+    }
+
+    private static func findBrew() -> String? {
+        for path in ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"] {
+            if FileManager.default.isExecutableFile(atPath: path) { return path }
+        }
+        return nil
+    }
 
     func transcribeYouTube(urlString: String) {
         guard let url = makeYouTubeURL(urlString) else { return }
@@ -435,16 +539,36 @@ final class AppModel: ObservableObject {
         if let obs = playerTimeObserver, let player {
             player.removeTimeObserver(obs)
         }
+        timeControlObserver?.invalidate()
+        timeControlObserver = nil
         player?.pause()
         playerTimeObserver = nil
         let p = AVPlayer(url: url)
         player = p
+        hasVideo = false
+        currentTimeSeconds = 0
+        isPlaying = false
+        playerInstallToken &+= 1
+        let token = playerInstallToken
         let interval = CMTime(seconds: 0.2, preferredTimescale: 600)
         playerTimeObserver = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             let seconds = CMTimeGetSeconds(time)
             MainActor.assumeIsolated {
+                self?.currentTimeSeconds = seconds
                 self?.updateCurrentSegment(time: seconds)
             }
+        }
+        timeControlObserver = p.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
+            let playing = player.timeControlStatus == .playing
+            Task { @MainActor in
+                self?.isPlaying = playing
+            }
+        }
+        let asset = AVURLAsset(url: url)
+        Task { [weak self] in
+            let tracks = (try? await asset.loadTracks(withMediaType: .video)) ?? []
+            guard let self, self.playerInstallToken == token else { return }
+            self.hasVideo = !tracks.isEmpty
         }
     }
 
@@ -662,5 +786,20 @@ final class AppModel: ObservableObject {
         } catch {
             phase = .failed(message: "Export failed: \(error.localizedDescription)")
         }
+    }
+}
+
+private final class ProcessOutputBuffer: @unchecked Sendable {
+    private var data = Data()
+    private let lock = NSLock()
+
+    func append(_ chunk: Data) {
+        lock.lock(); defer { lock.unlock() }
+        data.append(chunk)
+    }
+
+    func string() -> String {
+        lock.lock(); defer { lock.unlock() }
+        return String(data: data, encoding: .utf8) ?? ""
     }
 }

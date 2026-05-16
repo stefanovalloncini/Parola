@@ -7,46 +7,43 @@ struct ContentView: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            toolbar
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(.thinMaterial)
-            Divider()
-
-            content
-        }
-        .dropDestination(for: URL.self) { urls, _ in
-            handleDroppedURLs(urls)
-            return !urls.isEmpty
-        }
-        .onChange(of: model.pendingExport) { _, format in
-            if let format {
-                model.performExport(format)
-                model.pendingExport = nil
+        content
+            .dropDestination(for: URL.self) { urls, _ in
+                handleDroppedURLs(urls)
+                return !urls.isEmpty
             }
-        }
+            .onChange(of: model.pendingExport) { _, format in
+                if let format {
+                    model.performExport(format)
+                    model.pendingExport = nil
+                }
+            }
+            .toolbar { toolbarItems }
+            .sheet(isPresented: $model.youtubeSheetOpen) { YouTubeURLSheet() }
     }
 
-    // MARK: - Toolbar
-
-    @ViewBuilder
-    private var toolbar: some View {
-        HStack(spacing: 12) {
+    @ToolbarContentBuilder
+    private var toolbarItems: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigation) {
             ModelPickerView()
             LanguagePickerView()
-            Toggle("Translate", isOn: $model.translate)
-                .toggleStyle(.switch)
-                .help("Translate to English instead of transcribing in the source language.")
-
-            Spacer()
-
+            Toggle(isOn: $model.translate) {
+                HStack(spacing: 4) {
+                    Image(systemName: "character.bubble")
+                    Text("Translate")
+                }
+            }
+            .toggleStyle(.button)
+            .help("Translate to English instead of transcribing in the source language.")
+        }
+        ToolbarItemGroup(placement: .primaryAction) {
             Button {
                 model.youtubeSheetOpen = true
             } label: {
                 Label("YouTube URL", systemImage: "play.rectangle.on.rectangle")
             }
             .disabled(isBusy)
+            .help("Transcribe from a YouTube URL.")
 
             Menu {
                 Button("Microphone") { model.startRecording(source: .microphone) }
@@ -54,18 +51,17 @@ struct ContentView: View {
             } label: {
                 Label("Record", systemImage: "mic.fill")
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
             .disabled(isBusy)
+            .help("Record from the microphone or system audio.")
 
             Button {
                 model.presentOpenPanel()
             } label: {
-                Label("Open File", systemImage: "doc")
+                Label("Open File", systemImage: "doc.badge.plus")
             }
             .disabled(isBusy)
+            .help("Open an audio or video file.")
         }
-        .sheet(isPresented: $model.youtubeSheetOpen) { YouTubeURLSheet() }
     }
 
     private var isBusy: Bool {
@@ -122,12 +118,44 @@ struct ContentView: View {
 // MARK: - Empty state
 
 struct EmptyDropZone: View {
+    @EnvironmentObject var model: AppModel
+
     var body: some View {
-        ContentUnavailableView(
-            "Drop an audio or video file",
-            systemImage: "waveform",
-            description: Text("Or use the toolbar to open a file, record, or paste a URL.")
-        )
+        ContentUnavailableView {
+            Label("Drop an audio or video file", systemImage: "waveform")
+        } description: {
+            Text("Pick a source to start transcribing on-device.")
+        } actions: {
+            HStack(spacing: DS.Spacing.small) {
+                Button {
+                    model.presentOpenPanel()
+                } label: {
+                    Label("Choose File…", systemImage: "doc.badge.plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .fixedSize()
+
+                Menu {
+                    Button("Microphone") { model.startRecording(source: .microphone) }
+                    Button("System audio") { model.startRecording(source: .systemAudio) }
+                } label: {
+                    Label("Record", systemImage: "mic.fill")
+                }
+                .menuStyle(.borderedButton)
+                .controlSize(.large)
+                .fixedSize()
+
+                Button {
+                    model.youtubeSheetOpen = true
+                } label: {
+                    Label("YouTube URL", systemImage: "play.rectangle.on.rectangle")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .fixedSize()
+            }
+        }
     }
 }
 

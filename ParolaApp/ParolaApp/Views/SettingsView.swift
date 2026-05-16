@@ -8,6 +8,7 @@ struct SettingsView: View {
         TabView {
             GeneralTab().tabItem { Label("General", systemImage: "slider.horizontal.3") }
             ModelsTab().tabItem { Label("Models", systemImage: "cpu") }
+            ToolsTab().tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
             AboutTab().tabItem { Label("About", systemImage: "info.circle") }
         }
         .padding()
@@ -20,8 +21,17 @@ private struct GeneralTab: View {
     var body: some View {
         Form {
             Section("Playback") {
-                Toggle("Highlight words during playback", isOn: $model.wordTimestamps)
-                Text("Word-level highlighting needs precise timestamps. Transcription is slower with this on.")
+                Toggle("Highlight the word being spoken", isOn: $model.karaokeHighlight)
+                    .onChange(of: model.karaokeHighlight) { _, isOn in
+                        if !isOn { model.wordTimestamps = false }
+                    }
+                Text("Bolds and tints the current word as audio plays. Approximate by default — turn on precise timings below for exact word-level sync.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle("Use precise word timings", isOn: $model.wordTimestamps)
+                    .disabled(!model.karaokeHighlight)
+                Text("Asks Whisper for word-level timestamps during transcription. More accurate karaoke, but transcription is noticeably slower.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -47,6 +57,81 @@ private struct GeneralTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+private struct ToolsTab: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        Form {
+            Section {
+                ToolStatusRow(
+                    name: "yt-dlp",
+                    description: "Required to transcribe YouTube URLs. Parola downloads the audio locally; no upload happens.",
+                    available: model.ytDlpAvailable,
+                    installing: model.ytDlpInstalling,
+                    error: model.ytDlpInstallError,
+                    install: { model.installYtDlpViaBrew() }
+                )
+            } header: {
+                Text("Optional tools")
+            } footer: {
+                Text("Parola only uses these tools when you ask it to — none of them are required for local audio or video files.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear { model.refreshYtDlpAvailability() }
+    }
+}
+
+private struct ToolStatusRow: View {
+    let name: String
+    let description: String
+    let available: Bool
+    let installing: Bool
+    let error: String?
+    let install: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            HStack(alignment: .firstTextBaseline) {
+                Image(systemName: available ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                    .foregroundStyle(available ? Color.green : Color.orange)
+                Text(name).font(.headline)
+                Text(available ? "Installed" : "Not installed")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if !available {
+                    Button(action: install) {
+                        if installing {
+                            HStack(spacing: 6) {
+                                ProgressView().controlSize(.small)
+                                Text("Installing…")
+                            }
+                        } else {
+                            Label("Install with Homebrew", systemImage: "arrow.down.circle")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(installing)
+                }
+            }
+            Text(description)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let error {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
 

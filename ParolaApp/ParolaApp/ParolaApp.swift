@@ -9,11 +9,12 @@ struct ParolaApp: App {
         WindowGroup("Parola") {
             ContentView()
                 .environmentObject(model)
-                .frame(minWidth: 720, minHeight: 480)
+                .frame(minWidth: 920, minHeight: 600)
                 .onAppear { appDelegate.bind(model: model) }
                 .onOpenURL { url in model.transcribe(fileURL: url) }
         }
         .windowResizability(.contentSize)
+        .defaultSize(width: 1100, height: 720)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Open Audio…") { model.presentOpenPanel() }
