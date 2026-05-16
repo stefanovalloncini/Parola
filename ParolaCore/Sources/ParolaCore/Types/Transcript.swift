@@ -58,6 +58,7 @@ public struct Transcript: Codable, Hashable, Sendable {
     public var sourceURL: URL?
     public var durationSeconds: Double?
     public var summary: Summary?
+    public var chatHistory: [ChatMessage]?
 
     public init(
         segments: [TranscriptSegment],
@@ -65,7 +66,8 @@ public struct Transcript: Codable, Hashable, Sendable {
         modelName: String,
         sourceURL: URL? = nil,
         durationSeconds: Double? = nil,
-        summary: Summary? = nil
+        summary: Summary? = nil,
+        chatHistory: [ChatMessage]? = nil
     ) {
         self.segments = segments
         self.language = language
@@ -73,6 +75,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         self.sourceURL = sourceURL
         self.durationSeconds = durationSeconds
         self.summary = summary
+        self.chatHistory = chatHistory
     }
 
     public var text: String {

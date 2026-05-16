@@ -123,6 +123,21 @@ public actor LibraryStore {
         return entry
     }
 
+    /// Overwrites the transcript.json inside an existing bundle. Audio + manifest untouched.
+    public func updateTranscript(_ transcript: Transcript, for id: LibraryEntry.ID) throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        let transcriptURL = bundleURL.appendingPathComponent("transcript.json")
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        let data = try encoder.encode(transcript)
+        try data.write(to: transcriptURL, options: .atomic)
+        if cachedLoaded?.id == id { cachedLoaded = nil }
+    }
+
     /// Soft-deletes by stamping `deletedAt`. The bundle stays on disk so it can be restored.
     public func delete(_ id: LibraryEntry.ID, at now: Date = Date()) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)

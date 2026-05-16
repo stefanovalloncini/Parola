@@ -24,7 +24,7 @@ struct TranscriptPane: View {
     @EnvironmentObject var model: AppModel
     @State private var rightTab: RightTab = .player
 
-    enum RightTab { case player, summary }
+    enum RightTab { case player, summary, chat }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -47,6 +47,7 @@ struct TranscriptPane: View {
             Picker("Right pane", selection: $rightTab) {
                 Text("Player").tag(RightTab.player)
                 Text("Summary").tag(RightTab.summary)
+                Text("Chat").tag(RightTab.chat)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -58,6 +59,7 @@ struct TranscriptPane: View {
             switch rightTab {
             case .player: playerColumn
             case .summary: SummaryPane()
+            case .chat: ChatPane()
             }
         }
     }

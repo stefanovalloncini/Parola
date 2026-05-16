@@ -7,6 +7,7 @@ struct TranscriptDetailView: View {
     @Environment(PlaybackController.self) private var playback
     @State private var loaded: LoadedEntry?
     @State private var loadError: String?
+    @State private var showingChat: Bool = false
 
     var body: some View {
         Group {
@@ -19,8 +20,17 @@ struct TranscriptDetailView: View {
                 }
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
+                        Button { showingChat = true } label: {
+                            Image(systemName: "bubble.left.and.text.bubble.right")
+                        }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
                         ShareLink(item: loaded.document.transcript.text)
                     }
+                }
+                .sheet(isPresented: $showingChat) {
+                    ChatSheet(entry: loaded.entry, transcript: loaded.document.transcript)
+                        .environmentObject(model)
                 }
             } else if let loadError {
                 Text(loadError).foregroundStyle(.red)

@@ -113,6 +113,18 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: - Chat
+
+    func recordChat(history: [ChatMessage]) {
+        guard var transcript = self.transcript else { return }
+        transcript.chatHistory = history
+        self.transcript = transcript
+        guard let id = selectedEntryID else { return }
+        Task { [library] in
+            try? await library.updateTranscript(transcript, for: id)
+        }
+    }
+
     func postProcess(_ transcript: Transcript) -> Transcript {
         var out = transcript
         out.segments = IgnoredSegments.apply(rules: ignoredSegmentRules, to: out.segments)
