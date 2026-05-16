@@ -6,6 +6,7 @@ struct RootView: View {
     @State private var selectedEntry: LibraryEntry.ID?
     @State private var showingSettings = false
     @State private var showingNew = false
+    @State private var showingTrash = false
 
     var body: some View {
         Group {
@@ -20,6 +21,9 @@ struct RootView: View {
         }
         .sheet(isPresented: $showingNew) {
             NewTranscriptionSheet()
+        }
+        .sheet(isPresented: $showingTrash) {
+            RecentlyDeletedView()
         }
         .alert(
             "Something went wrong",
@@ -76,6 +80,12 @@ struct RootView: View {
     private var toolbarItems: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
             Button { showingSettings = true } label: { Image(systemName: "gearshape") }
+        }
+        if !model.deletedEntries.isEmpty {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { showingTrash = true } label: { Image(systemName: "trash") }
+                    .accessibilityLabel(Text("Recently Deleted"))
+            }
         }
         ToolbarItem(placement: .topBarTrailing) {
             Button { showingNew = true } label: { Image(systemName: "plus") }

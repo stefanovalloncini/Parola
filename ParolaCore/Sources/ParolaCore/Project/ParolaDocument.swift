@@ -94,6 +94,21 @@ public struct ParolaDocument: Sendable {
         return target
     }
 
+    /// Rewrites the manifest of an existing `.parola` bundle in place.
+    /// Used by soft-delete, restore, and category-edit flows — no audio or transcript I/O.
+    public static func updateManifest(
+        at bundleURL: URL,
+        transform: (inout Manifest) throws -> Void
+    ) throws {
+        let manifestURL = bundleURL.appendingPathComponent("manifest.json")
+        guard FileManager.default.fileExists(atPath: manifestURL.path) else {
+            throw ParolaError.ioError("Parola document does not exist: \(bundleURL.path)")
+        }
+        var manifest: Manifest = try readJSON(at: manifestURL)
+        try transform(&manifest)
+        try writeJSON(manifest, to: manifestURL)
+    }
+
     /// Reads a `.parola` bundle. `audioURL` is nil for transcript-only bundles.
     public static func read(at url: URL) throws -> ParolaDocument {
         let fm = FileManager.default

@@ -18,7 +18,8 @@ actor LibraryStore {
     }
 
     let libraryURL: URL
-    private var cachedEntries: [LibraryEntry]?
+    private var cachedActive: [LibraryEntry]?
+    private var cachedDeleted: [LibraryEntry]?
     private var cachedLoaded: (id: LibraryEntry.ID, value: LoadedEntry)?
 
     init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
@@ -31,18 +32,32 @@ actor LibraryStore {
     }
 
     func list() -> [LibraryEntry] {
-        if let cachedEntries { return cachedEntries }
+        if let cachedActive { return cachedActive }
+        primeCaches()
+        return cachedActive ?? []
+    }
+
+    func listDeleted() -> [LibraryEntry] {
+        if let cachedDeleted { return cachedDeleted }
+        primeCaches()
+        return cachedDeleted ?? []
+    }
+
+    private func primeCaches() {
         let fm = FileManager.default
         guard let contents = try? fm.contentsOfDirectory(at: libraryURL, includingPropertiesForKeys: nil) else {
-            cachedEntries = []
-            return []
+            cachedActive = []
+            cachedDeleted = []
+            return
         }
-        let entries = contents
+        let all = contents
             .filter { $0.pathExtension == "parola" }
             .compactMap { try? makeEntry(bundleURL: $0) }
             .sorted { $0.createdAt > $1.createdAt }
-        cachedEntries = entries
-        return entries
+        cachedActive = all.filter { $0.deletedAt == nil }
+        cachedDeleted = all
+            .filter { $0.deletedAt != nil }
+            .sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
     }
 
     func load(_ id: LibraryEntry.ID) throws -> LoadedEntry {
@@ -68,7 +83,7 @@ actor LibraryStore {
             audioURL: audioSource,
             to: bundleURL
         )
-        cachedEntries = nil
+        invalidateListCaches()
         return try makeEntry(bundleURL: bundleURL.appendingPathExtension("parola"))
     }
 
@@ -78,18 +93,61 @@ actor LibraryStore {
         let fm = FileManager.default
         if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
         try fm.copyItem(at: url, to: target)
-        cachedEntries = nil
+        invalidateListCaches()
         return try makeEntry(bundleURL: target)
     }
 
-    func delete(_ id: LibraryEntry.ID) throws {
+    /// Soft-deletes by stamping `deletedAt`. The bundle stays on disk so it can be restored.
+    func delete(_ id: LibraryEntry.ID, at now: Date = Date()) throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.deletedAt = now
+        }
+        invalidateListCaches()
+        if cachedLoaded?.id == id { cachedLoaded = nil }
+    }
+
+    /// Reverses a soft-delete by clearing `deletedAt`.
+    func restore(_ id: LibraryEntry.ID) throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.deletedAt = nil
+        }
+        invalidateListCaches()
+        if cachedLoaded?.id == id { cachedLoaded = nil }
+    }
+
+    /// Permanently removes a bundle from disk.
+    func purge(_ id: LibraryEntry.ID) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
         try FileManager.default.removeItem(at: bundleURL)
-        cachedEntries = nil
+        invalidateListCaches()
         if cachedLoaded?.id == id { cachedLoaded = nil }
+    }
+
+    /// Hard-deletes any soft-deleted entry whose `deletedAt` is older than `days` before `now`.
+    func purgeDeletedOlderThan(days: Int, now: Date) {
+        let cutoff = now.addingTimeInterval(-Double(days) * 86_400)
+        primeCaches()
+        let toPurge = (cachedDeleted ?? []).filter { ($0.deletedAt ?? .distantFuture) < cutoff }
+        for entry in toPurge {
+            try? FileManager.default.removeItem(at: entry.bundleURL)
+        }
+        invalidateListCaches()
+    }
+
+    private func invalidateListCaches() {
+        cachedActive = nil
+        cachedDeleted = nil
     }
 
     private func makeEntry(bundleURL: URL) throws -> LibraryEntry {

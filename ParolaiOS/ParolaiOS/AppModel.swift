@@ -11,7 +11,10 @@ final class AppModel: ObservableObject {
 
     @Published var availableModels: [ModelInfo] = []
     @Published var libraryEntries: [LibraryEntry] = []
+    @Published var deletedEntries: [LibraryEntry] = []
     @Published var lastError: String?
+
+    static let trashRetentionDays = 30
 
     init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
         let store = LibraryStore(libraryURL: libraryURL)
@@ -24,6 +27,10 @@ final class AppModel: ObservableObject {
         }
         refreshModelList()
         refreshLibrary()
+        Task { [weak self] in
+            await store.purgeDeletedOlderThan(days: AppModel.trashRetentionDays, now: Date())
+            self?.refreshLibrary()
+        }
     }
 
     func refreshModelList() {
@@ -41,6 +48,7 @@ final class AppModel: ObservableObject {
     func refreshLibrary() {
         Task {
             libraryEntries = await library.list()
+            deletedEntries = await library.listDeleted()
         }
     }
 
@@ -48,6 +56,28 @@ final class AppModel: ObservableObject {
         Task {
             do {
                 try await library.delete(id)
+            } catch {
+                lastError = error.localizedDescription
+            }
+            refreshLibrary()
+        }
+    }
+
+    func restoreEntry(_ id: LibraryEntry.ID) {
+        Task {
+            do {
+                try await library.restore(id)
+            } catch {
+                lastError = error.localizedDescription
+            }
+            refreshLibrary()
+        }
+    }
+
+    func purgeEntry(_ id: LibraryEntry.ID) {
+        Task {
+            do {
+                try await library.purge(id)
             } catch {
                 lastError = error.localizedDescription
             }

@@ -61,15 +61,73 @@ struct LibraryStoreTests {
         #expect(loaded.document.transcript.segments.first?.text == "hi")
     }
 
-    @Test("delete invalidates the loaded cache")
+    @Test("delete sets deletedAt and excludes from list")
+    func deleteSetsTimestamp() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        let when = Date(timeIntervalSince1970: 1_700_000_000)
+        try await store.delete(entry.id, at: when)
+
+        let active = await store.list()
+        #expect(active.isEmpty)
+
+        let deleted = await store.listDeleted()
+        #expect(deleted.count == 1)
+        #expect(deleted.first?.deletedAt == when)
+    }
+
+    @Test("restore clears deletedAt and returns entry to list")
+    func restoreClearsTimestamp() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        try await store.delete(entry.id, at: Date())
+        try await store.restore(entry.id)
+
+        let active = await store.list()
+        #expect(active.count == 1)
+        #expect(active.first?.deletedAt == nil)
+
+        let deleted = await store.listDeleted()
+        #expect(deleted.isEmpty)
+    }
+
+    @Test("purge removes the directory")
+    func purgeHardDeletes() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: sampleAudioURL)
+        try await store.purge(entry.id)
+        let exists = FileManager.default.fileExists(atPath: entry.bundleURL.path)
+        #expect(exists == false)
+        let entries = await store.list()
+        #expect(entries.isEmpty)
+    }
+
+    @Test("purgeDeletedOlderThan removes only sufficiently-old entries")
+    func purgeOldDeletedOnly() async throws {
+        let (store, _) = try makeTempLibrary()
+        let recent = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        let old = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        let now = Date()
+        try await store.delete(recent.id, at: now)
+        try await store.delete(old.id, at: now.addingTimeInterval(-31 * 86_400))
+
+        await store.purgeDeletedOlderThan(days: 30, now: now)
+
+        let deleted = await store.listDeleted()
+        #expect(deleted.map(\.id).contains(recent.id))
+        #expect(!deleted.map(\.id).contains(old.id))
+        #expect(FileManager.default.fileExists(atPath: recent.bundleURL.path))
+        #expect(!FileManager.default.fileExists(atPath: old.bundleURL.path))
+    }
+
+    @Test("delete invalidates the list cache so the entry no longer appears")
     func deleteInvalidatesCache() async throws {
         let (store, _) = try makeTempLibrary()
         let entry = try await store.add(transcript: makeTranscript(), audioSource: sampleAudioURL)
-        _ = try await store.load(entry.id)
-        try await store.delete(entry.id)
-        await #expect(throws: LibraryStore.LibraryError.self) {
-            try await store.load(entry.id)
-        }
+        _ = await store.list()
+        try await store.delete(entry.id, at: Date())
+        let active = await store.list()
+        #expect(active.isEmpty)
     }
 
     @Test("loading missing entry throws notFound")
@@ -80,22 +138,19 @@ struct LibraryStoreTests {
         }
     }
 
-    @Test("delete removes the directory")
-    func deleteEntry() async throws {
-        let (store, _) = try makeTempLibrary()
-        let entry = try await store.add(transcript: makeTranscript(), audioSource: sampleAudioURL)
-        try await store.delete(entry.id)
-        let exists = FileManager.default.fileExists(atPath: entry.bundleURL.path)
-        #expect(exists == false)
-        let entries = await store.list()
-        #expect(entries.isEmpty)
-    }
-
     @Test("deleting a missing entry throws notFound")
     func deleteMissingThrows() async throws {
         let (store, _) = try makeTempLibrary()
         await #expect(throws: LibraryStore.LibraryError.self) {
-            try await store.delete("nope")
+            try await store.delete("nope", at: Date())
+        }
+    }
+
+    @Test("purging a missing entry throws notFound")
+    func purgeMissingThrows() async throws {
+        let (store, _) = try makeTempLibrary()
+        await #expect(throws: LibraryStore.LibraryError.self) {
+            try await store.purge("nope")
         }
     }
 
