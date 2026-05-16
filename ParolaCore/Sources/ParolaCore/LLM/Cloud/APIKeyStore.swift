@@ -1,0 +1,93 @@
+import Foundation
+import Security
+
+/// Stores per-provider API keys. The shared instance uses the system Keychain;
+/// tests should use `InMemoryAPIKeyStore` to avoid touching real credentials.
+public protocol APIKeyStore: Sendable {
+    func get(for provider: CloudLLMProviderID) async throws -> String?
+    func set(_ value: String?, for provider: CloudLLMProviderID) async throws
+}
+
+public final class KeychainAPIKeyStore: APIKeyStore, @unchecked Sendable {
+    private let service: String
+
+    public init(service: String = "app.parola.cloudllm") {
+        self.service = service
+    }
+
+    public static let shared = KeychainAPIKeyStore()
+
+    public func get(for provider: CloudLLMProviderID) async throws -> String? {
+        let account = providerAccount(provider)
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecReturnData as String: kCFBooleanTrue!
+        ]
+        if ProcessInfo.processInfo.environment["PAROLA_KEYCHAIN_USE_DATA_PROTECTION"] != nil {
+            query[kSecUseDataProtectionKeychain as String] = kCFBooleanTrue
+        }
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess else {
+            throw ParolaError.ioError("Keychain read failed: \(status)")
+        }
+        guard let data = item as? Data, let value = String(data: data, encoding: .utf8) else {
+            throw ParolaError.ioError("Keychain returned malformed data")
+        }
+        return value
+    }
+
+    public func set(_ value: String?, for provider: CloudLLMProviderID) async throws {
+        let account = providerAccount(provider)
+        let baseQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        if let value, !value.isEmpty {
+            let data = Data(value.utf8)
+            let attributes: [String: Any] = [kSecValueData as String: data]
+            let status = SecItemUpdate(baseQuery as CFDictionary, attributes as CFDictionary)
+            if status == errSecItemNotFound {
+                var add = baseQuery
+                add[kSecValueData as String] = data
+                let addStatus = SecItemAdd(add as CFDictionary, nil)
+                guard addStatus == errSecSuccess else {
+                    throw ParolaError.ioError("Keychain add failed: \(addStatus)")
+                }
+            } else if status != errSecSuccess {
+                throw ParolaError.ioError("Keychain update failed: \(status)")
+            }
+        } else {
+            let status = SecItemDelete(baseQuery as CFDictionary)
+            if status != errSecSuccess && status != errSecItemNotFound {
+                throw ParolaError.ioError("Keychain delete failed: \(status)")
+            }
+        }
+    }
+
+    private func providerAccount(_ provider: CloudLLMProviderID) -> String {
+        CloudLLMProviderInfo.info(for: provider)?.keychainAccount ?? "app.parola.cloudllm.\(provider.rawValue)"
+    }
+}
+
+public actor InMemoryAPIKeyStore: APIKeyStore {
+    private var keys: [CloudLLMProviderID: String] = [:]
+    public init(keys: [CloudLLMProviderID: String] = [:]) {
+        self.keys = keys
+    }
+    public func get(for provider: CloudLLMProviderID) async throws -> String? {
+        keys[provider]
+    }
+    public func set(_ value: String?, for provider: CloudLLMProviderID) async throws {
+        if let value, !value.isEmpty {
+            keys[provider] = value
+        } else {
+            keys.removeValue(forKey: provider)
+        }
+    }
+}
