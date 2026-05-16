@@ -41,6 +41,18 @@ enum DS {
         static let danger = SwiftUI.Color.red
     }
 
+    enum Palette {
+        static let canvas = SwiftUI.Color("CanvasColor")
+        static let surface = SwiftUI.Color("SurfaceColor")
+        static let surfaceElevated = SwiftUI.Color("SurfaceElevatedColor")
+        static let surfaceHover = SwiftUI.Color.primary.opacity(0.06)
+        static let divider = SwiftUI.Color("DividerColor")
+        static let pillFill = SwiftUI.Color.primary.opacity(0.08)
+        static let pillFillHover = SwiftUI.Color.primary.opacity(0.14)
+        static let success = SwiftUI.Color(red: 0.32, green: 0.74, blue: 0.42)
+        static let warning = SwiftUI.Color(red: 0.95, green: 0.66, blue: 0.20)
+    }
+
     /// Desaturated speaker tints.
     static let speakerPalette: [SwiftUI.Color] = [
         SwiftUI.Color(red: 0.30, green: 0.45, blue: 0.68),  // dusty blue
@@ -61,5 +73,40 @@ enum DS {
     static func formatBytes(_ bytes: Int) -> String {
         Measurement(value: Double(bytes), unit: UnitInformationStorage.bytes)
             .formatted(.byteCount(style: .file))
+    }
+}
+
+extension View {
+    func cardBackground(
+        radius: CGFloat = DS.Radius.regular,
+        bordered: Bool = true
+    ) -> some View {
+        background(
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(DS.Palette.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .strokeBorder(DS.Palette.divider, lineWidth: bordered ? 1 : 0)
+        )
+    }
+
+    func pillStyle(bordered: Bool = true) -> some View {
+        padding(.horizontal, DS.Spacing.regular)
+            .padding(.vertical, DS.Spacing.small)
+            .background(Capsule(style: .continuous).fill(DS.Palette.pillFill))
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(DS.Palette.divider, lineWidth: bordered ? 1 : 0)
+            )
+            .clipShape(Capsule(style: .continuous))
+            .contentShape(Capsule(style: .continuous))
+    }
+
+    func inspectorPanel() -> some View {
+        background(DS.Palette.surface)
+            .overlay(alignment: .leading) {
+                DS.Palette.divider.frame(width: 1)
+            }
     }
 }
