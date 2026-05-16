@@ -9,6 +9,7 @@ struct RootView: View {
     @State private var showingSettings = false
     @State private var showingNew = false
     @State private var showingTrash = false
+    @State private var showingLiveCaptions = false
     @State private var searchText = ""
 
     var body: some View {
@@ -27,6 +28,9 @@ struct RootView: View {
         }
         .sheet(isPresented: $showingTrash) {
             RecentlyDeletedView()
+        }
+        .sheet(isPresented: $showingLiveCaptions) {
+            LiveCaptionsSheet().environmentObject(model)
         }
         .alert(
             "Something went wrong",
@@ -98,6 +102,10 @@ struct RootView: View {
                 Button { showingTrash = true } label: { Image(systemName: "trash") }
                     .accessibilityLabel(Text("Recently Deleted"))
             }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Button { showingLiveCaptions = true } label: { Image(systemName: "captions.bubble") }
+                .accessibilityLabel(Text("Live Captions"))
         }
         ToolbarItem(placement: .topBarTrailing) {
             Button { showingNew = true } label: { Image(systemName: "plus") }
