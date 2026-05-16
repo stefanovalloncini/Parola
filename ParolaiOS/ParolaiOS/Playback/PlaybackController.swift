@@ -41,7 +41,8 @@ final class PlaybackController {
     }
 
     func play() {
-        player?.play()
+        guard let player else { return }
+        player.play()
         isPlaying = true
     }
 
@@ -50,7 +51,10 @@ final class PlaybackController {
         isPlaying = false
     }
 
-    func toggle() { isPlaying ? pause() : play() }
+    func toggle() {
+        guard player != nil else { return }
+        isPlaying ? pause() : play()
+    }
 
     func seek(to time: TimeInterval) {
         guard let player else { return }
