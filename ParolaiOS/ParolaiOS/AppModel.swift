@@ -68,15 +68,17 @@ extension AppModel {
             } else {
                 let copy = FileManager.default.temporaryDirectory
                     .appendingPathComponent("parola-incoming-\(UUID().uuidString)-\(url.lastPathComponent)")
-                try await Self.copyOffMainThread(from: url, to: copy)
+                try await FileCopier.copy(from: url, to: copy)
                 coordinator.startFileTranscriptionFromTrustedCopy(at: copy)
             }
         } catch {
             lastError = error.localizedDescription
         }
     }
+}
 
-    private static func copyOffMainThread(from source: URL, to destination: URL) async throws {
+enum FileCopier {
+    static func copy(from source: URL, to destination: URL) async throws {
         try await Task.detached(priority: .userInitiated) {
             try FileManager.default.copyItem(at: source, to: destination)
         }.value

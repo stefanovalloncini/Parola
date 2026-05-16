@@ -48,9 +48,7 @@ final class TranscriptionCoordinator: ObservableObject {
             let copy = FileManager.default.temporaryDirectory
                 .appendingPathComponent("parola-ios-\(UUID().uuidString)-\(sourceURL.lastPathComponent)")
             do {
-                try await Task.detached(priority: .userInitiated) {
-                    try FileManager.default.copyItem(at: sourceURL, to: copy)
-                }.value
+                try await FileCopier.copy(from: sourceURL, to: copy)
             } catch {
                 phase = .failed(message: error.localizedDescription)
                 return
