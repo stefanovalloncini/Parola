@@ -25,6 +25,7 @@ final class TranscriptionCoordinator: ObservableObject {
     private let session = TranscriptionSession()
     private var streamingSession: StreamingTranscriptionSession?
     private var streamingTask: Task<Void, Never>?
+    private var discardingRecording = false
     private var lastProgressPercent: Int = -1
 
     init(library: LibraryStore, settings: UserSettings) {
@@ -87,6 +88,7 @@ final class TranscriptionCoordinator: ObservableObject {
         configureAudioSession()
         liveSegments = []
         livePartialText = ""
+        discardingRecording = false
         let session = StreamingTranscriptionSession()
         streamingSession = session
         phase = .recording
@@ -114,6 +116,15 @@ final class TranscriptionCoordinator: ObservableObject {
         }
     }
 
+    func cancelRecording() {
+        discardingRecording = true
+        guard let session = streamingSession else { return }
+        streamingSession = nil
+        Task {
+            await session.stop()
+        }
+    }
+
     func handleStreamingEvent(_ event: StreamingEvent) {
         switch event {
         case .partial(let text):
@@ -129,6 +140,11 @@ final class TranscriptionCoordinator: ObservableObject {
             phase = .failed(message: msg)
         case .finished(let final):
             livePartialText = ""
+            if discardingRecording {
+                discardingRecording = false
+                phase = .idle
+                return
+            }
             Task {
                 do {
                     let entry = try await library.add(transcript: final, audioSource: nil)

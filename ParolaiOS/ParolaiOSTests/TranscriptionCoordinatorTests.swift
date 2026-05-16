@@ -55,6 +55,26 @@ struct TranscriptionCoordinatorTests {
         #expect(coord.livePartialText == "")
     }
 
+    @Test("finished event after cancelRecording does not persist")
+    func cancelRecordingDiscards() async throws {
+        let (coord, library) = try makeCoordinator()
+        var observed: LibraryEntry?
+        coord.onComplete = { entry in observed = entry }
+
+        coord.cancelRecording()
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 0.5, text: "Discarded")],
+            language: "en",
+            modelName: "openai_whisper-tiny"
+        )
+        coord.handleStreamingEvent(.finished(transcript))
+
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(observed == nil)
+        let entries = await library.list()
+        #expect(entries.isEmpty)
+    }
+
     @Test("finished event saves a transcript-only library entry")
     func finishedPersistsTranscript() async throws {
         let (coord, library) = try makeCoordinator()
