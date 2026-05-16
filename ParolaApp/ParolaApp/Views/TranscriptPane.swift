@@ -121,6 +121,8 @@ struct TranscriptPane: View {
                 Menu {
                     Button("As Plain Text…") { model.exportRequest(.txt) }
                     Button("As Markdown…") { model.exportRequest(.md) }
+                    Button("As HTML…") { model.exportRequest(.html) }
+                    Button("As CSV…") { model.exportRequest(.csv) }
                     Button("As SubRip (.srt)…") { model.exportRequest(.srt) }
                     Button("As WebVTT (.vtt)…") { model.exportRequest(.vtt) }
                     Button("As JSON…") { model.exportRequest(.json) }

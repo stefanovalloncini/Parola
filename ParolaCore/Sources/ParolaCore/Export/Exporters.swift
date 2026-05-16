@@ -6,6 +6,8 @@ public enum ExportFormat: String, CaseIterable, Sendable, Codable {
     case vtt
     case json
     case md
+    case html
+    case csv
 
     public var fileExtension: String { rawValue }
 }
@@ -126,6 +128,63 @@ public struct JsonExporter: TranscriptExporter {
     }
 }
 
+public struct HtmlExporter: TranscriptExporter {
+    public let format: ExportFormat = .html
+    public init() {}
+
+    public func render(_ transcript: Transcript) throws -> String {
+        var body = ""
+        for seg in transcript.segments {
+            let text = Self.escape(seg.text.trimmingCharacters(in: .whitespaces))
+            let ts = MarkdownExporter.timestamp(seg.start)
+            let anchor = "t-\(seg.id)"
+            var paragraph = "<p id=\"\(anchor)\"><a class=\"t\" href=\"#\(anchor)\">[\(ts)]</a> "
+            if let speaker = seg.speaker {
+                paragraph += "<span class=\"s\">\(Self.escape(speaker))</span>: "
+            }
+            paragraph += "\(text)</p>\n"
+            body += paragraph
+        }
+        return """
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"><title>Transcript</title>
+        <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.5}.t{color:#888;font-family:ui-monospace,monospace;font-size:.85em;text-decoration:none;margin-right:.4em}.s{font-weight:600}p{margin:0 0 1em}</style>
+        </head><body>
+        \(body)</body></html>
+        """
+    }
+
+    static func escape(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&#39;")
+    }
+}
+
+public struct CsvExporter: TranscriptExporter {
+    public let format: ExportFormat = .csv
+    public init() {}
+
+    public func render(_ transcript: Transcript) throws -> String {
+        var out = "start_seconds,end_seconds,speaker,text\n"
+        for seg in transcript.segments {
+            let speaker = seg.speaker ?? ""
+            let text = seg.text.trimmingCharacters(in: .whitespaces)
+            out += "\(seg.start),\(seg.end),\(Self.quote(speaker)),\(Self.quote(text))\n"
+        }
+        return out
+    }
+
+    static func quote(_ s: String) -> String {
+        let needsQuotes = s.contains(",") || s.contains("\"") || s.contains("\n") || s.contains("\r")
+        guard needsQuotes else { return s }
+        let escaped = s.replacingOccurrences(of: "\"", with: "\"\"")
+        return "\"\(escaped)\""
+    }
+}
+
 public enum Exporters {
     public static func exporter(for format: ExportFormat) -> TranscriptExporter {
         switch format {
@@ -134,6 +193,8 @@ public enum Exporters {
         case .vtt:  return VttExporter()
         case .json: return JsonExporter()
         case .md:   return MarkdownExporter()
+        case .html: return HtmlExporter()
+        case .csv:  return CsvExporter()
         }
     }
 }

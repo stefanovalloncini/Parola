@@ -102,4 +102,90 @@ struct ExporterTests {
         #expect(ExportFormat.md.fileExtension == "md")
         #expect(Exporters.exporter(for: .md) is MarkdownExporter)
     }
+
+    @Test("html starts with doctype and has a title")
+    func htmlSkeleton() throws {
+        let out = try HtmlExporter().render(sample())
+        #expect(out.hasPrefix("<!DOCTYPE html>"))
+        #expect(out.contains("<title>Transcript</title>"))
+        #expect(out.hasSuffix("</html>"))
+    }
+
+    @Test("html has one paragraph per segment with anchored timestamp")
+    func htmlSegments() throws {
+        let out = try HtmlExporter().render(sample())
+        #expect(out.contains("id=\"t-0\""))
+        #expect(out.contains("href=\"#t-0\""))
+        #expect(out.contains("[00:00:00]"))
+        #expect(out.contains("Hello world."))
+        #expect(out.contains("id=\"t-2\""))
+    }
+
+    @Test("html includes speaker prefix when present")
+    func htmlSpeakers() throws {
+        let out = try HtmlExporter().render(sampleWithSpeakers())
+        #expect(out.contains("class=\"s\">Speaker 1</span>"))
+        #expect(out.contains("class=\"s\">Speaker 2</span>"))
+    }
+
+    @Test("html escapes special characters")
+    func htmlEscapes() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "5 < 10 & \"true\"")],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try HtmlExporter().render(transcript)
+        #expect(out.contains("5 &lt; 10 &amp; &quot;true&quot;"))
+    }
+
+    @Test("html is a recognized ExportFormat")
+    func htmlFormat() {
+        #expect(ExportFormat.html.fileExtension == "html")
+        #expect(Exporters.exporter(for: .html) is HtmlExporter)
+    }
+
+    @Test("csv has a header row")
+    func csvHeader() throws {
+        let out = try CsvExporter().render(sample())
+        #expect(out.hasPrefix("start_seconds,end_seconds,speaker,text\n"))
+    }
+
+    @Test("csv emits one row per segment")
+    func csvRows() throws {
+        let out = try CsvExporter().render(sample())
+        let lines = out.split(separator: "\n", omittingEmptySubsequences: false)
+        // header + 3 segments
+        #expect(lines.count >= 4)
+        #expect(out.contains("0.0,1.5,,Hello world."))
+    }
+
+    @Test("csv quotes fields containing commas, quotes, newlines")
+    func csvQuoting() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "hello, world"),
+                TranscriptSegment(id: 1, start: 1, end: 2, text: "she said \"hi\""),
+                TranscriptSegment(id: 2, start: 2, end: 3, text: "line1\nline2"),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try CsvExporter().render(transcript)
+        #expect(out.contains("\"hello, world\""))
+        #expect(out.contains("\"she said \"\"hi\"\"\""))
+        #expect(out.contains("\"line1\nline2\""))
+    }
+
+    @Test("csv emits empty speaker column when nil")
+    func csvEmptySpeaker() throws {
+        let out = try CsvExporter().render(sample())
+        #expect(out.contains(",,"))   // empty speaker between start_seconds,end_seconds,,text
+    }
+
+    @Test("csv is a recognized ExportFormat")
+    func csvFormat() {
+        #expect(ExportFormat.csv.fileExtension == "csv")
+        #expect(Exporters.exporter(for: .csv) is CsvExporter)
+    }
 }
