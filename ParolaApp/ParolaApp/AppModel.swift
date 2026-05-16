@@ -228,6 +228,7 @@ final class AppModel: ObservableObject {
                 )
                 transcript = result
                 phase = .ready
+                refreshModelList()
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
@@ -421,6 +422,7 @@ final class AppModel: ObservableObject {
                 )
                 transcript = result
                 phase = .ready
+                refreshModelList()
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
