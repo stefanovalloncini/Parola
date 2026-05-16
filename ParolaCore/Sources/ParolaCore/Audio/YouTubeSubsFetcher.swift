@@ -42,9 +42,7 @@ public enum YouTubeSubsFetcher {
         do { try process.run() } catch {
             throw ParolaError.captureUnavailable("Could not launch yt-dlp: \(error.localizedDescription)")
         }
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            process.terminationHandler = { _ in cont.resume() }
-        }
+        try await waitWithTimeout(process, seconds: 120)
 
         if process.terminationStatus != 0 {
             let errData = stderr.fileHandleForReading.readDataToEndOfFile()
@@ -73,6 +71,29 @@ public enum YouTubeSubsFetcher {
             return manual
         }
         return vtts.first
+    }
+
+    static func waitWithTimeout(_ process: Process, seconds: Int) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { await waitForExit(process) }
+            group.addTask {
+                try await Task.sleep(for: .seconds(seconds))
+                process.terminate()
+                throw ParolaError.captureUnavailable("yt-dlp exceeded \(seconds)s timeout")
+            }
+            try await group.next()
+            group.cancelAll()
+        }
+    }
+
+    private static func waitForExit(_ process: Process) async {
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                process.terminationHandler = { _ in cont.resume() }
+            }
+        } onCancel: {
+            process.terminate()
+        }
     }
 
     private static func findYtDlp() -> String? {

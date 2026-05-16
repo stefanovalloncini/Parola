@@ -21,10 +21,7 @@ public extension URL {
 /// Audio source that downloads a YouTube video's audio via `yt-dlp`.
 ///
 /// Requires `yt-dlp` on `$PATH`. Common install: `brew install yt-dlp`.
-///
-/// Unchecked Sendable: `downloadedURL` and `workingDir` are written once during a
-/// single `prepare()` call, which Swift's structured-concurrency rules already
-/// serialize from any one caller.
+// Justification: downloadedURL is written once per instance during a single prepare() call; callers serialize access by awaiting it.
 public final class YouTubeAudioSource: AudioSource, @unchecked Sendable {
     public let url: URL
 
@@ -82,7 +79,7 @@ public final class YouTubeAudioSource: AudioSource, @unchecked Sendable {
             throw ParolaError.captureUnavailable("Could not launch yt-dlp: \(error.localizedDescription)")
         }
 
-        await Self.waitForExit(process)
+        try await Self.waitWithTimeout(process, seconds: 120)
 
         let outData = stdout.fileHandleForReading.readDataToEndOfFile()
         let errData = stderr.fileHandleForReading.readDataToEndOfFile()
@@ -100,9 +97,26 @@ public final class YouTubeAudioSource: AudioSource, @unchecked Sendable {
         return URL(fileURLWithPath: path)
     }
 
+    static func waitWithTimeout(_ process: Process, seconds: Int) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { await waitForExit(process) }
+            group.addTask {
+                try await Task.sleep(for: .seconds(seconds))
+                process.terminate()
+                throw ParolaError.captureUnavailable("yt-dlp exceeded \(seconds)s timeout")
+            }
+            try await group.next()
+            group.cancelAll()
+        }
+    }
+
     private static func waitForExit(_ process: Process) async {
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            process.terminationHandler = { _ in cont.resume() }
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                process.terminationHandler = { _ in cont.resume() }
+            }
+        } onCancel: {
+            process.terminate()
         }
     }
 
