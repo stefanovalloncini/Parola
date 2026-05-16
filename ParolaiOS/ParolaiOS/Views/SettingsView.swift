@@ -65,6 +65,20 @@ struct SettingsSheet: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    NavigationLink {
+                        IgnoredSegmentsSettings()
+                            .environmentObject(model)
+                            .navigationTitle("Filters")
+                            .navigationBarTitleDisplayMode(.inline)
+                    } label: {
+                        HStack {
+                            Image(systemName: "line.3.horizontal.decrease.circle")
+                            Text("Ignored Segments")
+                            Spacer()
+                            Text("\(model.ignoredSegmentRules.filter(\.enabled).count) active")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
 
                 Section {

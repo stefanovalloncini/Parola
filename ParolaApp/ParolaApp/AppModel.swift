@@ -79,6 +79,30 @@ final class AppModel: ObservableObject {
 
     @Published var pendingExport: ExportFormat?
 
+    // MARK: - Ignored segments
+
+    @Published var ignoredSegmentRules: [IgnoredSegmentRule] = [] {
+        didSet { saveIgnoredSegmentRules() }
+    }
+
+    private func loadIgnoredSegmentRules() {
+        guard let data = UserDefaults.standard.data(forKey: "ignoredSegmentRules"),
+              let rules = try? JSONDecoder().decode([IgnoredSegmentRule].self, from: data) else { return }
+        ignoredSegmentRules = rules
+    }
+
+    private func saveIgnoredSegmentRules() {
+        if let data = try? JSONEncoder().encode(ignoredSegmentRules) {
+            UserDefaults.standard.set(data, forKey: "ignoredSegmentRules")
+        }
+    }
+
+    func postProcess(_ transcript: Transcript) -> Transcript {
+        var out = transcript
+        out.segments = IgnoredSegments.apply(rules: ignoredSegmentRules, to: out.segments)
+        return out
+    }
+
     // MARK: - Auto-export rules
 
     @Published var autoExportRules: [AutoExportRule] = [] {
@@ -135,6 +159,7 @@ final class AppModel: ObservableObject {
 
     init() {
         loadAutoExportRules()
+        loadIgnoredSegmentRules()
         refreshModelList()
         refreshYtDlpAvailability()
         refreshLibrary()
@@ -329,10 +354,11 @@ final class AppModel: ObservableObject {
                     options: makeOptions(task: task),
                     downloadProgress: makeDownloadProgressHandler()
                 )
-                transcript = result
+                let processed = postProcess(result)
+                transcript = processed
                 phase = .ready
                 refreshModelList()
-                persistToLibrary(result, audioSource: fileURL)
+                persistToLibrary(processed, audioSource: fileURL)
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
@@ -486,10 +512,11 @@ final class AppModel: ObservableObject {
                     options: currentOptions,
                     downloadProgress: makeDownloadProgressHandler()
                 )
-                transcript = result
+                let processed = postProcess(result)
+                transcript = processed
                 phase = .ready
                 refreshModelList()
-                persistToLibrary(result, audioSource: audioURL)
+                persistToLibrary(processed, audioSource: audioURL)
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
@@ -503,9 +530,10 @@ final class AppModel: ObservableObject {
             do {
                 phase = .transcribing(file: url)
                 let result = try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: selectedLanguage)
-                transcript = result
+                let processed = postProcess(result)
+                transcript = processed
                 phase = .ready
-                persistToLibrary(result, audioSource: nil)
+                persistToLibrary(processed, audioSource: nil)
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
@@ -652,10 +680,11 @@ final class AppModel: ObservableObject {
         case .failed(let msg):
             phase = .failed(message: msg)
         case .finished(let transcript):
-            self.transcript = transcript
+            let processed = postProcess(transcript)
+            self.transcript = processed
             self.livePartialText = ""
             self.phase = .ready
-            persistToLibrary(transcript, audioSource: nil)
+            persistToLibrary(processed, audioSource: nil)
         }
     }
 
@@ -683,10 +712,11 @@ final class AppModel: ObservableObject {
                     source: FileAudioSource(url: url),
                     options: currentOptions
                 )
-                transcript = result
+                let processed = postProcess(result)
+                transcript = processed
                 phase = .ready
                 refreshModelList()
-                persistToLibrary(result, audioSource: url)
+                persistToLibrary(processed, audioSource: url)
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }

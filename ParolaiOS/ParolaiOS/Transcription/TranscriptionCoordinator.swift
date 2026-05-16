@@ -19,6 +19,7 @@ final class TranscriptionCoordinator: ObservableObject {
     @Published private(set) var livePartialText: String = ""
 
     var onComplete: (@MainActor (LibraryEntry) -> Void)?
+    var postProcessor: (@MainActor (Transcript) -> Transcript)?
 
     private let library: LibraryStore
     private let settings: UserSettings
@@ -77,7 +78,8 @@ final class TranscriptionCoordinator: ObservableObject {
                     downloadProgress: makeDownloadProgressHandler()
                 )
                 try Task.checkCancellation()
-                let entry = try await library.add(transcript: result, audioSource: audio)
+                let processed = postProcessor?(result) ?? result
+                let entry = try await library.add(transcript: processed, audioSource: audio)
                 phase = .idle
                 onComplete?(entry)
             } catch is CancellationError {
@@ -161,9 +163,10 @@ final class TranscriptionCoordinator: ObservableObject {
                 phase = .idle
                 return
             }
+            let processed = postProcessor?(final) ?? final
             Task {
                 do {
-                    let entry = try await library.add(transcript: final, audioSource: nil)
+                    let entry = try await library.add(transcript: processed, audioSource: nil)
                     phase = .idle
                     onComplete?(entry)
                 } catch {

@@ -16,6 +16,9 @@ final class AppModel: ObservableObject {
     @Published var autoExportRules: [AutoExportRule] = [] {
         didSet { saveAutoExportRules() }
     }
+    @Published var ignoredSegmentRules: [IgnoredSegmentRule] = [] {
+        didSet { saveIgnoredSegmentRules() }
+    }
     @Published var lastError: String?
 
     private var searchTask: Task<Void, Never>?
@@ -31,6 +34,18 @@ final class AppModel: ObservableObject {
     private func saveAutoExportRules() {
         if let data = try? JSONEncoder().encode(autoExportRules) {
             UserDefaults.standard.set(data, forKey: "autoExportRules")
+        }
+    }
+
+    private func loadIgnoredSegmentRules() {
+        guard let data = UserDefaults.standard.data(forKey: "ignoredSegmentRules"),
+              let rules = try? JSONDecoder().decode([IgnoredSegmentRule].self, from: data) else { return }
+        ignoredSegmentRules = rules
+    }
+
+    private func saveIgnoredSegmentRules() {
+        if let data = try? JSONEncoder().encode(ignoredSegmentRules) {
+            UserDefaults.standard.set(data, forKey: "ignoredSegmentRules")
         }
     }
 
@@ -67,6 +82,13 @@ final class AppModel: ObservableObject {
             self?.runAutoExports(for: entry)
         }
         loadAutoExportRules()
+        loadIgnoredSegmentRules()
+        coordinator.postProcessor = { [weak self] transcript in
+            guard let self else { return transcript }
+            var out = transcript
+            out.segments = IgnoredSegments.apply(rules: self.ignoredSegmentRules, to: out.segments)
+            return out
+        }
         refreshModelList()
         refreshLibrary()
         Task { [weak self] in
