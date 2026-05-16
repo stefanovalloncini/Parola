@@ -8,38 +8,14 @@ struct YouTubeURLSheet: View {
     @FocusState private var fieldFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.regular) {
-            Text("Transcribe a YouTube video")
-                .font(DS.Font.heading)
-            Text("Paste a URL — Parola downloads the audio locally with yt-dlp.")
-                .font(DS.Font.body)
-                .foregroundStyle(DS.Color.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if !model.ytDlpAvailable {
-                YtDlpBanner()
-            }
-
-            TextField("https://www.youtube.com/watch?v=…", text: $urlDraft)
-                .textFieldStyle(.roundedBorder)
-                .focused($fieldFocused)
-                .onSubmit { submit(prefersExistingSubs: false) }
-
-            HStack(spacing: DS.Spacing.small) {
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Spacer()
-                Button("Use Captions") { submit(prefersExistingSubs: true) }
-                    .disabled(disabled || !model.ytDlpAvailable)
-                Button("Transcribe") { submit(prefersExistingSubs: false) }
-                    .buttonStyle(.borderedProminent)
-                    .tint(DS.Color.accent)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(disabled || !model.ytDlpAvailable)
-            }
-        }
-        .padding(DS.Spacing.large)
-        .frame(width: 520)
+        SheetFrame(
+            icon: "play.rectangle.fill",
+            iconTint: DS.Color.accent,
+            title: "Add YouTube URL",
+            onClose: { dismiss() },
+            content: { contentBody },
+            footer: { footerBody }
+        )
         .onAppear {
             model.refreshYtDlpAvailability()
             if urlDraft.isEmpty,
@@ -49,6 +25,46 @@ struct YouTubeURLSheet: View {
                 urlDraft = url.absoluteString
             }
             fieldFocused = true
+        }
+    }
+
+    private var contentBody: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: DS.Spacing.regular) {
+                Text("Paste a link — Parola downloads the audio locally with yt-dlp.")
+                    .font(DS.Font.body)
+                    .foregroundStyle(DS.Color.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                TextField("https://www.youtube.com/watch?v=…", text: $urlDraft)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($fieldFocused)
+                    .onSubmit { submit(prefersExistingSubs: false) }
+
+                if !model.ytDlpAvailable {
+                    YtDlpBanner()
+                }
+            }
+            .padding(DS.Spacing.regular)
+        }
+    }
+
+    private var footerBody: some View {
+        HStack(spacing: DS.Spacing.small) {
+            Button("Cancel") { dismiss() }
+                .sheetSecondaryAction()
+                .keyboardShortcut(.cancelAction)
+
+            Spacer()
+
+            Button("Use captions") { submit(prefersExistingSubs: true) }
+                .sheetSecondaryAction()
+                .disabled(disabled || !model.ytDlpAvailable)
+
+            Button("Transcribe") { submit(prefersExistingSubs: false) }
+                .sheetPrimaryAction()
+                .keyboardShortcut(.defaultAction)
+                .disabled(disabled || !model.ytDlpAvailable)
         }
     }
 
@@ -110,7 +126,7 @@ private struct YtDlpBanner: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(model.ytDlpInstalling)
 
-                Button("Copy Command") {
+                Button("Copy command") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString("brew install yt-dlp", forType: .string)
                 }
