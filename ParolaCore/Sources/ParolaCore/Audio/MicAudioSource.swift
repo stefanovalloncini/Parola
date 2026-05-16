@@ -4,13 +4,9 @@ import Foundation
 /// Records microphone input to a temporary WAV file (16 kHz mono Float32 — Whisper's expected format).
 ///
 /// Lifecycle: `start()` to begin, `prepare()` to stop and return the file URL,
-/// or `cancel()` to stop and discard. Thread-safe via an internal serial queue.
-///
-/// Unchecked Sendable: every mutation of the stored state goes through `stateQueue`,
-/// including the AVAudioEngine tap callback. The serial queue is the lock.
-public final class MicAudioSource: AudioSource, @unchecked Sendable {
+/// or `cancel()` to stop and discard.
+public actor MicAudioSource: AudioSource {
     private let engine = AVAudioEngine()
-    private let stateQueue = DispatchQueue(label: "com.parola.mic")
     private var writeFile: AVAudioFile?
     private var outputURL: URL?
     private var converter: AVAudioConverter?
@@ -19,20 +15,7 @@ public final class MicAudioSource: AudioSource, @unchecked Sendable {
 
     public init() {}
 
-    public func start() async throws {
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            stateQueue.async {
-                do {
-                    try self.startLocked()
-                    cont.resume()
-                } catch {
-                    cont.resume(throwing: error)
-                }
-            }
-        }
-    }
-
-    private func startLocked() throws {
+    public func start() throws {
         guard !isRecording else { return }
 
         let inputNode = engine.inputNode
@@ -68,7 +51,8 @@ public final class MicAudioSource: AudioSource, @unchecked Sendable {
         self.outputURL = url
 
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            self?.write(buffer: buffer)
+            guard let self else { return }
+            Task { await self.write(buffer: buffer) }
         }
 
         engine.prepare()
@@ -77,53 +61,41 @@ public final class MicAudioSource: AudioSource, @unchecked Sendable {
     }
 
     private func write(buffer: AVAudioPCMBuffer) {
-        stateQueue.sync {
-            guard let conv = converter, let outFormat = outputFormat, let file = writeFile else { return }
-            let ratio = outFormat.sampleRate / buffer.format.sampleRate
-            let outCap = AVAudioFrameCount(Double(buffer.frameLength) * ratio + 1024)
-            guard let outBuffer = AVAudioPCMBuffer(pcmFormat: outFormat, frameCapacity: outCap) else { return }
+        guard let conv = converter, let outFormat = outputFormat, let file = writeFile else { return }
+        let ratio = outFormat.sampleRate / buffer.format.sampleRate
+        let outCap = AVAudioFrameCount(Double(buffer.frameLength) * ratio + 1024)
+        guard let outBuffer = AVAudioPCMBuffer(pcmFormat: outFormat, frameCapacity: outCap) else { return }
 
-            var error: NSError?
-            let bufBox = BufferBox(buffer: buffer)
-            let status = conv.convert(to: outBuffer, error: &error) { _, outStatus in
-                if bufBox.consumed {
-                    outStatus.pointee = .endOfStream
-                    return nil
-                }
-                bufBox.consumed = true
-                outStatus.pointee = .haveData
-                return bufBox.buffer
+        var error: NSError?
+        let bufBox = BufferBox(buffer: buffer)
+        let status = conv.convert(to: outBuffer, error: &error) { _, outStatus in
+            if bufBox.consumed {
+                outStatus.pointee = .endOfStream
+                return nil
             }
-            if status == .error || outBuffer.frameLength == 0 { return }
-            try? file.write(from: outBuffer)
+            bufBox.consumed = true
+            outStatus.pointee = .haveData
+            return bufBox.buffer
         }
+        if status == .error || outBuffer.frameLength == 0 { return }
+        try? file.write(from: outBuffer)
     }
 
-    public func prepare() async throws -> URL {
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<URL, Error>) in
-            stateQueue.async {
-                self.stopLocked()
-                if let url = self.outputURL {
-                    cont.resume(returning: url)
-                } else {
-                    cont.resume(throwing: ParolaError.captureUnavailable("recording was not started"))
-                }
-            }
+    public func prepare() throws -> URL {
+        stop()
+        guard let url = outputURL else {
+            throw ParolaError.captureUnavailable("recording was not started")
         }
+        return url
     }
 
-    public func cancel() async {
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            stateQueue.async {
-                self.stopLocked()
-                if let url = self.outputURL { try? FileManager.default.removeItem(at: url) }
-                self.outputURL = nil
-                cont.resume()
-            }
-        }
+    public func cancel() {
+        stop()
+        if let url = outputURL { try? FileManager.default.removeItem(at: url) }
+        outputURL = nil
     }
 
-    private func stopLocked() {
+    private func stop() {
         guard isRecording else { return }
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
@@ -132,10 +104,8 @@ public final class MicAudioSource: AudioSource, @unchecked Sendable {
     }
 }
 
-/// Wraps the converter state so the closure captures a reference, not a `var`.
-///
-/// Unchecked Sendable: each box is touched only by the converter callback that owns it,
-/// inside the single `stateQueue.sync` block where it's created.
+// Unchecked Sendable: the box is captured by the @Sendable converter callback but is touched
+// only synchronously inside the single convert(to:error:) call that creates it.
 private final class BufferBox: @unchecked Sendable {
     let buffer: AVAudioPCMBuffer
     var consumed = false
