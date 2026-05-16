@@ -7,8 +7,9 @@ struct LibraryEntry: Identifiable, Hashable, Sendable {
     let manifest: ParolaDocument.Manifest
 
     var title: String {
-        if !manifest.originalAudioName.isEmpty { return manifest.originalAudioName }
-        return String(localized: "library.fallback.title")
+        let name = manifest.originalAudioName
+        guard !name.isEmpty else { return String(localized: "library.fallback.title") }
+        return (name as NSString).deletingPathExtension
     }
 
     var createdAt: Date { manifest.createdAt }
