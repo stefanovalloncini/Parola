@@ -8,7 +8,7 @@ struct ParolaApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        WindowGroup("Parola") {
+        WindowGroup {
             ContentView()
                 .environmentObject(model)
                 .frame(minWidth: 920, minHeight: 600)
@@ -16,8 +16,10 @@ struct ParolaApp: App {
                 .onAppear { appDelegate.bind(model: model) }
                 .onOpenURL { url in model.transcribe(fileURL: url) }
         }
+        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified(showsTitle: false))
         .windowResizability(.contentSize)
-        .defaultSize(width: 1100, height: 720)
+        .defaultSize(width: 1180, height: 760)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Open Audio…") { model.presentOpenPanel() }
@@ -72,7 +74,7 @@ struct ParolaApp: App {
         Settings {
             SettingsView()
                 .environmentObject(model)
-                .frame(width: 520, height: 440)
+                .frame(width: 900, height: 640)
         }
     }
 }

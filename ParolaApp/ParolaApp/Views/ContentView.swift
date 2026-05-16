@@ -23,6 +23,7 @@ struct ContentView: View {
                     }
                 }
                 .toolbar { toolbarItems }
+                .modifier(HideToolbarTitleIfAvailable())
         }
         .sheet(isPresented: $model.youtubeSheetOpen) { YouTubeURLSheet() }
         .sheet(isPresented: $showingTrash) { MacRecentlyDeletedView() }
@@ -489,6 +490,16 @@ struct LiveTranscriptView: View {
             proxy.scrollTo("__partial", anchor: .bottom)
         } else if let last = model.liveSegments.last {
             proxy.scrollTo(last.id, anchor: .bottom)
+        }
+    }
+}
+
+private struct HideToolbarTitleIfAvailable: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.toolbar(removing: .title)
+        } else {
+            content
         }
     }
 }
