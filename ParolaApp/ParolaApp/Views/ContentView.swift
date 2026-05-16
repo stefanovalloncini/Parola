@@ -29,6 +29,11 @@ struct ContentView: View {
         .sheet(item: $model.promptOutput) { output in
             PromptOutputSheet(output: output)
         }
+        .sheet(isPresented: $model.showingSpeakersSheet) {
+            if let transcript = model.transcript {
+                SpeakersSheet(transcript: transcript)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .parolaOpenEntry)) { note in
             if let id = note.userInfo?["id"] as? String {
                 model.selectedEntryID = id

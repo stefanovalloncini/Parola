@@ -12,6 +12,7 @@ struct PromptsMenu: View {
             }
             Divider()
             Button("YouTube Chapters") { model.generateYouTubeChapters() }
+            Button("Speakers…") { model.showingSpeakersSheet = true }
             if !userPrompts.isEmpty {
                 Divider()
                 ForEach(userPrompts) { prompt in

@@ -8,6 +8,7 @@ struct TranscriptDetailView: View {
     @State private var loaded: LoadedEntry?
     @State private var loadError: String?
     @State private var showingChat: Bool = false
+    @State private var showingSpeakers: Bool = false
 
     var body: some View {
         Group {
@@ -30,6 +31,7 @@ struct TranscriptDetailView: View {
                             Button("YouTube Chapters") {
                                 model.generateYouTubeChapters(for: loaded.document.transcript)
                             }
+                            Button("Speakers…") { showingSpeakers = true }
                         } label: {
                             if model.isRunningPrompt {
                                 ProgressView().controlSize(.small)
@@ -54,6 +56,15 @@ struct TranscriptDetailView: View {
                 }
                 .sheet(item: $model.promptOutput) { output in
                     PromptOutputSheet(output: output)
+                }
+                .sheet(isPresented: $showingSpeakers) {
+                    SpeakersSheet(
+                        entryID: loaded.entry.id,
+                        transcript: loaded.document.transcript
+                    ) { updated in
+                        self.loaded = LoadedEntry(entry: loaded.entry, document: ParolaDocument(transcript: updated, audioURL: loaded.document.audioURL, manifest: loaded.document.manifest))
+                    }
+                    .environmentObject(model)
                 }
             } else if let loadError {
                 Text(loadError).foregroundStyle(.red)
