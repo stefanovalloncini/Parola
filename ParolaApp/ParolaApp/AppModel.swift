@@ -79,6 +79,14 @@ final class AppModel: ObservableObject {
 
     @Published var pendingExport: ExportFormat?
 
+    // MARK: - Library
+
+    let library = LibraryStore()
+    @Published var libraryEntries: [LibraryEntry] = []
+    @Published var deletedEntries: [LibraryEntry] = []
+    @Published var selectedEntryID: LibraryEntry.ID?
+    static let trashRetentionDays = 30
+
     // MARK: - Engine
 
     private let session = TranscriptionSession()
@@ -92,6 +100,92 @@ final class AppModel: ObservableObject {
     init() {
         refreshModelList()
         refreshYtDlpAvailability()
+        refreshLibrary()
+        Task { [weak self, library] in
+            await library.purgeDeletedOlderThan(days: AppModel.trashRetentionDays, now: Date())
+            self?.refreshLibrary()
+        }
+    }
+
+    // MARK: - Library
+
+    func refreshLibrary() {
+        Task { [weak self] in
+            guard let self else { return }
+            libraryEntries = await library.list()
+            deletedEntries = await library.listDeleted()
+        }
+    }
+
+    func deleteEntry(_ id: LibraryEntry.ID) {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await library.delete(id)
+                if selectedEntryID == id { selectedEntryID = nil }
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+            refreshLibrary()
+        }
+    }
+
+    func restoreEntry(_ id: LibraryEntry.ID) {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await library.restore(id)
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+            refreshLibrary()
+        }
+    }
+
+    func purgeEntry(_ id: LibraryEntry.ID) {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await library.purge(id)
+                if selectedEntryID == id { selectedEntryID = nil }
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+            refreshLibrary()
+        }
+    }
+
+    func loadEntry(_ id: LibraryEntry.ID) {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let loaded = try await library.load(id)
+                transcript = loaded.document.transcript
+                sourceFileURL = loaded.document.audioURL
+                if let audioURL = loaded.document.audioURL {
+                    installPlayer(for: audioURL)
+                } else {
+                    player?.pause()
+                    player = nil
+                }
+                phase = .ready
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+        }
+    }
+
+    private func persistToLibrary(_ result: Transcript, audioSource: URL?) {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let entry = try await library.add(transcript: result, audioSource: audioSource)
+                refreshLibrary()
+                selectedEntryID = entry.id
+            } catch {
+                // Don't fail the transcription if library save fails; the user still has the in-memory result.
+            }
+        }
     }
 
 
@@ -177,6 +271,7 @@ final class AppModel: ObservableObject {
                 transcript = result
                 phase = .ready
                 refreshModelList()
+                persistToLibrary(result, audioSource: fileURL)
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
@@ -333,6 +428,7 @@ final class AppModel: ObservableObject {
                 transcript = result
                 phase = .ready
                 refreshModelList()
+                persistToLibrary(result, audioSource: audioURL)
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
@@ -348,6 +444,7 @@ final class AppModel: ObservableObject {
                 let result = try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: selectedLanguage)
                 transcript = result
                 phase = .ready
+                persistToLibrary(result, audioSource: nil)
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
@@ -497,6 +594,7 @@ final class AppModel: ObservableObject {
             self.transcript = transcript
             self.livePartialText = ""
             self.phase = .ready
+            persistToLibrary(transcript, audioSource: nil)
         }
     }
 
@@ -527,6 +625,7 @@ final class AppModel: ObservableObject {
                 transcript = result
                 phase = .ready
                 refreshModelList()
+                persistToLibrary(result, audioSource: url)
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }

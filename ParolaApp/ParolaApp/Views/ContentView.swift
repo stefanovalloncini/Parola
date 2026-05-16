@@ -5,21 +5,27 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @EnvironmentObject var model: AppModel
+    @State private var showingTrash = false
 
     var body: some View {
-        content
-            .dropDestination(for: URL.self) { urls, _ in
-                handleDroppedURLs(urls)
-                return !urls.isEmpty
-            }
-            .onChange(of: model.pendingExport) { _, format in
-                if let format {
-                    model.performExport(format)
-                    model.pendingExport = nil
+        NavigationSplitView {
+            MacLibrarySidebar()
+        } detail: {
+            content
+                .dropDestination(for: URL.self) { urls, _ in
+                    handleDroppedURLs(urls)
+                    return !urls.isEmpty
                 }
-            }
-            .toolbar { toolbarItems }
-            .sheet(isPresented: $model.youtubeSheetOpen) { YouTubeURLSheet() }
+                .onChange(of: model.pendingExport) { _, format in
+                    if let format {
+                        model.performExport(format)
+                        model.pendingExport = nil
+                    }
+                }
+                .toolbar { toolbarItems }
+        }
+        .sheet(isPresented: $model.youtubeSheetOpen) { YouTubeURLSheet() }
+        .sheet(isPresented: $showingTrash) { MacRecentlyDeletedView() }
     }
 
     @ToolbarContentBuilder
@@ -37,6 +43,12 @@ struct ContentView: View {
             .help("Translate to English instead of transcribing in the source language.")
         }
         ToolbarItemGroup(placement: .primaryAction) {
+            if !model.deletedEntries.isEmpty {
+                Button { showingTrash = true } label: {
+                    Label("Recently Deleted", systemImage: "trash")
+                }
+                .help("Show Recently Deleted")
+            }
             Button {
                 model.youtubeSheetOpen = true
             } label: {
