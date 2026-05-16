@@ -122,6 +122,10 @@ public actor TranscriptionSession {
     }
 
     private func defaultModelName() -> String {
+        if let managed = ManagedConfiguration.shared.defaultModel,
+           ModelCatalog.variant(id: managed) != nil {
+            return managed
+        }
         if let recommended = ModelCatalog.all.first(where: { $0.category == .recommended }) {
             return recommended.id
         }

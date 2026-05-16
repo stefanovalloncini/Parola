@@ -51,8 +51,9 @@ public final class ModelStore: Sendable {
     }
 
     /// Returns the curated catalog merged with what's actually on disk.
+    /// Filters by the managed-config engine allowlist if one is set.
     public func catalog() -> [ModelInfo] {
-        ModelCatalog.all.map { variant in
+        ManagedConfiguration.shared.filterAllowed(ModelCatalog.all).map { variant in
             let url = installedURL(for: variant.downloadSource)
             let installed = FileManager.default.fileExists(atPath: url.path)
             return ModelInfo(
