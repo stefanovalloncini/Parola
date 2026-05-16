@@ -38,6 +38,8 @@ struct ParolaApp: App {
                     .disabled(model.transcript == nil)
                 Button("Export as HTML…") { model.exportRequest(.html) }
                     .disabled(model.transcript == nil)
+                Button("Export as Word (.docx)…") { model.exportRequest(.docx) }
+                    .disabled(model.transcript == nil)
                 Button("Export as CSV…") { model.exportRequest(.csv) }
                     .disabled(model.transcript == nil)
                 Button("Export as SRT…") { model.exportRequest(.srt) }

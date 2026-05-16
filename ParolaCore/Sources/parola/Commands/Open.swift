@@ -11,7 +11,7 @@ struct Open: AsyncParsableCommand {
     @Argument(help: "Path to a .parola bundle.")
     var input: String
 
-    @Option(name: .shortAndLong, help: "Output format: txt | md | html | csv | srt | vtt | json.")
+    @Option(name: .shortAndLong, help: "Output format: txt | md | html | docx | csv | srt | vtt | json.")
     var format: ExportFormat = .txt
 
     @Option(name: .shortAndLong, help: "Write output to this path. Defaults to stdout.")
@@ -20,11 +20,11 @@ struct Open: AsyncParsableCommand {
     func run() async throws {
         let url = URL(fileURLWithPath: input).resolvingSymlinksInPath()
         let doc = try ParolaDocument.read(at: url)
-        let rendered = try Exporters.exporter(for: format).render(doc.transcript)
+        let exporter = Exporters.exporter(for: format)
         if let output {
-            try rendered.write(to: URL(fileURLWithPath: output), atomically: true, encoding: .utf8)
+            try exporter.render(doc.transcript).write(to: URL(fileURLWithPath: output), options: .atomic)
         } else {
-            print(rendered)
+            print(try exporter.renderText(doc.transcript))
         }
     }
 }

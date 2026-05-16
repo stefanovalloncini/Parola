@@ -20,7 +20,7 @@ struct Transcribe: AsyncParsableCommand {
     @Flag(help: "Translate to English instead of transcribing in source language.")
     var translate: Bool = false
 
-    @Option(name: .shortAndLong, help: "Output format: txt | md | html | csv | srt | vtt | json.")
+    @Option(name: .shortAndLong, help: "Output format: txt | md | html | docx | csv | srt | vtt | json.")
     var format: ExportFormat = .txt
 
     @Option(name: .shortAndLong, help: "Write output to this path. Defaults to stdout. Ignored when multiple inputs are given.")
@@ -145,15 +145,16 @@ struct Transcribe: AsyncParsableCommand {
     }
 
     private func emitTranscript(_ transcript: Transcript, sourceURL: URL) throws {
-        let rendered = try Exporters.exporter(for: format).render(transcript)
+        let exporter = Exporters.exporter(for: format)
         if let output {
             let outURL = URL(fileURLWithPath: output)
-            try rendered.write(to: outURL, atomically: true, encoding: .utf8)
+            let data = try exporter.render(transcript)
+            try data.write(to: outURL, options: .atomic)
             if verbose {
                 stderr("Wrote \(transcript.segments.count) segments to \(outURL.path)")
             }
         } else {
-            print(rendered)
+            print(try exporter.renderText(transcript))
         }
         if let savePath = save,
            FileManager.default.fileExists(atPath: sourceURL.path) {
@@ -186,7 +187,7 @@ struct Transcribe: AsyncParsableCommand {
                 guard let job = jobByID[id] else { continue }
                 let target = outDirURL.appendingPathComponent("\(job.displayName).\(format.fileExtension)")
                 let rendered = try Exporters.exporter(for: format).render(transcript)
-                try rendered.write(to: target, atomically: true, encoding: .utf8)
+                try rendered.write(to: target, options: .atomic)
                 stderr("✓ \(job.url.lastPathComponent) → \(target.path)")
             case .failed(let id, let reason):
                 if let job = jobByID[id] { stderr("✘ \(job.url.lastPathComponent): \(reason)") }

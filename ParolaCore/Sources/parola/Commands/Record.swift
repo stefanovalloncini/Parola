@@ -28,7 +28,7 @@ struct Record: AsyncParsableCommand {
     @Flag(help: "Translate to English.")
     var translate: Bool = false
 
-    @Option(name: .shortAndLong, help: "Output format: txt | md | html | csv | srt | vtt | json.")
+    @Option(name: .shortAndLong, help: "Output format: txt | md | html | docx | csv | srt | vtt | json.")
     var format: ExportFormat = .txt
 
     @Option(name: .shortAndLong, help: "Write output to this path. Defaults to stdout.")
@@ -88,11 +88,11 @@ struct Record: AsyncParsableCommand {
         )
         progress.finish()
 
-        let rendered = try Exporters.exporter(for: format).render(transcript)
+        let exporter = Exporters.exporter(for: format)
         if let output {
-            try rendered.write(to: URL(fileURLWithPath: output), atomically: true, encoding: .utf8)
+            try exporter.render(transcript).write(to: URL(fileURLWithPath: output), options: .atomic)
         } else {
-            print(rendered)
+            print(try exporter.renderText(transcript))
         }
     }
 
@@ -133,11 +133,11 @@ struct Record: AsyncParsableCommand {
                     let owesFinalRender = format != .txt || output != nil
                     guard owesFinalRender else { break }
                     do {
-                        let rendered = try Exporters.exporter(for: format).render(transcript)
+                        let exporter = Exporters.exporter(for: format)
                         if let output {
-                            try rendered.write(to: URL(fileURLWithPath: output), atomically: true, encoding: .utf8)
+                            try exporter.render(transcript).write(to: URL(fileURLWithPath: output), options: .atomic)
                         } else {
-                            print(rendered)
+                            print(try exporter.renderText(transcript))
                         }
                     } catch {
                         stderr("error: failed to write output — \(error.localizedDescription)")

@@ -903,8 +903,8 @@ final class AppModel: ObservableObject {
         panel.nameFieldStringValue = "transcript.\(format.fileExtension)"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            let text = try Exporters.exporter(for: format).render(transcript)
-            try text.write(to: url, atomically: true, encoding: .utf8)
+            let data = try Exporters.exporter(for: format).render(transcript)
+            try data.write(to: url, options: .atomic)
         } catch {
             phase = .failed(message: "Export failed: \(error.localizedDescription)")
         }
