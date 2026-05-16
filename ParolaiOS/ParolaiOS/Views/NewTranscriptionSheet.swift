@@ -32,8 +32,7 @@ struct NewTranscriptionSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {
-                        model.coordinator.cancelRecording()
-                        model.coordinator.cancelFileTranscription()
+                        model.coordinator.cancel()
                         model.coordinator.reset()
                         dismiss()
                     }

@@ -138,6 +138,12 @@ final class TranscriptionCoordinator: ObservableObject {
         }
     }
 
+    /// Cancels whatever is in flight — recording or file transcription. Safe to call when idle.
+    func cancel() {
+        cancelRecording()
+        cancelFileTranscription()
+    }
+
     func handleStreamingEvent(_ event: StreamingEvent, generation: Int = 0) {
         switch event {
         case .partial(let text):
