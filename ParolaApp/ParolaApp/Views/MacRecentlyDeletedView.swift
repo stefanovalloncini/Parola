@@ -11,7 +11,11 @@ struct MacRecentlyDeletedView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            RecentlyDeletedToolbar(
+                searchText: $searchText,
+                confirmingEmpty: $confirmingEmpty,
+                onDone: { dismiss() }
+            )
             Divider().opacity(0.5)
             if model.deletedEntries.isEmpty {
                 empty
@@ -51,79 +55,6 @@ struct MacRecentlyDeletedView: View {
         }
     }
 
-    private var header: some View {
-        HStack(spacing: DS.Spacing.regular) {
-            Text("Recently Deleted")
-                .font(.system(.title2, design: .default, weight: .semibold))
-            Spacer(minLength: DS.Spacing.regular)
-            searchField
-            actionMenu
-            emptyTrashButton
-            Button("Done") { dismiss() }
-                .keyboardShortcut(.defaultAction)
-        }
-        .padding(.horizontal, DS.Spacing.regular)
-        .padding(.vertical, DS.Spacing.small)
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-            TextField("Search", text: $searchText)
-                .textFieldStyle(.plain)
-                .frame(minWidth: 140, maxWidth: 200)
-            if !searchText.isEmpty {
-                Button { searchText = "" } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 10)
-        .frame(height: 26)
-        .background(PillChrome())
-    }
-
-    private var actionMenu: some View {
-        Menu {
-            Button("Restore All") {
-                for entry in model.deletedEntries { model.restoreEntry(entry.id) }
-            }
-            .disabled(model.deletedEntries.isEmpty)
-            Divider()
-            Button("Empty Recently Deleted", role: .destructive) {
-                confirmingEmpty = true
-            }
-            .disabled(model.deletedEntries.isEmpty)
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 13, weight: .semibold))
-                .frame(width: 28, height: 26)
-                .background(PillChrome())
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("More actions")
-    }
-
-    private var emptyTrashButton: some View {
-        Button { confirmingEmpty = true } label: {
-            Image(systemName: "trash")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 26)
-                .background(PillChrome())
-        }
-        .buttonStyle(.plain)
-        .disabled(model.deletedEntries.isEmpty)
-        .help("Empty Recently Deleted")
-    }
-
     private var list: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: DS.Spacing.large, pinnedViews: []) {
@@ -147,7 +78,7 @@ struct MacRecentlyDeletedView: View {
                 .padding(.leading, 4)
             VStack(spacing: DS.Spacing.small) {
                 ForEach(entries) { entry in
-                    DeletedCard(
+                    RecentlyDeletedRow(
                         entry: entry,
                         preview: previews[entry.id],
                         onRestore: { model.restoreEntry(entry.id) },
@@ -231,154 +162,5 @@ struct MacRecentlyDeletedView: View {
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         previews[entry.id] = trimmed.isEmpty ? "" : String(trimmed.prefix(280))
-    }
-}
-
-private struct PillChrome: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: 13, style: .continuous)
-            .fill(DS.Color.surfaceElevated.opacity(0.85))
-            .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .stroke(DS.Color.separator.opacity(0.4), lineWidth: 0.5)
-            )
-    }
-}
-
-private struct DeletedCard: View {
-    let entry: LibraryEntry
-    let preview: String?
-    let onRestore: () -> Void
-    let onPurge: () -> Void
-    let onTap: () -> Void
-
-    @State private var hovered = false
-
-    var body: some View {
-        HStack(alignment: .top, spacing: DS.Spacing.regular) {
-            categoryBadge
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(entry.title)
-                        .font(.system(.headline, design: .default, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Spacer(minLength: DS.Spacing.small)
-                    if let deletedAt = entry.deletedAt {
-                        Text(deletedAt, format: .dateTime.hour().minute())
-                            .font(DS.Font.captionMono)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Text(previewText)
-                    .font(.system(.subheadline))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .padding(DS.Spacing.regular)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(DS.Color.surfaceElevated.opacity(hovered ? 1.0 : 0.7))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(DS.Color.separator.opacity(0.5), lineWidth: 1)
-        )
-        .overlay(alignment: .topTrailing) {
-            if hovered { hoverActions }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture { onTap() }
-        .onHover { hovered = $0 }
-        .contextMenu {
-            Button { onRestore() } label: {
-                Label("Restore", systemImage: "arrow.uturn.backward")
-            }
-            Button(role: .destructive) { onPurge() } label: {
-                Label("Delete permanently", systemImage: "trash")
-            }
-        }
-        .animation(.easeInOut(duration: 0.12), value: hovered)
-    }
-
-    private var previewText: String {
-        if let preview, !preview.isEmpty { return preview }
-        if preview == nil { return "Loading preview…" }
-        return "No transcript text."
-    }
-
-    private var categoryBadge: some View {
-        RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(categoryTint.opacity(0.18))
-            .overlay(
-                Image(systemName: categoryIcon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(categoryTint)
-            )
-            .frame(width: 32, height: 32)
-    }
-
-    private var hoverActions: some View {
-        HStack(spacing: 4) {
-            CardIconButton(systemName: "arrow.uturn.backward", help: "Restore", action: onRestore)
-            CardIconButton(systemName: "trash", help: "Delete permanently", tint: DS.Color.danger, action: onPurge)
-        }
-        .padding(6)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(.regularMaterial)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(DS.Color.separator.opacity(0.5), lineWidth: 0.5)
-        )
-        .padding(DS.Spacing.small)
-    }
-
-    private var categoryIcon: String {
-        switch entry.category {
-        case .transcription: return "waveform"
-        case .meeting: return "video.fill"
-        case .dictation: return "text.bubble.fill"
-        }
-    }
-
-    private var categoryTint: Color {
-        switch entry.category {
-        case .transcription: return Color(red: 0.20, green: 0.62, blue: 0.62)
-        case .meeting: return Color(red: 0.34, green: 0.62, blue: 0.36)
-        case .dictation: return Color(red: 0.82, green: 0.50, blue: 0.18)
-        }
-    }
-}
-
-private struct CardIconButton: View {
-    let systemName: String
-    let help: String
-    var tint: Color = .primary
-    let action: () -> Void
-
-    @State private var hovered = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(tint.opacity(hovered ? 1.0 : 0.75))
-                .frame(width: 22, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(hovered ? DS.Color.surface : Color.clear)
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovered = $0 }
-        .help(help)
     }
 }
