@@ -7,50 +7,40 @@ struct ModelPickerView: View {
     private let groups: [(ModelCategory, [ModelVariant])] = ModelCatalog.groupedForPicker()
 
     var body: some View {
-        Menu {
-            ForEach(groups, id: \.0) { category, variants in
-                Section(category.displayName) {
+        PillPickerButton(icon: "cpu", caption: "Model", value: currentLabel) {
+            VStack(spacing: 0) {
+                ForEach(groups, id: \.0) { category, variants in
+                    PillPopoverSectionHeader(title: category.displayName)
                     ForEach(variants, id: \.id) { variant in
-                        Button {
-                            select(variant: variant)
-                        } label: {
-                            row(for: variant)
-                        }
+                        let installed = isInstalled(variant)
+                        PillPopoverRow(
+                            title: variant.displayName,
+                            isSelected: variant.id == model.selectedModel,
+                            trailingText: DS.formatBytes(Int(variant.sizeBytes)),
+                            leadingSystemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle",
+                            leadingTint: installed ? .green : .secondary,
+                            action: { select(variant: variant) }
+                        )
                     }
                 }
+                Divider().padding(.vertical, 4)
+                PillPopoverRow(
+                    title: "Refresh",
+                    leadingSystemImage: "arrow.clockwise",
+                    action: { model.refreshModelList() }
+                )
             }
-            Divider()
-            Button("Refresh") { model.refreshModelList() }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "cpu")
-                Text(currentLabel)
-                    .lineLimit(1)
-            }
+            .padding(.horizontal, 6)
         }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
         .help("Active model. Models are downloaded on demand.")
     }
 
-    private func row(for variant: ModelVariant) -> some View {
-        let installed = model.availableModels.first(where: { $0.name == variant.id })?.isInstalled ?? false
-        return HStack {
-            if installed {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-            } else {
-                Image(systemName: "arrow.down.circle").foregroundStyle(.secondary)
-            }
-            Text(variant.displayName)
-            Spacer()
-            Text(DS.formatBytes(Int(variant.sizeBytes)))
-                .foregroundStyle(.secondary).font(.caption)
-        }
+    private func isInstalled(_ variant: ModelVariant) -> Bool {
+        model.availableModels.first(where: { $0.name == variant.id })?.isInstalled ?? false
     }
 
     private func select(variant: ModelVariant) {
-        let installed = model.availableModels.first(where: { $0.name == variant.id })?.isInstalled ?? false
-        if !installed {
+        if !isInstalled(variant) {
             model.downloadModel(variant.id)
         }
         model.selectedModel = variant.id
