@@ -21,24 +21,24 @@ struct LanguagePickerView: View {
     ]
 
     var body: some View {
-        Menu {
-            ForEach(languages, id: \.name) { lang in
-                Button(lang.name) { model.selectedLanguage = lang.code }
+        PillPickerButton(icon: "globe", caption: "Language", value: currentLabel) {
+            VStack(spacing: 0) {
+                ForEach(languages, id: \.name) { lang in
+                    PillPopoverRow(
+                        title: lang.name,
+                        isSelected: lang.code == model.selectedLanguage,
+                        action: { model.selectedLanguage = lang.code }
+                    )
+                }
             }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "globe")
-                Text(currentLabel).lineLimit(1)
-            }
+            .padding(.horizontal, 6)
         }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
     }
 
     private var currentLabel: String {
         if let code = model.selectedLanguage {
             return languages.first { $0.code == code }?.name ?? code
         }
-        return "Auto"
+        return "Auto-detect"
     }
 }
