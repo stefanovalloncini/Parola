@@ -84,6 +84,14 @@ struct ContentView: View {
             }
         }
         ToolbarItemGroup(placement: .primaryAction) {
+            if model.route != .batch {
+                Button {
+                    model.route = .batch
+                } label: {
+                    Label("Batch", systemImage: "square.stack.3d.up")
+                }
+                .help("Open the batch transcription page.")
+            }
             if !model.deletedEntries.isEmpty {
                 Button { showingTrash = true } label: {
                     Label("Recently Deleted", systemImage: "trash")
@@ -141,6 +149,16 @@ struct ContentView: View {
 
     @ViewBuilder
     private var content: some View {
+        switch model.route {
+        case .batch:
+            BatchView()
+        case .transcript:
+            transcriptContent
+        }
+    }
+
+    @ViewBuilder
+    private var transcriptContent: some View {
         if !model.batchJobs.isEmpty {
             HSplitView {
                 BatchSidebar()
