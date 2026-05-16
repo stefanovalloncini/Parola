@@ -9,9 +9,107 @@ struct SettingsView: View {
             GeneralTab().tabItem { Label("General", systemImage: "slider.horizontal.3") }
             ModelsTab().tabItem { Label("Models", systemImage: "cpu") }
             ToolsTab().tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
+            AutoExportTab().tabItem { Label("Auto-Export", systemImage: "square.and.arrow.up") }
             AboutTab().tabItem { Label("About", systemImage: "info.circle") }
         }
         .padding()
+    }
+}
+
+private struct AutoExportTab: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach($model.autoExportRules) { $rule in
+                    AutoExportRuleRow(rule: $rule) {
+                        model.autoExportRules.removeAll { $0.id == rule.id }
+                    }
+                }
+                Button {
+                    model.autoExportRules.append(
+                        AutoExportRule(sourceExtensions: ["mp4"], outputFormats: [.srt])
+                    )
+                } label: {
+                    Label("Add rule", systemImage: "plus.circle")
+                }
+            } header: {
+                Text("Rules")
+            } footer: {
+                Text("Auto-export rules write additional files next to your source whenever a transcription completes. Files are written only when the source location is writable.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+private struct AutoExportRuleRow: View {
+    @Binding var rule: AutoExportRule
+    let onDelete: () -> Void
+    @State private var extensionsText: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            HStack {
+                Toggle("Enabled", isOn: $rule.enabled).labelsHidden()
+                Text(summary).font(.body.weight(.medium))
+                Spacer()
+                Button(role: .destructive, action: onDelete) {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+            }
+            HStack {
+                Text("When source is").font(.caption).foregroundStyle(.secondary)
+                TextField("mp4, mov", text: $extensionsText)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: extensionsText) { _, new in
+                        rule.sourceExtensions = Set(
+                            new.split(separator: ",")
+                                .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+                                .filter { !$0.isEmpty }
+                        )
+                    }
+            }
+            HStack(alignment: .top) {
+                Text("Also write").font(.caption).foregroundStyle(.secondary)
+                AutoExportFormatChips(selected: $rule.outputFormats)
+            }
+        }
+        .padding(.vertical, 4)
+        .onAppear {
+            extensionsText = rule.sourceExtensions.sorted().joined(separator: ", ")
+        }
+    }
+
+    private var summary: String {
+        let exts = rule.sourceExtensions.sorted().joined(separator: ", ")
+        let fmts = rule.outputFormats.map(\.rawValue).sorted().joined(separator: ", ")
+        let left = exts.isEmpty ? "any" : exts
+        let right = fmts.isEmpty ? "nothing" : fmts
+        return "\(left) → \(right)"
+    }
+}
+
+private struct AutoExportFormatChips: View {
+    @Binding var selected: Set<ExportFormat>
+
+    var body: some View {
+        let grid = [GridItem(.adaptive(minimum: 50))]
+        LazyVGrid(columns: grid, alignment: .leading, spacing: 4) {
+            ForEach(ExportFormat.allCases, id: \.self) { format in
+                let isOn = selected.contains(format)
+                Button(format.fileExtension) {
+                    if isOn { selected.remove(format) } else { selected.insert(format) }
+                }
+                .buttonStyle(.bordered)
+                .tint(isOn ? .accentColor : .secondary)
+                .controlSize(.small)
+            }
+        }
     }
 }
 

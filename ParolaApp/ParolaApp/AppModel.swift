@@ -79,6 +79,40 @@ final class AppModel: ObservableObject {
 
     @Published var pendingExport: ExportFormat?
 
+    // MARK: - Auto-export rules
+
+    @Published var autoExportRules: [AutoExportRule] = [] {
+        didSet { saveAutoExportRules() }
+    }
+
+    private func loadAutoExportRules() {
+        guard let data = UserDefaults.standard.data(forKey: "autoExportRules"),
+              let rules = try? JSONDecoder().decode([AutoExportRule].self, from: data) else { return }
+        autoExportRules = rules
+    }
+
+    private func saveAutoExportRules() {
+        if let data = try? JSONEncoder().encode(autoExportRules) {
+            UserDefaults.standard.set(data, forKey: "autoExportRules")
+        }
+    }
+
+    private func runAutoExports(transcript: Transcript, sourceURL: URL) {
+        let formats = AutoExportEngine.plannedFormats(
+            rules: autoExportRules,
+            sourceExtension: sourceURL.pathExtension
+        )
+        for format in formats {
+            do {
+                let target = sourceURL.deletingPathExtension().appendingPathExtension(format.fileExtension)
+                let data = try Exporters.exporter(for: format).render(transcript)
+                try data.write(to: target, options: .atomic)
+            } catch {
+                // Auto-export is best-effort; primary transcription already in the library.
+            }
+        }
+    }
+
     // MARK: - Library
 
     let library = LibraryStore()
@@ -100,6 +134,7 @@ final class AppModel: ObservableObject {
     private var lastDownloadPercent: Int = -1
 
     init() {
+        loadAutoExportRules()
         refreshModelList()
         refreshYtDlpAvailability()
         refreshLibrary()
@@ -186,6 +221,9 @@ final class AppModel: ObservableObject {
                 selectedEntryID = entry.id
             } catch {
                 // Don't fail the transcription if library save fails; the user still has the in-memory result.
+            }
+            if let audioSource {
+                runAutoExports(transcript: result, sourceURL: audioSource)
             }
         }
     }

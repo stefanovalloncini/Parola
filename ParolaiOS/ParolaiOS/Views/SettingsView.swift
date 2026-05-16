@@ -51,6 +51,23 @@ struct SettingsSheet: View {
                 }
 
                 Section {
+                    NavigationLink {
+                        AutoExportSettings()
+                            .environmentObject(model)
+                            .navigationTitle("Auto-Export")
+                            .navigationBarTitleDisplayMode(.inline)
+                    } label: {
+                        HStack {
+                            Image(systemName: "square.and.arrow.up")
+                            Text("Auto-Export")
+                            Spacer()
+                            Text("\(model.autoExportRules.filter(\.enabled).count) active")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Section {
                     Button {
                         confirmingReset = true
                     } label: {

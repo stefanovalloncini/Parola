@@ -13,11 +13,48 @@ final class AppModel: ObservableObject {
     @Published var libraryEntries: [LibraryEntry] = []
     @Published var deletedEntries: [LibraryEntry] = []
     @Published var searchResults: [LibraryEntry]?
+    @Published var autoExportRules: [AutoExportRule] = [] {
+        didSet { saveAutoExportRules() }
+    }
     @Published var lastError: String?
 
     private var searchTask: Task<Void, Never>?
 
     static let trashRetentionDays = 30
+
+    private func loadAutoExportRules() {
+        guard let data = UserDefaults.standard.data(forKey: "autoExportRules"),
+              let rules = try? JSONDecoder().decode([AutoExportRule].self, from: data) else { return }
+        autoExportRules = rules
+    }
+
+    private func saveAutoExportRules() {
+        if let data = try? JSONEncoder().encode(autoExportRules) {
+            UserDefaults.standard.set(data, forKey: "autoExportRules")
+        }
+    }
+
+    private func runAutoExports(for entry: LibraryEntry) {
+        let ext = (entry.manifest.originalAudioName as NSString).pathExtension
+        let formats = AutoExportEngine.plannedFormats(rules: autoExportRules, sourceExtension: ext)
+        guard !formats.isEmpty else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let loaded = try await library.load(entry.id)
+                let exportsDir = library.libraryURL.appendingPathComponent("Exports", isDirectory: true)
+                try FileManager.default.createDirectory(at: exportsDir, withIntermediateDirectories: true)
+                let base = (entry.title as NSString).deletingPathExtension
+                for format in formats {
+                    let target = exportsDir.appendingPathComponent("\(base).\(format.fileExtension)")
+                    let data = try Exporters.exporter(for: format).render(loaded.document.transcript)
+                    try data.write(to: target, options: .atomic)
+                }
+            } catch {
+                // Best-effort; primary transcription already saved.
+            }
+        }
+    }
 
     init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
         let store = LibraryStore(libraryURL: libraryURL)
@@ -25,9 +62,11 @@ final class AppModel: ObservableObject {
         let userSettings = UserSettings()
         self.settings = userSettings
         self.coordinator = TranscriptionCoordinator(library: store, settings: userSettings)
-        coordinator.onComplete = { [weak self] _ in
+        coordinator.onComplete = { [weak self] entry in
             self?.refreshLibrary()
+            self?.runAutoExports(for: entry)
         }
+        loadAutoExportRules()
         refreshModelList()
         refreshLibrary()
         Task { [weak self] in

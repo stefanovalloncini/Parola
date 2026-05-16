@@ -16,7 +16,7 @@ public actor LibraryStore {
         URL.applicationSupportDirectory.appending(path: "Parola/Library", directoryHint: .isDirectory)
     }
 
-    public let libraryURL: URL
+    public nonisolated let libraryURL: URL
     private let searchIndex: LibrarySearchIndex
     private let extraIndexer: LibraryIndexer?
     private var cachedActive: [LibraryEntry]?
