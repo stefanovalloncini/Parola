@@ -15,6 +15,8 @@ public actor DictationCoordinator {
     private let inserter: any TextInserter
     private var postProcessor: any TextPostProcessor
     private let onStateChange: @Sendable (State) async -> Void
+    private var eventTask: Task<Void, Never>?
+    private var eventContinuation: AsyncStream<HotkeyEvent>.Continuation?
 
     public init(
         hotkey: any HotkeyMonitor,
@@ -30,18 +32,36 @@ public actor DictationCoordinator {
         self.onStateChange = onStateChange
     }
 
+    deinit {
+        eventContinuation?.finish()
+        eventTask?.cancel()
+    }
+
     public func setPostProcessor(_ processor: any TextPostProcessor) {
         postProcessor = processor
     }
 
     public func startMonitoring() async {
-        await hotkey.start { [weak self] event in
-            Task { await self?.handle(event) }
+        eventTask?.cancel()
+        eventContinuation?.finish()
+        let (stream, continuation) = AsyncStream.makeStream(of: HotkeyEvent.self)
+        eventContinuation = continuation
+        eventTask = Task { [weak self] in
+            for await event in stream {
+                await self?.handle(event)
+            }
+        }
+        await hotkey.start { event in
+            continuation.yield(event)
         }
     }
 
     public func stopMonitoring() async {
         await hotkey.stop()
+        eventContinuation?.finish()
+        eventContinuation = nil
+        eventTask?.cancel()
+        eventTask = nil
         if case .listening = state {
             _ = try? await recorder.stopAndTranscribe()
         }
