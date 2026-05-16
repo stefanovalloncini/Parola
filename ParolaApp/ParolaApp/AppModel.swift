@@ -245,6 +245,14 @@ final class AppModel: ObservableObject {
         self?.transcribe(fileURL: url)
     }
 
+    // MARK: - Live captions
+
+    lazy var liveCaptions: LiveCaptionsController = LiveCaptionsController()
+
+    func toggleLiveCaptions() {
+        Task { await liveCaptions.toggle(options: makeOptions(task: .transcribe)) }
+    }
+
     // MARK: - Library
 
     let library = LibraryStore()

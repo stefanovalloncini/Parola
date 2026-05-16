@@ -30,6 +30,12 @@ struct ParolaApp: App {
                     .keyboardShortcut("f", modifiers: [.command])
                     .disabled(model.transcript == nil)
             }
+            CommandMenu("Captions") {
+                Button(model.liveCaptions.isActive ? "Stop Live Captions" : "Start Live Captions") {
+                    model.toggleLiveCaptions()
+                }
+                .keyboardShortcut("l", modifiers: [.command, .shift])
+            }
             CommandMenu("Transcript") {
                 Button("Export as TXT…") { model.exportRequest(.txt) }
                     .keyboardShortcut("e", modifiers: [.command])
