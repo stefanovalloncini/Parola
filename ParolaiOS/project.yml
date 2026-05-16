@@ -83,6 +83,8 @@ targets:
         product: ParolaCore
       - target: ParolaiOSKeyboard
         embed: true
+      - target: ParolaiOSWidgets
+        embed: true
 
   ParolaiOSKeyboard:
     type: app-extension
@@ -110,6 +112,30 @@ targets:
         PRODUCT_MODULE_NAME: ParolaKeyboard
         CODE_SIGN_ENTITLEMENTS: ParolaiOSKeyboard/ParolaiOSKeyboard.entitlements
         INFOPLIST_KEY_CFBundleDisplayName: Parola
+
+  ParolaiOSWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ParolaiOSWidgets
+    info:
+      path: ParolaiOSWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Parola
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.parola.ParolaiOS.Widgets
+        PRODUCT_NAME: ParolaWidgets
+        PRODUCT_MODULE_NAME: ParolaWidgets
+        CODE_SIGN_ENTITLEMENTS: ParolaiOSWidgets/ParolaiOSWidgets.entitlements
+        INFOPLIST_KEY_CFBundleDisplayName: Parola
+    dependencies:
+      - package: ParolaCore
+        product: ParolaCore
 
   ParolaiOSTests:
     type: bundle.unit-test

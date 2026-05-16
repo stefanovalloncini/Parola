@@ -95,3 +95,32 @@ targets:
     dependencies:
       - package: ParolaCore
         product: ParolaCore
+      - target: ParolaQuickLook
+        embed: true
+
+  ParolaQuickLook:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: ParolaQuickLook
+    info:
+      path: ParolaQuickLook/Info.plist
+      properties:
+        CFBundleDisplayName: Parola Quick Look
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.quicklook.preview
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ParolaPreviewProvider
+          NSExtensionAttributes:
+            QLSupportedContentTypes:
+              - app.parola.document
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.parola.ParolaApp.QuickLook
+        PRODUCT_NAME: ParolaQuickLook
+        PRODUCT_MODULE_NAME: ParolaQuickLook
+        CODE_SIGN_ENTITLEMENTS: ParolaQuickLook/ParolaQuickLook.entitlements
+    dependencies:
+      - package: ParolaCore
+        product: ParolaCore
