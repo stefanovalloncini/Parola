@@ -21,8 +21,15 @@ struct MacLibrarySidebar: View {
                         .padding(.vertical, DS.Spacing.small)
                 }
             } else {
-                ForEach(displayed) { entry in
-                    row(entry).tag(entry.id)
+                ForEach(EntryCategory.allCases, id: \.self) { category in
+                    let entries = displayed.filter { $0.category == category }
+                    if !entries.isEmpty {
+                        Section(Self.label(for: category)) {
+                            ForEach(entries) { entry in
+                                row(entry).tag(entry.id)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -33,6 +40,14 @@ struct MacLibrarySidebar: View {
         .onChange(of: searchText) { _, newValue in model.search(newValue) }
         .onChange(of: model.selectedEntryID) { _, newValue in
             if let id = newValue { model.loadEntry(id) }
+        }
+    }
+
+    private static func label(for category: EntryCategory) -> String {
+        switch category {
+        case .transcription: return "Transcriptions"
+        case .meeting: return "Meetings"
+        case .dictation: return "Dictations"
         }
     }
 

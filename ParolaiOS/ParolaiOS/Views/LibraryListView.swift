@@ -21,18 +21,31 @@ struct LibraryListView: View {
                 }
             } else {
                 List(selection: $selection) {
-                    ForEach(displayed) { entry in
-                        row(entry).tag(entry.id)
-                    }
-                    .onDelete { offsets in
-                        let ids = offsets.map { displayed[$0].id }
-                        for id in ids {
-                            model.deleteEntry(id)
+                    ForEach(EntryCategory.allCases, id: \.self) { category in
+                        let entries = displayed.filter { $0.category == category }
+                        if !entries.isEmpty {
+                            Section(Self.label(for: category)) {
+                                ForEach(entries) { entry in
+                                    row(entry).tag(entry.id)
+                                }
+                                .onDelete { offsets in
+                                    let ids = offsets.map { entries[$0].id }
+                                    for id in ids { model.deleteEntry(id) }
+                                }
+                            }
                         }
                     }
                 }
                 .listStyle(.plain)
             }
+        }
+    }
+
+    private static func label(for category: EntryCategory) -> String {
+        switch category {
+        case .transcription: return "Transcriptions"
+        case .meeting: return "Meetings"
+        case .dictation: return "Dictations"
         }
     }
 
