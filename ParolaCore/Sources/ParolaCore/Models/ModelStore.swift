@@ -1,7 +1,7 @@
 import Foundation
 import WhisperKit
 
-/// Manages the on-disk cache of WhisperKit Core ML models.
+/// Manages the on-disk cache of transcription models.
 ///
 /// Both the macOS app and the CLI use the same cache directory so a model
 /// downloaded by either is visible to the other.
@@ -28,55 +28,85 @@ public final class ModelStore: Sendable {
 
     public var directory: URL { modelsDirectory }
 
-    /// WhisperKit downloads into `<downloadBase>/models/argmaxinc/whisperkit-coreml/<variant>/`.
-    /// This computes that canonical path.
-    public func installedURL(for variant: String, repo: String = "argmaxinc/whisperkit-coreml") -> URL {
-        modelsDirectory
+    /// Returns the on-disk path for a model variant. Looks up the catalog to find the
+    /// canonical repo + subpath; falls back to the legacy WhisperKit path for unknown variants.
+    public func installedURL(for variant: String) -> URL {
+        if let entry = ModelCatalog.variant(id: variant) {
+            return installedURL(for: entry.downloadSource)
+        }
+        return installedURL(for: ModelDownloadSource(
+            huggingFaceRepo: "argmaxinc/whisperkit-coreml",
+            subpath: variant
+        ))
+    }
+
+    public func installedURL(for source: ModelDownloadSource) -> URL {
+        var url = modelsDirectory
             .appendingPathComponent("models", isDirectory: true)
-            .appendingPathComponent(repo, isDirectory: true)
-            .appendingPathComponent(variant, isDirectory: true)
+            .appendingPathComponent(source.huggingFaceRepo, isDirectory: true)
+        if !source.subpath.isEmpty {
+            url = url.appendingPathComponent(source.subpath, isDirectory: true)
+        }
+        return url
     }
 
     /// Returns the curated catalog merged with what's actually on disk.
     public func catalog() -> [ModelInfo] {
-        ModelInfo.defaultCatalog.map { entry in
-            let url = installedURL(for: entry.name)
+        ModelCatalog.all.map { variant in
+            let url = installedURL(for: variant.downloadSource)
             let installed = FileManager.default.fileExists(atPath: url.path)
-            var copy = entry
-            copy.isInstalled = installed
-            copy.installedURL = installed ? url : nil
-            return copy
+            return ModelInfo(
+                name: variant.id,
+                label: variant.displayName,
+                approximateSizeBytes: Int(variant.sizeBytes),
+                isMultilingual: variant.languageScope == nil,
+                isInstalled: installed,
+                installedURL: installed ? url : nil
+            )
         }
     }
 
     /// Returns models present on disk, even if not in the curated catalog.
     public func installedModels() throws -> [ModelInfo] {
         let fm = FileManager.default
-        let repoDir = modelsDirectory
-            .appendingPathComponent("models/argmaxinc/whisperkit-coreml", isDirectory: true)
-        guard fm.fileExists(atPath: repoDir.path) else { return [] }
-        let entries = (try? fm.contentsOfDirectory(at: repoDir, includingPropertiesForKeys: nil)) ?? []
-        let catalog = ModelInfo.defaultCatalog
-        return entries
-            .filter { $0.lastPathComponent.hasPrefix(".") == false }
-            .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
-            .map { url in
-                if let known = catalog.first(where: { $0.name == url.lastPathComponent }) {
-                    var copy = known
-                    copy.isInstalled = true
-                    copy.installedURL = url
-                    return copy
-                }
-                return ModelInfo(
-                    name: url.lastPathComponent,
-                    label: url.lastPathComponent,
-                    approximateSizeBytes: directorySize(url),
-                    isMultilingual: !url.lastPathComponent.hasSuffix(".en"),
+        var seen: [String: ModelInfo] = [:]
+
+        for variant in ModelCatalog.all {
+            let url = installedURL(for: variant.downloadSource)
+            if fm.fileExists(atPath: url.path) {
+                seen[variant.id] = ModelInfo(
+                    name: variant.id,
+                    label: variant.displayName,
+                    approximateSizeBytes: Int(variant.sizeBytes),
+                    isMultilingual: variant.languageScope == nil,
                     isInstalled: true,
                     installedURL: url
                 )
             }
-            .sorted { $0.name < $1.name }
+        }
+
+        let legacyRepoDir = modelsDirectory
+            .appendingPathComponent("models/argmaxinc/whisperkit-coreml", isDirectory: true)
+        if fm.fileExists(atPath: legacyRepoDir.path) {
+            let entries = (try? fm.contentsOfDirectory(at: legacyRepoDir, includingPropertiesForKeys: nil)) ?? []
+            for url in entries
+                where !url.lastPathComponent.hasPrefix(".")
+                && (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                let id = url.lastPathComponent
+                if seen[id] == nil {
+                    seen[id] = ModelInfo(
+                        name: id,
+                        label: id,
+                        approximateSizeBytes: directorySize(url),
+                        isMultilingual: !id.hasSuffix(".en"),
+                        isInstalled: true,
+                        installedURL: url
+                    )
+                }
+            }
+        }
+
+        return seen.values.sorted { $0.name < $1.name }
     }
 
     public func isInstalled(_ variant: String) -> Bool {
@@ -93,18 +123,52 @@ public final class ModelStore: Sendable {
             progress?(1.0)
             return installedURL(for: variant)
         }
+        guard let entry = ModelCatalog.variant(id: variant) else {
+            return try await downloadViaWhisperKit(variant: variant, progress: progress)
+        }
+        switch entry.engineID {
+        case .whisperKit:
+            return try await downloadViaWhisperKit(variant: variant, progress: progress)
+        case .parakeet:
+            return try await downloadViaHuggingFace(source: entry.downloadSource, progress: progress)
+        default:
+            return try await downloadViaHuggingFace(source: entry.downloadSource, progress: progress)
+        }
+    }
+
+    private func downloadViaWhisperKit(
+        variant: String,
+        progress: (@Sendable (Double) -> Void)?
+    ) async throws -> URL {
         do {
-            let url = try await WhisperKit.download(
+            return try await WhisperKit.download(
                 variant: variant,
                 downloadBase: modelsDirectory,
                 useBackgroundSession: false,
-                progressCallback: { p in
-                    progress?(p.fractionCompleted)
-                }
+                progressCallback: { p in progress?(p.fractionCompleted) }
             )
-            return url
         } catch {
             throw ParolaError.modelDownloadFailed(variant, underlying: String(describing: error))
+        }
+    }
+
+    private func downloadViaHuggingFace(
+        source: ModelDownloadSource,
+        progress: (@Sendable (Double) -> Void)?
+    ) async throws -> URL {
+        let destination = installedURL(for: source)
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        do {
+            try await HuggingFaceDownloader.snapshot(
+                repo: source.huggingFaceRepo,
+                subpath: source.subpath.isEmpty ? nil : source.subpath,
+                destination: destination,
+                progress: progress
+            )
+            progress?(1.0)
+            return destination
+        } catch {
+            throw ParolaError.modelDownloadFailed(source.huggingFaceRepo, underlying: String(describing: error))
         }
     }
 

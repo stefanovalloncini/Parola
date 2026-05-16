@@ -9,6 +9,8 @@ public enum ParolaError: Error, CustomStringConvertible, Sendable {
     case captureUnavailable(String)
     case invalidLanguage(String)
     case ioError(String)
+    case engineNotRegistered(String)
+    case unsupportedForEngine(String)
 
     public var description: String {
         switch self {
@@ -28,6 +30,10 @@ public enum ParolaError: Error, CustomStringConvertible, Sendable {
             return "Invalid language code: \(code)"
         case .ioError(let reason):
             return reason
+        case .engineNotRegistered(let id):
+            return "Engine \"\(id)\" is not registered. Call ParolaCore.bootstrap() before transcribing."
+        case .unsupportedForEngine(let detail):
+            return "Unsupported for selected engine: \(detail)"
         }
     }
 }
