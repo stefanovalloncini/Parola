@@ -35,6 +35,9 @@ private struct AppRoot: View {
             }
             Task { await model.handleIncoming(url: url) }
         }
+        .onChange(of: onboardingComplete) { _, completed in
+            if !completed { deferOnboarding = false }
+        }
     }
 
     private var shouldShowOnboarding: Bool {
