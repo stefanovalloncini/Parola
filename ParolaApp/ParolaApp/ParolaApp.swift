@@ -74,7 +74,7 @@ struct ParolaApp: App {
         Settings {
             SettingsView()
                 .environmentObject(model)
-                .frame(width: 900, height: 640)
+                .frame(minWidth: 880, idealWidth: 900, maxWidth: .infinity, minHeight: 600, idealHeight: 640, maxHeight: .infinity)
         }
     }
 }
