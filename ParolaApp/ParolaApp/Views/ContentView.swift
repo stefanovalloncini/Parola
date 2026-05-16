@@ -51,6 +51,12 @@ struct ContentView: View {
                 model.selectedEntryID = id
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .parolaStartDictation)) { _ in
+            model.startDictationFromIntent()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .parolaStopDictation)) { _ in
+            model.stopDictationFromIntent()
+        }
     }
 
     @ToolbarContentBuilder

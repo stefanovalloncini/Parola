@@ -354,6 +354,17 @@ final class AppModel: ObservableObject {
         Task { await coord.setPostProcessor(processor) }
     }
 
+    func startDictationFromIntent() {
+        if !dictationEnabled { dictationEnabled = true }
+        guard let coord = dictationCoordinator else { return }
+        Task { await coord.simulatePress() }
+    }
+
+    func stopDictationFromIntent() {
+        guard let coord = dictationCoordinator else { return }
+        Task { await coord.simulateRelease() }
+    }
+
     private func stopDictation() {
         if let coord = dictationCoordinator {
             Task { await coord.stopMonitoring() }

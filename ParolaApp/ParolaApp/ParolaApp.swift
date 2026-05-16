@@ -87,5 +87,17 @@ struct ParolaShortcuts: AppShortcutsProvider {
             shortTitle: "Open Last Transcript",
             systemImageName: "doc.text"
         )
+        AppShortcut(
+            intent: StartDictationIntent(),
+            phrases: ["Start \(.applicationName) dictation"],
+            shortTitle: "Start Dictation",
+            systemImageName: "mic.fill"
+        )
+        AppShortcut(
+            intent: StopDictationIntent(),
+            phrases: ["Stop \(.applicationName) dictation"],
+            shortTitle: "Stop Dictation",
+            systemImageName: "stop.fill"
+        )
     }
 }

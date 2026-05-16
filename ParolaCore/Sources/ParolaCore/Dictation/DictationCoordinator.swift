@@ -48,6 +48,9 @@ public actor DictationCoordinator {
         await setState(.idle)
     }
 
+    public func simulatePress() async { await handle(.press) }
+    public func simulateRelease() async { await handle(.release) }
+
     func handle(_ event: HotkeyEvent) async {
         switch event {
         case .press:
