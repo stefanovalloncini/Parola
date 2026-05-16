@@ -8,59 +8,72 @@ struct ChatPane: View {
     @State private var input: String = ""
     @State private var isSending: Bool = false
     @State private var displayedHistory: [ChatMessage] = []
+    @FocusState private var composerFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            if let error = sessionError {
-                ContentUnavailableView(
-                    "Chat unavailable",
-                    systemImage: "exclamationmark.bubble",
-                    description: Text(error)
-                )
-            } else if session == nil {
-                ContentUnavailableView(
-                    "No transcript",
-                    systemImage: "bubble.left.and.text.bubble.right",
-                    description: Text("Open a transcript to start chatting.")
-                )
-            } else {
-                messages
-                Divider()
-                composer
-            }
+            header
+            Divider().opacity(0.4)
+            content
         }
+        .background(DS.Color.surface)
         .task(id: model.transcript) { await rebuildSession() }
     }
 
+    private var header: some View {
+        HStack {
+            Text("Chat")
+                .font(DS.Font.heading)
+            Spacer()
+            Button(role: .destructive, action: resetConversation) {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(DS.Color.secondaryText)
+            .help("Clear conversation")
+            .disabled(displayedHistory.isEmpty || isSending)
+        }
+        .padding(.horizontal, DS.Spacing.medium)
+        .padding(.vertical, DS.Spacing.regular)
+    }
+
     @ViewBuilder
+    private var content: some View {
+        if let error = sessionError {
+            ChatUnavailable(message: error)
+        } else if session == nil {
+            ChatEmpty()
+        } else {
+            messages
+            composer
+        }
+    }
+
     private var messages: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: DS.Spacing.regular) {
+                LazyVStack(alignment: .leading, spacing: 4) {
                     if displayedHistory.isEmpty {
-                        Text("Ask anything about the transcript.")
-                            .font(DS.Font.caption)
-                            .foregroundStyle(DS.Color.secondaryText)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.top, DS.Spacing.large)
+                        ChatHint()
+                            .padding(.top, DS.Spacing.xlarge)
                     }
                     ForEach(displayedHistory) { msg in
                         ChatBubble(message: msg).id(msg.id)
                     }
                     if isSending {
-                        HStack {
-                            ProgressView().controlSize(.small)
-                            Text("Thinking…").foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal, 12)
+                        ThinkingIndicator()
+                            .id("thinking")
                     }
                 }
-                .padding(DS.Spacing.regular)
+                .padding(.horizontal, DS.Spacing.medium)
+                .padding(.vertical, DS.Spacing.regular)
             }
             .onChange(of: displayedHistory.count) { _, _ in
-                if let last = displayedHistory.last {
-                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
-                }
+                scrollToEnd(proxy: proxy)
+            }
+            .onChange(of: isSending) { _, sending in
+                if sending { scrollToEnd(proxy: proxy) }
             }
         }
     }
@@ -68,19 +81,52 @@ struct ChatPane: View {
     private var composer: some View {
         HStack(alignment: .bottom, spacing: DS.Spacing.small) {
             TextField("Ask about this transcript…", text: $input, axis: .vertical)
-                .lineLimit(1...4)
-                .textFieldStyle(.roundedBorder)
+                .lineLimit(1...5)
+                .textFieldStyle(.plain)
+                .focused($composerFocused)
+                .padding(.horizontal, DS.Spacing.regular)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(DS.Color.surfaceElevated)
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(DS.Color.separator.opacity(0.6), lineWidth: 0.5)
+                )
                 .onSubmit(send)
+
             Button(action: send) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(DS.Color.accent)
+                Image(systemName: "paperplane.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        Circle().fill(isSendDisabled ? DS.Color.accent.opacity(0.4) : DS.Color.accent)
+                    )
             }
             .buttonStyle(.plain)
-            .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty || isSending)
+            .disabled(isSendDisabled)
             .keyboardShortcut(.return, modifiers: [.command])
+            .help("Send (⌘↩)")
         }
-        .padding(DS.Spacing.regular)
+        .padding(.horizontal, DS.Spacing.medium)
+        .padding(.bottom, DS.Spacing.medium)
+        .padding(.top, DS.Spacing.small)
+    }
+
+    private var isSendDisabled: Bool {
+        input.trimmingCharacters(in: .whitespaces).isEmpty || isSending
+    }
+
+    private func scrollToEnd(proxy: ScrollViewProxy) {
+        withAnimation(.easeOut(duration: 0.2)) {
+            if isSending {
+                proxy.scrollTo("thinking", anchor: .bottom)
+            } else if let last = displayedHistory.last {
+                proxy.scrollTo(last.id, anchor: .bottom)
+            }
+        }
     }
 
     private func rebuildSession() async {
@@ -97,6 +143,16 @@ struct ChatPane: View {
             displayedHistory = await s.history
         } catch {
             sessionError = error.localizedDescription
+        }
+    }
+
+    private func resetConversation() {
+        guard let session else { return }
+        Task {
+            await session.clearHistory()
+            let updated = await session.history
+            displayedHistory = updated
+            model.recordChat(history: updated)
         }
     }
 
@@ -124,15 +180,106 @@ private struct ChatBubble: View {
     let message: ChatMessage
 
     var body: some View {
-        HStack {
-            if message.role == .user { Spacer(minLength: 40) }
-            Text(message.text)
-                .textSelection(.enabled)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(message.role == .user ? DS.Color.accent.opacity(0.18) : DS.Color.surfaceElevated)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            if message.role == .assistant { Spacer(minLength: 40) }
+        HStack(spacing: 0) {
+            if message.role == .user {
+                Spacer(minLength: 40)
+                bubble
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(DS.Color.accent)
+                    )
+                    .foregroundStyle(.white)
+            } else {
+                bubble
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(DS.Color.surfaceElevated)
+                    )
+                    .foregroundStyle(DS.Color.primaryText)
+                Spacer(minLength: 40)
+            }
         }
+        .padding(.vertical, 2)
+    }
+
+    private var bubble: some View {
+        Text(message.text)
+            .textSelection(.enabled)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxWidth: 480, alignment: .leading)
+    }
+}
+
+private struct ChatHint: View {
+    var body: some View {
+        VStack(spacing: DS.Spacing.small) {
+            Image(systemName: "bubble.left.and.text.bubble.right")
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(DS.Color.secondaryText)
+            Text("Ask anything about this transcript.")
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.secondaryText)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct ThinkingIndicator: View {
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 0.08, paused: false)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            HStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { i in
+                    Circle()
+                        .fill(DS.Color.secondaryText)
+                        .frame(width: 6, height: 6)
+                        .opacity(dotOpacity(time: t, index: i))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(DS.Color.surfaceElevated)
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 2)
+        }
+    }
+
+    private func dotOpacity(time: TimeInterval, index: Int) -> Double {
+        let cycle = 1.2
+        let phase = (time / cycle).truncatingRemainder(dividingBy: 1)
+        let offset = Double(index) * 0.15
+        let local = (phase - offset + 1).truncatingRemainder(dividingBy: 1)
+        let wave = sin(local * .pi)
+        return 0.3 + max(0, wave) * 0.7
+    }
+}
+
+private struct ChatUnavailable: View {
+    let message: String
+
+    var body: some View {
+        ContentUnavailableView {
+            Label("Chat unavailable", systemImage: "bubble.left.and.exclamationmark.bubble.right")
+        } description: {
+            Text(message)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct ChatEmpty: View {
+    var body: some View {
+        ContentUnavailableView {
+            Label("No transcript", systemImage: "bubble.left.and.text.bubble.right")
+        } description: {
+            Text("Open a transcript to start chatting.")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
