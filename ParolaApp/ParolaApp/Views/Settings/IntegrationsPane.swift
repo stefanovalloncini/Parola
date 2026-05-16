@@ -1,0 +1,77 @@
+import SwiftUI
+import ParolaCore
+
+struct IntegrationsPane: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsSection {
+                ToolStatusRow(
+                    name: "yt-dlp",
+                    description: "Required to transcribe YouTube URLs. Audio downloads locally; no upload happens.",
+                    available: model.ytDlpAvailable,
+                    installing: model.ytDlpInstalling,
+                    error: model.ytDlpInstallError,
+                    isFirst: true,
+                    install: { model.installYtDlpViaBrew() }
+                )
+            }
+            SettingHelper(text: "Parola only uses these tools when you ask it to.")
+        }
+        .onAppear { model.refreshYtDlpAvailability() }
+    }
+}
+
+private struct ToolStatusRow: View {
+    let name: String
+    let description: String
+    let available: Bool
+    let installing: Bool
+    let error: String?
+    let isFirst: Bool
+    let install: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if !isFirst { Divider().padding(.leading, 16) }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Image(systemName: available ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                        .foregroundStyle(available ? Color.green : Color.orange)
+                    Text(name).font(.system(size: 13, weight: .semibold))
+                    Text(available ? "Installed" : "Not installed")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if !available {
+                        Button(action: install) {
+                            if installing {
+                                HStack(spacing: 6) {
+                                    ProgressView().controlSize(.small)
+                                    Text("Installing…")
+                                }
+                            } else {
+                                Label("Install with Homebrew", systemImage: "arrow.down.circle")
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(installing)
+                    }
+                }
+                Text(description)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let error {
+                    Text(error)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+    }
+}
