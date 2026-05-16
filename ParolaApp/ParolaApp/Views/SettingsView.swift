@@ -12,10 +12,45 @@ struct SettingsView: View {
             AutoExportTab().tabItem { Label("Auto-Export", systemImage: "square.and.arrow.up") }
             FiltersTab().tabItem { Label("Filters", systemImage: "line.3.horizontal.decrease.circle") }
             DictationTab().tabItem { Label("Dictation", systemImage: "mic.and.signal.meter") }
+            CustomizationTab().tabItem { Label("Customization", systemImage: "paintbrush") }
             WatchedFoldersTab().tabItem { Label("Watched", systemImage: "folder.badge.gearshape") }
             AboutTab().tabItem { Label("About", systemImage: "info.circle") }
         }
         .padding()
+    }
+}
+
+private struct CustomizationTab: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        Form {
+            Section {
+                Picker("Appearance", selection: $model.appTheme) {
+                    Text("Match system").tag("system")
+                    Text("Light").tag("light")
+                    Text("Dark").tag("dark")
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("Theme")
+            }
+
+            Section {
+                Toggle("Monospaced timestamps in transcripts", isOn: $model.monospacedTimestamps)
+                Picker("Sidebar density", selection: $model.sidebarDensity) {
+                    Text("Comfortable").tag("comfortable")
+                    Text("Compact").tag("compact")
+                }
+            } header: {
+                Text("Layout")
+            } footer: {
+                Text("Density affects spacing in the library sidebar.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 

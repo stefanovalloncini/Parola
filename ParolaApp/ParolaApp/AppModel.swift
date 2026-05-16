@@ -258,6 +258,20 @@ final class AppModel: ObservableObject {
     @AppStorage("dictationEnabled") var dictationEnabled: Bool = false {
         didSet { applyDictationEnabledChange() }
     }
+
+    // MARK: - Customization
+
+    @AppStorage("appTheme") var appTheme: String = "system"  // "system" | "light" | "dark"
+    @AppStorage("monospacedTimestamps") var monospacedTimestamps: Bool = true
+    @AppStorage("sidebarDensity") var sidebarDensity: String = "comfortable"  // "comfortable" | "compact"
+
+    var preferredColorScheme: ColorScheme? {
+        switch appTheme {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
     @AppStorage("dictationCleanupPromptID") var dictationCleanupPromptID: String = "" {
         didSet { applyDictationCleanupPromptChange() }
     }

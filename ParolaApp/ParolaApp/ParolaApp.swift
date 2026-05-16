@@ -12,6 +12,7 @@ struct ParolaApp: App {
             ContentView()
                 .environmentObject(model)
                 .frame(minWidth: 920, minHeight: 600)
+                .preferredColorScheme(model.preferredColorScheme)
                 .onAppear { appDelegate.bind(model: model) }
                 .onOpenURL { url in model.transcribe(fileURL: url) }
         }
