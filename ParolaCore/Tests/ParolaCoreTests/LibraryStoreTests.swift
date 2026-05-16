@@ -1,7 +1,6 @@
 import Testing
 import Foundation
-@testable import Parola
-import ParolaCore
+@testable import ParolaCore
 
 @Suite("LibraryStore")
 struct LibraryStoreTests {
@@ -12,8 +11,11 @@ struct LibraryStoreTests {
         return (LibraryStore(libraryURL: tmp), tmp)
     }
 
-    private var sampleAudioURL: URL {
-        Bundle(for: BundleAnchor.self).url(forResource: "sample", withExtension: "wav")!
+    private func makeFakeAudio() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-store-audio-\(UUID().uuidString).wav")
+        try Data("RIFFfakeaudio".utf8).write(to: url)
+        return url
     }
 
     private func makeTranscript() -> Transcript {
@@ -34,7 +36,8 @@ struct LibraryStoreTests {
     @Test("add writes a .parola bundle and list returns it")
     func addAndList() async throws {
         let (store, _) = try makeTempLibrary()
-        let entry = try await store.add(transcript: makeTranscript(), audioSource: sampleAudioURL)
+        let audio = try makeFakeAudio()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: audio)
         #expect(entry.bundleURL.pathExtension == "parola")
         #expect(FileManager.default.fileExists(atPath: entry.bundleURL.path))
 
@@ -46,7 +49,8 @@ struct LibraryStoreTests {
     @Test("load round-trips transcript and audio URL")
     func loadRoundTrip() async throws {
         let (store, _) = try makeTempLibrary()
-        let entry = try await store.add(transcript: makeTranscript(), audioSource: sampleAudioURL)
+        let audio = try makeFakeAudio()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: audio)
         let loaded = try await store.load(entry.id)
         #expect(loaded.document.transcript.segments.first?.text == "hi")
         #expect(loaded.document.audioURL?.lastPathComponent.hasPrefix("audio.") == true)
@@ -94,7 +98,8 @@ struct LibraryStoreTests {
     @Test("purge removes the directory")
     func purgeHardDeletes() async throws {
         let (store, _) = try makeTempLibrary()
-        let entry = try await store.add(transcript: makeTranscript(), audioSource: sampleAudioURL)
+        let audio = try makeFakeAudio()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: audio)
         try await store.purge(entry.id)
         let exists = FileManager.default.fileExists(atPath: entry.bundleURL.path)
         #expect(exists == false)
@@ -123,7 +128,8 @@ struct LibraryStoreTests {
     @Test("delete invalidates the list cache so the entry no longer appears")
     func deleteInvalidatesCache() async throws {
         let (store, _) = try makeTempLibrary()
-        let entry = try await store.add(transcript: makeTranscript(), audioSource: sampleAudioURL)
+        let audio = try makeFakeAudio()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: audio)
         _ = await store.list()
         try await store.delete(entry.id, at: Date())
         let active = await store.list()
@@ -157,11 +163,12 @@ struct LibraryStoreTests {
     @Test("adopt imports an existing .parola bundle without re-transcribing")
     func adoptParolaBundle() async throws {
         let (store, tmp) = try makeTempLibrary()
+        let audio = try makeFakeAudio()
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("scratch-\(UUID().uuidString).parola", isDirectory: true)
         try ParolaDocument.write(
             transcript: makeTranscript(),
-            audioURL: sampleAudioURL,
+            audioURL: audio,
             to: scratch
         )
         let entry = try await store.adopt(parolaBundle: scratch)
@@ -179,5 +186,3 @@ struct LibraryStoreTests {
         #expect(entry.deletedAt == nil)
     }
 }
-
-private final class BundleAnchor {}

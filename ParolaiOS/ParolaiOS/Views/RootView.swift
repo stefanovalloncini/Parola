@@ -1,4 +1,5 @@
 import SwiftUI
+import ParolaCore
 
 struct RootView: View {
     @EnvironmentObject var model: AppModel

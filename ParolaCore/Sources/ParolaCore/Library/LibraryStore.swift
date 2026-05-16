@@ -1,28 +1,27 @@
 import Foundation
-import ParolaCore
 
-actor LibraryStore {
-    enum LibraryError: Error, LocalizedError {
+public actor LibraryStore {
+    public enum LibraryError: Error, LocalizedError {
         case notFound(String)
 
-        var errorDescription: String? {
+        public var errorDescription: String? {
             switch self {
-            case .notFound: return String(localized: "library.notfound")
+            case .notFound(let id): return "Library entry \(id) not found."
             }
         }
     }
 
-    static let shared = LibraryStore()
-    static var defaultLibraryURL: URL {
+    public static let shared = LibraryStore()
+    public static var defaultLibraryURL: URL {
         URL.applicationSupportDirectory.appending(path: "Parola/Library", directoryHint: .isDirectory)
     }
 
-    let libraryURL: URL
+    public let libraryURL: URL
     private var cachedActive: [LibraryEntry]?
     private var cachedDeleted: [LibraryEntry]?
     private var cachedLoaded: (id: LibraryEntry.ID, value: LoadedEntry)?
 
-    init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
+    public init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
         self.libraryURL = libraryURL
         try? FileManager.default.createDirectory(at: libraryURL, withIntermediateDirectories: true)
         var url = libraryURL
@@ -31,13 +30,13 @@ actor LibraryStore {
         try? url.setResourceValues(values)
     }
 
-    func list() -> [LibraryEntry] {
+    public func list() -> [LibraryEntry] {
         if let cachedActive { return cachedActive }
         primeCaches()
         return cachedActive ?? []
     }
 
-    func listDeleted() -> [LibraryEntry] {
+    public func listDeleted() -> [LibraryEntry] {
         if let cachedDeleted { return cachedDeleted }
         primeCaches()
         return cachedDeleted ?? []
@@ -60,7 +59,7 @@ actor LibraryStore {
             .sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
     }
 
-    func load(_ id: LibraryEntry.ID) throws -> LoadedEntry {
+    public func load(_ id: LibraryEntry.ID) throws -> LoadedEntry {
         if let cached = cachedLoaded, cached.id == id {
             return cached.value
         }
@@ -75,7 +74,7 @@ actor LibraryStore {
         return loaded
     }
 
-    func add(transcript: Transcript, audioSource: URL?) throws -> LibraryEntry {
+    public func add(transcript: Transcript, audioSource: URL?) throws -> LibraryEntry {
         let name = uniqueEntryName(at: Date())
         let bundleURL = libraryURL.appendingPathComponent(name)
         try ParolaDocument.write(
@@ -87,7 +86,7 @@ actor LibraryStore {
         return try makeEntry(bundleURL: bundleURL.appendingPathExtension("parola"))
     }
 
-    func adopt(parolaBundle url: URL) throws -> LibraryEntry {
+    public func adopt(parolaBundle url: URL) throws -> LibraryEntry {
         let name = uniqueEntryName(at: Date())
         let target = libraryURL.appendingPathComponent("\(name).parola")
         let fm = FileManager.default
@@ -98,7 +97,7 @@ actor LibraryStore {
     }
 
     /// Soft-deletes by stamping `deletedAt`. The bundle stays on disk so it can be restored.
-    func delete(_ id: LibraryEntry.ID, at now: Date = Date()) throws {
+    public func delete(_ id: LibraryEntry.ID, at now: Date = Date()) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
@@ -111,7 +110,7 @@ actor LibraryStore {
     }
 
     /// Reverses a soft-delete by clearing `deletedAt`.
-    func restore(_ id: LibraryEntry.ID) throws {
+    public func restore(_ id: LibraryEntry.ID) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
@@ -124,7 +123,7 @@ actor LibraryStore {
     }
 
     /// Permanently removes a bundle from disk.
-    func purge(_ id: LibraryEntry.ID) throws {
+    public func purge(_ id: LibraryEntry.ID) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
@@ -135,7 +134,7 @@ actor LibraryStore {
     }
 
     /// Hard-deletes any soft-deleted entry whose `deletedAt` is older than `days` before `now`.
-    func purgeDeletedOlderThan(days: Int, now: Date) {
+    public func purgeDeletedOlderThan(days: Int, now: Date) {
         let cutoff = now.addingTimeInterval(-Double(days) * 86_400)
         primeCaches()
         let toPurge = (cachedDeleted ?? []).filter { ($0.deletedAt ?? .distantFuture) < cutoff }
