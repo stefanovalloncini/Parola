@@ -1,10 +1,24 @@
+import AppKit
 import Foundation
 import ParolaCore
 
 struct PromptDictationProcessor: TextPostProcessor {
-    let prompt: Prompt?
+    let defaultPrompt: Prompt?
+    let overrides: [String: Prompt]
+
+    init(prompt: Prompt?) {
+        self.defaultPrompt = prompt
+        self.overrides = [:]
+    }
+
+    init(defaultPrompt: Prompt?, overrides: [String: Prompt]) {
+        self.defaultPrompt = defaultPrompt
+        self.overrides = overrides
+    }
 
     func process(_ text: String) async -> String {
+        let bundleID = await frontmostBundleID()
+        let prompt: Prompt? = (bundleID.flatMap { overrides[$0] }) ?? defaultPrompt
         guard let prompt else { return text }
         do {
             let model = try LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
@@ -14,5 +28,10 @@ struct PromptDictationProcessor: TextPostProcessor {
         } catch {
             return text
         }
+    }
+
+    @MainActor
+    private func frontmostBundleID() async -> String? {
+        NSWorkspace.shared.frontmostApplication?.bundleIdentifier
     }
 }

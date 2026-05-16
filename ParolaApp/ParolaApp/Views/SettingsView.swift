@@ -45,9 +45,29 @@ private struct DictationTab: View {
                     }
                 }
             } header: {
-                Text("Post-processing")
+                Text("Default mode")
             } footer: {
                 Text("After Whisper transcribes your dictation, the selected prompt rewrites the text before it's pasted. Adds ~0.5–2s. Choose Raw for the fastest insertion.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                ForEach(AppModel.dictationOverrideApps, id: \.bundleID) { app in
+                    Picker(app.name, selection: Binding(
+                        get: { model.dictationOverridePromptID(for: app.bundleID) },
+                        set: { model.setDictationOverridePromptID($0, for: app.bundleID) }
+                    )) {
+                        Text("Use default").tag("")
+                        ForEach(Prompt.builtIns) { prompt in
+                            Text(prompt.name).tag(prompt.id.uuidString)
+                        }
+                    }
+                }
+            } header: {
+                Text("Per-app overrides")
+            } footer: {
+                Text("Override the default cleanup mode when the frontmost app matches.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

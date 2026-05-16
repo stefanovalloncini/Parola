@@ -261,6 +261,36 @@ final class AppModel: ObservableObject {
     @AppStorage("dictationCleanupPromptID") var dictationCleanupPromptID: String = "" {
         didSet { applyDictationCleanupPromptChange() }
     }
+    @AppStorage("dictationPerAppOverridesJSON") var dictationPerAppOverridesJSON: String = "{}" {
+        didSet { applyDictationCleanupPromptChange() }
+    }
+
+    static let dictationOverrideApps: [(bundleID: String, name: String)] = [
+        ("com.apple.mail", "Mail"),
+        ("com.apple.MobileSMS", "Messages"),
+        ("com.tinyspeck.slackmacgap", "Slack"),
+        ("com.apple.Notes", "Notes"),
+    ]
+
+    func dictationOverridePromptID(for bundleID: String) -> String {
+        guard let data = dictationPerAppOverridesJSON.data(using: .utf8),
+              let map = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return ""
+        }
+        return map[bundleID] ?? ""
+    }
+
+    func setDictationOverridePromptID(_ promptID: String, for bundleID: String) {
+        var map = (try? JSONDecoder().decode([String: String].self, from: dictationPerAppOverridesJSON.data(using: .utf8) ?? Data())) ?? [:]
+        if promptID.isEmpty {
+            map.removeValue(forKey: bundleID)
+        } else {
+            map[bundleID] = promptID
+        }
+        if let data = try? JSONEncoder().encode(map) {
+            dictationPerAppOverridesJSON = String(decoding: data, as: UTF8.self)
+        }
+    }
     @Published var dictationState: DictationCoordinator.State = .idle
     private var dictationCoordinator: DictationCoordinator?
     private var dictationHUD: NSPanel?
@@ -278,7 +308,7 @@ final class AppModel: ObservableObject {
         let hotkey = F5HotkeyMonitor()
         let recorder = MicDictationRecorder(model: selectedModel, language: selectedLanguage)
         let inserter = ClipboardPasteInserter()
-        let processor = PromptDictationProcessor(prompt: currentDictationCleanupPrompt())
+        let processor = currentDictationProcessor()
         let coord = DictationCoordinator(
             hotkey: hotkey,
             recorder: recorder,
@@ -296,9 +326,31 @@ final class AppModel: ObservableObject {
         return Prompt.builtIns.first { $0.id == uuid }
     }
 
+    private func currentDictationOverrides() -> [String: Prompt] {
+        guard let data = dictationPerAppOverridesJSON.data(using: .utf8),
+              let map = try? JSONDecoder().decode([String: String].self, from: data) else {
+            return [:]
+        }
+        var out: [String: Prompt] = [:]
+        for (bundleID, promptID) in map {
+            if let uuid = UUID(uuidString: promptID),
+               let prompt = Prompt.builtIns.first(where: { $0.id == uuid }) {
+                out[bundleID] = prompt
+            }
+        }
+        return out
+    }
+
+    private func currentDictationProcessor() -> PromptDictationProcessor {
+        PromptDictationProcessor(
+            defaultPrompt: currentDictationCleanupPrompt(),
+            overrides: currentDictationOverrides()
+        )
+    }
+
     private func applyDictationCleanupPromptChange() {
         guard let coord = dictationCoordinator else { return }
-        let processor = PromptDictationProcessor(prompt: currentDictationCleanupPrompt())
+        let processor = currentDictationProcessor()
         Task { await coord.setPostProcessor(processor) }
     }
 
