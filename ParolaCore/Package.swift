@@ -10,6 +10,7 @@ let package = Package(
     products: [
         .library(name: "ParolaCore", targets: ["ParolaCore"]),
         .executable(name: "parola", targets: ["parola"]),
+        .executable(name: "parola-mcp", targets: ["parola-mcp"]),
     ],
     dependencies: [
         .package(url: "https://github.com/argmaxinc/WhisperKit.git", exact: "1.0.0"),
@@ -31,6 +32,10 @@ let package = Package(
                 "ParolaCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
+        ),
+        .executableTarget(
+            name: "parola-mcp",
+            dependencies: ["ParolaCore"]
         ),
         .testTarget(
             name: "ParolaCoreTests",
