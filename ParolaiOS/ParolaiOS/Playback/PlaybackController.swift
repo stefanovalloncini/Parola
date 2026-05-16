@@ -42,6 +42,10 @@ final class PlaybackController {
 
     func play() {
         guard let player else { return }
+        if duration > 0, currentTime >= duration - 0.05 {
+            player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+            tick(to: 0)
+        }
         player.play()
         isPlaying = true
     }
