@@ -48,6 +48,44 @@ private struct FiltersTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                ForEach($model.findReplaceRules) { $rule in
+                    VStack(alignment: .leading, spacing: DS.Spacing.small) {
+                        HStack {
+                            Toggle("Enabled", isOn: $rule.enabled).labelsHidden()
+                            TextField("find", text: $rule.find).textFieldStyle(.roundedBorder)
+                            Text("→").foregroundStyle(.secondary)
+                            TextField("replace with", text: $rule.replace).textFieldStyle(.roundedBorder)
+                            Button(role: .destructive) {
+                                model.findReplaceRules.removeAll { $0.id == rule.id }
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                        HStack {
+                            Toggle("Case-sensitive", isOn: $rule.caseSensitive)
+                                .toggleStyle(.checkbox)
+                            Toggle("Regex", isOn: $rule.regex)
+                                .toggleStyle(.checkbox)
+                        }
+                        .font(.caption)
+                    }
+                    .padding(.vertical, 4)
+                }
+                Button {
+                    model.findReplaceRules.append(FindReplaceRule(find: "", replace: ""))
+                } label: {
+                    Label("Add rule", systemImage: "plus.circle")
+                }
+            } header: {
+                Text("Find & replace")
+            } footer: {
+                Text("Substitutions applied to every new transcript before it's saved. Per-document find & replace stays in the main window.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
     }

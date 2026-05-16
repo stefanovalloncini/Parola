@@ -19,6 +19,9 @@ final class AppModel: ObservableObject {
     @Published var ignoredSegmentRules: [IgnoredSegmentRule] = [] {
         didSet { saveIgnoredSegmentRules() }
     }
+    @Published var findReplaceRules: [FindReplaceRule] = [] {
+        didSet { saveFindReplaceRules() }
+    }
     @Published var lastError: String?
 
     private var searchTask: Task<Void, Never>?
@@ -46,6 +49,18 @@ final class AppModel: ObservableObject {
     private func saveIgnoredSegmentRules() {
         if let data = try? JSONEncoder().encode(ignoredSegmentRules) {
             UserDefaults.standard.set(data, forKey: "ignoredSegmentRules")
+        }
+    }
+
+    private func loadFindReplaceRules() {
+        guard let data = UserDefaults.standard.data(forKey: "findReplaceRules"),
+              let rules = try? JSONDecoder().decode([FindReplaceRule].self, from: data) else { return }
+        findReplaceRules = rules
+    }
+
+    private func saveFindReplaceRules() {
+        if let data = try? JSONEncoder().encode(findReplaceRules) {
+            UserDefaults.standard.set(data, forKey: "findReplaceRules")
         }
     }
 
@@ -83,10 +98,12 @@ final class AppModel: ObservableObject {
         }
         loadAutoExportRules()
         loadIgnoredSegmentRules()
+        loadFindReplaceRules()
         coordinator.postProcessor = { [weak self] transcript in
             guard let self else { return transcript }
             var out = transcript
             out.segments = IgnoredSegments.apply(rules: self.ignoredSegmentRules, to: out.segments)
+            out.segments = GlobalFindReplace.apply(rules: self.findReplaceRules, to: out.segments)
             return out
         }
         refreshModelList()

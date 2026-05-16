@@ -79,10 +79,14 @@ final class AppModel: ObservableObject {
 
     @Published var pendingExport: ExportFormat?
 
-    // MARK: - Ignored segments
+    // MARK: - Post-process rules
 
     @Published var ignoredSegmentRules: [IgnoredSegmentRule] = [] {
         didSet { saveIgnoredSegmentRules() }
+    }
+
+    @Published var findReplaceRules: [FindReplaceRule] = [] {
+        didSet { saveFindReplaceRules() }
     }
 
     private func loadIgnoredSegmentRules() {
@@ -97,9 +101,22 @@ final class AppModel: ObservableObject {
         }
     }
 
+    private func loadFindReplaceRules() {
+        guard let data = UserDefaults.standard.data(forKey: "findReplaceRules"),
+              let rules = try? JSONDecoder().decode([FindReplaceRule].self, from: data) else { return }
+        findReplaceRules = rules
+    }
+
+    private func saveFindReplaceRules() {
+        if let data = try? JSONEncoder().encode(findReplaceRules) {
+            UserDefaults.standard.set(data, forKey: "findReplaceRules")
+        }
+    }
+
     func postProcess(_ transcript: Transcript) -> Transcript {
         var out = transcript
         out.segments = IgnoredSegments.apply(rules: ignoredSegmentRules, to: out.segments)
+        out.segments = GlobalFindReplace.apply(rules: findReplaceRules, to: out.segments)
         return out
     }
 
@@ -160,6 +177,7 @@ final class AppModel: ObservableObject {
     init() {
         loadAutoExportRules()
         loadIgnoredSegmentRules()
+        loadFindReplaceRules()
         refreshModelList()
         refreshYtDlpAvailability()
         refreshLibrary()

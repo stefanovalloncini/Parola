@@ -79,6 +79,20 @@ struct SettingsSheet: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    NavigationLink {
+                        FindReplaceSettings()
+                            .environmentObject(model)
+                            .navigationTitle("Find & Replace")
+                            .navigationBarTitleDisplayMode(.inline)
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                            Text("Find & Replace")
+                            Spacer()
+                            Text("\(model.findReplaceRules.filter(\.enabled).count) active")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
 
                 Section {
