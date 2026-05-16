@@ -20,6 +20,22 @@ struct TranscriptDetailView: View {
                 }
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            ForEach(Prompt.builtIns) { prompt in
+                                Button(prompt.name) {
+                                    model.runPrompt(prompt, on: loaded.document.transcript)
+                                }
+                            }
+                        } label: {
+                            if model.isRunningPrompt {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "sparkles")
+                            }
+                        }
+                        .disabled(model.isRunningPrompt)
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button { showingChat = true } label: {
                             Image(systemName: "bubble.left.and.text.bubble.right")
                         }
@@ -31,6 +47,9 @@ struct TranscriptDetailView: View {
                 .sheet(isPresented: $showingChat) {
                     ChatSheet(entry: loaded.entry, transcript: loaded.document.transcript)
                         .environmentObject(model)
+                }
+                .sheet(item: $model.promptOutput) { output in
+                    PromptOutputSheet(output: output)
                 }
             } else if let loadError {
                 Text(loadError).foregroundStyle(.red)

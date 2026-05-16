@@ -113,6 +113,36 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: - Prompt library
+
+    let promptLibrary = PromptLibrary()
+    @Published var promptOutput: PromptOutput?
+    @Published var isRunningPrompt: Bool = false
+
+    struct PromptOutput: Identifiable {
+        let id = UUID()
+        let promptName: String
+        let text: String
+    }
+
+    func runPrompt(_ prompt: Prompt) {
+        guard let transcript = self.transcript else { return }
+        guard !isRunningPrompt else { return }
+        isRunningPrompt = true
+        promptOutput = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let model = try LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
+                let result = try await PromptRunner.run(prompt, on: transcript.text, model: model)
+                promptOutput = PromptOutput(promptName: prompt.name, text: result)
+            } catch {
+                phase = .failed(message: "Prompt failed: \(error.localizedDescription)")
+            }
+            isRunningPrompt = false
+        }
+    }
+
     // MARK: - Chat
 
     func recordChat(history: [ChatMessage]) {

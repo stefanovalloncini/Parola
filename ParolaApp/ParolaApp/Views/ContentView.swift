@@ -26,6 +26,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $model.youtubeSheetOpen) { YouTubeURLSheet() }
         .sheet(isPresented: $showingTrash) { MacRecentlyDeletedView() }
+        .sheet(item: $model.promptOutput) { output in
+            PromptOutputSheet(output: output)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .parolaOpenEntry)) { note in
             if let id = note.userInfo?["id"] as? String {
                 model.selectedEntryID = id
@@ -70,6 +73,9 @@ struct ContentView: View {
             }
             .disabled(isBusy)
             .help("Record from the microphone or system audio.")
+
+            PromptsMenu()
+                .disabled(model.transcript == nil || model.isRunningPrompt)
 
             Button {
                 model.presentOpenPanel()

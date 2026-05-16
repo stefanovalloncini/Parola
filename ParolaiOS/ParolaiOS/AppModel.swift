@@ -23,6 +23,33 @@ final class AppModel: ObservableObject {
         didSet { saveFindReplaceRules() }
     }
     @Published var lastError: String?
+    @Published var promptOutput: PromptOutput?
+    @Published var isRunningPrompt: Bool = false
+
+    let promptLibrary = PromptLibrary()
+
+    struct PromptOutput: Identifiable {
+        let id = UUID()
+        let promptName: String
+        let text: String
+    }
+
+    func runPrompt(_ prompt: Prompt, on transcript: Transcript) {
+        guard !isRunningPrompt else { return }
+        isRunningPrompt = true
+        promptOutput = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let model = try LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
+                let result = try await PromptRunner.run(prompt, on: transcript.text, model: model)
+                promptOutput = PromptOutput(promptName: prompt.name, text: result)
+            } catch {
+                lastError = error.localizedDescription
+            }
+            isRunningPrompt = false
+        }
+    }
 
     private var searchTask: Task<Void, Never>?
 
