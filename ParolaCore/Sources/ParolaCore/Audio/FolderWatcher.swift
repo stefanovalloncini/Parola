@@ -14,10 +14,18 @@ public actor FolderWatcher {
     private var fileDescriptor: Int32 = -1
     private var source: DispatchSourceFileSystemObject?
     private var knownFiles: Set<String> = []
+    private var scanTask: Task<Void, Never>?
+    private var scanContinuation: AsyncStream<Void>.Continuation?
 
     public init(folderURL: URL, onNewMediaFile: @escaping @Sendable (URL) -> Void) {
         self.folderURL = folderURL
         self.onNewMediaFile = onNewMediaFile
+    }
+
+    deinit {
+        scanContinuation?.finish()
+        scanTask?.cancel()
+        source?.cancel()
     }
 
     public func start() {
@@ -27,14 +35,22 @@ public actor FolderWatcher {
         fileDescriptor = fd
         knownFiles = scanFolder()
 
+        let (stream, continuation) = AsyncStream.makeStream(of: Void.self)
+        scanContinuation = continuation
+        scanTask = Task { [weak self] in
+            for await _ in stream {
+                await self?.checkForNewFiles()
+            }
+        }
+
         let queue = DispatchQueue(label: "com.parola.folder-watch.\(UUID().uuidString)")
         let src = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
             eventMask: .write,
             queue: queue
         )
-        src.setEventHandler { [weak self] in
-            Task { await self?.checkForNewFiles() }
+        src.setEventHandler {
+            continuation.yield()
         }
         src.setCancelHandler { [fd] in
             close(fd)
@@ -47,6 +63,10 @@ public actor FolderWatcher {
         source?.cancel()
         source = nil
         fileDescriptor = -1
+        scanContinuation?.finish()
+        scanContinuation = nil
+        scanTask?.cancel()
+        scanTask = nil
     }
 
     private func checkForNewFiles() {
