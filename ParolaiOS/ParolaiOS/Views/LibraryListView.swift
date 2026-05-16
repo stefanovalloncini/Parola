@@ -5,17 +5,27 @@ struct LibraryListView: View {
     @EnvironmentObject var model: AppModel
     @Binding var selection: LibraryEntry.ID?
 
+    private var displayed: [LibraryEntry] {
+        model.searchResults ?? model.libraryEntries
+    }
+
+    private var isSearching: Bool { model.searchResults != nil }
+
     var body: some View {
         Group {
-            if model.libraryEntries.isEmpty {
-                EmptyLibraryView()
+            if displayed.isEmpty {
+                if isSearching {
+                    ContentUnavailableView.search
+                } else {
+                    EmptyLibraryView()
+                }
             } else {
                 List(selection: $selection) {
-                    ForEach(model.libraryEntries) { entry in
+                    ForEach(displayed) { entry in
                         row(entry).tag(entry.id)
                     }
                     .onDelete { offsets in
-                        let ids = offsets.map { model.libraryEntries[$0].id }
+                        let ids = offsets.map { displayed[$0].id }
                         for id in ids {
                             model.deleteEntry(id)
                         }

@@ -17,17 +17,26 @@ public actor LibraryStore {
     }
 
     public let libraryURL: URL
+    private let searchIndex: LibrarySearchIndex
+    private let extraIndexer: LibraryIndexer?
     private var cachedActive: [LibraryEntry]?
     private var cachedDeleted: [LibraryEntry]?
     private var cachedLoaded: (id: LibraryEntry.ID, value: LoadedEntry)?
 
     public init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
+        self.init(libraryURL: libraryURL, extraIndexer: SpotlightIndexer())
+    }
+
+    public init(libraryURL: URL, extraIndexer: LibraryIndexer?) {
         self.libraryURL = libraryURL
+        self.extraIndexer = extraIndexer
         try? FileManager.default.createDirectory(at: libraryURL, withIntermediateDirectories: true)
         var url = libraryURL
         var values = URLResourceValues()
         values.isExcludedFromBackup = false
         try? url.setResourceValues(values)
+        let indexURL = libraryURL.appendingPathComponent(".search-index.json")
+        self.searchIndex = LibrarySearchIndex(indexURL: indexURL)
     }
 
     public func list() -> [LibraryEntry] {
@@ -40,6 +49,13 @@ public actor LibraryStore {
         if let cachedDeleted { return cachedDeleted }
         primeCaches()
         return cachedDeleted ?? []
+    }
+
+    public func search(_ query: String) async -> [LibrarySearchIndex.Match] {
+        let matches = await searchIndex.search(query)
+        if cachedActive == nil { primeCaches() }
+        let activeIDs = Set((cachedActive ?? []).map(\.id))
+        return matches.filter { activeIDs.contains($0.entryID) }
     }
 
     private func primeCaches() {
@@ -74,7 +90,7 @@ public actor LibraryStore {
         return loaded
     }
 
-    public func add(transcript: Transcript, audioSource: URL?) throws -> LibraryEntry {
+    public func add(transcript: Transcript, audioSource: URL?) async throws -> LibraryEntry {
         let name = uniqueEntryName(at: Date())
         let bundleURL = libraryURL.appendingPathComponent(name)
         try ParolaDocument.write(
@@ -83,17 +99,28 @@ public actor LibraryStore {
             to: bundleURL
         )
         invalidateListCaches()
-        return try makeEntry(bundleURL: bundleURL.appendingPathExtension("parola"))
+        let entry = try makeEntry(bundleURL: bundleURL.appendingPathExtension("parola"))
+        await searchIndex.index(id: entry.id, title: entry.title, text: transcript.text, createdAt: entry.createdAt)
+        if let extraIndexer {
+            await extraIndexer.index(id: entry.id, title: entry.title, text: transcript.text, createdAt: entry.createdAt)
+        }
+        return entry
     }
 
-    public func adopt(parolaBundle url: URL) throws -> LibraryEntry {
+    public func adopt(parolaBundle url: URL) async throws -> LibraryEntry {
         let name = uniqueEntryName(at: Date())
         let target = libraryURL.appendingPathComponent("\(name).parola")
         let fm = FileManager.default
         if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
         try fm.copyItem(at: url, to: target)
         invalidateListCaches()
-        return try makeEntry(bundleURL: target)
+        let entry = try makeEntry(bundleURL: target)
+        let doc = try ParolaDocument.read(at: target)
+        await searchIndex.index(id: entry.id, title: entry.title, text: doc.transcript.text, createdAt: entry.createdAt)
+        if let extraIndexer {
+            await extraIndexer.index(id: entry.id, title: entry.title, text: doc.transcript.text, createdAt: entry.createdAt)
+        }
+        return entry
     }
 
     /// Soft-deletes by stamping `deletedAt`. The bundle stays on disk so it can be restored.
@@ -123,7 +150,7 @@ public actor LibraryStore {
     }
 
     /// Permanently removes a bundle from disk.
-    public func purge(_ id: LibraryEntry.ID) throws {
+    public func purge(_ id: LibraryEntry.ID) async throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
@@ -131,15 +158,19 @@ public actor LibraryStore {
         try FileManager.default.removeItem(at: bundleURL)
         invalidateListCaches()
         if cachedLoaded?.id == id { cachedLoaded = nil }
+        await searchIndex.remove(id)
+        if let extraIndexer { await extraIndexer.deindex(id: id) }
     }
 
     /// Hard-deletes any soft-deleted entry whose `deletedAt` is older than `days` before `now`.
-    public func purgeDeletedOlderThan(days: Int, now: Date) {
+    public func purgeDeletedOlderThan(days: Int, now: Date) async {
         let cutoff = now.addingTimeInterval(-Double(days) * 86_400)
         primeCaches()
         let toPurge = (cachedDeleted ?? []).filter { ($0.deletedAt ?? .distantFuture) < cutoff }
         for entry in toPurge {
             try? FileManager.default.removeItem(at: entry.bundleURL)
+            await searchIndex.remove(entry.id)
+            if let extraIndexer { await extraIndexer.deindex(id: entry.id) }
         }
         invalidateListCaches()
     }

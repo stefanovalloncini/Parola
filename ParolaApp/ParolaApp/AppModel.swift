@@ -84,7 +84,9 @@ final class AppModel: ObservableObject {
     let library = LibraryStore()
     @Published var libraryEntries: [LibraryEntry] = []
     @Published var deletedEntries: [LibraryEntry] = []
+    @Published var searchResults: [LibraryEntry]?
     @Published var selectedEntryID: LibraryEntry.ID?
+    private var searchTask: Task<Void, Never>?
     static let trashRetentionDays = 30
 
     // MARK: - Engine
@@ -185,6 +187,27 @@ final class AppModel: ObservableObject {
             } catch {
                 // Don't fail the transcription if library save fails; the user still has the in-memory result.
             }
+        }
+    }
+
+    func search(_ query: String) {
+        searchTask?.cancel()
+        let q = query.trimmingCharacters(in: .whitespaces)
+        if q.isEmpty {
+            searchResults = nil
+            return
+        }
+        searchTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(200))
+            guard !Task.isCancelled, let self else { return }
+            let matches = await library.search(q)
+            guard !Task.isCancelled else { return }
+            let scoreByID = Dictionary(uniqueKeysWithValues: matches.map { ($0.entryID, $0.score) })
+            let active = await library.list()
+            guard !Task.isCancelled else { return }
+            searchResults = active
+                .filter { scoreByID[$0.id] != nil }
+                .sorted { (scoreByID[$0.id] ?? 0) > (scoreByID[$1.id] ?? 0) }
         }
     }
 

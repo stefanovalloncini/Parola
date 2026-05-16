@@ -3,18 +3,25 @@ import ParolaCore
 
 struct MacLibrarySidebar: View {
     @EnvironmentObject var model: AppModel
+    @State private var searchText = ""
+
+    private var displayed: [LibraryEntry] {
+        model.searchResults ?? model.libraryEntries
+    }
+
+    private var isSearching: Bool { model.searchResults != nil }
 
     var body: some View {
         List(selection: $model.selectedEntryID) {
-            if model.libraryEntries.isEmpty {
+            if displayed.isEmpty {
                 Section {
-                    Text("Transcribe a file to start your library.")
+                    Text(isSearching ? "No matches." : "Transcribe a file to start your library.")
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.Color.secondaryText)
                         .padding(.vertical, DS.Spacing.small)
                 }
             } else {
-                ForEach(model.libraryEntries) { entry in
+                ForEach(displayed) { entry in
                     row(entry).tag(entry.id)
                 }
             }
@@ -22,6 +29,8 @@ struct MacLibrarySidebar: View {
         .listStyle(.sidebar)
         .navigationTitle("Library")
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 360)
+        .searchable(text: $searchText, placement: .sidebar, prompt: "Search transcripts")
+        .onChange(of: searchText) { _, newValue in model.search(newValue) }
         .onChange(of: model.selectedEntryID) { _, newValue in
             if let id = newValue { model.loadEntry(id) }
         }

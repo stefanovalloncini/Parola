@@ -9,6 +9,7 @@ struct RootView: View {
     @State private var showingSettings = false
     @State private var showingNew = false
     @State private var showingTrash = false
+    @State private var searchText = ""
 
     var body: some View {
         Group {
@@ -55,6 +56,8 @@ struct RootView: View {
             }
             .navigationTitle("Parola")
             .toolbar { toolbarItems }
+            .searchable(text: $searchText, prompt: "Search transcripts")
+            .onChange(of: searchText) { _, newValue in model.search(newValue) }
             .navigationDestination(item: $selectedEntry) { id in
                 TranscriptDetailView(entryID: id)
             }
@@ -70,6 +73,8 @@ struct RootView: View {
             }
             .navigationTitle("Parola")
             .toolbar { toolbarItems }
+            .searchable(text: $searchText, prompt: "Search transcripts")
+            .onChange(of: searchText) { _, newValue in model.search(newValue) }
         } detail: {
             if let id = selectedEntry {
                 TranscriptDetailView(entryID: id)

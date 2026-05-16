@@ -8,7 +8,7 @@ struct LibraryStoreTests {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-library-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        return (LibraryStore(libraryURL: tmp), tmp)
+        return (LibraryStore(libraryURL: tmp, extraIndexer: nil), tmp)
     }
 
     private func makeFakeAudio() throws -> URL {
@@ -184,5 +184,26 @@ struct LibraryStoreTests {
         let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
         #expect(entry.category == .transcription)
         #expect(entry.deletedAt == nil)
+    }
+
+    @Test("search returns active entries and filters soft-deleted")
+    func searchFiltersSoftDeleted() async throws {
+        let (store, _) = try makeTempLibrary()
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Sprint planning meeting")],
+            language: "en",
+            modelName: "tiny"
+        )
+        let entry = try await store.add(transcript: transcript, audioSource: nil)
+        var results = await store.search("sprint")
+        #expect(results.contains(where: { $0.entryID == entry.id }))
+
+        try await store.delete(entry.id, at: Date())
+        results = await store.search("sprint")
+        #expect(!results.contains(where: { $0.entryID == entry.id }))
+
+        try await store.restore(entry.id)
+        results = await store.search("sprint")
+        #expect(results.contains(where: { $0.entryID == entry.id }))
     }
 }

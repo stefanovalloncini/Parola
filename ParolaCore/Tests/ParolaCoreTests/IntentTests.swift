@@ -8,7 +8,7 @@ struct IntentTests {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-intent-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        return LibraryStore(libraryURL: tmp)
+        return LibraryStore(libraryURL: tmp, extraIndexer: nil)
     }
 
     private func makeTranscript() -> Transcript {
