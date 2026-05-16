@@ -5,14 +5,8 @@ func stderr(_ line: String) {
 }
 
 func humanBytes(_ bytes: Int) -> String {
-    let units = ["B", "KB", "MB", "GB", "TB"]
-    var value = Double(bytes)
-    var idx = 0
-    while value >= 1024, idx < units.count - 1 {
-        value /= 1024
-        idx += 1
-    }
-    return String(format: "%.1f %@", value, units[idx])
+    Measurement(value: Double(bytes), unit: UnitInformationStorage.bytes)
+        .formatted(.byteCount(style: .file))
 }
 
 extension JSONEncoder {
