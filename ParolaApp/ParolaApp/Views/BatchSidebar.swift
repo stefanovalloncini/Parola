@@ -69,6 +69,9 @@ private struct BatchRow: View {
         case .failed:
             Image(systemName: "exclamationmark.triangle")
                 .foregroundStyle(DS.Color.danger)
+        case .cancelled:
+            Image(systemName: "xmark.circle")
+                .foregroundStyle(DS.Color.secondaryText)
         }
     }
 
@@ -80,6 +83,7 @@ private struct BatchRow: View {
             let count = job.transcript?.segments.count ?? 0
             return "\(count) segments"
         case .failed: return job.error ?? "Failed"
+        case .cancelled: return "Cancelled"
         }
     }
 }

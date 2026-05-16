@@ -153,6 +153,8 @@ struct ContentView: View {
         switch model.route {
         case .batch:
             BatchView()
+        case .queue:
+            QueueView()
         case .transcript:
             transcriptContent
         }
