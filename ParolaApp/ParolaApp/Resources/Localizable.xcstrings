@@ -1,0 +1,223 @@
+{
+  "sourceLanguage" : "en",
+  "version" : "1.0",
+  "strings" : {
+    "About" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "About" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Informazioni" } }
+      }
+    },
+    "Auto-Export" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Auto-Export" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Esportazione automatica" } }
+      }
+    },
+    "Burn Subtitles into Video…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Burn Subtitles into Video…" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Incolla sottotitoli nel video…" } }
+      }
+    },
+    "Chat" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Chat" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Chat" } }
+      }
+    },
+    "Customization" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Customization" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Personalizzazione" } }
+      }
+    },
+    "Dictation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dictation" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Dettatura" } }
+      }
+    },
+    "Done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Done" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Fine" } }
+      }
+    },
+    "Enable dictation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enable dictation" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Attiva dettatura" } }
+      }
+    },
+    "Export" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Export" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Esporta" } }
+      }
+    },
+    "Filters" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Filters" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Filtri" } }
+      }
+    },
+    "Find…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Find…" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Trova…" } }
+      }
+    },
+    "General" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "General" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Generali" } }
+      }
+    },
+    "Library" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Library" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Libreria" } }
+      }
+    },
+    "Live Captions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Live Captions" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Sottotitoli in tempo reale" } }
+      }
+    },
+    "Meetings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Meetings" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Riunioni" } }
+      }
+    },
+    "Models" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Models" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Modelli" } }
+      }
+    },
+    "Open Audio…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Audio…" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Apri audio…" } }
+      }
+    },
+    "Open File" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open File" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Apri file" } }
+      }
+    },
+    "Player" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Player" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Player" } }
+      }
+    },
+    "Prompts" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Prompts" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Prompt" } }
+      }
+    },
+    "Record" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Record" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Registra" } }
+      }
+    },
+    "Recently Deleted" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recently Deleted" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Eliminati di recente" } }
+      }
+    },
+    "Save As Parola Document…" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save As Parola Document…" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Salva come documento Parola…" } }
+      }
+    },
+    "Speakers" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Speakers" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Persone" } }
+      }
+    },
+    "Summary" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Summary" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Riassunto" } }
+      }
+    },
+    "Tools" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Tools" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Strumenti" } }
+      }
+    },
+    "Transcript" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Transcript" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Trascrizione" } }
+      }
+    },
+    "Transcriptions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Transcriptions" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Trascrizioni" } }
+      }
+    },
+    "Translate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Translate" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Traduci" } }
+      }
+    },
+    "Watched" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Watched" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Cartelle" } }
+      }
+    },
+    "YouTube URL" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "YouTube URL" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "URL YouTube" } }
+      }
+    }
+  }
+}
