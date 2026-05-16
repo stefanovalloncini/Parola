@@ -1,0 +1,151 @@
+import Foundation
+import os
+@preconcurrency import FluidAudio
+
+/// Parakeet TDT engine wrapper. Loads a CoreML Parakeet model on Apple Silicon via FluidAudio
+/// and runs ASR on the Apple Neural Engine.
+public actor ParakeetTranscriber: Transcriber {
+    public static let engineID = EngineID.parakeet
+    public static let capabilities = EngineCapabilities.parakeetDefaults
+
+    private let modelStore: ModelStore
+    private var loadedModel: String?
+    private var manager: AsrManager?
+    private let signposter = OSSignposter(subsystem: "app.parola.core", category: "engine.parakeet")
+
+    public init(modelStore: ModelStore) {
+        self.modelStore = modelStore
+    }
+
+    public func load(model: String) async throws {
+        if loadedModel == model, manager != nil { return }
+        let interval = signposter.beginInterval("load", "model=\(model, privacy: .public)")
+        defer { signposter.endInterval("load", interval) }
+
+        let version = try Self.modelVersion(for: model)
+        let targetDir = modelStore.installedURL(for: model)
+        try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+
+        do {
+            let models = try await AsrModels.downloadAndLoad(to: targetDir, version: version)
+            let asr = AsrManager(config: .default)
+            try await asr.loadModels(models)
+            self.manager = asr
+            self.loadedModel = model
+        } catch {
+            throw ParolaError.transcriptionFailed("Parakeet load failed: \(error.localizedDescription)")
+        }
+    }
+
+    public func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+        guard let asr = manager, let modelName = loadedModel else {
+            throw ParolaError.transcriptionFailed("Parakeet model not loaded")
+        }
+        if let lang = options.language, lang.lowercased() != "en" {
+            throw ParolaError.unsupportedForEngine("Parakeet only supports English (got \"\(lang)\")")
+        }
+        if options.task == .translate {
+            throw ParolaError.unsupportedForEngine("Parakeet does not support translation")
+        }
+        let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
+        defer { signposter.endInterval("transcribe", interval) }
+
+        var decoderState = TdtDecoderState.make()
+        let result: ASRResult
+        do {
+            result = try await asr.transcribe(url, decoderState: &decoderState, language: nil)
+        } catch {
+            throw ParolaError.transcriptionFailed("Parakeet transcribe failed: \(error.localizedDescription)")
+        }
+
+        let segments = Self.makeSegments(from: result, includeWords: options.wordTimestamps)
+        return Transcript(
+            segments: segments,
+            language: "en",
+            modelName: modelName,
+            sourceURL: url,
+            durationSeconds: result.duration > 0 ? result.duration : nil
+        )
+    }
+
+    public func unload() async {
+        let interval = signposter.beginInterval("unload")
+        defer { signposter.endInterval("unload", interval) }
+        manager = nil
+        loadedModel = nil
+    }
+
+    public func loadedModelName() async -> String? { loadedModel }
+
+    static func modelVersion(for model: String) throws -> AsrModelVersion {
+        switch model {
+        case "nvidia_parakeet-tdt-0.6b-v2":
+            return .v2
+        case "nvidia_parakeet-tdt-0.6b-v3":
+            return .v3
+        default:
+            throw ParolaError.modelNotFound(model)
+        }
+    }
+
+    /// Group token timings into segments by detecting silence gaps (> 0.8 s) or
+    /// sentence-ending punctuation. Falls back to a single segment containing the full text.
+    static func makeSegments(from result: ASRResult, includeWords: Bool) -> [TranscriptSegment] {
+        let trimmedText = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let timings = result.tokenTimings, !timings.isEmpty else {
+            guard !trimmedText.isEmpty else { return [] }
+            return [TranscriptSegment(id: 0, start: 0, end: result.duration, text: trimmedText, words: nil)]
+        }
+
+        let gapThreshold: TimeInterval = 0.8
+        var segments: [TranscriptSegment] = []
+        var currentTokens: [TokenTiming] = []
+        var lastEnd: TimeInterval = 0
+        var nextID = 0
+
+        func flush() {
+            guard !currentTokens.isEmpty else { return }
+            let start = currentTokens.first!.startTime
+            let end = currentTokens.last!.endTime
+            let text = currentTokens
+                .map { $0.token }
+                .joined()
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else {
+                currentTokens.removeAll()
+                return
+            }
+            let words: [WordTiming]? = includeWords
+                ? currentTokens.enumerated().map { idx, t in
+                    WordTiming(
+                        id: "\(nextID)-\(idx)",
+                        word: t.token.trimmingCharacters(in: .whitespaces),
+                        start: t.startTime,
+                        end: t.endTime,
+                        probability: Double(t.confidence)
+                    )
+                }
+                : nil
+            segments.append(TranscriptSegment(id: nextID, start: start, end: end, text: text, words: words))
+            nextID += 1
+            currentTokens.removeAll()
+        }
+
+        for timing in timings {
+            if !currentTokens.isEmpty {
+                let gap = timing.startTime - lastEnd
+                if gap > gapThreshold || currentTokens.count > 80 {
+                    flush()
+                }
+            }
+            currentTokens.append(timing)
+            lastEnd = timing.endTime
+        }
+        flush()
+
+        if segments.isEmpty, !trimmedText.isEmpty {
+            return [TranscriptSegment(id: 0, start: 0, end: result.duration, text: trimmedText, words: nil)]
+        }
+        return segments
+    }
+}

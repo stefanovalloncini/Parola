@@ -1,18 +1,25 @@
 import Foundation
-import WhisperKit
+@preconcurrency import WhisperKit
+import os
 
 /// Thin async wrapper over WhisperKit. Owns one WhisperKit instance at a time.
-actor WhisperKitTranscriber {
+public actor WhisperKitTranscriber: Transcriber {
+    public static let engineID = EngineID.whisperKit
+    public static let capabilities = EngineCapabilities.whisperKitDefaults
+
     private var whisperKit: WhisperKit?
     private var loadedModel: String?
     private let modelStore: ModelStore
+    private let signposter = OSSignposter(subsystem: "app.parola.core", category: "engine.whisperkit")
 
-    init(modelStore: ModelStore) {
+    public init(modelStore: ModelStore) {
         self.modelStore = modelStore
     }
 
-    func load(model: String) async throws {
+    public func load(model: String) async throws {
         if loadedModel == model, whisperKit != nil { return }
+        let interval = signposter.beginInterval("load", "model=\(model, privacy: .public)")
+        defer { signposter.endInterval("load", interval) }
         do {
             let folder = modelStore.installedURL(for: model).path
             let kit = try await WhisperKit(
@@ -32,20 +39,24 @@ actor WhisperKitTranscriber {
         }
     }
 
-    func unload() {
+    public func unload() {
+        let interval = signposter.beginInterval("unload")
+        defer { signposter.endInterval("unload", interval) }
         whisperKit = nil
         loadedModel = nil
     }
 
-    func loadedModelName() -> String? { loadedModel }
+    public func loadedModelName() -> String? { loadedModel }
 
-    func transcribe(
+    public func transcribe(
         url: URL,
         options: TranscriptionOptions
     ) async throws -> Transcript {
         guard let kit = whisperKit, let modelName = loadedModel else {
             throw ParolaError.transcriptionFailed("model not loaded")
         }
+        let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
+        defer { signposter.endInterval("transcribe", interval) }
         var decoding = DecodingOptions(
             verbose: options.verbose,
             task: options.task == .translate ? .translate : .transcribe,

@@ -1,44 +1,57 @@
 import Foundation
 
-/// Top-level orchestrator. Owns a WhisperKit transcriber, manages model loading,
-/// and emits transcription events.
+/// Top-level orchestrator. Resolves the right `Transcriber` for the selected model via the
+/// shared `EngineRegistry`, manages model loading, and emits transcription events.
 ///
-/// Idle-unload: after `idleTimeout` seconds of inactivity, the model is released
+/// Idle-unload: after `idleTimeout` seconds of inactivity, the active transcriber is released
 /// to free memory; the next transcribe call transparently reloads.
 public actor TranscriptionSession {
     public let modelStore: ModelStore
     public var idleTimeout: TimeInterval
 
-    private let transcriber: WhisperKitTranscriber
+    private let registry: EngineRegistry
     private let diarizer = DiarizationService()
+    private var transcriber: (any Transcriber)?
+    private var transcriberEngineID: EngineID?
     private var idleTask: Task<Void, Never>?
 
-    public init(modelStore: ModelStore = .shared, idleTimeout: TimeInterval = 60) {
+    public init(
+        modelStore: ModelStore = .shared,
+        registry: EngineRegistry = .shared,
+        idleTimeout: TimeInterval = 60
+    ) {
         self.modelStore = modelStore
+        self.registry = registry
         self.idleTimeout = idleTimeout
-        self.transcriber = WhisperKitTranscriber(modelStore: modelStore)
     }
 
     /// Transcribes from an AudioSource. Downloads the requested model on demand.
-    /// - Parameters:
-    ///   - source: anything conforming to AudioSource (file, mic, system audio)
-    ///   - options: language / task / model selection
-    ///   - downloadProgress: optional 0–1 callback for model download progress
-    /// - Returns: the completed Transcript
     public func transcribe(
         source: any AudioSource,
         options: TranscriptionOptions,
         downloadProgress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> Transcript {
-        let modelName = options.model ?? "openai_whisper-tiny"
+        await ensureBootstrap()
+        let modelName = options.model ?? defaultModelName()
         try Task.checkCancellation()
+
+        let variant = ModelCatalog.variant(id: modelName)
+        let engineID = variant?.engineID ?? .whisperKit
+
+        try await validate(options: options, engineID: engineID, variant: variant)
+
         if !modelStore.isInstalled(modelName) {
             _ = try await modelStore.download(variant: modelName, progress: downloadProgress)
         }
         try Task.checkCancellation()
         cancelIdleTimer()
+        try await ensureTranscriber(for: engineID)
+        guard let transcriber else {
+            throw ParolaError.engineNotRegistered(engineID.rawValue)
+        }
         try await transcriber.load(model: modelName)
         try Task.checkCancellation()
+
         let audioURL = try await source.prepare()
         try Task.checkCancellation()
         var transcript = try await transcriber.transcribe(url: audioURL, options: options)
@@ -56,12 +69,63 @@ public actor TranscriptionSession {
 
     public func unloadModel() async {
         cancelIdleTimer()
-        await transcriber.unload()
+        if let transcriber {
+            await transcriber.unload()
+        }
+        transcriber = nil
+        transcriberEngineID = nil
         await diarizer.unload()
     }
 
     public func currentModel() async -> String? {
-        await transcriber.loadedModelName()
+        await transcriber?.loadedModelName()
+    }
+
+    private func validate(
+        options: TranscriptionOptions,
+        engineID: EngineID,
+        variant: ModelVariant?
+    ) async throws {
+        guard let baseCaps = await registry.capabilities(for: engineID) else {
+            throw ParolaError.engineNotRegistered(engineID.rawValue)
+        }
+        let caps = baseCaps.tightened(by: variant?.languageScope)
+        if !caps.supportedLanguages.allows(options.language) && options.language != nil {
+            throw ParolaError.unsupportedForEngine(
+                "Engine \(engineID) does not support language \"\(options.language ?? "?")\""
+            )
+        }
+        if options.task == .translate, !caps.supportsTranslate {
+            throw ParolaError.unsupportedForEngine("Engine \(engineID) does not support translate task")
+        }
+        if options.diarize, !caps.supportsDiarization {
+            throw ParolaError.unsupportedForEngine("Engine \(engineID) does not support diarization")
+        }
+    }
+
+    private func ensureBootstrap() async {
+        let registered = await registry.registeredEngines()
+        if registered.isEmpty {
+            await ParolaCoreBootstrap.registerBuiltInEngines(registry: registry)
+        }
+    }
+
+    private func ensureTranscriber(for engineID: EngineID) async throws {
+        if transcriber != nil, transcriberEngineID == engineID {
+            return
+        }
+        if let old = transcriber {
+            await old.unload()
+        }
+        transcriber = try await registry.transcriber(for: engineID, store: modelStore)
+        transcriberEngineID = engineID
+    }
+
+    private func defaultModelName() -> String {
+        if let recommended = ModelCatalog.all.first(where: { $0.category == .recommended }) {
+            return recommended.id
+        }
+        return "openai_whisper-tiny"
     }
 
     private func scheduleIdleUnload() {
@@ -70,7 +134,7 @@ public actor TranscriptionSession {
         idleTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(timeout))
             guard !Task.isCancelled else { return }
-            await self?.transcriber.unload()
+            await self?.unloadModel()
         }
     }
 
