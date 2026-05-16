@@ -8,6 +8,7 @@ struct LiveCaptionsSheet: View {
     @State private var state = LiveCaptionsState()
     @State private var session: StreamingTranscriptionSession?
     @State private var consumer: Task<Void, Never>?
+    @State private var translate: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -37,6 +38,14 @@ struct LiveCaptionsSheet: View {
                 Spacer()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .safeAreaInset(edge: .bottom) {
+                Toggle("Translate to English", isOn: $translate)
+                    .padding()
+                    .background(.thinMaterial)
+                    .onChange(of: translate) { _, _ in
+                        restartIfNeeded()
+                    }
+            }
             .navigationTitle("Live Captions")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -50,6 +59,12 @@ struct LiveCaptionsSheet: View {
         .onDisappear { stop() }
     }
 
+    private func restartIfNeeded() {
+        guard state.isActive else { return }
+        stop()
+        Task { await start() }
+    }
+
     private func start() async {
         guard session == nil else { return }
         configureAudioSession()
@@ -61,7 +76,7 @@ struct LiveCaptionsSheet: View {
         let options = TranscriptionOptions(
             model: model.settings.modelName,
             language: model.settings.language,
-            task: .transcribe
+            task: translate ? .translate : .transcribe
         )
         consumer = Task { [weak session = s] in
             do {

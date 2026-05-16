@@ -6,10 +6,12 @@ import SwiftUI
 @MainActor
 final class LiveCaptionsController: ObservableObject {
     @Published var state: LiveCaptionsState = LiveCaptionsState()
+    @Published var translateToEnglish: Bool = false
 
     private var panel: NSPanel?
     private var session: StreamingTranscriptionSession?
     private var consumer: Task<Void, Never>?
+    private var lastOptions: TranscriptionOptions?
 
     var isActive: Bool { state.isActive }
 
@@ -17,12 +19,34 @@ final class LiveCaptionsController: ObservableObject {
         if state.isActive {
             await stop()
         } else {
-            await start(options: options)
+            await start(options: optionsWithTranslate(options))
         }
+    }
+
+    func setTranslate(_ enabled: Bool) async {
+        guard translateToEnglish != enabled else { return }
+        translateToEnglish = enabled
+        guard let last = lastOptions, state.isActive else { return }
+        await stop()
+        await start(options: optionsWithTranslate(last))
+    }
+
+    private func optionsWithTranslate(_ options: TranscriptionOptions) -> TranscriptionOptions {
+        TranscriptionOptions(
+            model: options.model,
+            language: options.language,
+            task: translateToEnglish ? .translate : .transcribe,
+            wordTimestamps: options.wordTimestamps,
+            verbose: options.verbose,
+            initialPrompt: options.initialPrompt,
+            diarize: options.diarize,
+            expectedSpeakers: options.expectedSpeakers
+        )
     }
 
     func start(options: TranscriptionOptions) async {
         guard !state.isActive else { return }
+        lastOptions = options
         state.reset()
         state.isActive = true
 

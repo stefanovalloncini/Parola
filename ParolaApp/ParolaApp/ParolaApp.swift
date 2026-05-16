@@ -35,6 +35,12 @@ struct ParolaApp: App {
                     model.toggleLiveCaptions()
                 }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
+                Toggle("Translate to English", isOn: Binding(
+                    get: { model.liveCaptions.translateToEnglish },
+                    set: { newValue in
+                        Task { await model.liveCaptions.setTranslate(newValue) }
+                    }
+                ))
             }
             CommandMenu("Transcript") {
                 Button("Export as TXT…") { model.exportRequest(.txt) }
