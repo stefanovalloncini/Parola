@@ -10,7 +10,8 @@ struct AutoExportPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                searchField
+                SearchPill(text: $searchText, placeholder: "Search rules…")
+                    .frame(maxWidth: 240)
                 RuleEnabledFilterChips(filter: $enabledFilter)
                 Spacer()
                 sortMenu
@@ -89,34 +90,6 @@ struct AutoExportPane: View {
         let r = model.autoExportRules[rhs].enabled
         if l == r { return lhs < rhs }
         return preferEnabled ? l : r
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("Search rules…", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        )
-        .frame(maxWidth: 240)
     }
 
     private var sortMenu: some View {

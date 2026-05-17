@@ -1,8 +1,6 @@
 import AppKit
 import Foundation
 
-/// Snapshots Parola's settings to a JSON-encoded `.parola-settings` file and restores them on import.
-/// The format is a flat key/value map of the UserDefaults keys listed in `SettingsPaneScope.defaultsKeys`.
 enum SettingsExportService {
     private static let exportedKeys: [String] = {
         var keys: Set<String> = []

@@ -91,8 +91,6 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// Returns the matching SettingsPaneScope used for reset / search keywords. Some routes do not
-    /// map to a scope (e.g. `localModels`, `cloudModels`, `about`) and return nil.
     var paneScope: SettingsPaneScope? {
         switch self {
         case .general: return .general
@@ -147,7 +145,7 @@ private struct SettingsSidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SettingsSearchPill(text: $search)
+            SearchPill(text: $search, placeholder: "Search Settings…")
                 .padding(.horizontal, 12)
                 .padding(.top, 14)
                 .padding(.bottom, 10)
@@ -191,27 +189,6 @@ private struct SettingsSidebar: View {
             return scope.searchKeywords.contains { $0.lowercased().contains(query) }
         }
         return false
-    }
-}
-
-private struct SettingsSearchPill: View {
-    @Binding var text: String
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            TextField("Search Settings…", text: $text)
-                .textFieldStyle(.plain)
-                .font(.caption)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(.quaternary.opacity(0.5))
-        )
     }
 }
 

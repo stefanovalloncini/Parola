@@ -10,7 +10,7 @@ struct PromptsPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            searchField
+            SearchPill(text: $searchText, placeholder: "Search prompts…")
             sortRow
 
             SettingsSection {
@@ -81,33 +81,6 @@ struct PromptsPane: View {
             prompts.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
         }
         return prompts
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("Search prompts…", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        )
     }
 
     private var sortRow: some View {

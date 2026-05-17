@@ -5,7 +5,6 @@ struct MacLibrarySidebar: View {
     @EnvironmentObject var model: AppModel
     @State private var searchText = ""
 
-    /// Derived from the model so external mutations (bridge, app intents) keep the sidebar in sync.
     private var selectedRoute: SidebarRoute {
         switch model.route {
         case .queue: return .queue
@@ -134,14 +133,10 @@ struct MacLibrarySidebar: View {
     }
 
     private var bottomPills: some View {
-        VStack(spacing: 6) {
-            PillRow(title: "Support", systemImage: "questionmark.circle.fill") { }
-
-            SettingsLink {
-                PillRowContent(title: "Settings", systemImage: "gearshape.fill")
-            }
-            .buttonStyle(.plain)
+        SettingsLink {
+            PillRowContent(title: "Settings", systemImage: "gearshape.fill")
         }
+        .buttonStyle(.plain)
     }
 }
 
@@ -249,19 +244,6 @@ private struct SectionLabel: View {
             .foregroundStyle(.secondary)
             .padding(.horizontal, 10)
             .padding(.bottom, 4)
-    }
-}
-
-private struct PillRow: View {
-    let title: String
-    let systemImage: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            PillRowContent(title: title, systemImage: systemImage)
-        }
-        .buttonStyle(.plain)
     }
 }
 

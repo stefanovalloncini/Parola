@@ -7,7 +7,7 @@ struct SnippetsPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            searchField
+            SearchPill(text: $searchText, placeholder: "Search snippets…")
 
             SettingsSection {
                 let visible = visibleSnippets
@@ -56,33 +56,6 @@ struct SnippetsPane: View {
     private func binding(for id: Snippet.ID) -> Binding<Snippet>? {
         guard let idx = model.snippets.firstIndex(where: { $0.id == id }) else { return nil }
         return $model.snippets[idx]
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("Search snippets…", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        )
     }
 
     private var placeholderHelp: some View {

@@ -132,8 +132,6 @@ struct ModelPickerView: View {
         return model.availableModels.first(where: { $0.name == model.selectedModel })?.label ?? model.selectedModel
     }
 
-    /// Trims marketing-grade names so the toolbar pill stays compact.
-    /// "Parakeet TDT 0.6B v2" → "Parakeet v2", "Whisper Large v3 Turbo" → "Whisper Turbo".
     static func shortLabel(for displayName: String) -> String {
         let replacements: [(String, String)] = [
             ("Whisper Large v3 Turbo", "Whisper Turbo"),
