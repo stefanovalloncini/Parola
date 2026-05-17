@@ -45,6 +45,7 @@ final class SparkleUpdater: NSObject {
     }
 
     func start() {
+        guard feedURLConfigured else { return }
         controller.startUpdater()
     }
 
@@ -63,8 +64,12 @@ final class SparkleUpdater: NSObject {
     }
 
     var feedURLConfigured: Bool {
-        guard let url = controller.updater.feedURL else { return false }
-        return !url.absoluteString.isEmpty
+        let bundle = Bundle.main
+        guard let raw = bundle.infoDictionary?["SUFeedURL"] as? String else { return false }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        guard let key = bundle.infoDictionary?["SUPublicEDKey"] as? String else { return false }
+        return !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 
