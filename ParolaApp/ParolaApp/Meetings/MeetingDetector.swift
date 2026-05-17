@@ -27,7 +27,7 @@ final class MeetingDetector: ObservableObject {
         startObserving()
     }
 
-    deinit {
+    isolated deinit {
         for token in observerTokens {
             NSWorkspace.shared.notificationCenter.removeObserver(token)
         }
