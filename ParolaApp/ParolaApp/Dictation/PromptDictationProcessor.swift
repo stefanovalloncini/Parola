@@ -6,11 +6,6 @@ struct PromptDictationProcessor: TextPostProcessor {
     let defaultPrompt: Prompt?
     let overrides: [String: Prompt]
 
-    init(prompt: Prompt?) {
-        self.defaultPrompt = prompt
-        self.overrides = [:]
-    }
-
     init(defaultPrompt: Prompt?, overrides: [String: Prompt]) {
         self.defaultPrompt = defaultPrompt
         self.overrides = overrides
