@@ -61,7 +61,8 @@ public struct ParolaDocument: Sendable {
         audioURL source: URL?,
         to destination: URL,
         category: EntryCategory = .transcription,
-        deletedAt: Date? = nil
+        deletedAt: Date? = nil,
+        titleOverride: String? = nil
     ) throws -> URL {
         let target = destination.pathExtension == "parola"
             ? destination
@@ -79,6 +80,9 @@ public struct ParolaDocument: Sendable {
             let audioName = "audio.\(audioExt)"
             try fm.copyItem(at: source, to: target.appendingPathComponent(audioName))
             originalAudioName = source.lastPathComponent
+        }
+        if let titleOverride, !titleOverride.isEmpty {
+            originalAudioName = titleOverride
         }
 
         let manifest = Manifest(

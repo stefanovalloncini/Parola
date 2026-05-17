@@ -5,8 +5,17 @@ import Foundation
 /// Much faster than transcribing — Whisper isn't run at all.
 ///
 /// Requires `yt-dlp` on `$PATH`. Common install: `brew install yt-dlp`.
+public struct YouTubeSubsResult: Sendable {
+    public let transcript: Transcript
+    public let videoTitle: String?
+}
+
 public enum YouTubeSubsFetcher {
     public static func fetch(url: URL, preferLanguage: String? = nil) async throws -> Transcript {
+        try await fetchWithTitle(url: url, preferLanguage: preferLanguage).transcript
+    }
+
+    public static func fetchWithTitle(url: URL, preferLanguage: String? = nil) async throws -> YouTubeSubsResult {
         guard let ytDlp = findYtDlp() else {
             throw ParolaError.captureUnavailable(
                 "yt-dlp not found on PATH. Install with: brew install yt-dlp"
@@ -30,9 +39,12 @@ public enum YouTubeSubsFetcher {
             "--sub-format", "vtt",
             "--sub-lang", langList,
             "--no-playlist",
+            "--no-warnings",
+            "--print", "before_dl:[PAROLA_TITLE] %(title)s",
             "-o", outputTemplate,
             url.absoluteString,
         ]
+        process.environment = augmentedEnvironment()
 
         let stdout = Pipe()
         let stderr = Pipe()
@@ -44,11 +56,16 @@ public enum YouTubeSubsFetcher {
         }
         try await waitWithTimeout(process, seconds: 120)
 
+        let outData = stdout.fileHandleForReading.readDataToEndOfFile()
+        let stdoutText = String(decoding: outData, as: UTF8.self)
+
         if process.terminationStatus != 0 {
             let errData = stderr.fileHandleForReading.readDataToEndOfFile()
             let detail = String(decoding: errData, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
             throw ParolaError.captureUnavailable("yt-dlp failed: \(detail)")
         }
+
+        let videoTitle = parseTitle(from: stdoutText)
 
         let vttFiles = (try? FileManager.default.contentsOfDirectory(at: workingDir, includingPropertiesForKeys: nil)) ?? []
         guard let chosen = pickVtt(from: vttFiles, preferLanguage: preferLanguage) else {
@@ -56,9 +73,82 @@ public enum YouTubeSubsFetcher {
         }
 
         var transcript = try VttImporter.parse(contentsOf: chosen)
+        transcript = dedupeRollingCaptions(transcript)
         transcript.modelName = chosen.lastPathComponent.contains(".auto.") ? "youtube-auto-subs" : "youtube-subs"
         transcript.sourceURL = url
-        return transcript
+        return YouTubeSubsResult(transcript: transcript, videoTitle: videoTitle)
+    }
+
+    /// YouTube's auto-generated captions roll: each cue shows two lines where the first line
+    /// repeats the previous cue's second line. After VTT parsing each cue's lines are joined,
+    /// so consecutive segments overlap at the boundary like:
+    ///     prev: "hello world how"
+    ///     curr: "world how are you"
+    /// This strips the overlap from each segment, leaving only the new words.
+    static func dedupeRollingCaptions(_ transcript: Transcript) -> Transcript {
+        var output: [TranscriptSegment] = []
+        for segment in transcript.segments {
+            // Drop the ~10ms "finalisation" cues YouTube emits between rolling cues.
+            if segment.end - segment.start < 0.1 { continue }
+            let trimmed = segment.text.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { continue }
+
+            if let last = output.last {
+                let lastTrim = last.text.trimmingCharacters(in: .whitespaces)
+                if lastTrim.hasPrefix(trimmed) {
+                    continue
+                }
+                if let suffix = strippingOverlap(of: lastTrim, from: trimmed), !suffix.isEmpty {
+                    output.append(TranscriptSegment(
+                        id: output.count,
+                        start: last.end,
+                        end: segment.end,
+                        text: suffix
+                    ))
+                    continue
+                }
+            }
+            output.append(TranscriptSegment(
+                id: output.count,
+                start: segment.start,
+                end: segment.end,
+                text: trimmed
+            ))
+        }
+        var updated = transcript
+        updated.segments = output
+        updated.durationSeconds = output.last?.end ?? transcript.durationSeconds
+        return updated
+    }
+
+    /// If a suffix of `previous` (word-aligned) matches a prefix of `current`, returns
+    /// `current` with that overlap removed. Returns nil if there's no usable overlap.
+    static func strippingOverlap(of previous: String, from current: String) -> String? {
+        let prevWords = previous.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        let currWords = current.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        guard !prevWords.isEmpty, !currWords.isEmpty else { return nil }
+
+        let maxOverlap = min(prevWords.count, currWords.count)
+        var overlap = 0
+        for k in stride(from: maxOverlap, through: 1, by: -1) {
+            if Array(prevWords.suffix(k)) == Array(currWords.prefix(k)) {
+                overlap = k
+                break
+            }
+        }
+        guard overlap > 0 else { return nil }
+        return currWords.dropFirst(overlap).joined(separator: " ")
+    }
+
+    static func parseTitle(from stdout: String) -> String? {
+        for raw in stdout.split(separator: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if let range = line.range(of: "[PAROLA_TITLE]") {
+                let title = line[range.upperBound...].trimmingCharacters(in: .whitespaces)
+                if !title.isEmpty { return String(title) }
+            }
+        }
+        return nil
     }
 
     static func pickVtt(from files: [URL], preferLanguage: String?) -> URL? {
@@ -106,6 +196,15 @@ public enum YouTubeSubsFetcher {
             if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
         }
         return nil
+    }
+
+    /// Same PATH augmentation used by `YouTubeAudioSource` so yt-dlp can find `ffmpeg`/`deno`
+    /// when launched from a GUI app (which inherits a minimal PATH without `/opt/homebrew/bin`).
+    private static func augmentedEnvironment() -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        let existing = env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+        env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/opt/local/bin:\(existing)"
+        return env
     }
 }
 #endif

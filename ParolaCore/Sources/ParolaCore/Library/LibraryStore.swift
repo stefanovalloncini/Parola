@@ -93,7 +93,8 @@ public actor LibraryStore {
     public func add(
         transcript: Transcript,
         audioSource: URL?,
-        category: EntryCategory = .transcription
+        category: EntryCategory = .transcription,
+        title: String? = nil
     ) async throws -> LibraryEntry {
         let name = uniqueEntryName(at: Date())
         let bundleURL = libraryURL.appendingPathComponent(name)
@@ -101,7 +102,8 @@ public actor LibraryStore {
             transcript: transcript,
             audioURL: audioSource,
             to: bundleURL,
-            category: category
+            category: category,
+            titleOverride: title
         )
         invalidateListCaches()
         let entry = try makeEntry(bundleURL: bundleURL.appendingPathExtension("parola"))
