@@ -75,8 +75,8 @@ public actor StreamingTranscriptionSession {
             decoding.usePrefillPrompt = true
         }
 
-        let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .unbounded)
-        let (segStream, segCont) = AsyncStream<[TranscriptionSegment]>.makeStream(bufferingPolicy: .unbounded)
+        let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(256))
+        let (segStream, segCont) = AsyncStream<[TranscriptionSegment]>.makeStream(bufferingPolicy: .bufferingNewest(64))
 
         let sink = EventSink(continuation: cont)
         sink.onConfirmed = { segments in segCont.yield(segments) }
@@ -133,6 +133,8 @@ public actor StreamingTranscriptionSession {
         await streamer?.stopStreamTranscription()
         segmentContinuation?.finish()
         await consumerTask?.value
+        streamerTask?.cancel()
+        await streamerTask?.value
 
         let finalTranscript = Transcript(
             segments: allConfirmed,
