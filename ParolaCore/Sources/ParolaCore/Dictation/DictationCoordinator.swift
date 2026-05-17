@@ -76,11 +76,7 @@ public actor DictationCoordinator {
     /// so the user's last utterance isn't dropped. Use ``abortMonitoring()`` for "give up"
     /// semantics that discard pending audio.
     public func stopMonitoring() async {
-        await hotkey.stop()
-        eventContinuation?.finish()
-        eventContinuation = nil
-        eventTask?.cancel()
-        eventTask = nil
+        await teardownMonitor()
         if case .listening = state {
             await finishListening()
         } else {
@@ -90,15 +86,19 @@ public actor DictationCoordinator {
 
     /// Stops listening and discards any in-flight recording without inserting text.
     public func abortMonitoring() async {
+        await teardownMonitor()
+        if case .listening = state {
+            _ = try? await recorder.stopAndTranscribe()
+        }
+        await setState(.idle)
+    }
+
+    private func teardownMonitor() async {
         await hotkey.stop()
         eventContinuation?.finish()
         eventContinuation = nil
         eventTask?.cancel()
         eventTask = nil
-        if case .listening = state {
-            _ = try? await recorder.stopAndTranscribe()
-        }
-        await setState(.idle)
     }
 
     public func simulatePress() async { await handle(.press) }
