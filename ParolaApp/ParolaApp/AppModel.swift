@@ -139,6 +139,8 @@ final class AppModel: ObservableObject {
     @Published var isRunningPrompt: Bool = false
     @Published var actionItems: [ActionItem] = []
     @Published var isExtractingActionItems: Bool = false
+    @Published var smartChapters: [Chapter] = []
+    @Published var isExtractingChapters: Bool = false
 
     struct PromptOutput: Identifiable {
         let id = UUID()

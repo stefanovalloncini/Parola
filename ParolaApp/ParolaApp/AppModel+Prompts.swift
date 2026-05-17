@@ -44,6 +44,27 @@ extension AppModel {
         actionItems = []
     }
 
+    func extractSmartChapters() {
+        guard let transcript = self.transcript else { return }
+        guard !isExtractingChapters else { return }
+        isExtractingChapters = true
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let model = try LanguageModelFactory.makeOnDevice()
+                let chapters = try await SmartChapters.generate(for: transcript, model: model)
+                smartChapters = chapters
+            } catch {
+                phase = .failed(message: "Chapter extraction failed: \(error.localizedDescription)")
+            }
+            isExtractingChapters = false
+        }
+    }
+
+    func clearSmartChapters() {
+        smartChapters = []
+    }
+
     func generateYouTubeChapters() {
         guard let transcript = self.transcript else { return }
         guard !isRunningPrompt else { return }
