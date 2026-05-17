@@ -23,7 +23,7 @@ struct SettingsView: View {
 
 private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     case general, customization, watchedFolders, recordMeetings, shortcuts
-    case microphone, liveCaptions, dictation
+    case microphone, liveCaptions, dictation, snippets
     case localModels, cloudModels, people, translation, ignoredSegments, findReplace
     case exportFormats, batchExport, autoExport, integrations
     case services, prompts
@@ -42,6 +42,7 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .microphone: return "Microphone"
         case .liveCaptions: return "Live Captions"
         case .dictation: return "Dictation"
+        case .snippets: return "Snippets"
         case .localModels: return "Local Models"
         case .cloudModels: return "Cloud Models"
         case .people: return "People"
@@ -70,6 +71,7 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .microphone: return "mic"
         case .liveCaptions: return "captions.bubble"
         case .dictation: return "text.bubble"
+        case .snippets: return "text.append"
         case .localModels: return "cpu"
         case .cloudModels: return "cloud"
         case .people: return "person.2"
@@ -97,7 +99,7 @@ private struct SidebarGroup: Identifiable {
 
 private let sidebarGroups: [SidebarGroup] = [
     SidebarGroup(title: nil, routes: [.general, .customization, .watchedFolders, .recordMeetings, .shortcuts]),
-    SidebarGroup(title: "AUDIO & VIDEO", routes: [.microphone, .liveCaptions, .dictation]),
+    SidebarGroup(title: "AUDIO & VIDEO", routes: [.microphone, .liveCaptions, .dictation, .snippets]),
     SidebarGroup(title: "TRANSCRIPTION", routes: [.localModels, .cloudModels, .people, .translation, .ignoredSegments, .findReplace]),
     SidebarGroup(title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport, .integrations]),
     SidebarGroup(title: "AI", routes: [.services, .prompts]),
@@ -243,6 +245,7 @@ private struct SettingsDetail: View {
         case .microphone: MicrophonePane()
         case .liveCaptions: LiveCaptionsPane()
         case .dictation: DictationPane()
+        case .snippets: SnippetsPane()
         case .localModels:
             ModelsSettingsPane()
         case .cloudModels:

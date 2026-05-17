@@ -71,11 +71,16 @@ extension AppModel {
         return out
     }
 
-    private func currentDictationProcessor() -> PromptDictationProcessor {
-        PromptDictationProcessor(
+    private func currentDictationProcessor() -> any TextPostProcessor {
+        let prompt = PromptDictationProcessor(
             defaultPrompt: currentDictationCleanupPrompt(),
             overrides: currentDictationOverrides()
         )
+        let snippetExpander = makeSnippetExpander()
+        if snippets.contains(where: { $0.enabled }) {
+            return CompositePostProcessor([snippetExpander, prompt])
+        }
+        return prompt
     }
 
     func applyDictationCleanupPromptChange() {

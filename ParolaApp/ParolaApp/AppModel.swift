@@ -100,6 +100,13 @@ final class AppModel: ObservableObject {
         didSet { saveFindReplaceRules() }
     }
 
+    @Published var snippets: [Snippet] = [] {
+        didSet {
+            saveSnippets()
+            applyDictationCleanupPromptChange()
+        }
+    }
+
     // MARK: - People (speakers)
 
     let peopleStore = PeopleStore()
@@ -270,6 +277,7 @@ final class AppModel: ObservableObject {
         loadAutoExportRules()
         loadIgnoredSegmentRules()
         loadFindReplaceRules()
+        loadSnippets()
         refreshModelList()
         refreshYtDlpAvailability()
         refreshLibrary()
