@@ -19,6 +19,7 @@ final class MeetingDetector: ObservableObject {
 
     private let onDetected: @MainActor (String) -> Void
     private var lastFiredAt: Date?
+    nonisolated(unsafe) private var observerTokens: [NSObjectProtocol] = []
 
     init(onDetected: @escaping @MainActor (String) -> Void) {
         self.onDetected = onDetected
@@ -26,8 +27,14 @@ final class MeetingDetector: ObservableObject {
         startObserving()
     }
 
+    isolated deinit {
+        for token in observerTokens {
+            NSWorkspace.shared.notificationCenter.removeObserver(token)
+        }
+    }
+
     private func startObserving() {
-        NSWorkspace.shared.notificationCenter.addObserver(
+        let token = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification,
             object: nil,
             queue: .main
@@ -38,6 +45,7 @@ final class MeetingDetector: ObservableObject {
                 self?.fire(appName: display)
             }
         }
+        observerTokens.append(token)
     }
 
     private func fire(appName: String) {

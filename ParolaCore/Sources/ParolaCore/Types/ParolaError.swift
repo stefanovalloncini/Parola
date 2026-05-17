@@ -3,6 +3,7 @@ import Foundation
 public enum ParolaError: Error, CustomStringConvertible, Sendable {
     case modelNotFound(String)
     case modelDownloadFailed(String, underlying: String)
+    case modelChecksumMismatch(file: String, expected: String, got: String)
     case audioLoadFailed(URL, underlying: String)
     case transcriptionFailed(String)
     case unsupportedAudioFormat(String)
@@ -18,6 +19,8 @@ public enum ParolaError: Error, CustomStringConvertible, Sendable {
             return "Model not found: \(name). Run `parola models download \(name)` first."
         case .modelDownloadFailed(let name, let underlying):
             return "Failed to download model \(name): \(underlying)"
+        case .modelChecksumMismatch(let file, let expected, let got):
+            return "Checksum mismatch for \(file): expected \(expected), got \(got)"
         case .audioLoadFailed(let url, let underlying):
             return "Failed to load audio at \(url.path): \(underlying)"
         case .transcriptionFailed(let reason):

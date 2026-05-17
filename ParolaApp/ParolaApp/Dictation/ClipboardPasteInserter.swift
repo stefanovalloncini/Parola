@@ -11,8 +11,8 @@ struct ClipboardPasteInserter: TextInserter {
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
             postCmdV()
-            // Restore prior pasteboard contents after a short delay so the paste lands.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(300))
                 guard let priorContents else { return }
                 pasteboard.clearContents()
                 pasteboard.setString(priorContents, forType: .string)

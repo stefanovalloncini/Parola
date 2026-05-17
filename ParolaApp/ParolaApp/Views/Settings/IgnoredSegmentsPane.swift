@@ -3,9 +3,19 @@ import ParolaCore
 
 struct IgnoredSegmentsPane: View {
     @EnvironmentObject var model: AppModel
+    @State private var searchText = ""
+    @State private var enabledFilter: RuleEnabledFilter = .all
+    @State private var sort: IgnoredSegmentsSort = .originalOrder
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                searchField
+                RuleEnabledFilterChips(filter: $enabledFilter)
+                Spacer()
+                sortMenu
+            }
+
             SettingsSection {
                 if model.ignoredSegmentRules.isEmpty {
                     HStack {
@@ -13,10 +23,20 @@ struct IgnoredSegmentsPane: View {
                         Spacer()
                     }
                     .padding(16)
+                } else if displayedIndices.isEmpty {
+                    HStack {
+                        Text("No matches").foregroundStyle(.secondary).font(.system(size: 13))
+                        Spacer()
+                    }
+                    .padding(16)
                 } else {
-                    ForEach(Array(model.ignoredSegmentRules.enumerated()), id: \.element.id) { idx, rule in
-                        IgnoredRuleRow(rule: $model.ignoredSegmentRules[idx], isFirst: idx == 0) {
-                            model.ignoredSegmentRules.removeAll { $0.id == rule.id }
+                    ForEach(Array(displayedIndices.enumerated()), id: \.element) { position, idx in
+                        IgnoredRuleRow(
+                            rule: $model.ignoredSegmentRules[idx],
+                            isFirst: position == 0
+                        ) {
+                            let id = model.ignoredSegmentRules[idx].id
+                            model.ignoredSegmentRules.removeAll { $0.id == id }
                         }
                     }
                 }
@@ -29,6 +49,155 @@ struct IgnoredSegmentsPane: View {
             }
 
             SettingHelper(text: "Segments matching a pattern (case-insensitive, trimmed) are removed before saving.")
+        }
+    }
+
+    private var displayedIndices: [Int] {
+        let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
+        var indices = model.ignoredSegmentRules.indices.filter { idx in
+            let rule = model.ignoredSegmentRules[idx]
+            if !enabledFilter.includes(rule.enabled) { return false }
+            if query.isEmpty { return true }
+            return rule.pattern.lowercased().contains(query)
+        }
+        switch sort {
+        case .originalOrder:
+            break
+        case .patternAscending:
+            indices.sort { pattern(at: $0).localizedCaseInsensitiveCompare(pattern(at: $1)) == .orderedAscending }
+        case .patternDescending:
+            indices.sort { pattern(at: $0).localizedCaseInsensitiveCompare(pattern(at: $1)) == .orderedDescending }
+        case .enabledFirst:
+            indices.sort { enabledFirstOrder(lhs: $0, rhs: $1, preferEnabled: true) }
+        case .disabledFirst:
+            indices.sort { enabledFirstOrder(lhs: $0, rhs: $1, preferEnabled: false) }
+        }
+        return indices
+    }
+
+    private func pattern(at index: Int) -> String {
+        model.ignoredSegmentRules[index].pattern
+    }
+
+    private func enabledFirstOrder(lhs: Int, rhs: Int, preferEnabled: Bool) -> Bool {
+        let l = model.ignoredSegmentRules[lhs].enabled
+        let r = model.ignoredSegmentRules[rhs].enabled
+        if l == r { return lhs < rhs }
+        return preferEnabled ? l : r
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            TextField("Search patterns…", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.subheadline)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Color.primary.opacity(0.06))
+        )
+        .frame(maxWidth: 240)
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            ForEach(IgnoredSegmentsSort.allCases, id: \.self) { option in
+                Button {
+                    sort = option
+                } label: {
+                    if sort == option {
+                        Label(option.title, systemImage: "checkmark")
+                    } else {
+                        Text(option.title)
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "chevron.up.arrow.down")
+                .font(.system(size: 12, weight: .medium))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Sort")
+    }
+}
+
+enum IgnoredSegmentsSort: CaseIterable {
+    case originalOrder
+    case patternAscending
+    case patternDescending
+    case enabledFirst
+    case disabledFirst
+
+    var title: String {
+        switch self {
+        case .originalOrder: return "Original order"
+        case .patternAscending: return "Pattern A→Z"
+        case .patternDescending: return "Pattern Z→A"
+        case .enabledFirst: return "Enabled first"
+        case .disabledFirst: return "Disabled first"
+        }
+    }
+}
+
+enum RuleEnabledFilter: CaseIterable {
+    case all
+    case enabled
+    case disabled
+
+    var title: String {
+        switch self {
+        case .all: return "All"
+        case .enabled: return "Enabled"
+        case .disabled: return "Disabled"
+        }
+    }
+
+    func includes(_ enabled: Bool) -> Bool {
+        switch self {
+        case .all: return true
+        case .enabled: return enabled
+        case .disabled: return !enabled
+        }
+    }
+}
+
+struct RuleEnabledFilterChips: View {
+    @Binding var filter: RuleEnabledFilter
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(RuleEnabledFilter.allCases, id: \.self) { option in
+                Button {
+                    filter = option
+                } label: {
+                    Text(option.title)
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .foregroundStyle(filter == option ? Color.white : Color.primary.opacity(0.85))
+                        .background(
+                            Capsule().fill(filter == option ? Color.accentColor : Color.secondary.opacity(0.15))
+                        )
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 }

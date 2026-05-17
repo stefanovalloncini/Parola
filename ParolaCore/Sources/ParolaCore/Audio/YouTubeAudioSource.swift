@@ -21,15 +21,19 @@ public extension URL {
 /// Audio source that downloads a YouTube video's audio via `yt-dlp`.
 ///
 /// Requires `yt-dlp` on `$PATH`. Common install: `brew install yt-dlp`.
-// Justification: downloadedURL is written once per instance during a single prepare() call; callers serialize access by awaiting it.
-public final class YouTubeAudioSource: AudioSource, @unchecked Sendable {
+public actor YouTubeAudioSource: AudioSource {
     public let url: URL
 
     private let workingDir: URL
+    private let timeoutSeconds: Int
     private var downloadedURL: URL?
 
-    public init(url: URL) {
+    public init(url: URL, timeoutSeconds: Int = 120) throws {
+        guard url.isYouTubeVideo else {
+            throw ParolaError.captureUnavailable("Not a YouTube URL: \(url.absoluteString)")
+        }
         self.url = url
+        self.timeoutSeconds = timeoutSeconds
         self.workingDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-yt-\(UUID().uuidString)")
     }
@@ -79,7 +83,7 @@ public final class YouTubeAudioSource: AudioSource, @unchecked Sendable {
             throw ParolaError.captureUnavailable("Could not launch yt-dlp: \(error.localizedDescription)")
         }
 
-        try await Self.waitWithTimeout(process, seconds: 120)
+        try await Self.waitWithTimeout(process, seconds: timeoutSeconds)
 
         let outData = stdout.fileHandleForReading.readDataToEndOfFile()
         let errData = stderr.fileHandleForReading.readDataToEndOfFile()

@@ -7,14 +7,22 @@ struct MacRecentlyDeletedView: View {
     @State private var confirmingPurge: LibraryEntry.ID?
     @State private var confirmingEmpty = false
     @State private var searchText = ""
+    @State private var dateFilter: RecentlyDeletedDateFilter = .all
+    @State private var categoryFilter: RecentlyDeletedCategoryFilter = .all
+    @State private var sortOption: RecentlyDeletedSort = .recentlyDeleted
     @State private var previews: [LibraryEntry.ID: String] = [:]
 
     var body: some View {
         VStack(spacing: 0) {
             RecentlyDeletedToolbar(
                 searchText: $searchText,
+                sortOption: $sortOption,
                 confirmingEmpty: $confirmingEmpty,
                 onDone: { dismiss() }
+            )
+            RecentlyDeletedFilterBar(
+                dateFilter: $dateFilter,
+                categoryFilter: $categoryFilter
             )
             Divider().opacity(0.5)
             if model.deletedEntries.isEmpty {
@@ -58,7 +66,7 @@ struct MacRecentlyDeletedView: View {
     private var list: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: DS.Spacing.large, pinnedViews: []) {
-                ForEach(grouped, id: \.0) { group in
+                ForEach(sections, id: \.0) { group in
                     section(title: group.0, entries: group.1)
                 }
                 footer
@@ -71,11 +79,13 @@ struct MacRecentlyDeletedView: View {
 
     private func section(title: String, entries: [LibraryEntry]) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            Text(title.uppercased())
-                .font(.system(.caption, design: .default, weight: .semibold))
-                .tracking(0.8)
-                .foregroundStyle(.secondary)
-                .padding(.leading, 4)
+            if !title.isEmpty {
+                Text(title.uppercased())
+                    .font(.system(.caption, design: .default, weight: .semibold))
+                    .tracking(0.8)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 4)
+            }
             VStack(spacing: DS.Spacing.small) {
                 ForEach(entries) { entry in
                     RecentlyDeletedRow(
@@ -115,19 +125,39 @@ struct MacRecentlyDeletedView: View {
     }
 
     private var filtered: [LibraryEntry] {
-        guard !searchText.isEmpty else { return model.deletedEntries }
         let q = searchText.lowercased()
-        return model.deletedEntries.filter {
-            $0.title.lowercased().contains(q)
-            || (previews[$0.id]?.lowercased().contains(q) ?? false)
+        return model.deletedEntries.filter { entry in
+            guard categoryFilter.matches(entry.category) else { return false }
+            guard dateFilter.matches(entry.deletedAt, now: Date()) else { return false }
+            guard !q.isEmpty else { return true }
+            if entry.title.lowercased().contains(q) { return true }
+            return previews[entry.id]?.lowercased().contains(q) ?? false
         }
     }
 
-    private var grouped: [(String, [LibraryEntry])] {
+    private var sorted: [LibraryEntry] {
+        switch sortOption {
+        case .recentlyDeleted:
+            return filtered.sorted { lhs, rhs in
+                (lhs.deletedAt ?? .distantPast) > (rhs.deletedAt ?? .distantPast)
+            }
+        case .deletedEarliest:
+            return filtered.sorted { lhs, rhs in
+                (lhs.deletedAt ?? .distantFuture) < (rhs.deletedAt ?? .distantFuture)
+            }
+        case .titleAZ:
+            return filtered.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        case .titleZA:
+            return filtered.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
+        }
+    }
+
+    private var sections: [(String, [LibraryEntry])] {
+        guard sortOption.groupsByDate else { return [("", sorted)] }
         var seen = Set<String>()
         var order: [String] = []
         var bucketed: [String: [LibraryEntry]] = [:]
-        for entry in filtered {
+        for entry in sorted {
             let key = bucket(for: entry.deletedAt)
             if seen.insert(key).inserted { order.append(key) }
             bucketed[key, default: []].append(entry)
@@ -162,5 +192,21 @@ struct MacRecentlyDeletedView: View {
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         previews[entry.id] = trimmed.isEmpty ? "" : String(trimmed.prefix(280))
+    }
+}
+
+private extension RecentlyDeletedDateFilter {
+    func matches(_ deletedAt: Date?, now: Date) -> Bool {
+        guard self != .all else { return true }
+        guard let deletedAt else { return self == .older }
+        let cal = Calendar.current
+        let days = cal.dateComponents([.day], from: cal.startOfDay(for: deletedAt), to: cal.startOfDay(for: now)).day ?? 0
+        switch self {
+        case .all: return true
+        case .today: return cal.isDateInToday(deletedAt)
+        case .week: return days < 7
+        case .month: return days < 30
+        case .older: return days >= 30
+        }
     }
 }

@@ -192,6 +192,10 @@ final class AppModel: ObservableObject {
     @Published var searchResults: [LibraryEntry]?
     @Published var selectedEntryID: LibraryEntry.ID?
     @Published var libraryFilter: EntryCategory?
+    @Published var librarySortOrder: LibrarySortOrder = .newest {
+        didSet { reapplyLibrarySort() }
+    }
+    var libraryBundleSizes: [String: Int64] = [:]
     var searchTask: Task<Void, Never>?
     static let trashRetentionDays = 30
 
@@ -456,7 +460,7 @@ final class AppModel: ObservableObject {
             if chunk.isEmpty {
                 fh.readabilityHandler = nil
             } else {
-                buffer.append(chunk)
+                Task { await buffer.append(chunk) }
             }
         }
 
@@ -469,12 +473,14 @@ final class AppModel: ObservableObject {
         return await withCheckedContinuation { cont in
             proc.terminationHandler = { p in
                 pipe.fileHandleForReading.readabilityHandler = nil
-                let output = buffer.string()
-                if p.terminationStatus == 0 {
-                    cont.resume(returning: .success)
-                } else {
-                    let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                    cont.resume(returning: .failure(detail.isEmpty ? "brew exited with status \(p.terminationStatus)." : detail))
+                Task {
+                    let output = await buffer.string()
+                    if p.terminationStatus == 0 {
+                        cont.resume(returning: .success)
+                    } else {
+                        let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                        cont.resume(returning: .failure(detail.isEmpty ? "brew exited with status \(p.terminationStatus)." : detail))
+                    }
                 }
             }
         }
@@ -505,7 +511,7 @@ final class AppModel: ObservableObject {
         Task {
             do {
                 phase = .downloadingModel(name: "youtube", progress: 0)
-                let source = YouTubeAudioSource(url: url)
+                let source = try YouTubeAudioSource(url: url)
                 let audioURL = try await source.prepare()
                 sourceFileURL = audioURL
                 installPlayer(for: audioURL)
@@ -804,17 +810,14 @@ final class AppModel: ObservableObject {
     }
 }
 
-private final class ProcessOutputBuffer: @unchecked Sendable {
+private actor ProcessOutputBuffer {
     private var data = Data()
-    private let lock = NSLock()
 
     func append(_ chunk: Data) {
-        lock.lock(); defer { lock.unlock() }
         data.append(chunk)
     }
 
     func string() -> String {
-        lock.lock(); defer { lock.unlock() }
-        return String(data: data, encoding: .utf8) ?? ""
+        String(decoding: data, as: UTF8.self)
     }
 }

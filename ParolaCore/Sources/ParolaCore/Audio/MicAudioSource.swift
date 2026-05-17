@@ -74,8 +74,9 @@ public actor MicAudioSource: AudioSource {
         self.outputURL = url
 
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            guard let self else { return }
-            Task { await self.write(buffer: buffer) }
+            guard let self, let copy = Self.copy(buffer) else { return }
+            let box = BufferBox(buffer: copy)
+            Task { [weak self] in await self?.write(box: box) }
         }
 
         engine.prepare()
@@ -83,24 +84,36 @@ public actor MicAudioSource: AudioSource {
         isRecording = true
     }
 
-    private func write(buffer: AVAudioPCMBuffer) {
-        emitLevel(MicAudioSource.normalisedLevel(of: buffer))
+    private static func copy(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+        guard
+            buffer.frameLength > 0,
+            let src = buffer.floatChannelData,
+            let copy = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: buffer.frameLength),
+            let dst = copy.floatChannelData
+        else { return nil }
+        copy.frameLength = buffer.frameLength
+        let bytes = Int(buffer.frameLength) * MemoryLayout<Float>.size
+        for ch in 0..<Int(buffer.format.channelCount) { memcpy(dst[ch], src[ch], bytes) }
+        return copy
+    }
+
+    private func write(box: BufferBox) {
+        emitLevel(MicAudioSource.normalisedLevel(of: box.buffer))
 
         guard let conv = converter, let outFormat = outputFormat, let file = writeFile else { return }
-        let ratio = outFormat.sampleRate / buffer.format.sampleRate
-        let outCap = AVAudioFrameCount(Double(buffer.frameLength) * ratio + 1024)
+        let ratio = outFormat.sampleRate / box.buffer.format.sampleRate
+        let outCap = AVAudioFrameCount(Double(box.buffer.frameLength) * ratio + 1024)
         guard let outBuffer = AVAudioPCMBuffer(pcmFormat: outFormat, frameCapacity: outCap) else { return }
 
         var error: NSError?
-        let bufBox = BufferBox(buffer: buffer)
         let status = conv.convert(to: outBuffer, error: &error) { _, outStatus in
-            if bufBox.consumed {
+            if box.consumed {
                 outStatus.pointee = .endOfStream
                 return nil
             }
-            bufBox.consumed = true
+            box.consumed = true
             outStatus.pointee = .haveData
-            return bufBox.buffer
+            return box.buffer
         }
         if status == .error || outBuffer.frameLength == 0 { return }
         try? file.write(from: outBuffer)
@@ -150,8 +163,8 @@ public actor MicAudioSource: AudioSource {
     }
 }
 
-// Unchecked Sendable: the box is captured by the @Sendable converter callback but is touched
-// only synchronously inside the single convert(to:error:) call that creates it.
+// Unchecked Sendable: each box owns a freshly-copied PCM buffer and is handed off to a single
+// consumer (the actor's write(box:)), which then uses it synchronously inside convert(to:error:).
 private final class BufferBox: @unchecked Sendable {
     let buffer: AVAudioPCMBuffer
     var consumed = false

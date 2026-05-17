@@ -5,6 +5,7 @@ import Network
 import PDFKit
 import ParolaCore
 
+#if DEBUG
 /// TCP-loopback IPC server so external tooling (e.g. parola-mcp) can drive
 /// a running Parola.app. Speaks line-delimited JSON: `{id, cmd, args}` → `{id, ok, result|error}`.
 /// Port is written to `~/Library/Caches/Parola/bridge.port` on start.
@@ -613,4 +614,3 @@ private struct BridgeError: Error {
     let message: String
     init(_ message: String) { self.message = message }
 }
-#endif

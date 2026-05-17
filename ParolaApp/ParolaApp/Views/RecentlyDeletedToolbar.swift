@@ -1,9 +1,69 @@
 import SwiftUI
 import ParolaCore
 
+enum RecentlyDeletedDateFilter: String, CaseIterable, Identifiable {
+    case all, today, week, month, older
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return "All"
+        case .today: return "Today"
+        case .week: return "This Week"
+        case .month: return "This Month"
+        case .older: return "Older"
+        }
+    }
+}
+
+enum RecentlyDeletedCategoryFilter: String, CaseIterable, Identifiable {
+    case all, transcriptions, meetings, dictations
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return "All"
+        case .transcriptions: return "Transcriptions"
+        case .meetings: return "Meetings"
+        case .dictations: return "Dictations"
+        }
+    }
+
+    func matches(_ category: EntryCategory) -> Bool {
+        switch self {
+        case .all: return true
+        case .transcriptions: return category == .transcription
+        case .meetings: return category == .meeting
+        case .dictations: return category == .dictation
+        }
+    }
+}
+
+enum RecentlyDeletedSort: String, CaseIterable, Identifiable {
+    case recentlyDeleted, deletedEarliest, titleAZ, titleZA
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .recentlyDeleted: return "Recently deleted"
+        case .deletedEarliest: return "Deleted earliest"
+        case .titleAZ: return "Title A→Z"
+        case .titleZA: return "Title Z→A"
+        }
+    }
+
+    var groupsByDate: Bool {
+        switch self {
+        case .recentlyDeleted, .deletedEarliest: return true
+        case .titleAZ, .titleZA: return false
+        }
+    }
+}
+
 struct RecentlyDeletedToolbar: View {
     @EnvironmentObject var model: AppModel
     @Binding var searchText: String
+    @Binding var sortOption: RecentlyDeletedSort
     @Binding var confirmingEmpty: Bool
     let onDone: () -> Void
 
@@ -13,6 +73,7 @@ struct RecentlyDeletedToolbar: View {
                 .font(.system(.title2, design: .default, weight: .semibold))
             Spacer(minLength: DS.Spacing.regular)
             searchField
+            sortMenu
             actionMenu
             emptyTrashButton
             Button("Done", action: onDone)
@@ -42,6 +103,27 @@ struct RecentlyDeletedToolbar: View {
         .padding(.horizontal, 10)
         .frame(height: 26)
         .background(RecentlyDeletedPillChrome())
+    }
+
+    var sortMenu: some View {
+        Menu {
+            Picker("Sort by", selection: $sortOption) {
+                ForEach(RecentlyDeletedSort.allCases) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 26)
+                .background(RecentlyDeletedPillChrome())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Sort")
     }
 
     var actionMenu: some View {
@@ -78,6 +160,97 @@ struct RecentlyDeletedToolbar: View {
         .buttonStyle(.plain)
         .disabled(model.deletedEntries.isEmpty)
         .help("Empty Recently Deleted")
+    }
+}
+
+struct RecentlyDeletedFilterBar: View {
+    @Binding var dateFilter: RecentlyDeletedDateFilter
+    @Binding var categoryFilter: RecentlyDeletedCategoryFilter
+
+    var body: some View {
+        HStack(alignment: .center, spacing: DS.Spacing.regular) {
+            chipRow(
+                label: "When",
+                options: RecentlyDeletedDateFilter.allCases,
+                selection: $dateFilter,
+                title: \.title
+            )
+            Divider().frame(height: 18)
+            chipRow(
+                label: "Kind",
+                options: RecentlyDeletedCategoryFilter.allCases,
+                selection: $categoryFilter,
+                title: \.title
+            )
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, 6)
+    }
+
+    @ViewBuilder
+    private func chipRow<Option: Identifiable & Hashable>(
+        label: String,
+        options: [Option],
+        selection: Binding<Option>,
+        title: KeyPath<Option, String>
+    ) -> some View {
+        HStack(spacing: 6) {
+            Text(label.uppercased())
+                .font(.caption2.weight(.semibold))
+                .tracking(0.6)
+                .foregroundStyle(.secondary)
+            ForEach(options) { option in
+                FilterChip(
+                    title: option[keyPath: title],
+                    isSelected: selection.wrappedValue == option
+                ) {
+                    selection.wrappedValue = option
+                }
+            }
+        }
+    }
+}
+
+private struct FilterChip: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(foreground)
+                .padding(.horizontal, 10)
+                .frame(height: 22)
+                .background(
+                    Capsule(style: .continuous).fill(background)
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(border, lineWidth: 0.5)
+                )
+                .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+    }
+
+    private var foreground: Color {
+        isSelected ? .white : .primary.opacity(0.85)
+    }
+
+    private var background: Color {
+        if isSelected { return DS.Color.accent }
+        if hovered { return DS.Color.surfaceElevated }
+        return DS.Color.surfaceElevated.opacity(0.6)
+    }
+
+    private var border: Color {
+        isSelected ? DS.Color.accent : DS.Color.separator.opacity(0.4)
     }
 }
 
