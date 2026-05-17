@@ -5,16 +5,38 @@ struct RecentlyDeletedView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var confirmingPurge: LibraryEntry.ID?
+    @State private var searchText = ""
+    @State private var sortOrder: SortOrder = .recentlyDeleted
+
+    enum SortOrder: String, CaseIterable, Identifiable {
+        case recentlyDeleted
+        case deletedEarliest
+        case titleAscending
+        case titleDescending
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .recentlyDeleted: return "Recently deleted"
+            case .deletedEarliest: return "Deleted earliest"
+            case .titleAscending: return "Title A→Z"
+            case .titleDescending: return "Title Z→A"
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
             Group {
                 if model.deletedEntries.isEmpty {
                     empty
+                } else if visibleEntries.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
                 } else {
                     List {
                         Section {
-                            ForEach(model.deletedEntries) { entry in
+                            ForEach(visibleEntries) { entry in
                                 row(entry)
                             }
                         } footer: {
@@ -27,7 +49,20 @@ struct RecentlyDeletedView: View {
             }
             .navigationTitle("Recently Deleted")
             .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText)
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Picker("Sort", selection: $sortOrder) {
+                            ForEach(SortOrder.allCases) { order in
+                                Text(order.label).tag(order)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                    }
+                    .disabled(model.deletedEntries.isEmpty)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                 }
@@ -48,6 +83,27 @@ struct RecentlyDeletedView: View {
             } message: {
                 Text("This can't be undone.")
             }
+        }
+    }
+
+    private var visibleEntries: [LibraryEntry] {
+        let filtered: [LibraryEntry]
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            filtered = model.deletedEntries
+        } else {
+            let needle = trimmed.lowercased()
+            filtered = model.deletedEntries.filter { $0.title.lowercased().contains(needle) }
+        }
+        switch sortOrder {
+        case .recentlyDeleted:
+            return filtered.sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
+        case .deletedEarliest:
+            return filtered.sorted { ($0.deletedAt ?? .distantFuture) < ($1.deletedAt ?? .distantFuture) }
+        case .titleAscending:
+            return filtered.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        case .titleDescending:
+            return filtered.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
         }
     }
 
