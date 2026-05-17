@@ -1,5 +1,3 @@
-import Foundation
-import AppKit
 import SwiftUI
 
 enum SettingsPaneScope: String, CaseIterable, Identifiable {
@@ -11,7 +9,6 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     case liveCaptions
     case dictation
     case snippets
-    case people
     case translation
     case transcriptionDefaults
     case ignoredSegments
@@ -20,7 +17,6 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     case batchExport
     case autoExport
     case integrations
-    case services
     case prompts
     case automation
     case updates
@@ -38,7 +34,6 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .liveCaptions: return "Live Captions"
         case .dictation: return "Dictation"
         case .snippets: return "Snippets"
-        case .people: return "People"
         case .translation: return "Translation"
         case .transcriptionDefaults: return "Transcription Defaults"
         case .ignoredSegments: return "Ignored Segments"
@@ -47,7 +42,6 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .batchExport: return "Batch Export"
         case .autoExport: return "Auto-Export"
         case .integrations: return "Integrations"
-        case .services: return "Services"
         case .prompts: return "Prompts"
         case .automation: return "MCP & Automation"
         case .updates: return "Updates"
@@ -66,7 +60,6 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .liveCaptions: return ["captions", "translate", "live"]
         case .dictation: return ["hotkey", "f5", "push to talk", "toggle", "indicator", "notch", "overlay", "cleanup", "workflows", "per-app"]
         case .snippets: return ["snippet", "expand", "abbreviation"]
-        case .people: return ["speaker", "names"]
         case .translation: return ["translate", "english"]
         case .transcriptionDefaults: return ["default", "model", "language", "engine", "whisper"]
         case .ignoredSegments: return ["filler", "uh", "um", "ignore", "skip"]
@@ -75,7 +68,6 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .batchExport: return ["batch", "multiple files", "drag drop"]
         case .autoExport: return ["auto export", "rule"]
         case .integrations: return ["yt-dlp", "youtube", "homebrew"]
-        case .services: return ["llm", "cloud", "byok", "api key", "openai", "anthropic"]
         case .prompts: return ["prompt", "cleanup", "translate", "bullet", "action"]
         case .automation: return ["mcp", "bridge", "claude code", "codex", "loopback"]
         case .updates: return ["sparkle", "appcast", "channel", "auto-update"]
@@ -123,7 +115,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
             return ["batchExportFormats", "batchExportToSourceFolder", "batchExportIncludeTimestamps"]
         case .autoExport:
             return ["autoExportRules"]
-        case .integrations, .services, .prompts, .people:
+        case .integrations, .prompts:
             return []
         case .automation:
             return ["automationBridgeEnabled"]

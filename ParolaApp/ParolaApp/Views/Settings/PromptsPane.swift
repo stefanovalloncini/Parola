@@ -10,14 +10,14 @@ struct PromptsPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            searchField
+            SearchPill(text: $searchText, placeholder: "Search prompts…")
             sortRow
 
             SettingsSection {
                 let visible = visiblePrompts
                 if visible.isEmpty {
                     HStack {
-                        Text("No prompts match.").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No prompts match.").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
@@ -72,8 +72,8 @@ struct PromptsPane: View {
         switch sortOption {
         case .builtInFirst:
             prompts.sort { lhs, rhs in
-                if lhs.isBuiltIn != rhs.isBuiltIn { return lhs.isBuiltIn && !rhs.isBuiltIn }
-                return false
+                if lhs.isBuiltIn == rhs.isBuiltIn { return false }
+                return lhs.isBuiltIn
             }
         case .nameAZ:
             prompts.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -81,33 +81,6 @@ struct PromptsPane: View {
             prompts.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
         }
         return prompts
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("Search prompts…", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        )
     }
 
     private var sortRow: some View {
@@ -193,7 +166,7 @@ private struct PromptRow: View {
         SettingRow(prompt.name, isFirst: isFirst) {
             HStack(spacing: 6) {
                 Text(prompt.isBuiltIn ? "Built-in" : "Custom")
-                    .font(.system(size: 11))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 if !prompt.isBuiltIn {
                     Button {
@@ -238,18 +211,18 @@ private struct PromptEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(draft.isExisting ? "Edit Prompt" : "New Prompt")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.title3.weight(.semibold))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Name").font(.system(size: 11)).foregroundStyle(.secondary)
+                Text("Name").font(.caption).foregroundStyle(.secondary)
                 TextField("Name", text: $draft.name)
                     .textFieldStyle(.roundedBorder)
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Instructions").font(.system(size: 11)).foregroundStyle(.secondary)
+                Text("Instructions").font(.caption).foregroundStyle(.secondary)
                 TextEditor(text: $draft.instructions)
-                    .font(.system(size: 12))
+                    .font(.subheadline)
                     .frame(minHeight: 160)
                     .padding(4)
                     .overlay(

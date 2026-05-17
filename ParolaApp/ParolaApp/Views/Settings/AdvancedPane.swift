@@ -22,7 +22,7 @@ struct AdvancedPane: View {
             SettingsSection("Backup & restore") {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Snapshot every setting on this Mac to a `.parola-settings` file, or restore one.")
-                        .font(.system(size: 11))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                     HStack(spacing: 8) {
                         Button("Export settings…") {
@@ -39,7 +39,7 @@ struct AdvancedPane: View {
             SettingsSection("Reset") {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Clears every setting saved by Parola. Models on disk are untouched.")
-                        .font(.system(size: 11))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                     Button(role: .destructive) {
                         resetAllConfirming = true

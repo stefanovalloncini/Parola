@@ -127,22 +127,19 @@ struct BatchFormatCard: View {
     }
 
     private var writeToSourceFolder: Binding<Bool> {
-        Binding(
-            get: { model.options(for: format).writeToSourceFolder },
-            set: { newValue in
-                var opts = model.options(for: format)
-                opts.writeToSourceFolder = newValue
-                model.setOptions(opts, for: format)
-            }
-        )
+        optionBinding(\.writeToSourceFolder)
     }
 
     private var includeTimestamps: Binding<Bool> {
+        optionBinding(\.includeTimestamps)
+    }
+
+    private func optionBinding(_ keyPath: WritableKeyPath<BatchExportFormatOptions, Bool>) -> Binding<Bool> {
         Binding(
-            get: { model.options(for: format).includeTimestamps },
+            get: { model.options(for: format)[keyPath: keyPath] },
             set: { newValue in
                 var opts = model.options(for: format)
-                opts.includeTimestamps = newValue
+                opts[keyPath: keyPath] = newValue
                 model.setOptions(opts, for: format)
             }
         )

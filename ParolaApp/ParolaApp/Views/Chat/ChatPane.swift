@@ -83,7 +83,7 @@ struct ChatPane: View {
 
     private var searchBar: some View {
         HStack(spacing: DS.Spacing.small) {
-            ChatSearchPill {
+            BarPill {
                 Image(systemName: "magnifyingglass")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)

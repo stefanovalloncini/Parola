@@ -59,10 +59,7 @@ struct ModelCategorySection: View {
     var body: some View {
         VStack(spacing: 0) {
             ForEach(Array(categories.enumerated()), id: \.element.id) { index, category in
-                Button { } label: {
-                    ModelCategoryRow(category: category)
-                }
-                .buttonStyle(.plain)
+                ModelCategoryRow(category: category)
                 if index < categories.count - 1 {
                     Divider().padding(.leading, 56)
                 }
@@ -78,7 +75,7 @@ struct ModelCategoryRow: View {
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: category.symbol)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.headline)
                 .foregroundStyle(category.tint)
                 .frame(width: 28, height: 28)
                 .background(category.tint.opacity(0.15), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
@@ -90,12 +87,8 @@ struct ModelCategoryRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .contentShape(Rectangle())
     }
 }

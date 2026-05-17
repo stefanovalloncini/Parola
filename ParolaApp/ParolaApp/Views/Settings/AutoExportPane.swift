@@ -10,7 +10,8 @@ struct AutoExportPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                searchField
+                SearchPill(text: $searchText, placeholder: "Search rules…")
+                    .frame(maxWidth: 240)
                 RuleEnabledFilterChips(filter: $enabledFilter)
                 Spacer()
                 sortMenu
@@ -19,13 +20,13 @@ struct AutoExportPane: View {
             SettingsSection {
                 if model.autoExportRules.isEmpty {
                     HStack {
-                        Text("No rules yet.").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No rules yet.").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
                 } else if displayedIndices.isEmpty {
                     HStack {
-                        Text("No matches").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No matches").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
@@ -91,34 +92,6 @@ struct AutoExportPane: View {
         return preferEnabled ? l : r
     }
 
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("Search rules…", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        )
-        .frame(maxWidth: 240)
-    }
-
     private var sortMenu: some View {
         Menu {
             ForEach(AutoExportSort.allCases, id: \.self) { option in
@@ -173,7 +146,7 @@ private struct AutoExportRuleRow: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Toggle("", isOn: $rule.enabled).labelsHidden()
-                    Text(summary).font(.system(size: 13, weight: .medium))
+                    Text(summary).font(.body.weight(.medium))
                     Spacer()
                     Button(role: .destructive, action: onDelete) {
                         Image(systemName: "trash")
@@ -181,7 +154,7 @@ private struct AutoExportRuleRow: View {
                     .buttonStyle(.borderless)
                 }
                 HStack {
-                    Text("When source is").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text("When source is").font(.caption).foregroundStyle(.secondary)
                     TextField("mp4, mov", text: $extensionsText)
                         .textFieldStyle(.roundedBorder)
                         .onChange(of: extensionsText) { _, new in
@@ -193,7 +166,7 @@ private struct AutoExportRuleRow: View {
                         }
                 }
                 HStack(alignment: .top) {
-                    Text("Also write").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text("Also write").font(.caption).foregroundStyle(.secondary)
                     AutoExportFormatChips(selected: $rule.outputFormats)
                 }
             }

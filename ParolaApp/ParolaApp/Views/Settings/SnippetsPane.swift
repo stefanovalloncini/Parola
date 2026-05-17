@@ -7,19 +7,19 @@ struct SnippetsPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            searchField
+            SearchPill(text: $searchText, placeholder: "Search snippets…")
 
             SettingsSection {
                 let visible = visibleSnippets
                 if model.snippets.isEmpty {
                     HStack {
-                        Text("No snippets yet.").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No snippets yet.").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
                 } else if visible.isEmpty {
                     HStack {
-                        Text("No snippets match.").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No snippets match.").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
@@ -58,37 +58,10 @@ struct SnippetsPane: View {
         return $model.snippets[idx]
     }
 
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("Search snippets…", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        )
-    }
-
     private var placeholderHelp: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Triggers fire on dictated text only; matching is case-insensitive and word-bounded.")
-                .font(.system(size: 11))
+                .font(.caption)
                 .italic()
                 .foregroundStyle(.secondary)
             Text("Placeholders: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}")

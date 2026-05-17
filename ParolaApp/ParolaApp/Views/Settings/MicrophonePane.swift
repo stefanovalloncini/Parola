@@ -115,14 +115,14 @@ private struct MicErrorBanner: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(DS.Palette.warning)
                 Text("Couldn't open microphone")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.callout.weight(.medium))
             }
             Text(message)
-                .font(.system(size: 11))
+                .font(.caption)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
             Text(hint)
-                .font(.system(size: 11))
+                .font(.caption)
                 .foregroundStyle(.secondary)
             if message.lowercased().contains("permission") || message.lowercased().contains("denied") || message.lowercased().contains("authoriz") {
                 Button("Open System Settings…") {

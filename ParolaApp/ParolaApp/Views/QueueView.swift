@@ -182,10 +182,7 @@ struct QueueView: View {
     }
 
     private func handleDelete(job: BatchJob) {
-        switch job.status {
-        case .pending, .transcribing: model.cancelBatchJob(job.id)
-        case .done, .failed, .cancelled: model.cancelBatchJob(job.id)
-        }
+        model.cancelBatchJob(job.id)
     }
 }
 
@@ -266,17 +263,14 @@ private struct QueueRow: View {
         .frame(width: 32, height: 32)
     }
 
+    private var kind: BatchMediaKind { BatchMediaKind(url: job.url) }
+
     private var iconTint: Color {
-        isVideo ? .green : .teal
+        kind == .video ? .green : .teal
     }
 
     private var iconName: String {
-        isVideo ? "film" : "waveform"
-    }
-
-    private var isVideo: Bool {
-        let videoExts: Set<String> = ["mp4", "mov", "m4v", "mkv", "avi", "webm"]
-        return videoExts.contains(job.url.pathExtension.lowercased())
+        kind == .video ? "film" : "waveform"
     }
 
     private var showsProgressBar: Bool {

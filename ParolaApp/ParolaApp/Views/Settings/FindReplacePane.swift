@@ -9,20 +9,20 @@ struct FindReplacePane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            searchField
+            SearchPill(text: $searchText, placeholder: "Search rules…")
             filterRow
 
             SettingsSection {
                 let visible = visibleRules
                 if model.findReplaceRules.isEmpty {
                     HStack {
-                        Text("No rules yet.").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No rules yet.").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
                 } else if visible.isEmpty {
                     HStack {
-                        Text("No rules match.").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No rules match.").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
@@ -99,33 +99,6 @@ struct FindReplacePane: View {
         return $model.findReplaceRules[idx]
     }
 
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("Search rules…", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        )
-    }
-
     private var filterRow: some View {
         HStack(spacing: 8) {
             ForEach(StatusFilter.allCases, id: \.self) { option in
@@ -192,7 +165,7 @@ private struct FilterChip: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 11, weight: .medium))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(isSelected ? Color.white : .primary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
@@ -254,7 +227,7 @@ private struct FindReplaceRuleRow: View {
                     Toggle("Case-sensitive", isOn: $rule.caseSensitive).toggleStyle(.checkbox)
                     Toggle("Regex", isOn: $rule.regex).toggleStyle(.checkbox)
                 }
-                .font(.system(size: 11))
+                .font(.caption)
                 if let regexError {
                     HStack(spacing: 4) {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -262,7 +235,7 @@ private struct FindReplaceRuleRow: View {
                         Text(regexError)
                             .foregroundStyle(.red)
                     }
-                    .font(.system(size: 11))
+                    .font(.caption)
                 }
             }
             .padding(.horizontal, 16)

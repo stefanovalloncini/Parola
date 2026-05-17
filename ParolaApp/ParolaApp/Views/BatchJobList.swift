@@ -105,14 +105,6 @@ struct BatchJobList: View {
             }
     }
 
-    @ViewBuilder
-    private func dropTargetOverlay(visible: Bool) -> some View {
-        if visible {
-            RoundedRectangle(cornerRadius: DS.Radius.regular)
-                .strokeBorder(DS.Color.accent, lineWidth: 2)
-        }
-    }
-
     private var sortMenu: some View {
         Menu {
             Picker("Sort", selection: $sortOrder) {

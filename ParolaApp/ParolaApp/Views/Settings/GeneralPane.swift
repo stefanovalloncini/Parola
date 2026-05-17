@@ -39,7 +39,7 @@ struct GeneralPane: View {
                         .lineLimit(2...6)
                         .textFieldStyle(.roundedBorder)
                     Text("A short list of names or jargon helps Whisper get unusual words right.")
-                        .font(.system(size: 11))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 .padding(16)

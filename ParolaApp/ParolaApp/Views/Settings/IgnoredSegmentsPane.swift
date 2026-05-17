@@ -10,7 +10,8 @@ struct IgnoredSegmentsPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                searchField
+                SearchPill(text: $searchText, placeholder: "Search patterns…")
+                    .frame(maxWidth: 240)
                 RuleEnabledFilterChips(filter: $enabledFilter)
                 Spacer()
                 sortMenu
@@ -19,13 +20,13 @@ struct IgnoredSegmentsPane: View {
             SettingsSection {
                 if model.ignoredSegmentRules.isEmpty {
                     HStack {
-                        Text("No patterns yet.").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No patterns yet.").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
                 } else if displayedIndices.isEmpty {
                     HStack {
-                        Text("No matches").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No matches").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
@@ -85,34 +86,6 @@ struct IgnoredSegmentsPane: View {
         let r = model.ignoredSegmentRules[rhs].enabled
         if l == r { return lhs < rhs }
         return preferEnabled ? l : r
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("Search patterns…", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        )
-        .frame(maxWidth: 240)
     }
 
     private var sortMenu: some View {
