@@ -67,9 +67,18 @@ struct SettingsSheet: View {
                     }
                 }
 
-                Section("settings.modelsOnDevice") {
-                    ForEach(model.availableModels) { entry in
-                        modelRow(entry)
+                Section {
+                    NavigationLink {
+                        ModelManagerView()
+                            .environmentObject(model)
+                    } label: {
+                        HStack {
+                            Image(systemName: "internaldrive")
+                            Text("settings.modelsOnDevice")
+                            Spacer()
+                            Text("\(installedCount)/\(model.availableModels.count)")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 
@@ -169,32 +178,7 @@ struct SettingsSheet: View {
     private var supportsTranslate: Bool { capabilities.supportsTranslate }
     private var supportsInitialPrompt: Bool { capabilities.supportsInitialPrompt }
 
-    @ViewBuilder
-    private func modelRow(_ entry: ModelInfo) -> some View {
-        HStack {
-            Image(systemName: entry.isInstalled ? "checkmark.circle.fill" : "arrow.down.circle")
-                .foregroundStyle(entry.isInstalled ? Color.accentColor : Color.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.label)
-                if let size = entry.approximateSizeBytes {
-                    Text(humanBytes(size))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            if entry.isInstalled {
-                Button(role: .destructive) {
-                    model.deleteModel(entry.name)
-                } label: {
-                    Image(systemName: "trash")
-                }
-            }
-        }
-    }
-
-    private func humanBytes(_ bytes: Int) -> String {
-        Measurement(value: Double(bytes), unit: UnitInformationStorage.bytes)
-            .formatted(.byteCount(style: .file))
+    private var installedCount: Int {
+        model.availableModels.filter(\.isInstalled).count
     }
 }
