@@ -14,16 +14,19 @@ final class MeetingDetector: ObservableObject {
 
     @Published var detectedAppName: String?
     @Published var isEnabled: Bool {
-        didSet { UserDefaults.standard.set(isEnabled, forKey: "meetingDetectorEnabled") }
+        didSet { UserDefaults.standard.set(isEnabled, forKey: Self.defaultsKey) }
     }
 
     private let onDetected: @MainActor (String) -> Void
+    private var lastFiredApp: String?
     private var lastFiredAt: Date?
     nonisolated(unsafe) private var observerTokens: [NSObjectProtocol] = []
 
+    private static let defaultsKey = "meetingDetectorEnabled"
+
     init(onDetected: @escaping @MainActor (String) -> Void) {
         self.onDetected = onDetected
-        self.isEnabled = UserDefaults.standard.bool(forKey: "meetingDetectorEnabled")
+        self.isEnabled = (UserDefaults.standard.object(forKey: Self.defaultsKey) as? Bool) ?? true
         startObserving()
     }
 
@@ -50,7 +53,10 @@ final class MeetingDetector: ObservableObject {
 
     private func fire(appName: String) {
         guard isEnabled else { return }
-        if let last = lastFiredAt, Date().timeIntervalSince(last) < 30 { return }
+        if appName == lastFiredApp,
+           let last = lastFiredAt,
+           Date().timeIntervalSince(last) < 5 { return }
+        lastFiredApp = appName
         lastFiredAt = Date()
         detectedAppName = appName
         onDetected(appName)
