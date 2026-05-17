@@ -10,10 +10,12 @@ struct ClipboardPasteInserter: TextInserter {
             let priorContents = pasteboard.string(forType: .string)
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
+            let changeCountAfterWrite = pasteboard.changeCount
             postCmdV()
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(300))
                 guard let priorContents else { return }
+                guard pasteboard.changeCount == changeCountAfterWrite else { return }
                 pasteboard.clearContents()
                 pasteboard.setString(priorContents, forType: .string)
             }

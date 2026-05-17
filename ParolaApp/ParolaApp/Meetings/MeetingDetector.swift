@@ -37,18 +37,28 @@ final class MeetingDetector: ObservableObject {
     }
 
     private func startObserving() {
-        let token = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didLaunchApplicationNotification,
-            object: nil,
-            queue: .main
-        ) { note in
-            let bundleID = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier
-            guard let bundleID, let display = MeetingDetector.knownMeetingApps[bundleID] else { return }
-            Task { @MainActor [weak self] in
-                self?.fire(appName: display)
+        let center = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didActivateApplicationNotification] {
+            let token = center.addObserver(
+                forName: name,
+                object: nil,
+                queue: .main
+            ) { note in
+                let bundleID = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier
+                guard let bundleID, let display = MeetingDetector.knownMeetingApps[bundleID] else { return }
+                Task { @MainActor [weak self] in
+                    self?.fire(appName: display)
+                }
+            }
+            observerTokens.append(token)
+        }
+        for app in NSWorkspace.shared.runningApplications {
+            if let bundleID = app.bundleIdentifier,
+               let display = MeetingDetector.knownMeetingApps[bundleID] {
+                fire(appName: display)
+                break
             }
         }
-        observerTokens.append(token)
     }
 
     private func fire(appName: String) {

@@ -1,16 +1,29 @@
 import Foundation
 
+public enum DictationInsertionMode: String, Codable, Sendable, Hashable, CaseIterable {
+    case paste
+    case keystroke
+}
+
 public struct DictationWorkflow: Codable, Sendable, Hashable {
     public var promptID: String?
     public var language: String?
+    public var insertion: DictationInsertionMode?
 
-    public init(promptID: String? = nil, language: String? = nil) {
+    public init(
+        promptID: String? = nil,
+        language: String? = nil,
+        insertion: DictationInsertionMode? = nil
+    ) {
         self.promptID = promptID
         self.language = language
+        self.insertion = insertion
     }
 
     public var isEmpty: Bool {
-        (promptID?.isEmpty ?? true) && (language?.isEmpty ?? true)
+        (promptID?.isEmpty ?? true)
+            && (language?.isEmpty ?? true)
+            && insertion == nil
     }
 }
 

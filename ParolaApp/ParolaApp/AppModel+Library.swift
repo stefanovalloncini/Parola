@@ -79,7 +79,7 @@ extension AppModel {
             guard let self else { return }
             do {
                 try await library.delete(id)
-                if selectedEntryID == id { selectedEntryID = nil }
+                if selectedEntryID == id { clearLoadedEntry() }
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
@@ -104,12 +104,32 @@ extension AppModel {
             guard let self else { return }
             do {
                 try await library.purge(id)
-                if selectedEntryID == id { selectedEntryID = nil }
+                if selectedEntryID == id { clearLoadedEntry() }
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
             refreshLibrary()
         }
+    }
+
+    private func clearLoadedEntry() {
+        selectedEntryID = nil
+        transcript = nil
+        sourceFileURL = nil
+        if let obs = playerTimeObserver, let player {
+            player.removeTimeObserver(obs)
+        }
+        playerTimeObserver = nil
+        timeControlObserver?.invalidate()
+        timeControlObserver = nil
+        player?.pause()
+        player = nil
+        hasVideo = false
+        currentTimeSeconds = 0
+        isPlaying = false
+        currentSegmentID = nil
+        currentWordID = nil
+        if case .ready = phase { phase = .idle }
     }
 
     func loadEntry(_ id: LibraryEntry.ID) {

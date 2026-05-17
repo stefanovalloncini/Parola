@@ -2,7 +2,8 @@ import Darwin
 import Foundation
 
 /// Talks to the in-app `ParolaTestBridge` over TCP loopback. Discovers the port
-/// from `~/Library/Caches/Parola/bridge.port` (written by the bridge on startup).
+/// from `~/Library/Caches/Parola/bridge.port` (written by the bridge on startup)
+/// and the per-launch auth token from `~/Library/Caches/Parola/bridge.token`.
 /// One request per call: open, send a line, read a line, close.
 public struct BridgeClient: BridgeProtocol {
     public struct BridgeNotRunning: LocalizedError {
@@ -17,6 +18,7 @@ public struct BridgeClient: BridgeProtocol {
     }
 
     private let portFileURL: URL
+    private let tokenFileURL: URL
     private let timeout: TimeInterval
 
     /// Bumped when the wire format breaks. The bridge echoes back its own version
@@ -27,15 +29,16 @@ public struct BridgeClient: BridgeProtocol {
         let caches = (try? FileManager.default.url(
             for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: false
         )) ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Caches")
-        self.portFileURL = caches
-            .appendingPathComponent("Parola", isDirectory: true)
-            .appendingPathComponent("bridge.port")
+        let dir = caches.appendingPathComponent("Parola", isDirectory: true)
+        self.portFileURL = dir.appendingPathComponent("bridge.port")
+        self.tokenFileURL = dir.appendingPathComponent("bridge.token")
         self.timeout = timeout
     }
 
     public func call(_ cmd: String, argsJSON: Data) async throws -> String {
         let port = try readPort()
-        let payload = encodeRequest(cmd: cmd, argsJSON: argsJSON)
+        let token = readToken() ?? ""
+        let payload = encodeRequest(cmd: cmd, argsJSON: argsJSON, token: token)
         let timeout = self.timeout
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -64,11 +67,17 @@ public struct BridgeClient: BridgeProtocol {
         return port
     }
 
-    private func encodeRequest(cmd: String, argsJSON: Data) -> Data {
+    private func readToken() -> String? {
+        guard let raw = try? String(contentsOf: tokenFileURL, encoding: .utf8) else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func encodeRequest(cmd: String, argsJSON: Data, token: String) -> Data {
         let argsBytes = argsJSON.isEmpty ? Data("{}".utf8) : argsJSON
         let id = UUID().uuidString
         var out = Data()
-        out.append(Data("{\"id\":\"\(id)\",\"version\":\(BridgeClient.clientVersion),\"cmd\":\"\(cmd)\",\"args\":".utf8))
+        out.append(Data("{\"id\":\"\(id)\",\"version\":\(BridgeClient.clientVersion),\"cmd\":\"\(cmd)\",\"auth\":\"\(token)\",\"args\":".utf8))
         out.append(argsBytes)
         out.append(Data("}\n".utf8))
         return out

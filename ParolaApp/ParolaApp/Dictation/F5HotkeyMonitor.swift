@@ -8,6 +8,7 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
     private let keyCode: Int
     private let modifierMask: NSEvent.ModifierFlags
     private var globalMonitor: Any?
+    private var localMonitor: Any?
     private var isPressed: Bool = false
 
     init(keyCode: Int = Int(kVK_F5), modifiers: NSEvent.ModifierFlags = []) {
@@ -26,29 +27,39 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
     @MainActor
     private func installMonitor(handler: @escaping @Sendable (HotkeyEvent) -> Void) async {
         await removeMonitor()
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .keyUp]) { [weak self] event in
+        let mask: NSEvent.EventTypeMask = [.keyDown, .keyUp]
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
             Task { @MainActor [weak self] in
-                guard let self else { return }
-                guard event.keyCode == self.keyCode else { return }
-                let needed = self.modifierMask
-                if !needed.isEmpty {
-                    let pressed = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-                    guard pressed.contains(needed) else { return }
-                }
-                switch event.type {
-                case .keyDown:
-                    if !self.isPressed {
-                        self.isPressed = true
-                        handler(.press)
-                    }
-                case .keyUp:
-                    if self.isPressed {
-                        self.isPressed = false
-                        handler(.release)
-                    }
-                default: break
-                }
+                self?.process(event: event, handler: handler)
             }
+        }
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
+            Task { @MainActor [weak self] in
+                self?.process(event: event, handler: handler)
+            }
+            return event
+        }
+    }
+
+    private func process(event: NSEvent, handler: @Sendable (HotkeyEvent) -> Void) {
+        guard event.keyCode == self.keyCode else { return }
+        let needed = self.modifierMask
+        if !needed.isEmpty {
+            let pressed = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard pressed.contains(needed) else { return }
+        }
+        switch event.type {
+        case .keyDown:
+            if !self.isPressed {
+                self.isPressed = true
+                handler(.press)
+            }
+        case .keyUp:
+            if self.isPressed {
+                self.isPressed = false
+                handler(.release)
+            }
+        default: break
         }
     }
 
@@ -57,6 +68,10 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
         if let m = globalMonitor {
             NSEvent.removeMonitor(m)
             globalMonitor = nil
+        }
+        if let m = localMonitor {
+            NSEvent.removeMonitor(m)
+            localMonitor = nil
         }
         isPressed = false
     }

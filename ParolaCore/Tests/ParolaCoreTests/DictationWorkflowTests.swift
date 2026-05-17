@@ -41,4 +41,14 @@ struct DictationWorkflowTests {
         let decoded = DictationWorkflowMap.decode(legacy: data)
         #expect(decoded == original)
     }
+
+    @Test("insertion mode round-trips")
+    func insertionMode() {
+        let original: [String: DictationWorkflow] = [
+            "com.apple.Terminal": DictationWorkflow(insertion: .keystroke)
+        ]
+        let data = DictationWorkflowMap.encode(original)
+        let decoded = DictationWorkflowMap.decode(legacy: data)
+        #expect(decoded["com.apple.Terminal"]?.insertion == .keystroke)
+    }
 }

@@ -186,6 +186,22 @@ struct LibraryStoreTests {
         #expect(entry.deletedAt == nil)
     }
 
+    @Test("updateTranscript stamps updatedAt on the manifest")
+    func updateTranscriptStampsUpdatedAt() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        #expect(entry.updatedAt == nil)
+
+        let when = Date(timeIntervalSince1970: 1_900_000_000)
+        var newTranscript = makeTranscript()
+        newTranscript.segments[0].text = "edited"
+        try await store.updateTranscript(newTranscript, for: entry.id, at: when)
+
+        let entries = await store.list()
+        let refreshed = try #require(entries.first(where: { $0.id == entry.id }))
+        #expect(refreshed.updatedAt == when)
+    }
+
     @Test("search returns active entries and filters soft-deleted")
     func searchFiltersSoftDeleted() async throws {
         let (store, _) = try makeTempLibrary()

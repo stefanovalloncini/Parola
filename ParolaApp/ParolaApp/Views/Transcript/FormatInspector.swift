@@ -3,10 +3,6 @@ import SwiftUI
 struct FormatInspector: View {
     @EnvironmentObject var model: AppModel
     @AppStorage("transcriptDisplayMode") private var displayModeRaw: String = TranscriptDisplayMode.transcript.rawValue
-    @AppStorage("transcriptFontSize") private var fontSize: Int = 18
-    @AppStorage("transcriptFavoritesOnly") private var favoritesOnly: Bool = false
-    @AppStorage("transcriptGroupUnnamed") private var groupUnnamed: Bool = false
-    @State private var translateExpanded = false
     @State private var newSpeaker: String = ""
 
     private var displayMode: TranscriptDisplayMode {
@@ -24,30 +20,6 @@ struct FormatInspector: View {
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { commitSpeaker() }
             }
-
-            InspectorDisclosureRow(title: "Translate to…", isExpanded: $translateExpanded) {
-                Text("Translation runs as a separate pass.")
-                    .font(DS.Font.caption)
-                    .foregroundStyle(DS.Color.secondaryText)
-            }
-
-            HStack {
-                Text("Font Size")
-                Spacer()
-                Picker("Font Size", selection: $fontSize) {
-                    ForEach([14, 16, 18, 20, 22, 24, 28], id: \.self) { size in
-                        Text("\(size)").tag(size)
-                    }
-                }
-                .labelsHidden()
-                .fixedSize()
-            }
-
-            Toggle("Favorites Only", isOn: $favoritesOnly)
-                .toggleStyle(.switch)
-
-            Toggle("Group segments without speakers", isOn: $groupUnnamed)
-                .toggleStyle(.switch)
         }
     }
 
