@@ -20,7 +20,7 @@ final class MeetingDetector: ObservableObject {
     private let onDetected: @MainActor (String) -> Void
     private var lastFiredApp: String?
     private var lastFiredAt: Date?
-    nonisolated(unsafe) private var observerTokens: [NSObjectProtocol] = []
+    private var observerTokens: [NSObjectProtocol] = []
 
     private static let defaultsKey = "meetingDetectorEnabled"
 

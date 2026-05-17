@@ -8,7 +8,7 @@ public protocol APIKeyStore: Sendable {
     func set(_ value: String?, for provider: CloudLLMProviderID) async throws
 }
 
-public final class KeychainAPIKeyStore: APIKeyStore, @unchecked Sendable {
+public final class KeychainAPIKeyStore: APIKeyStore {
     private let service: String
 
     public init(service: String = "app.parola.cloudllm") {
