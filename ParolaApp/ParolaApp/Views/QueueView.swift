@@ -3,6 +3,19 @@ import ParolaCore
 
 struct QueueView: View {
     @EnvironmentObject var model: AppModel
+    @State private var searchText: String = ""
+    @State private var sortOption: SortOption = .newestFirst
+
+    enum SortOption: String, CaseIterable, Identifiable {
+        case newestFirst = "Newest first"
+        case oldestFirst = "Oldest first"
+        case nameAscending = "Name A→Z"
+        case nameDescending = "Name Z→A"
+        case mostProgress = "Most progress"
+        case leastProgress = "Least progress"
+
+        var id: String { rawValue }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,9 +28,12 @@ struct QueueView: View {
     }
 
     private var toolbar: some View {
-        HStack {
+        HStack(spacing: DS.Spacing.regular) {
             Text("Queue").font(DS.Font.title)
             Spacer()
+            searchField
+                .frame(maxWidth: 240)
+            sortMenu
             Button {
                 model.clearFinishedBatchJobs()
             } label: {
@@ -40,20 +56,76 @@ struct QueueView: View {
         .padding(.vertical, DS.Spacing.regular)
     }
 
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            TextField("Search queue", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.subheadline)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Color.primary.opacity(0.06))
+        )
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort", selection: $sortOption) {
+                ForEach(SortOption.allCases) { option in
+                    Text(option.rawValue).tag(option)
+                }
+            }
+        } label: {
+            Image(systemName: "chevron.up.arrow.down")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.primary.opacity(0.06))
+                )
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Sort jobs")
+    }
+
     @ViewBuilder
     private var mainContent: some View {
         if model.batchJobs.isEmpty {
             empty
         } else {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: DS.Spacing.large) {
-                    section(title: "In Progress", statuses: [.transcribing, .pending])
-                    section(title: "Cancelled", statuses: [.cancelled])
-                    section(title: "Failed", statuses: [.failed])
-                    section(title: "Completed", statuses: [.done])
+            let jobs = visibleJobs
+            if jobs.isEmpty {
+                ContentUnavailableView.search(text: searchText)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: DS.Spacing.large) {
+                        section(title: "In Progress", jobs: jobs, statuses: [.transcribing, .pending])
+                        section(title: "Cancelled", jobs: jobs, statuses: [.cancelled])
+                        section(title: "Failed", jobs: jobs, statuses: [.failed])
+                        section(title: "Completed", jobs: jobs, statuses: [.done])
+                    }
+                    .padding(.horizontal, DS.Spacing.large)
+                    .padding(.vertical, DS.Spacing.medium)
                 }
-                .padding(.horizontal, DS.Spacing.large)
-                .padding(.vertical, DS.Spacing.medium)
             }
         }
     }
@@ -71,17 +143,47 @@ struct QueueView: View {
         model.batchJobs.contains { $0.status == .done || $0.status == .cancelled || $0.status == .failed }
     }
 
+    private var visibleJobs: [BatchJob] {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        let filtered: [BatchJob]
+        if query.isEmpty {
+            filtered = model.batchJobs
+        } else {
+            filtered = model.batchJobs.filter {
+                $0.url.lastPathComponent.range(of: query, options: .caseInsensitive) != nil
+            }
+        }
+        switch sortOption {
+        case .newestFirst:
+            return filtered
+        case .oldestFirst:
+            return filtered.reversed()
+        case .nameAscending:
+            return filtered.sorted {
+                $0.url.lastPathComponent.localizedCaseInsensitiveCompare($1.url.lastPathComponent) == .orderedAscending
+            }
+        case .nameDescending:
+            return filtered.sorted {
+                $0.url.lastPathComponent.localizedCaseInsensitiveCompare($1.url.lastPathComponent) == .orderedDescending
+            }
+        case .mostProgress:
+            return filtered.sorted { $0.progress > $1.progress }
+        case .leastProgress:
+            return filtered.sorted { $0.progress < $1.progress }
+        }
+    }
+
     @ViewBuilder
-    private func section(title: String, statuses: Set<BatchJob.Status>) -> some View {
-        let jobs = model.batchJobs.filter { statuses.contains($0.status) }
-        if !jobs.isEmpty {
+    private func section(title: String, jobs: [BatchJob], statuses: Set<BatchJob.Status>) -> some View {
+        let matching = jobs.filter { statuses.contains($0.status) }
+        if !matching.isEmpty {
             VStack(alignment: .leading, spacing: DS.Spacing.small) {
                 Text(title.uppercased())
                     .font(.caption.weight(.medium))
                     .tracking(0.6)
                     .foregroundStyle(DS.Color.secondaryText)
                 VStack(spacing: 1) {
-                    ForEach(jobs) { job in
+                    ForEach(matching) { job in
                         QueueRow(job: job)
                     }
                 }

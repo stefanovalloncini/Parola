@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import AppKit
 import Network
