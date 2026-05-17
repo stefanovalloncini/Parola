@@ -22,6 +22,7 @@ public actor StreamingTranscriptionSession {
     private var consumerTask: Task<Void, Never>?
     private var streamerTask: Task<Void, Never>?
     private var allConfirmed: [TranscriptSegment] = []
+    private var nextSegmentID: Int = 0
     private var loadedModel: String?
     private var optionsForRun: TranscriptionOptions?
 
@@ -146,11 +147,12 @@ public actor StreamingTranscriptionSession {
     private func appendConfirmed(_ segments: [TranscriptionSegment]) {
         for seg in segments {
             let mapped = TranscriptSegment(
-                id: allConfirmed.count,
+                id: nextSegmentID,
                 start: Double(seg.start),
                 end: Double(seg.end),
                 text: seg.text
             )
+            nextSegmentID += 1
             allConfirmed.append(mapped)
             continuation?.yield(.confirmed(mapped))
         }
