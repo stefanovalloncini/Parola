@@ -84,6 +84,29 @@ struct ToolRegistryTests {
         let parsed = try JSONSerialization.jsonObject(with: call.argsJSON) as? [String: Any]
         #expect(parsed?.isEmpty == true)
     }
+
+    @Test("parola_open_app tool is exposed as an engine tool")
+    func openAppToolRegistered() {
+        #expect(ToolRegistry.allToolNames().contains("parola_open_app"))
+    }
+
+    @Test("Dictation app tools forward to startDictation / stopDictation")
+    func dictationToolsForwardCorrectly() async throws {
+        let start = try #require(AppTools.byName["parola_app_dictate"])
+        let stop = try #require(AppTools.byName["parola_app_dictate_stop"])
+        let bridge = RecordingBridge()
+        _ = try await start.invoke(args: [:], bridge: bridge)
+        let startCall = try #require(await bridge.lastCall)
+        #expect(startCall.cmd == "startDictation")
+        _ = try await stop.invoke(args: [:], bridge: bridge)
+        let stopCall = try #require(await bridge.lastCall)
+        #expect(stopCall.cmd == "stopDictation")
+    }
+
+    @Test("BridgeClient pins a version constant for the wire protocol")
+    func bridgeClientVersionPinned() {
+        #expect(BridgeClient.clientVersion >= 1)
+    }
 }
 
 private actor RecordingBridge: BridgeProtocol {

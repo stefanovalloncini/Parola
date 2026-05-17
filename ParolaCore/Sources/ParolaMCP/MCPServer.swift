@@ -1,17 +1,26 @@
 import Foundation
 import ParolaCore
-import ParolaMCP
 
-actor MCPServer {
+/// JSON-RPC handler for the Parola MCP server. Owns the engine session and proxies
+/// app-bridge calls. Used by both `parola mcp` and the legacy `parola-mcp` binary.
+public actor MCPServer {
+    public static let supportedProtocolVersions: Set<String> = ["2024-11-05", "2025-03-26"]
+    public static let preferredProtocolVersion: String = "2024-11-05"
+
     private let session: TranscriptionSession
     private let modelStore: ModelStore
-    private let libraryStore: LibraryStore?
+    private let libraryStore: LibraryStore
     private let bridge: any BridgeProtocol
+    private(set) var shouldExit: Bool = false
 
-    init(
+    public func requestExit() {
+        shouldExit = true
+    }
+
+    public init(
         session: TranscriptionSession = TranscriptionSession(),
         modelStore: ModelStore = .shared,
-        libraryStore: LibraryStore? = nil,
+        libraryStore: LibraryStore = .shared,
         bridge: any BridgeProtocol = BridgeClient()
     ) {
         self.session = session
@@ -20,17 +29,18 @@ actor MCPServer {
         self.bridge = bridge
     }
 
-    func handle(_ request: JSONRPCRequest) async -> JSONRPCResponse? {
+    public func handle(_ request: JSONRPCRequest) async throws -> JSONRPCResponse? {
         switch request.method {
         case "initialize":
-            return JSONRPCResponse.success(id: request.id, result: initializeResult())
+            return JSONRPCResponse.success(id: request.id, result: initializeResult(for: request))
         case "notifications/initialized":
             return nil
         case "tools/list":
             return JSONRPCResponse.success(id: request.id, result: MCPListToolsResult(tools: ToolRegistry.allTools()))
         case "tools/call":
-            return await callTool(request)
+            return try await callTool(request)
         case "shutdown":
+            shouldExit = true
             return JSONRPCResponse.success(id: request.id, result: AnyEncodable([String: String]()))
         default:
             return JSONRPCResponse.failure(
@@ -41,15 +51,18 @@ actor MCPServer {
         }
     }
 
-    private func initializeResult() -> MCPInitializeResult {
-        MCPInitializeResult(
-            protocolVersion: "2024-11-05",
+    private func initializeResult(for request: JSONRPCRequest) -> MCPInitializeResult {
+        let requested = (request.params?.value as? [String: Any])?["protocolVersion"] as? String
+        let negotiated = requested.flatMap { MCPServer.supportedProtocolVersions.contains($0) ? $0 : nil }
+            ?? MCPServer.preferredProtocolVersion
+        return MCPInitializeResult(
+            protocolVersion: negotiated,
             capabilities: .init(tools: .init(listChanged: false)),
             serverInfo: .init(name: "parola", version: Parola.version)
         )
     }
 
-    private func callTool(_ request: JSONRPCRequest) async -> JSONRPCResponse {
+    private func callTool(_ request: JSONRPCRequest) async throws -> JSONRPCResponse {
         guard let params = request.params?.value as? [String: Any],
               let name = params["name"] as? String else {
             return JSONRPCResponse.failure(
@@ -74,6 +87,8 @@ actor MCPServer {
                 )
             }
             return JSONRPCResponse.success(id: request.id, result: result)
+        } catch let error as CancellationError {
+            throw error
         } catch {
             return JSONRPCResponse.success(
                 id: request.id,
@@ -90,10 +105,9 @@ actor MCPServer {
         case .searchLibrary: return await searchLibrary(args: args)
         case .listRecent:    return await listRecent(args: args)
         case .summarize:     return try await summarize(args: args)
+        case .openApp:       return try await openApp(args: args)
         }
     }
-
-    // MARK: - Engine tool implementations
 
     private func transcribe(args: [String: Any]) async throws -> MCPToolCallResult {
         guard let path = args["path"] as? String, !path.isEmpty else {
@@ -135,7 +149,7 @@ actor MCPServer {
         for (category, variants) in grouped {
             lines.append("## \(category.displayName)")
             for variant in variants {
-                let mark = installed.contains(variant.id) ? "✓" : " "
+                let mark = installed.contains(variant.id) ? "x" : " "
                 lines.append("- [\(mark)] `\(variant.id)` — \(variant.displayName) (\(variant.engineID))")
                 lines.append("    \(variant.tagline)")
             }
@@ -156,12 +170,9 @@ actor MCPServer {
     }
 
     private func searchLibrary(args: [String: Any]) async -> MCPToolCallResult {
-        guard let store = libraryStore else {
-            return MCPToolCallResult(text: "Library not available in this context.", isError: true)
-        }
         let query = (args["query"] as? String) ?? ""
         let limit = args["limit"] as? Int ?? 10
-        let matches = await store.search(query)
+        let matches = await libraryStore.search(query)
         let lines = matches.prefix(limit).map { match in
             "- `\(match.entryID)` (score \(match.score)) \(match.snippet)"
         }
@@ -169,11 +180,8 @@ actor MCPServer {
     }
 
     private func listRecent(args: [String: Any]) async -> MCPToolCallResult {
-        guard let store = libraryStore else {
-            return MCPToolCallResult(text: "Library not available.", isError: true)
-        }
         let limit = args["limit"] as? Int ?? 10
-        let entries = await store.list().prefix(limit)
+        let entries = await libraryStore.list().prefix(limit)
         return MCPToolCallResult(text: entries.map { "- \($0.title)" }.joined(separator: "\n"))
     }
 
@@ -193,10 +201,17 @@ actor MCPServer {
         let summary = try await model.respond(to: transcript.text)
         return MCPToolCallResult(text: summary)
     }
+
+    private func openApp(args: [String: Any]) async throws -> MCPToolCallResult {
+        let timeoutMs = args["timeoutMs"] as? Int ?? 10_000
+        let bundleID = args["bundleID"] as? String ?? "com.parola.Parola"
+        let report = try await AppLauncher.launch(bundleID: bundleID, timeoutMs: timeoutMs)
+        return MCPToolCallResult(text: report)
+    }
 }
 
-struct MCPToolError: LocalizedError {
-    let message: String
-    init(_ message: String) { self.message = message }
-    var errorDescription: String? { message }
+public struct MCPToolError: LocalizedError {
+    public let message: String
+    public init(_ message: String) { self.message = message }
+    public var errorDescription: String? { message }
 }
