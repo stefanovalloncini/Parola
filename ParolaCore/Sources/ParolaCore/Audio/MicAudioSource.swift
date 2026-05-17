@@ -12,8 +12,31 @@ public actor MicAudioSource: AudioSource {
     private var converter: AVAudioConverter?
     private var outputFormat: AVAudioFormat?
     private var isRecording = false
+    private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
 
     public init() {}
+
+    /// Emits a normalised 0...1 amplitude per captured buffer. Multiple subscribers are supported.
+    public func levels() -> AsyncStream<Float> {
+        AsyncStream { continuation in
+            let id = UUID()
+            levelContinuations[id] = continuation
+            continuation.onTermination = { [weak self] _ in
+                guard let self else { return }
+                Task { await self.removeLevelContinuation(id) }
+            }
+        }
+    }
+
+    private func removeLevelContinuation(_ id: UUID) {
+        levelContinuations.removeValue(forKey: id)
+    }
+
+    private func emitLevel(_ level: Float) {
+        for continuation in levelContinuations.values {
+            continuation.yield(level)
+        }
+    }
 
     public func start() throws {
         guard !isRecording else { return }
@@ -75,6 +98,8 @@ public actor MicAudioSource: AudioSource {
     }
 
     private func write(box: BufferBox) {
+        emitLevel(MicAudioSource.normalisedLevel(of: box.buffer))
+
         guard let conv = converter, let outFormat = outputFormat, let file = writeFile else { return }
         let ratio = outFormat.sampleRate / box.buffer.format.sampleRate
         let outCap = AVAudioFrameCount(Double(box.buffer.frameLength) * ratio + 1024)
@@ -92,6 +117,23 @@ public actor MicAudioSource: AudioSource {
         }
         if status == .error || outBuffer.frameLength == 0 { return }
         try? file.write(from: outBuffer)
+    }
+
+    private static func normalisedLevel(of buffer: AVAudioPCMBuffer) -> Float {
+        guard let channels = buffer.floatChannelData else { return 0 }
+        let frameCount = Int(buffer.frameLength)
+        guard frameCount > 0 else { return 0 }
+        let samples = channels[0]
+        var sumSquares: Float = 0
+        for index in 0..<frameCount {
+            let sample = samples[index]
+            sumSquares += sample * sample
+        }
+        let rms = sqrtf(sumSquares / Float(frameCount))
+        let minDb: Float = -55
+        let db = 20 * log10f(max(rms, 1e-7))
+        let clamped = max(minDb, min(0, db))
+        return (clamped - minDb) / -minDb
     }
 
     public func prepare() throws -> URL {
@@ -114,6 +156,10 @@ public actor MicAudioSource: AudioSource {
         engine.stop()
         writeFile = nil
         isRecording = false
+        for continuation in levelContinuations.values {
+            continuation.finish()
+        }
+        levelContinuations.removeAll()
     }
 }
 

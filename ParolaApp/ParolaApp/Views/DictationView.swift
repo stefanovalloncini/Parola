@@ -3,13 +3,14 @@ import ParolaCore
 
 struct DictationView: View {
     let state: DictationCoordinator.State
+    @ObservedObject var model: AppModel
 
     @State private var startedAt: Date = Date()
 
     var body: some View {
         HStack(spacing: 14) {
             indicator
-                .frame(width: 14, height: 14)
+                .frame(width: 28, height: 20)
             statusLabel
                 .foregroundStyle(.white)
             Spacer(minLength: 0)
@@ -36,14 +37,14 @@ struct DictationView: View {
     private var indicator: some View {
         switch state {
         case .idle:
-            Circle().fill(Color.gray.opacity(0.6))
+            Circle().fill(Color.gray.opacity(0.6)).frame(width: 14, height: 14)
         case .listening:
-            ListeningDot()
+            WaveformBars(level: model.dictationAudioLevel)
         case .transcribing:
-            SpinningRing()
+            SpinningRing().frame(width: 14, height: 14)
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 14))
+                .font(.system(size: 16))
                 .foregroundStyle(.orange)
         }
     }
@@ -82,15 +83,40 @@ struct DictationView: View {
     }
 }
 
-private struct ListeningDot: View {
-    @State private var pulse = false
+private struct WaveformBars: View {
+    let level: Float
+
+    private static let barCount = 5
+    private static let phaseOffsets: [Float] = [0.85, 1.05, 1.0, 0.95, 0.8]
+    private static let idleHeight: CGFloat = 3
+    private static let maxHeight: CGFloat = 18
+    private static let barWidth: CGFloat = 3
+    private static let spacing: CGFloat = 2
+
+    @State private var idlePulse = false
+
     var body: some View {
-        Circle()
-            .fill(Color.red)
-            .scaleEffect(pulse ? 1.0 : 0.7)
-            .opacity(pulse ? 1.0 : 0.5)
-            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
-            .onAppear { pulse = true }
+        HStack(alignment: .center, spacing: Self.spacing) {
+            ForEach(0..<Self.barCount, id: \.self) { index in
+                Capsule(style: .continuous)
+                    .fill(Color.white)
+                    .frame(width: Self.barWidth, height: barHeight(at: index))
+                    .animation(.easeOut(duration: 0.08), value: level)
+            }
+        }
+        .frame(height: Self.maxHeight)
+        .onAppear { idlePulse = true }
+        .animation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: idlePulse)
+    }
+
+    private func barHeight(at index: Int) -> CGFloat {
+        if level <= 0.02 {
+            return idlePulse ? Self.idleHeight + 1 : Self.idleHeight
+        }
+        let shaped = pow(level, 0.6)
+        let offset = Self.phaseOffsets[index % Self.phaseOffsets.count]
+        let scaled = min(1, max(0, CGFloat(shaped * offset)))
+        return Self.idleHeight + (Self.maxHeight - Self.idleHeight) * scaled
     }
 }
 
