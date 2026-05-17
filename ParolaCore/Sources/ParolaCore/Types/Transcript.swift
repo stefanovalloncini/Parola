@@ -7,13 +7,22 @@ public struct WordTiming: Codable, Hashable, Sendable, Identifiable {
     public var start: Double
     public var end: Double
     public var probability: Double
+    public var speaker: String?
 
-    public init(id: String, word: String, start: Double, end: Double, probability: Double) {
+    public init(
+        id: String,
+        word: String,
+        start: Double,
+        end: Double,
+        probability: Double,
+        speaker: String? = nil
+    ) {
         self.id = id
         self.word = word
         self.start = start
         self.end = end
         self.probability = probability
+        self.speaker = speaker
     }
 
     public var duration: Double { end - start }

@@ -75,4 +75,22 @@ struct GlobalFindReplaceTests {
         #expect(decoded.first?.caseSensitive == true)
         #expect(decoded.first?.regex == true)
     }
+
+    @Test("validate returns nil for a literal rule")
+    func validateLiteral() {
+        let rule = FindReplaceRule(find: "hello", replace: "hi")
+        #expect(GlobalFindReplace.validate(rule) == nil)
+    }
+
+    @Test("validate returns nil for a well-formed regex")
+    func validateGoodRegex() {
+        let rule = FindReplaceRule(find: "h(e)llo", replace: "h$1y", regex: true)
+        #expect(GlobalFindReplace.validate(rule) == nil)
+    }
+
+    @Test("validate returns a reason for an invalid regex")
+    func validateBadRegex() {
+        let rule = FindReplaceRule(find: "h(ello", replace: "bye", regex: true)
+        #expect(GlobalFindReplace.validate(rule) != nil)
+    }
 }

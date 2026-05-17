@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import CoreMedia
+import os
 
 #if canImport(Speech)
 import Speech
@@ -14,12 +15,16 @@ public actor AppleSpeechTranscriber: Transcriber {
 
     private let modelStore: ModelStore
     private var loadedModel: String?
+    private var inFlightCancel: (@Sendable () async -> Void)?
+    private let signposter = OSSignposter(subsystem: "app.parola.core", category: "engine.apple-speech")
 
     public init(modelStore: ModelStore) {
         self.modelStore = modelStore
     }
 
     public func load(model: String) async throws {
+        let interval = signposter.beginInterval("load", "model=\(model, privacy: .public)")
+        defer { signposter.endInterval("load", interval) }
         loadedModel = model
     }
 
@@ -36,30 +41,44 @@ public actor AppleSpeechTranscriber: Transcriber {
             )
         }
         #if canImport(Speech)
-        return try await Self.runSpeechAnalyzer(
+        let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
+        defer { signposter.endInterval("transcribe", interval) }
+        let cancellation = AnalyzerCancellation()
+        inFlightCancel = { [weak cancellation] in await cancellation?.cancel() }
+        defer { inFlightCancel = nil }
+        return try await runSpeechAnalyzer(
             url: url,
             options: options,
-            modelName: modelName
+            modelName: modelName,
+            cancellation: cancellation
         )
         #else
         throw ParolaError.unsupportedForEngine("Apple Speech framework not available in this build.")
         #endif
     }
 
+    public func cancelInFlight() async {
+        await inFlightCancel?()
+    }
+
     public func unload() async {
+        let interval = signposter.beginInterval("unload")
+        defer { signposter.endInterval("unload", interval) }
+        await cancelInFlight()
         loadedModel = nil
     }
 
     public func loadedModelName() async -> String? { loadedModel }
 
     @available(macOS 26.0, iOS 26.0, *)
-    private static func runSpeechAnalyzer(
+    private func runSpeechAnalyzer(
         url: URL,
         options: TranscriptionOptions,
-        modelName: String
+        modelName: String,
+        cancellation: AnalyzerCancellation
     ) async throws -> Transcript {
         #if canImport(Speech)
-        let locale = pickLocale(language: options.language)
+        let locale = Self.pickLocale(language: options.language)
 
         let transcriber = SpeechTranscriber(
             locale: locale,
@@ -73,6 +92,7 @@ public actor AppleSpeechTranscriber: Transcriber {
         }
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
+        await cancellation.attach(analyzer: analyzer)
         let audioFile = try AVAudioFile(forReading: url)
         let durationSeconds = Double(audioFile.length) / audioFile.processingFormat.sampleRate
 
@@ -97,19 +117,29 @@ public actor AppleSpeechTranscriber: Transcriber {
             return segments
         }
 
+        let segments: [TranscriptSegment]
         do {
-            try await analyzer.analyzeSequence(from: audioFile)
-            let endTime = CMTime(
-                seconds: max(durationSeconds, 0),
-                preferredTimescale: CMTimeScale(audioFile.processingFormat.sampleRate)
-            )
-            try await analyzer.finalizeAndFinish(through: endTime)
+            segments = try await withTaskCancellationHandler {
+                try Task.checkCancellation()
+                try await analyzer.analyzeSequence(from: audioFile)
+                let endTime = CMTime(
+                    seconds: max(durationSeconds, 0),
+                    preferredTimescale: CMTimeScale(audioFile.processingFormat.sampleRate)
+                )
+                try await analyzer.finalizeAndFinish(through: endTime)
+                return try await collectorTask.value
+            } onCancel: {
+                collectorTask.cancel()
+                Task { await cancellation.cancel() }
+            }
+        } catch is CancellationError {
+            collectorTask.cancel()
+            throw CancellationError()
         } catch {
             collectorTask.cancel()
             throw ParolaError.transcriptionFailed("Apple Speech failed: \(error.localizedDescription)")
         }
 
-        let segments = try await collectorTask.value
         let resolvedLanguage = locale.language.languageCode?.identifier
             ?? options.language
             ?? "en"
@@ -140,3 +170,30 @@ public actor AppleSpeechTranscriber: Transcriber {
         return Locale(identifier: "\(language)_\(region)")
     }
 }
+
+#if canImport(Speech)
+@available(macOS 26.0, iOS 26.0, *)
+final actor AnalyzerCancellation {
+    private var analyzer: SpeechAnalyzer?
+    private var cancelled = false
+
+    func attach(analyzer: SpeechAnalyzer) async {
+        if cancelled {
+            await analyzer.cancelAndFinishNow()
+            return
+        }
+        self.analyzer = analyzer
+    }
+
+    func cancel() async {
+        cancelled = true
+        guard let analyzer else { return }
+        self.analyzer = nil
+        await analyzer.cancelAndFinishNow()
+    }
+}
+#else
+final actor AnalyzerCancellation {
+    func cancel() async {}
+}
+#endif

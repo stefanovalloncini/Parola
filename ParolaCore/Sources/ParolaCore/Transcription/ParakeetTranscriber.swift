@@ -88,6 +88,9 @@ public actor ParakeetTranscriber: Transcriber {
         }
     }
 
+    static let segmentGapThreshold: TimeInterval = 0.8
+    static let maxTokensPerSegment: Int = 80
+
     /// Group token timings into segments by detecting silence gaps (> 0.8 s) or
     /// sentence-ending punctuation. Falls back to a single segment containing the full text.
     static func makeSegments(from result: ASRResult, includeWords: Bool) -> [TranscriptSegment] {
@@ -97,18 +100,15 @@ public actor ParakeetTranscriber: Transcriber {
             return [TranscriptSegment(id: 0, start: 0, end: result.duration, text: trimmedText, words: nil)]
         }
 
-        let gapThreshold: TimeInterval = 0.8
         var segments: [TranscriptSegment] = []
         var currentTokens: [TokenTiming] = []
         var lastEnd: TimeInterval = 0
         var nextID = 0
 
         func flush() {
-            guard !currentTokens.isEmpty else { return }
-            let start = currentTokens.first!.startTime
-            let end = currentTokens.last!.endTime
+            guard let first = currentTokens.first, let last = currentTokens.last else { return }
             let text = currentTokens
-                .map { $0.token }
+                .map(\.token)
                 .joined()
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else {
@@ -126,7 +126,13 @@ public actor ParakeetTranscriber: Transcriber {
                     )
                 }
                 : nil
-            segments.append(TranscriptSegment(id: nextID, start: start, end: end, text: text, words: words))
+            segments.append(TranscriptSegment(
+                id: nextID,
+                start: first.startTime,
+                end: last.endTime,
+                text: text,
+                words: words
+            ))
             nextID += 1
             currentTokens.removeAll()
         }
@@ -134,7 +140,7 @@ public actor ParakeetTranscriber: Transcriber {
         for timing in timings {
             if !currentTokens.isEmpty {
                 let gap = timing.startTime - lastEnd
-                if gap > gapThreshold || currentTokens.count > 80 {
+                if gap > segmentGapThreshold || currentTokens.count >= maxTokensPerSegment {
                     flush()
                 }
             }
