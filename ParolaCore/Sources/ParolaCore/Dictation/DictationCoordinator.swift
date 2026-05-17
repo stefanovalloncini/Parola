@@ -147,11 +147,8 @@ public actor DictationCoordinator {
     private func handleHybrid(_ event: HotkeyEvent) async {
         switch event {
         case .press:
-            if state == .listening && hybridLocked {
-                pressStartedAt = Date()
-                return
-            }
             pressStartedAt = Date()
+            if state == .listening && hybridLocked { return }
             hybridLocked = false
             await beginListening()
         case .release:
