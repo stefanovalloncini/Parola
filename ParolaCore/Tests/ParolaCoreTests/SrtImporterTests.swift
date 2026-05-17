@@ -48,4 +48,24 @@ struct SrtImporterTests {
         let ts = SrtImporter.parseTimestamp("01:02:03,500")
         #expect(ts == 3723.5)
     }
+
+    @Test("MM:SS,mmm timestamp parses without an hour field")
+    func shortTimestamp() {
+        let ts = SrtImporter.parseTimestamp("01:30,500")
+        #expect(ts == 90.5)
+    }
+
+    @Test("MM:SS encoder cues are not dropped")
+    func mmssCue() {
+        let srt = """
+        1
+        00:00,000 --> 00:01,500
+        Short form.
+        """
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.count == 1)
+        #expect(t.segments.first?.text == "Short form.")
+        #expect(t.segments.first?.start == 0.0)
+        #expect(t.segments.first?.end == 1.5)
+    }
 }
