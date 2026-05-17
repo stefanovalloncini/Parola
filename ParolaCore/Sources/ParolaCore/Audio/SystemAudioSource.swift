@@ -193,7 +193,7 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
         }
         if convStatus == .error || outBuffer.frameLength == 0 { return }
         try? writeFile.write(from: outBuffer)
-        onLevel(Self.normalisedLevel(of: copied))
+        onLevel(AudioLevel.normalised(of: copied))
     }
 
     /// Allocates a fresh PCM buffer and copies samples out of the sample buffer. The original
@@ -236,23 +236,6 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
         }
         _ = blockBufferOut
         return copy
-    }
-
-    private static func normalisedLevel(of buffer: AVAudioPCMBuffer) -> Float {
-        guard let channels = buffer.floatChannelData else { return 0 }
-        let frameCount = Int(buffer.frameLength)
-        guard frameCount > 0 else { return 0 }
-        let samples = channels[0]
-        var sumSquares: Float = 0
-        for index in 0..<frameCount {
-            let sample = samples[index]
-            sumSquares += sample * sample
-        }
-        let rms = sqrtf(sumSquares / Float(frameCount))
-        let minDb: Float = -55
-        let db = 20 * log10f(max(rms, 1e-7))
-        let clamped = max(minDb, min(0, db))
-        return (clamped - minDb) / -minDb
     }
 
     /// Awaits a no-op block on the sample-handler queue. Any in-flight callback finishes

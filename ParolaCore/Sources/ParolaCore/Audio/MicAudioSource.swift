@@ -121,7 +121,7 @@ public actor MicAudioSource: AudioSource {
     }
 
     private func write(box: BufferBox) {
-        emitLevel(MicAudioSource.normalisedLevel(of: box.buffer))
+        emitLevel(AudioLevel.normalised(of: box.buffer))
 
         guard let current = session, let file = current.writeFile else { return }
         let ratio = current.outputFormat.sampleRate / box.buffer.format.sampleRate
@@ -142,23 +142,6 @@ public actor MicAudioSource: AudioSource {
         try? file.write(from: outBuffer)
     }
 
-    private static func normalisedLevel(of buffer: AVAudioPCMBuffer) -> Float {
-        guard let channels = buffer.floatChannelData else { return 0 }
-        let frameCount = Int(buffer.frameLength)
-        guard frameCount > 0 else { return 0 }
-        let samples = channels[0]
-        var sumSquares: Float = 0
-        for index in 0..<frameCount {
-            let sample = samples[index]
-            sumSquares += sample * sample
-        }
-        let rms = sqrtf(sumSquares / Float(frameCount))
-        let minDb: Float = -55
-        let db = 20 * log10f(max(rms, 1e-7))
-        let clamped = max(minDb, min(0, db))
-        return (clamped - minDb) / -minDb
-    }
-
     public func prepare() async throws -> URL {
         guard let url = session?.outputURL else {
             throw ParolaError.captureUnavailable("recording was not started")
@@ -175,8 +158,7 @@ public actor MicAudioSource: AudioSource {
 
     private func stop() async {
         guard let current = session else { return }
-        // Stop the engine first; removeTap second; then drain the pending buffers
-        // so writes complete before we release the file handle.
+        // Order: stop engine, remove tap, finish continuation, drain consumer — writes must complete before the file handle is released.
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)
         current.bufferContinuation.finish()
