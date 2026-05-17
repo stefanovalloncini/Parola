@@ -1,5 +1,3 @@
-import Foundation
-import AppKit
 import SwiftUI
 
 enum SettingsPaneScope: String, CaseIterable, Identifiable {
