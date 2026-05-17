@@ -503,7 +503,7 @@ final class AppModel: ObservableObject {
         Task {
             do {
                 phase = .downloadingModel(name: "youtube", progress: 0)
-                let source = YouTubeAudioSource(url: url)
+                let source = try YouTubeAudioSource(url: url)
                 let audioURL = try await source.prepare()
                 sourceFileURL = audioURL
                 installPlayer(for: audioURL)
