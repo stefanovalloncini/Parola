@@ -257,6 +257,8 @@ final class AppModel: ObservableObject {
     @Published var dictationState: DictationCoordinator.State = .idle
     @Published var dictationAudioLevel: Float = 0
     @Published var dictationPartialText: String = ""
+    @Published var recordingAudioLevel: Float = 0
+    var recordingLevelTask: Task<Void, Never>?
 
     private static func readString(_ key: String, default fallback: String) -> String {
         UserDefaults.standard.string(forKey: key) ?? fallback
@@ -789,15 +791,49 @@ final class AppModel: ObservableObject {
                     let mic = MicAudioSource(deviceUID: preferredInputDeviceUID)
                     try await mic.start()
                     liveSource = mic
+                    observeRecordingLevels(from: mic)
                 case .systemAudio:
                     let sys = SystemAudioSource()
                     try await sys.start()
                     liveSource = sys
+                    observeRecordingLevels(from: sys)
                 }
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
         }
+    }
+
+    private func observeRecordingLevels(from mic: MicAudioSource) {
+        recordingLevelTask?.cancel()
+        recordingLevelTask = Task { @MainActor [weak self] in
+            let stream = await mic.levels()
+            for await value in stream {
+                guard let self else { return }
+                if abs(self.recordingAudioLevel - value) > 0.01 {
+                    self.recordingAudioLevel = value
+                }
+            }
+        }
+    }
+
+    private func observeRecordingLevels(from system: SystemAudioSource) {
+        recordingLevelTask?.cancel()
+        recordingLevelTask = Task { @MainActor [weak self] in
+            let stream = await system.levels()
+            for await value in stream {
+                guard let self else { return }
+                if abs(self.recordingAudioLevel - value) > 0.01 {
+                    self.recordingAudioLevel = value
+                }
+            }
+        }
+    }
+
+    private func stopRecordingLevelObserver() {
+        recordingLevelTask?.cancel()
+        recordingLevelTask = nil
+        recordingAudioLevel = 0
     }
 
     private func startStreamingMic() {
@@ -853,6 +889,7 @@ final class AppModel: ObservableObject {
                 streamingSession = nil
                 streamingConsumer?.cancel()
                 streamingConsumer = nil
+                stopRecordingLevelObserver()
             }
             return
         }
@@ -862,6 +899,7 @@ final class AppModel: ObservableObject {
             do {
                 let url = try await source.prepare()
                 liveSource = nil
+                stopRecordingLevelObserver()
                 sourceFileURL = url
                 installPlayer(for: url)
 

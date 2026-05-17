@@ -29,8 +29,7 @@ struct DictationView: View {
     private var overlayBody: some View {
         VStack(alignment: .leading, spacing: hasPartial ? 6 : 0) {
             HStack(spacing: 12) {
-                indicator
-                    .frame(width: 28, height: 20)
+                overlayIndicator
                 statusLabel
                     .foregroundStyle(.white)
                 Spacer(minLength: 0)
@@ -124,6 +123,19 @@ struct DictationView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 16))
                 .foregroundStyle(.orange)
+        }
+    }
+
+    @ViewBuilder
+    private var overlayIndicator: some View {
+        switch state {
+        case .listening:
+            WaveformHistory(level: model.dictationAudioLevel, capacity: 18, maxHeight: 20)
+                .frame(height: 22)
+                .fixedSize(horizontal: true, vertical: true)
+        default:
+            indicator
+                .frame(width: 28, height: 20)
         }
     }
 

@@ -8,6 +8,7 @@ struct RecordingPane: View {
     private var isStreaming: Bool { source == .microphone && model.useStreaming }
     private var stateLabel: String { model.liveVoiceActive ? "Listening" : "Standing by" }
     private var stopTitle: String { isStreaming ? "Finish" : "Stop" }
+    private var showsWaveform: Bool { source == .microphone }
 
     @ViewBuilder
     private var card: some View {
@@ -17,6 +18,8 @@ struct RecordingPane: View {
             startedAt: startedAt,
             isVoiceActive: model.liveVoiceActive,
             stopTitle: stopTitle,
+            audioLevel: model.recordingAudioLevel,
+            showsWaveform: showsWaveform,
             onStop: { model.stopRecordingAndTranscribe() }
         )
     }
@@ -47,6 +50,8 @@ struct RecordingCard: View {
     let startedAt: Date
     let isVoiceActive: Bool
     let stopTitle: String
+    var audioLevel: Float = 0
+    var showsWaveform: Bool = false
     let onStop: () -> Void
 
     @State private var pulse = false
@@ -83,6 +88,19 @@ struct RecordingCard: View {
                     Text(stateLabel)
                         .font(DS.Font.heading)
                         .foregroundStyle(DS.Color.secondaryText)
+                }
+                if showsWaveform {
+                    WaveformHistory(
+                        level: audioLevel,
+                        capacity: 48,
+                        barWidth: 2,
+                        spacing: 2,
+                        maxHeight: 28,
+                        idleHeight: 3,
+                        fill: DS.Color.accent
+                    )
+                    .frame(width: 220, height: 30)
+                    .padding(.top, 2)
                 }
                 Text(source.label)
                     .font(DS.Font.caption)
