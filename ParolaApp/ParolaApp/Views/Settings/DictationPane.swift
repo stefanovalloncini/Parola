@@ -105,6 +105,17 @@ private struct WorkflowRow: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .frame(width: 130)
+
+                Picker("", selection: Binding(
+                    get: { model.dictationOverrideInsertion(for: app.bundleID) },
+                    set: { model.setDictationOverrideInsertion($0, for: app.bundleID) }
+                )) {
+                    Text("Paste").tag(DictationInsertionMode.paste)
+                    Text("Keystrokes").tag(DictationInsertionMode.keystroke)
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 120)
             }
         }
     }

@@ -12,6 +12,7 @@ public struct ParolaDocument: Sendable {
         public var language: String
         public var category: EntryCategory
         public var deletedAt: Date?
+        public var updatedAt: Date?
 
         public init(
             version: Int = Manifest.currentVersion,
@@ -20,7 +21,8 @@ public struct ParolaDocument: Sendable {
             modelName: String,
             language: String,
             category: EntryCategory = .transcription,
-            deletedAt: Date? = nil
+            deletedAt: Date? = nil,
+            updatedAt: Date? = nil
         ) {
             self.version = version
             self.createdAt = createdAt
@@ -29,6 +31,7 @@ public struct ParolaDocument: Sendable {
             self.language = language
             self.category = category
             self.deletedAt = deletedAt
+            self.updatedAt = updatedAt
         }
 
         public init(from decoder: any Decoder) throws {
@@ -40,6 +43,7 @@ public struct ParolaDocument: Sendable {
             language = try c.decode(String.self, forKey: .language)
             category = try c.decodeIfPresent(EntryCategory.self, forKey: .category) ?? .transcription
             deletedAt = try c.decodeIfPresent(Date.self, forKey: .deletedAt)
+            updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt)
         }
     }
 

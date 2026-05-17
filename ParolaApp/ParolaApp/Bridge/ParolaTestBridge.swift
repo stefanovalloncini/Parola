@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 import Network
 import PDFKit
+import Security
 import ParolaCore
 
 /// TCP-loopback IPC server so external tooling (e.g. parola-mcp) can drive
@@ -16,7 +17,10 @@ final class ParolaTestBridge {
     private let listener: NWListener
     private weak var model: AppModel?
     private let portFileURL: URL
+    private let tokenFileURL: URL
+    private let authToken: String
     private var connections: [ObjectIdentifier: NWConnection] = [:]
+    private var connectionTasks: [ObjectIdentifier: Task<Void, Never>] = [:]
 
     init(model: AppModel) throws {
         self.model = model
@@ -32,17 +36,33 @@ final class ParolaTestBridge {
         let dir = caches.appendingPathComponent("Parola", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         self.portFileURL = dir.appendingPathComponent("bridge.port")
+        self.tokenFileURL = dir.appendingPathComponent("bridge.token")
+        self.authToken = Self.generateToken()
+    }
+
+    private static func generateToken() -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        if status != errSecSuccess {
+            for i in 0..<bytes.count { bytes[i] = UInt8.random(in: 0...255) }
+        }
+        return bytes.map { String(format: "%02x", $0) }.joined()
     }
 
     func start() {
         listener.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
-            if case .ready = state, let port = self.listener.port {
-                let portString = "\(port.rawValue)"
-                try? portString.write(to: self.portFileURL, atomically: true, encoding: .utf8)
-                FileHandle.standardError.write(
-                    Data("[ParolaTestBridge] listening on 127.0.0.1:\(portString)\n".utf8)
-                )
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if case .ready = state, let port = self.listener.port {
+                    let portString = "\(port.rawValue)"
+                    try? portString.write(to: self.portFileURL, atomically: true, encoding: .utf8)
+                    try? self.authToken.write(to: self.tokenFileURL, atomically: true, encoding: .utf8)
+                    self.restrictTokenPermissions()
+                    FileHandle.standardError.write(
+                        Data("[ParolaTestBridge] listening on 127.0.0.1:\(portString)\n".utf8)
+                    )
+                }
             }
         }
         listener.newConnectionHandler = { [weak self] conn in
@@ -53,13 +73,20 @@ final class ParolaTestBridge {
         listener.start(queue: .main)
     }
 
-    /// Tears down the listener and any open connections. Removes the port discovery file so
-    /// MCP clients can detect the bridge is gone.
+    private func restrictTokenPermissions() {
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tokenFileURL.path)
+    }
+
+    /// Tears down the listener and any open connections. Removes the port and token discovery
+    /// files so MCP clients can detect the bridge is gone.
     func stop() {
         listener.cancel()
         for conn in connections.values { conn.cancel() }
         connections.removeAll()
+        for task in connectionTasks.values { task.cancel() }
+        connectionTasks.removeAll()
         try? FileManager.default.removeItem(at: portFileURL)
+        try? FileManager.default.removeItem(at: tokenFileURL)
     }
 
     private func accept(_ conn: NWConnection) {
@@ -68,56 +95,71 @@ final class ParolaTestBridge {
         conn.stateUpdateHandler = { [weak self] state in
             switch state {
             case .failed, .cancelled:
-                Task { @MainActor in self?.connections.removeValue(forKey: key) }
+                Task { @MainActor [weak self] in
+                    self?.connectionTasks.removeValue(forKey: key)?.cancel()
+                    self?.connections.removeValue(forKey: key)
+                }
             default: break
             }
         }
         conn.start(queue: .main)
-        receiveLoop(conn, buffer: Data())
+        connectionTasks[key] = Task { @MainActor [weak self] in
+            await self?.runConnection(conn)
+        }
     }
 
-    private func receiveLoop(_ conn: NWConnection, buffer: Data) {
-        conn.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self] data, _, isComplete, error in
-            guard let self else { return }
-            var buf = buffer
-            if let data = data { buf.append(data) }
-
-            let lines = Self.consumeLines(buffer: &buf)
-            for lineData in lines {
-                Task { @MainActor in
-                    let response = await self.handle(line: lineData)
+    private func runConnection(_ conn: NWConnection) async {
+        var buffer = Data()
+        while !Task.isCancelled {
+            do {
+                let (data, isComplete) = try await receive(from: conn)
+                if let data { buffer.append(data) }
+                let lines = Self.consumeLines(buffer: &buffer)
+                for lineData in lines {
+                    let response = await handle(line: lineData)
                     var out = response
                     out.append(0x0A)
-                    let endsConnection = isComplete
-                    conn.send(content: out, isComplete: endsConnection, completion: .contentProcessed { sendErr in
-                        if let sendErr {
-                            FileHandle.standardError.write(
-                                Data("[ParolaTestBridge] send error: \(sendErr)\n".utf8)
-                            )
-                        }
-                        if endsConnection {
-                            conn.cancel()
-                        }
-                    })
+                    await send(out, on: conn, ending: isComplete && lines.last == lineData)
                 }
-            }
-
-            if let error {
+                if isComplete {
+                    if lines.isEmpty { conn.cancel() }
+                    return
+                }
+            } catch {
                 FileHandle.standardError.write(
                     Data("[ParolaTestBridge] receive error: \(error)\n".utf8)
                 )
                 conn.cancel()
                 return
             }
-            if isComplete {
-                if lines.isEmpty {
+        }
+    }
+
+    private func receive(from conn: NWConnection) async throws -> (Data?, Bool) {
+        try await withCheckedThrowingContinuation { cont in
+            conn.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { data, _, isComplete, error in
+                if let error {
+                    cont.resume(throwing: error)
+                } else {
+                    cont.resume(returning: (data, isComplete))
+                }
+            }
+        }
+    }
+
+    private func send(_ data: Data, on conn: NWConnection, ending: Bool) async {
+        await withCheckedContinuation { cont in
+            conn.send(content: data, isComplete: ending, completion: .contentProcessed { sendErr in
+                if let sendErr {
+                    FileHandle.standardError.write(
+                        Data("[ParolaTestBridge] send error: \(sendErr)\n".utf8)
+                    )
+                }
+                if ending {
                     conn.cancel()
                 }
-                return
-            }
-            Task { @MainActor in
-                self.receiveLoop(conn, buffer: buf)
-            }
+                cont.resume()
+            })
         }
     }
 
@@ -135,14 +177,20 @@ final class ParolaTestBridge {
         let id: String
         let cmd: String
         let args: [String: Any]
+        let auth: String
 
         do {
             let obj = try JSONSerialization.jsonObject(with: line) as? [String: Any] ?? [:]
             id = obj["id"] as? String ?? ""
             cmd = obj["cmd"] as? String ?? ""
             args = obj["args"] as? [String: Any] ?? [:]
+            auth = obj["auth"] as? String ?? ""
         } catch {
             return Self.encode(["id": "", "ok": false, "error": "invalid JSON: \(error.localizedDescription)"])
+        }
+
+        guard authenticate(auth) else {
+            return Self.encode(["id": id, "ok": false, "error": "auth required"])
         }
 
         do {
@@ -153,6 +201,15 @@ final class ParolaTestBridge {
         } catch {
             return Self.encode(["id": id, "ok": false, "error": "\(error)"])
         }
+    }
+
+    private func authenticate(_ candidate: String) -> Bool {
+        let lhs = Array(authToken.utf8)
+        let rhs = Array(candidate.utf8)
+        guard lhs.count == rhs.count else { return false }
+        var diff: UInt8 = 0
+        for i in 0..<lhs.count { diff |= lhs[i] ^ rhs[i] }
+        return diff == 0
     }
 
     private func dispatch(cmd: String, args: [String: Any]) async throws -> Any {
@@ -235,14 +292,14 @@ final class ParolaTestBridge {
             return ["useStreaming": on]
 
         case "toggleLiveCaptions":
-            let before = model.liveCaptions.isActive
+            let before = model.liveCaptions?.isActive ?? false
             model.toggleLiveCaptions()
             // toggleLiveCaptions kicks off an async Task; wait briefly so callers see the flip.
             let deadline = Date().addingTimeInterval(1.0)
-            while model.liveCaptions.isActive == before, Date() < deadline {
+            while (model.liveCaptions?.isActive ?? false) == before, Date() < deadline {
                 try? await Task.sleep(for: .milliseconds(50))
             }
-            return ["liveCaptionsActive": model.liveCaptions.isActive]
+            return ["liveCaptionsActive": model.liveCaptions?.isActive ?? false]
 
         case "openYouTubeSheet":
             model.youtubeSheetOpen = true
@@ -317,7 +374,9 @@ final class ParolaTestBridge {
             return ["queued": true, "format": raw]
 
         case "screenshot":
-            return try captureMainWindow(path: (args["path"] as? String) ?? "/tmp/parola-bridge-screenshot.png")
+            let requested = (args["path"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            let target = try resolveScreenshotPath(requested)
+            return try captureMainWindow(path: target.path)
 
         case "listPrompts":
             let prompts = await model.promptLibrary.allPrompts
@@ -414,6 +473,9 @@ final class ParolaTestBridge {
         case "setSetting":
             let key = try requireString(args, "key")
             let value = args["value"]
+            guard Self.writableSettingKeys.contains(key) else {
+                throw BridgeError("setting '\(key)' is not writable through the bridge")
+            }
             UserDefaults.standard.set(value, forKey: key)
             model.objectWillChange.send()
             return ["key": key, "value": value ?? NSNull()]
@@ -521,6 +583,39 @@ final class ParolaTestBridge {
         }
     }
 
+    /// Keys the bridge is allowed to write through `setSetting`. Anything else is rejected to
+    /// keep MCP tooling from poking at arbitrary UserDefaults keys.
+    static let writableSettingKeys: Set<String> = [
+        "useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt",
+        "diarize", "batchExportFormats", "batchExportToSourceFolder",
+        "batchExportIncludeTimestamps", "selectedModel", "selectedLanguageRaw",
+        "translate", "dictationEnabled", "appTheme", "monospacedTimestamps",
+        "sidebarDensity", "dictationCleanupPromptID", "dictationPerAppOverridesJSON",
+        "meetingDetectorEnabled", "dictationModeRaw", "dictationKeyCode",
+        "dictationIndicatorStyleRaw", "automationBridgeEnabled",
+        "transcriptDisplayMode",
+    ]
+
+    /// Resolves a caller-supplied screenshot path to a location inside Parola's caches dir.
+    /// Absolute paths outside the sandbox are rejected so the bridge can't be used to overwrite
+    /// arbitrary files on disk.
+    private func resolveScreenshotPath(_ requested: String?) throws -> URL {
+        let caches = try FileManager.default.url(
+            for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true
+        )
+        let dir = caches.appendingPathComponent("Parola/Screenshots", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        guard let requested else {
+            let name = "screenshot-\(Int(Date().timeIntervalSince1970)).png"
+            return dir.appendingPathComponent(name)
+        }
+        let bare = (requested as NSString).lastPathComponent
+        guard !bare.isEmpty, !bare.contains("/"), !bare.contains("..") else {
+            throw BridgeError("screenshot 'path' must be a bare filename")
+        }
+        return dir.appendingPathComponent(bare)
+    }
+
     private func captureMainWindow(path: String) throws -> [String: Any] {
         guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil && !$0.isMiniaturized && $0.frame.size.width > 200 }),
               let view = window.contentView else {
@@ -584,7 +679,7 @@ final class ParolaTestBridge {
             "availableModels": model.availableModels.map(\.name),
             "isRunningPrompt": model.isRunningPrompt,
             "youtubeSheetOpen": model.youtubeSheetOpen,
-            "liveCaptionsActive": model.liveCaptions.isActive,
+            "liveCaptionsActive": model.liveCaptions?.isActive ?? false,
             "batchJobCount": model.batchJobs.count,
         ]
     }

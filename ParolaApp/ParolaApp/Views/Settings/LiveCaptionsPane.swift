@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct LiveCaptionsPane: View {
-    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var liveCaptions: LiveCaptionsController
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -11,15 +11,15 @@ struct LiveCaptionsPane: View {
                            description: "Translate captions live as you speak.",
                            isFirst: true) {
                     Toggle("", isOn: Binding(
-                        get: { model.liveCaptions.translateToEnglish },
+                        get: { liveCaptions.translateToEnglish },
                         set: { newValue in
-                            Task { await model.liveCaptions.setTranslate(newValue) }
+                            Task { await liveCaptions.setTranslate(newValue) }
                         }
                     ))
                     .labelsHidden()
                 }
                 SettingRow("Status") {
-                    Text(model.liveCaptions.isActive ? "Running" : "Stopped")
+                    Text(liveCaptions.isActive ? "Running" : "Stopped")
                         .foregroundStyle(.secondary)
                 }
             }

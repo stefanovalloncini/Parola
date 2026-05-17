@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftUI
 import AVFoundation
@@ -144,28 +145,41 @@ final class AppModel: ObservableObject {
 
     // MARK: - Live captions
 
-    lazy var liveCaptions: LiveCaptionsController = LiveCaptionsController()
+    weak var liveCaptions: LiveCaptionsController?
 
     func toggleLiveCaptions() {
+        guard let liveCaptions else { return }
         Task { await liveCaptions.toggle(options: makeOptions(task: .transcribe)) }
     }
 
     // MARK: - Dictation
 
-    @AppStorage("dictationEnabled") var dictationEnabled: Bool = false {
-        didSet { applyDictationEnabledChange() }
+    @Published var dictationEnabled: Bool = UserDefaults.standard.bool(forKey: "dictationEnabled") {
+        didSet {
+            UserDefaults.standard.set(dictationEnabled, forKey: "dictationEnabled")
+            applyDictationEnabledChange()
+        }
     }
 
-    @AppStorage("dictationModeRaw") var dictationModeRaw: String = DictationMode.pushToTalk.rawValue {
-        didSet { applyDictationModeChange() }
+    @Published var dictationModeRaw: String = AppModel.readString("dictationModeRaw", default: DictationMode.pushToTalk.rawValue) {
+        didSet {
+            UserDefaults.standard.set(dictationModeRaw, forKey: "dictationModeRaw")
+            applyDictationModeChange()
+        }
     }
 
-    @AppStorage("dictationKeyCode") var dictationKeyCode: Int = 96 {
-        didSet { restartDictationForKeyChange() }
+    @Published var dictationKeyCode: Int = AppModel.readInt("dictationKeyCode", default: 96) {
+        didSet {
+            UserDefaults.standard.set(dictationKeyCode, forKey: "dictationKeyCode")
+            restartDictationForKeyChange()
+        }
     }
 
-    @AppStorage("dictationIndicatorStyleRaw") var dictationIndicatorStyleRaw: String = DictationIndicatorStyle.overlay.rawValue {
-        didSet { applyIndicatorStyleChange() }
+    @Published var dictationIndicatorStyleRaw: String = AppModel.readString("dictationIndicatorStyleRaw", default: DictationIndicatorStyle.overlay.rawValue) {
+        didSet {
+            UserDefaults.standard.set(dictationIndicatorStyleRaw, forKey: "dictationIndicatorStyleRaw")
+            applyIndicatorStyleChange()
+        }
     }
 
     var dictationMode: DictationMode {
@@ -189,11 +203,17 @@ final class AppModel: ObservableObject {
         default: return nil
         }
     }
-    @AppStorage("dictationCleanupPromptID") var dictationCleanupPromptID: String = "" {
-        didSet { applyDictationCleanupPromptChange() }
-    }
-    @AppStorage("dictationPerAppOverridesJSON") var dictationPerAppOverridesJSON: String = "{}" {
+
+    @Published var dictationCleanupPromptID: String = AppModel.readString("dictationCleanupPromptID", default: "") {
         didSet {
+            UserDefaults.standard.set(dictationCleanupPromptID, forKey: "dictationCleanupPromptID")
+            applyDictationCleanupPromptChange()
+        }
+    }
+
+    @Published var dictationPerAppOverridesJSON: String = AppModel.readString("dictationPerAppOverridesJSON", default: "{}") {
+        didSet {
+            UserDefaults.standard.set(dictationPerAppOverridesJSON, forKey: "dictationPerAppOverridesJSON")
             applyDictationCleanupPromptChange()
             restartDictationForWorkflowChange()
         }
@@ -206,19 +226,21 @@ final class AppModel: ObservableObject {
         ("com.apple.Notes", "Notes"),
     ]
 
+    let dictationController = DictationController()
+    var dictationCancellables: Set<AnyCancellable> = []
+
     @Published var dictationState: DictationCoordinator.State = .idle
     @Published var dictationAudioLevel: Float = 0
-    @Published var dictationPartialText: String = "" {
-        didSet {
-            if oldValue.isEmpty != dictationPartialText.isEmpty {
-                resizeDictationHUDForPartial()
-            }
-        }
+    @Published var dictationPartialText: String = ""
+
+    private static func readString(_ key: String, default fallback: String) -> String {
+        UserDefaults.standard.string(forKey: key) ?? fallback
     }
-    var dictationCoordinator: DictationCoordinator?
-    var dictationHUD: NSPanel?
-    var dictationLevelTask: Task<Void, Never>?
-    var dictationPartialTask: Task<Void, Never>?
+
+    private static func readInt(_ key: String, default fallback: Int) -> Int {
+        if UserDefaults.standard.object(forKey: key) == nil { return fallback }
+        return UserDefaults.standard.integer(forKey: key)
+    }
 
     // MARK: - Meeting detection
 
@@ -251,17 +273,29 @@ final class AppModel: ObservableObject {
     private var liveSource: AudioSource?
     private var streamingSession: StreamingTranscriptionSession?
     private var streamingConsumer: Task<Void, Never>?
+    private var fileTranscribeTask: Task<Void, Never>?
+    private var youtubeTranscribeTask: Task<Void, Never>?
+    private var youtubeSubsTask: Task<Void, Never>?
     private var lastDownloadPercent: Int = -1
 
     var canCancel: Bool {
         if batchTask != nil { return true }
         if streamingConsumer != nil { return true }
+        if fileTranscribeTask != nil { return true }
+        if youtubeTranscribeTask != nil { return true }
+        if youtubeSubsTask != nil { return true }
         return false
     }
 
     func cancelCurrentWork() {
         batchTask?.cancel()
         batchTask = nil
+        fileTranscribeTask?.cancel()
+        fileTranscribeTask = nil
+        youtubeTranscribeTask?.cancel()
+        youtubeTranscribeTask = nil
+        youtubeSubsTask?.cancel()
+        youtubeSubsTask = nil
         if let consumer = streamingConsumer {
             consumer.cancel()
             streamingConsumer = nil
@@ -320,6 +354,7 @@ final class AppModel: ObservableObject {
         refreshLibrary()
         _ = watchedFolders   // touch lazy var to start watchers on launch
         _ = meetingDetector  // touch lazy var to start NSWorkspace observation
+        wireDictationController()
         if dictationEnabled { startDictation() }
         if automationBridgeEnabled {
             startAutomationBridge()
@@ -418,7 +453,9 @@ final class AppModel: ObservableObject {
 
         let task: TranscriptionTask = (translateOverride ?? translate) ? .translate : .transcribe
 
-        Task {
+        fileTranscribeTask?.cancel()
+        fileTranscribeTask = Task { [weak self] in
+            guard let self else { return }
             do {
                 phase = .loadingModel(name: selectedModel)
                 if !store.isInstalled(selectedModel) {
@@ -431,14 +468,22 @@ final class AppModel: ObservableObject {
                     options: makeOptions(task: task),
                     downloadProgress: makeDownloadProgressHandler()
                 )
+                try Task.checkCancellation()
                 let processed = postProcess(result)
                 transcript = processed
                 phase = .ready
                 refreshModelList()
                 persistToLibrary(processed, audioSource: fileURL)
+            } catch is CancellationError {
+                phase = .idle
             } catch {
-                phase = .failed(message: error.localizedDescription)
+                if Task.isCancelled {
+                    phase = .idle
+                } else {
+                    phase = .failed(message: error.localizedDescription)
+                }
             }
+            self.fileTranscribeTask = nil
         }
     }
 
@@ -523,27 +568,38 @@ final class AppModel: ObservableObject {
         proc.standardOutput = pipe
         proc.standardError = pipe
 
-        let buffer = ProcessOutputBuffer()
+        let (chunkStream, chunkContinuation) = AsyncStream.makeStream(of: Data.self)
         pipe.fileHandleForReading.readabilityHandler = { fh in
             let chunk = fh.availableData
             if chunk.isEmpty {
                 fh.readabilityHandler = nil
+                chunkContinuation.finish()
             } else {
-                Task { await buffer.append(chunk) }
+                chunkContinuation.yield(chunk)
             }
+        }
+
+        let bufferTask = Task<String, Never> {
+            var data = Data()
+            for await chunk in chunkStream {
+                data.append(chunk)
+            }
+            return String(decoding: data, as: UTF8.self)
         }
 
         do {
             try proc.run()
         } catch {
             pipe.fileHandleForReading.readabilityHandler = nil
+            chunkContinuation.finish()
             return .failure("Could not launch brew: \(error.localizedDescription)")
         }
         return await withCheckedContinuation { cont in
             proc.terminationHandler = { p in
                 pipe.fileHandleForReading.readabilityHandler = nil
+                chunkContinuation.finish()
                 Task {
-                    let output = await buffer.string()
+                    let output = await bufferTask.value
                     if p.terminationStatus == 0 {
                         cont.resume(returning: .success)
                     } else {
@@ -577,11 +633,14 @@ final class AppModel: ObservableObject {
     func transcribeYouTube(urlString: String) {
         guard let url = makeYouTubeURL(urlString) else { return }
 
-        Task {
+        youtubeTranscribeTask?.cancel()
+        youtubeTranscribeTask = Task { [weak self] in
+            guard let self else { return }
             do {
                 phase = .downloadingModel(name: "youtube", progress: 0)
                 let source = try YouTubeAudioSource(url: url)
                 let audioURL = try await source.prepare()
+                try Task.checkCancellation()
                 sourceFileURL = audioURL
                 installPlayer(for: audioURL)
 
@@ -591,31 +650,49 @@ final class AppModel: ObservableObject {
                     options: currentOptions,
                     downloadProgress: makeDownloadProgressHandler()
                 )
+                try Task.checkCancellation()
                 let processed = postProcess(result)
                 transcript = processed
                 phase = .ready
                 refreshModelList()
                 persistToLibrary(processed, audioSource: audioURL)
+            } catch is CancellationError {
+                phase = .idle
             } catch {
-                phase = .failed(message: error.localizedDescription)
+                if Task.isCancelled {
+                    phase = .idle
+                } else {
+                    phase = .failed(message: error.localizedDescription)
+                }
             }
+            self.youtubeTranscribeTask = nil
         }
     }
 
     func fetchYouTubeSubs(urlString: String) {
         guard let url = makeYouTubeURL(urlString) else { return }
 
-        Task {
+        youtubeSubsTask?.cancel()
+        youtubeSubsTask = Task { [weak self] in
+            guard let self else { return }
             do {
                 phase = .transcribing(file: url)
                 let result = try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: selectedLanguage)
+                try Task.checkCancellation()
                 let processed = postProcess(result)
                 transcript = processed
                 phase = .ready
                 persistToLibrary(processed, audioSource: nil)
+            } catch is CancellationError {
+                phase = .idle
             } catch {
-                phase = .failed(message: error.localizedDescription)
+                if Task.isCancelled {
+                    phase = .idle
+                } else {
+                    phase = .failed(message: error.localizedDescription)
+                }
             }
+            self.youtubeSubsTask = nil
         }
     }
 
@@ -879,14 +956,3 @@ final class AppModel: ObservableObject {
     }
 }
 
-private actor ProcessOutputBuffer {
-    private var data = Data()
-
-    func append(_ chunk: Data) {
-        data.append(chunk)
-    }
-
-    func string() -> String {
-        String(decoding: data, as: UTF8.self)
-    }
-}

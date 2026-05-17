@@ -16,20 +16,22 @@ public struct BridgeClient: BridgeProtocol {
     }
 
     private let portFileURL: URL
+    private let tokenFileURL: URL
     private let timeout: TimeInterval
 
     public init(timeout: TimeInterval = 30) {
         let caches = (try? FileManager.default.url(
             for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: false
         )) ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Caches")
-        self.portFileURL = caches
-            .appendingPathComponent("Parola", isDirectory: true)
-            .appendingPathComponent("bridge.port")
+        let dir = caches.appendingPathComponent("Parola", isDirectory: true)
+        self.portFileURL = dir.appendingPathComponent("bridge.port")
+        self.tokenFileURL = dir.appendingPathComponent("bridge.token")
         self.timeout = timeout
     }
 
     public func call(_ cmd: String, argsJSON: Data) async throws -> String {
         guard let port = readPort() else { throw BridgeNotRunning() }
+        let token = readToken() ?? ""
 
         let socketFD = socket(AF_INET, SOCK_STREAM, 0)
         guard socketFD >= 0 else { throw BridgeFailure(message: "socket() failed") }
@@ -53,7 +55,7 @@ public struct BridgeClient: BridgeProtocol {
         let argsBytes = argsJSON.isEmpty ? Data("{}".utf8) : argsJSON
         let id = UUID().uuidString
         var requestData = Data()
-        requestData.append(Data("{\"id\":\"\(id)\",\"cmd\":\"\(cmd)\",\"args\":".utf8))
+        requestData.append(Data("{\"id\":\"\(id)\",\"cmd\":\"\(cmd)\",\"auth\":\"\(token)\",\"args\":".utf8))
         requestData.append(argsBytes)
         requestData.append(Data("}\n".utf8))
 
@@ -96,6 +98,12 @@ public struct BridgeClient: BridgeProtocol {
     private func readPort() -> Int? {
         guard let raw = try? String(contentsOf: portFileURL, encoding: .utf8) else { return nil }
         return Int(raw.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private func readToken() -> String? {
+        guard let raw = try? String(contentsOf: tokenFileURL, encoding: .utf8) else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 

@@ -6,6 +6,7 @@ actor MicDictationRecorder: DictationRecorder {
     private let defaultLanguage: String?
     private var effectiveLanguage: String?
     private let deviceUID: String?
+    private let streamingEnabled: Bool
     private let workflowResolver: (@Sendable () async -> DictationWorkflow?)?
     private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
     private var partialContinuations: [UUID: AsyncStream<String>.Continuation] = [:]
@@ -24,12 +25,14 @@ actor MicDictationRecorder: DictationRecorder {
         model: String?,
         language: String?,
         deviceUID: String? = nil,
+        streamingEnabled: Bool = true,
         workflowResolver: (@Sendable () async -> DictationWorkflow?)? = nil
     ) {
         self.model = model
         self.defaultLanguage = language
         self.effectiveLanguage = language
         self.deviceUID = deviceUID
+        self.streamingEnabled = streamingEnabled
         self.workflowResolver = workflowResolver
     }
 
@@ -56,6 +59,7 @@ actor MicDictationRecorder: DictationRecorder {
     }
 
     func stopAndTranscribe() async throws -> String {
+        await resolveLanguageOverride()
         if streamingSession != nil {
             return await stopStreaming()
         }
@@ -85,6 +89,7 @@ actor MicDictationRecorder: DictationRecorder {
     }
 
     private var useStreaming: Bool {
+        guard streamingEnabled else { return false }
         guard let model else { return false }
         guard let variant = ModelCatalog.variant(id: model) else { return false }
         return variant.engineID == .whisperKit
