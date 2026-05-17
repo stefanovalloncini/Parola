@@ -32,6 +32,17 @@ struct DictationPane: View {
                     .pickerStyle(.menu)
                     .frame(width: 200)
                 }
+                SettingRow("Indicator style",
+                           description: model.dictationIndicatorStyle.description) {
+                    Picker("", selection: $model.dictationIndicatorStyleRaw) {
+                        ForEach(DictationIndicatorStyle.allCases) { style in
+                            Text(style.displayName).tag(style.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 200)
+                }
                 SettingRow("Cleanup mode") {
                     Picker("", selection: $model.dictationCleanupPromptID) {
                         Text("Raw (no cleanup)").tag("")

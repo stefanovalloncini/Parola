@@ -164,8 +164,16 @@ final class AppModel: ObservableObject {
         didSet { restartDictationForKeyChange() }
     }
 
+    @AppStorage("dictationIndicatorStyleRaw") var dictationIndicatorStyleRaw: String = DictationIndicatorStyle.overlay.rawValue {
+        didSet { applyIndicatorStyleChange() }
+    }
+
     var dictationMode: DictationMode {
         DictationMode(rawValue: dictationModeRaw) ?? .pushToTalk
+    }
+
+    var dictationIndicatorStyle: DictationIndicatorStyle {
+        DictationIndicatorStyle(rawValue: dictationIndicatorStyleRaw) ?? .overlay
     }
 
     // MARK: - Customization

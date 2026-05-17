@@ -9,6 +9,24 @@ struct DictationView: View {
     @State private var startedAt: Date = Date()
 
     var body: some View {
+        Group {
+            switch model.dictationIndicatorStyle {
+            case .overlay: overlayBody
+            case .notch:   notchBody
+            case .minimal: minimalBody
+            }
+        }
+        .padding(4)
+        .onChange(of: state) { _, newValue in
+            if case .listening = newValue { startedAt = Date() }
+        }
+    }
+
+    private var hasPartial: Bool {
+        !model.dictationPartialText.isEmpty
+    }
+
+    private var overlayBody: some View {
         VStack(alignment: .leading, spacing: hasPartial ? 6 : 0) {
             HStack(spacing: 12) {
                 indicator
@@ -43,14 +61,54 @@ struct DictationView: View {
                 .stroke(.white.opacity(0.08), lineWidth: 1)
         )
         .animation(.easeOut(duration: 0.18), value: hasPartial)
-        .padding(4)
-        .onChange(of: state) { _, newValue in
-            if case .listening = newValue { startedAt = Date() }
-        }
     }
 
-    private var hasPartial: Bool {
-        !model.dictationPartialText.isEmpty
+    private var notchBody: some View {
+        HStack(spacing: 10) {
+            indicator
+                .frame(width: 22, height: 16)
+            Text(notchLabel)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            timer
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.65))
+            stopButton
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .frame(width: hasPartial ? 360 : 240, height: 28, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.black.opacity(0.9))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(.white.opacity(0.05), lineWidth: 1)
+        )
+        .animation(.easeOut(duration: 0.18), value: hasPartial)
+    }
+
+    private var minimalBody: some View {
+        ZStack {
+            Circle()
+                .fill(Color.black.opacity(0.85))
+                .overlay(
+                    Circle()
+                        .stroke(.white.opacity(0.08), lineWidth: 1)
+                )
+            indicator
+                .frame(width: 18, height: 14)
+                .scaleEffect(0.85)
+        }
+        .frame(width: 36, height: 36)
+    }
+
+    private var notchLabel: String {
+        if hasPartial { return model.dictationPartialText }
+        return label
     }
 
     @ViewBuilder

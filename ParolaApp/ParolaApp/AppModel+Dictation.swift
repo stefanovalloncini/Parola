@@ -206,31 +206,52 @@ extension AppModel {
             if let host = panel.contentView as? NSHostingView<DictationView> {
                 host.rootView = DictationView(state: state, model: self)
             }
-            resizeDictationHUDForPartial()
-            if let screen = NSScreen.main {
-                let frame = screen.visibleFrame
-                let panelFrame = panel.frame
-                let x = frame.midX - panelFrame.width / 2
-                let y = frame.minY + 100
-                panel.setFrameOrigin(NSPoint(x: x, y: y))
-            }
+            panel.setFrame(preferredHUDFrame(), display: true, animate: false)
             panel.orderFrontRegardless()
         }
     }
 
     func resizeDictationHUDForPartial() {
         guard let panel = dictationHUD else { return }
+        let target = preferredHUDFrame()
+        guard panel.frame != target else { return }
+        panel.setFrame(target, display: true, animate: true)
+    }
+
+    func applyIndicatorStyleChange() {
+        guard let panel = dictationHUD else { return }
+        panel.setFrame(preferredHUDFrame(), display: true, animate: true)
+    }
+
+    private func preferredHUDFrame() -> NSRect {
+        let style = dictationIndicatorStyle
         let hasPartial = !dictationPartialText.isEmpty
-        let target = NSSize(
-            width: hasPartial ? 332 : 268,
-            height: hasPartial ? 78 : 64
-        )
-        guard panel.frame.size != target else { return }
-        var newFrame = panel.frame
-        let oldCenterX = newFrame.midX
-        newFrame.size = target
-        newFrame.origin.x = oldCenterX - target.width / 2
-        panel.setFrame(newFrame, display: true, animate: true)
+        let size: NSSize
+        switch style {
+        case .overlay:
+            size = NSSize(width: hasPartial ? 332 : 268, height: hasPartial ? 78 : 64)
+        case .notch:
+            size = NSSize(width: hasPartial ? 372 : 252, height: 36)
+        case .minimal:
+            size = NSSize(width: 44, height: 44)
+        }
+        guard let screen = NSScreen.main else {
+            return NSRect(x: 0, y: 0, width: size.width, height: size.height)
+        }
+        let frame = screen.visibleFrame
+        let origin: NSPoint
+        switch style {
+        case .overlay:
+            origin = NSPoint(x: frame.midX - size.width / 2, y: frame.minY + 100)
+        case .notch:
+            let topY = screen.frame.maxY - screen.visibleFrame.maxY > 30
+                ? screen.frame.maxY - size.height - 4
+                : screen.visibleFrame.maxY - size.height - 8
+            origin = NSPoint(x: frame.midX - size.width / 2, y: topY)
+        case .minimal:
+            origin = NSPoint(x: frame.maxX - size.width - 24, y: frame.minY + 24)
+        }
+        return NSRect(origin: origin, size: size)
     }
 
     private func hideDictationHUD() {
