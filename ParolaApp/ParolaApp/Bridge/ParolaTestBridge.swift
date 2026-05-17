@@ -612,4 +612,3 @@ private struct BridgeError: Error {
     let message: String
     init(_ message: String) { self.message = message }
 }
-#endif
