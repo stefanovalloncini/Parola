@@ -3,13 +3,33 @@ import ParolaCore
 
 struct AutoExportSettings: View {
     @EnvironmentObject var model: AppModel
+    @State private var query = ""
+    @State private var filter: RuleFilter = .all
 
     var body: some View {
         Form {
             Section {
-                ForEach($model.autoExportRules) { $rule in
-                    AutoExportRuleEditor(rule: $rule) {
-                        model.autoExportRules.removeAll { $0.id == rule.id }
+                Picker("Filter", selection: $filter) {
+                    ForEach(RuleFilter.allCases) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
+            }
+
+            Section {
+                if filteredRuleIDs.isEmpty, !model.autoExportRules.isEmpty {
+                    ContentUnavailableView.search(text: query)
+                        .listRowBackground(Color.clear)
+                } else {
+                    ForEach($model.autoExportRules) { $rule in
+                        if filteredRuleIDs.contains(rule.id) {
+                            AutoExportRuleEditor(rule: $rule) {
+                                model.autoExportRules.removeAll { $0.id == rule.id }
+                            }
+                        }
                     }
                 }
                 Button {
@@ -25,6 +45,26 @@ struct AutoExportSettings: View {
                 Text("Auto-export writes additional files to your library's Exports folder whenever a transcription completes.")
             }
         }
+        .searchable(text: $query, prompt: "Search extensions or formats")
+    }
+
+    private var filteredRuleIDs: Set<AutoExportRule.ID> {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return Set(
+            model.autoExportRules
+                .filter { filter.matches($0.enabled) }
+                .filter { rule in
+                    guard !trimmed.isEmpty else { return true }
+                    if rule.sourceExtensions.contains(where: { $0.lowercased().contains(trimmed) }) {
+                        return true
+                    }
+                    return rule.outputFormats.contains { format in
+                        format.fileExtension.lowercased().contains(trimmed)
+                            || format.rawValue.lowercased().contains(trimmed)
+                    }
+                }
+                .map(\.id)
+        )
     }
 }
 
@@ -97,6 +137,28 @@ private struct FlowGrid<Content: View>: View {
             spacing: 4
         ) {
             content()
+        }
+    }
+}
+
+enum RuleFilter: String, CaseIterable, Identifiable {
+    case all, enabled, disabled
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .all: "All"
+        case .enabled: "Enabled"
+        case .disabled: "Disabled"
+        }
+    }
+
+    func matches(_ enabled: Bool) -> Bool {
+        switch self {
+        case .all: true
+        case .enabled: enabled
+        case .disabled: !enabled
         }
     }
 }
