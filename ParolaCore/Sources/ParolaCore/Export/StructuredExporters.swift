@@ -17,12 +17,12 @@ public struct HtmlExporter: TranscriptExporter {
     public func render(_ transcript: Transcript) throws -> Data {
         var body = ""
         for seg in transcript.segments {
-            let text = Self.escape(seg.text.trimmingCharacters(in: .whitespaces))
-            let ts = MarkdownExporter.timestamp(seg.start)
+            let text = Format.escapeHTML(seg.text.trimmingCharacters(in: .whitespaces))
+            let ts = Format.timestampHHMMSS(seg.start)
             let anchor = "t-\(seg.id)"
             var paragraph = "<p id=\"\(anchor)\"><a class=\"t\" href=\"#\(anchor)\">[\(ts)]</a> "
             if let speaker = seg.speaker {
-                paragraph += "<span class=\"s\">\(Self.escape(speaker))</span>: "
+                paragraph += "<span class=\"s\">\(Format.escapeHTML(speaker))</span>: "
             }
             paragraph += "\(text)</p>\n"
             body += paragraph
@@ -37,13 +37,6 @@ public struct HtmlExporter: TranscriptExporter {
         return utf8(doc)
     }
 
-    static func escape(_ s: String) -> String {
-        s.replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: "<", with: "&lt;")
-            .replacingOccurrences(of: ">", with: "&gt;")
-            .replacingOccurrences(of: "\"", with: "&quot;")
-            .replacingOccurrences(of: "'", with: "&#39;")
-    }
 }
 
 public struct CsvExporter: TranscriptExporter {
@@ -85,9 +78,9 @@ public struct DocxExporter: TranscriptExporter {
     private func buildDocumentXML(_ transcript: Transcript) -> String {
         var body = ""
         for seg in transcript.segments {
-            let text = HtmlExporter.escape(seg.text.trimmingCharacters(in: .whitespaces))
+            let text = Format.escapeXML(seg.text.trimmingCharacters(in: .whitespaces))
             if let speaker = seg.speaker {
-                let escapedSpeaker = HtmlExporter.escape(speaker)
+                let escapedSpeaker = Format.escapeXML(speaker)
                 body += "<w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space=\"preserve\">\(escapedSpeaker): </w:t></w:r><w:r><w:t xml:space=\"preserve\">\(text)</w:t></w:r></w:p>"
             } else {
                 body += "<w:p><w:r><w:t xml:space=\"preserve\">\(text)</w:t></w:r></w:p>"

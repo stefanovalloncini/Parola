@@ -44,6 +44,7 @@ struct GeneralPane: View {
                 }
                 .padding(16)
             }
+            ResetPaneButton(scope: .general)
         }
     }
 }

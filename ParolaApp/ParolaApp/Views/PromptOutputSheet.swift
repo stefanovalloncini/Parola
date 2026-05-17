@@ -5,6 +5,7 @@ struct PromptOutputSheet: View {
     let output: AppModel.PromptOutput
     @Environment(\.dismiss) private var dismiss
     @State private var copied: Bool = false
+    @State private var resetTask: Task<Void, Never>?
 
     var body: some View {
         SheetFrame(
@@ -15,6 +16,10 @@ struct PromptOutputSheet: View {
             content: { contentBody },
             footer: { footerBody }
         )
+        .onDisappear {
+            resetTask?.cancel()
+            resetTask = nil
+        }
     }
 
     private var contentBody: some View {
@@ -59,8 +64,10 @@ struct PromptOutputSheet: View {
         pb.clearContents()
         pb.setString(output.text, forType: .string)
         copied = true
-        Task { @MainActor in
+        resetTask?.cancel()
+        resetTask = Task {
             try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
             copied = false
         }
     }

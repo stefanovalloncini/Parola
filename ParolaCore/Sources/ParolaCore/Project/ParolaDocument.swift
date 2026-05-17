@@ -13,6 +13,7 @@ public struct ParolaDocument: Sendable {
         public var category: EntryCategory
         public var deletedAt: Date?
         public var updatedAt: Date?
+        public var audioFilename: String?
 
         public init(
             version: Int = Manifest.currentVersion,
@@ -22,7 +23,8 @@ public struct ParolaDocument: Sendable {
             language: String,
             category: EntryCategory = .transcription,
             deletedAt: Date? = nil,
-            updatedAt: Date? = nil
+            updatedAt: Date? = nil,
+            audioFilename: String? = nil
         ) {
             self.version = version
             self.createdAt = createdAt
@@ -32,6 +34,19 @@ public struct ParolaDocument: Sendable {
             self.category = category
             self.deletedAt = deletedAt
             self.updatedAt = updatedAt
+            self.audioFilename = audioFilename
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case version
+            case createdAt
+            case originalAudioName
+            case modelName
+            case language
+            case category
+            case deletedAt
+            case updatedAt
+            case audioFilename
         }
 
         public init(from decoder: any Decoder) throws {
@@ -44,6 +59,20 @@ public struct ParolaDocument: Sendable {
             category = try c.decodeIfPresent(EntryCategory.self, forKey: .category) ?? .transcription
             deletedAt = try c.decodeIfPresent(Date.self, forKey: .deletedAt)
             updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt)
+            audioFilename = try c.decodeIfPresent(String.self, forKey: .audioFilename)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(version, forKey: .version)
+            try c.encode(createdAt, forKey: .createdAt)
+            try c.encode(originalAudioName, forKey: .originalAudioName)
+            try c.encode(modelName, forKey: .modelName)
+            try c.encode(language, forKey: .language)
+            try c.encode(category, forKey: .category)
+            try c.encodeIfPresent(deletedAt, forKey: .deletedAt)
+            try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
+            try c.encodeIfPresent(audioFilename, forKey: .audioFilename)
         }
     }
 
@@ -57,7 +86,7 @@ public struct ParolaDocument: Sendable {
         self.manifest = manifest
     }
 
-    /// Writes a `.parola` bundle. If `to` doesn't end in `.parola`, the extension is appended.
+    /// Writes a `.parola` bundle atomically. If `to` doesn't end in `.parola`, the extension is appended.
     /// Pass `audioURL: nil` for transcript-only bundles (live recordings without saved audio).
     @discardableResult
     public static func write(
@@ -71,33 +100,47 @@ public struct ParolaDocument: Sendable {
         let target = destination.pathExtension == "parola"
             ? destination
             : destination.appendingPathExtension("parola")
+        let staging = target.appendingPathExtension("tmp")
 
         let fm = FileManager.default
-        if fm.fileExists(atPath: target.path) {
-            try fm.removeItem(at: target)
+        if fm.fileExists(atPath: staging.path) {
+            try fm.removeItem(at: staging)
         }
-        try fm.createDirectory(at: target, withIntermediateDirectories: true)
+        try fm.createDirectory(at: staging, withIntermediateDirectories: true)
 
-        var originalAudioName = ""
-        if let source {
-            let audioExt = source.pathExtension.isEmpty ? "wav" : source.pathExtension
-            let audioName = "audio.\(audioExt)"
-            try fm.copyItem(at: source, to: target.appendingPathComponent(audioName))
-            originalAudioName = source.lastPathComponent
-        }
-        if let titleOverride, !titleOverride.isEmpty {
-            originalAudioName = titleOverride
-        }
+        do {
+            var originalAudioName = ""
+            var audioFilename: String?
+            if let source {
+                let audioExt = source.pathExtension.isEmpty ? "wav" : source.pathExtension
+                let audioName = "audio.\(audioExt)"
+                try fm.copyItem(at: source, to: staging.appendingPathComponent(audioName))
+                originalAudioName = source.lastPathComponent
+                audioFilename = audioName
+            }
+            if let titleOverride, !titleOverride.isEmpty {
+                originalAudioName = titleOverride
+            }
 
-        let manifest = Manifest(
-            originalAudioName: originalAudioName,
-            modelName: transcript.modelName,
-            language: transcript.language,
-            category: category,
-            deletedAt: deletedAt
-        )
-        try writeJSON(manifest, to: target.appendingPathComponent("manifest.json"))
-        try writeJSON(transcript, to: target.appendingPathComponent("transcript.json"))
+            let manifest = Manifest(
+                originalAudioName: originalAudioName,
+                modelName: transcript.modelName,
+                language: transcript.language,
+                category: category,
+                deletedAt: deletedAt,
+                audioFilename: audioFilename
+            )
+            try writeJSON(manifest, to: staging.appendingPathComponent("manifest.json"))
+            try writeJSON(transcript, to: staging.appendingPathComponent("transcript.json"))
+
+            if fm.fileExists(atPath: target.path) {
+                try fm.removeItem(at: target)
+            }
+            try fm.moveItem(at: staging, to: target)
+        } catch {
+            try? fm.removeItem(at: staging)
+            throw error
+        }
 
         return target
     }
@@ -129,10 +172,22 @@ public struct ParolaDocument: Sendable {
         }
         let transcript: Transcript = try readJSON(at: url.appendingPathComponent("transcript.json"))
 
-        let contents = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
-        let audioURL = contents.first(where: { $0.lastPathComponent.hasPrefix("audio.") })
+        let audioURL = resolveAudioURL(in: url, manifest: manifest)
 
         return ParolaDocument(transcript: transcript, audioURL: audioURL, manifest: manifest)
+    }
+
+    private static func resolveAudioURL(in bundleURL: URL, manifest: Manifest) -> URL? {
+        let fm = FileManager.default
+        if let stamped = manifest.audioFilename, !stamped.isEmpty {
+            let candidate = bundleURL.appendingPathComponent(stamped)
+            if fm.fileExists(atPath: candidate.path) { return candidate }
+        }
+        let contents = (try? fm.contentsOfDirectory(at: bundleURL, includingPropertiesForKeys: nil)) ?? []
+        let audioCandidates = contents
+            .filter { $0.lastPathComponent.hasPrefix("audio.") }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        return audioCandidates.first
     }
 
     private static func writeJSON<T: Encodable>(_ value: T, to url: URL) throws {

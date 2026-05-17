@@ -64,6 +64,7 @@ struct FindReplacePane: View {
             }
 
             SettingHelper(text: "Substitutions applied to every new transcript before it's saved. Term packs add curated rules in one click.")
+            ResetPaneButton(scope: .findReplace)
         }
     }
 
@@ -84,7 +85,11 @@ struct FindReplacePane: View {
         case .original: break
         case .findAZ: rules.sort { $0.find.localizedCaseInsensitiveCompare($1.find) == .orderedAscending }
         case .findZA: rules.sort { $0.find.localizedCaseInsensitiveCompare($1.find) == .orderedDescending }
-        case .enabledFirst: rules.sort { $0.enabled && !$1.enabled }
+        case .enabledFirst:
+            rules.sort { lhs, rhs in
+                if lhs.enabled == rhs.enabled { return false }
+                return lhs.enabled
+            }
         }
         return rules
     }
@@ -205,13 +210,39 @@ private struct FindReplaceRuleRow: View {
     let isFirst: Bool
     let onDelete: () -> Void
 
+    private var canEnable: Bool {
+        !rule.find.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && regexError == nil
+    }
+
+    private var regexError: String? {
+        guard rule.regex else { return nil }
+        let trimmed = rule.find.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        do {
+            _ = try NSRegularExpression(pattern: rule.find)
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if !isFirst { Divider().padding(.leading, 16) }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Toggle("", isOn: $rule.enabled).labelsHidden()
-                    TextField("find", text: $rule.find).textFieldStyle(.roundedBorder)
+                    Toggle("", isOn: Binding(
+                        get: { rule.enabled && canEnable },
+                        set: { if canEnable { rule.enabled = $0 } }
+                    ))
+                    .labelsHidden()
+                    .disabled(!canEnable)
+                    TextField("find", text: $rule.find)
+                        .textFieldStyle(.roundedBorder)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .strokeBorder(regexError == nil ? Color.clear : Color.red.opacity(0.8), lineWidth: 1)
+                        )
                     Text("→").foregroundStyle(.secondary)
                     TextField("replace with", text: $rule.replace).textFieldStyle(.roundedBorder)
                     Button(role: .destructive, action: onDelete) {
@@ -224,6 +255,15 @@ private struct FindReplaceRuleRow: View {
                     Toggle("Regex", isOn: $rule.regex).toggleStyle(.checkbox)
                 }
                 .font(.system(size: 11))
+                if let regexError {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.red)
+                        Text(regexError)
+                            .foregroundStyle(.red)
+                    }
+                    .font(.system(size: 11))
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)

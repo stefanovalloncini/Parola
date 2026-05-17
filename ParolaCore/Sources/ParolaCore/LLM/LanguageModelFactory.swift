@@ -26,6 +26,9 @@ public enum LanguageModelFactory {
         if managed.disableCloudLLM {
             throw CloudLLMError.disabledByPolicy
         }
+        guard CloudLanguageModel.isSupported(provider) else {
+            throw CloudLLMError.unsupportedProvider(provider)
+        }
         guard let key = try await keyStore.get(for: provider), !key.isEmpty else {
             throw CloudLLMError.missingAPIKey(provider)
         }
@@ -37,8 +40,7 @@ public enum LanguageModelFactory {
         if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
             switch SystemLanguageModel.default.availability {
             case .available:
-                let session = LanguageModelSession(instructions: instructions)
-                return FoundationLanguageModel(session: session)
+                return FoundationLanguageModel(instructions: instructions)
             case .unavailable(let reason):
                 throw Failure.notAvailable("\(reason)")
             @unknown default:

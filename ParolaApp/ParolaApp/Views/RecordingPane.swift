@@ -50,6 +50,7 @@ struct RecordingCard: View {
     let onStop: () -> Void
 
     @State private var pulse = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: DS.Spacing.large) {
@@ -60,9 +61,9 @@ struct RecordingCard: View {
                 Image(systemName: "mic.fill")
                     .font(.system(size: 64, weight: .regular))
                     .foregroundStyle(DS.Color.accent)
-                    .scaleEffect(pulse ? 1.05 : 1.0)
+                    .scaleEffect(reduceMotion ? 1.0 : (pulse ? 1.05 : 1.0))
                     .animation(
-                        .easeInOut(duration: 0.7).repeatForever(autoreverses: true),
+                        reduceMotion ? nil : .easeInOut(duration: 0.7).repeatForever(autoreverses: true),
                         value: pulse
                     )
             }
@@ -110,7 +111,7 @@ struct RecordingCard: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(DS.Color.separator.opacity(0.6), lineWidth: 1)
         )
-        .onAppear { pulse = true }
+        .onAppear { if !reduceMotion { pulse = true } }
     }
 }
 

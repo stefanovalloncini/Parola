@@ -11,6 +11,8 @@ public struct TranscriptionOptions: Sendable {
     public var model: String?
     public var language: String?
     public var task: TranscriptionTask
+
+    /// Forced on when ``diarize`` is set, since speaker alignment needs word boundaries.
     public var wordTimestamps: Bool
     public var verbose: Bool
 

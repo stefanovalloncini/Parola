@@ -8,6 +8,7 @@ struct SpeakersSheet: View {
     @State private var renames: [String: String] = [:]
     @State private var suggestions: [Person] = []
     @State private var searchText: String = ""
+    @FocusState private var focusedSpeaker: String?
 
     var body: some View {
         SheetFrame(
@@ -27,7 +28,7 @@ struct SpeakersSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.medium) {
                 if !transcript.uniqueSpeakers.isEmpty || !suggestions.isEmpty {
-                    searchField
+                    SearchPill(text: $searchText, placeholder: "Search speakers…")
                 }
                 if transcript.uniqueSpeakers.isEmpty {
                     Text("This transcript wasn't diarized — turn on Identify speakers in Settings before transcribing.")
@@ -55,33 +56,6 @@ struct SpeakersSheet: View {
             }
             .padding(DS.Spacing.regular)
         }
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("Search speakers…", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        )
     }
 
     private var filteredSpeakers: [String] {
@@ -127,11 +101,13 @@ struct SpeakersSheet: View {
                 set: { renames[speaker] = $0 }
             ))
             .textFieldStyle(.roundedBorder)
+            .focused($focusedSpeaker, equals: speaker)
         }
     }
 
     private var activeFieldKey: String? {
-        renames.keys.first(where: { speaker in
+        if let focused = focusedSpeaker { return focused }
+        return renames.keys.first(where: { speaker in
             (renames[speaker] ?? speaker) != speaker
         })
     }
@@ -140,6 +116,7 @@ struct SpeakersSheet: View {
         let target = activeFieldKey ?? transcript.uniqueSpeakers.first
         guard let target else { return }
         renames[target] = name
+        focusedSpeaker = target
     }
 }
 

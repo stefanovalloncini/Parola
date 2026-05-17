@@ -5,10 +5,7 @@ struct ContentRoutes: View {
 
     var body: some View {
         content
-            .dropDestination(for: URL.self) { urls, _ in
-                handleDroppedURLs(urls)
-                return !urls.isEmpty
-            }
+            .modifier(RouteAwareDropDestination(route: model.route, handler: handleDroppedURLs))
             .onChange(of: model.pendingExport) { _, format in
                 if let format {
                     model.performExport(format)
@@ -67,6 +64,22 @@ struct ContentRoutes: View {
             model.transcribe(fileURL: urls[0])
         } else {
             model.startBatch(urls: urls)
+        }
+    }
+}
+
+private struct RouteAwareDropDestination: ViewModifier {
+    let route: AppModel.Route
+    let handler: ([URL]) -> Void
+
+    func body(content: Content) -> some View {
+        if route == .batch {
+            content
+        } else {
+            content.dropDestination(for: URL.self) { urls, _ in
+                handler(urls)
+                return !urls.isEmpty
+            }
         }
     }
 }

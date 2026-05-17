@@ -9,23 +9,51 @@ public actor FolderWatcher {
         return audioExtensions.contains(ext) || videoExtensions.contains(ext)
     }
 
+    public struct Options: Sendable {
+        public var recursive: Bool
+        public var settledInterval: Duration
+        public var clock: any FolderWatcherClock
+
+        public init(
+            recursive: Bool = true,
+            settledInterval: Duration = .milliseconds(750),
+            clock: any FolderWatcherClock = SystemFolderWatcherClock()
+        ) {
+            self.recursive = recursive
+            self.settledInterval = settledInterval
+            self.clock = clock
+        }
+    }
+
     private let folderURL: URL
     private let onNewMediaFile: @Sendable (URL) -> Void
+    private let options: Options
     private var fileDescriptor: Int32 = -1
     private var source: DispatchSourceFileSystemObject?
     private var knownFiles: Set<String> = []
+    private var pendingFiles: [String: PendingFile] = [:]
     private var scanTask: Task<Void, Never>?
     private var scanContinuation: AsyncStream<Void>.Continuation?
+    private var settledTask: Task<Void, Never>?
 
-    public init(folderURL: URL, onNewMediaFile: @escaping @Sendable (URL) -> Void) {
+    private struct PendingFile {
+        var modificationDate: Date
+        var size: Int64
+        var firstSeen: Date
+    }
+
+    public init(
+        folderURL: URL,
+        options: Options = Options(),
+        onNewMediaFile: @escaping @Sendable (URL) -> Void
+    ) {
         self.folderURL = folderURL
+        self.options = options
         self.onNewMediaFile = onNewMediaFile
     }
 
-    deinit {
-        scanContinuation?.finish()
-        scanTask?.cancel()
-        source?.cancel()
+    public init(folderURL: URL, onNewMediaFile: @escaping @Sendable (URL) -> Void) {
+        self.init(folderURL: folderURL, options: Options(), onNewMediaFile: onNewMediaFile)
     }
 
     public func start() {
@@ -67,23 +95,98 @@ public actor FolderWatcher {
         scanContinuation = nil
         scanTask?.cancel()
         scanTask = nil
+        settledTask?.cancel()
+        settledTask = nil
+        pendingFiles.removeAll()
     }
 
-    private func checkForNewFiles() {
+    internal func checkForNewFiles() async {
         let current = scanFolder()
         let added = current.subtracting(knownFiles)
-        knownFiles = current
+        knownFiles.formUnion(current)
+
+        let now = options.clock.now()
         for path in added {
             let url = URL(fileURLWithPath: path)
-            if Self.isMediaFile(url) {
-                onNewMediaFile(url)
+            guard Self.isMediaFile(url) else { continue }
+            let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+            let mtime = attrs?[.modificationDate] as? Date ?? now
+            let size = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
+            pendingFiles[path] = PendingFile(modificationDate: mtime, size: size, firstSeen: now)
+        }
+
+        if !pendingFiles.isEmpty {
+            schedulePendingCheck()
+        }
+    }
+
+    private func schedulePendingCheck() {
+        if settledTask != nil { return }
+        let interval = options.settledInterval
+        settledTask = Task { [weak self] in
+            try? await Task.sleep(for: interval)
+            await self?.processPending()
+        }
+    }
+
+    private func processPending() {
+        settledTask = nil
+        guard !pendingFiles.isEmpty else { return }
+        let now = options.clock.now()
+        let cutoff = now.addingTimeInterval(-Self.intervalAsSeconds(options.settledInterval))
+        var stillPending: [String: PendingFile] = [:]
+        for (path, info) in pendingFiles {
+            let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+            guard let attrs else { continue }
+            let mtime = attrs[.modificationDate] as? Date ?? info.modificationDate
+            let size = (attrs[.size] as? NSNumber)?.int64Value ?? 0
+            if mtime <= cutoff && size == info.size && size > 0 {
+                onNewMediaFile(URL(fileURLWithPath: path))
+            } else {
+                stillPending[path] = PendingFile(
+                    modificationDate: mtime,
+                    size: size,
+                    firstSeen: info.firstSeen
+                )
             }
         }
+        pendingFiles = stillPending
+        if !pendingFiles.isEmpty {
+            schedulePendingCheck()
+        }
+    }
+
+    private static func intervalAsSeconds(_ duration: Duration) -> Double {
+        let comp = duration.components
+        return Double(comp.seconds) + Double(comp.attoseconds) / 1e18
     }
 
     private func scanFolder() -> Set<String> {
         let fm = FileManager.default
-        guard let contents = try? fm.contentsOfDirectory(atPath: folderURL.path) else { return [] }
-        return Set(contents.map { folderURL.appendingPathComponent($0).path })
+        guard options.recursive else {
+            guard let contents = try? fm.contentsOfDirectory(atPath: folderURL.path) else { return [] }
+            return Set(contents.map { folderURL.appendingPathComponent($0).path })
+        }
+        guard let enumerator = fm.enumerator(
+            at: folderURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else { return [] }
+        var paths: Set<String> = []
+        for case let url as URL in enumerator {
+            let resourceValues = try? url.resourceValues(forKeys: [.isRegularFileKey])
+            guard resourceValues?.isRegularFile == true else { continue }
+            paths.insert(url.path)
+        }
+        return paths
     }
+}
+
+public protocol FolderWatcherClock: Sendable {
+    func now() -> Date
+}
+
+public struct SystemFolderWatcherClock: FolderWatcherClock {
+    public init() {}
+    public func now() -> Date { Date() }
 }

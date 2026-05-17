@@ -1,8 +1,30 @@
 import SwiftUI
 import ParolaCore
 
+struct ChatSessionKey: Hashable {
+    let entryID: String?
+    let hasTranscript: Bool
+}
+
+struct FocusChatComposerAction {
+    let focus: @MainActor () -> Void
+    @MainActor func callAsFunction() { focus() }
+}
+
+private struct FocusChatComposerKey: FocusedValueKey {
+    typealias Value = FocusChatComposerAction
+}
+
+extension FocusedValues {
+    var focusChatComposer: FocusChatComposerAction? {
+        get { self[FocusChatComposerKey.self] }
+        set { self[FocusChatComposerKey.self] = newValue }
+    }
+}
+
 struct ChatPane: View {
     @EnvironmentObject var model: AppModel
+    @AppStorage("chat.searchExpanded") private var isSearchingPersisted: Bool = false
     @State private var session: TranscriptChatSession?
     @State private var sessionError: String?
     @State private var input: String = ""
@@ -11,6 +33,7 @@ struct ChatPane: View {
     @State private var isSearching: Bool = false
     @State private var searchQuery: String = ""
     @State private var senderFilter: ChatSenderFilter = .all
+    @State private var sendTask: Task<Void, Never>?
     @FocusState private var composerFocused: Bool
     @FocusState private var searchFocused: Bool
 
@@ -25,7 +48,10 @@ struct ChatPane: View {
             content
         }
         .background(DS.Color.surface)
-        .task(id: model.transcript) { await rebuildSession() }
+        .task(id: sessionKey) { await rebuildSession() }
+        .onAppear { isSearching = isSearchingPersisted }
+        .onChange(of: isSearching) { _, value in isSearchingPersisted = value }
+        .focusedSceneValue(\.focusChatComposer, FocusChatComposerAction { composerFocused = true })
     }
 
     private var header: some View {
@@ -35,7 +61,7 @@ struct ChatPane: View {
             Spacer()
             Button(action: toggleSearch) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.body.weight(.medium))
                     .foregroundStyle(isSearching ? DS.Color.accent : DS.Color.secondaryText)
             }
             .buttonStyle(.plain)
@@ -44,7 +70,7 @@ struct ChatPane: View {
 
             Button(role: .destructive, action: resetConversation) {
                 Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.body.weight(.medium))
             }
             .buttonStyle(.plain)
             .foregroundStyle(DS.Color.secondaryText)
@@ -59,7 +85,7 @@ struct ChatPane: View {
         HStack(spacing: DS.Spacing.small) {
             ChatSearchPill {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 13, weight: .regular))
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                 TextField("Filter messages", text: $searchQuery)
                     .textFieldStyle(.plain)
@@ -69,7 +95,7 @@ struct ChatPane: View {
                         searchQuery = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 13))
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
@@ -81,7 +107,7 @@ struct ChatPane: View {
 
             Button(action: toggleSearch) {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 16))
+                    .font(.title3)
                     .foregroundStyle(.secondary)
                     .contentShape(Rectangle())
             }
@@ -135,7 +161,7 @@ struct ChatPane: View {
                         ChatBubble(message: msg).id(msg.id)
                     }
                     if isSending {
-                        ThinkingIndicator()
+                        ChatThinkingIndicator(isActive: isSending)
                             .id("thinking")
                     }
                 }
@@ -171,7 +197,7 @@ struct ChatPane: View {
 
             Button(action: send) {
                 Image(systemName: "paperplane.fill")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.callout.weight(.semibold))
                     .foregroundStyle(.white)
                     .frame(width: 32, height: 32)
                     .background(
@@ -190,6 +216,10 @@ struct ChatPane: View {
 
     private var isSendDisabled: Bool {
         input.trimmingCharacters(in: .whitespaces).isEmpty || isSending
+    }
+
+    private var sessionKey: ChatSessionKey {
+        ChatSessionKey(entryID: model.selectedEntryID, hasTranscript: model.transcript != nil)
     }
 
     private func toggleSearch() {
@@ -216,6 +246,9 @@ struct ChatPane: View {
     }
 
     private func rebuildSession() async {
+        sendTask?.cancel()
+        sendTask = nil
+        isSending = false
         sessionError = nil
         session = nil
         displayedHistory = []
@@ -234,11 +267,13 @@ struct ChatPane: View {
 
     private func resetConversation() {
         guard let session else { return }
+        let entryID = model.selectedEntryID
         Task {
             await session.clearHistory()
             let updated = await session.history
+            guard entryID == model.selectedEntryID else { return }
             displayedHistory = updated
-            model.recordChat(history: updated)
+            model.recordChat(history: updated, for: entryID)
         }
     }
 
@@ -247,210 +282,24 @@ struct ChatPane: View {
         guard !text.isEmpty, let session, !isSending else { return }
         input = ""
         isSending = true
-        Task {
+        let entryID = model.selectedEntryID
+        sendTask?.cancel()
+        sendTask = Task {
+            defer {
+                if !Task.isCancelled, entryID == model.selectedEntryID {
+                    isSending = false
+                }
+            }
             do {
                 _ = try await session.ask(text)
+                guard !Task.isCancelled, entryID == model.selectedEntryID else { return }
                 let updated = await session.history
                 displayedHistory = updated
-                model.recordChat(history: updated)
-                isSending = false
+                model.recordChat(history: updated, for: entryID)
             } catch {
+                guard !Task.isCancelled, entryID == model.selectedEntryID else { return }
                 sessionError = error.localizedDescription
-                isSending = false
             }
         }
-    }
-}
-
-private enum ChatSenderFilter: CaseIterable, Hashable {
-    case all, user, assistant
-
-    var label: String {
-        switch self {
-        case .all: return "All"
-        case .user: return "User"
-        case .assistant: return "Assistant"
-        }
-    }
-
-    func matches(_ role: ChatMessage.Role) -> Bool {
-        switch self {
-        case .all: return true
-        case .user: return role == .user
-        case .assistant: return role == .assistant
-        }
-    }
-}
-
-private struct ChatSearchPill<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        HStack(spacing: 8) { content }
-            .padding(.horizontal, 10)
-            .frame(height: 28)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(DS.Color.surfaceElevated.opacity(0.85))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(DS.Color.separator.opacity(0.4), lineWidth: 0.5)
-            )
-    }
-}
-
-private struct ChatSenderChip: View {
-    @Binding var selection: ChatSenderFilter
-
-    var body: some View {
-        Menu {
-            ForEach(ChatSenderFilter.allCases, id: \.self) { option in
-                Button {
-                    selection = option
-                } label: {
-                    if option == selection {
-                        Label(option.label, systemImage: "checkmark")
-                    } else {
-                        Text(option.label)
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "person.crop.circle")
-                    .font(.system(size: 11, weight: .semibold))
-                Text(selection.label)
-                    .font(DS.Font.caption)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-            }
-            .padding(.horizontal, 10)
-            .frame(height: 28)
-            .foregroundStyle(selection == .all ? Color.primary.opacity(0.85) : Color.white)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(selection == .all ? DS.Color.surfaceElevated.opacity(0.85) : DS.Color.accent)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(DS.Color.separator.opacity(0.4), lineWidth: 0.5)
-            )
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Filter by sender")
-    }
-}
-
-private struct ChatBubble: View {
-    let message: ChatMessage
-
-    var body: some View {
-        HStack(spacing: 0) {
-            if message.role == .user {
-                Spacer(minLength: 40)
-                bubble
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(DS.Color.accent)
-                    )
-                    .foregroundStyle(.white)
-            } else {
-                bubble
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(DS.Color.surfaceElevated)
-                    )
-                    .foregroundStyle(DS.Color.primaryText)
-                Spacer(minLength: 40)
-            }
-        }
-        .padding(.vertical, 2)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(message.role == .user ? "You" : "Assistant"): \(message.text)")
-    }
-
-    private var bubble: some View {
-        Text(message.text)
-            .textSelection(.enabled)
-            .multilineTextAlignment(.leading)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .frame(maxWidth: 480, alignment: .leading)
-    }
-}
-
-private struct ChatHint: View {
-    var body: some View {
-        VStack(spacing: DS.Spacing.small) {
-            Image(systemName: "bubble.left.and.text.bubble.right")
-                .font(.system(size: 28, weight: .light))
-                .foregroundStyle(DS.Color.secondaryText)
-            Text("Ask anything about this transcript.")
-                .font(DS.Font.caption)
-                .foregroundStyle(DS.Color.secondaryText)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-private struct ThinkingIndicator: View {
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 0.08, paused: false)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
-            HStack(spacing: 4) {
-                ForEach(0..<3, id: \.self) { i in
-                    Circle()
-                        .fill(DS.Color.secondaryText)
-                        .frame(width: 6, height: 6)
-                        .opacity(dotOpacity(time: t, index: i))
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(DS.Color.surfaceElevated)
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 2)
-        }
-    }
-
-    private func dotOpacity(time: TimeInterval, index: Int) -> Double {
-        let cycle = 1.2
-        let phase = (time / cycle).truncatingRemainder(dividingBy: 1)
-        let offset = Double(index) * 0.15
-        let local = (phase - offset + 1).truncatingRemainder(dividingBy: 1)
-        let wave = sin(local * .pi)
-        return 0.3 + max(0, wave) * 0.7
-    }
-}
-
-private struct ChatUnavailable: View {
-    let message: String
-
-    var body: some View {
-        ContentUnavailableView {
-            Label("Chat unavailable", systemImage: "bubble.left.and.exclamationmark.bubble.right")
-        } description: {
-            Text(message)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-private struct ChatEmpty: View {
-    var body: some View {
-        ContentUnavailableView {
-            Label("No transcript", systemImage: "bubble.left.and.text.bubble.right")
-        } description: {
-            Text("Open a transcript to start chatting.")
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

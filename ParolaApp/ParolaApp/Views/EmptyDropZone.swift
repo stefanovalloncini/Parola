@@ -2,7 +2,6 @@ import SwiftUI
 
 struct EmptyDropZone: View {
     @EnvironmentObject var model: AppModel
-    @State private var showingTrash = false
     @Environment(\.openSettings) private var openSettings
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: DS.Spacing.regular), count: 4)
@@ -50,7 +49,7 @@ struct EmptyDropZone: View {
                         title: "Recently Deleted",
                         systemImage: "trash.fill",
                         isEnabled: !model.deletedEntries.isEmpty,
-                        action: { showingTrash = true }
+                        action: { model.showingTrash = true }
                     )
                 }
 
@@ -71,7 +70,6 @@ struct EmptyDropZone: View {
             .padding(.vertical, DS.Spacing.large)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .sheet(isPresented: $showingTrash) { MacRecentlyDeletedView() }
     }
 }
 

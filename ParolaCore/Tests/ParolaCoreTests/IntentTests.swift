@@ -58,4 +58,16 @@ struct IntentTests {
         let resolved = try await query.entities(for: ["nope"])
         #expect(resolved.isEmpty)
     }
+
+    @Test("Darwin dictation signal delivers across the start/stop names")
+    func dictationSignalRoundTrip() async throws {
+        try await confirmation("received start") { received in
+            let subscription = DictationSignal.subscribe { name in
+                if name == DictationSignal.startName { received() }
+            }
+            DictationSignal.start()
+            try await Task.sleep(for: .milliseconds(120))
+            subscription.cancel()
+        }
+    }
 }

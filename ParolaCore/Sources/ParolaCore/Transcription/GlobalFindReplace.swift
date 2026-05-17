@@ -26,6 +26,18 @@ public struct FindReplaceRule: Codable, Sendable, Identifiable, Hashable {
 }
 
 public enum GlobalFindReplace {
+    /// Returns nil if the rule is valid for use; otherwise the user-facing reason.
+    public static func validate(_ rule: FindReplaceRule) -> String? {
+        guard rule.regex else { return nil }
+        let options: NSRegularExpression.Options = rule.caseSensitive ? [] : [.caseInsensitive]
+        do {
+            _ = try NSRegularExpression(pattern: rule.find, options: options)
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
     public static func apply(
         rules: [FindReplaceRule],
         to segments: [TranscriptSegment]

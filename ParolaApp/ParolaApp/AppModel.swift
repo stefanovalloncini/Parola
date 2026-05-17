@@ -41,6 +41,7 @@ final class AppModel: ObservableObject {
     @Published var route: Route = .transcript
     @Published var phase: Phase = .idle
     @Published var transcript: Transcript?
+    @Published var showingTrash: Bool = false
     @Published var currentSegmentID: TranscriptSegment.ID?
     @Published var currentWordID: WordTiming.ID?
 
@@ -60,6 +61,7 @@ final class AppModel: ObservableObject {
     @AppStorage("batchExportFormats") var batchExportFormatsRaw: String = "txt,srt"
     @AppStorage("batchExportToSourceFolder") var batchExportToSourceFolder: Bool = true
     @AppStorage("batchExportIncludeTimestamps") var batchExportIncludeTimestamps: Bool = false
+    @AppStorage("batchExportFormatOptions") var batchExportFormatOptionsJSON: String = "{}"
 
     @Published var findIsOpen: Bool = false
     @Published var findQuery: String = "" { didSet { scheduleRecomputeMatches() } }
@@ -78,6 +80,17 @@ final class AppModel: ObservableObject {
     @AppStorage("selectedModel") var selectedModel: String = "openai_whisper-tiny"
     @AppStorage("selectedLanguageRaw") private var selectedLanguageRaw: String = ""
     @AppStorage("translate") var translate: Bool = false
+
+    private var cachedSelectedModel: String = ""
+    private var cachedCapabilities: EngineCapabilities = .whisperKitDefaults
+
+    var selectedModelCapabilities: EngineCapabilities {
+        if cachedSelectedModel != selectedModel {
+            cachedSelectedModel = selectedModel
+            cachedCapabilities = ModelCatalog.staticCapabilities(forID: selectedModel) ?? .whisperKitDefaults
+        }
+        return cachedCapabilities
+    }
 
     var selectedLanguage: String? {
         get { selectedLanguageRaw.isEmpty ? nil : selectedLanguageRaw }
@@ -173,6 +186,18 @@ final class AppModel: ObservableObject {
             UserDefaults.standard.set(dictationKeyCode, forKey: "dictationKeyCode")
             restartDictationForKeyChange()
         }
+    }
+
+    @Published var dictationKeyModifiers: Int = AppModel.readInt("dictationKeyModifiers", default: 0) {
+        didSet {
+            UserDefaults.standard.set(dictationKeyModifiers, forKey: "dictationKeyModifiers")
+            restartDictationForKeyChange()
+        }
+    }
+
+    var dictationModifierFlags: NSEvent.ModifierFlags {
+        NSEvent.ModifierFlags(rawValue: UInt(dictationKeyModifiers))
+            .intersection(.deviceIndependentFlagsMask)
     }
 
     @Published var dictationIndicatorStyleRaw: String = AppModel.readString("dictationIndicatorStyleRaw", default: DictationIndicatorStyle.overlay.rawValue) {
@@ -317,6 +342,7 @@ final class AppModel: ObservableObject {
     /// `true` if the MCP automation bridge is currently listening. Debug builds opt in by default;
     /// Release builds require an explicit toggle in Settings → MCP & Automation.
     @Published private(set) var automationBridgeRunning: Bool = false
+    @Published private(set) var automationBridgePort: UInt16?
 
     /// User-controlled toggle. Default differs by configuration so notarised binaries don't
     /// start a local TCP listener without consent.
@@ -330,10 +356,41 @@ final class AppModel: ObservableObject {
         #endif
     }
 
+    // MARK: - Sparkle
+
+    @AppStorage("sparkleChannel") var sparkleChannelRaw: String = SparkleChannel.stable.rawValue {
+        didSet { applySparkleChannelChange() }
+    }
+
+    @AppStorage("sparkleAutomatic") var sparkleAutomatic: Bool = true {
+        didSet { SparkleUpdater.shared.automaticallyChecks = sparkleAutomatic }
+    }
+
+    var sparkleChannel: SparkleChannel {
+        SparkleChannel(rawValue: sparkleChannelRaw) ?? .stable
+    }
+
+    private func applySparkleChannelChange() {
+        SparkleUpdater.shared.channel = sparkleChannel
+    }
+
+    // MARK: - Live captions translation
+
+    @AppStorage("liveCaptionsTranslate") var liveCaptionsTranslate: Bool = false {
+        didSet { applyLiveCaptionsTranslateChange() }
+    }
+
+    private func applyLiveCaptionsTranslateChange() {
+        let enabled = liveCaptionsTranslate
+        Task { await liveCaptions?.setTranslate(enabled) }
+    }
+
     func startAutomationBridge() {
         guard testBridge == nil else { return }
         guard let bridge = try? ParolaTestBridge(model: self) else { return }
-        bridge.start()
+        bridge.start { [weak self] port in
+            self?.automationBridgePort = port
+        }
         testBridge = bridge
         automationBridgeRunning = true
     }
@@ -342,6 +399,7 @@ final class AppModel: ObservableObject {
         testBridge?.stop()
         testBridge = nil
         automationBridgeRunning = false
+        automationBridgePort = nil
     }
 
     init() {
@@ -356,6 +414,10 @@ final class AppModel: ObservableObject {
         _ = meetingDetector  // touch lazy var to start NSWorkspace observation
         wireDictationController()
         if dictationEnabled { startDictation() }
+        SparkleUpdater.shared.channel = sparkleChannel
+        SparkleUpdater.shared.automaticallyChecks = sparkleAutomatic
+        let initialTranslate = liveCaptionsTranslate
+        Task { [weak self] in await self?.liveCaptions?.setTranslate(initialTranslate) }
         if automationBridgeEnabled {
             startAutomationBridge()
         }

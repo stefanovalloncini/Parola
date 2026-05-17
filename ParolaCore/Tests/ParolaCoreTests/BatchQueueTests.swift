@@ -34,4 +34,16 @@ struct BatchQueueTests {
         #expect(sawFinished)
         #expect(failedOrder == jobs.map(\.id))
     }
+
+    @Test("BatchEvent.cancelled exists alongside .failed in the enum surface")
+    func cancelledCase() {
+        let id = UUID()
+        let cancelled = BatchEvent.cancelled(jobID: id)
+        switch cancelled {
+        case .cancelled(let jobID):
+            #expect(jobID == id)
+        default:
+            Issue.record("expected .cancelled")
+        }
+    }
 }

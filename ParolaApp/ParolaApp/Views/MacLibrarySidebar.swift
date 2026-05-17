@@ -4,7 +4,6 @@ import ParolaCore
 struct MacLibrarySidebar: View {
     @EnvironmentObject var model: AppModel
     @State private var searchText = ""
-    @State private var showingTrash = false
 
     /// Derived from the model so external mutations (bridge, app intents) keep the sidebar in sync.
     private var selectedRoute: SidebarRoute {
@@ -19,7 +18,7 @@ struct MacLibrarySidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            searchField
+            SearchPill(text: $searchText, placeholder: "Search history…")
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
                 .padding(.bottom, 8)
@@ -52,9 +51,9 @@ struct MacLibrarySidebar: View {
                     SidebarRow(
                         title: "Recently Deleted",
                         systemImage: "trash",
-                        isSelected: showingTrash
+                        isSelected: model.showingTrash
                     ) {
-                        showingTrash = true
+                        model.showingTrash = true
                     }
 
                     SectionLabel("People").padding(.top, 14)
@@ -81,42 +80,12 @@ struct MacLibrarySidebar: View {
                 .padding(.vertical, 10)
         }
         .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 320)
-        .sheet(isPresented: $showingTrash) {
-            MacRecentlyDeletedView()
-        }
         .onChange(of: searchText) { _, newValue in model.search(newValue) }
     }
 
     private var activeQueueBadge: Int? {
         let n = model.batchJobs.filter { $0.status == .pending || $0.status == .transcribing }.count
         return n > 0 ? n : nil
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("Search history…", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        )
     }
 
     private var filterRow: some View {

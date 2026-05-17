@@ -33,7 +33,7 @@ public struct LibraryEntryEntityQuery: EntityQuery, Sendable {
     private let store: LibraryStore
 
     public init() {
-        self.store = LibraryStore()
+        self.store = LibraryStore.shared
     }
 
     public init(store: LibraryStore) {

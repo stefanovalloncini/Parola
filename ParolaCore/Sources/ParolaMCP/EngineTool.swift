@@ -10,6 +10,7 @@ public enum EngineTool: String, CaseIterable, Sendable {
     case searchLibrary    = "parola_search_library"
     case listRecent       = "parola_list_recent"
     case summarize        = "parola_summarize"
+    case openApp          = "parola_open_app"
 
     public var mcpTool: MCPTool {
         switch self {
@@ -72,6 +73,18 @@ public enum EngineTool: String, CaseIterable, Sendable {
                     "type": "object",
                     "properties": ["path": ["type": "string"]],
                     "required": ["path"],
+                ] as [String: Any])
+            )
+        case .openApp:
+            return MCPTool(
+                name: rawValue,
+                description: "Launch Parola.app if it isn't running and wait until the app bridge is reachable. Call this first when other parola_app_* tools report the bridge is down.",
+                inputSchema: AnyEncodable([
+                    "type": "object",
+                    "properties": [
+                        "timeoutMs": ["type": "integer", "description": "Max ms to wait for the bridge after launch. Defaults to 10000."],
+                        "bundleID": ["type": "string", "description": "Override the bundle id. Defaults to com.parola.Parola."],
+                    ],
                 ] as [String: Any])
             )
         }

@@ -14,6 +14,7 @@ struct RecordMeetingsPane: View {
                 }
             }
             SettingHelper(text: "Parola watches running applications; nothing leaves your Mac.")
+            ResetPaneButton(scope: .recordMeetings)
         }
     }
 }

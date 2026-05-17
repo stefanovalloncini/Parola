@@ -24,6 +24,7 @@ struct LiveCaptionsPane: View {
                 }
             }
             SettingHelper(text: "Start and stop live captions from the Captions menu (⇧⌘L).")
+            ResetPaneButton(scope: .liveCaptions)
         }
     }
 }

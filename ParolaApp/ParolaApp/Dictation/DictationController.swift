@@ -28,6 +28,7 @@ final class DictationController: ObservableObject {
         var deviceUID: String?
         var streamingEnabled: Bool
         var hotkeyKeyCode: Int
+        var hotkeyModifiers: NSEvent.ModifierFlags = []
         var mode: DictationMode
         var workflows: [String: DictationWorkflow]
         var postProcessor: any TextPostProcessor
@@ -41,7 +42,7 @@ final class DictationController: ObservableObject {
     func start(configuration: Configuration) {
         guard coordinator == nil else { return }
         self.configuration = configuration
-        let hotkey = GlobalHotkeyMonitor(keyCode: configuration.hotkeyKeyCode)
+        let hotkey = GlobalHotkeyMonitor(keyCode: configuration.hotkeyKeyCode, modifiers: configuration.hotkeyModifiers)
         let workflows = configuration.workflows
         let recorder = MicDictationRecorder(
             model: configuration.modelName,

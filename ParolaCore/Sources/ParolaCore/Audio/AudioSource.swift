@@ -10,4 +10,11 @@ public protocol AudioSource: Sendable {
 
     /// Stops any in-flight capture. Safe to call multiple times.
     func cancel() async
+
+    /// Best-effort duration in seconds. Returns nil for live sources or when probing fails.
+    func estimatedDuration() async -> Double?
+}
+
+public extension AudioSource {
+    func estimatedDuration() async -> Double? { nil }
 }

@@ -82,7 +82,7 @@ struct BatchFormatCard: View {
                         title: "Export to folder of audio file",
                         description: "Saves the \(format.fileExtension.uppercased()) next to each transcribed file."
                     ) {
-                        Toggle("", isOn: $model.batchExportToSourceFolder)
+                        Toggle("", isOn: writeToSourceFolder)
                             .labelsHidden()
                             .toggleStyle(.switch)
                             .controlSize(.small)
@@ -93,7 +93,7 @@ struct BatchFormatCard: View {
                             title: "Include timestamps",
                             description: "Writes start times alongside each segment."
                         ) {
-                            Toggle("", isOn: $model.batchExportIncludeTimestamps)
+                            Toggle("", isOn: includeTimestamps)
                                 .labelsHidden()
                                 .toggleStyle(.switch)
                                 .controlSize(.small)
@@ -120,9 +120,32 @@ struct BatchFormatCard: View {
         case .md: return "Markdown"
         case .html: return "HTML"
         case .csv: return "CSV"
+        case .tsv: return "TSV"
         case .docx: return "Word Document"
         case .pdf: return "PDF"
         }
+    }
+
+    private var writeToSourceFolder: Binding<Bool> {
+        Binding(
+            get: { model.options(for: format).writeToSourceFolder },
+            set: { newValue in
+                var opts = model.options(for: format)
+                opts.writeToSourceFolder = newValue
+                model.setOptions(opts, for: format)
+            }
+        )
+    }
+
+    private var includeTimestamps: Binding<Bool> {
+        Binding(
+            get: { model.options(for: format).includeTimestamps },
+            set: { newValue in
+                var opts = model.options(for: format)
+                opts.includeTimestamps = newValue
+                model.setOptions(opts, for: format)
+            }
+        )
     }
 }
 
