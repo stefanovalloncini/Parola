@@ -13,6 +13,8 @@ public actor MicAudioSource: AudioSource {
     private var outputFormat: AVAudioFormat?
     private var isRecording = false
     private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
+    private var bufferContinuation: AsyncStream<BufferBox>.Continuation?
+    private var consumerTask: Task<Void, Never>?
 
     public init() {}
 
@@ -73,10 +75,17 @@ public actor MicAudioSource: AudioSource {
         self.writeFile = file
         self.outputURL = url
 
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            guard let self, let copy = Self.copy(buffer) else { return }
-            let box = BufferBox(buffer: copy)
-            Task { [weak self] in await self?.write(box: box) }
+        let (stream, cont) = AsyncStream<BufferBox>.makeStream(bufferingPolicy: .unbounded)
+        self.bufferContinuation = cont
+        self.consumerTask = Task { [weak self] in
+            for await box in stream {
+                await self?.write(box: box)
+            }
+        }
+
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { buffer, _ in
+            guard let copy = Self.copy(buffer) else { return }
+            cont.yield(BufferBox(buffer: copy))
         }
 
         engine.prepare()
@@ -154,6 +163,10 @@ public actor MicAudioSource: AudioSource {
         guard isRecording else { return }
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
+        bufferContinuation?.finish()
+        bufferContinuation = nil
+        consumerTask?.cancel()
+        consumerTask = nil
         writeFile = nil
         isRecording = false
         for continuation in levelContinuations.values {
