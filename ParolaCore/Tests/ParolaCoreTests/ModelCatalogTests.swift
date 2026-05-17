@@ -66,8 +66,7 @@ struct ModelCatalogTests {
             engineID: .whisperKit,
             capabilities: .whisperKitDefaults
         ) { _ in
-            // Stub: we don't actually instantiate WhisperKit here; this test only resolves capabilities.
-            fatalError("not called")
+            fatalError("unused — this test only resolves capabilities")
         }
         guard let tinyEN = ModelCatalog.variant(id: "openai_whisper-tiny.en") else {
             Issue.record("variant missing"); return

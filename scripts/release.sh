@@ -145,7 +145,7 @@ if [ "$SHIP" -eq 0 ]; then
   echo "  2. Staple:      xcrun stapler staple \"$DMG\""
   echo "  3. Sign Sparkle update with your private EdDSA key:"
   echo "       ./scripts/sign-update.sh \"$DMG\""
-  echo "  4. Upload \$DMG and append the printed <item> to your appcast.xml."
+  echo "  4. Upload $DMG and append the printed <item> to your appcast.xml."
   exit 0
 fi
 

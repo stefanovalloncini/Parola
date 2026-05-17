@@ -156,7 +156,6 @@ struct ExporterTests {
     func csvRows() throws {
         let out = try CsvExporter().renderText(sample())
         let lines = out.split(separator: "\n", omittingEmptySubsequences: false)
-        // header + 3 segments
         #expect(lines.count >= 4)
         #expect(out.contains("0.0,1.5,,Hello world."))
     }

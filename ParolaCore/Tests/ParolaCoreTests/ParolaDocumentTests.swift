@@ -114,7 +114,6 @@ struct ParolaDocumentTests {
         let bundle = scratch.appendingPathComponent("future.parola")
         try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
 
-        // Hand-craft a manifest claiming a much higher version.
         let manifest = """
         { "version": 999, "createdAt": "2030-01-01T00:00:00Z", "originalAudioName": "x.wav", "modelName": "x", "language": "en" }
         """
