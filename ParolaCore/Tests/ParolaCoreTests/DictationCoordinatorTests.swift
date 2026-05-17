@@ -215,9 +215,34 @@ struct DictationCoordinatorTests {
         await coord.handle(.release)
         await #expect(coord.state == .listening)
         await coord.handle(.press)
+        await coord.handle(.release)
         await #expect(coord.state == .idle)
         let inserted = await inserter.inserted
         #expect(inserted == ["hybrid"])
+    }
+
+    @Test("hybrid mode: tap then hold-and-release closes via release path")
+    func hybridTapThenHold() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .text("held"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(
+            hotkey: hotkey,
+            recorder: recorder,
+            inserter: inserter,
+            mode: .hybrid
+        )
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await coord.handle(.release)
+        await #expect(coord.state == .listening)
+        await coord.handle(.press)
+        try await Task.sleep(for: .milliseconds(350))
+        await #expect(coord.state == .listening)
+        await coord.handle(.release)
+        await #expect(coord.state == .idle)
+        let inserted = await inserter.inserted
+        #expect(inserted == ["held"])
     }
 
     @Test("setMode resets pending hybrid state")
@@ -237,6 +262,34 @@ struct DictationCoordinatorTests {
         await coord.setMode(.pushToTalk)
         await coord.handle(.release)
         await #expect(coord.state == .idle)
+    }
+
+    @Test("stopMonitoring flushes in-flight recording instead of dropping it")
+    func stopMonitoringFlushes() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .text("flushed"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(hotkey: hotkey, recorder: recorder, inserter: inserter)
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await coord.stopMonitoring()
+        await #expect(coord.state == .idle)
+        let inserted = await inserter.inserted
+        #expect(inserted == ["flushed"])
+    }
+
+    @Test("abortMonitoring discards in-flight recording")
+    func abortMonitoringDiscards() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .text("dropped"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(hotkey: hotkey, recorder: recorder, inserter: inserter)
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await coord.abortMonitoring()
+        await #expect(coord.state == .idle)
+        let inserted = await inserter.inserted
+        #expect(inserted.isEmpty)
     }
 
     @Test("post-processor that returns empty text skips insertion")
