@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-@Suite("FolderWatcher media filter and lifecycle")
+@Suite("FolderWatcher media filter and lifecycle", .tags(.fileSystem))
 struct FolderWatcherTests {
     @Test("audio extensions are recognized")
     func audio() {

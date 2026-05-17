@@ -1,0 +1,81 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  parola-core:
+    name: ParolaCore (swift test)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Cache SwiftPM build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ParolaCore/.build
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-${{ runner.os }}-${{ hashFiles('ParolaCore/Package.resolved', 'ParolaCore/Package.swift') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: swift build
+        working-directory: ParolaCore
+        run: swift build
+
+      - name: swift test
+        working-directory: ParolaCore
+        run: swift test --parallel
+
+  parola-app:
+    name: ParolaApp (xcodebuild test)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: derived-${{ runner.os }}-${{ hashFiles('ParolaApp/project.yml', 'ParolaCore/Package.resolved') }}
+          restore-keys: |
+            derived-${{ runner.os }}-
+
+      - name: Generate Xcode project
+        working-directory: ParolaApp
+        run: xcodegen generate
+
+      - name: xcodebuild test
+        run: |
+          xcodebuild \
+            -project ParolaApp/ParolaApp.xcodeproj \
+            -scheme ParolaApp \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            test

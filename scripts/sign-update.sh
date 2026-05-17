@@ -36,7 +36,28 @@ EOF
   exit 1
 fi
 
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+EXPECTED_PUBKEY=$(grep -E '^[[:space:]]+SUPublicEDKey:' "$REPO/ParolaApp/project.yml" | head -1 | sed -E 's/.*"([^"]*)".*/\1/')
+
+if [ -z "$EXPECTED_PUBKEY" ]; then
+  cat <<EOF
+⚠ SUPublicEDKey is empty in ParolaApp/project.yml.
+  This build's Sparkle integration will not verify any signature, so signing
+  this asset would only be useful for a future release that pins a real key.
+  Aborting to avoid shipping a mismatched signature.
+EOF
+  exit 1
+fi
+
 echo "▶ Signing $ASSET with $SIGN_UPDATE"
 "$SIGN_UPDATE" "$ASSET"
 echo
-echo "Append the printed sparkle:edSignature attribute to your appcast.xml entry."
+cat <<EOF
+Append the printed sparkle:edSignature attribute to your appcast.xml entry.
+
+The signed asset must verify against the public key in your installed apps:
+  SUPublicEDKey (from project.yml): $EXPECTED_PUBKEY
+
+If you rotated keys, every existing install on the old key will reject the
+update silently. Roll out a transitional release first.
+EOF

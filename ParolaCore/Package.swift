@@ -46,7 +46,15 @@ let package = Package(
         .testTarget(
             name: "ParolaCoreTests",
             dependencies: ["ParolaCore"],
-            resources: [.process("Resources")]
+            resources: [
+                .process("Resources/sample.srt"),
+                .process("Resources/sample.vtt"),
+                .process("Resources/sample-crlf.srt"),
+                .process("Resources/transcript-v1.json"),
+                .process("Resources/transcript-legacy.json"),
+                .copy("Resources/tiny.parola"),
+                .copy("Resources/expected"),
+            ]
         ),
         .testTarget(
             name: "ParolaMCPTests",

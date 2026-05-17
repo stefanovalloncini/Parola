@@ -12,20 +12,27 @@ final class MeetingDetector: ObservableObject {
         "com.google.Meet": "Google Meet",
     ]
 
+    static let dedupWindow: TimeInterval = 5
+
     @Published var detectedAppName: String?
     @Published var isEnabled: Bool {
         didSet { UserDefaults.standard.set(isEnabled, forKey: Self.defaultsKey) }
     }
 
     private let onDetected: @MainActor (String) -> Void
+    private let clock: @MainActor () -> Date
     private var lastFiredApp: String?
     private var lastFiredAt: Date?
     private var observerTokens: [NSObjectProtocol] = []
 
     private static let defaultsKey = "meetingDetectorEnabled"
 
-    init(onDetected: @escaping @MainActor (String) -> Void) {
+    init(
+        onDetected: @escaping @MainActor (String) -> Void,
+        clock: @escaping @MainActor () -> Date = { Date() }
+    ) {
         self.onDetected = onDetected
+        self.clock = clock
         self.isEnabled = (UserDefaults.standard.object(forKey: Self.defaultsKey) as? Bool) ?? true
         startObserving()
     }
@@ -61,13 +68,14 @@ final class MeetingDetector: ObservableObject {
         }
     }
 
-    private func fire(appName: String) {
+    func fire(appName: String) {
         guard isEnabled else { return }
+        let now = clock()
         if appName == lastFiredApp,
            let last = lastFiredAt,
-           Date().timeIntervalSince(last) < 5 { return }
+           now.timeIntervalSince(last) < Self.dedupWindow { return }
         lastFiredApp = appName
-        lastFiredAt = Date()
+        lastFiredAt = now
         detectedAppName = appName
         onDetected(appName)
     }

@@ -4,6 +4,20 @@ import Testing
 
 @Suite("VTT importer")
 struct VttImporterTests {
+    @Test("parses sample.vtt fixture", .tags(.fileSystem))
+    func sampleFixture() throws {
+        let url = try #require(Bundle.module.url(forResource: "sample", withExtension: "vtt"))
+        let raw = try String(contentsOf: url, encoding: .utf8)
+        let t = VttImporter.parse(raw)
+        #expect(t.segments.count == 3)
+        #expect(t.segments[0].text == "Hello world.")
+        #expect(t.segments[0].start == 0.0)
+        #expect(t.segments[0].end == 1.5)
+        #expect(t.segments[1].text == "This is a sample VTT file.")
+        #expect(t.segments[2].text == "Goodbye world.")
+        #expect(t.modelName == "youtube-subs")
+    }
+
     @Test("parses a basic two-cue file")
     func basic() {
         let vtt = """

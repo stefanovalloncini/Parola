@@ -4,6 +4,30 @@ import Testing
 
 @Suite("SRT importer")
 struct SrtImporterTests {
+    @Test("parses sample.srt fixture", .tags(.fileSystem))
+    func sampleFixture() throws {
+        let url = try #require(Bundle.module.url(forResource: "sample", withExtension: "srt"))
+        let raw = try String(contentsOf: url, encoding: .utf8)
+        let t = SrtImporter.parse(raw)
+        #expect(t.segments.count == 3)
+        #expect(t.segments[0].text == "Hello world.")
+        #expect(t.segments[0].start == 0.0)
+        #expect(t.segments[0].end == 1.5)
+        #expect(t.segments[1].text == "This is a sample SRT file.")
+        #expect(t.segments[2].text == "Goodbye world.")
+        #expect(t.segments[2].end == 4.8)
+    }
+
+    @Test("parses CRLF-encoded sample-crlf.srt fixture", .tags(.fileSystem))
+    func crlfFixture() throws {
+        let url = try #require(Bundle.module.url(forResource: "sample-crlf", withExtension: "srt"))
+        let raw = try String(contentsOf: url, encoding: .utf8)
+        let t = SrtImporter.parse(raw)
+        #expect(t.segments.count == 2)
+        #expect(t.segments[0].text == "Hello CRLF world.")
+        #expect(t.segments[1].text == "Second cue.")
+    }
+
     @Test("parses a two-block file")
     func twoBlocks() {
         let srt = """

@@ -83,7 +83,7 @@ struct ParolaDocumentTests {
         defer { try? FileManager.default.removeItem(at: scratch) }
         let bundle = scratch.appendingPathComponent("empty.parola")
         try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
-        #expect(throws: Error.self) { try ParolaDocument.read(at: bundle) }
+        #expect(throws: ParolaError.self) { try ParolaDocument.read(at: bundle) }
     }
 
     @Test("missing audio file no longer throws")
@@ -122,7 +122,7 @@ struct ParolaDocumentTests {
         try Data("{}".utf8).write(to: bundle.appendingPathComponent("transcript.json"))
         try Data("".utf8).write(to: bundle.appendingPathComponent("audio.wav"))
 
-        #expect(throws: Error.self) { try ParolaDocument.read(at: bundle) }
+        #expect(throws: ParolaError.self) { try ParolaDocument.read(at: bundle) }
     }
 
     @Test("destination without extension gets .parola appended")
@@ -166,6 +166,19 @@ struct ParolaDocumentTests {
         let loaded = try ParolaDocument.read(at: bundleURL)
         #expect(loaded.manifest.category == .meeting)
         #expect(loaded.manifest.deletedAt == Date(timeIntervalSince1970: 1_700_000_000))
+    }
+
+    @Test("reads bundled tiny.parola fixture", .tags(.fileSystem))
+    func bundledFixture() throws {
+        let url = try #require(Bundle.module.url(forResource: "tiny", withExtension: "parola"))
+        let loaded = try ParolaDocument.read(at: url)
+        #expect(loaded.transcript.segments.count == 2)
+        #expect(loaded.transcript.segments[0].text == "Hello world.")
+        #expect(loaded.transcript.segments[1].text == "Goodbye.")
+        #expect(loaded.manifest.modelName == "openai_whisper-tiny")
+        #expect(loaded.manifest.language == "en")
+        #expect(loaded.manifest.category == .transcription)
+        #expect(loaded.audioURL == nil)
     }
 
     @Test("default write produces transcription category and nil deletedAt")

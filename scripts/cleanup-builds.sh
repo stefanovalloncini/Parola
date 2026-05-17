@@ -23,6 +23,11 @@ Targets:
   - ParolaApp-* and ParolaiOS-* DerivedData folders themselves
   - ParolaApp/build, ParolaiOS/build, ParolaCore/.build inside the repo
   - Repo-local dist/ artifacts
+
+Note: ParolaCore/.build holds both build products AND the SwiftPM dependency
+checkouts (WhisperKit, FluidAudio, swift-argument-parser). The next
+'swift build' after a cleanup re-fetches them all — expect a one-off 1–2
+minute resolve step. scripts/smoke.sh also rebuilds the CLI from scratch.
 EOF
       exit 0 ;;
   esac
