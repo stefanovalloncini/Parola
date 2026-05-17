@@ -5,10 +5,14 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private weak var model: AppModel?
     private let provider = ServicesProvider()
+    private var dictationStatusItem: DictationStatusItem?
 
     func bind(model: AppModel) {
         self.model = model
         provider.model = model
+        if dictationStatusItem == nil {
+            dictationStatusItem = DictationStatusItem(model: model)
+        }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
