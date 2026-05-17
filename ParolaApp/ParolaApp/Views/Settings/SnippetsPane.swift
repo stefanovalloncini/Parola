@@ -13,13 +13,13 @@ struct SnippetsPane: View {
                 let visible = visibleSnippets
                 if model.snippets.isEmpty {
                     HStack {
-                        Text("No snippets yet.").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No snippets yet.").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
                 } else if visible.isEmpty {
                     HStack {
-                        Text("No snippets match.").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No snippets match.").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
@@ -61,7 +61,7 @@ struct SnippetsPane: View {
     private var placeholderHelp: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Triggers fire on dictated text only; matching is case-insensitive and word-bounded.")
-                .font(.system(size: 11))
+                .font(.caption)
                 .italic()
                 .foregroundStyle(.secondary)
             Text("Placeholders: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}")

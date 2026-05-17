@@ -17,7 +17,7 @@ struct PromptsPane: View {
                 let visible = visiblePrompts
                 if visible.isEmpty {
                     HStack {
-                        Text("No prompts match.").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No prompts match.").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
@@ -166,7 +166,7 @@ private struct PromptRow: View {
         SettingRow(prompt.name, isFirst: isFirst) {
             HStack(spacing: 6) {
                 Text(prompt.isBuiltIn ? "Built-in" : "Custom")
-                    .font(.system(size: 11))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 if !prompt.isBuiltIn {
                     Button {
@@ -211,18 +211,18 @@ private struct PromptEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(draft.isExisting ? "Edit Prompt" : "New Prompt")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.title3.weight(.semibold))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Name").font(.system(size: 11)).foregroundStyle(.secondary)
+                Text("Name").font(.caption).foregroundStyle(.secondary)
                 TextField("Name", text: $draft.name)
                     .textFieldStyle(.roundedBorder)
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Instructions").font(.system(size: 11)).foregroundStyle(.secondary)
+                Text("Instructions").font(.caption).foregroundStyle(.secondary)
                 TextEditor(text: $draft.instructions)
-                    .font(.system(size: 12))
+                    .font(.subheadline)
                     .frame(minHeight: 160)
                     .padding(4)
                     .overlay(

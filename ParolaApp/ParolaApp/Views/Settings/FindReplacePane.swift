@@ -16,13 +16,13 @@ struct FindReplacePane: View {
                 let visible = visibleRules
                 if model.findReplaceRules.isEmpty {
                     HStack {
-                        Text("No rules yet.").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No rules yet.").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
                 } else if visible.isEmpty {
                     HStack {
-                        Text("No rules match.").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No rules match.").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
@@ -165,7 +165,7 @@ private struct FilterChip: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 11, weight: .medium))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(isSelected ? Color.white : .primary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
@@ -227,7 +227,7 @@ private struct FindReplaceRuleRow: View {
                     Toggle("Case-sensitive", isOn: $rule.caseSensitive).toggleStyle(.checkbox)
                     Toggle("Regex", isOn: $rule.regex).toggleStyle(.checkbox)
                 }
-                .font(.system(size: 11))
+                .font(.caption)
                 if let regexError {
                     HStack(spacing: 4) {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -235,7 +235,7 @@ private struct FindReplaceRuleRow: View {
                         Text(regexError)
                             .foregroundStyle(.red)
                     }
-                    .font(.system(size: 11))
+                    .font(.caption)
                 }
             }
             .padding(.horizontal, 16)

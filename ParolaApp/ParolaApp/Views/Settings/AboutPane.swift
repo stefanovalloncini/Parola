@@ -10,10 +10,10 @@ struct AboutPane: View {
                 .padding(.top, 32)
             Text("Parola").font(.system(size: 22, weight: .semibold))
             Text(versionLine)
-                .font(.system(size: 12))
+                .font(.caption)
                 .foregroundStyle(.secondary)
             Text("On-device speech-to-text for macOS, built on WhisperKit.")
-                .font(.system(size: 12))
+                .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
@@ -21,9 +21,9 @@ struct AboutPane: View {
             Divider().padding(.vertical, 8)
 
             VStack(spacing: 4) {
-                Text("Built on").font(.system(size: 11, weight: .semibold))
+                Text("Built on").font(.caption.weight(.semibold))
                 Text("WhisperKit · FluidAudio · Sparkle")
-                    .font(.system(size: 11))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
 

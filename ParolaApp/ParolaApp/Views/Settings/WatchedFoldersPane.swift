@@ -19,7 +19,7 @@ private struct WatchedFoldersPaneBody: View {
                     HStack {
                         Text("No watched folders yet.")
                             .foregroundStyle(.secondary)
-                            .font(.system(size: 13))
+                            .font(.body)
                         Spacer()
                     }
                     .padding(16)
@@ -35,7 +35,7 @@ private struct WatchedFoldersPaneBody: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(DS.Palette.warning)
                     Text(error)
-                        .font(.system(size: 11))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
@@ -76,7 +76,7 @@ private struct WatchedFolderRow: View {
             HStack(spacing: 6) {
                 if stale {
                     Label("Stale", systemImage: "exclamationmark.triangle.fill")
-                        .font(.system(size: 11))
+                        .font(.caption)
                         .foregroundStyle(DS.Palette.warning)
                     Button("Re-add") {
                         store.reattach(folder.id)

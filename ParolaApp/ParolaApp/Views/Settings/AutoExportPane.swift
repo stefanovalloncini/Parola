@@ -20,13 +20,13 @@ struct AutoExportPane: View {
             SettingsSection {
                 if model.autoExportRules.isEmpty {
                     HStack {
-                        Text("No rules yet.").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No rules yet.").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
                 } else if displayedIndices.isEmpty {
                     HStack {
-                        Text("No matches").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No matches").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
@@ -146,7 +146,7 @@ private struct AutoExportRuleRow: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Toggle("", isOn: $rule.enabled).labelsHidden()
-                    Text(summary).font(.system(size: 13, weight: .medium))
+                    Text(summary).font(.body.weight(.medium))
                     Spacer()
                     Button(role: .destructive, action: onDelete) {
                         Image(systemName: "trash")
@@ -154,7 +154,7 @@ private struct AutoExportRuleRow: View {
                     .buttonStyle(.borderless)
                 }
                 HStack {
-                    Text("When source is").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text("When source is").font(.caption).foregroundStyle(.secondary)
                     TextField("mp4, mov", text: $extensionsText)
                         .textFieldStyle(.roundedBorder)
                         .onChange(of: extensionsText) { _, new in
@@ -166,7 +166,7 @@ private struct AutoExportRuleRow: View {
                         }
                 }
                 HStack(alignment: .top) {
-                    Text("Also write").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text("Also write").font(.caption).foregroundStyle(.secondary)
                     AutoExportFormatChips(selected: $rule.outputFormats)
                 }
             }

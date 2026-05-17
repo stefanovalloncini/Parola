@@ -20,13 +20,13 @@ struct IgnoredSegmentsPane: View {
             SettingsSection {
                 if model.ignoredSegmentRules.isEmpty {
                     HStack {
-                        Text("No patterns yet.").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No patterns yet.").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
                 } else if displayedIndices.isEmpty {
                     HStack {
-                        Text("No matches").foregroundStyle(.secondary).font(.system(size: 13))
+                        Text("No matches").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
