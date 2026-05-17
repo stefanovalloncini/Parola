@@ -45,6 +45,8 @@ struct LiveCaptionsView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .id(caption)
                 .transition(.opacity)
+                .accessibilityLabel(caption)
+                .accessibilityAddTraits(.updatesFrequently)
         }
     }
 
