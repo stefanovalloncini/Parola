@@ -5,7 +5,7 @@ enum DictationHUD {
     @MainActor
     static func make<Content: View>(@ViewBuilder content: @escaping () -> Content) -> NSPanel {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 228, height: 64),
+            contentRect: NSRect(x: 0, y: 0, width: 264, height: 64),
             styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered,
             defer: false

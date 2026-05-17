@@ -4,11 +4,12 @@ import ParolaCore
 struct DictationView: View {
     let state: DictationCoordinator.State
     @ObservedObject var model: AppModel
+    var onStop: (() -> Void)?
 
     @State private var startedAt: Date = Date()
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             indicator
                 .frame(width: 28, height: 20)
             statusLabel
@@ -16,9 +17,10 @@ struct DictationView: View {
             Spacer(minLength: 0)
             timer
                 .foregroundStyle(.white.opacity(0.7))
+            stopButton
         }
         .padding(.horizontal, 18)
-        .frame(width: 220, height: 56)
+        .frame(width: 256, height: 56)
         .background(
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(Color.black.opacity(0.85))
@@ -53,6 +55,23 @@ struct DictationView: View {
     private var statusLabel: some View {
         Text(label)
             .font(.subheadline.weight(.semibold))
+    }
+
+    @ViewBuilder
+    private var stopButton: some View {
+        if let onStop, case .listening = state {
+            Button(action: onStop) {
+                ZStack {
+                    Circle().fill(Color.white.opacity(0.14))
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.plain)
+            .help("Stop dictation")
+        }
     }
 
     @ViewBuilder

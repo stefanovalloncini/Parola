@@ -127,8 +127,28 @@ struct ModelPickerView: View {
 
     private var currentLabel: String {
         if let variant = ModelCatalog.variant(id: model.selectedModel) {
-            return variant.displayName
+            return Self.shortLabel(for: variant.displayName)
         }
         return model.availableModels.first(where: { $0.name == model.selectedModel })?.label ?? model.selectedModel
+    }
+
+    /// Trims marketing-grade names so the toolbar pill stays compact.
+    /// "Parakeet TDT 0.6B v2" → "Parakeet v2", "Whisper Large v3 Turbo" → "Whisper Turbo".
+    static func shortLabel(for displayName: String) -> String {
+        let replacements: [(String, String)] = [
+            ("Whisper Large v3 Turbo", "Whisper Turbo"),
+            ("Whisper Large v3", "Whisper Large"),
+            ("Whisper Small", "Whisper Small"),
+            ("Whisper Base", "Whisper Base"),
+            ("Whisper Tiny (English)", "Whisper Tiny EN"),
+            ("Whisper Tiny", "Whisper Tiny"),
+            ("Parakeet TDT 0.6B v2", "Parakeet v2"),
+            ("Parakeet TDT 0.6B v3", "Parakeet v3"),
+            ("Distil Whisper Large v3", "Distil Large"),
+        ]
+        for (long, short) in replacements where displayName == long {
+            return short
+        }
+        return displayName
     }
 }

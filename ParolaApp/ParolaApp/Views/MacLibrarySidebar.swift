@@ -4,8 +4,18 @@ import ParolaCore
 struct MacLibrarySidebar: View {
     @EnvironmentObject var model: AppModel
     @State private var searchText = ""
-    @State private var selectedRoute: SidebarRoute = .home
     @State private var showingTrash = false
+
+    /// Derived from the model so external mutations (bridge, app intents) keep the sidebar in sync.
+    private var selectedRoute: SidebarRoute {
+        switch model.route {
+        case .queue: return .queue
+        case .batch: return .batch
+        case .transcript:
+            if let filter = model.libraryFilter { return .category(filter) }
+            return .home
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -25,7 +35,7 @@ struct MacLibrarySidebar: View {
                         systemImage: "house.fill",
                         isSelected: selectedRoute == .home
                     ) {
-                        selectedRoute = .home
+                        model.libraryFilter = nil
                         model.route = .transcript
                     }
 
@@ -35,16 +45,15 @@ struct MacLibrarySidebar: View {
                         isSelected: selectedRoute == .queue,
                         badge: activeQueueBadge
                     ) {
-                        selectedRoute = .queue
+                        model.libraryFilter = nil
                         model.route = .queue
                     }
 
                     SidebarRow(
                         title: "Recently Deleted",
                         systemImage: "trash",
-                        isSelected: selectedRoute == .recentlyDeleted
+                        isSelected: showingTrash
                     ) {
-                        selectedRoute = .recentlyDeleted
                         showingTrash = true
                     }
 
@@ -53,10 +62,9 @@ struct MacLibrarySidebar: View {
                     SidebarRow(
                         title: "Add People",
                         systemImage: "person.fill.badge.plus",
-                        isSelected: selectedRoute == .addPeople
+                        isSelected: model.showingSpeakersSheet
                     ) {
                         if model.transcript != nil {
-                            selectedRoute = .addPeople
                             model.showingSpeakersSheet = true
                         }
                     }
@@ -73,9 +81,7 @@ struct MacLibrarySidebar: View {
                 .padding(.vertical, 10)
         }
         .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 320)
-        .sheet(isPresented: $showingTrash, onDismiss: {
-            if selectedRoute == .recentlyDeleted { selectedRoute = .home }
-        }) {
+        .sheet(isPresented: $showingTrash) {
             MacRecentlyDeletedView()
         }
         .onChange(of: searchText) { _, newValue in model.search(newValue) }
@@ -173,8 +179,8 @@ struct MacLibrarySidebar: View {
 private enum SidebarRoute: Hashable {
     case home
     case queue
-    case recentlyDeleted
-    case addPeople
+    case batch
+    case category(EntryCategory)
 }
 
 private struct SidebarRow: View {

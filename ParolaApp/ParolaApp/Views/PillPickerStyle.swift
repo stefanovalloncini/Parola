@@ -7,50 +7,95 @@ struct PillPickerButton<MenuContent: View>: View {
     @ViewBuilder var menuContent: () -> MenuContent
 
     @State private var isPresented = false
+    @State private var hovering = false
 
     var body: some View {
         Button {
             isPresented = true
         } label: {
-            HStack(spacing: 8) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(DS.Color.accent.opacity(0.18))
-                    Image(systemName: icon)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(DS.Color.accent)
-                }
-                .frame(width: 22, height: 22)
-
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(caption)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Text(value)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                }
-
+            HStack(spacing: 7) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(DS.Color.accent)
+                    .frame(width: 14)
+                Text(value)
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .frame(height: 36)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 5)
+            .frame(height: 28)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.secondary.opacity(0.15))
+                Capsule(style: .continuous)
+                    .fill(Color.primary.opacity(hovering ? 0.10 : 0.06))
             )
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+            )
+            .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityLabel("\(caption): \(value)")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             menuContent()
                 .padding(.vertical, 6)
                 .frame(minWidth: 240)
         }
+    }
+}
+
+struct PillToggleButton: View {
+    let icon: String
+    let label: String
+    @Binding var isOn: Bool
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button {
+            isOn.toggle()
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 14)
+                Text(label)
+                    .font(.system(size: 12.5, weight: .medium))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(isOn ? Color.white : Color.primary)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 5)
+            .frame(height: 28)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(fillColor)
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(borderColor, lineWidth: 0.5)
+            )
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityLabel(label)
+        .accessibilityValue(isOn ? "on" : "off")
+    }
+
+    private var fillColor: Color {
+        if isOn { return DS.Color.accent.opacity(hovering ? 0.95 : 0.85) }
+        return Color.primary.opacity(hovering ? 0.10 : 0.06)
+    }
+
+    private var borderColor: Color {
+        isOn ? DS.Color.accent.opacity(0.45) : Color.primary.opacity(0.08)
     }
 }
 

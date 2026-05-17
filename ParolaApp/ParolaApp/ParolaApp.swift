@@ -1,6 +1,17 @@
 import SwiftUI
+import AppKit
 import AppIntents
 import ParolaCore
+
+@MainActor
+private func applyAppAppearance(_ theme: String) {
+    let appearance: NSAppearance? = switch theme {
+    case "light": NSAppearance(named: .aqua)
+    case "dark":  NSAppearance(named: .darkAqua)
+    default:      nil
+    }
+    NSApp.appearance = appearance
+}
 
 @main
 struct ParolaApp: App {
@@ -13,7 +24,13 @@ struct ParolaApp: App {
                 .environmentObject(model)
                 .frame(minWidth: 920, minHeight: 600)
                 .preferredColorScheme(model.preferredColorScheme)
-                .onAppear { appDelegate.bind(model: model) }
+                .onAppear {
+                    appDelegate.bind(model: model)
+                    applyAppAppearance(model.appTheme)
+                }
+                .onChange(of: model.appTheme) { _, newValue in
+                    applyAppAppearance(newValue)
+                }
                 .onOpenURL { url in model.transcribe(fileURL: url) }
         }
         .windowStyle(.hiddenTitleBar)
