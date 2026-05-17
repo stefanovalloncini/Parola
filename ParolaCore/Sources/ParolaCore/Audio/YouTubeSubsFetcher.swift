@@ -16,7 +16,7 @@ public enum YouTubeSubsFetcher {
     }
 
     public static func fetchWithTitle(url: URL, preferLanguage: String? = nil) async throws -> YouTubeSubsResult {
-        guard let ytDlp = findYtDlp() else {
+        guard let ytDlp = YouTubeProcess.findYtDlp() else {
             throw ParolaError.captureUnavailable(
                 "yt-dlp not found on PATH. Install with: brew install yt-dlp"
             )
@@ -44,7 +44,7 @@ public enum YouTubeSubsFetcher {
             "-o", outputTemplate,
             url.absoluteString,
         ]
-        process.environment = augmentedEnvironment()
+        process.environment = YouTubeProcess.augmentedEnvironment()
 
         let stdout = Pipe()
         let stderr = Pipe()
@@ -54,7 +54,7 @@ public enum YouTubeSubsFetcher {
         do { try process.run() } catch {
             throw ParolaError.captureUnavailable("Could not launch yt-dlp: \(error.localizedDescription)")
         }
-        try await waitWithTimeout(process, seconds: 120)
+        try await YouTubeProcess.waitWithTimeout(process, seconds: 120)
 
         let outData = stdout.fileHandleForReading.readDataToEndOfFile()
         let stdoutText = String(decoding: outData, as: UTF8.self)
@@ -163,48 +163,5 @@ public enum YouTubeSubsFetcher {
         return vtts.first
     }
 
-    static func waitWithTimeout(_ process: Process, seconds: Int) async throws {
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask { await waitForExit(process) }
-            group.addTask {
-                try await Task.sleep(for: .seconds(seconds))
-                process.terminate()
-                throw ParolaError.captureUnavailable("yt-dlp exceeded \(seconds)s timeout")
-            }
-            try await group.next()
-            group.cancelAll()
-        }
-    }
-
-    private static func waitForExit(_ process: Process) async {
-        await withTaskCancellationHandler {
-            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-                process.terminationHandler = { _ in cont.resume() }
-            }
-        } onCancel: {
-            process.terminate()
-        }
-    }
-
-    private static func findYtDlp() -> String? {
-        for candidate in ["/opt/homebrew/bin/yt-dlp", "/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"] {
-            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
-        }
-        let env = ProcessInfo.processInfo.environment["PATH"] ?? ""
-        for dir in env.split(separator: ":") {
-            let candidate = "\(dir)/yt-dlp"
-            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
-        }
-        return nil
-    }
-
-    /// Same PATH augmentation used by `YouTubeAudioSource` so yt-dlp can find `ffmpeg`/`deno`
-    /// when launched from a GUI app (which inherits a minimal PATH without `/opt/homebrew/bin`).
-    private static func augmentedEnvironment() -> [String: String] {
-        var env = ProcessInfo.processInfo.environment
-        let existing = env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
-        env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/opt/local/bin:\(existing)"
-        return env
-    }
 }
 #endif
