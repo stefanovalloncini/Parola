@@ -156,6 +156,18 @@ final class AppModel: ObservableObject {
         didSet { applyDictationEnabledChange() }
     }
 
+    @AppStorage("dictationModeRaw") var dictationModeRaw: String = DictationMode.pushToTalk.rawValue {
+        didSet { applyDictationModeChange() }
+    }
+
+    @AppStorage("dictationKeyCode") var dictationKeyCode: Int = 96 {
+        didSet { restartDictationForKeyChange() }
+    }
+
+    var dictationMode: DictationMode {
+        DictationMode(rawValue: dictationModeRaw) ?? .pushToTalk
+    }
+
     // MARK: - Customization
 
     @AppStorage("appTheme") var appTheme: String = "system"  // "system" | "light" | "dark"

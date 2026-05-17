@@ -8,9 +8,29 @@ struct DictationPane: View {
         VStack(alignment: .leading, spacing: 16) {
             SettingsSection {
                 SettingRow("Enable dictation",
-                           description: "Hold F5 to dictate; release to paste the text at the cursor.",
+                           description: modeDescription,
                            isFirst: true) {
                     Toggle("", isOn: $model.dictationEnabled).labelsHidden()
+                }
+                SettingRow("Mode") {
+                    Picker("", selection: $model.dictationModeRaw) {
+                        ForEach(DictationMode.allCases, id: \.rawValue) { mode in
+                            Text(mode.displayName).tag(mode.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 200)
+                }
+                SettingRow("Activation key") {
+                    Picker("", selection: $model.dictationKeyCode) {
+                        ForEach(DictationHotkey.allCases, id: \.rawValue) { key in
+                            Text(key.displayName).tag(key.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 200)
                 }
                 SettingRow("Cleanup mode") {
                     Picker("", selection: $model.dictationCleanupPromptID) {
@@ -24,7 +44,7 @@ struct DictationPane: View {
                     .frame(width: 200)
                 }
             }
-            SettingHelper(text: "Press and hold the dictation key to dictate. Requires Input Monitoring permission.")
+            SettingHelper(text: "Requires Input Monitoring permission. The HUD shows a live waveform while you speak.")
 
             SettingsSection("Per-app overrides") {
                 let apps = AppModel.dictationOverrideApps
@@ -47,5 +67,9 @@ struct DictationPane: View {
             }
             SettingHelper(text: "Override the default cleanup mode when the frontmost app matches.")
         }
+    }
+
+    private var modeDescription: String {
+        model.dictationMode.description
     }
 }

@@ -35,7 +35,7 @@ extension AppModel {
 
     func startDictation() {
         guard dictationCoordinator == nil else { return }
-        let hotkey = F5HotkeyMonitor()
+        let hotkey = GlobalHotkeyMonitor(keyCode: dictationKeyCode)
         let recorder = MicDictationRecorder(
             model: selectedModel,
             language: selectedLanguage,
@@ -47,12 +47,25 @@ extension AppModel {
             hotkey: hotkey,
             recorder: recorder,
             inserter: inserter,
-            postProcessor: processor
+            postProcessor: processor,
+            mode: dictationMode
         ) { [weak self] state in
             await MainActor.run { self?.handleDictationState(state) }
         }
         dictationCoordinator = coord
         Task { await coord.startMonitoring() }
+    }
+
+    func applyDictationModeChange() {
+        guard let coord = dictationCoordinator else { return }
+        let newMode = dictationMode
+        Task { await coord.setMode(newMode) }
+    }
+
+    func restartDictationForKeyChange() {
+        guard dictationEnabled else { return }
+        stopDictation()
+        startDictation()
     }
 
     private func currentDictationCleanupPrompt() -> Prompt? {

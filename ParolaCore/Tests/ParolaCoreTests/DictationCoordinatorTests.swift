@@ -177,6 +177,68 @@ struct DictationCoordinatorTests {
         #expect(inserted == ["HELLO WORLD"])
     }
 
+    @Test("toggle mode: press starts, second press stops and transcribes")
+    func toggleMode() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .text("toggled"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(
+            hotkey: hotkey,
+            recorder: recorder,
+            inserter: inserter,
+            mode: .toggle
+        )
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await #expect(coord.state == .listening)
+        await coord.handle(.release)
+        await #expect(coord.state == .listening)
+        await coord.handle(.press)
+        await #expect(coord.state == .idle)
+        let inserted = await inserter.inserted
+        #expect(inserted == ["toggled"])
+    }
+
+    @Test("hybrid mode: quick tap toggles, hold acts as PTT")
+    func hybridMode() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .text("hybrid"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(
+            hotkey: hotkey,
+            recorder: recorder,
+            inserter: inserter,
+            mode: .hybrid
+        )
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await coord.handle(.release)
+        await #expect(coord.state == .listening)
+        await coord.handle(.press)
+        await #expect(coord.state == .idle)
+        let inserted = await inserter.inserted
+        #expect(inserted == ["hybrid"])
+    }
+
+    @Test("setMode resets pending hybrid state")
+    func setModeResetsHybrid() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .text("x"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(
+            hotkey: hotkey,
+            recorder: recorder,
+            inserter: inserter,
+            mode: .hybrid
+        )
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await coord.handle(.release)
+        await coord.setMode(.pushToTalk)
+        await coord.handle(.release)
+        await #expect(coord.state == .idle)
+    }
+
     @Test("post-processor that returns empty text skips insertion")
     func postProcessorEmptyOutputSkips() async throws {
         let hotkey = MockHotkey()
