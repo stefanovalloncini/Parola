@@ -52,6 +52,22 @@ struct AutoExportPane: View {
             }
 
             SettingHelper(text: "Auto-export writes additional files next to the source when transcription completes.")
+
+            SettingsSection("Subtitle captions") {
+                SettingRow("Line length",
+                           description: "Applied to SRT and VTT exports.",
+                           isFirst: true) {
+                    Picker("", selection: $model.subtitleCaptionLengthRaw) {
+                        ForEach(CaptionLength.allCases) { preset in
+                            Text(preset.displayName).tag(preset.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 200)
+                }
+            }
+
             ResetPaneButton(scope: .autoExport)
         }
     }

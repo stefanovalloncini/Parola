@@ -54,6 +54,7 @@ final class AppModel: ObservableObject {
     @AppStorage("initialPrompt") var initialPrompt: String = ""
     @AppStorage("diarize") var diarize: Bool = false
     @AppStorage("subtitleFPS") var subtitleFPS: Double = 30
+    @AppStorage("subtitleCaptionLength") var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue
 
     @Published var batchJobs: [BatchJob] = []
     @Published var selectedBatchJobID: BatchJob.ID?
@@ -1062,10 +1063,22 @@ final class AppModel: ObservableObject {
         panel.nameFieldStringValue = "transcript.\(format.fileExtension)"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            let data = try Exporters.exporter(for: format).render(transcript)
+            let data = try makeExporter(for: format).render(transcript)
             try data.write(to: url, options: .atomic)
         } catch {
             phase = .failed(message: "Export failed: \(error.localizedDescription)")
+        }
+    }
+
+    var subtitleCaptionLength: CaptionLength {
+        CaptionLength(rawValue: subtitleCaptionLengthRaw) ?? .none
+    }
+
+    func makeExporter(for format: ExportFormat) -> TranscriptExporter {
+        switch format {
+        case .srt: return SrtExporter(options: SubtitleOptions(captionLength: subtitleCaptionLength))
+        case .vtt: return VttExporter(options: SubtitleOptions(captionLength: subtitleCaptionLength))
+        default:   return Exporters.exporter(for: format)
         }
     }
 }

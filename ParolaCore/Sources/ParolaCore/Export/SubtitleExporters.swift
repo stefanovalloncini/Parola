@@ -2,9 +2,21 @@ import Foundation
 
 public struct SubtitleOptions: Sendable, Codable, Hashable {
     public var includeSpeakers: Bool
+    public var captionLength: CaptionLength
 
-    public init(includeSpeakers: Bool = false) {
+    public init(includeSpeakers: Bool = false, captionLength: CaptionLength = .none) {
         self.includeSpeakers = includeSpeakers
+        self.captionLength = captionLength
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case includeSpeakers, captionLength
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        includeSpeakers = try c.decodeIfPresent(Bool.self, forKey: .includeSpeakers) ?? false
+        captionLength = try c.decodeIfPresent(CaptionLength.self, forKey: .captionLength) ?? .none
     }
 }
 
@@ -21,7 +33,7 @@ public struct SrtExporter: TranscriptExporter {
         for (i, seg) in transcript.segments.enumerated() {
             out += "\(i + 1)\n"
             out += "\(Self.srtTimestamp(seg.start)) --> \(Self.srtTimestamp(seg.end))\n"
-            let body = seg.text.trimmingCharacters(in: .whitespaces)
+            let body = CaptionWrapper.wrap(seg.text, length: options.captionLength)
             if options.includeSpeakers, let speaker = seg.speaker, !speaker.isEmpty {
                 out += "\(speaker): \(body)\n\n"
             } else {
@@ -48,7 +60,7 @@ public struct VttExporter: TranscriptExporter {
         var out = "WEBVTT\n\n"
         for seg in transcript.segments {
             out += "\(Self.vttTimestamp(seg.start)) --> \(Self.vttTimestamp(seg.end))\n"
-            let body = seg.text.trimmingCharacters(in: .whitespaces)
+            let body = CaptionWrapper.wrap(seg.text, length: options.captionLength)
             if options.includeSpeakers, let speaker = seg.speaker, !speaker.isEmpty {
                 out += "<v \(speaker)>\(body)</v>\n\n"
             } else {
