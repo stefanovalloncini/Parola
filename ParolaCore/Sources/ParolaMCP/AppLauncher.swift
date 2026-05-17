@@ -3,8 +3,7 @@ import Foundation
 import AppKit
 #endif
 
-/// Launches Parola.app and polls the bridge port file until it appears, or returns
-/// a structured failure if the app can't be reached. Used by the `parola_open_app` tool.
+/// Launches Parola.app and polls for the bridge port file. Backs the `parola_open_app` tool.
 public enum AppLauncher {
     public static func launch(bundleID: String, timeoutMs: Int) async throws -> String {
         let portFile = portFileURL()
@@ -57,11 +56,17 @@ public enum AppLauncher {
     #endif
 
     public static func portFileURL() -> URL {
+        cacheDirectory().appendingPathComponent("bridge.port")
+    }
+
+    public static func tokenFileURL() -> URL {
+        cacheDirectory().appendingPathComponent("bridge.token")
+    }
+
+    private static func cacheDirectory() -> URL {
         let caches = (try? FileManager.default.url(
             for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: false
         )) ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Caches")
-        return caches
-            .appendingPathComponent("Parola", isDirectory: true)
-            .appendingPathComponent("bridge.port")
+        return caches.appendingPathComponent("Parola", isDirectory: true)
     }
 }

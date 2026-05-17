@@ -6,10 +6,7 @@ public extension Notification.Name {
     static let parolaStopDictation = Notification.Name("com.parola.stopDictation")
 }
 
-/// Cross-process channel for dictation triggers. `NotificationCenter.default` is
-/// process-local, so intents hosted out-of-process (Siri / Shortcuts) need a Darwin
-/// notification to reach the running app. The app subscribes via `subscribe`; the
-/// intent posts via `start` / `stop`.
+/// Darwin notification channel that carries dictation triggers across processes (intents host -> app).
 public enum DictationSignal: Sendable {
     public static let startName: String = "com.parola.dictation.start"
     public static let stopName: String = "com.parola.dictation.stop"
@@ -40,6 +37,7 @@ public enum DictationSignal: Sendable {
     }
 }
 
+/// Unchecked Sendable: `handler` is `@Sendable` and the only mutable state lives in CF's observer registry, which is thread-safe.
 public final class DictationSubscription: @unchecked Sendable {
     let handler: @Sendable (String) -> Void
 

@@ -1,10 +1,9 @@
 import Darwin
 import Foundation
 
-/// Talks to the in-app `ParolaTestBridge` over TCP loopback. Discovers the port
-/// from `~/Library/Caches/Parola/bridge.port` (written by the bridge on startup)
-/// and the per-launch auth token from `~/Library/Caches/Parola/bridge.token`.
-/// One request per call: open, send a line, read a line, close.
+/// Talks to the in-app `ParolaTestBridge` over TCP loopback. One request per call:
+/// reads the port + auth token from `~/Library/Caches/Parola/`, opens a socket,
+/// sends a line, reads a line, closes.
 public struct BridgeClient: BridgeProtocol {
     public struct BridgeNotRunning: LocalizedError {
         public var errorDescription: String? {
@@ -21,17 +20,12 @@ public struct BridgeClient: BridgeProtocol {
     private let tokenFileURL: URL
     private let timeout: TimeInterval
 
-    /// Bumped when the wire format breaks. The bridge echoes back its own version
-    /// so clients can detect skew between parola-mcp and a stale running app build.
+    /// Bumped when the wire format breaks. The bridge echoes its own version so the client can detect skew.
     public static let clientVersion: Int = 1
 
     public init(timeout: TimeInterval = 30) {
-        let caches = (try? FileManager.default.url(
-            for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: false
-        )) ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Caches")
-        let dir = caches.appendingPathComponent("Parola", isDirectory: true)
-        self.portFileURL = dir.appendingPathComponent("bridge.port")
-        self.tokenFileURL = dir.appendingPathComponent("bridge.token")
+        self.portFileURL = AppLauncher.portFileURL()
+        self.tokenFileURL = AppLauncher.tokenFileURL()
         self.timeout = timeout
     }
 

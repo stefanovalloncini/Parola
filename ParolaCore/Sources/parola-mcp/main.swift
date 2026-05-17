@@ -1,6 +1,5 @@
 import Foundation
 import ParolaMCP
 
-/// Backward-compat shim: ships the same stdio loop as `parola mcp`. Lets MCP-client
-/// configs that point at `parola-mcp` keep working after the binary consolidation.
+// Backward-compat shim for MCP-client configs that still point at the standalone binary.
 await StdioRunner.run()

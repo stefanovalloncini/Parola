@@ -1,8 +1,7 @@
 import Darwin
 import Foundation
 
-/// Drives an `MCPServer` from line-delimited JSON-RPC over stdin / stdout. Used by
-/// both `parola mcp` (subcommand) and the legacy `parola-mcp` executable.
+/// Drives an `MCPServer` from line-delimited JSON-RPC over stdin/stdout.
 public enum StdioRunner {
     public static func run(server: MCPServer = MCPServer()) async {
         let encoder = JSONEncoder()
@@ -49,8 +48,7 @@ public enum StdioRunner {
         }
     }
 
-    /// Two-pass parse: even if the request body is malformed, the envelope may still
-    /// carry the id so the client can correlate the error response.
+    /// Second-pass parse so a malformed body still surfaces the envelope id, letting the client correlate the error.
     private static func recoverRequestID(from data: Data) -> JSONRPCID? {
         struct Envelope: Decodable {
             let id: JSONRPCID?
@@ -72,9 +70,7 @@ public enum StdioRunner {
         FileHandle.standardError.write(Data((message + "\n").utf8))
     }
 
-    /// Closes stdin on SIGINT/SIGTERM so the blocking `readLine` returns `nil` and the
-    /// stdio loop exits cleanly. Default termination signals would otherwise abort
-    /// mid-write and leave the client hanging on a partial JSON envelope.
+    /// Closes stdin on SIGINT/SIGTERM so `readLine` returns `nil` and the loop exits cleanly instead of aborting mid-write.
     private static func installSignalHandlers() {
         let handler: @convention(c) (Int32) -> Void = { _ in
             close(fileno(stdin))
