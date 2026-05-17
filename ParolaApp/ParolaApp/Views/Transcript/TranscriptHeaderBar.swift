@@ -1,10 +1,13 @@
 import SwiftUI
 
 struct TranscriptHeaderBar: View {
+    @EnvironmentObject var model: AppModel
     let title: String
     let onAdvance: () -> Void
     let onOpenSummary: () -> Void
     let onOpenChat: () -> Void
+
+    @State private var outlineOpen = false
 
     var body: some View {
         HStack(spacing: DS.Spacing.small) {
@@ -13,6 +16,19 @@ struct TranscriptHeaderBar: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button { outlineOpen.toggle() } label: {
+                Image(systemName: "list.bullet.rectangle.portrait")
+            }
+            .buttonStyle(.borderless)
+            .help("Outline")
+            .popover(isPresented: $outlineOpen, arrowEdge: .bottom) {
+                OutlinePopover { seconds in
+                    model.seekTo(seconds: seconds)
+                    outlineOpen = false
+                }
+                .environmentObject(model)
+            }
 
             Button(action: onOpenSummary) {
                 Image(systemName: "sparkles")

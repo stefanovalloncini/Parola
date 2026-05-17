@@ -74,4 +74,11 @@ extension AppModel {
         player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
         player.play()
     }
+
+    func seekTo(seconds: Double) {
+        guard let player else { return }
+        let t = CMTime(seconds: seconds, preferredTimescale: 600)
+        player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
+        player.play()
+    }
 }
