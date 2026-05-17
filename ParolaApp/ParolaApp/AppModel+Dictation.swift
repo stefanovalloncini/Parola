@@ -5,24 +5,50 @@ import ParolaCore
 
 extension AppModel {
 
-    func dictationOverridePromptID(for bundleID: String) -> String {
-        guard let data = dictationPerAppOverridesJSON.data(using: .utf8),
-              let map = try? JSONDecoder().decode([String: String].self, from: data) else {
-            return ""
+    func dictationWorkflows() -> [String: DictationWorkflow] {
+        guard let data = dictationPerAppOverridesJSON.data(using: .utf8) else { return [:] }
+        return DictationWorkflowMap.decode(legacy: data)
+    }
+
+    func dictationWorkflow(for bundleID: String) -> DictationWorkflow {
+        dictationWorkflows()[bundleID] ?? DictationWorkflow()
+    }
+
+    func setDictationWorkflow(_ workflow: DictationWorkflow, for bundleID: String) {
+        var map = dictationWorkflows()
+        if workflow.isEmpty {
+            map.removeValue(forKey: bundleID)
+        } else {
+            map[bundleID] = workflow
         }
-        return map[bundleID] ?? ""
+        let data = DictationWorkflowMap.encode(map)
+        dictationPerAppOverridesJSON = String(decoding: data, as: UTF8.self)
+    }
+
+    func dictationOverridePromptID(for bundleID: String) -> String {
+        dictationWorkflow(for: bundleID).promptID ?? ""
     }
 
     func setDictationOverridePromptID(_ promptID: String, for bundleID: String) {
-        var map = (try? JSONDecoder().decode([String: String].self, from: dictationPerAppOverridesJSON.data(using: .utf8) ?? Data())) ?? [:]
-        if promptID.isEmpty {
-            map.removeValue(forKey: bundleID)
-        } else {
-            map[bundleID] = promptID
-        }
-        if let data = try? JSONEncoder().encode(map) {
-            dictationPerAppOverridesJSON = String(decoding: data, as: UTF8.self)
-        }
+        var workflow = dictationWorkflow(for: bundleID)
+        workflow.promptID = promptID.isEmpty ? nil : promptID
+        setDictationWorkflow(workflow, for: bundleID)
+    }
+
+    func dictationOverrideLanguage(for bundleID: String) -> String {
+        dictationWorkflow(for: bundleID).language ?? ""
+    }
+
+    func setDictationOverrideLanguage(_ language: String, for bundleID: String) {
+        var workflow = dictationWorkflow(for: bundleID)
+        workflow.language = language.isEmpty ? nil : language
+        setDictationWorkflow(workflow, for: bundleID)
+    }
+
+    func restartDictationForWorkflowChange() {
+        guard dictationEnabled, dictationCoordinator != nil else { return }
+        stopDictation()
+        startDictation()
     }
 
     func applyDictationEnabledChange() {
@@ -36,10 +62,16 @@ extension AppModel {
     func startDictation() {
         guard dictationCoordinator == nil else { return }
         let hotkey = GlobalHotkeyMonitor(keyCode: dictationKeyCode)
+        let workflows = dictationWorkflows()
         let recorder = MicDictationRecorder(
             model: selectedModel,
             language: selectedLanguage,
-            deviceUID: preferredInputDeviceUID
+            deviceUID: preferredInputDeviceUID,
+            workflowResolver: { @Sendable in
+                let bundleID = await MainActor.run { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
+                guard let bundleID else { return nil }
+                return workflows[bundleID]
+            }
         )
         let inserter = ClipboardPasteInserter()
         let processor = currentDictationProcessor()
@@ -74,16 +106,14 @@ extension AppModel {
     }
 
     private func currentDictationOverrides() -> [String: Prompt] {
-        guard let data = dictationPerAppOverridesJSON.data(using: .utf8),
-              let map = try? JSONDecoder().decode([String: String].self, from: data) else {
-            return [:]
-        }
         var out: [String: Prompt] = [:]
-        for (bundleID, promptID) in map {
-            if let uuid = UUID(uuidString: promptID),
-               let prompt = Prompt.builtIns.first(where: { $0.id == uuid }) {
-                out[bundleID] = prompt
+        for (bundleID, workflow) in dictationWorkflows() {
+            guard let promptID = workflow.promptID,
+                  let uuid = UUID(uuidString: promptID),
+                  let prompt = Prompt.builtIns.first(where: { $0.id == uuid }) else {
+                continue
             }
+            out[bundleID] = prompt
         }
         return out
     }

@@ -193,7 +193,10 @@ final class AppModel: ObservableObject {
         didSet { applyDictationCleanupPromptChange() }
     }
     @AppStorage("dictationPerAppOverridesJSON") var dictationPerAppOverridesJSON: String = "{}" {
-        didSet { applyDictationCleanupPromptChange() }
+        didSet {
+            applyDictationCleanupPromptChange()
+            restartDictationForWorkflowChange()
+        }
     }
 
     static let dictationOverrideApps: [(bundleID: String, name: String)] = [

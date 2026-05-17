@@ -3,8 +3,10 @@ import ParolaCore
 
 actor MicDictationRecorder: DictationRecorder {
     private let model: String?
-    private let language: String?
+    private let defaultLanguage: String?
+    private var effectiveLanguage: String?
     private let deviceUID: String?
+    private let workflowResolver: (@Sendable () async -> DictationWorkflow?)?
     private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
     private var partialContinuations: [UUID: AsyncStream<String>.Continuation] = [:]
 
@@ -18,13 +20,34 @@ actor MicDictationRecorder: DictationRecorder {
     private var streamingPartial: String = ""
     private var streamingFinished: Bool = false
 
-    init(model: String?, language: String?, deviceUID: String? = nil) {
+    init(
+        model: String?,
+        language: String?,
+        deviceUID: String? = nil,
+        workflowResolver: (@Sendable () async -> DictationWorkflow?)? = nil
+    ) {
         self.model = model
-        self.language = language
+        self.defaultLanguage = language
+        self.effectiveLanguage = language
         self.deviceUID = deviceUID
+        self.workflowResolver = workflowResolver
+    }
+
+    private func resolveLanguageOverride() async {
+        guard let resolver = workflowResolver else {
+            effectiveLanguage = defaultLanguage
+            return
+        }
+        let workflow = await resolver()
+        if let override = workflow?.language, !override.isEmpty {
+            effectiveLanguage = override
+        } else {
+            effectiveLanguage = defaultLanguage
+        }
     }
 
     func start() async throws {
+        await resolveLanguageOverride()
         if useStreaming {
             try await startStreaming()
         } else {
@@ -75,7 +98,7 @@ actor MicDictationRecorder: DictationRecorder {
 
         let options = TranscriptionOptions(
             model: model,
-            language: language,
+            language: effectiveLanguage,
             task: .transcribe
         )
         let events = try await session.start(options: options)
@@ -150,7 +173,7 @@ actor MicDictationRecorder: DictationRecorder {
         let url = try await source.prepare()
         let options = TranscriptionOptions(
             model: model,
-            language: language,
+            language: effectiveLanguage,
             task: .transcribe
         )
         let transcript = try await fallbackSession.transcribe(
