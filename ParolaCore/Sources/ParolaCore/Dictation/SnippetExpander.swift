@@ -67,6 +67,7 @@ public struct SnippetExpander: TextPostProcessor {
             return expandDeferred ? snippet.expandAtInsert : !snippet.expandAtInsert
         }
         guard !active.isEmpty else { return text }
+        let timestamp = now()
         var result = text
         for snippet in active {
             let expanded = Self.expand(
@@ -74,7 +75,7 @@ public struct SnippetExpander: TextPostProcessor {
                 clipboard: clipboard,
                 selection: selection,
                 appContext: appContext,
-                now: now()
+                now: timestamp
             )
             result = Self.replace(trigger: snippet.trigger, in: result, with: expanded)
         }
