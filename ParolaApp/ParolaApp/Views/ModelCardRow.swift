@@ -91,11 +91,7 @@ struct ModelCardRow: View {
     }
 
     private var engineLabel: String {
-        switch variant.engineID {
-        case .whisperKit: return "WhisperKit"
-        case .parakeet:   return "Parakeet"
-        default:          return variant.engineID.rawValue.capitalized
-        }
+        variant.engineID.displayName
     }
 
     private var chips: [ModelTagChip.Chip] {

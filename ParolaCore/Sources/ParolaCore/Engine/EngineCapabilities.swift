@@ -9,6 +9,15 @@ public struct EngineID: RawRepresentable, Hashable, Sendable, Codable, CustomStr
     public static let whisperKit = EngineID("whisperkit")
     public static let parakeet = EngineID("parakeet")
     public static let appleSpeech = EngineID("apple-speech")
+
+    public var displayName: String {
+        switch self {
+        case .whisperKit:  return "WhisperKit"
+        case .parakeet:    return "Parakeet"
+        case .appleSpeech: return "Apple Speech"
+        default:           return rawValue.capitalized
+        }
+    }
 }
 
 public enum SupportedLanguages: Sendable, Hashable {
