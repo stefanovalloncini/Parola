@@ -7,6 +7,7 @@ struct SpeakersSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var renames: [String: String] = [:]
     @State private var suggestions: [Person] = []
+    @State private var searchText: String = ""
 
     var body: some View {
         SheetFrame(
@@ -25,27 +26,77 @@ struct SpeakersSheet: View {
     private var contentBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.medium) {
+                if !transcript.uniqueSpeakers.isEmpty || !suggestions.isEmpty {
+                    searchField
+                }
                 if transcript.uniqueSpeakers.isEmpty {
                     Text("This transcript wasn't diarized — turn on Identify speakers in Settings before transcribing.")
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.Color.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                ForEach(transcript.uniqueSpeakers, id: \.self) { speaker in
+                if filteredSpeakers.isEmpty && !transcript.uniqueSpeakers.isEmpty {
+                    Text("No speakers match")
+                        .font(DS.Font.caption)
+                        .foregroundStyle(DS.Color.secondaryText)
+                }
+                ForEach(filteredSpeakers, id: \.self) { speaker in
                     speakerRow(speaker)
                 }
-                if !suggestions.isEmpty {
+                if !filteredSuggestions.isEmpty {
                     Divider().padding(.vertical, 2)
                     Text("Recent")
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.Color.secondaryText)
-                    FlowChips(items: suggestions.map(\.name)) { name in
+                    FlowChips(items: filteredSuggestions.map(\.name)) { name in
                         applySuggestion(name)
                     }
                 }
             }
             .padding(DS.Spacing.regular)
         }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            TextField("Search speakers…", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.subheadline)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Color.primary.opacity(0.06))
+        )
+    }
+
+    private var filteredSpeakers: [String] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return transcript.uniqueSpeakers }
+        return transcript.uniqueSpeakers.filter { speaker in
+            speaker.localizedCaseInsensitiveContains(query) ||
+            (renames[speaker] ?? "").localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    private var filteredSuggestions: [Person] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return suggestions }
+        return suggestions.filter { $0.name.localizedCaseInsensitiveContains(query) }
     }
 
     private var footerBody: some View {
