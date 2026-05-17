@@ -28,7 +28,6 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func dictateTapped() {
-        // Placeholder. Real mic + Whisper transcription lands in #45b.
         textDocumentProxy.insertText("[dictation coming soon]")
     }
 }
