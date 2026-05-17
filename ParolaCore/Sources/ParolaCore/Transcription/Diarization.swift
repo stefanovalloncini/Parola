@@ -88,11 +88,11 @@ actor DiarizationService {
         var labeledWords: [WordTiming] = []
         labeledWords.reserveCapacity(words.count)
         for word in words {
-            var w = word
-            if let s = dominantSpeaker(in: diarization, start: word.start, end: word.end) {
-                w.speaker = label(for: s)
+            var labeled = word
+            if let speaker = dominantSpeaker(in: diarization, start: word.start, end: word.end) {
+                labeled.speaker = label(for: speaker)
             }
-            labeledWords.append(w)
+            labeledWords.append(labeled)
         }
 
         let runs = speakerRuns(in: labeledWords)
