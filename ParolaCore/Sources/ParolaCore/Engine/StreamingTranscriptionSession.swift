@@ -81,13 +81,22 @@ public actor StreamingTranscriptionSession {
         let sink = EventSink(continuation: cont)
         sink.onConfirmed = { segments in segCont.yield(segments) }
 
+        // AudioStreamTranscriber owns its own internal queue and is held in actor-isolated
+        // `streamer`, so these non-Sendable WhisperKit references never escape.
+        nonisolated(unsafe) let streamerAudioEncoder = kit.audioEncoder
+        nonisolated(unsafe) let streamerFeatureExtractor = kit.featureExtractor
+        nonisolated(unsafe) let streamerSegmentSeeker = kit.segmentSeeker
+        nonisolated(unsafe) let streamerTextDecoder = kit.textDecoder
+        nonisolated(unsafe) let streamerTokenizer = tokenizer
+        nonisolated(unsafe) let streamerAudioProcessor = kit.audioProcessor
+
         let st = AudioStreamTranscriber(
-            audioEncoder: kit.audioEncoder,
-            featureExtractor: kit.featureExtractor,
-            segmentSeeker: kit.segmentSeeker,
-            textDecoder: kit.textDecoder,
-            tokenizer: tokenizer,
-            audioProcessor: kit.audioProcessor,
+            audioEncoder: streamerAudioEncoder,
+            featureExtractor: streamerFeatureExtractor,
+            segmentSeeker: streamerSegmentSeeker,
+            textDecoder: streamerTextDecoder,
+            tokenizer: streamerTokenizer,
+            audioProcessor: streamerAudioProcessor,
             decodingOptions: decoding,
             stateChangeCallback: { [sink] oldState, newState in
                 sink.handle(oldState: oldState, newState: newState)
