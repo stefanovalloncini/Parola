@@ -35,40 +35,48 @@ public actor LibraryStore {
         self.searchIndex = LibrarySearchIndex(indexURL: indexURL)
     }
 
-    public func list() -> [LibraryEntry] {
+    public func list() async -> [LibraryEntry] {
         if let cachedActive { return cachedActive }
-        primeCaches()
+        await primeCaches()
         return cachedActive ?? []
     }
 
-    public func listDeleted() -> [LibraryEntry] {
+    public func listDeleted() async -> [LibraryEntry] {
         if let cachedDeleted { return cachedDeleted }
-        primeCaches()
+        await primeCaches()
         return cachedDeleted ?? []
     }
 
     public func search(_ query: String) async -> [LibrarySearchIndex.Match] {
-        let matches = await searchIndex.search(query)
-        if cachedActive == nil { primeCaches() }
+        if cachedActive == nil { await primeCaches() }
         let activeIDs = Set((cachedActive ?? []).map(\.id))
+        let matches = await searchIndex.search(query)
         return matches.filter { activeIDs.contains($0.entryID) }
     }
 
-    private func primeCaches() {
-        let fm = FileManager.default
-        guard let contents = try? fm.contentsOfDirectory(at: libraryURL, includingPropertiesForKeys: nil) else {
-            cachedActive = []
-            cachedDeleted = []
-            return
-        }
-        let all = contents
-            .filter { $0.pathExtension == "parola" }
-            .compactMap { try? makeEntry(bundleURL: $0) }
+    private func primeCaches() async {
+        let url = libraryURL
+        let entries = await Task.detached(priority: .userInitiated) { [self] in
+            scanEntries(at: url)
+        }.value
+        let active = entries
+            .filter { $0.deletedAt == nil }
             .sorted { $0.createdAt > $1.createdAt }
-        cachedActive = all.filter { $0.deletedAt == nil }
-        cachedDeleted = all
+        let deleted = entries
             .filter { $0.deletedAt != nil }
             .sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
+        cachedActive = active
+        cachedDeleted = deleted
+    }
+
+    private nonisolated func scanEntries(at libraryURL: URL) -> [LibraryEntry] {
+        let fm = FileManager.default
+        guard let contents = try? fm.contentsOfDirectory(at: libraryURL, includingPropertiesForKeys: nil) else {
+            return []
+        }
+        return contents
+            .filter { $0.pathExtension == "parola" }
+            .compactMap { try? makeEntry(bundleURL: $0) }
     }
 
     public func load(_ id: LibraryEntry.ID) throws -> LoadedEntry {
@@ -104,30 +112,45 @@ public actor LibraryStore {
         invalidateListCaches()
         let entry = try makeEntry(bundleURL: bundleURL.appendingPathExtension("parola"))
         await searchIndex.index(id: entry.id, title: entry.title, text: transcript.text, createdAt: entry.createdAt)
-        if let extraIndexer {
-            await extraIndexer.index(id: entry.id, title: entry.title, text: transcript.text, createdAt: entry.createdAt)
-        }
+        scheduleExtraIndex(id: entry.id, title: entry.title, text: transcript.text, createdAt: entry.createdAt)
         return entry
     }
 
+    private func scheduleExtraIndex(id: String, title: String, text: String, createdAt: Date) {
+        guard let extraIndexer else { return }
+        Task.detached(priority: .utility) {
+            await extraIndexer.index(id: id, title: title, text: text, createdAt: createdAt)
+        }
+    }
+
+    private func scheduleExtraDeindex(id: String) {
+        guard let extraIndexer else { return }
+        Task.detached(priority: .utility) {
+            await extraIndexer.deindex(id: id)
+        }
+    }
+
     public func adopt(parolaBundle url: URL) async throws -> LibraryEntry {
+        let sourceDoc = try ParolaDocument.read(at: url)
         let name = uniqueEntryName(at: Date())
         let target = libraryURL.appendingPathComponent("\(name).parola")
         let fm = FileManager.default
         if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
-        try fm.copyItem(at: url, to: target)
+        do {
+            try fm.copyItem(at: url, to: target)
+        } catch {
+            try? fm.removeItem(at: target)
+            throw error
+        }
         invalidateListCaches()
         let entry = try makeEntry(bundleURL: target)
-        let doc = try ParolaDocument.read(at: target)
-        await searchIndex.index(id: entry.id, title: entry.title, text: doc.transcript.text, createdAt: entry.createdAt)
-        if let extraIndexer {
-            await extraIndexer.index(id: entry.id, title: entry.title, text: doc.transcript.text, createdAt: entry.createdAt)
-        }
+        await searchIndex.index(id: entry.id, title: entry.title, text: sourceDoc.transcript.text, createdAt: entry.createdAt)
+        scheduleExtraIndex(id: entry.id, title: entry.title, text: sourceDoc.transcript.text, createdAt: entry.createdAt)
         return entry
     }
 
-    /// Overwrites the transcript.json inside an existing bundle. Audio + manifest untouched.
-    public func updateTranscript(_ transcript: Transcript, for id: LibraryEntry.ID) throws {
+    /// Overwrites the transcript.json inside an existing bundle. Bumps the manifest `updatedAt`.
+    public func updateTranscript(_ transcript: Transcript, for id: LibraryEntry.ID, at now: Date = Date()) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
@@ -138,6 +161,10 @@ public actor LibraryStore {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         let data = try encoder.encode(transcript)
         try data.write(to: transcriptURL, options: .atomic)
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.updatedAt = now
+        }
+        invalidateListCaches()
         if cachedLoaded?.id == id { cachedLoaded = nil }
     }
 
@@ -177,19 +204,92 @@ public actor LibraryStore {
         invalidateListCaches()
         if cachedLoaded?.id == id { cachedLoaded = nil }
         await searchIndex.remove(id)
-        if let extraIndexer { await extraIndexer.deindex(id: id) }
+        scheduleExtraDeindex(id: id)
+    }
+
+    public struct VerificationReport: Sendable, Equatable {
+        public enum Issue: Sendable, Equatable {
+            case missingManifest
+            case unreadableManifest
+            case missingTranscript
+            case versionTooNew(Int)
+        }
+
+        public struct Problem: Sendable, Equatable {
+            public let bundleURL: URL
+            public let issue: Issue
+
+            public init(bundleURL: URL, issue: Issue) {
+                self.bundleURL = bundleURL
+                self.issue = issue
+            }
+        }
+
+        public let healthy: [LibraryEntry]
+        public let problems: [Problem]
+
+        public init(healthy: [LibraryEntry], problems: [Problem]) {
+            self.healthy = healthy
+            self.problems = problems
+        }
+    }
+
+    /// Walks every `.parola` bundle in the library and reports half-written or invalid ones.
+    public func verify() async -> VerificationReport {
+        let url = libraryURL
+        return await Task.detached(priority: .userInitiated) {
+            Self.verifySync(at: url)
+        }.value
+    }
+
+    nonisolated static func verifySync(at libraryURL: URL) -> VerificationReport {
+        let fm = FileManager.default
+        guard let contents = try? fm.contentsOfDirectory(at: libraryURL, includingPropertiesForKeys: nil) else {
+            return VerificationReport(healthy: [], problems: [])
+        }
+        var healthy: [LibraryEntry] = []
+        var problems: [VerificationReport.Problem] = []
+        for bundleURL in contents where bundleURL.pathExtension == "parola" {
+            let manifestURL = bundleURL.appendingPathComponent("manifest.json")
+            guard fm.fileExists(atPath: manifestURL.path) else {
+                problems.append(.init(bundleURL: bundleURL, issue: .missingManifest))
+                continue
+            }
+            guard let data = try? Data(contentsOf: manifestURL) else {
+                problems.append(.init(bundleURL: bundleURL, issue: .unreadableManifest))
+                continue
+            }
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            guard let manifest = try? decoder.decode(ParolaDocument.Manifest.self, from: data) else {
+                problems.append(.init(bundleURL: bundleURL, issue: .unreadableManifest))
+                continue
+            }
+            if manifest.version > ParolaDocument.Manifest.currentVersion {
+                problems.append(.init(bundleURL: bundleURL, issue: .versionTooNew(manifest.version)))
+                continue
+            }
+            let transcriptURL = bundleURL.appendingPathComponent("transcript.json")
+            guard fm.fileExists(atPath: transcriptURL.path) else {
+                problems.append(.init(bundleURL: bundleURL, issue: .missingTranscript))
+                continue
+            }
+            let id = (bundleURL.lastPathComponent as NSString).deletingPathExtension
+            healthy.append(LibraryEntry(id: id, bundleURL: bundleURL, manifest: manifest))
+        }
+        return VerificationReport(healthy: healthy, problems: problems)
     }
 
     /// Hard-deletes any soft-deleted entry whose `deletedAt` is older than `days` before `now`.
     public func purgeDeletedOlderThan(days: Int, now: Date) async {
         let cutoff = now.addingTimeInterval(-Double(days) * 86_400)
-        primeCaches()
+        await primeCaches()
         let toPurge = (cachedDeleted ?? []).filter { ($0.deletedAt ?? .distantFuture) < cutoff }
         for entry in toPurge {
             do {
                 try FileManager.default.removeItem(at: entry.bundleURL)
                 await searchIndex.remove(entry.id)
-                if let extraIndexer { await extraIndexer.deindex(id: entry.id) }
+                scheduleExtraDeindex(id: entry.id)
             } catch {
                 continue
             }
@@ -202,7 +302,7 @@ public actor LibraryStore {
         cachedDeleted = nil
     }
 
-    private func makeEntry(bundleURL: URL) throws -> LibraryEntry {
+    private nonisolated func makeEntry(bundleURL: URL) throws -> LibraryEntry {
         let manifestURL = bundleURL.appendingPathComponent("manifest.json")
         let data = try Data(contentsOf: manifestURL)
         let decoder = JSONDecoder()

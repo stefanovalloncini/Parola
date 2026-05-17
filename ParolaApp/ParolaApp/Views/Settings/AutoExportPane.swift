@@ -51,6 +51,7 @@ struct AutoExportPane: View {
             }
 
             SettingHelper(text: "Auto-export writes additional files next to the source when transcription completes.")
+            ResetPaneButton(scope: .autoExport)
         }
     }
 

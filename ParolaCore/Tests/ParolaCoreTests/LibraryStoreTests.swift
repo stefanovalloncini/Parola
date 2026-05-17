@@ -186,6 +186,22 @@ struct LibraryStoreTests {
         #expect(entry.deletedAt == nil)
     }
 
+    @Test("updateTranscript stamps updatedAt on the manifest")
+    func updateTranscriptStampsUpdatedAt() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        #expect(entry.updatedAt == nil)
+
+        let when = Date(timeIntervalSince1970: 1_900_000_000)
+        var newTranscript = makeTranscript()
+        newTranscript.segments[0].text = "edited"
+        try await store.updateTranscript(newTranscript, for: entry.id, at: when)
+
+        let entries = await store.list()
+        let refreshed = try #require(entries.first(where: { $0.id == entry.id }))
+        #expect(refreshed.updatedAt == when)
+    }
+
     @Test("search returns active entries and filters soft-deleted")
     func searchFiltersSoftDeleted() async throws {
         let (store, _) = try makeTempLibrary()
@@ -205,5 +221,72 @@ struct LibraryStoreTests {
         try await store.restore(entry.id)
         results = await store.search("sprint")
         #expect(results.contains(where: { $0.entryID == entry.id }))
+    }
+
+    @Test("adopt rejects a source that is not a valid bundle and leaves nothing behind")
+    func adoptInvalidSource() async throws {
+        let (store, libraryURL) = try makeTempLibrary()
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bogus-\(UUID().uuidString).parola", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+
+        await #expect(throws: Error.self) {
+            try await store.adopt(parolaBundle: scratch)
+        }
+
+        let contents = try FileManager.default.contentsOfDirectory(at: libraryURL, includingPropertiesForKeys: nil)
+        let bundles = contents.filter { $0.pathExtension == "parola" }
+        #expect(bundles.isEmpty)
+    }
+
+    @Test("verify reports half-written bundles")
+    func verifyDetectsPartials() async throws {
+        let (store, libraryURL) = try makeTempLibrary()
+        let healthy = try await store.add(transcript: makeTranscript(), audioSource: nil)
+
+        let halfWritten = libraryURL.appendingPathComponent("orphan.parola", isDirectory: true)
+        try FileManager.default.createDirectory(at: halfWritten, withIntermediateDirectories: true)
+        let manifest = """
+        { "version": 1, "createdAt": "2030-01-01T00:00:00Z", "originalAudioName": "x.wav", "modelName": "x", "language": "en" }
+        """
+        try Data(manifest.utf8).write(to: halfWritten.appendingPathComponent("manifest.json"))
+
+        let report = await store.verify()
+        #expect(report.healthy.map(\.id).contains(healthy.id))
+        #expect(report.problems.count == 1)
+        if let problem = report.problems.first {
+            #expect(problem.bundleURL.lastPathComponent == "orphan.parola")
+            #expect(problem.issue == .missingTranscript)
+        }
+    }
+
+    @Test("verify flags unreadable manifests")
+    func verifyDetectsBrokenManifest() async throws {
+        let (store, libraryURL) = try makeTempLibrary()
+        let broken = libraryURL.appendingPathComponent("broken.parola", isDirectory: true)
+        try FileManager.default.createDirectory(at: broken, withIntermediateDirectories: true)
+        try Data("not json".utf8).write(to: broken.appendingPathComponent("manifest.json"))
+
+        let report = await store.verify()
+        #expect(report.problems.contains { $0.issue == .unreadableManifest })
+    }
+
+    @Test("verify flags bundles with newer schema versions")
+    func verifyFlagsNewerVersion() async throws {
+        let (store, libraryURL) = try makeTempLibrary()
+        let bundle = libraryURL.appendingPathComponent("future.parola", isDirectory: true)
+        try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+        let manifest = """
+        { "version": 999, "createdAt": "2030-01-01T00:00:00Z", "originalAudioName": "x.wav", "modelName": "x", "language": "en" }
+        """
+        try Data(manifest.utf8).write(to: bundle.appendingPathComponent("manifest.json"))
+        try Data("{}".utf8).write(to: bundle.appendingPathComponent("transcript.json"))
+
+        let report = await store.verify()
+        if case .versionTooNew(let v) = report.problems.first?.issue {
+            #expect(v == 999)
+        } else {
+            Issue.record("expected versionTooNew issue")
+        }
     }
 }

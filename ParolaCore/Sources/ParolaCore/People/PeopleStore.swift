@@ -21,7 +21,8 @@ public actor PeopleStore {
     @discardableResult
     public func recordUsage(name: String, at date: Date = Date()) -> Person {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let idx = people.firstIndex(where: { $0.name.lowercased() == trimmed.lowercased() }) {
+        let normalizedKey = Self.normalize(trimmed)
+        if let idx = people.firstIndex(where: { Self.normalize($0.name) == normalizedKey }) {
             people[idx].name = trimmed
             people[idx].lastUsedAt = date
             people[idx].usageCount += 1
@@ -46,6 +47,34 @@ public actor PeopleStore {
         let removed = people.count != before
         if removed { save() }
         return removed
+    }
+
+    /// Renames a person while preserving `lastUsedAt` and `usageCount`.
+    @discardableResult
+    public func rename(_ id: UUID, to newName: String) -> Person? {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let idx = people.firstIndex(where: { $0.id == id }) else {
+            return nil
+        }
+        let normalized = Self.normalize(trimmed)
+        if let existing = people.firstIndex(where: { $0.id != id && Self.normalize($0.name) == normalized }) {
+            let absorbed = people[idx]
+            people[existing].usageCount += absorbed.usageCount
+            if absorbed.lastUsedAt > people[existing].lastUsedAt {
+                people[existing].lastUsedAt = absorbed.lastUsedAt
+            }
+            people[existing].name = trimmed
+            people.remove(at: idx)
+            save()
+            return people[existing > idx ? existing - 1 : existing]
+        }
+        people[idx].name = trimmed
+        save()
+        return people[idx]
+    }
+
+    static func normalize(_ name: String) -> String {
+        name.precomposedStringWithCanonicalMapping.localizedLowercase
     }
 
     private func save() {

@@ -197,4 +197,71 @@ struct ParolaDocumentTests {
         #expect(loaded.manifest.category == .transcription)
         #expect(loaded.manifest.deletedAt == nil)
     }
+
+    @Test("write does not leave a .parola.tmp staging directory")
+    func atomicWriteCleansStaging() throws {
+        let scratch = tempDir()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let dest = scratch.appendingPathComponent("note")
+        _ = try ParolaDocument.write(transcript: sampleTranscript(), audioURL: nil, to: dest)
+        let staging = scratch.appendingPathComponent("note.parola.tmp")
+        #expect(!FileManager.default.fileExists(atPath: staging.path))
+    }
+
+    @Test("manifest stamps audioFilename so read is deterministic with multiple audio.*")
+    func deterministicAudioPick() throws {
+        let scratch = tempDir()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let fakeAudio = scratch.appendingPathComponent("clip.mp3")
+        try Data("ID3fake".utf8).write(to: fakeAudio)
+
+        let dest = scratch.appendingPathComponent("project")
+        let bundle = try ParolaDocument.write(transcript: sampleTranscript(), audioURL: fakeAudio, to: dest)
+
+        try Data("RIFFstray".utf8).write(to: bundle.appendingPathComponent("audio.wav"))
+
+        let loaded = try ParolaDocument.read(at: bundle)
+        #expect(loaded.audioURL?.lastPathComponent == "audio.mp3")
+        #expect(loaded.manifest.audioFilename == "audio.mp3")
+    }
+
+    @Test("old manifest without audioFilename still resolves an audio file deterministically")
+    func legacyManifestAudio() throws {
+        let scratch = tempDir()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let bundle = scratch.appendingPathComponent("legacy.parola")
+        try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+        let manifestText = """
+        { "version": 1, "createdAt": "2030-01-01T00:00:00Z", "originalAudioName": "x.mp3", "modelName": "x", "language": "en" }
+        """
+        try Data(manifestText.utf8).write(to: bundle.appendingPathComponent("manifest.json"))
+        try Data("{ \"segments\": [], \"language\": \"en\", \"modelName\": \"x\" }".utf8)
+            .write(to: bundle.appendingPathComponent("transcript.json"))
+        try Data("ID3".utf8).write(to: bundle.appendingPathComponent("audio.mp3"))
+        try Data("RIFF".utf8).write(to: bundle.appendingPathComponent("audio.wav"))
+
+        let loaded = try ParolaDocument.read(at: bundle)
+        #expect(loaded.audioURL?.lastPathComponent == "audio.mp3")
+    }
+
+    @Test("manifest encode round-trip preserves all fields including audioFilename")
+    func manifestEncodeRoundTrip() throws {
+        let manifest = ParolaDocument.Manifest(
+            version: 1,
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            originalAudioName: "clip.wav",
+            modelName: "tiny",
+            language: "en",
+            category: .meeting,
+            deletedAt: Date(timeIntervalSince1970: 1_700_000_500),
+            audioFilename: "audio.wav"
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(manifest)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(ParolaDocument.Manifest.self, from: data)
+        #expect(decoded == manifest)
+    }
 }

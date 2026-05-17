@@ -36,7 +36,7 @@ public struct ManagedConfiguration: @unchecked Sendable {
     }
 
     public var allowedEngines: [EngineID]? {
-        guard let raw = managedDict?[Key.allowedEngines.rawValue] as? [String], !raw.isEmpty else {
+        guard let raw = managedDict?[Key.allowedEngines.rawValue] as? [String] else {
             return nil
         }
         return raw.map { EngineID($0) }

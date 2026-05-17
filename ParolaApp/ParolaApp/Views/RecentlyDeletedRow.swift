@@ -4,6 +4,7 @@ import ParolaCore
 struct RecentlyDeletedRow: View {
     let entry: LibraryEntry
     let preview: String?
+    var isSelected: Bool = false
     let onRestore: () -> Void
     let onPurge: () -> Void
     let onTap: () -> Void
@@ -39,14 +40,14 @@ struct RecentlyDeletedRow: View {
         .padding(DS.Spacing.regular)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(DS.Color.surfaceElevated.opacity(hovered ? 1.0 : 0.7))
+                .fill(rowFill)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(DS.Color.separator.opacity(0.5), lineWidth: 1)
+                .stroke(rowStroke, lineWidth: isSelected ? 1.5 : 1)
         )
         .overlay(alignment: .topTrailing) {
-            if hovered { hoverActions }
+            if hovered || isSelected { hoverActions }
         }
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
@@ -66,6 +67,16 @@ struct RecentlyDeletedRow: View {
         if let preview, !preview.isEmpty { return preview }
         if preview == nil { return "Loading preview…" }
         return "No transcript text."
+    }
+
+    private var rowFill: Color {
+        if isSelected { return DS.Color.accent.opacity(0.12) }
+        return DS.Color.surfaceElevated.opacity(hovered ? 1.0 : 0.7)
+    }
+
+    private var rowStroke: Color {
+        if isSelected { return DS.Color.accent.opacity(0.55) }
+        return DS.Color.separator.opacity(0.5)
     }
 
     var categoryBadge: some View {

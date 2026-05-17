@@ -24,7 +24,8 @@ let package = Package(
                 .product(name: "WhisperKit", package: "WhisperKit"),
                 .product(name: "SpeakerKit", package: "WhisperKit"),
                 .product(name: "FluidAudio", package: "FluidAudio"),
-            ]
+            ],
+            resources: [.process("Resources")]
         ),
         .target(
             name: "ParolaMCP",
@@ -34,6 +35,7 @@ let package = Package(
             name: "parola",
             dependencies: [
                 "ParolaCore",
+                "ParolaMCP",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
@@ -48,6 +50,8 @@ let package = Package(
                 .process("Resources/sample.srt"),
                 .process("Resources/sample.vtt"),
                 .process("Resources/sample-crlf.srt"),
+                .process("Resources/transcript-v1.json"),
+                .process("Resources/transcript-legacy.json"),
                 .copy("Resources/tiny.parola"),
                 .copy("Resources/expected"),
             ]

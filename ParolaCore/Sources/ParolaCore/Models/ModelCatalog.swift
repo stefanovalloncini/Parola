@@ -149,23 +149,22 @@ public enum ModelCatalog {
         return base.tightened(by: variant.languageScope)
     }
 
-    /// Synchronous capability lookup for UI gating. Uses the engine's compile-time defaults
-    /// rather than the registry (which is an actor and not reachable from SwiftUI view bodies).
-    /// Stays in sync with the live registry as long as built-in engines keep their default
-    /// capabilities — which is enforced by the conformance contract in each transcriber.
-    public static func staticCapabilities(for variant: ModelVariant) -> EngineCapabilities {
+    /// Synchronous capability lookup for UI gating. Returns nil for engines this build
+    /// doesn't know about — callers must handle unknown engines explicitly rather than
+    /// claim a possibly-wrong default. The registry remains the source of truth at run time.
+    public static func staticCapabilities(for variant: ModelVariant) -> EngineCapabilities? {
         let base: EngineCapabilities
         switch variant.engineID {
         case .whisperKit:  base = .whisperKitDefaults
         case .parakeet:    base = .parakeetDefaults
         case .appleSpeech: base = .appleSpeechDefaults
-        default:           base = .whisperKitDefaults
+        default:           return nil
         }
         return base.tightened(by: variant.languageScope)
     }
 
     public static func staticCapabilities(forID id: String) -> EngineCapabilities? {
-        variant(id: id).map(staticCapabilities(for:))
+        variant(id: id).flatMap(staticCapabilities(for:))
     }
 
     public static func groupedForPicker() -> [(ModelCategory, [ModelVariant])] {

@@ -288,4 +288,115 @@ struct ExporterTests {
     func renderTextThrowsForPdf() throws {
         #expect(throws: ParolaError.self) { _ = try PdfExporter().renderText(sample()) }
     }
+
+    @Test("srt with includeSpeakers prefixes each cue")
+    func srtSpeakers() throws {
+        let exporter = SrtExporter(options: SubtitleOptions(includeSpeakers: true))
+        let out = try exporter.renderText(sampleWithSpeakers())
+        #expect(out.contains("Speaker 1: Hello world."))
+        #expect(out.contains("Speaker 2: This is Parola."))
+    }
+
+    @Test("srt without includeSpeakers omits them by default")
+    func srtNoSpeakersDefault() throws {
+        let out = try SrtExporter().renderText(sampleWithSpeakers())
+        #expect(!out.contains("Speaker 1:"))
+        #expect(out.contains("Hello world."))
+    }
+
+    @Test("vtt with includeSpeakers wraps cues in <v> tags")
+    func vttSpeakers() throws {
+        let exporter = VttExporter(options: SubtitleOptions(includeSpeakers: true))
+        let out = try exporter.renderText(sampleWithSpeakers())
+        #expect(out.contains("<v Speaker 1>Hello world.</v>"))
+        #expect(out.contains("<v Speaker 2>This is Parola.</v>"))
+    }
+
+    @Test("vtt without includeSpeakers omits them by default")
+    func vttNoSpeakersDefault() throws {
+        let out = try VttExporter().renderText(sampleWithSpeakers())
+        #expect(!out.contains("<v"))
+    }
+
+    @Test("tsv emits header and tab-separated rows")
+    func tsvHeader() throws {
+        let out = try TsvExporter().renderText(sample())
+        #expect(out.hasPrefix("start_seconds\tend_seconds\tspeaker\ttext\n"))
+        #expect(out.contains("0.0\t1.5\t\tHello world."))
+    }
+
+    @Test("tsv escapes tabs and newlines in fields")
+    func tsvEscape() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "tab\there"),
+                TranscriptSegment(id: 1, start: 1, end: 2, text: "line1\nline2"),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try TsvExporter().renderText(transcript)
+        #expect(out.contains("tab\\there"))
+        #expect(out.contains("line1\\nline2"))
+        #expect(!out.contains("tab\there"))
+    }
+
+    @Test("tsv is a recognized ExportFormat")
+    func tsvFormat() {
+        #expect(ExportFormat.tsv.fileExtension == "tsv")
+        #expect(Exporters.exporter(for: .tsv) is TsvExporter)
+    }
+
+    @Test("Format namespace provides shared helpers")
+    func formatNamespace() {
+        #expect(Format.timestampHHMMSS(0) == "00:00:00")
+        #expect(Format.timestampHHMMSS(3661) == "01:01:01")
+        #expect(Format.escapeHTML("a < b & c") == "a &lt; b &amp; c")
+        #expect(Format.escapeXML("<x>") == "&lt;x&gt;")
+    }
+
+    @Test("pdf with non-Latin language still produces glyphs (font cascade)")
+    func pdfCJK() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "你好，世界")],
+            language: "zh",
+            modelName: "x"
+        )
+        let data = try PdfExporter().render(transcript)
+        let doc = try #require(PDFDocument(data: data))
+        let text = (0..<doc.pageCount).compactMap { doc.page(at: $0)?.string }.joined()
+        #expect(text.contains("你好"))
+    }
+
+    @Test("ExportPreset round-trips through JSON")
+    func exportPresetRoundTrip() throws {
+        let preset = ExportPreset(
+            name: "YouTube",
+            formats: [.srt, .vtt, .pdf],
+            markdownOptions: MarkdownOptions(showTimestamps: true),
+            subtitleOptions: SubtitleOptions(includeSpeakers: true)
+        )
+        let encoded = try JSONEncoder().encode(preset)
+        let decoded = try JSONDecoder().decode(ExportPreset.self, from: encoded)
+        #expect(decoded == preset)
+    }
+
+    @Test("ExportPreset.exporter applies options for declared formats")
+    func exportPresetExporter() throws {
+        let preset = ExportPreset(
+            name: "speakers",
+            formats: [.srt],
+            subtitleOptions: SubtitleOptions(includeSpeakers: true)
+        )
+        let exporter = try #require(preset.exporter(for: .srt))
+        let out = try exporter.renderText(sampleWithSpeakers())
+        #expect(out.contains("Speaker 1: Hello world."))
+    }
+
+    @Test("ExportPreset.exporter is nil for formats not in the preset")
+    func exportPresetExcludes() {
+        let preset = ExportPreset(name: "txt-only", formats: [.txt])
+        #expect(preset.exporter(for: .srt) == nil)
+        #expect(preset.exporter(for: .txt) is TxtExporter)
+    }
 }

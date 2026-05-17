@@ -23,7 +23,7 @@ extension AppModel {
         let interval = CMTime(seconds: 0.2, preferredTimescale: 600)
         playerTimeObserver = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             let seconds = CMTimeGetSeconds(time)
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 self?.currentTimeSeconds = seconds
                 self?.updateCurrentSegment(time: seconds)
             }

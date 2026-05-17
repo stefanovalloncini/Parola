@@ -45,7 +45,7 @@ struct ModelsSettingsPane: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(DS.Color.surface)
-        .onAppear { model.refreshModelList() }
+        .task { model.refreshModelList() }
     }
 
     // MARK: - Controls
@@ -53,38 +53,11 @@ struct ModelsSettingsPane: View {
     private var controls: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                searchField
+                SearchPill(text: $searchText, placeholder: "Search models…")
                 sortMenu
             }
             chipsRow
         }
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("Search models…", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        )
     }
 
     private var sortMenu: some View {

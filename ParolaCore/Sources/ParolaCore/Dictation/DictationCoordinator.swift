@@ -57,6 +57,7 @@ public actor DictationCoordinator {
     }
 
     public func startMonitoring() async {
+        await hotkey.stop()
         eventTask?.cancel()
         eventContinuation?.finish()
         let (stream, continuation) = AsyncStream.makeStream(of: HotkeyEvent.self)
@@ -71,7 +72,24 @@ public actor DictationCoordinator {
         }
     }
 
+    /// Stops listening for hotkeys. If a recording is in flight, transcribes and inserts it
+    /// so the user's last utterance isn't dropped. Use ``abortMonitoring()`` for "give up"
+    /// semantics that discard pending audio.
     public func stopMonitoring() async {
+        await hotkey.stop()
+        eventContinuation?.finish()
+        eventContinuation = nil
+        eventTask?.cancel()
+        eventTask = nil
+        if case .listening = state {
+            await finishListening()
+        } else {
+            await setState(.idle)
+        }
+    }
+
+    /// Stops listening and discards any in-flight recording without inserting text.
+    public func abortMonitoring() async {
         await hotkey.stop()
         eventContinuation?.finish()
         eventContinuation = nil
@@ -130,8 +148,7 @@ public actor DictationCoordinator {
         switch event {
         case .press:
             if state == .listening && hybridLocked {
-                hybridLocked = false
-                await finishListening()
+                pressStartedAt = Date()
                 return
             }
             pressStartedAt = Date()
@@ -141,6 +158,11 @@ public actor DictationCoordinator {
             guard state == .listening else { return }
             let held = pressStartedAt.map { Date().timeIntervalSince($0) } ?? 0
             pressStartedAt = nil
+            if hybridLocked {
+                hybridLocked = false
+                await finishListening()
+                return
+            }
             if held >= Self.hybridHoldThreshold {
                 await finishListening()
             } else {

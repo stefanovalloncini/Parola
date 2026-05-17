@@ -11,30 +11,20 @@ struct InfoInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.large) {
-            InfoSection(title: "Model & Language") {
-                InfoRow(icon: "cube", label: "Model", value: model.transcript?.modelName ?? "—")
-                InfoRow(icon: "globe", label: "Language", value: languageLabel)
-            }
-
             InfoSection(title: "Properties") {
                 InfoRow(icon: "clock", label: "Audio Duration", value: durationLabel)
                 InfoRow(icon: "calendar", label: "Created", value: dateLabel(entry?.createdAt))
-                InfoRow(icon: "calendar.badge.clock", label: "Updated", value: dateLabel(entry?.createdAt))
+                if let updated = entry?.updatedAt {
+                    InfoRow(icon: "calendar.badge.clock", label: "Updated", value: dateLabel(updated))
+                }
             }
 
             InfoSection(title: "Transcription Details") {
-                InfoRow(icon: "globe", label: "Model Language", value: languageLabel)
+                InfoRow(icon: "globe", label: "Language", value: languageLabel)
                 InfoRow(icon: "cube", label: "Model", value: model.transcript?.modelName ?? "—")
                 InfoRow(icon: "cpu", label: "Engine", value: engineLabel)
                 InfoRow(icon: "character", label: "Characters", value: "\(charCount)")
                 InfoRow(icon: "text.word.spacing", label: "Words", value: "\(wordCount)")
-            }
-
-            InfoSection(title: "Transcription Quality Feedback") {
-                HStack(spacing: DS.Spacing.small) {
-                    FeedbackPill(icon: "hand.thumbsup", title: "Accurate")
-                    FeedbackPill(icon: "hand.thumbsdown", title: "Not Accurate")
-                }
             }
         }
     }
@@ -109,21 +99,3 @@ struct InfoRow: View {
     }
 }
 
-struct FeedbackPill: View {
-    let icon: String
-    let title: String
-
-    var body: some View {
-        Button {} label: {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                Text(title)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, DS.Spacing.small)
-            .background(DS.Color.surfaceElevated)
-            .clipShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-}

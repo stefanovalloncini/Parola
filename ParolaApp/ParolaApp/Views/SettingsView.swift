@@ -24,9 +24,9 @@ struct SettingsView: View {
 private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     case general, customization, watchedFolders, recordMeetings, shortcuts
     case microphone, liveCaptions, dictation, snippets
-    case localModels, cloudModels, people, translation, ignoredSegments, findReplace
+    case localModels, cloudModels, transcriptionDefaults, translation, ignoredSegments, findReplace
     case exportFormats, batchExport, autoExport, integrations
-    case services, prompts
+    case prompts
     case automation
     case updates
     case advanced, about
@@ -46,7 +46,7 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .snippets: return "Snippets"
         case .localModels: return "Local Models"
         case .cloudModels: return "Cloud Models"
-        case .people: return "People"
+        case .transcriptionDefaults: return "Transcription Defaults"
         case .translation: return "Translation"
         case .ignoredSegments: return "Ignored Segments"
         case .findReplace: return "Find & Replace"
@@ -54,7 +54,6 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .batchExport: return "Batch Export"
         case .autoExport: return "Auto-Export"
         case .integrations: return "Integrations"
-        case .services: return "Services"
         case .prompts: return "Prompts"
         case .automation: return "MCP & Automation"
         case .updates: return "Updates"
@@ -76,7 +75,7 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .snippets: return "text.append"
         case .localModels: return "cpu"
         case .cloudModels: return "cloud"
-        case .people: return "person.2"
+        case .transcriptionDefaults: return "slider.horizontal.3"
         case .translation: return "character.book.closed"
         case .ignoredSegments: return "line.3.horizontal.decrease.circle"
         case .findReplace: return "arrow.triangle.2.circlepath"
@@ -84,12 +83,42 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .batchExport: return "rectangle.stack.badge.play"
         case .autoExport: return "arrow.up.doc"
         case .integrations: return "puzzlepiece.extension"
-        case .services: return "sparkles"
         case .prompts: return "text.cursor"
         case .automation: return "bolt.horizontal.circle"
         case .updates: return "arrow.down.circle"
         case .advanced: return "wrench.and.screwdriver"
         case .about: return "info.circle"
+        }
+    }
+
+    /// Returns the matching SettingsPaneScope used for reset / search keywords. Some routes do not
+    /// map to a scope (e.g. `localModels`, `cloudModels`, `about`) and return nil.
+    var paneScope: SettingsPaneScope? {
+        switch self {
+        case .general: return .general
+        case .customization: return .customization
+        case .watchedFolders: return .watchedFolders
+        case .recordMeetings: return .recordMeetings
+        case .shortcuts: return nil
+        case .microphone: return .microphone
+        case .liveCaptions: return .liveCaptions
+        case .dictation: return .dictation
+        case .snippets: return .snippets
+        case .localModels: return nil
+        case .cloudModels: return nil
+        case .transcriptionDefaults: return .transcriptionDefaults
+        case .translation: return .translation
+        case .ignoredSegments: return .ignoredSegments
+        case .findReplace: return .findReplace
+        case .exportFormats: return .exportFormats
+        case .batchExport: return .batchExport
+        case .autoExport: return .autoExport
+        case .integrations: return .integrations
+        case .prompts: return .prompts
+        case .automation: return .automation
+        case .updates: return .updates
+        case .advanced: return .advanced
+        case .about: return nil
         }
     }
 }
@@ -103,9 +132,9 @@ private struct SidebarGroup: Identifiable {
 private let sidebarGroups: [SidebarGroup] = [
     SidebarGroup(title: nil, routes: [.general, .customization, .watchedFolders, .recordMeetings, .shortcuts]),
     SidebarGroup(title: "AUDIO & VIDEO", routes: [.microphone, .liveCaptions, .dictation, .snippets]),
-    SidebarGroup(title: "TRANSCRIPTION", routes: [.localModels, .cloudModels, .people, .translation, .ignoredSegments, .findReplace]),
+    SidebarGroup(title: "TRANSCRIPTION", routes: [.localModels, .transcriptionDefaults, .translation, .ignoredSegments, .findReplace]),
     SidebarGroup(title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport, .integrations]),
-    SidebarGroup(title: "AI", routes: [.services, .prompts]),
+    SidebarGroup(title: "AI", routes: [.prompts]),
     SidebarGroup(title: "AUTOMATION", routes: [.automation, .updates]),
     SidebarGroup(title: nil, routes: [.advanced, .about])
 ]
@@ -118,7 +147,7 @@ private struct SettingsSidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SearchPill(text: $search)
+            SettingsSearchPill(text: $search)
                 .padding(.horizontal, 12)
                 .padding(.top, 14)
                 .padding(.bottom, 10)
@@ -127,7 +156,7 @@ private struct SettingsSidebar: View {
                     ForEach(filteredGroups) { group in
                         if let title = group.title {
                             Text(title)
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
                                 .padding(.horizontal, 16)
                                 .padding(.top, 4)
@@ -151,23 +180,31 @@ private struct SettingsSidebar: View {
         let trimmed = search.trimmingCharacters(in: .whitespaces).lowercased()
         guard !trimmed.isEmpty else { return sidebarGroups }
         return sidebarGroups.compactMap { group in
-            let matches = group.routes.filter { $0.label.lowercased().contains(trimmed) }
-            return matches.isEmpty ? nil : SidebarGroup(title: group.title, routes: matches)
+            let hits = group.routes.filter { matches(route: $0, query: trimmed) }
+            return hits.isEmpty ? nil : SidebarGroup(title: group.title, routes: hits)
         }
+    }
+
+    private func matches(route: SettingsRoute, query: String) -> Bool {
+        if route.label.lowercased().contains(query) { return true }
+        if let scope = route.paneScope {
+            return scope.searchKeywords.contains { $0.lowercased().contains(query) }
+        }
+        return false
     }
 }
 
-private struct SearchPill: View {
+private struct SettingsSearchPill: View {
     @Binding var text: String
 
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .regular))
+                .font(.caption)
                 .foregroundStyle(.secondary)
             TextField("Search Settings…", text: $text)
                 .textFieldStyle(.plain)
-                .font(.system(size: 12))
+                .font(.caption)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -189,11 +226,11 @@ private struct SidebarRow: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: route.symbol)
-                    .font(.system(size: 13))
+                    .font(.subheadline)
                     .frame(width: 16)
                     .foregroundStyle(selected ? Color.white : Color.secondary)
                 Text(route.label)
-                    .font(.system(size: 13))
+                    .font(.subheadline)
                     .foregroundStyle(selected ? Color.white : Color.primary)
                 Spacer(minLength: 0)
             }
@@ -227,7 +264,7 @@ private struct SettingsDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 Text(route.label)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .padding(.top, 20)
                 content
                 Spacer(minLength: 24)
@@ -253,7 +290,7 @@ private struct SettingsDetail: View {
             ModelsSettingsPane()
         case .cloudModels:
             Text("Models pane — see Unit 5b").foregroundStyle(.secondary)
-        case .people: PeoplePane()
+        case .transcriptionDefaults: TranscriptionDefaultsPane()
         case .translation: TranslationPane()
         case .ignoredSegments: IgnoredSegmentsPane()
         case .findReplace: FindReplacePane()
@@ -261,7 +298,6 @@ private struct SettingsDetail: View {
         case .batchExport: BatchExportSettingsPane()
         case .autoExport: AutoExportPane()
         case .integrations: IntegrationsPane()
-        case .services: ServicesPane()
         case .prompts: PromptsPane()
         case .automation: AutomationPane()
         case .updates: UpdatesPane()
@@ -320,10 +356,10 @@ struct SettingRow<Trailing: View>: View {
             }
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(size: 13))
+                    Text(title).font(.subheadline)
                     if let description {
                         Text(description)
-                            .font(.system(size: 11))
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -340,7 +376,7 @@ struct SettingHelper: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(.system(size: 11))
+            .font(.caption)
             .italic()
             .foregroundStyle(.secondary)
             .padding(.horizontal, 4)

@@ -16,15 +16,18 @@ private func applyAppAppearance(_ theme: String) {
 @main
 struct ParolaApp: App {
     @StateObject private var model = AppModel()
+    @StateObject private var liveCaptions = LiveCaptionsController()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(model)
+                .environmentObject(liveCaptions)
                 .frame(minWidth: 920, minHeight: 600)
                 .preferredColorScheme(model.preferredColorScheme)
                 .onAppear {
+                    model.liveCaptions = liveCaptions
                     appDelegate.bind(model: model)
                     applyAppAppearance(model.appTheme)
                 }
@@ -49,16 +52,17 @@ struct ParolaApp: App {
                 Button("Find…") { model.toggleFind() }
                     .keyboardShortcut("f", modifiers: [.command])
                     .disabled(model.transcript == nil)
+                FocusChatComposerCommand()
             }
             CommandMenu("Captions") {
-                Button(model.liveCaptions.isActive ? "Stop Live Captions" : "Start Live Captions") {
+                Button(liveCaptions.isActive ? "Stop Live Captions" : "Start Live Captions") {
                     model.toggleLiveCaptions()
                 }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
                 Toggle("Translate to English", isOn: Binding(
-                    get: { model.liveCaptions.translateToEnglish },
+                    get: { liveCaptions.translateToEnglish },
                     set: { newValue in
-                        Task { await model.liveCaptions.setTranslate(newValue) }
+                        Task { await liveCaptions.setTranslate(newValue) }
                     }
                 ))
             }
@@ -91,6 +95,7 @@ struct ParolaApp: App {
         Settings {
             SettingsView()
                 .environmentObject(model)
+                .environmentObject(liveCaptions)
                 .frame(minWidth: 880, idealWidth: 900, maxWidth: .infinity, minHeight: 600, idealHeight: 640, maxHeight: .infinity)
         }
     }

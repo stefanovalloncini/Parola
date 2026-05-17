@@ -4,21 +4,6 @@ import Testing
 
 @Suite("Transcript chat")
 struct TranscriptChatTests {
-    private actor MockLanguageModel: LanguageModel {
-        var scriptedResponses: [String]
-        var receivedPrompts: [String] = []
-
-        init(scriptedResponses: [String]) {
-            self.scriptedResponses = scriptedResponses
-        }
-
-        func respond(to prompt: String) async throws -> String {
-            receivedPrompts.append(prompt)
-            guard !scriptedResponses.isEmpty else { return "" }
-            return scriptedResponses.removeFirst()
-        }
-    }
-
     private func makeTranscript() -> Transcript {
         Transcript(
             segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello world.")],
@@ -52,6 +37,18 @@ struct TranscriptChatTests {
         #expect(history.map(\.text) == ["Q1", "Answer 1", "Q2", "Answer 2"])
     }
 
+    @Test("second turn forwards full prior history to the model")
+    func multiTurnHistoryThreading() async throws {
+        let model = MockLanguageModel(scriptedResponses: ["Answer 1", "Answer 2"])
+        let chat = TranscriptChatSession(transcript: makeTranscript(), model: model)
+        _ = try await chat.ask("Q1")
+        _ = try await chat.ask("Q2")
+        let lastHistory = await model.lastReceivedHistory
+        #expect(lastHistory?.count == 3)
+        #expect(lastHistory?.map(\.text) == ["Q1", "Answer 1", "Q2"])
+        #expect(lastHistory?.map(\.role) == [.user, .assistant, .user])
+    }
+
     @Test("clearHistory empties the conversation")
     func clear() async throws {
         let model = MockLanguageModel(scriptedResponses: ["Answer"])
@@ -62,7 +59,7 @@ struct TranscriptChatTests {
         #expect(history.isEmpty)
     }
 
-    @Test("initial history is restored")
+    @Test("initial history is restored and forwarded to the model")
     func resumeWithHistory() async throws {
         let prior = [
             ChatMessage(role: .user, text: "Previous Q"),
@@ -75,6 +72,53 @@ struct TranscriptChatTests {
         #expect(history.count == 4)
         #expect(history.first?.text == "Previous Q")
         #expect(history.last?.text == "Reply")
+        let lastHistory = await model.lastReceivedHistory
+        #expect(lastHistory?.map(\.text) == ["Previous Q", "Previous A", "New Q"])
+    }
+
+    @Test("failed ask leaves history unchanged")
+    func askFailureLeavesHistoryUntouched() async throws {
+        let model = MockLanguageModel(error: NSError(domain: "test", code: 1))
+        let chat = TranscriptChatSession(transcript: makeTranscript(), model: model)
+        var didThrow = false
+        do {
+            _ = try await chat.ask("Q")
+        } catch {
+            didThrow = true
+        }
+        #expect(didThrow)
+        let history = await chat.history
+        #expect(history.isEmpty)
+    }
+
+    @Test("retry after a failed ask succeeds and records a clean turn")
+    func askRetryAfterFailure() async throws {
+        let model = MockLanguageModel(error: NSError(domain: "test", code: 1))
+        let chat = TranscriptChatSession(transcript: makeTranscript(), model: model)
+        do { _ = try await chat.ask("Q1") } catch {}
+        await model.setError(nil)
+        await model.enqueue("Answer 1")
+        _ = try await chat.ask("Q1")
+        let history = await chat.history
+        #expect(history.map(\.text) == ["Q1", "Answer 1"])
+    }
+
+    @Test("stream yields deltas then a completed message")
+    func streamYieldsDeltasAndCompletion() async throws {
+        let model = MockLanguageModel(scriptedResponses: ["Hi!"])
+        let chat = TranscriptChatSession(transcript: makeTranscript(), model: model)
+        var collected = ""
+        var completed: ChatMessage?
+        for try await event in chat.stream("Hello?") {
+            switch event {
+            case .delta(let text): collected += text
+            case .completed(let message): completed = message
+            }
+        }
+        #expect(collected == "Hi!")
+        #expect(completed?.text == "Hi!")
+        let history = await chat.history
+        #expect(history.map(\.text) == ["Hello?", "Hi!"])
     }
 
     @Test("ChatMessage round-trips through JSON")

@@ -4,14 +4,6 @@ import Testing
 
 @Suite("Prompt library")
 struct PromptLibraryTests {
-    private actor MockModel: LanguageModel {
-        var lastPrompt: String = ""
-        func respond(to prompt: String) async throws -> String {
-            lastPrompt = prompt
-            return "MOCK_RESPONSE"
-        }
-    }
-
     private func makeTempStorage() -> URL {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-prompts-test-\(UUID().uuidString).json")
@@ -74,14 +66,14 @@ struct PromptLibraryTests {
 
     @Test("PromptRunner dispatches via the language model")
     func runnerDispatches() async throws {
-        let model = MockModel()
+        let model = MockLanguageModel(scriptedResponses: ["MOCK_RESPONSE"])
         let result = try await PromptRunner.run(
             Prompt.builtIns[0],
             on: "hello",
             model: model
         )
         #expect(result == "MOCK_RESPONSE")
-        let prompt = await model.lastPrompt
+        let prompt = await model.receivedPrompts.last ?? ""
         #expect(prompt.contains("Cleanup the transcript") || prompt.contains("Clean up the transcript"))
         #expect(prompt.contains("hello"))
     }
@@ -93,5 +85,51 @@ struct PromptLibraryTests {
         let decoded = try JSONDecoder().decode(Prompt.self, from: data)
         #expect(decoded.id == p.id)
         #expect(decoded.name == "Test")
+    }
+
+    @Test("Prompt without a version field decodes to version 1")
+    func promptVersionDefaultsToOne() throws {
+        let json = #"{"id":"00000000-0000-0000-0000-000000000099","name":"Legacy","instructions":"hi","isBuiltIn":false}"#
+        let data = Data(json.utf8)
+        let decoded = try JSONDecoder().decode(Prompt.self, from: data)
+        #expect(decoded.version == 1)
+    }
+
+    @Test("Outdated built-in is flagged when stored version is behind")
+    func outdatedBuiltInDetected() async throws {
+        let url = makeTempStorage()
+        let stale = [Prompt(
+            id: Prompt.builtIns[0].id,
+            name: Prompt.builtIns[0].name,
+            instructions: Prompt.builtIns[0].instructions,
+            isBuiltIn: true,
+            version: 0
+        )]
+        let data = try JSONEncoder().encode(stale)
+        try data.write(to: url)
+        let lib = PromptLibrary(storageURL: url)
+        let outdated = await lib.outdatedBuiltIns
+        #expect(outdated.count == 1)
+        #expect(outdated.first?.id == Prompt.builtIns[0].id)
+        #expect(outdated.first?.storedVersion == 0)
+        #expect(outdated.first?.currentVersion == 1)
+    }
+
+    @Test("dismissOutdatedBuiltIn clears the flag for that id")
+    func dismissOutdatedBuiltIn() async throws {
+        let url = makeTempStorage()
+        let stale = [Prompt(
+            id: Prompt.builtIns[0].id,
+            name: Prompt.builtIns[0].name,
+            instructions: Prompt.builtIns[0].instructions,
+            isBuiltIn: true,
+            version: 0
+        )]
+        let data = try JSONEncoder().encode(stale)
+        try data.write(to: url)
+        let lib = PromptLibrary(storageURL: url)
+        await lib.dismissOutdatedBuiltIn(Prompt.builtIns[0].id)
+        let outdated = await lib.outdatedBuiltIns
+        #expect(outdated.isEmpty)
     }
 }

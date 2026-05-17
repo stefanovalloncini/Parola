@@ -12,14 +12,17 @@ import CoreAudio
 public actor MicAudioSource: AudioSource {
     private let engine = AVAudioEngine()
     private let preferredDeviceUID: String?
-    private var writeFile: AVAudioFile?
-    private var outputURL: URL?
-    private var converter: AVAudioConverter?
-    private var outputFormat: AVAudioFormat?
-    private var isRecording = false
+    private var session: Session?
     private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
-    private var bufferContinuation: AsyncStream<BufferBox>.Continuation?
-    private var consumerTask: Task<Void, Never>?
+
+    private struct Session {
+        var outputURL: URL
+        var converter: AVAudioConverter
+        var outputFormat: AVAudioFormat
+        var writeFile: AVAudioFile?
+        var bufferContinuation: AsyncStream<BufferBox>.Continuation
+        var consumerTask: Task<Void, Never>
+    }
 
     public init(deviceUID: String? = nil) {
         self.preferredDeviceUID = deviceUID
@@ -48,7 +51,7 @@ public actor MicAudioSource: AudioSource {
     }
 
     public func start() throws {
-        guard !isRecording else { return }
+        guard session == nil else { return }
 
         let inputNode = engine.inputNode
         if let uid = preferredDeviceUID, !uid.isEmpty {
@@ -56,7 +59,7 @@ public actor MicAudioSource: AudioSource {
         }
         let inputFormat = inputNode.inputFormat(forBus: 0)
         guard inputFormat.sampleRate > 0 else {
-            throw ParolaError.captureUnavailable("microphone not available (input format invalid; permission may be denied)")
+            throw ParolaError.captureUnavailable("microphone not available — input format invalid (mic permission?)")
         }
 
         guard let outFormat = AVAudioFormat(
@@ -80,18 +83,20 @@ public actor MicAudioSource: AudioSource {
             interleaved: false
         )
 
-        self.outputFormat = outFormat
-        self.converter = conv
-        self.writeFile = file
-        self.outputURL = url
-
         let (stream, cont) = AsyncStream<BufferBox>.makeStream(bufferingPolicy: .unbounded)
-        self.bufferContinuation = cont
-        self.consumerTask = Task { [weak self] in
+        let consumer = Task { [weak self] in
             for await box in stream {
                 await self?.write(box: box)
             }
         }
+        session = Session(
+            outputURL: url,
+            converter: conv,
+            outputFormat: outFormat,
+            writeFile: file,
+            bufferContinuation: cont,
+            consumerTask: consumer
+        )
 
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { buffer, _ in
             guard let copy = Self.copy(buffer) else { return }
@@ -100,7 +105,6 @@ public actor MicAudioSource: AudioSource {
 
         engine.prepare()
         try engine.start()
-        isRecording = true
     }
 
     private static func copy(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
@@ -119,13 +123,13 @@ public actor MicAudioSource: AudioSource {
     private func write(box: BufferBox) {
         emitLevel(MicAudioSource.normalisedLevel(of: box.buffer))
 
-        guard let conv = converter, let outFormat = outputFormat, let file = writeFile else { return }
-        let ratio = outFormat.sampleRate / box.buffer.format.sampleRate
+        guard let current = session, let file = current.writeFile else { return }
+        let ratio = current.outputFormat.sampleRate / box.buffer.format.sampleRate
         let outCap = AVAudioFrameCount(Double(box.buffer.frameLength) * ratio + 1024)
-        guard let outBuffer = AVAudioPCMBuffer(pcmFormat: outFormat, frameCapacity: outCap) else { return }
+        guard let outBuffer = AVAudioPCMBuffer(pcmFormat: current.outputFormat, frameCapacity: outCap) else { return }
 
         var error: NSError?
-        let status = conv.convert(to: outBuffer, error: &error) { _, outStatus in
+        let status = current.converter.convert(to: outBuffer, error: &error) { _, outStatus in
             if box.consumed {
                 outStatus.pointee = .endOfStream
                 return nil
@@ -155,32 +159,29 @@ public actor MicAudioSource: AudioSource {
         return (clamped - minDb) / -minDb
     }
 
-    public func prepare() throws -> URL {
-        stop()
-        guard let url = outputURL else {
+    public func prepare() async throws -> URL {
+        guard let url = session?.outputURL else {
             throw ParolaError.captureUnavailable("recording was not started")
         }
+        await stop()
         return url
     }
 
-    public func cancel() {
-        stop()
-        if let url = outputURL { try? FileManager.default.removeItem(at: url) }
-        outputURL = nil
-        converter = nil
-        outputFormat = nil
+    public func cancel() async {
+        let url = session?.outputURL
+        await stop()
+        if let url { try? FileManager.default.removeItem(at: url) }
     }
 
-    private func stop() {
-        guard isRecording else { return }
-        engine.inputNode.removeTap(onBus: 0)
+    private func stop() async {
+        guard let current = session else { return }
+        // Stop the engine first; removeTap second; then drain the pending buffers
+        // so writes complete before we release the file handle.
         engine.stop()
-        bufferContinuation?.finish()
-        bufferContinuation = nil
-        consumerTask?.cancel()
-        consumerTask = nil
-        writeFile = nil
-        isRecording = false
+        engine.inputNode.removeTap(onBus: 0)
+        current.bufferContinuation.finish()
+        await current.consumerTask.value
+        session = nil
         for continuation in levelContinuations.values {
             continuation.finish()
         }

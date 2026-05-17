@@ -19,8 +19,11 @@ public struct FileAudioSource: AudioSource {
 
     public func cancel() async {}
 
-    /// Best-effort duration in seconds. Returns nil if AVFoundation can't read the file.
     public func duration() async -> Double? {
+        await estimatedDuration()
+    }
+
+    public func estimatedDuration() async -> Double? {
         let asset = AVURLAsset(url: url)
         do {
             let dur = try await asset.load(.duration)

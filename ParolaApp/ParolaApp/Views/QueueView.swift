@@ -5,6 +5,7 @@ struct QueueView: View {
     @EnvironmentObject var model: AppModel
     @State private var searchText: String = ""
     @State private var sortOption: SortOption = .newestFirst
+    @FocusState private var focusedJob: BatchJob.ID?
 
     enum SortOption: String, CaseIterable, Identifiable {
         case newestFirst = "Newest first"
@@ -31,7 +32,7 @@ struct QueueView: View {
         HStack(spacing: DS.Spacing.regular) {
             Text("Queue").font(DS.Font.title)
             Spacer()
-            searchField
+            SearchPill(text: $searchText, placeholder: "Search queue")
                 .frame(maxWidth: 240)
             sortMenu
             Button {
@@ -54,33 +55,6 @@ struct QueueView: View {
         }
         .padding(.horizontal, DS.Spacing.large)
         .padding(.vertical, DS.Spacing.regular)
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("Search queue", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        )
     }
 
     private var sortMenu: some View {
@@ -134,7 +108,7 @@ struct QueueView: View {
         ContentUnavailableView(
             "No jobs yet",
             systemImage: "list.bullet.indent",
-            description: Text("Files you transcribe in batch show up here while they run, then stay until you clear them.")
+            description: Text("Batch transcriptions appear here. They stay until you clear them.")
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -184,16 +158,40 @@ struct QueueView: View {
                     .foregroundStyle(DS.Color.secondaryText)
                 VStack(spacing: 1) {
                     ForEach(matching) { job in
-                        QueueRow(job: job)
+                        QueueRow(job: job, isFocused: focusedJob == job.id)
+                            .focusable(true)
+                            .focused($focusedJob, equals: job.id)
+                            .onKeyPress(.return) {
+                                handleReturn(job: job); return .handled
+                            }
+                            .onKeyPress(.delete) {
+                                handleDelete(job: job); return .handled
+                            }
                     }
                 }
             }
+        }
+    }
+
+    private func handleReturn(job: BatchJob) {
+        switch job.status {
+        case .done: model.openBatchJobTranscript(job.id)
+        case .failed, .cancelled: model.retryBatchJob(job.id)
+        case .pending, .transcribing: break
+        }
+    }
+
+    private func handleDelete(job: BatchJob) {
+        switch job.status {
+        case .pending, .transcribing: model.cancelBatchJob(job.id)
+        case .done, .failed, .cancelled: model.cancelBatchJob(job.id)
         }
     }
 }
 
 private struct QueueRow: View {
     let job: BatchJob
+    let isFocused: Bool
     @EnvironmentObject var model: AppModel
     @State private var hovered = false
 
@@ -219,7 +217,8 @@ private struct QueueRow: View {
                 }
             }
             Spacer()
-            if hovered { trailingActions }
+            trailingActions
+                .opacity(hovered ? 1 : 0.55)
         }
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.small)
@@ -227,8 +226,33 @@ private struct QueueRow: View {
             RoundedRectangle(cornerRadius: DS.Radius.regular)
                 .fill(DS.Color.surfaceElevated)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: DS.Radius.regular)
+                .stroke(DS.Color.accent.opacity(isFocused ? 0.55 : 0), lineWidth: 1.5)
+        )
         .contentShape(Rectangle())
         .onHover { hovered = $0 }
+        .contextMenu {
+            switch job.status {
+            case .pending, .transcribing:
+                Button("Cancel batch") { model.cancelAllInFlightBatchJobs() }
+            case .failed, .cancelled:
+                Button("Retry") { model.retryBatchJob(job.id) }
+            case .done:
+                Button("Open") { model.openBatchJobTranscript(job.id) }
+                Button("Reveal in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([job.url])
+                }
+            }
+        }
+        .onDrag {
+            guard case .done = job.status else { return NSItemProvider() }
+            let exports = model.batchExportFormats
+                .map { job.url.deletingPathExtension().appendingPathExtension($0.fileExtension) }
+                .filter { FileManager.default.fileExists(atPath: $0.path) }
+            let primary = exports.first ?? job.url
+            return NSItemProvider(object: primary as NSURL)
+        }
     }
 
     private var iconSquare: some View {
