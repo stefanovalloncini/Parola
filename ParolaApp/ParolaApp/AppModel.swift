@@ -53,6 +53,7 @@ final class AppModel: ObservableObject {
     @AppStorage("karaokeHighlight") var karaokeHighlight: Bool = true
     @AppStorage("initialPrompt") var initialPrompt: String = ""
     @AppStorage("diarize") var diarize: Bool = false
+    @AppStorage("subtitleFPS") var subtitleFPS: Double = 30
 
     @Published var batchJobs: [BatchJob] = []
     @Published var selectedBatchJobID: BatchJob.ID?
@@ -931,6 +932,22 @@ final class AppModel: ObservableObject {
         t.segments[idx].text = newText
         transcript = t
         if findIsOpen { scheduleRecomputeMatches() }
+    }
+
+    func nudgeSegmentStart(id: TranscriptSegment.ID, frames: Int) {
+        guard var t = transcript else { return }
+        t.segments = SegmentTimingNudge.nudgeStart(
+            segments: t.segments, id: id, frameDelta: frames, fps: subtitleFPS
+        )
+        transcript = t
+    }
+
+    func nudgeSegmentEnd(id: TranscriptSegment.ID, frames: Int) {
+        guard var t = transcript else { return }
+        t.segments = SegmentTimingNudge.nudgeEnd(
+            segments: t.segments, id: id, frameDelta: frames, fps: subtitleFPS
+        )
+        transcript = t
     }
 
     // MARK: - Find & replace

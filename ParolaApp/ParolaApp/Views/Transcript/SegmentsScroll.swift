@@ -231,11 +231,20 @@ struct SegmentCard: View {
         }
     }
 
+    @State private var timingPopoverOpen = false
+
     private var actionStrip: some View {
         HStack(spacing: 2) {
             cardButton(systemName: "pencil", help: "Edit") { beginEditing() }
             cardButton(systemName: "play.fill", help: "Play from here") {
                 model.seek(to: segment)
+            }
+            cardButton(systemName: "clock", help: "Nudge timing") {
+                timingPopoverOpen = true
+            }
+            .popover(isPresented: $timingPopoverOpen, arrowEdge: .top) {
+                SegmentTimingPopover(segment: segment)
+                    .environmentObject(model)
             }
             cardButton(systemName: "doc.on.doc", help: "Copy segment") {
                 NSPasteboard.general.clearContents()
