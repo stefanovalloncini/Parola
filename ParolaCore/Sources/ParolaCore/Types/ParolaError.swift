@@ -1,6 +1,6 @@
 import Foundation
 
-public enum ParolaError: Error, CustomStringConvertible, Sendable {
+public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
     case modelNotFound(String)
     case modelDownloadFailed(String, underlying: String)
     case modelChecksumMismatch(file: String, expected: String, got: String)
@@ -39,4 +39,6 @@ public enum ParolaError: Error, CustomStringConvertible, Sendable {
             return "Unsupported for selected engine: \(detail)"
         }
     }
+
+    public var errorDescription: String? { description }
 }
