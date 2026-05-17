@@ -1,14 +1,12 @@
 import Foundation
 import Security
 
-/// Stores per-provider API keys. The shared instance uses the system Keychain;
-/// tests should use `InMemoryAPIKeyStore` to avoid touching real credentials.
 public protocol APIKeyStore: Sendable {
     func get(for provider: CloudLLMProviderID) async throws -> String?
     func set(_ value: String?, for provider: CloudLLMProviderID) async throws
 }
 
-public final class KeychainAPIKeyStore: APIKeyStore {
+public actor KeychainAPIKeyStore: APIKeyStore {
     private let service: String
 
     public init(service: String = "app.parola.cloudllm") {
@@ -56,7 +54,12 @@ public final class KeychainAPIKeyStore: APIKeyStore {
                 var add = baseQuery
                 add[kSecValueData as String] = data
                 let addStatus = SecItemAdd(add as CFDictionary, nil)
-                guard addStatus == errSecSuccess else {
+                if addStatus == errSecDuplicateItem {
+                    let retry = SecItemUpdate(baseQuery as CFDictionary, attributes as CFDictionary)
+                    guard retry == errSecSuccess else {
+                        throw ParolaError.ioError("Keychain update failed: \(retry)")
+                    }
+                } else if addStatus != errSecSuccess {
                     throw ParolaError.ioError("Keychain add failed: \(addStatus)")
                 }
             } else if status != errSecSuccess {
