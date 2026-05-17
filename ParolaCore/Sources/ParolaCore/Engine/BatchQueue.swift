@@ -39,6 +39,7 @@ public enum BatchEvent: Sendable {
     case started(jobID: UUID)
     case completed(jobID: UUID, transcript: Transcript)
     case failed(jobID: UUID, reason: String)
+    case cancelled(jobID: UUID)
     case finished
 }
 
@@ -60,7 +61,10 @@ public actor BatchQueue {
         AsyncStream { continuation in
             let processingTask = Task {
                 for job in jobs {
-                    if Task.isCancelled { break }
+                    if Task.isCancelled {
+                        continuation.yield(.cancelled(jobID: job.id))
+                        continue
+                    }
                     continuation.yield(.started(jobID: job.id))
                     do {
                         let transcript = try await session.transcribe(
@@ -68,6 +72,8 @@ public actor BatchQueue {
                             options: options
                         )
                         continuation.yield(.completed(jobID: job.id, transcript: transcript))
+                    } catch is CancellationError {
+                        continuation.yield(.cancelled(jobID: job.id))
                     } catch {
                         continuation.yield(.failed(jobID: job.id, reason: String(describing: error)))
                     }
