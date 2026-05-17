@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "parola": {
+      "command": "ParolaCore/.build/debug/parola-mcp",
+      "args": [],
+      "env": {}
+    }
+  }
+}
