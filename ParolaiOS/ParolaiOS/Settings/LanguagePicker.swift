@@ -36,12 +36,26 @@ enum LanguageCatalog {
         if code == nil { return auto.label }
         return extended.first(where: { $0.code == code })?.label ?? LocalizedStringKey("language.unknown")
     }
+
+    static func displayName(for option: LanguageOption) -> String {
+        String(localized: String.LocalizationValue(option.labelKey))
+    }
+
+    static func matches(_ option: LanguageOption, query: String) -> Bool {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return true }
+        let needle = trimmed.lowercased()
+        if displayName(for: option).lowercased().contains(needle) { return true }
+        if let code = option.code, code.lowercased().contains(needle) { return true }
+        return false
+    }
 }
 
 struct LanguagePicker: View {
     @Binding var selection: String?
     let compact: Bool
     @State private var showingFullList = false
+    @State private var query = ""
 
     var body: some View {
         if compact {
@@ -49,6 +63,24 @@ struct LanguagePicker: View {
         } else {
             fullList
         }
+    }
+
+    private var filteredCommon: [LanguageOption] {
+        LanguageCatalog.common.filter { LanguageCatalog.matches($0, query: query) }
+    }
+
+    private var filteredOther: [LanguageOption] {
+        let commonCodes = Set(LanguageCatalog.common.compactMap(\.code))
+        return LanguageCatalog.extended
+            .filter { option in
+                guard let code = option.code else { return false }
+                return !commonCodes.contains(code)
+            }
+            .filter { LanguageCatalog.matches($0, query: query) }
+    }
+
+    private var hasQuery: Bool {
+        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var compactPicker: some View {
@@ -90,17 +122,37 @@ struct LanguagePicker: View {
     }
 
     private var fullList: some View {
-        List {
-            Section {
-                fullListRow(LanguageCatalog.auto)
+        let common = filteredCommon
+        let other = filteredOther
+        return List {
+            if !hasQuery {
+                Section { fullListRow(LanguageCatalog.auto) }
             }
-            Section {
-                ForEach(LanguageCatalog.extended) { option in
-                    fullListRow(option)
+            if !common.isEmpty {
+                Section {
+                    ForEach(common) { fullListRow($0) }
+                } header: {
+                    if !other.isEmpty { Text("language.section.common") }
+                }
+            }
+            if !other.isEmpty {
+                Section {
+                    ForEach(other) { fullListRow($0) }
+                } header: {
+                    Text("language.section.more")
+                }
+            }
+            if hasQuery && common.isEmpty && other.isEmpty {
+                Section {
+                    ContentUnavailableView.search(text: query)
+                        .listRowBackground(Color.clear)
                 }
             }
         }
         .listStyle(.insetGrouped)
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: Text("language.search.prompt"))
+        .autocorrectionDisabled()
+        .textInputAutocapitalization(.never)
     }
 
     private func optionRow(_ option: LanguageOption) -> some View {

@@ -331,6 +331,27 @@
         "it" : { "stringUnit" : { "state" : "translated", "value" : "Scegli una lingua" } }
       }
     },
+    "language.search.prompt" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Search by name or code" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Cerca per nome o codice" } }
+      }
+    },
+    "language.section.common" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Common" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Comuni" } }
+      }
+    },
+    "language.section.more" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "More languages" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Altre lingue" } }
+      }
+    },
     "Language" : {
       "extractionState" : "manual",
       "localizations" : {
