@@ -36,7 +36,11 @@ extension AppModel {
     func startDictation() {
         guard dictationCoordinator == nil else { return }
         let hotkey = F5HotkeyMonitor()
-        let recorder = MicDictationRecorder(model: selectedModel, language: selectedLanguage)
+        let recorder = MicDictationRecorder(
+            model: selectedModel,
+            language: selectedLanguage,
+            deviceUID: preferredInputDeviceUID
+        )
         let inserter = ClipboardPasteInserter()
         let processor = currentDictationProcessor()
         let coord = DictationCoordinator(

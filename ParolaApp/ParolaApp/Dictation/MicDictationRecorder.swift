@@ -4,6 +4,7 @@ import ParolaCore
 actor MicDictationRecorder: DictationRecorder {
     private let model: String?
     private let language: String?
+    private let deviceUID: String?
     private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
     private var partialContinuations: [UUID: AsyncStream<String>.Continuation] = [:]
 
@@ -17,9 +18,10 @@ actor MicDictationRecorder: DictationRecorder {
     private var streamingPartial: String = ""
     private var streamingFinished: Bool = false
 
-    init(model: String?, language: String?) {
+    init(model: String?, language: String?, deviceUID: String? = nil) {
         self.model = model
         self.language = language
+        self.deviceUID = deviceUID
     }
 
     func start() async throws {
@@ -127,7 +129,7 @@ actor MicDictationRecorder: DictationRecorder {
 
     private func startFallback() async throws {
         guard fallbackSource == nil else { return }
-        let mic = MicAudioSource()
+        let mic = MicAudioSource(deviceUID: deviceUID)
         try await mic.start()
         fallbackSource = mic
         fallbackForwardingTask?.cancel()

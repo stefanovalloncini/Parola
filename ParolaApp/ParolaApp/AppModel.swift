@@ -68,6 +68,12 @@ final class AppModel: ObservableObject {
     @Published var currentMatchIndex: Int = 0
     var matchesDebounce: Task<Void, Never>?
 
+    @AppStorage("inputDeviceUID") var inputDeviceUID: String = ""
+
+    var preferredInputDeviceUID: String? {
+        inputDeviceUID.isEmpty ? nil : inputDeviceUID
+    }
+
     @AppStorage("selectedModel") var selectedModel: String = "openai_whisper-tiny"
     @AppStorage("selectedLanguageRaw") private var selectedLanguageRaw: String = ""
     @AppStorage("translate") var translate: Bool = false
@@ -624,7 +630,7 @@ final class AppModel: ObservableObject {
                 phase = .recording(source: source)
                 switch source {
                 case .microphone:
-                    let mic = MicAudioSource()
+                    let mic = MicAudioSource(deviceUID: preferredInputDeviceUID)
                     try await mic.start()
                     liveSource = mic
                 case .systemAudio:

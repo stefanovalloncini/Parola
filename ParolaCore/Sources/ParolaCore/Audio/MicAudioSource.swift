@@ -1,12 +1,17 @@
 import Foundation
 @preconcurrency import AVFoundation
 
+#if canImport(CoreAudio)
+import CoreAudio
+#endif
+
 /// Records microphone input to a temporary WAV file (16 kHz mono Float32 — Whisper's expected format).
 ///
 /// Lifecycle: `start()` to begin, `prepare()` to stop and return the file URL,
 /// or `cancel()` to stop and discard.
 public actor MicAudioSource: AudioSource {
     private let engine = AVAudioEngine()
+    private let preferredDeviceUID: String?
     private var writeFile: AVAudioFile?
     private var outputURL: URL?
     private var converter: AVAudioConverter?
@@ -16,7 +21,9 @@ public actor MicAudioSource: AudioSource {
     private var bufferContinuation: AsyncStream<BufferBox>.Continuation?
     private var consumerTask: Task<Void, Never>?
 
-    public init() {}
+    public init(deviceUID: String? = nil) {
+        self.preferredDeviceUID = deviceUID
+    }
 
     /// Emits a normalised 0...1 amplitude per captured buffer. Multiple subscribers are supported.
     public func levels() -> AsyncStream<Float> {
@@ -44,6 +51,9 @@ public actor MicAudioSource: AudioSource {
         guard !isRecording else { return }
 
         let inputNode = engine.inputNode
+        if let uid = preferredDeviceUID, !uid.isEmpty {
+            try Self.applyInputDevice(uid: uid, to: inputNode)
+        }
         let inputFormat = inputNode.inputFormat(forBus: 0)
         guard inputFormat.sampleRate > 0 else {
             throw ParolaError.captureUnavailable("microphone not available (input format invalid; permission may be denied)")
@@ -184,4 +194,28 @@ private final class BufferBox: @unchecked Sendable {
     let buffer: AVAudioPCMBuffer
     var consumed = false
     init(buffer: AVAudioPCMBuffer) { self.buffer = buffer }
+}
+
+extension MicAudioSource {
+    #if canImport(CoreAudio) && os(macOS)
+    static func applyInputDevice(uid: String, to inputNode: AVAudioInputNode) throws {
+        guard var deviceID = AudioDevices.deviceID(forUID: uid) else {
+            return
+        }
+        guard let unit = inputNode.audioUnit else { return }
+        let status = AudioUnitSetProperty(
+            unit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &deviceID,
+            UInt32(MemoryLayout<AudioDeviceID>.size)
+        )
+        if status != noErr {
+            throw ParolaError.captureUnavailable("could not set input device (\(status))")
+        }
+    }
+    #else
+    static func applyInputDevice(uid: String, to inputNode: AVAudioInputNode) throws {}
+    #endif
 }
