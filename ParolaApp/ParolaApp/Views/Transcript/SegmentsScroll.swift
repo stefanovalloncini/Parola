@@ -3,13 +3,19 @@ import ParolaCore
 
 struct SegmentsScroll: View {
     @EnvironmentObject var model: AppModel
+    @State private var speakerFilter: String?
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {
                     if let t = model.transcript {
-                        ForEach(t.segments) { seg in
+                        let speakers = t.uniqueSpeakers
+                        if speakers.count >= 2 {
+                            SpeakerFilterRow(speakers: speakers, selection: $speakerFilter)
+                                .padding(.bottom, DS.Spacing.tight)
+                        }
+                        ForEach(visibleSegments(in: t)) { seg in
                             SegmentCard(segment: seg, isCurrent: seg.id == model.currentSegmentID)
                                 .id(seg.id)
                         }
@@ -24,7 +30,92 @@ struct SegmentsScroll: View {
                     proxy.scrollTo(id, anchor: .center)
                 }
             }
+            .onChange(of: speakerFilter) { _, newValue in
+                if newValue != nil, model.findIsOpen { model.toggleFind() }
+            }
+            .onChange(of: model.findIsOpen) { _, isOpen in
+                if isOpen { speakerFilter = nil }
+            }
+            .onChange(of: model.transcript?.uniqueSpeakers ?? []) { _, speakers in
+                if let current = speakerFilter, !speakers.contains(current) {
+                    speakerFilter = nil
+                }
+            }
         }
+    }
+
+    private func visibleSegments(in transcript: Transcript) -> [TranscriptSegment] {
+        guard let speakerFilter else { return transcript.segments }
+        return transcript.segments.filter { $0.speaker == speakerFilter }
+    }
+}
+
+private struct SpeakerFilterRow: View {
+    let speakers: [String]
+    @Binding var selection: String?
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: DS.Spacing.small) {
+                SpeakerChip(label: "All", tint: nil, isSelected: selection == nil) {
+                    selection = nil
+                }
+                ForEach(speakers, id: \.self) { speaker in
+                    SpeakerChip(
+                        label: speaker,
+                        tint: DS.speakerColor(for: speaker),
+                        isSelected: selection == speaker
+                    ) {
+                        selection = (selection == speaker) ? nil : speaker
+                    }
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+}
+
+private struct SpeakerChip: View {
+    let label: String
+    let tint: Color?
+    let isSelected: Bool
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                if let tint {
+                    Circle()
+                        .fill(tint)
+                        .frame(width: 8, height: 8)
+                }
+                Text(label)
+                    .font(DS.Font.caption)
+                    .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.85))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(background)
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(DS.Color.separator.opacity(isSelected ? 0 : 0.5), lineWidth: 0.5)
+            )
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(isSelected ? "Show all speakers" : "Show only \(label)")
+    }
+
+    private var background: Color {
+        if isSelected { return DS.Color.accent }
+        if hovering { return DS.Color.surfaceElevated.opacity(0.85) }
+        return DS.Color.surfaceElevated
     }
 }
 
