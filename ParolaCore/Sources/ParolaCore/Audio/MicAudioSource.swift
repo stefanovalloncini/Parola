@@ -157,6 +157,8 @@ public actor MicAudioSource: AudioSource {
         stop()
         if let url = outputURL { try? FileManager.default.removeItem(at: url) }
         outputURL = nil
+        converter = nil
+        outputFormat = nil
     }
 
     private func stop() {
