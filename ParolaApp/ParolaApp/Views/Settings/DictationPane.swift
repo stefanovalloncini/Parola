@@ -41,6 +41,10 @@ struct DictationPane: View {
                     .pickerStyle(.menu)
                     .frame(width: 200)
                 }
+                SettingRow("Rewrite preset",
+                           description: "One-click style for the dictated text. Sets the cleanup prompt below.") {
+                    RewritePresetRow(selectedID: $model.dictationCleanupPromptID)
+                }
                 SettingRow("Cleanup mode") {
                     Picker("", selection: $model.dictationCleanupPromptID) {
                         Text("Raw (no cleanup)").tag("")
@@ -144,6 +148,55 @@ private struct WorkflowRow: View {
                     .buttonStyle(.borderless)
                 }
             }
+        }
+    }
+}
+
+private struct RewritePresetRow: View {
+    @Binding var selectedID: String
+
+    private static let presetIDs: Set<String> = Set(Prompt.rewritePresets.map { $0.id.uuidString })
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(Prompt.rewritePresets) { preset in
+                presetPill(preset)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func presetPill(_ preset: Prompt) -> some View {
+        let on = selectedID == preset.id.uuidString
+        return Button {
+            selectedID = on ? "" : preset.id.uuidString
+        } label: {
+            Text(presetLabel(preset))
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(on ? Color.white : Color.primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .frame(height: 28)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(on ? DS.Color.accent.opacity(0.85) : Color.primary.opacity(0.06))
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .strokeBorder(on ? DS.Color.accent.opacity(0.45) : Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
+                .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(presetLabel(preset)) rewrite preset")
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    private func presetLabel(_ preset: Prompt) -> String {
+        switch preset.name {
+        case "Professional tone": return "Formal"
+        case "Bullet points": return "Bullets"
+        default: return preset.name
         }
     }
 }

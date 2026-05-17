@@ -79,5 +79,25 @@ public extension Prompt {
             isBuiltIn: true,
             version: 1
         ),
+        Prompt(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000007")!,
+            name: "Casual",
+            instructions: "Rewrite the text below in a casual, friendly tone. Keep the meaning intact but use plain everyday words and short sentences. Don't add new ideas.",
+            isBuiltIn: true,
+            version: 1
+        ),
+        Prompt(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000008")!,
+            name: "Concise",
+            instructions: "Rewrite the text below as tightly as possible. Drop filler words and redundancy. Keep the same meaning. No bullet lists.",
+            isBuiltIn: true,
+            version: 1
+        ),
     ]
+
+    static let rewritePresets: [Prompt] = {
+        let lookup = Dictionary(uniqueKeysWithValues: builtIns.map { ($0.name, $0) })
+        let order = ["Professional tone", "Casual", "Concise", "Bullet points"]
+        return order.compactMap { lookup[$0] }
+    }()
 }
