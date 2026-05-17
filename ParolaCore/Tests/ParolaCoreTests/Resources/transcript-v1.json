@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "language": "en",
+  "modelName": "openai_whisper-large-v3_turbo",
+  "durationSeconds": 7.42,
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.0,
+      "end": 3.2,
+      "text": "Welcome to the Parola podcast.",
+      "speaker": "Speaker 1",
+      "words": [
+        { "id": "0-0", "word": "Welcome", "start": 0.0, "end": 0.6, "probability": 0.98 },
+        { "id": "0-1", "word": "to", "start": 0.62, "end": 0.78, "probability": 0.99 },
+        { "id": "0-2", "word": "the", "start": 0.8, "end": 0.95, "probability": 0.99 },
+        { "id": "0-3", "word": "Parola", "start": 1.0, "end": 1.85, "probability": 0.94 },
+        { "id": "0-4", "word": "podcast", "start": 1.9, "end": 3.1, "probability": 0.96 }
+      ]
+    },
+    {
+      "id": 1,
+      "start": 3.4,
+      "end": 7.42,
+      "text": "Today we're talking about transcripts.",
+      "speaker": "Speaker 2",
+      "words": [
+        { "id": "1-0", "word": "Today", "start": 3.4, "end": 3.85, "probability": 0.97 },
+        { "id": "1-1", "word": "we're", "start": 3.9, "end": 4.2, "probability": 0.95 },
+        { "id": "1-2", "word": "talking", "start": 4.25, "end": 4.85, "probability": 0.98 },
+        { "id": "1-3", "word": "about", "start": 4.9, "end": 5.3, "probability": 0.99 },
+        { "id": "1-4", "word": "transcripts", "start": 5.35, "end": 7.4, "probability": 0.93 }
+      ]
+    }
+  ],
+  "summary": {
+    "text": "Intro to the Parola podcast.",
+    "chapters": [
+      { "id": "ch-0-12345", "title": "Welcome", "start": 0.0 },
+      { "id": "ch-3-67890", "title": "Today's topic", "start": 3.4 }
+    ]
+  }
+}

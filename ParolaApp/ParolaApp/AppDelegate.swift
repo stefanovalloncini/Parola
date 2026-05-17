@@ -1,4 +1,5 @@
 import AppKit
+import ParolaCore
 
 /// Hosts the macOS Services provider and wires Finder-originated requests into ``AppModel``.
 @MainActor
@@ -6,12 +7,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private weak var model: AppModel?
     private let provider = ServicesProvider()
     private var dictationStatusItem: DictationStatusItem?
+    private var dictationSubscription: DictationSubscription?
 
     func bind(model: AppModel) {
         self.model = model
         provider.model = model
         if dictationStatusItem == nil {
             dictationStatusItem = DictationStatusItem(model: model)
+        }
+        if dictationSubscription == nil {
+            dictationSubscription = DictationSignal.subscribe { [weak self] name in
+                Task { @MainActor [weak self] in
+                    guard let model = self?.model else { return }
+                    switch name {
+                    case DictationSignal.startName: model.startDictationFromIntent()
+                    case DictationSignal.stopName:  model.stopDictationFromIntent()
+                    default: break
+                    }
+                }
+            }
         }
     }
 

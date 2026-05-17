@@ -4,39 +4,42 @@ import ParolaCore
 
 struct AutomationPane: View {
     @EnvironmentObject var model: AppModel
-    @State private var portText: String? = readBridgePort()
     @State private var copyConfirmation: String?
-    @State private var refreshTimer: Timer?
 
-    private static func readBridgePort() -> String? {
-        let url = FileManager.default
-            .urls(for: .cachesDirectory, in: .userDomainMask)
-            .first?
-            .appendingPathComponent("Parola/bridge.port")
-        guard let url,
-              let raw = try? String(contentsOf: url, encoding: .utf8) else { return nil }
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-
-    private var mcpBinaryPath: String {
-        // Bundled location when shipped inside Parola.app's Contents/MacOS.
-        if let bundled = Bundle.main.executableURL?
+    private var bundledBinaryPath: String? {
+        guard let bundled = Bundle.main.executableURL?
             .deletingLastPathComponent()
-            .appendingPathComponent("parola-mcp").path,
-           FileManager.default.isExecutableFile(atPath: bundled) {
-            return bundled
-        }
-        // Dev fallback: the SwiftPM build output in the workspace.
-        return "/Users/stefano/Dev/Parola/ParolaCore/.build/debug/parola-mcp"
+            .appendingPathComponent("parola-mcp").path else { return nil }
+        return FileManager.default.isExecutableFile(atPath: bundled) ? bundled : nil
     }
 
-    private var mcpJSONSnippet: String {
-        """
+    private var developmentBinaryPath: String? {
+        #if DEBUG
+        let workspace = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("ParolaCore/.build/debug/parola-mcp")
+            .path
+        return FileManager.default.isExecutableFile(atPath: workspace) ? workspace : nil
+        #else
+        return nil
+        #endif
+    }
+
+    private var resolvedBinaryPath: String? {
+        bundledBinaryPath ?? developmentBinaryPath
+    }
+
+    private var mcpJSONSnippet: String? {
+        guard let path = resolvedBinaryPath else { return nil }
+        return """
         {
           "mcpServers": {
             "parola": {
-              "command": "\(mcpBinaryPath)",
+              "command": "\(path)",
               "args": [],
               "env": {}
             }
@@ -62,7 +65,6 @@ struct AutomationPane: View {
                                 } else {
                                     model.stopAutomationBridge()
                                 }
-                                portText = Self.readBridgePort()
                             }
                     }
                 }
@@ -80,39 +82,53 @@ struct AutomationPane: View {
 
                 SettingsSection("parola-mcp binary") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(mcpBinaryPath)
-                            .font(.system(.caption, design: .monospaced))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .foregroundStyle(.secondary)
-                        HStack(spacing: 8) {
-                            Button("Reveal in Finder") { revealMCPBinary() }
-                            Button("Copy path") { copy(mcpBinaryPath, label: "Path copied") }
+                        if let path = resolvedBinaryPath {
+                            Text(path)
+                                .font(.system(.caption, design: .monospaced))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .foregroundStyle(.secondary)
+                            HStack(spacing: 8) {
+                                Button("Reveal in Finder") { reveal(path: path) }
+                                Button("Copy path") { copy(path, label: "Path copied") }
+                            }
+                        } else {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(DS.Palette.warning)
+                                Text("parola-mcp isn't bundled in this build.")
+                                    .font(DS.Font.caption)
+                            }
+                            Text("Run `swift build --product parola-mcp` in ParolaCore and relaunch.")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(.secondary)
                         }
                     }
                     .padding(16)
                 }
 
-                SettingsSection("MCP client snippet") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Drop this into your MCP client's config (Claude Code .mcp.json, Codex, etc.)")
-                            .font(DS.Font.caption)
-                            .foregroundStyle(.secondary)
-                        ScrollView {
-                            Text(mcpJSONSnippet)
-                                .font(.system(.caption, design: .monospaced))
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(10)
+                if let snippet = mcpJSONSnippet {
+                    SettingsSection("MCP client snippet") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Drop this into your MCP client's config (Claude Code .mcp.json, Codex, etc.)")
+                                .font(DS.Font.caption)
+                                .foregroundStyle(.secondary)
+                            ScrollView {
+                                Text(snippet)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(10)
+                            }
+                            .frame(maxHeight: 160)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(Color.primary.opacity(0.05))
+                            )
+                            Button("Copy snippet") { copy(snippet, label: "Snippet copied") }
                         }
-                        .frame(maxHeight: 160)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(Color.primary.opacity(0.05))
-                        )
-                        Button("Copy snippet") { copy(mcpJSONSnippet, label: "Snippet copied") }
+                        .padding(16)
                     }
-                    .padding(16)
                 }
 
                 if let confirmation = copyConfirmation {
@@ -128,16 +144,6 @@ struct AutomationPane: View {
             }
             .padding(20)
         }
-        .onAppear {
-            portText = Self.readBridgePort()
-            refreshTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-                Task { @MainActor in portText = Self.readBridgePort() }
-            }
-        }
-        .onDisappear {
-            refreshTimer?.invalidate()
-            refreshTimer = nil
-        }
     }
 
     private var statusRow: some View {
@@ -145,7 +151,7 @@ struct AutomationPane: View {
             Circle()
                 .fill(model.automationBridgeRunning ? Color.green : Color.secondary.opacity(0.5))
                 .frame(width: 10, height: 10)
-            if model.automationBridgeRunning, let port = portText {
+            if model.automationBridgeRunning, let port = model.automationBridgePort {
                 Text("Listening on 127.0.0.1:\(port)")
                     .font(.subheadline)
             } else if model.automationBridgeRunning {
@@ -172,9 +178,8 @@ struct AutomationPane: View {
         #endif
     }
 
-    private func revealMCPBinary() {
-        let url = URL(fileURLWithPath: mcpBinaryPath)
-        NSWorkspace.shared.activateFileViewerSelecting([url])
+    private func reveal(path: String) {
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
     }
 
     private func copy(_ text: String, label: String) {

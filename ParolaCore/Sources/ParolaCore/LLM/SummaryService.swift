@@ -2,10 +2,8 @@ import Foundation
 
 #if canImport(FoundationModels)
 import FoundationModels
+#endif
 
-/// Wraps Apple's Foundation Models on-device LLM to produce transcript summaries + chapter markers.
-///
-/// macOS 26 / iOS 26 only. Earlier OSes get a `.notAvailable` error — caller should hide the feature.
 public actor SummaryService {
     public enum FailureReason: LocalizedError, CustomStringConvertible, Sendable {
         case notAvailable(String)
@@ -24,15 +22,32 @@ public actor SummaryService {
     public init() {}
 
     public func summarise(_ transcript: Transcript) async throws -> Summary {
+        #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
-            return try await summariseUsingFoundationModels(transcript)
-        } else {
-            throw FailureReason.notAvailable("Foundation Models requires macOS 26 / iOS 26 or newer.")
+            return try await summariseStructured(transcript)
+        }
+        #endif
+        return try await summariseText(transcript)
+    }
+
+    public func summarise(_ transcript: Transcript, model: any LanguageModel) async throws -> Summary {
+        let prompt = SummaryService.buildPrompt(for: transcript)
+        do {
+            let response = try await model.respond(to: prompt)
+            return SummaryService.parse(response)
+        } catch {
+            throw FailureReason.modelError(error.localizedDescription)
         }
     }
 
+    private func summariseText(_ transcript: Transcript) async throws -> Summary {
+        let model = try LanguageModelFactory.makeOnDevice(instructions: SummaryService.textInstructions)
+        return try await summarise(transcript, model: model)
+    }
+
+    #if canImport(FoundationModels)
     @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
-    private func summariseUsingFoundationModels(_ transcript: Transcript) async throws -> Summary {
+    private func summariseStructured(_ transcript: Transcript) async throws -> Summary {
         switch SystemLanguageModel.default.availability {
         case .available:
             break
@@ -42,26 +57,30 @@ public actor SummaryService {
             throw FailureReason.notAvailable("On-device language model availability is unknown.")
         }
 
+        let session = LanguageModelSession(instructions: SummaryService.structuredInstructions)
         let prompt = SummaryService.buildPrompt(for: transcript)
-        let session = LanguageModelSession(
-            instructions: """
-            You summarise transcripts. Always respond with exactly two sections:
-
-            SUMMARY:
-            A two-to-four-sentence paragraph in plain prose. No bullet points, no headings inside the paragraph.
-
-            CHAPTERS:
-            One line per chapter, in the form "MM:SS  Short title". Three to six words for the title. Five to ten chapters total, fewer if the transcript is short.
-            """
-        )
-
         do {
-            let response = try await session.respond(to: prompt)
-            return SummaryService.parse(response.content)
+            let response = try await session.respond(to: prompt, generating: GenerableSummary.self)
+            return response.content.toSummary()
         } catch {
             throw FailureReason.modelError(error.localizedDescription)
         }
     }
+    #endif
+
+    static let textInstructions = """
+    You summarise transcripts. Always respond with exactly two sections:
+
+    SUMMARY:
+    A two-to-four-sentence paragraph in plain prose. No bullet points, no headings inside the paragraph.
+
+    CHAPTERS:
+    One line per chapter, in the form "MM:SS  Short title". Three to six words for the title. Five to ten chapters total, fewer if the transcript is short.
+    """
+
+    static let structuredInstructions = """
+    You summarise transcripts. Produce a two-to-four-sentence summary plus five to ten chapter markers. Each chapter has a timestamp in seconds from the start of the transcript and a three-to-six-word title.
+    """
 
     static func buildPrompt(for transcript: Transcript) -> String {
         var out = "Transcript follows. Each line is prefixed with its timestamp.\n\n"
@@ -73,21 +92,30 @@ public actor SummaryService {
 
     static func parse(_ raw: String) -> Summary {
         let lines = raw.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
-        var summaryLines: [String] = []
+        var summaryParagraphs: [[String]] = []
+        var currentParagraph: [String] = []
         var chapters: [Chapter] = []
 
         enum Section { case none, summary, chapters }
         var section: Section = .none
+
+        func flushParagraph() {
+            if !currentParagraph.isEmpty {
+                summaryParagraphs.append(currentParagraph)
+                currentParagraph = []
+            }
+        }
 
         for rawLine in lines {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
             if line.uppercased().hasPrefix("SUMMARY:") {
                 section = .summary
                 let remainder = line.dropFirst("SUMMARY:".count).trimmingCharacters(in: .whitespaces)
-                if !remainder.isEmpty { summaryLines.append(remainder) }
+                if !remainder.isEmpty { currentParagraph.append(remainder) }
                 continue
             }
             if line.uppercased().hasPrefix("CHAPTERS:") {
+                flushParagraph()
                 section = .chapters
                 continue
             }
@@ -97,18 +125,20 @@ public actor SummaryService {
                 continue
             case .summary:
                 if line.isEmpty {
-                    if !summaryLines.isEmpty { section = .none }
+                    flushParagraph()
                 } else {
-                    summaryLines.append(line)
+                    currentParagraph.append(line)
                 }
             case .chapters:
                 guard let chapter = SummaryService.parseChapter(line) else { continue }
                 chapters.append(chapter)
             }
         }
+        flushParagraph()
 
-        let summaryText = summaryLines
-            .joined(separator: " ")
+        let summaryText = summaryParagraphs
+            .map { $0.joined(separator: " ") }
+            .joined(separator: "\n\n")
             .replacingOccurrences(of: "  ", with: " ")
             .trimmingCharacters(in: .whitespaces)
         return Summary(text: summaryText, chapters: chapters)
@@ -143,21 +173,33 @@ public actor SummaryService {
             return nil
         }
     }
-
 }
-#else
-/// Stub for platforms without FoundationModels (theoretically unreachable on iOS 17 / macOS 14).
-public actor SummaryService {
-    public enum FailureReason: LocalizedError, CustomStringConvertible, Sendable {
-        case notAvailable(String)
-        public var description: String {
-            switch self { case .notAvailable(let r): return "Summary unavailable: \(r)" }
-        }
-        public var errorDescription: String? { description }
+
+#if canImport(FoundationModels)
+@available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+@Generable
+struct GenerableSummary: Sendable {
+    @Guide(description: "Two to four sentences in plain prose. No bullet points.")
+    var summary: String
+
+    @Guide(description: "Five to ten chapter markers covering the transcript in order.")
+    var chapters: [GenerableChapter]
+
+    func toSummary() -> Summary {
+        Summary(
+            text: summary.trimmingCharacters(in: .whitespacesAndNewlines),
+            chapters: chapters.map { Chapter(title: $0.title, start: $0.startSeconds) }
+        )
     }
-    public init() {}
-    public func summarise(_ transcript: Transcript) async throws -> Summary {
-        throw FailureReason.notAvailable("FoundationModels not available in this build.")
-    }
+}
+
+@available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+@Generable
+struct GenerableChapter: Sendable {
+    @Guide(description: "Seconds from the start of the transcript.")
+    var startSeconds: Double
+
+    @Guide(description: "Three to six words.")
+    var title: String
 }
 #endif

@@ -1,6 +1,20 @@
 import Foundation
 @preconcurrency import WhisperKit
 
+/// Labels a confirmed live-caption segment with a speaker.
+///
+/// Receives the segment plus the rolling audio buffer the streaming session has captured so far,
+/// and the timeline offset that audio buffer starts at. Returns the speaker label to attach to the
+/// segment, or nil to leave it unlabeled.
+public protocol StreamingSpeakerLabeler: Sendable {
+    func labelSpeaker(
+        for segment: TranscriptSegment,
+        audioWindow: [Float],
+        windowStartTime: TimeInterval,
+        sampleRate: Double
+    ) async -> String?
+}
+
 /// Drives real-time microphone transcription via WhisperKit's `AudioStreamTranscriber`.
 ///
 /// Lifecycle:
@@ -25,6 +39,7 @@ public actor StreamingTranscriptionSession {
     private var nextSegmentID: Int = 0
     private var loadedModel: String?
     private var optionsForRun: TranscriptionOptions?
+    private var speakerLabeler: (any StreamingSpeakerLabeler)?
 
     public init(modelStore: ModelStore = .shared) {
         self.modelStore = modelStore
@@ -36,6 +51,7 @@ public actor StreamingTranscriptionSession {
     /// is shown on first run; if the user denies, the stream closes with `.failed`.
     public func start(
         options: TranscriptionOptions,
+        speakerLabeler: (any StreamingSpeakerLabeler)? = nil,
         downloadProgress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> AsyncStream<StreamingEvent> {
         guard streamer == nil else {
@@ -78,11 +94,11 @@ public actor StreamingTranscriptionSession {
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(256))
         let (segStream, segCont) = AsyncStream<[TranscriptionSegment]>.makeStream(bufferingPolicy: .bufferingNewest(64))
 
-        let sink = EventSink(continuation: cont)
-        sink.onConfirmed = { segments in segCont.yield(segments) }
+        let sink = EventSink(
+            continuation: cont,
+            onConfirmed: { segments in segCont.yield(segments) }
+        )
 
-        // AudioStreamTranscriber owns its own internal queue and is held in actor-isolated
-        // `streamer`, so these non-Sendable WhisperKit references never escape.
         nonisolated(unsafe) let streamerAudioEncoder = kit.audioEncoder
         nonisolated(unsafe) let streamerFeatureExtractor = kit.featureExtractor
         nonisolated(unsafe) let streamerSegmentSeeker = kit.segmentSeeker
@@ -109,6 +125,7 @@ public actor StreamingTranscriptionSession {
         self.streamer = st
         self.continuation = cont
         self.segmentContinuation = segCont
+        self.speakerLabeler = speakerLabeler
 
         consumerTask = Task { [weak self] in
             for await batch in segStream {
@@ -116,12 +133,16 @@ public actor StreamingTranscriptionSession {
             }
         }
 
-        streamerTask = Task {
+        streamerTask = Task { [weak self] in
             do {
                 try await st.startStreamTranscription()
             } catch {
-                cont.yield(.failed("stream start failed: \(error.localizedDescription)"))
-                cont.finish()
+                guard let self else {
+                    cont.yield(.failed(error.localizedDescription))
+                    cont.finish()
+                    return
+                }
+                await self.handleStreamerFailure(error)
             }
         }
 
@@ -130,6 +151,7 @@ public actor StreamingTranscriptionSession {
 
     /// Stops the mic stream, flushes a final transcript, and finishes the stream.
     public func stop() async {
+        guard streamer != nil else { return }
         await streamer?.stopStreamTranscription()
         segmentContinuation?.finish()
         await consumerTask?.value
@@ -145,28 +167,72 @@ public actor StreamingTranscriptionSession {
         )
         continuation?.yield(.finished(finalTranscript))
         continuation?.finish()
+        teardown()
+    }
+
+    public func currentModel() -> String? { loadedModel }
+
+    private func handleStreamerFailure(_ error: Error) async {
+        continuation?.yield(.failed(error.localizedDescription))
+        segmentContinuation?.finish()
+        await consumerTask?.value
+        continuation?.finish()
+        teardown()
+    }
+
+    private func teardown() {
         continuation = nil
         segmentContinuation = nil
         consumerTask = nil
         streamerTask = nil
         streamer = nil
         whisperKit = nil
+        speakerLabeler = nil
     }
 
-    public func currentModel() -> String? { loadedModel }
-
-    private func appendConfirmed(_ segments: [TranscriptionSegment]) {
+    private func appendConfirmed(_ segments: [TranscriptionSegment]) async {
         for seg in segments {
-            let mapped = TranscriptSegment(
+            var mapped = TranscriptSegment(
                 id: nextSegmentID,
                 start: Double(seg.start),
                 end: Double(seg.end),
                 text: seg.text
             )
             nextSegmentID += 1
+            if let labeler = speakerLabeler,
+               let label = await labelSpeaker(for: mapped, with: labeler) {
+                mapped.speaker = label
+            }
             allConfirmed.append(mapped)
             continuation?.yield(.confirmed(mapped))
         }
+    }
+
+    private func labelSpeaker(
+        for segment: TranscriptSegment,
+        with labeler: any StreamingSpeakerLabeler
+    ) async -> String? {
+        guard let kit = whisperKit else { return nil }
+        nonisolated(unsafe) let processor = kit.audioProcessor
+        let allSamples = processor.audioSamples
+        let sampleRate = Double(WhisperKit.sampleRate)
+        let totalSeconds = Double(allSamples.count) / sampleRate
+        let segmentStart = max(0, segment.start)
+        let segmentEnd = max(segmentStart, segment.end)
+        let windowPadding: Double = 0.5
+        let windowStartTime = max(0, segmentStart - windowPadding)
+        let windowEndTime = min(totalSeconds, segmentEnd + windowPadding)
+        guard windowEndTime > windowStartTime else { return nil }
+        let startIndex = Int(windowStartTime * sampleRate)
+        let endIndex = min(allSamples.count, Int(windowEndTime * sampleRate))
+        guard startIndex < endIndex else { return nil }
+        let window = Array(allSamples[startIndex..<endIndex])
+        return await labeler.labelSpeaker(
+            for: segment,
+            audioWindow: window,
+            windowStartTime: windowStartTime,
+            sampleRate: sampleRate
+        )
     }
 }
 
@@ -174,49 +240,47 @@ public actor StreamingTranscriptionSession {
 
 /// Adapts AudioStreamTranscriber's coarse state-diff callback into our finer-grained events.
 ///
-/// Unchecked Sendable: WhisperKit's `AudioStreamTranscriber` delivers state callbacks serially
-/// from its own internal queue, so the mutable state inside this sink is touched by one thread
-/// at a time even without explicit locking.
-private final class EventSink: @unchecked Sendable {
+/// Unchecked Sendable: WhisperKit's `AudioStreamTranscriber` delivers `stateChangeCallback`
+/// invocations serially from its own internal queue, so `lastPartial` and `lastVoiceActive` are
+/// only mutated from that single producer. `onConfirmed` is a `let` set at init.
+final class EventSink: @unchecked Sendable {
     let continuation: AsyncStream<StreamingEvent>.Continuation
-    var onConfirmed: (@Sendable ([TranscriptionSegment]) -> Void)?
+    let onConfirmed: @Sendable ([TranscriptionSegment]) -> Void
     private var lastPartial: String = ""
     private var lastVoiceActive: Bool? = nil
 
-    init(continuation: AsyncStream<StreamingEvent>.Continuation) {
+    init(
+        continuation: AsyncStream<StreamingEvent>.Continuation,
+        onConfirmed: @escaping @Sendable ([TranscriptionSegment]) -> Void
+    ) {
         self.continuation = continuation
+        self.onConfirmed = onConfirmed
     }
 
     func handle(
         oldState: AudioStreamTranscriber.State,
         newState: AudioStreamTranscriber.State
     ) {
-        emitNewlyConfirmedSegments(oldState: oldState, newState: newState)
-        emitPartial(from: newState)
-        emitVoiceActivity(from: newState)
-    }
-
-    private func emitNewlyConfirmedSegments(
-        oldState: AudioStreamTranscriber.State,
-        newState: AudioStreamTranscriber.State
-    ) {
         let oldCount = oldState.confirmedSegments.count
         let newCount = newState.confirmedSegments.count
-        guard newCount > oldCount else { return }
-        onConfirmed?(Array(newState.confirmedSegments.suffix(newCount - oldCount)))
+        if newCount > oldCount {
+            onConfirmed(Array(newState.confirmedSegments.suffix(newCount - oldCount)))
+        }
+        handlePartial(text: Self.partial(from: newState))
+        handleEnergy(last: newState.bufferEnergy.last)
     }
 
-    private func emitPartial(from state: AudioStreamTranscriber.State) {
-        let partial = Self.partial(from: state)
-        guard partial != lastPartial else { return }
-        lastPartial = partial
-        if !partial.isEmpty {
-            continuation.yield(.partial(text: partial))
+    func handlePartial(text: String) {
+        guard text != lastPartial else { return }
+        lastPartial = text
+        if !text.isEmpty {
+            continuation.yield(.partial(text: text))
         }
     }
 
-    private func emitVoiceActivity(from state: AudioStreamTranscriber.State) {
-        let voice = state.bufferEnergy.last.map { $0 > 0.05 } ?? false
+    func handleEnergy(last: Float?) {
+        guard let last else { return }
+        let voice = last > 0.05
         guard lastVoiceActive != voice else { return }
         lastVoiceActive = voice
         continuation.yield(.voiceActivity(active: voice))

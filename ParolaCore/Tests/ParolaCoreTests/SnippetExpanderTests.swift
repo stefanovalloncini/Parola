@@ -7,6 +7,16 @@ struct StubClipboard: ClipboardReader {
     func currentText() -> String? { value }
 }
 
+struct StubSelection: SelectionReader {
+    let value: String?
+    func currentSelection() -> String? { value }
+}
+
+struct StubAppContext: AppContextReader {
+    let value: String?
+    func frontmostAppName() -> String? { value }
+}
+
 @Suite("SnippetExpander")
 struct SnippetExpanderTests {
     @Test("replaces a trigger with its replacement on word boundaries")
@@ -73,5 +83,66 @@ struct SnippetExpanderTests {
         let composite = CompositePostProcessor([first, second])
         let out = await composite.process("hello me")
         #expect(out == "hello S.")
+    }
+
+    @Test("expands {{SELECTION}} from the selection reader")
+    func selectionPlaceholder() async {
+        let expander = SnippetExpander(
+            snippets: [Snippet(trigger: "quote", replacement: "> {{SELECTION}}")],
+            selection: StubSelection(value: "hi there")
+        )
+        let out = await expander.process("Please quote here")
+        #expect(out == "Please > hi there here")
+    }
+
+    @Test("expands {{APP}} from the app context reader")
+    func appPlaceholder() async {
+        let expander = SnippetExpander(
+            snippets: [Snippet(trigger: "where", replacement: "writing in {{APP}}")],
+            appContext: StubAppContext(value: "Notes")
+        )
+        let out = await expander.process("typed where now")
+        #expect(out == "typed writing in Notes now")
+    }
+
+    @Test("{{CURSOR}} is replaced with the cursor marker sentinel")
+    func cursorPlaceholder() async {
+        let expander = SnippetExpander(snippets: [
+            Snippet(trigger: "sig", replacement: "Best,\n{{CURSOR}}\nStefano")
+        ])
+        let out = await expander.process("typed sig here")
+        #expect(out.contains(SnippetMarker.cursor))
+    }
+
+    @Test("expandAtInsert snippets are skipped at process time")
+    func expandAtInsertSkipsDefault() async {
+        let snippet = Snippet(trigger: "paste", replacement: "{{CLIPBOARD}}", expandAtInsert: true)
+        let expander = SnippetExpander(
+            snippets: [snippet],
+            clipboard: StubClipboard(value: "at-process")
+        )
+        let out = await expander.process("now paste me")
+        #expect(out == "now paste me")
+    }
+
+    @Test("deferredOnly() expands only insert-time snippets")
+    func deferredOnlyExpandsInsertTime() async {
+        let snippet = Snippet(trigger: "paste", replacement: "{{CLIPBOARD}}", expandAtInsert: true)
+        let expander = SnippetExpander(
+            snippets: [snippet],
+            clipboard: StubClipboard(value: "fresh-paste")
+        )
+        let deferred = expander.deferredOnly()
+        let out = await deferred.process("now paste me")
+        #expect(out == "now fresh-paste me")
+    }
+
+    @Test("snippet decodes without expandAtInsert field for backward compat")
+    func snippetDecodesLegacy() throws {
+        let json = #"{"id":"00000000-0000-0000-0000-000000000001","trigger":"x","replacement":"y","enabled":true}"#
+        let data = Data(json.utf8)
+        let decoded = try JSONDecoder().decode(Snippet.self, from: data)
+        #expect(decoded.expandAtInsert == false)
+        #expect(decoded.trigger == "x")
     }
 }

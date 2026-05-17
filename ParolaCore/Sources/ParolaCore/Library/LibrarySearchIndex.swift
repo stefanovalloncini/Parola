@@ -2,10 +2,28 @@ import Foundation
 import NaturalLanguage
 
 public actor LibrarySearchIndex {
+    public struct Highlight: Sendable, Equatable {
+        public let start: Int
+        public let length: Int
+
+        public init(start: Int, length: Int) {
+            self.start = start
+            self.length = length
+        }
+    }
+
     public struct Match: Sendable, Equatable {
         public let entryID: String
         public let score: Int
         public let snippet: String
+        public let highlights: [Highlight]
+
+        public init(entryID: String, score: Int, snippet: String, highlights: [Highlight] = []) {
+            self.entryID = entryID
+            self.score = score
+            self.snippet = snippet
+            self.highlights = highlights
+        }
     }
 
     private struct IndexedEntry: Codable {
@@ -22,9 +40,12 @@ public actor LibrarySearchIndex {
     private var entries: [String: IndexedEntry]
     private var inverted: [String: Set<String>]
     private let indexURL: URL
+    private let saveDebounce: Duration
+    private var pendingSaveTask: Task<Void, Never>?
 
-    public init(indexURL: URL) {
+    public init(indexURL: URL, saveDebounce: Duration = .milliseconds(250)) {
         self.indexURL = indexURL
+        self.saveDebounce = saveDebounce
         if let data = try? Data(contentsOf: indexURL),
            let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) {
             self.entries = snapshot.entries
@@ -42,12 +63,12 @@ public actor LibrarySearchIndex {
         for token in Set(tokens) {
             inverted[token, default: []].insert(id)
         }
-        saveSnapshot()
+        scheduleSave()
     }
 
     public func remove(_ id: String) {
         removeFromIndex(id)
-        saveSnapshot()
+        scheduleSave()
     }
 
     public func search(_ query: String) -> [Match] {
@@ -65,16 +86,26 @@ public actor LibrarySearchIndex {
             .sorted { $0.value > $1.value }
             .compactMap { (id, score) -> Match? in
                 guard let entry = entries[id] else { return nil }
+                let snippet = Self.makeSnippet(text: entry.text, tokens: queryTokens)
                 return Match(
                     entryID: id,
                     score: score,
-                    snippet: Self.makeSnippet(text: entry.text, tokens: queryTokens)
+                    snippet: snippet.text,
+                    highlights: snippet.highlights
                 )
             }
     }
 
     public func entryIDs() -> Set<String> {
         Set(entries.keys)
+    }
+
+    /// Forces a synchronous-style flush of any pending debounced save. Use before app termination.
+    public func flush() async {
+        let task = pendingSaveTask
+        pendingSaveTask = nil
+        task?.cancel()
+        saveSnapshot()
     }
 
     private func removeFromIndex(_ id: String) {
@@ -103,17 +134,67 @@ public actor LibrarySearchIndex {
         return tokens
     }
 
-    private static func makeSnippet(text: String, tokens: [String]) -> String {
-        guard !text.isEmpty else { return "" }
+    private static func makeSnippet(text: String, tokens: [String]) -> (text: String, highlights: [Highlight]) {
+        guard !text.isEmpty else { return ("", []) }
         let lower = text.lowercased()
+        var firstHit: Range<String.Index>?
         for token in tokens {
             if let range = lower.range(of: token) {
-                let lowerIdx = text.index(range.lowerBound, offsetBy: -40, limitedBy: text.startIndex) ?? text.startIndex
-                let upperIdx = text.index(range.upperBound, offsetBy: 40, limitedBy: text.endIndex) ?? text.endIndex
-                return String(text[lowerIdx..<upperIdx])
+                firstHit = range
+                break
             }
         }
-        return String(text.prefix(80))
+        let snippetRange: Range<String.Index>
+        if let firstHit {
+            let lowerIdx = text.index(firstHit.lowerBound, offsetBy: -40, limitedBy: text.startIndex) ?? text.startIndex
+            let upperIdx = text.index(firstHit.upperBound, offsetBy: 40, limitedBy: text.endIndex) ?? text.endIndex
+            snippetRange = lowerIdx..<upperIdx
+        } else {
+            snippetRange = text.startIndex..<(text.index(text.startIndex, offsetBy: 80, limitedBy: text.endIndex) ?? text.endIndex)
+        }
+        let snippet = String(text[snippetRange])
+        let snippetLower = snippet.lowercased()
+        var highlights: [Highlight] = []
+        for token in Set(tokens) {
+            var cursor = snippetLower.startIndex
+            while let hit = snippetLower.range(of: token, range: cursor..<snippetLower.endIndex) {
+                let start = snippetLower.distance(from: snippetLower.startIndex, to: hit.lowerBound)
+                let length = snippetLower.distance(from: hit.lowerBound, to: hit.upperBound)
+                highlights.append(Highlight(start: start, length: length))
+                cursor = hit.upperBound
+            }
+        }
+        highlights.sort { $0.start < $1.start }
+        return (snippet, mergeOverlapping(highlights))
+    }
+
+    private static func mergeOverlapping(_ highlights: [Highlight]) -> [Highlight] {
+        guard !highlights.isEmpty else { return [] }
+        var merged: [Highlight] = []
+        for h in highlights {
+            if let last = merged.last, h.start <= last.start + last.length {
+                let end = max(last.start + last.length, h.start + h.length)
+                merged.removeLast()
+                merged.append(Highlight(start: last.start, length: end - last.start))
+            } else {
+                merged.append(h)
+            }
+        }
+        return merged
+    }
+
+    private func scheduleSave() {
+        if pendingSaveTask != nil { return }
+        let debounce = saveDebounce
+        pendingSaveTask = Task { [weak self] in
+            try? await Task.sleep(for: debounce)
+            await self?.persistAfterDebounce()
+        }
+    }
+
+    private func persistAfterDebounce() {
+        pendingSaveTask = nil
+        saveSnapshot()
     }
 
     private func saveSnapshot() {

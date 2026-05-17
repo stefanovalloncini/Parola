@@ -120,6 +120,7 @@ struct BatchFormatCard: View {
         case .md: return "Markdown"
         case .html: return "HTML"
         case .csv: return "CSV"
+        case .tsv: return "TSV"
         case .docx: return "Word Document"
         case .pdf: return "PDF"
         }

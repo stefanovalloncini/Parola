@@ -70,3 +70,27 @@ public enum TermPackIO {
         return out
     }
 }
+
+/// Built-in term packs shipped inside `ParolaCore.Resources/TermPacks/`.
+/// Available to every frontend — macOS app, iOS app, CLI, MCP server.
+public enum BundledTermPacks {
+    public static let identifiers: [String] = ["tech-terms-en", "tech-terms-it"]
+
+    public static func load(_ identifier: String) -> TermPack? {
+        let bundle = Bundle.module
+        guard let url = bundle.url(forResource: identifier, withExtension: "json", subdirectory: "TermPacks")
+                ?? bundle.url(forResource: identifier, withExtension: "json")
+        else { return nil }
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? TermPackIO.decode(data)
+    }
+
+    public static func all() -> [TermPack] {
+        identifiers.compactMap(load(_:))
+    }
+
+    public static func matching(locale: Locale) -> [TermPack] {
+        guard let code = locale.language.languageCode?.identifier else { return [] }
+        return all().filter { $0.locale == code }
+    }
+}

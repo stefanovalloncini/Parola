@@ -6,7 +6,11 @@ public enum HotkeyEvent: Sendable {
 }
 
 public protocol HotkeyMonitor: Sendable {
+    /// Begins listening for the configured hotkey. Replaces any previously installed handler.
+    /// Implementations must release the prior closure to avoid leaks when `start` is called
+    /// repeatedly (e.g. on settings changes).
     func start(handler: @escaping @Sendable (HotkeyEvent) -> Void) async
+    /// Stops listening and releases the installed handler.
     func stop() async
 }
 

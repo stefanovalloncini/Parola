@@ -1,7 +1,7 @@
 import Foundation
 
 enum Timecode {
-    /// HH:MM:SS for durations over an hour, MM:SS otherwise.
+    /// H:MM:SS for durations over an hour, MM:SS otherwise.
     static func format(_ seconds: Double) -> String {
         let total = Int(seconds)
         let h = total / 3600

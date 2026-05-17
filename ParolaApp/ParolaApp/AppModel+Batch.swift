@@ -95,6 +95,8 @@ extension AppModel {
         case .failed(let id, let reason):
             guard !isCancelled(id) else { return }
             mutateBatchJob(id) { $0.status = .failed; $0.error = reason }
+        case .cancelled(let id):
+            mutateBatchJob(id) { $0.status = .cancelled }
         case .finished:
             phase = .ready
             let pending = batchJobs.filter { $0.status == .pending }

@@ -1,9 +1,12 @@
 import CoreSpotlight
 import Foundation
+import os
 import UniformTypeIdentifiers
 
 public struct SpotlightIndexer: LibraryIndexer {
     public static let domainID = "com.parola.library"
+
+    private static let log = Logger(subsystem: "com.parola.library", category: "spotlight")
 
     public init() {}
 
@@ -17,10 +20,18 @@ public struct SpotlightIndexer: LibraryIndexer {
             domainIdentifier: Self.domainID,
             attributeSet: attributes
         )
-        try? await CSSearchableIndex.default().indexSearchableItems([item])
+        do {
+            try await CSSearchableIndex.default().indexSearchableItems([item])
+        } catch {
+            Self.log.error("spotlight index failed for \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     public func deindex(id: String) async {
-        try? await CSSearchableIndex.default().deleteSearchableItems(withIdentifiers: [id])
+        do {
+            try await CSSearchableIndex.default().deleteSearchableItems(withIdentifiers: [id])
+        } catch {
+            Self.log.error("spotlight deindex failed for \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
     }
 }

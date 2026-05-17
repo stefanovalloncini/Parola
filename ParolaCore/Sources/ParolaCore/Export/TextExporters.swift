@@ -11,7 +11,7 @@ public struct TxtExporter: TranscriptExporter {
     }
 }
 
-public struct MarkdownOptions: Sendable {
+public struct MarkdownOptions: Sendable, Codable, Hashable {
     public var showTimestamps: Bool
 
     public init(showTimestamps: Bool = false) {
@@ -33,23 +33,38 @@ public struct MarkdownExporter: TranscriptExporter {
             let body = seg.text.trimmingCharacters(in: .whitespaces)
             switch (seg.speaker, options.showTimestamps) {
             case (let speaker?, true):
-                out += "**\(speaker)** *[\(Self.timestamp(seg.start))]*: \(body)\n\n"
+                out += "**\(speaker)** *[\(Format.timestampHHMMSS(seg.start))]*: \(body)\n\n"
             case (let speaker?, false):
                 out += "**\(speaker):** \(body)\n\n"
             case (nil, true):
-                out += "*[\(Self.timestamp(seg.start))]* \(body)\n\n"
+                out += "*[\(Format.timestampHHMMSS(seg.start))]* \(body)\n\n"
             case (nil, false):
                 out += "\(body)\n\n"
             }
         }
         return utf8(String(out.dropLast()))
     }
+}
 
-    static func timestamp(_ seconds: Double) -> String {
-        let total = Int(max(0, seconds))
-        let h = total / 3600
-        let m = (total / 60) % 60
-        let s = total % 60
-        return String(format: "%02d:%02d:%02d", h, m, s)
+public struct TsvExporter: TranscriptExporter {
+    public let format: ExportFormat = .tsv
+    public init() {}
+
+    public func render(_ transcript: Transcript) throws -> Data {
+        var out = "start_seconds\tend_seconds\tspeaker\ttext\n"
+        for seg in transcript.segments {
+            let speaker = Self.escape(seg.speaker ?? "")
+            let text = Self.escape(seg.text.trimmingCharacters(in: .whitespaces))
+            out += "\(seg.start)\t\(seg.end)\t\(speaker)\t\(text)\n"
+        }
+        return utf8(out)
+    }
+
+    static func escape(_ s: String) -> String {
+        s
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\t", with: "\\t")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
     }
 }

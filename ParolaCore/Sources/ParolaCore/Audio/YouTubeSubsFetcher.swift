@@ -18,7 +18,7 @@ public enum YouTubeSubsFetcher {
     public static func fetchWithTitle(url: URL, preferLanguage: String? = nil) async throws -> YouTubeSubsResult {
         guard let ytDlp = YouTubeProcess.findYtDlp() else {
             throw ParolaError.captureUnavailable(
-                "yt-dlp not found on PATH. Install with: brew install yt-dlp"
+                "yt-dlp not found on PATH. install with: brew install yt-dlp"
             )
         }
 
@@ -50,18 +50,19 @@ public enum YouTubeSubsFetcher {
         let stderr = Pipe()
         process.standardOutput = stdout
         process.standardError = stderr
+        let outDrain = PipeDrain(pipe: stdout)
+        let errDrain = PipeDrain(pipe: stderr)
 
         do { try process.run() } catch {
-            throw ParolaError.captureUnavailable("Could not launch yt-dlp: \(error.localizedDescription)")
+            throw ParolaError.captureUnavailable("could not launch yt-dlp: \(error.localizedDescription)")
         }
         try await YouTubeProcess.waitWithTimeout(process, seconds: 120)
 
-        let outData = stdout.fileHandleForReading.readDataToEndOfFile()
-        let stdoutText = String(decoding: outData, as: UTF8.self)
+        let stdoutText = String(decoding: outDrain.data(), as: UTF8.self)
 
         if process.terminationStatus != 0 {
-            let errData = stderr.fileHandleForReading.readDataToEndOfFile()
-            let detail = String(decoding: errData, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            let detail = String(decoding: errDrain.data(), as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             throw ParolaError.captureUnavailable("yt-dlp failed: \(detail)")
         }
 
@@ -69,7 +70,7 @@ public enum YouTubeSubsFetcher {
 
         let vttFiles = (try? FileManager.default.contentsOfDirectory(at: workingDir, includingPropertiesForKeys: nil)) ?? []
         guard let chosen = pickVtt(from: vttFiles, preferLanguage: preferLanguage) else {
-            throw ParolaError.captureUnavailable("This video has no subtitles available. Transcribe with Whisper instead.")
+            throw ParolaError.captureUnavailable("no subtitles available for this video; transcribe with Whisper")
         }
 
         var transcript = try VttImporter.parse(contentsOf: chosen)

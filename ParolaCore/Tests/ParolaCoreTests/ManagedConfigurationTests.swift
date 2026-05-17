@@ -44,11 +44,13 @@ struct ManagedConfigurationTests {
         #expect(engines?.contains(.parakeet) == true)
     }
 
-    @Test("allowedEngines empty array returns nil (no restriction)")
+    @Test("allowedEngines empty array means all engines blocked")
     func allowedEnginesEmpty() {
         let storage = makeStorage(["allowedEngines": [String]()])
         let config = ManagedConfiguration(storage: storage)
-        #expect(config.allowedEngines == nil)
+        #expect(config.allowedEngines == [])
+        let filtered = config.filterAllowed(ModelCatalog.all)
+        #expect(filtered.isEmpty)
     }
 
     @Test("boolean keys distinguish missing from false")

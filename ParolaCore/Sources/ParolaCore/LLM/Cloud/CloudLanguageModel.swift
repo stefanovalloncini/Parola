@@ -1,7 +1,5 @@
 import Foundation
 
-/// Concrete `LanguageModel` adapter that proxies completions to a cloud provider via HTTPS.
-/// Constructs the right request body per provider (OpenAI / Anthropic / Groq) and decodes the response.
 public struct CloudLanguageModel: LanguageModel {
     private let provider: CloudLLMProviderID
     private let model: String
@@ -23,8 +21,16 @@ public struct CloudLanguageModel: LanguageModel {
         self.session = session
     }
 
-    public func respond(to prompt: String) async throws -> String {
-        let (request, decode) = try buildRequest(prompt: prompt)
+    public static func isSupported(_ provider: CloudLLMProviderID) -> Bool {
+        switch provider {
+        case .openAI, .anthropic, .groq: return true
+        default: return false
+        }
+    }
+
+    public func respond(history: [ChatTurn]) async throws -> String {
+        try TokenBudget.check(history: history, system: instructions, provider: provider)
+        let (request, decode) = try buildRequest(history: history, streaming: false)
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw CloudLLMError.malformedResponse(provider: provider)
@@ -36,31 +42,96 @@ public struct CloudLanguageModel: LanguageModel {
         return try decode(data)
     }
 
-    func buildRequest(prompt: String) throws -> (URLRequest, (Data) throws -> String) {
-        switch provider {
-        case .openAI:
-            return try buildOpenAIRequest(prompt: prompt)
-        case .anthropic:
-            return try buildAnthropicRequest(prompt: prompt)
-        case .groq:
-            return try buildGroqRequest(prompt: prompt)
-        default:
-            throw CloudLLMError.malformedResponse(provider: provider)
+    public func stream(history: [ChatTurn]) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    try TokenBudget.check(history: history, system: instructions, provider: provider)
+                    let (request, parseLine) = try buildStreamingRequest(history: history)
+                    let (bytes, response) = try await session.bytes(for: request)
+                    guard let http = response as? HTTPURLResponse else {
+                        throw CloudLLMError.malformedResponse(provider: provider)
+                    }
+                    guard (200..<300).contains(http.statusCode) else {
+                        var body = ""
+                        for try await line in bytes.lines { body += line + "\n" }
+                        throw CloudLLMError.requestFailed(provider: provider, status: http.statusCode, body: body)
+                    }
+                    for try await line in bytes.lines {
+                        try Task.checkCancellation()
+                        if let chunk = parseLine(line), !chunk.isEmpty {
+                            continuation.yield(chunk)
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
-    private func buildOpenAIRequest(prompt: String) throws -> (URLRequest, (Data) throws -> String) {
+    func buildRequest(prompt: String) throws -> (URLRequest, (Data) throws -> String) {
+        try buildRequest(history: [ChatTurn(role: .user, text: prompt)], streaming: false)
+    }
+
+    func buildRequest(
+        history: [ChatTurn],
+        streaming: Bool
+    ) throws -> (URLRequest, (Data) throws -> String) {
+        switch provider {
+        case .openAI:
+            return try buildOpenAIRequest(history: history, streaming: streaming)
+        case .anthropic:
+            return try buildAnthropicRequest(history: history, streaming: streaming)
+        case .groq:
+            return try buildGroqRequest(history: history, streaming: streaming)
+        default:
+            throw CloudLLMError.unsupportedProvider(provider)
+        }
+    }
+
+    func buildStreamingRequest(
+        history: [ChatTurn]
+    ) throws -> (URLRequest, @Sendable (String) -> String?) {
+        switch provider {
+        case .openAI, .groq:
+            let (request, _) = try buildRequest(history: history, streaming: true)
+            return (request, Self.parseOpenAIStreamLine)
+        case .anthropic:
+            let (request, _) = try buildAnthropicRequest(history: history, streaming: true)
+            return (request, Self.parseAnthropicStreamLine)
+        default:
+            throw CloudLLMError.unsupportedProvider(provider)
+        }
+    }
+
+    private func openAIMessages(history: [ChatTurn]) -> [[String: String]] {
+        var messages: [[String: String]] = [["role": "system", "content": instructions]]
+        for turn in history {
+            messages.append(["role": turn.role == .user ? "user" : "assistant", "content": turn.text])
+        }
+        return messages
+    }
+
+    private func anthropicMessages(history: [ChatTurn]) -> [[String: String]] {
+        history.map { ["role": $0.role == .user ? "user" : "assistant", "content": $0.text] }
+    }
+
+    private func buildOpenAIRequest(
+        history: [ChatTurn],
+        streaming: Bool
+    ) throws -> (URLRequest, (Data) throws -> String) {
         var request = URLRequest(url: URL(string: "https://api.openai.com/v1/chat/completions")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
-            "messages": [
-                ["role": "system", "content": instructions],
-                ["role": "user", "content": prompt]
-            ]
+            "messages": openAIMessages(history: history)
         ]
+        if streaming { body["stream"] = true }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let provider = self.provider
         return (request, { data in
@@ -77,20 +148,22 @@ public struct CloudLanguageModel: LanguageModel {
         })
     }
 
-    private func buildAnthropicRequest(prompt: String) throws -> (URLRequest, (Data) throws -> String) {
+    private func buildAnthropicRequest(
+        history: [ChatTurn],
+        streaming: Bool
+    ) throws -> (URLRequest, (Data) throws -> String) {
         var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "max_tokens": 4096,
             "system": instructions,
-            "messages": [
-                ["role": "user", "content": prompt]
-            ]
+            "messages": anthropicMessages(history: history)
         ]
+        if streaming { body["stream"] = true }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let provider = self.provider
         return (request, { data in
@@ -107,18 +180,19 @@ public struct CloudLanguageModel: LanguageModel {
         })
     }
 
-    private func buildGroqRequest(prompt: String) throws -> (URLRequest, (Data) throws -> String) {
+    private func buildGroqRequest(
+        history: [ChatTurn],
+        streaming: Bool
+    ) throws -> (URLRequest, (Data) throws -> String) {
         var request = URLRequest(url: URL(string: "https://api.groq.com/openai/v1/chat/completions")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
-            "messages": [
-                ["role": "system", "content": instructions],
-                ["role": "user", "content": prompt]
-            ]
+            "messages": openAIMessages(history: history)
         ]
+        if streaming { body["stream"] = true }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let provider = self.provider
         return (request, { data in
@@ -133,5 +207,40 @@ public struct CloudLanguageModel: LanguageModel {
             }
             return text
         })
+    }
+
+    static func parseOpenAIStreamLine(_ line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("data:") else { return nil }
+        let payload = String(trimmed.dropFirst("data:".count)).trimmingCharacters(in: .whitespaces)
+        if payload == "[DONE]" || payload.isEmpty { return nil }
+        guard let data = payload.data(using: .utf8) else { return nil }
+        struct Chunk: Decodable {
+            struct Choice: Decodable {
+                struct Delta: Decodable { let content: String? }
+                let delta: Delta
+            }
+            let choices: [Choice]
+        }
+        guard let chunk = try? JSONDecoder().decode(Chunk.self, from: data) else { return nil }
+        return chunk.choices.first?.delta.content
+    }
+
+    static func parseAnthropicStreamLine(_ line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("data:") else { return nil }
+        let payload = String(trimmed.dropFirst("data:".count)).trimmingCharacters(in: .whitespaces)
+        guard !payload.isEmpty, payload != "[DONE]" else { return nil }
+        guard let data = payload.data(using: .utf8) else { return nil }
+        struct Event: Decodable {
+            struct Delta: Decodable { let type: String?; let text: String? }
+            let type: String
+            let delta: Delta?
+        }
+        guard let event = try? JSONDecoder().decode(Event.self, from: data) else { return nil }
+        if event.type == "content_block_delta", let text = event.delta?.text {
+            return text
+        }
+        return nil
     }
 }

@@ -24,12 +24,12 @@ extension AppModel {
         }
     }
 
-    func importBundledTermPack(named filename: String) {
-        guard let url = Bundle.main.url(forResource: filename, withExtension: "json") else {
-            phase = .failed(message: "Bundled pack \(filename).json not found.")
+    func importBundledTermPack(named identifier: String) {
+        guard let pack = BundledTermPacks.load(identifier) else {
+            phase = .failed(message: "Bundled pack \(identifier) not found.")
             return
         }
-        importTermPack(from: url)
+        findReplaceRules = TermPackIO.merge(pack: pack, into: findReplaceRules)
     }
 
     func presentTermPackExporter() {

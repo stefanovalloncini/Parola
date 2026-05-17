@@ -19,6 +19,8 @@ struct WatchedFolder: Codable, Identifiable, Hashable {
 @MainActor
 final class WatchedFoldersStore: ObservableObject {
     @Published private(set) var folders: [WatchedFolder] = []
+    @Published private(set) var lastError: String?
+    @Published private(set) var staleFolderIDs: Set<UUID> = []
     private var watchers: [UUID: FolderWatcher] = [:]
     private var scopedURLs: [UUID: URL] = [:]
     private let onNewMediaFile: @MainActor (URL) -> Void
@@ -49,8 +51,9 @@ final class WatchedFoldersStore: ObservableObject {
             folders.append(folder)
             save()
             startWatcher(for: folder)
+            lastError = nil
         } catch {
-            NSLog("watched-folders: bookmark failed — \(error.localizedDescription)")
+            lastError = "Couldn't watch \(url.path): \(error.localizedDescription)"
         }
     }
 
@@ -58,6 +61,7 @@ final class WatchedFoldersStore: ObservableObject {
         let watcher = watchers.removeValue(forKey: id)
         let scopedURL = scopedURLs.removeValue(forKey: id)
         folders.removeAll { $0.id == id }
+        staleFolderIDs.remove(id)
         save()
         if let watcher {
             Task { @MainActor in
@@ -69,6 +73,38 @@ final class WatchedFoldersStore: ObservableObject {
         }
     }
 
+    func reattach(_ id: UUID) {
+        guard let folder = folders.first(where: { $0.id == id }) else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(fileURLWithPath: folder.displayPath)
+        panel.message = "Pick \(folder.displayName) again to refresh permissions."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let bookmark = try url.bookmarkData(
+                options: .withSecurityScope,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            let refreshed = WatchedFolder(id: folder.id, bookmark: bookmark, displayPath: url.path)
+            if let idx = folders.firstIndex(where: { $0.id == folder.id }) {
+                folders[idx] = refreshed
+            }
+            staleFolderIDs.remove(folder.id)
+            save()
+            startWatcher(for: refreshed)
+            lastError = nil
+        } catch {
+            lastError = "Couldn't refresh \(url.path): \(error.localizedDescription)"
+        }
+    }
+
+    func isStale(_ id: UUID) -> Bool {
+        staleFolderIDs.contains(id)
+    }
+
     private func startWatcher(for folder: WatchedFolder) {
         var isStale = false
         guard let url = try? URL(
@@ -77,9 +113,14 @@ final class WatchedFoldersStore: ObservableObject {
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
         ) else {
+            staleFolderIDs.insert(folder.id)
             return
         }
-        guard !isStale, url.startAccessingSecurityScopedResource() else { return }
+        guard !isStale, url.startAccessingSecurityScopedResource() else {
+            staleFolderIDs.insert(folder.id)
+            return
+        }
+        staleFolderIDs.remove(folder.id)
         scopedURLs[folder.id] = url
 
         let handler = onNewMediaFile
@@ -100,5 +141,9 @@ final class WatchedFoldersStore: ObservableObject {
         if let data = try? JSONEncoder().encode(folders) {
             UserDefaults.standard.set(data, forKey: "watchedFolders")
         }
+    }
+
+    func dismissError() {
+        lastError = nil
     }
 }

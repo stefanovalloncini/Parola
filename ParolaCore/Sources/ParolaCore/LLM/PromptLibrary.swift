@@ -5,17 +5,43 @@ public actor PromptLibrary {
         URL.applicationSupportDirectory.appending(path: "Parola/Prompts.json")
     }
 
+    public struct OutdatedBuiltIn: Sendable, Hashable {
+        public let id: UUID
+        public let name: String
+        public let storedVersion: Int
+        public let currentVersion: Int
+    }
+
     private let storageURL: URL
     public private(set) var userPrompts: [Prompt]
+    public private(set) var outdatedBuiltIns: [OutdatedBuiltIn]
 
     public init(storageURL: URL = PromptLibrary.defaultStorageURL) {
         self.storageURL = storageURL
+        var loadedUser: [Prompt] = []
+        var stale: [OutdatedBuiltIn] = []
         if let data = try? Data(contentsOf: storageURL),
            let decoded = try? JSONDecoder().decode([Prompt].self, from: data) {
-            self.userPrompts = decoded.filter { !$0.isBuiltIn }
-        } else {
-            self.userPrompts = []
+            let currentByID = Dictionary(uniqueKeysWithValues: Prompt.builtIns.map { ($0.id, $0) })
+            for stored in decoded {
+                if let current = currentByID[stored.id] {
+                    if stored.version < current.version {
+                        stale.append(OutdatedBuiltIn(
+                            id: current.id,
+                            name: current.name,
+                            storedVersion: stored.version,
+                            currentVersion: current.version
+                        ))
+                    }
+                    continue
+                }
+                if !stored.isBuiltIn {
+                    loadedUser.append(stored)
+                }
+            }
         }
+        self.userPrompts = loadedUser
+        self.outdatedBuiltIns = stale
     }
 
     public var allPrompts: [Prompt] { Prompt.builtIns + userPrompts }
@@ -47,6 +73,10 @@ public actor PromptLibrary {
         let removed = userPrompts.count != before
         if removed { save() }
         return removed
+    }
+
+    public func dismissOutdatedBuiltIn(_ id: UUID) {
+        outdatedBuiltIns.removeAll { $0.id == id }
     }
 
     private func save() {

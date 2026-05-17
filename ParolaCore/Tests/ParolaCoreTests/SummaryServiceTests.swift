@@ -59,6 +59,43 @@ struct SummaryServiceTests {
         #expect(summary.chapters.isEmpty)
     }
 
+    @Test("two-paragraph summary preserves both paragraphs joined by a blank line")
+    func twoParagraphSummary() {
+        let response = """
+        SUMMARY:
+        First paragraph sentence.
+
+        Second paragraph sentence.
+
+        CHAPTERS:
+        00:00 Intro
+        """
+        let summary = SummaryService.parse(response)
+        #expect(summary.text.contains("First paragraph"))
+        #expect(summary.text.contains("Second paragraph"))
+        #expect(summary.text.contains("\n\n"))
+    }
+
+    @Test("summarise injects an external model so callers can swap providers")
+    func summariseWithInjectedModel() async throws {
+        let model = MockLanguageModel(scriptedResponses: ["""
+        SUMMARY:
+        It was a meeting.
+
+        CHAPTERS:
+        00:00 Start
+        """])
+        let service = SummaryService()
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hi")],
+            language: "en",
+            modelName: "tiny"
+        )
+        let summary = try await service.summarise(transcript, model: model)
+        #expect(summary.text == "It was a meeting.")
+        #expect(summary.chapters.first?.title == "Start")
+    }
+
     @Test("Transcript stores summary and round-trips through Codable")
     func transcriptRoundTrip() throws {
         var t = Transcript(

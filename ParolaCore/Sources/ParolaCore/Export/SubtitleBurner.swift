@@ -74,7 +74,7 @@ public enum SubtitleBurner {
                withMediaType: .audio,
                preferredTrackID: kCMPersistentTrackID_Invalid
            ) {
-            try? compAudioTrack.insertTimeRange(
+            try compAudioTrack.insertTimeRange(
                 CMTimeRangeMake(start: .zero, duration: assetDuration),
                 of: sourceAudioTrack,
                 at: .zero
@@ -131,9 +131,15 @@ public enum SubtitleBurner {
         parentLayer.addSublayer(videoLayer)
 
         for segment in transcript.segments {
-            let textLayer = makeTextLayer(text: segment.text, style: style, renderSize: renderSize)
+            let textLayer = makeTextLayer(
+                text: segment.text,
+                language: transcript.language,
+                style: style,
+                renderSize: renderSize
+            )
             attachVisibility(
                 layer: textLayer,
+                segmentID: segment.id,
                 start: segment.start,
                 end: segment.end,
                 totalDuration: duration
@@ -147,10 +153,10 @@ public enum SubtitleBurner {
         )
     }
 
-    private static func makeTextLayer(text: String, style: Style, renderSize: CGSize) -> CATextLayer {
+    private static func makeTextLayer(text: String, language: String, style: Style, renderSize: CGSize) -> CATextLayer {
         let layer = CATextLayer()
         layer.string = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        layer.font = CTFontCreateWithName(style.fontName as CFString, style.fontSize, nil)
+        layer.font = Format.cascadingFont(name: style.fontName, size: style.fontSize, language: language)
         layer.fontSize = style.fontSize
         layer.foregroundColor = style.textColor
         layer.alignmentMode = .center
@@ -176,6 +182,7 @@ public enum SubtitleBurner {
 
     private static func attachVisibility(
         layer: CALayer,
+        segmentID: Int,
         start: Double,
         end: Double,
         totalDuration: TimeInterval
@@ -199,8 +206,8 @@ public enum SubtitleBurner {
         disappear.fillMode = .forwards
         disappear.isRemovedOnCompletion = false
 
-        layer.add(appear, forKey: "appear-\(start)")
-        layer.add(disappear, forKey: "disappear-\(end)")
+        layer.add(appear, forKey: "appear-\(segmentID)")
+        layer.add(disappear, forKey: "disappear-\(segmentID)")
     }
 
     static func renderSize(naturalSize: CGSize, transform: CGAffineTransform) -> CGSize {

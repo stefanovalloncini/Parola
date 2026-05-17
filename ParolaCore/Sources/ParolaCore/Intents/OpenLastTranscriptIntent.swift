@@ -24,7 +24,7 @@ public struct OpenLastTranscriptIntent: AppIntent {
     public init() {}
 
     public func perform() async throws -> some IntentResult {
-        let store = LibraryStore()
+        let store = LibraryStore.shared
         let entries = await store.list()
         guard let latest = entries.first else {
             throw ParolaIntentError.noTranscripts

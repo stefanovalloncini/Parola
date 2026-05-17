@@ -45,6 +45,49 @@ extension AppModel {
         setDictationWorkflow(workflow, for: bundleID)
     }
 
+    func removeDictationOverride(for bundleID: String) {
+        var map = dictationWorkflows()
+        map.removeValue(forKey: bundleID)
+        let data = DictationWorkflowMap.encode(map)
+        dictationPerAppOverridesJSON = String(decoding: data, as: UTF8.self)
+    }
+
+    func presentAddDictationAppPanel() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.message = "Pick an app to give it a custom dictation workflow."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let bundle = Bundle(url: url), let bundleID = bundle.bundleIdentifier else { return }
+        var workflow = dictationWorkflow(for: bundleID)
+        if workflow.isEmpty {
+            workflow.promptID = ""
+            setDictationWorkflow(workflow, for: bundleID)
+        }
+    }
+
+    /// Bundle IDs the user has configured as workflow overrides beyond the four built-in seeds.
+    func customDictationOverrideApps() -> [(bundleID: String, name: String)] {
+        let seedIDs = Set(AppModel.dictationOverrideApps.map(\.bundleID))
+        let map = dictationWorkflows()
+        return map.keys.compactMap { bundleID -> (String, String)? in
+            guard !seedIDs.contains(bundleID) else { return nil }
+            let name = displayName(forBundleID: bundleID)
+            return (bundleID, name)
+        }.sorted { $0.1.localizedCaseInsensitiveCompare($1.1) == .orderedAscending }
+    }
+
+    private func displayName(forBundleID bundleID: String) -> String {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+            let info = Bundle(url: url)?.infoDictionary
+            if let name = info?["CFBundleDisplayName"] as? String, !name.isEmpty { return name }
+            if let name = info?["CFBundleName"] as? String, !name.isEmpty { return name }
+            return url.deletingPathExtension().lastPathComponent
+        }
+        return bundleID
+    }
+
     func restartDictationForWorkflowChange() {
         guard dictationEnabled, dictationCoordinator != nil else { return }
         stopDictation()
@@ -61,7 +104,7 @@ extension AppModel {
 
     func startDictation() {
         guard dictationCoordinator == nil else { return }
-        let hotkey = GlobalHotkeyMonitor(keyCode: dictationKeyCode)
+        let hotkey = GlobalHotkeyMonitor(keyCode: dictationKeyCode, modifiers: dictationModifierFlags)
         let workflows = dictationWorkflows()
         let recorder = MicDictationRecorder(
             model: selectedModel,

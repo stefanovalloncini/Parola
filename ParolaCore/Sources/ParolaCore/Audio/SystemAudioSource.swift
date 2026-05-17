@@ -14,6 +14,7 @@ public actor SystemAudioSource: AudioSource {
     private let outputURL: URL
     private let outputFormat: AVAudioFormat
     private let callbackQueue = DispatchQueue(label: "com.parola.system-audio")
+    private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
 
     public init() {
         self.outputURL = FileManager.default.temporaryDirectory
@@ -49,7 +50,6 @@ public actor SystemAudioSource: AudioSource {
         config.excludesCurrentProcessAudio = true
         config.sampleRate = 48_000
         config.channelCount = 2
-        // Minimal video config; we never read the frames but ScreenCaptureKit insists.
         config.width = 2
         config.height = 2
         config.minimumFrameInterval = CMTime(value: 1, timescale: 1)
@@ -70,7 +70,17 @@ public actor SystemAudioSource: AudioSource {
             interleaved: false
         )
 
-        let handler = SampleHandler(converter: converter, writeFile: writeFile, outputFormat: outputFormat)
+        let levelSink: @Sendable (Float) -> Void = { [weak self] level in
+            guard let self else { return }
+            Task { await self.emitLevel(level) }
+        }
+        let handler = SampleHandler(
+            converter: converter,
+            writeFile: writeFile,
+            outputFormat: outputFormat,
+            queue: callbackQueue,
+            onLevel: levelSink
+        )
         let stream = SCStream(filter: filter, configuration: config, delegate: handler)
         try stream.addStreamOutput(handler, type: .audio, sampleHandlerQueue: callbackQueue)
 
@@ -89,26 +99,67 @@ public actor SystemAudioSource: AudioSource {
         try? FileManager.default.removeItem(at: outputURL)
     }
 
+    /// Emits a normalised 0...1 amplitude per captured buffer. Multiple subscribers are supported.
+    public func levels() -> AsyncStream<Float> {
+        AsyncStream { continuation in
+            let id = UUID()
+            levelContinuations[id] = continuation
+            continuation.onTermination = { [weak self] _ in
+                guard let self else { return }
+                Task { await self.removeLevelContinuation(id) }
+            }
+        }
+    }
+
+    private func removeLevelContinuation(_ id: UUID) {
+        levelContinuations.removeValue(forKey: id)
+    }
+
+    private func emitLevel(_ level: Float) {
+        for continuation in levelContinuations.values {
+            continuation.yield(level)
+        }
+    }
+
     private func stop() async throws {
         if let stream {
             try? await stream.stopCapture()
             self.stream = nil
         }
+        if let handler {
+            await handler.drain()
+        }
         handler = nil
+        for continuation in levelContinuations.values {
+            continuation.finish()
+        }
+        levelContinuations.removeAll()
     }
 }
 
-// Unchecked Sendable: properties are set once in init, then only read on the SC sample-handler queue.
+// Unchecked Sendable: state is set in init, then mutated only on the serial DispatchQueue
+// passed in via `queue` (ScreenCaptureKit's sample-handler queue). `drain()` synchronises
+// with that queue before the owning actor releases this handler.
 @available(macOS 13.0, *)
 private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @unchecked Sendable {
     private let converter: AVAudioConverter
     private let writeFile: AVAudioFile
     private let outputFormat: AVAudioFormat
+    private let queue: DispatchQueue
+    private let onLevel: @Sendable (Float) -> Void
 
-    init(converter: AVAudioConverter, writeFile: AVAudioFile, outputFormat: AVAudioFormat) {
+    init(
+        converter: AVAudioConverter,
+        writeFile: AVAudioFile,
+        outputFormat: AVAudioFormat,
+        queue: DispatchQueue,
+        onLevel: @escaping @Sendable (Float) -> Void
+    ) {
         self.converter = converter
         self.writeFile = writeFile
         self.outputFormat = outputFormat
+        self.queue = queue
+        self.onLevel = onLevel
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
@@ -123,33 +174,17 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
         }
         guard let srcFormat = maybeSrcFormat else { return }
 
-        var blockBufferOut: CMBlockBuffer?
-        var audioBufferList = AudioBufferList()
-        let status = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
-            sampleBuffer,
-            bufferListSizeNeededOut: nil,
-            bufferListOut: &audioBufferList,
-            bufferListSize: MemoryLayout<AudioBufferList>.size,
-            blockBufferAllocator: kCFAllocatorDefault,
-            blockBufferMemoryAllocator: kCFAllocatorDefault,
-            flags: 0,
-            blockBufferOut: &blockBufferOut
-        )
-        guard status == noErr else { return }
-
         let frameCount = AVAudioFrameCount(sampleBuffer.numSamples)
-        guard let inBuffer = AVAudioPCMBuffer(
-            pcmFormat: srcFormat,
-            bufferListNoCopy: &audioBufferList
-        ) else { return }
-        inBuffer.frameLength = frameCount
+        guard let copied = Self.copy(sampleBuffer: sampleBuffer, srcFormat: srcFormat, frameCount: frameCount) else {
+            return
+        }
 
-        let ratio = outputFormat.sampleRate / inBuffer.format.sampleRate
-        let outCapacity = AVAudioFrameCount(Double(inBuffer.frameLength) * ratio + 1024)
+        let ratio = outputFormat.sampleRate / copied.format.sampleRate
+        let outCapacity = AVAudioFrameCount(Double(copied.frameLength) * ratio + 1024)
         guard let outBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: outCapacity) else { return }
 
         var error: NSError?
-        let box = AudioBufferBox(buffer: inBuffer)
+        let box = AudioBufferBox(buffer: copied)
         let convStatus = converter.convert(to: outBuffer, error: &error) { _, outStatus in
             if box.consumed { outStatus.pointee = .endOfStream; return nil }
             box.consumed = true
@@ -158,6 +193,74 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
         }
         if convStatus == .error || outBuffer.frameLength == 0 { return }
         try? writeFile.write(from: outBuffer)
+        onLevel(Self.normalisedLevel(of: copied))
+    }
+
+    /// Allocates a fresh PCM buffer and copies samples out of the sample buffer. The original
+    /// `CMBlockBuffer` may be returned to ScreenCaptureKit's pool the moment this method
+    /// returns — copying decouples our buffer's lifetime from theirs.
+    private static func copy(
+        sampleBuffer: CMSampleBuffer,
+        srcFormat: AVAudioFormat,
+        frameCount: AVAudioFrameCount
+    ) -> AVAudioPCMBuffer? {
+        var blockBufferOut: CMBlockBuffer?
+        var abl = AudioBufferList()
+        let status = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+            sampleBuffer,
+            bufferListSizeNeededOut: nil,
+            bufferListOut: &abl,
+            bufferListSize: MemoryLayout<AudioBufferList>.size,
+            blockBufferAllocator: kCFAllocatorDefault,
+            blockBufferMemoryAllocator: kCFAllocatorDefault,
+            flags: 0,
+            blockBufferOut: &blockBufferOut
+        )
+        guard status == noErr else { return nil }
+
+        guard let inBuffer = AVAudioPCMBuffer(pcmFormat: srcFormat, bufferListNoCopy: &abl) else {
+            return nil
+        }
+        inBuffer.frameLength = frameCount
+
+        guard
+            let copy = AVAudioPCMBuffer(pcmFormat: srcFormat, frameCapacity: frameCount),
+            let srcChannels = inBuffer.floatChannelData,
+            let dstChannels = copy.floatChannelData
+        else { return nil }
+        copy.frameLength = frameCount
+
+        let bytesPerChannel = Int(frameCount) * MemoryLayout<Float>.size
+        for ch in 0..<Int(srcFormat.channelCount) {
+            memcpy(dstChannels[ch], srcChannels[ch], bytesPerChannel)
+        }
+        _ = blockBufferOut
+        return copy
+    }
+
+    private static func normalisedLevel(of buffer: AVAudioPCMBuffer) -> Float {
+        guard let channels = buffer.floatChannelData else { return 0 }
+        let frameCount = Int(buffer.frameLength)
+        guard frameCount > 0 else { return 0 }
+        let samples = channels[0]
+        var sumSquares: Float = 0
+        for index in 0..<frameCount {
+            let sample = samples[index]
+            sumSquares += sample * sample
+        }
+        let rms = sqrtf(sumSquares / Float(frameCount))
+        let minDb: Float = -55
+        let db = 20 * log10f(max(rms, 1e-7))
+        let clamped = max(minDb, min(0, db))
+        return (clamped - minDb) / -minDb
+    }
+
+    /// Awaits a no-op block on the sample-handler queue. Any in-flight callback finishes
+    /// before this returns.
+    func drain() async {
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            queue.async { cont.resume() }
+        }
     }
 }
 

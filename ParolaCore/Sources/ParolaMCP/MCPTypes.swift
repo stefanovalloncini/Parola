@@ -61,6 +61,10 @@ public enum JSONRPCID: Codable, Sendable, Hashable {
 public struct AnyDecodable: Decodable, @unchecked Sendable {
     public let value: Any
 
+    public init(_ value: Any) {
+        self.value = value
+    }
+
     public init(from decoder: Decoder) throws {
         let c = try decoder.singleValueContainer()
         if c.decodeNil() { value = NSNull(); return }

@@ -62,7 +62,14 @@ public actor WhisperKitTranscriber: Transcriber {
         options: TranscriptionOptions
     ) async throws -> Transcript {
         if let requested = options.computeUnits, requested != loadedComputeUnits, let current = loadedModel {
-            try await load(model: current, computeUnits: requested)
+            do {
+                try await load(model: current, computeUnits: requested)
+            } catch {
+                whisperKit = nil
+                loadedModel = nil
+                loadedComputeUnits = nil
+                throw error
+            }
         }
         guard let kit = whisperKit, let modelName = loadedModel else {
             throw ParolaError.transcriptionFailed("model not loaded")
