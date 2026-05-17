@@ -31,7 +31,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    enum Route: Hashable {
+    enum Route: String, Hashable, CaseIterable {
         case transcript
         case batch
         case queue
@@ -189,6 +189,7 @@ final class AppModel: ObservableObject {
     @Published var deletedEntries: [LibraryEntry] = []
     @Published var searchResults: [LibraryEntry]?
     @Published var selectedEntryID: LibraryEntry.ID?
+    @Published var libraryFilter: EntryCategory?
     var searchTask: Task<Void, Never>?
     static let trashRetentionDays = 30
 
@@ -202,6 +203,36 @@ final class AppModel: ObservableObject {
     private var streamingConsumer: Task<Void, Never>?
     private var lastDownloadPercent: Int = -1
 
+    var canCancel: Bool {
+        if batchTask != nil { return true }
+        if streamingConsumer != nil { return true }
+        return false
+    }
+
+    func cancelCurrentWork() {
+        batchTask?.cancel()
+        batchTask = nil
+        if let consumer = streamingConsumer {
+            consumer.cancel()
+            streamingConsumer = nil
+        }
+        if let s = streamingSession {
+            streamingSession = nil
+            Task { await s.stop() }
+        }
+        if liveSource != nil {
+            let source = liveSource
+            liveSource = nil
+            Task { await source?.cancel() }
+        }
+        pendingRecordingCategory = .transcription
+        phase = .idle
+    }
+
+#if DEBUG
+    private var testBridge: ParolaTestBridge?
+#endif
+
     init() {
         loadAutoExportRules()
         loadIgnoredSegmentRules()
@@ -212,6 +243,12 @@ final class AppModel: ObservableObject {
         _ = watchedFolders   // touch lazy var to start watchers on launch
         _ = meetingDetector  // touch lazy var to start NSWorkspace observation
         if dictationEnabled { startDictation() }
+#if DEBUG
+        if let bridge = try? ParolaTestBridge(model: self) {
+            bridge.start()
+            testBridge = bridge
+        }
+#endif
         Task { [weak self, library] in
             await library.purgeDeletedOlderThan(days: AppModel.trashRetentionDays, now: Date())
             self?.refreshLibrary()
