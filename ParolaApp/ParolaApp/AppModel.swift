@@ -1056,6 +1056,62 @@ final class AppModel: ObservableObject {
         pendingExport = format
     }
 
+    func printTranscript() {
+        guard let transcript else { return }
+        let title = sourceFileURL?.deletingPathExtension().lastPathComponent ?? "Transcript"
+        let attributed = Self.makePrintableAttributedString(for: transcript, title: title)
+
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 612, height: 792))
+        textView.isEditable = false
+        textView.textContainerInset = NSSize(width: 36, height: 48)
+        textView.textStorage?.setAttributedString(attributed)
+
+        let printInfo = NSPrintInfo.shared
+        printInfo.horizontalPagination = .fit
+        printInfo.verticalPagination = .automatic
+        printInfo.topMargin = 36
+        printInfo.bottomMargin = 36
+        printInfo.leftMargin = 36
+        printInfo.rightMargin = 36
+
+        let operation = NSPrintOperation(view: textView, printInfo: printInfo)
+        operation.showsPrintPanel = true
+        operation.showsProgressPanel = true
+        operation.jobTitle = title
+        operation.run()
+    }
+
+    private static func makePrintableAttributedString(for transcript: Transcript, title: String) -> NSAttributedString {
+        let result = NSMutableAttributedString()
+        let titleAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.boldSystemFont(ofSize: 18),
+            .foregroundColor: NSColor.labelColor,
+        ]
+        result.append(NSAttributedString(string: title + "\n\n", attributes: titleAttrs))
+
+        let stampAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular),
+            .foregroundColor: NSColor.secondaryLabelColor,
+        ]
+        let bodyAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 12),
+            .foregroundColor: NSColor.labelColor,
+        ]
+        let speakerAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 12, weight: .semibold),
+            .foregroundColor: NSColor.labelColor,
+        ]
+
+        for segment in transcript.segments {
+            result.append(NSAttributedString(string: Timecode.format(segment.start) + "  ", attributes: stampAttrs))
+            if let speaker = segment.speaker {
+                result.append(NSAttributedString(string: speaker + ": ", attributes: speakerAttrs))
+            }
+            result.append(NSAttributedString(string: segment.text.trimmingCharacters(in: .whitespaces) + "\n\n", attributes: bodyAttrs))
+        }
+        return result
+    }
+
     func performExport(_ format: ExportFormat) {
         guard let transcript else { return }
         let panel = NSSavePanel()

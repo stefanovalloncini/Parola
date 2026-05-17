@@ -87,6 +87,10 @@ struct ParolaApp: App {
                 Button("Export as JSON…") { model.exportRequest(.json) }
                     .disabled(model.transcript == nil)
                 Divider()
+                Button("Print Transcript…") { model.printTranscript() }
+                    .keyboardShortcut("p", modifiers: [.command])
+                    .disabled(model.transcript == nil)
+                Divider()
                 Button("Burn Subtitles into Video…") { model.burnSubtitlesIntoVideo() }
                     .disabled(model.transcript == nil)
             }
