@@ -27,10 +27,11 @@ public actor YouTubeAudioSource: AudioSource {
     private let workingDir: URL
     private let timeoutSeconds: Int
     private var downloadedURL: URL?
+    private var runningProcess: Process?
 
     public init(url: URL, timeoutSeconds: Int = 120) throws {
         guard url.isYouTubeVideo else {
-            throw ParolaError.captureUnavailable("Not a YouTube URL: \(url.absoluteString)")
+            throw ParolaError.captureUnavailable("not a YouTube URL: \(url.absoluteString)")
         }
         self.url = url
         self.timeoutSeconds = timeoutSeconds
@@ -43,7 +44,7 @@ public actor YouTubeAudioSource: AudioSource {
 
         guard let ytDlp = YouTubeProcess.findYtDlp() else {
             throw ParolaError.captureUnavailable(
-                "yt-dlp not found on PATH. Install with: brew install yt-dlp"
+                "yt-dlp not found on PATH. install with: brew install yt-dlp"
             )
         }
 
@@ -54,8 +55,37 @@ public actor YouTubeAudioSource: AudioSource {
     }
 
     public func cancel() async {
+        if let process = runningProcess, process.isRunning {
+            process.terminate()
+        }
+        runningProcess = nil
         try? FileManager.default.removeItem(at: workingDir)
         downloadedURL = nil
+    }
+
+    /// Best-effort duration in seconds. Probes via `yt-dlp --print duration` without downloading.
+    public func estimatedDuration() async -> Double? {
+        guard let ytDlp = YouTubeProcess.findYtDlp() else { return nil }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: ytDlp)
+        process.arguments = [
+            "--no-playlist",
+            "--no-warnings",
+            "--skip-download",
+            "--print", "duration",
+            url.absoluteString,
+        ]
+        process.environment = YouTubeProcess.augmentedEnvironment()
+        let stdout = Pipe()
+        process.standardOutput = stdout
+        process.standardError = Pipe()
+        let drain = PipeDrain(pipe: stdout)
+        do { try process.run() } catch { return nil }
+        try? await YouTubeProcess.waitWithTimeout(process, seconds: 20)
+        guard process.terminationStatus == 0 else { return nil }
+        let raw = String(decoding: drain.data(), as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return Double(raw)
     }
 
     private func downloadAudio(ytDlpPath: String) async throws -> URL {
@@ -78,19 +108,23 @@ public actor YouTubeAudioSource: AudioSource {
         let stderr = Pipe()
         process.standardOutput = stdout
         process.standardError = stderr
+        let outDrain = PipeDrain(pipe: stdout)
+        let errDrain = PipeDrain(pipe: stderr)
 
         do {
             try process.run()
         } catch {
-            throw ParolaError.captureUnavailable("Could not launch yt-dlp: \(error.localizedDescription)")
+            throw ParolaError.captureUnavailable("could not launch yt-dlp: \(error.localizedDescription)")
         }
+        runningProcess = process
+        defer { runningProcess = nil }
 
         try await YouTubeProcess.waitWithTimeout(process, seconds: timeoutSeconds)
 
-        let outData = stdout.fileHandleForReading.readDataToEndOfFile()
-        let errData = stderr.fileHandleForReading.readDataToEndOfFile()
-        let outText = String(decoding: outData, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        let errText = String(decoding: errData, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        let outText = String(decoding: outDrain.data(), as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let errText = String(decoding: errDrain.data(), as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard process.terminationStatus == 0 else {
             throw ParolaError.captureUnavailable("yt-dlp failed: \(errText.isEmpty ? outText : errText)")
@@ -98,7 +132,7 @@ public actor YouTubeAudioSource: AudioSource {
 
         let path = outText.components(separatedBy: "\n").last ?? outText
         guard !path.isEmpty, FileManager.default.fileExists(atPath: path) else {
-            throw ParolaError.captureUnavailable("yt-dlp didn't report a usable file path.")
+            throw ParolaError.captureUnavailable("yt-dlp didn't report a usable file path")
         }
         return URL(fileURLWithPath: path)
     }
