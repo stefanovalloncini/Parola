@@ -27,7 +27,14 @@ enum HuggingFaceDownloader {
                 at: localURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            let (tmp, response) = try await URLSession.shared.download(from: fileURL)
+
+            let baseDone = downloadedBytes
+            let delegate = ProgressTrackingDelegate { written in
+                guard totalBytes > 0 else { return }
+                let total = baseDone + written
+                progress?(min(1.0, Double(total) / Double(totalBytes)))
+            }
+            let (tmp, response) = try await URLSession.shared.download(from: fileURL, delegate: delegate)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
                 throw ParolaError.modelDownloadFailed(repo, underlying: "HTTP \( (response as? HTTPURLResponse)?.statusCode ?? -1) for \(entry.path)")
             }
@@ -164,4 +171,27 @@ private extension String {
         guard !prefix.isEmpty, hasPrefix(prefix) else { return self }
         return String(dropFirst(prefix.count))
     }
+}
+
+/// Bridges `URLSessionDownloadDelegate` byte-level progress callbacks into a Swift closure.
+private final class ProgressTrackingDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    private let onWritten: @Sendable (Int64) -> Void
+
+    init(onWritten: @escaping @Sendable (Int64) -> Void) {
+        self.onWritten = onWritten
+    }
+
+    func urlSession(_ session: URLSession,
+                    downloadTask: URLSessionDownloadTask,
+                    didWriteData bytesWritten: Int64,
+                    totalBytesWritten: Int64,
+                    totalBytesExpectedToWrite: Int64) {
+        onWritten(totalBytesWritten)
+    }
+
+    // Required by URLSessionDownloadDelegate. The async URLSession.download(from:delegate:)
+    // API surfaces the temp file location via its return value, so we don't need to act here.
+    func urlSession(_ session: URLSession,
+                    downloadTask: URLSessionDownloadTask,
+                    didFinishDownloadingTo location: URL) {}
 }
