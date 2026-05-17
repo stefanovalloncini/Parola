@@ -137,6 +137,8 @@ final class AppModel: ObservableObject {
     let promptLibrary = PromptLibrary()
     @Published var promptOutput: PromptOutput?
     @Published var isRunningPrompt: Bool = false
+    @Published var actionItems: [ActionItem] = []
+    @Published var isExtractingActionItems: Bool = false
 
     struct PromptOutput: Identifiable {
         let id = UUID()

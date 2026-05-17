@@ -26,6 +26,10 @@ struct InfoInspector: View {
                 InfoRow(icon: "character", label: "Characters", value: "\(charCount)")
                 InfoRow(icon: "text.word.spacing", label: "Words", value: "\(wordCount)")
             }
+
+            if model.transcript != nil {
+                ActionItemsSection()
+            }
         }
     }
 

@@ -22,6 +22,28 @@ extension AppModel {
         }
     }
 
+    func extractActionItems() {
+        guard let transcript = self.transcript else { return }
+        guard !isExtractingActionItems else { return }
+        guard let prompt = Prompt.builtIns.first(where: { $0.name == "Action items" }) else { return }
+        isExtractingActionItems = true
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let model = try LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
+                let result = try await PromptRunner.run(prompt, on: transcript.text, model: model)
+                actionItems = ActionItemParser.parse(result)
+            } catch {
+                phase = .failed(message: "Action item extraction failed: \(error.localizedDescription)")
+            }
+            isExtractingActionItems = false
+        }
+    }
+
+    func clearActionItems() {
+        actionItems = []
+    }
+
     func generateYouTubeChapters() {
         guard let transcript = self.transcript else { return }
         guard !isRunningPrompt else { return }
