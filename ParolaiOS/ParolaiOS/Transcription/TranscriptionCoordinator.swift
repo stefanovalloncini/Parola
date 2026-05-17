@@ -133,6 +133,8 @@ final class TranscriptionCoordinator: ObservableObject {
         cancelledGeneration = recordingGeneration
         guard let session = streamingSession else { return }
         streamingSession = nil
+        streamingTask?.cancel()
+        streamingTask = nil
         Task {
             await session.stop()
         }
@@ -164,9 +166,13 @@ final class TranscriptionCoordinator: ObservableObject {
                 return
             }
             let processed = postProcessor?(final) ?? final
-            Task {
+            Task { [generation] in
                 do {
                     let entry = try await library.add(transcript: processed, audioSource: nil)
+                    guard generation != cancelledGeneration else {
+                        phase = .idle
+                        return
+                    }
                     phase = .idle
                     onComplete?(entry)
                 } catch {
