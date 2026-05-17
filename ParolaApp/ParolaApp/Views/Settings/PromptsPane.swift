@@ -72,8 +72,8 @@ struct PromptsPane: View {
         switch sortOption {
         case .builtInFirst:
             prompts.sort { lhs, rhs in
-                if lhs.isBuiltIn != rhs.isBuiltIn { return lhs.isBuiltIn && !rhs.isBuiltIn }
-                return false
+                if lhs.isBuiltIn == rhs.isBuiltIn { return false }
+                return lhs.isBuiltIn
             }
         case .nameAZ:
             prompts.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }

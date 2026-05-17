@@ -182,10 +182,7 @@ struct QueueView: View {
     }
 
     private func handleDelete(job: BatchJob) {
-        switch job.status {
-        case .pending, .transcribing: model.cancelBatchJob(job.id)
-        case .done, .failed, .cancelled: model.cancelBatchJob(job.id)
-        }
+        model.cancelBatchJob(job.id)
     }
 }
 
