@@ -55,6 +55,15 @@ final class ParolaTestBridge {
         listener.start(queue: .main)
     }
 
+    /// Tears down the listener and any open connections. Removes the port discovery file so
+    /// MCP clients can detect the bridge is gone.
+    func stop() {
+        listener.cancel()
+        for conn in connections.values { conn.cancel() }
+        connections.removeAll()
+        try? FileManager.default.removeItem(at: portFileURL)
+    }
+
     private func accept(_ conn: NWConnection) {
         let key = ObjectIdentifier(conn)
         connections[key] = conn

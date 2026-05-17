@@ -235,9 +235,36 @@ final class AppModel: ObservableObject {
         phase = .idle
     }
 
-#if DEBUG
     private var testBridge: ParolaTestBridge?
-#endif
+    /// `true` if the MCP automation bridge is currently listening. Debug builds opt in by default;
+    /// Release builds require an explicit toggle in Settings → MCP & Automation.
+    @Published private(set) var automationBridgeRunning: Bool = false
+
+    /// User-controlled toggle. Default differs by configuration so notarised binaries don't
+    /// start a local TCP listener without consent.
+    @AppStorage("automationBridgeEnabled") var automationBridgeEnabled: Bool = AppModel.defaultBridgeEnabled
+
+    static var defaultBridgeEnabled: Bool {
+        #if DEBUG
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    func startAutomationBridge() {
+        guard testBridge == nil else { return }
+        guard let bridge = try? ParolaTestBridge(model: self) else { return }
+        bridge.start()
+        testBridge = bridge
+        automationBridgeRunning = true
+    }
+
+    func stopAutomationBridge() {
+        testBridge?.stop()
+        testBridge = nil
+        automationBridgeRunning = false
+    }
 
     init() {
         loadAutoExportRules()
@@ -249,12 +276,9 @@ final class AppModel: ObservableObject {
         _ = watchedFolders   // touch lazy var to start watchers on launch
         _ = meetingDetector  // touch lazy var to start NSWorkspace observation
         if dictationEnabled { startDictation() }
-#if DEBUG
-        if let bridge = try? ParolaTestBridge(model: self) {
-            bridge.start()
-            testBridge = bridge
+        if automationBridgeEnabled {
+            startAutomationBridge()
         }
-#endif
         Task { [weak self, library] in
             await library.purgeDeletedOlderThan(days: AppModel.trashRetentionDays, now: Date())
             self?.refreshLibrary()
