@@ -28,27 +28,31 @@ struct ModelPickScreen: View {
     }
 
     private var modelGroups: some View {
-        VStack(spacing: 18) {
-            ForEach(groups, id: \.0) { category, variants in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(category.displayName.uppercased())
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 4)
-                    VStack(spacing: 8) {
-                        ForEach(variants, id: \.id) { variant in
-                            ModelVariantRow(
-                                variant: variant,
-                                isSelected: model.settings.modelName == variant.id
-                            ) {
-                                model.settings.modelName = variant.id
-                                applyDefaultLanguageIfNeeded(for: variant.id)
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 18) {
+                ForEach(groups, id: \.0) { category, variants in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(category.displayName.uppercased())
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 4)
+                        VStack(spacing: 8) {
+                            ForEach(variants, id: \.id) { variant in
+                                ModelVariantRow(
+                                    variant: variant,
+                                    isSelected: model.settings.modelName == variant.id
+                                ) {
+                                    model.settings.modelName = variant.id
+                                    applyDefaultLanguageIfNeeded(for: variant.id)
+                                }
                             }
                         }
                     }
                 }
             }
+            .padding(.vertical, 4)
         }
+        .frame(maxWidth: .infinity)
     }
 
     private func applyDefaultLanguageIfNeeded(for variantID: String) {
