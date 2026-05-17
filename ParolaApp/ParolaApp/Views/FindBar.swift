@@ -26,7 +26,7 @@ struct FindBar: View {
 
     private var searchRow: some View {
         HStack(spacing: 12) {
-            FindPill {
+            BarPill {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 13, weight: .regular))
                     .foregroundStyle(.secondary)
@@ -89,7 +89,7 @@ struct FindBar: View {
 
     private var replaceRow: some View {
         HStack(spacing: 12) {
-            FindPill {
+            BarPill {
                 Image(systemName: "arrow.2.squarepath")
                     .font(.system(size: 13, weight: .regular))
                     .foregroundStyle(.secondary)
@@ -115,25 +115,6 @@ struct FindBar: View {
     private var matchSummary: String {
         if model.matches.isEmpty { return "No matches" }
         return "\(model.currentMatchIndex + 1) of \(model.matches.count)"
-    }
-}
-
-private struct FindPill<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        HStack(spacing: 8) { content }
-            .padding(.horizontal, 10)
-            .frame(height: 28)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(DS.Color.surfaceElevated.opacity(0.85))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(DS.Color.separator.opacity(0.4), lineWidth: 0.5)
-            )
     }
 }
 

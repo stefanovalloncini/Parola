@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ChatSearchPill<Content: View>: View {
+struct BarPill<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
