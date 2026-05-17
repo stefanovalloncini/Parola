@@ -239,7 +239,7 @@ private struct SectionLabel: View {
     init(_ text: String) { self.text = text }
     var body: some View {
         Text(text.uppercased())
-            .font(.system(size: 10, weight: .semibold))
+            .font(.caption2.weight(.semibold))
             .tracking(0.6)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 10)

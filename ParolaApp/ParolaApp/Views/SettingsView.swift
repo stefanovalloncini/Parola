@@ -24,7 +24,7 @@ struct SettingsView: View {
 private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     case general, customization, watchedFolders, recordMeetings, shortcuts
     case microphone, liveCaptions, dictation, snippets
-    case localModels, cloudModels, transcriptionDefaults, translation, ignoredSegments, findReplace
+    case localModels, transcriptionDefaults, translation, ignoredSegments, findReplace
     case exportFormats, batchExport, autoExport, integrations
     case prompts
     case automation
@@ -45,7 +45,6 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .dictation: return "Dictation"
         case .snippets: return "Snippets"
         case .localModels: return "Local Models"
-        case .cloudModels: return "Cloud Models"
         case .transcriptionDefaults: return "Transcription Defaults"
         case .translation: return "Translation"
         case .ignoredSegments: return "Ignored Segments"
@@ -74,7 +73,6 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .dictation: return "text.bubble"
         case .snippets: return "text.append"
         case .localModels: return "cpu"
-        case .cloudModels: return "cloud"
         case .transcriptionDefaults: return "slider.horizontal.3"
         case .translation: return "character.book.closed"
         case .ignoredSegments: return "line.3.horizontal.decrease.circle"
@@ -103,7 +101,6 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .dictation: return .dictation
         case .snippets: return .snippets
         case .localModels: return nil
-        case .cloudModels: return nil
         case .transcriptionDefaults: return .transcriptionDefaults
         case .translation: return .translation
         case .ignoredSegments: return .ignoredSegments
@@ -265,8 +262,6 @@ private struct SettingsDetail: View {
         case .snippets: SnippetsPane()
         case .localModels:
             ModelsSettingsPane()
-        case .cloudModels:
-            Text("Models pane — see Unit 5b").foregroundStyle(.secondary)
         case .transcriptionDefaults: TranscriptionDefaultsPane()
         case .translation: TranslationPane()
         case .ignoredSegments: IgnoredSegmentsPane()
