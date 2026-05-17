@@ -16,7 +16,7 @@ struct Record: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Audio source: mic | system.")
     var source: Source = .mic
 
-    @Option(name: .shortAndLong, help: "Seconds to record. Omit to record until Ctrl-C.")
+    @Option(name: [.customShort("d"), .long], help: "Duration in seconds. Omit to record until Ctrl-C.")
     var seconds: Double?
 
     @Option(name: .shortAndLong, help: "Model variant.")
