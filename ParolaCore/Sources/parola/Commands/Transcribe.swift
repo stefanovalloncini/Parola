@@ -122,7 +122,7 @@ struct Transcribe: AsyncParsableCommand {
             sourceURL = url
         case .youtube(let url):
             stderr("Downloading audio from \(url.absoluteString)…")
-            let yt = YouTubeAudioSource(url: url)
+            let yt = try YouTubeAudioSource(url: url)
             source = yt
             sourceURL = try await yt.prepare()
         }
