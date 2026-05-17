@@ -1,0 +1,32 @@
+{
+  "name": "Tech Terms (English)",
+  "locale": "en",
+  "version": 1,
+  "rules": [
+    { "find": "k 8 s",        "replace": "Kubernetes",  "caseSensitive": false, "regex": false },
+    { "find": "kubernetes",   "replace": "Kubernetes",  "caseSensitive": false, "regex": false },
+    { "find": "grpc",         "replace": "gRPC",        "caseSensitive": false, "regex": false },
+    { "find": "g r p c",      "replace": "gRPC",        "caseSensitive": false, "regex": false },
+    { "find": "postgres",     "replace": "Postgres",    "caseSensitive": false, "regex": false },
+    { "find": "postgresql",   "replace": "PostgreSQL",  "caseSensitive": false, "regex": false },
+    { "find": "graphql",      "replace": "GraphQL",     "caseSensitive": false, "regex": false },
+    { "find": "github",       "replace": "GitHub",      "caseSensitive": false, "regex": false },
+    { "find": "openai",       "replace": "OpenAI",      "caseSensitive": false, "regex": false },
+    { "find": "javascript",   "replace": "JavaScript",  "caseSensitive": false, "regex": false },
+    { "find": "typescript",   "replace": "TypeScript",  "caseSensitive": false, "regex": false },
+    { "find": "swiftui",      "replace": "SwiftUI",     "caseSensitive": false, "regex": false },
+    { "find": "macos",        "replace": "macOS",       "caseSensitive": false, "regex": false },
+    { "find": "ios",          "replace": "iOS",         "caseSensitive": false, "regex": false },
+    { "find": "i pad os",     "replace": "iPadOS",      "caseSensitive": false, "regex": false },
+    { "find": "tv os",        "replace": "tvOS",        "caseSensitive": false, "regex": false },
+    { "find": "watch os",     "replace": "watchOS",     "caseSensitive": false, "regex": false },
+    { "find": "ssh",          "replace": "SSH",         "caseSensitive": false, "regex": false },
+    { "find": "tls",          "replace": "TLS",         "caseSensitive": false, "regex": false },
+    { "find": "json",         "replace": "JSON",        "caseSensitive": false, "regex": false },
+    { "find": "yaml",         "replace": "YAML",        "caseSensitive": false, "regex": false },
+    { "find": "url",          "replace": "URL",         "caseSensitive": false, "regex": false },
+    { "find": "uuid",         "replace": "UUID",        "caseSensitive": false, "regex": false },
+    { "find": "api",          "replace": "API",         "caseSensitive": false, "regex": false },
+    { "find": "sdk",          "replace": "SDK",         "caseSensitive": false, "regex": false }
+  ]
+}

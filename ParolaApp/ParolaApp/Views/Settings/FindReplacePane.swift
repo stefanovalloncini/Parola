@@ -37,13 +37,33 @@ struct FindReplacePane: View {
                 }
             }
 
-            Button {
-                model.findReplaceRules.append(FindReplaceRule(find: "", replace: ""))
-            } label: {
-                Label("Add rule", systemImage: "plus.circle")
+            HStack(spacing: 8) {
+                Button {
+                    model.findReplaceRules.append(FindReplaceRule(find: "", replace: ""))
+                } label: {
+                    Label("Add rule", systemImage: "plus.circle")
+                }
+                Spacer()
+                Menu {
+                    Button("Tech terms (English)") { model.importBundledTermPack(named: "tech-terms-en") }
+                    Button("Termini tecnici (Italiano)") { model.importBundledTermPack(named: "tech-terms-it") }
+                    Divider()
+                    Button("Import from file…") { model.presentTermPackImporter() }
+                } label: {
+                    Label("Import pack", systemImage: "tray.and.arrow.down")
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+
+                Button {
+                    model.presentTermPackExporter()
+                } label: {
+                    Label("Export pack", systemImage: "tray.and.arrow.up")
+                }
+                .disabled(model.findReplaceRules.isEmpty)
             }
 
-            SettingHelper(text: "Substitutions applied to every new transcript before it's saved.")
+            SettingHelper(text: "Substitutions applied to every new transcript before it's saved. Term packs add curated rules in one click.")
         }
     }
 

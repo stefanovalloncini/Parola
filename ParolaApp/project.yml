@@ -31,6 +31,10 @@ targets:
       - path: ParolaApp
         excludes:
           - "Resources/Assets.xcassets/AppIcon.appiconset/.gitkeep"
+      - path: ParolaApp/Resources/tech-terms-en.json
+        buildPhase: resources
+      - path: ParolaApp/Resources/tech-terms-it.json
+        buildPhase: resources
     info:
       path: ParolaApp/Info.plist
       properties:
