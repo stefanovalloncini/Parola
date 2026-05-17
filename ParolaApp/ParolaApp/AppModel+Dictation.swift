@@ -105,6 +105,7 @@ extension AppModel {
             Task { await coord.stopMonitoring() }
             dictationCoordinator = nil
         }
+        stopDictationPartialStream()
         hideDictationHUD()
         dictationState = .idle
     }
@@ -117,12 +118,14 @@ extension AppModel {
         case .listening:
             showDictationHUD(state: state)
             startDictationLevelStream()
+            startDictationPartialStream()
         case .transcribing:
             showDictationHUD(state: state)
             stopDictationLevelStream()
         case .failed:
             showDictationHUD(state: state)
             stopDictationLevelStream()
+            stopDictationPartialStream()
             Task {
                 try? await Task.sleep(for: .seconds(3))
                 if case .failed = self.dictationState { self.hideDictationHUD() }
@@ -152,6 +155,29 @@ extension AppModel {
         dictationAudioLevel = 0
     }
 
+    private func startDictationPartialStream() {
+        guard let coord = dictationCoordinator else { return }
+        dictationPartialTask?.cancel()
+        dictationPartialText = ""
+        dictationPartialTask = Task { [weak self] in
+            let stream = await coord.partials()
+            for await text in stream {
+                await MainActor.run {
+                    guard let self else { return }
+                    if self.dictationPartialText != text {
+                        self.dictationPartialText = text
+                    }
+                }
+            }
+        }
+    }
+
+    private func stopDictationPartialStream() {
+        dictationPartialTask?.cancel()
+        dictationPartialTask = nil
+        dictationPartialText = ""
+    }
+
     private func showDictationHUD(state: DictationCoordinator.State) {
         if dictationHUD == nil {
             let model = self
@@ -163,6 +189,7 @@ extension AppModel {
             if let host = panel.contentView as? NSHostingView<DictationView> {
                 host.rootView = DictationView(state: state, model: self)
             }
+            resizeDictationHUDForPartial()
             if let screen = NSScreen.main {
                 let frame = screen.visibleFrame
                 let panelFrame = panel.frame
@@ -172,6 +199,21 @@ extension AppModel {
             }
             panel.orderFrontRegardless()
         }
+    }
+
+    func resizeDictationHUDForPartial() {
+        guard let panel = dictationHUD else { return }
+        let hasPartial = !dictationPartialText.isEmpty
+        let target = NSSize(
+            width: hasPartial ? 332 : 268,
+            height: hasPartial ? 78 : 64
+        )
+        guard panel.frame.size != target else { return }
+        var newFrame = panel.frame
+        let oldCenterX = newFrame.midX
+        newFrame.size = target
+        newFrame.origin.x = oldCenterX - target.width / 2
+        panel.setFrame(newFrame, display: true, animate: true)
     }
 
     private func hideDictationHUD() {

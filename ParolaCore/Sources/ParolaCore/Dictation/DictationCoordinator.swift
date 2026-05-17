@@ -75,6 +75,10 @@ public actor DictationCoordinator {
         await recorder.levels()
     }
 
+    public func partials() async -> AsyncStream<String> {
+        await recorder.partials()
+    }
+
     func handle(_ event: HotkeyEvent) async {
         switch event {
         case .press:

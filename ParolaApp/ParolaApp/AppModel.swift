@@ -179,9 +179,17 @@ final class AppModel: ObservableObject {
 
     @Published var dictationState: DictationCoordinator.State = .idle
     @Published var dictationAudioLevel: Float = 0
+    @Published var dictationPartialText: String = "" {
+        didSet {
+            if oldValue.isEmpty != dictationPartialText.isEmpty {
+                resizeDictationHUDForPartial()
+            }
+        }
+    }
     var dictationCoordinator: DictationCoordinator?
     var dictationHUD: NSPanel?
     var dictationLevelTask: Task<Void, Never>?
+    var dictationPartialTask: Task<Void, Never>?
 
     // MARK: - Meeting detection
 

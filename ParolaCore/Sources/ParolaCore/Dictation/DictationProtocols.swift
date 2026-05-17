@@ -21,10 +21,16 @@ public protocol DictationRecorder: Sendable {
     func stopAndTranscribe() async throws -> String
     /// Emits a normalised 0...1 amplitude per captured audio buffer while recording.
     func levels() async -> AsyncStream<Float>
+    /// Emits partial transcription text as the recorder receives confidence-rising guesses.
+    /// May emit nothing for non-streaming backends.
+    func partials() async -> AsyncStream<String>
 }
 
 public extension DictationRecorder {
     func levels() async -> AsyncStream<Float> {
+        AsyncStream { $0.finish() }
+    }
+    func partials() async -> AsyncStream<String> {
         AsyncStream { $0.finish() }
     }
 }

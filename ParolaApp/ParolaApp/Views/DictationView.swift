@@ -9,30 +9,48 @@ struct DictationView: View {
     @State private var startedAt: Date = Date()
 
     var body: some View {
-        HStack(spacing: 12) {
-            indicator
-                .frame(width: 28, height: 20)
-            statusLabel
-                .foregroundStyle(.white)
-            Spacer(minLength: 0)
-            timer
-                .foregroundStyle(.white.opacity(0.7))
-            stopButton
+        VStack(alignment: .leading, spacing: hasPartial ? 6 : 0) {
+            HStack(spacing: 12) {
+                indicator
+                    .frame(width: 28, height: 20)
+                statusLabel
+                    .foregroundStyle(.white)
+                Spacer(minLength: 0)
+                timer
+                    .foregroundStyle(.white.opacity(0.7))
+                stopButton
+            }
+            .frame(height: 32)
+            if hasPartial {
+                Text(model.dictationPartialText)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .transition(.opacity)
+            }
         }
         .padding(.horizontal, 18)
-        .frame(width: 256, height: 56)
+        .padding(.vertical, 12)
+        .frame(width: hasPartial ? 320 : 256, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(Color.black.opacity(0.85))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(.white.opacity(0.08), lineWidth: 1)
         )
+        .animation(.easeOut(duration: 0.18), value: hasPartial)
         .padding(4)
         .onChange(of: state) { _, newValue in
             if case .listening = newValue { startedAt = Date() }
         }
+    }
+
+    private var hasPartial: Bool {
+        !model.dictationPartialText.isEmpty
     }
 
     @ViewBuilder
