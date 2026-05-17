@@ -19,6 +19,7 @@ final class DictationController: ObservableObject {
     }
 
     var configuration: Configuration?
+    weak var appModel: AppModel?
 
     struct Configuration {
         var modelName: String
@@ -178,24 +179,19 @@ final class DictationController: ObservableObject {
     }
 
     private func showHUD(state: DictationCoordinator.State) {
-        if hud == nil, let model = appModel {
+        guard let model = appModel else { return }
+        if hud == nil {
             hud = DictationHUD.make { [weak self] in
-                if let self {
-                    return DictationView(state: self.state, model: model)
-                }
-                return DictationView(state: .idle, model: model)
+                DictationView(state: self?.state ?? .idle, model: model)
             }
         }
-        if let panel = hud, let model = appModel {
-            if let host = panel.contentView as? NSHostingView<DictationView> {
-                host.rootView = DictationView(state: state, model: model)
-            }
-            panel.setFrame(preferredHUDFrame(), display: true, animate: false)
-            panel.orderFrontRegardless()
+        guard let panel = hud else { return }
+        if let host = panel.contentView as? NSHostingView<DictationView> {
+            host.rootView = DictationView(state: state, model: model)
         }
+        panel.setFrame(preferredHUDFrame(), display: true, animate: false)
+        panel.orderFrontRegardless()
     }
-
-    weak var appModel: AppModel?
 
     private func resizeHUDForPartial() {
         guard let panel = hud else { return }

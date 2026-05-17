@@ -50,15 +50,17 @@ final class ParolaTestBridge {
 
     func start(onPortReady: (@MainActor (UInt16) -> Void)? = nil) {
         self.onPortReady = onPortReady
-        listener.stateUpdateHandler = { [weak self] state in
-            guard let self else { return }
+        listener.stateUpdateHandler = { state in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 if case .ready = state, let port = self.listener.port {
                     let portString = "\(port.rawValue)"
                     try? portString.write(to: self.portFileURL, atomically: true, encoding: .utf8)
                     try? self.authToken.write(to: self.tokenFileURL, atomically: true, encoding: .utf8)
-                    self.restrictTokenPermissions()
+                    try? FileManager.default.setAttributes(
+                        [.posixPermissions: 0o600],
+                        ofItemAtPath: self.tokenFileURL.path
+                    )
                     FileHandle.standardError.write(
                         Data("[ParolaTestBridge] listening on 127.0.0.1:\(portString)\n".utf8)
                     )
@@ -66,16 +68,12 @@ final class ParolaTestBridge {
                 }
             }
         }
-        listener.newConnectionHandler = { [weak self] conn in
+        listener.newConnectionHandler = { conn in
             Task { @MainActor [weak self] in
                 self?.accept(conn)
             }
         }
         listener.start(queue: .main)
-    }
-
-    private func restrictTokenPermissions() {
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tokenFileURL.path)
     }
 
     func stop() {
@@ -91,7 +89,7 @@ final class ParolaTestBridge {
     private func accept(_ conn: NWConnection) {
         let key = ObjectIdentifier(conn)
         connections[key] = conn
-        conn.stateUpdateHandler = { [weak self] state in
+        conn.stateUpdateHandler = { state in
             switch state {
             case .failed, .cancelled:
                 Task { @MainActor [weak self] in
