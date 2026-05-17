@@ -1,19 +1,23 @@
 import Foundation
 import ParolaCore
+import ParolaMCP
 
 actor MCPServer {
     private let session: TranscriptionSession
     private let modelStore: ModelStore
     private let libraryStore: LibraryStore?
+    private let bridge: any BridgeProtocol
 
     init(
         session: TranscriptionSession = TranscriptionSession(),
         modelStore: ModelStore = .shared,
-        libraryStore: LibraryStore? = nil
+        libraryStore: LibraryStore? = nil,
+        bridge: any BridgeProtocol = BridgeClient()
     ) {
         self.session = session
         self.modelStore = modelStore
         self.libraryStore = libraryStore
+        self.bridge = bridge
     }
 
     func handle(_ request: JSONRPCRequest) async -> JSONRPCResponse? {
@@ -23,7 +27,7 @@ actor MCPServer {
         case "notifications/initialized":
             return nil
         case "tools/list":
-            return JSONRPCResponse.success(id: request.id, result: listToolsResult())
+            return JSONRPCResponse.success(id: request.id, result: MCPListToolsResult(tools: ToolRegistry.allTools()))
         case "tools/call":
             return await callTool(request)
         case "shutdown":
@@ -45,10 +49,6 @@ actor MCPServer {
         )
     }
 
-    private func listToolsResult() -> MCPListToolsResult {
-        MCPListToolsResult(tools: Tools.all())
-    }
-
     private func callTool(_ request: JSONRPCRequest) async -> JSONRPCResponse {
         guard let params = request.params?.value as? [String: Any],
               let name = params["name"] as? String else {
@@ -62,20 +62,11 @@ actor MCPServer {
 
         do {
             let result: MCPToolCallResult
-            switch name {
-            case "parola_transcribe":
-                result = try await transcribe(args: args)
-            case "parola_list_models":
-                result = listModels()
-            case "parola_list_engines":
-                result = await listEngines()
-            case "parola_search_library":
-                result = await searchLibrary(args: args)
-            case "parola_list_recent":
-                result = await listRecent(args: args)
-            case "parola_summarize":
-                result = try await summarize(args: args)
-            default:
+            if let engineTool = EngineTool(rawValue: name) {
+                result = try await invoke(engineTool, args: args)
+            } else if let appTool = AppTools.byName[name] {
+                result = try await appTool.invoke(args: args, bridge: bridge)
+            } else {
                 return JSONRPCResponse.failure(
                     id: request.id,
                     code: RPCErrorCode.invalidParams,
@@ -91,7 +82,18 @@ actor MCPServer {
         }
     }
 
-    // MARK: - Tool implementations
+    private func invoke(_ tool: EngineTool, args: [String: Any]) async throws -> MCPToolCallResult {
+        switch tool {
+        case .transcribe:    return try await transcribe(args: args)
+        case .listModels:    return listModels()
+        case .listEngines:   return await listEngines()
+        case .searchLibrary: return await searchLibrary(args: args)
+        case .listRecent:    return await listRecent(args: args)
+        case .summarize:     return try await summarize(args: args)
+        }
+    }
+
+    // MARK: - Engine tool implementations
 
     private func transcribe(args: [String: Any]) async throws -> MCPToolCallResult {
         guard let path = args["path"] as? String, !path.isEmpty else {

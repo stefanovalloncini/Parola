@@ -26,6 +26,10 @@ let package = Package(
                 .product(name: "FluidAudio", package: "FluidAudio"),
             ]
         ),
+        .target(
+            name: "ParolaMCP",
+            dependencies: ["ParolaCore"]
+        ),
         .executableTarget(
             name: "parola",
             dependencies: [
@@ -35,12 +39,16 @@ let package = Package(
         ),
         .executableTarget(
             name: "parola-mcp",
-            dependencies: ["ParolaCore"]
+            dependencies: ["ParolaCore", "ParolaMCP"]
         ),
         .testTarget(
             name: "ParolaCoreTests",
             dependencies: ["ParolaCore"],
             resources: [.process("Resources")]
+        ),
+        .testTarget(
+            name: "ParolaMCPTests",
+            dependencies: ["ParolaMCP"]
         ),
     ]
 )
