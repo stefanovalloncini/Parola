@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 enum YouTubeProcess {
@@ -49,3 +50,4 @@ enum YouTubeProcess {
         return env
     }
 }
+#endif
