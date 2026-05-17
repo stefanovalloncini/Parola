@@ -8,12 +8,20 @@ struct ChatPane: View {
     @State private var input: String = ""
     @State private var isSending: Bool = false
     @State private var displayedHistory: [ChatMessage] = []
+    @State private var isSearching: Bool = false
+    @State private var searchQuery: String = ""
+    @State private var senderFilter: ChatSenderFilter = .all
     @FocusState private var composerFocused: Bool
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             header
             Divider().opacity(0.4)
+            if isSearching {
+                searchBar
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
             content
         }
         .background(DS.Color.surface)
@@ -25,6 +33,15 @@ struct ChatPane: View {
             Text("Chat")
                 .font(DS.Font.heading)
             Spacer()
+            Button(action: toggleSearch) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(isSearching ? DS.Color.accent : DS.Color.secondaryText)
+            }
+            .buttonStyle(.plain)
+            .help("Search chat (⌘F)")
+            .keyboardShortcut("f", modifiers: [.command])
+
             Button(role: .destructive, action: resetConversation) {
                 Image(systemName: "arrow.counterclockwise")
                     .font(.system(size: 13, weight: .medium))
@@ -36,6 +53,45 @@ struct ChatPane: View {
         }
         .padding(.horizontal, DS.Spacing.medium)
         .padding(.vertical, DS.Spacing.regular)
+    }
+
+    private var searchBar: some View {
+        HStack(spacing: DS.Spacing.small) {
+            ChatSearchPill {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.secondary)
+                TextField("Filter messages", text: $searchQuery)
+                    .textFieldStyle(.plain)
+                    .focused($searchFocused)
+                if !searchQuery.isEmpty {
+                    Button {
+                        searchQuery = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Clear")
+                }
+            }
+
+            ChatSenderChip(selection: $senderFilter)
+
+            Button(action: toggleSearch) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.escape, modifiers: [])
+            .help("Close search")
+        }
+        .padding(.horizontal, DS.Spacing.medium)
+        .padding(.vertical, DS.Spacing.small)
+        .background(DS.Color.surface)
     }
 
     @ViewBuilder
@@ -50,15 +106,32 @@ struct ChatPane: View {
         }
     }
 
+    private var filteredHistory: [ChatMessage] {
+        let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        return displayedHistory.filter { msg in
+            guard senderFilter.matches(msg.role) else { return false }
+            if trimmed.isEmpty { return true }
+            return msg.text.range(of: trimmed, options: .caseInsensitive) != nil
+        }
+    }
+
+    private var hasActiveFilter: Bool {
+        !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || senderFilter != .all
+    }
+
     private var messages: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 4) {
+                    let visible = filteredHistory
                     if displayedHistory.isEmpty {
                         ChatHint()
                             .padding(.top, DS.Spacing.xlarge)
+                    } else if hasActiveFilter && visible.isEmpty {
+                        ContentUnavailableView.search(text: searchQuery)
+                            .padding(.top, DS.Spacing.xlarge)
                     }
-                    ForEach(displayedHistory) { msg in
+                    ForEach(visible) { msg in
                         ChatBubble(message: msg).id(msg.id)
                     }
                     if isSending {
@@ -119,6 +192,19 @@ struct ChatPane: View {
         input.trimmingCharacters(in: .whitespaces).isEmpty || isSending
     }
 
+    private func toggleSearch() {
+        withAnimation(.easeOut(duration: 0.18)) {
+            isSearching.toggle()
+        }
+        if isSearching {
+            searchFocused = true
+        } else {
+            searchQuery = ""
+            senderFilter = .all
+            searchFocused = false
+        }
+    }
+
     private func scrollToEnd(proxy: ScrollViewProxy) {
         withAnimation(.easeOut(duration: 0.2)) {
             if isSending {
@@ -173,6 +259,89 @@ struct ChatPane: View {
                 isSending = false
             }
         }
+    }
+}
+
+private enum ChatSenderFilter: CaseIterable, Hashable {
+    case all, user, assistant
+
+    var label: String {
+        switch self {
+        case .all: return "All"
+        case .user: return "User"
+        case .assistant: return "Assistant"
+        }
+    }
+
+    func matches(_ role: ChatMessage.Role) -> Bool {
+        switch self {
+        case .all: return true
+        case .user: return role == .user
+        case .assistant: return role == .assistant
+        }
+    }
+}
+
+private struct ChatSearchPill<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(spacing: 8) { content }
+            .padding(.horizontal, 10)
+            .frame(height: 28)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(DS.Color.surfaceElevated.opacity(0.85))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(DS.Color.separator.opacity(0.4), lineWidth: 0.5)
+            )
+    }
+}
+
+private struct ChatSenderChip: View {
+    @Binding var selection: ChatSenderFilter
+
+    var body: some View {
+        Menu {
+            ForEach(ChatSenderFilter.allCases, id: \.self) { option in
+                Button {
+                    selection = option
+                } label: {
+                    if option == selection {
+                        Label(option.label, systemImage: "checkmark")
+                    } else {
+                        Text(option.label)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "person.crop.circle")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(selection.label)
+                    .font(DS.Font.caption)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 28)
+            .foregroundStyle(selection == .all ? Color.primary.opacity(0.85) : Color.white)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(selection == .all ? DS.Color.surfaceElevated.opacity(0.85) : DS.Color.accent)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(DS.Color.separator.opacity(0.4), lineWidth: 0.5)
+            )
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Filter by sender")
     }
 }
 
