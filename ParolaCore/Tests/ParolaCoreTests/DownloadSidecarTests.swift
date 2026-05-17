@@ -71,10 +71,8 @@ struct DownloadSidecarTests {
             try await task.value
             Issue.record("expected the task to throw")
         } catch is CancellationError {
-            // expected
         } catch {
-            // network error before cancellation took effect is also acceptable here;
-            // the point is the task did not run to completion.
+            // Network error before cancellation took effect is also acceptable; the task did not complete.
         }
     }
 }
