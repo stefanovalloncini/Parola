@@ -4,7 +4,7 @@ public enum YouTubeChapters {
     public static func generate(for transcript: Transcript, model: any LanguageModel) async throws -> String {
         var input = ""
         for segment in transcript.segments {
-            let ts = formatTimestamp(segment.start)
+            let ts = Timecode.format(segment.start)
             input += "\(ts)  \(segment.text.trimmingCharacters(in: .whitespacesAndNewlines))\n"
         }
         let envelope = """
@@ -14,14 +14,5 @@ public enum YouTubeChapters {
         \(input)
         """
         return try await model.respond(to: envelope)
-    }
-
-    private static func formatTimestamp(_ seconds: Double) -> String {
-        let total = Int(seconds)
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
-        return String(format: "%02d:%02d", m, s)
     }
 }

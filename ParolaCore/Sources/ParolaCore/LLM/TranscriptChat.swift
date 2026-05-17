@@ -22,7 +22,7 @@ public enum TranscriptChat {
 
         """
         for segment in transcript.segments {
-            let ts = formatTimestamp(segment.start)
+            let ts = Timecode.format(segment.start)
             let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
             out += "\(ts)  \(body)\n"
         }
@@ -46,14 +46,6 @@ public enum TranscriptChat {
         throw TranscriptChatSession.FailureReason.notAvailable("Foundation Models requires macOS 26 / iOS 26 or newer.")
     }
 
-    private static func formatTimestamp(_ seconds: Double) -> String {
-        let total = Int(seconds)
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
-        return String(format: "%02d:%02d", m, s)
-    }
 }
 
 #if canImport(FoundationModels)

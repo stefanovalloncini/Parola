@@ -66,7 +66,7 @@ public actor SummaryService {
     static func buildPrompt(for transcript: Transcript) -> String {
         var out = "Transcript follows. Each line is prefixed with its timestamp.\n\n"
         for segment in transcript.segments {
-            out += "\(SummaryService.formatTimestamp(segment.start))  \(segment.text.trimmingCharacters(in: .whitespaces))\n"
+            out += "\(Timecode.format(segment.start))  \(segment.text.trimmingCharacters(in: .whitespaces))\n"
         }
         return out
     }
@@ -144,14 +144,6 @@ public actor SummaryService {
         }
     }
 
-    static func formatTimestamp(_ seconds: Double) -> String {
-        let total = Int(seconds)
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
-        return String(format: "%02d:%02d", m, s)
-    }
 }
 #else
 /// Stub for platforms without FoundationModels (theoretically unreachable on iOS 17 / macOS 14).
