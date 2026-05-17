@@ -72,6 +72,8 @@ public actor YouTubeAudioSource: AudioSource {
             url.absoluteString,
         ]
 
+        process.environment = YouTubeProcess.augmentedEnvironment()
+
         let stdout = Pipe()
         let stderr = Pipe()
         process.standardOutput = stdout
