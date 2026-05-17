@@ -190,6 +190,10 @@ final class AppModel: ObservableObject {
     @Published var searchResults: [LibraryEntry]?
     @Published var selectedEntryID: LibraryEntry.ID?
     @Published var libraryFilter: EntryCategory?
+    @Published var librarySortOrder: LibrarySortOrder = .newest {
+        didSet { reapplyLibrarySort() }
+    }
+    var libraryBundleSizes: [String: Int64] = [:]
     var searchTask: Task<Void, Never>?
     static let trashRetentionDays = 30
 

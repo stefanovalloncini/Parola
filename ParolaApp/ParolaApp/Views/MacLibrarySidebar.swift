@@ -12,6 +12,10 @@ struct MacLibrarySidebar: View {
             searchField
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
+                .padding(.bottom, 8)
+
+            filterRow
+                .padding(.horizontal, 12)
                 .padding(.bottom, 10)
 
             ScrollView {
@@ -34,26 +38,6 @@ struct MacLibrarySidebar: View {
                         selectedRoute = .queue
                         model.route = .queue
                     }
-
-                    SectionLabel("History").padding(.top, 14)
-
-                    SidebarRow(
-                        title: "Transcriptions",
-                        systemImage: "text.alignleft",
-                        isSelected: selectedRoute == .category(.transcription)
-                    ) { selectedRoute = .category(.transcription) }
-
-                    SidebarRow(
-                        title: "Meetings",
-                        systemImage: "person.2.fill",
-                        isSelected: selectedRoute == .category(.meeting)
-                    ) { selectedRoute = .category(.meeting) }
-
-                    SidebarRow(
-                        title: "Dictations",
-                        systemImage: "text.cursor",
-                        isSelected: selectedRoute == .category(.dictation)
-                    ) { selectedRoute = .category(.dictation) }
 
                     SidebarRow(
                         title: "Recently Deleted",
@@ -129,6 +113,51 @@ struct MacLibrarySidebar: View {
         )
     }
 
+    private var filterRow: some View {
+        HStack(spacing: 6) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    FilterChip(title: "All", isSelected: model.libraryFilter == nil) {
+                        model.libraryFilter = nil
+                    }
+                    FilterChip(title: "Transcriptions", isSelected: model.libraryFilter == .transcription) {
+                        model.libraryFilter = .transcription
+                    }
+                    FilterChip(title: "Meetings", isSelected: model.libraryFilter == .meeting) {
+                        model.libraryFilter = .meeting
+                    }
+                    FilterChip(title: "Dictations", isSelected: model.libraryFilter == .dictation) {
+                        model.libraryFilter = .dictation
+                    }
+                }
+            }
+            sortMenu
+        }
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort", selection: $model.librarySortOrder) {
+                ForEach(LibrarySortOrder.allCases) { order in
+                    Text(order.label).tag(order)
+                }
+            }
+        } label: {
+            Image(systemName: "chevron.up.arrow.down")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 22, height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(DS.Color.surfaceElevated)
+                )
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Sort")
+    }
+
     private var bottomPills: some View {
         VStack(spacing: 6) {
             PillRow(title: "Support", systemImage: "questionmark.circle.fill") { }
@@ -144,7 +173,6 @@ struct MacLibrarySidebar: View {
 private enum SidebarRoute: Hashable {
     case home
     case queue
-    case category(EntryCategory)
     case recentlyDeleted
     case addPeople
 }
@@ -203,6 +231,36 @@ private struct SidebarRow: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .fill(Color.primary.opacity(0.06))
         }
+    }
+}
+
+private struct FilterChip: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.85))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule(style: .continuous).fill(background)
+                )
+                .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+    }
+
+    private var background: Color {
+        if isSelected { return DS.Color.accent.opacity(0.85) }
+        if isHovering { return DS.Color.surfaceElevated }
+        return Color.primary.opacity(0.06)
     }
 }
 
