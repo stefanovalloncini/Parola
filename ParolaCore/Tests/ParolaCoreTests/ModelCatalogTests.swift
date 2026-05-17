@@ -7,7 +7,7 @@ struct ModelCatalogTests {
     @Test("catalog includes Whisper Large v3 Turbo as the Recommended entry")
     func recommendedIsTurbo() {
         let recommended = ModelCatalog.all.filter { $0.category == .recommended }
-        #expect(recommended.contains { $0.id == "openai_whisper-large-v3-turbo" })
+        #expect(recommended.contains { $0.id == "openai_whisper-large-v3_turbo" })
         #expect(recommended.count == 1)
     }
 

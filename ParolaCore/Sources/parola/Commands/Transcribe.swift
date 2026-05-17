@@ -11,7 +11,7 @@ struct Transcribe: AsyncParsableCommand {
     @Argument(help: "Path to one or more audio/video files, or a single YouTube URL. Multiple paths require --output-dir.")
     var inputs: [String]
 
-    @Option(name: .shortAndLong, help: "Model variant (e.g. openai_whisper-tiny, openai_whisper-large-v3-turbo).")
+    @Option(name: .shortAndLong, help: "Model variant (e.g. openai_whisper-tiny, openai_whisper-large-v3_turbo).")
     var model: String = "openai_whisper-tiny"
 
     @Option(name: .shortAndLong, help: "Language code (e.g. en, it, fr). Omit to auto-detect.")

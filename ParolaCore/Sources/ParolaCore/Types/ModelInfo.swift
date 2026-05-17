@@ -70,7 +70,7 @@ public extension ModelInfo {
             isInstalled: false
         ),
         ModelInfo(
-            name: "openai_whisper-large-v3-turbo",
+            name: "openai_whisper-large-v3_turbo",
             label: "Whisper Large v3 Turbo (recommended)",
             approximateSizeBytes: 1_600 * 1_000_000,
             isMultilingual: true,

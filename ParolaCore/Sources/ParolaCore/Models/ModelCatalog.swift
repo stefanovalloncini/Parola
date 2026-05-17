@@ -3,12 +3,12 @@ import Foundation
 public enum ModelCatalog {
     public static let all: [ModelVariant] = [
         ModelVariant(
-            id: "openai_whisper-large-v3-turbo",
+            id: "openai_whisper-large-v3_turbo",
             displayName: "Whisper Large v3 Turbo",
             tagline: "Best balance for most people",
             engineID: .whisperKit,
             sizeBytes: 1_600_000_000,
-            downloadSource: whisperKitSource("openai_whisper-large-v3-turbo"),
+            downloadSource: whisperKitSource("openai_whisper-large-v3_turbo"),
             category: .recommended,
             speedTier: .fast,
             qualityTier: .best,
