@@ -58,10 +58,10 @@ final class LiveCaptionsController: ObservableObject {
             do {
                 let events = try await s.start(options: options, downloadProgress: { _ in })
                 for await event in events {
-                    await self?.handle(event)
+                    self?.handle(event)
                 }
             } catch {
-                await self?.handleError(error.localizedDescription)
+                self?.handleError(error.localizedDescription)
             }
         }
     }
