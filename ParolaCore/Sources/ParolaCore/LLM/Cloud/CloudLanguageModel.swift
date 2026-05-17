@@ -82,11 +82,19 @@ public struct CloudLanguageModel: LanguageModel {
     ) throws -> (URLRequest, (Data) throws -> String) {
         switch provider {
         case .openAI:
-            return try buildOpenAIRequest(history: history, streaming: streaming)
+            return try buildOpenAICompatibleRequest(
+                url: "https://api.openai.com/v1/chat/completions",
+                history: history,
+                streaming: streaming
+            )
+        case .groq:
+            return try buildOpenAICompatibleRequest(
+                url: "https://api.groq.com/openai/v1/chat/completions",
+                history: history,
+                streaming: streaming
+            )
         case .anthropic:
             return try buildAnthropicRequest(history: history, streaming: streaming)
-        case .groq:
-            return try buildGroqRequest(history: history, streaming: streaming)
         default:
             throw CloudLLMError.unsupportedProvider(provider)
         }
@@ -95,16 +103,14 @@ public struct CloudLanguageModel: LanguageModel {
     func buildStreamingRequest(
         history: [ChatTurn]
     ) throws -> (URLRequest, @Sendable (String) -> String?) {
+        let parser: @Sendable (String) -> String?
         switch provider {
-        case .openAI, .groq:
-            let (request, _) = try buildRequest(history: history, streaming: true)
-            return (request, Self.parseOpenAIStreamLine)
-        case .anthropic:
-            let (request, _) = try buildAnthropicRequest(history: history, streaming: true)
-            return (request, Self.parseAnthropicStreamLine)
-        default:
-            throw CloudLLMError.unsupportedProvider(provider)
+        case .openAI, .groq: parser = Self.parseOpenAIStreamLine
+        case .anthropic: parser = Self.parseAnthropicStreamLine
+        default: throw CloudLLMError.unsupportedProvider(provider)
         }
+        let (request, _) = try buildRequest(history: history, streaming: true)
+        return (request, parser)
     }
 
     private func openAIMessages(history: [ChatTurn]) -> [[String: String]] {
@@ -119,11 +125,12 @@ public struct CloudLanguageModel: LanguageModel {
         history.map { ["role": $0.role == .user ? "user" : "assistant", "content": $0.text] }
     }
 
-    private func buildOpenAIRequest(
+    private func buildOpenAICompatibleRequest(
+        url: String,
         history: [ChatTurn],
         streaming: Bool
     ) throws -> (URLRequest, (Data) throws -> String) {
-        var request = URLRequest(url: URL(string: "https://api.openai.com/v1/chat/completions")!)
+        var request = URLRequest(url: URL(string: url)!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
@@ -174,35 +181,6 @@ public struct CloudLanguageModel: LanguageModel {
             let decoded = try JSONDecoder().decode(Response.self, from: data)
             let text = decoded.content.compactMap { $0.text }.joined()
             guard !text.isEmpty else {
-                throw CloudLLMError.malformedResponse(provider: provider)
-            }
-            return text
-        })
-    }
-
-    private func buildGroqRequest(
-        history: [ChatTurn],
-        streaming: Bool
-    ) throws -> (URLRequest, (Data) throws -> String) {
-        var request = URLRequest(url: URL(string: "https://api.groq.com/openai/v1/chat/completions")!)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        var body: [String: Any] = [
-            "model": model,
-            "messages": openAIMessages(history: history)
-        ]
-        if streaming { body["stream"] = true }
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let provider = self.provider
-        return (request, { data in
-            struct Response: Decodable {
-                struct Choice: Decodable { let message: Message }
-                struct Message: Decodable { let content: String }
-                let choices: [Choice]
-            }
-            let decoded = try JSONDecoder().decode(Response.self, from: data)
-            guard let text = decoded.choices.first?.message.content else {
                 throw CloudLLMError.malformedResponse(provider: provider)
             }
             return text
