@@ -54,6 +54,9 @@ public actor TranscriptionSession {
 
         let audioURL = try await source.prepare()
         try Task.checkCancellation()
+        guard self.transcriberEngineID == engineID else {
+            throw ParolaError.transcriptionFailed("model was unloaded during transcribe")
+        }
         var transcript = try await transcriber.transcribe(url: audioURL, options: options)
         if options.diarize {
             try Task.checkCancellation()
