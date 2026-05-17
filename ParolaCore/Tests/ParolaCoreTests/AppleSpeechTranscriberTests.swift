@@ -40,4 +40,18 @@ struct AppleSpeechTranscriberTests {
         let store = ModelStore(modelsDirectory: tmp)
         #expect(store.isInstalled(AppleSpeechTranscriber.syntheticModelID))
     }
+
+    @Test("cancelInFlight without a running transcribe is a no-op")
+    func cancelInFlightIdle() async {
+        guard #available(macOS 26.0, iOS 26.0, *) else { return }
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let store = ModelStore(modelsDirectory: tmp)
+        let engine = AppleSpeechTranscriber(modelStore: store)
+        await engine.cancelInFlight()
+        let loaded = await engine.loadedModelName()
+        #expect(loaded == nil)
+    }
 }
