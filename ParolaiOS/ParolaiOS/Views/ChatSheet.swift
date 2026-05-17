@@ -2,6 +2,25 @@ import SwiftUI
 import ParolaCore
 
 struct ChatSheet: View {
+    enum SenderFilter: String, CaseIterable, Identifiable {
+        case all, you, assistant
+        var id: Self { self }
+        var label: String {
+            switch self {
+            case .all: return "All"
+            case .you: return "You"
+            case .assistant: return "Assistant"
+            }
+        }
+        func includes(_ role: ChatMessage.Role) -> Bool {
+            switch self {
+            case .all: return true
+            case .you: return role == .user
+            case .assistant: return role == .assistant
+            }
+        }
+    }
+
     let entry: LibraryEntry
     let transcript: Transcript
     @EnvironmentObject var model: AppModel
@@ -11,6 +30,17 @@ struct ChatSheet: View {
     @State private var input: String = ""
     @State private var isSending: Bool = false
     @State private var displayedHistory: [ChatMessage] = []
+    @State private var query: String = ""
+    @State private var senderFilter: SenderFilter = .all
+
+    private var filteredHistory: [ChatMessage] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return displayedHistory.filter { msg in
+            guard senderFilter.includes(msg.role) else { return false }
+            guard !trimmed.isEmpty else { return true }
+            return msg.text.localizedCaseInsensitiveContains(trimmed)
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -25,6 +55,7 @@ struct ChatSheet: View {
                     ProgressView()
                 } else {
                     VStack(spacing: 0) {
+                        senderFilterBar
                         messages
                         Divider()
                         composer
@@ -33,6 +64,7 @@ struct ChatSheet: View {
             }
             .navigationTitle("Chat")
             .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $query, prompt: "Search messages")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
@@ -40,6 +72,17 @@ struct ChatSheet: View {
             }
         }
         .task { await rebuildSession() }
+    }
+
+    private var senderFilterBar: some View {
+        Picker("Sender", selection: $senderFilter) {
+            ForEach(SenderFilter.allCases) { option in
+                Text(option.label).tag(option)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal)
+        .padding(.top, 8)
     }
 
     @ViewBuilder
@@ -53,8 +96,12 @@ struct ChatSheet: View {
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.top, 24)
+                    } else if filteredHistory.isEmpty {
+                        ContentUnavailableView.search(text: query)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 24)
                     }
-                    ForEach(displayedHistory) { msg in
+                    ForEach(filteredHistory) { msg in
                         ChatBubble(message: msg).id(msg.id)
                     }
                     if isSending {
