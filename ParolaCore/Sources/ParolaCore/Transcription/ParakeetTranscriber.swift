@@ -91,8 +91,9 @@ public actor ParakeetTranscriber: Transcriber {
     static let segmentGapThreshold: TimeInterval = 0.8
     static let maxTokensPerSegment: Int = 80
 
-    /// Group token timings into segments by detecting silence gaps (> 0.8 s) or
-    /// sentence-ending punctuation. Falls back to a single segment containing the full text.
+    /// Group token timings into segments. Splits on silence gaps over `segmentGapThreshold`
+    /// seconds or when a run reaches `maxTokensPerSegment`. Falls back to a single segment
+    /// containing the full text.
     static func makeSegments(from result: ASRResult, includeWords: Bool) -> [TranscriptSegment] {
         let trimmedText = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let timings = result.tokenTimings, !timings.isEmpty else {
