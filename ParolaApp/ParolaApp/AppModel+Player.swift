@@ -5,19 +5,26 @@ import ParolaCore
 
 extension AppModel {
 
-    func installPlayer(for url: URL) {
+    func tearDownPlayer() {
         if let obs = playerTimeObserver, let player {
             player.removeTimeObserver(obs)
         }
+        playerTimeObserver = nil
         timeControlObserver?.invalidate()
         timeControlObserver = nil
         player?.pause()
-        playerTimeObserver = nil
-        let p = AVPlayer(url: url)
-        player = p
+        player = nil
         hasVideo = false
         currentTimeSeconds = 0
         isPlaying = false
+        currentSegmentID = nil
+        currentWordID = nil
+    }
+
+    func installPlayer(for url: URL) {
+        tearDownPlayer()
+        let p = AVPlayer(url: url)
+        player = p
         playerInstallToken &+= 1
         let token = playerInstallToken
         let interval = CMTime(seconds: 0.2, preferredTimescale: 600)

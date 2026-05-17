@@ -1,7 +1,6 @@
 import AppKit
 import ParolaCore
 
-/// Hosts the macOS Services provider and wires Finder-originated requests into ``AppModel``.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private weak var model: AppModel?
@@ -36,7 +35,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// `@objc` shim exposed to AppKit's Services machinery.
 @MainActor
 final class ServicesProvider: NSObject {
     weak var model: AppModel?
@@ -62,8 +60,6 @@ final class ServicesProvider: NSObject {
         model.transcribe(fileURL: url, translateOverride: translate)
     }
 
-    /// Returns the first file URL on the pasteboard, accepting either modern `URL` items
-    /// or legacy `NSFilenamesPboardType` arrays.
     static func firstFileURL(from pasteboard: NSPasteboard) -> URL? {
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
            let url = urls.first {

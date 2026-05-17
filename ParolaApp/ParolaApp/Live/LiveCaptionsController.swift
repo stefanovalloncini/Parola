@@ -32,16 +32,9 @@ final class LiveCaptionsController: ObservableObject {
     }
 
     private func optionsWithTranslate(_ options: TranscriptionOptions) -> TranscriptionOptions {
-        TranscriptionOptions(
-            model: options.model,
-            language: options.language,
-            task: translateToEnglish ? .translate : .transcribe,
-            wordTimestamps: options.wordTimestamps,
-            verbose: options.verbose,
-            initialPrompt: options.initialPrompt,
-            diarize: options.diarize,
-            expectedSpeakers: options.expectedSpeakers
-        )
+        var copy = options
+        copy.task = translateToEnglish ? .translate : .transcribe
+        return copy
     }
 
     func start(options: TranscriptionOptions) async {

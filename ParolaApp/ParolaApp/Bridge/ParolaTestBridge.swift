@@ -5,13 +5,9 @@ import PDFKit
 import Security
 import ParolaCore
 
-/// TCP-loopback IPC server so external tooling (e.g. parola-mcp) can drive
-/// a running Parola.app. Speaks line-delimited JSON: `{id, cmd, args}` → `{id, ok, result|error}`.
-/// Port is written to `~/Library/Caches/Parola/bridge.port` on start.
-///
-/// Always available in Debug builds. In Release builds the user has to opt in via
-/// Settings → MCP & Automation; defaults to off so notarised binaries don't open a
-/// local listener without explicit consent.
+/// TCP-loopback IPC server for external tooling (e.g. parola-mcp). Line-delimited JSON,
+/// `{id, cmd, args, auth}` → `{id, ok, result|error}`. Writes the port to
+/// `~/Library/Caches/Parola/bridge.port` and the auth token to `bridge.token` on start.
 @MainActor
 final class ParolaTestBridge {
     static let serverVersion: Int = 1
@@ -54,15 +50,17 @@ final class ParolaTestBridge {
 
     func start(onPortReady: (@MainActor (UInt16) -> Void)? = nil) {
         self.onPortReady = onPortReady
-        listener.stateUpdateHandler = { [weak self] state in
-            guard let self else { return }
+        listener.stateUpdateHandler = { state in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 if case .ready = state, let port = self.listener.port {
                     let portString = "\(port.rawValue)"
                     try? portString.write(to: self.portFileURL, atomically: true, encoding: .utf8)
                     try? self.authToken.write(to: self.tokenFileURL, atomically: true, encoding: .utf8)
-                    self.restrictTokenPermissions()
+                    try? FileManager.default.setAttributes(
+                        [.posixPermissions: 0o600],
+                        ofItemAtPath: self.tokenFileURL.path
+                    )
                     FileHandle.standardError.write(
                         Data("[ParolaTestBridge] listening on 127.0.0.1:\(portString)\n".utf8)
                     )
@@ -70,7 +68,7 @@ final class ParolaTestBridge {
                 }
             }
         }
-        listener.newConnectionHandler = { [weak self] conn in
+        listener.newConnectionHandler = { conn in
             Task { @MainActor [weak self] in
                 self?.accept(conn)
             }
@@ -78,12 +76,6 @@ final class ParolaTestBridge {
         listener.start(queue: .main)
     }
 
-    private func restrictTokenPermissions() {
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tokenFileURL.path)
-    }
-
-    /// Tears down the listener and any open connections. Removes the port and token discovery
-    /// files so MCP clients can detect the bridge is gone.
     func stop() {
         listener.cancel()
         for conn in connections.values { conn.cancel() }
@@ -97,7 +89,7 @@ final class ParolaTestBridge {
     private func accept(_ conn: NWConnection) {
         let key = ObjectIdentifier(conn)
         connections[key] = conn
-        conn.stateUpdateHandler = { [weak self] state in
+        conn.stateUpdateHandler = { state in
             switch state {
             case .failed, .cancelled:
                 Task { @MainActor [weak self] in
@@ -623,8 +615,6 @@ final class ParolaTestBridge {
         }
     }
 
-    /// Keys the bridge is allowed to write through `setSetting`. Anything else is rejected to
-    /// keep MCP tooling from poking at arbitrary UserDefaults keys.
     static let writableSettingKeys: Set<String> = [
         "useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt",
         "diarize", "batchExportFormats", "batchExportToSourceFolder",
@@ -636,9 +626,6 @@ final class ParolaTestBridge {
         "transcriptDisplayMode",
     ]
 
-    /// Resolves a caller-supplied screenshot path to a location inside Parola's caches dir.
-    /// Absolute paths outside the sandbox are rejected so the bridge can't be used to overwrite
-    /// arbitrary files on disk.
     private func resolveScreenshotPath(_ requested: String?) throws -> URL {
         let caches = try FileManager.default.url(
             for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true
@@ -694,8 +681,7 @@ final class ParolaTestBridge {
     }
 
     private func state(of model: AppModel) -> [String: Any] {
-        // @AppStorage doesn't always reflect cross-context UserDefaults writes synchronously;
-        // read the persisted values directly for fields the bridge mutates.
+        // @AppStorage doesn't always reflect cross-context UserDefaults writes synchronously.
         let defaults = UserDefaults.standard
         let selectedModel = defaults.string(forKey: "selectedModel") ?? "openai_whisper-tiny"
         let language = defaults.string(forKey: "selectedLanguageRaw") ?? ""

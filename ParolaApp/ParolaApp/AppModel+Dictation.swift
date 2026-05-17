@@ -78,7 +78,6 @@ extension AppModel {
         }
     }
 
-    /// Bundle IDs the user has configured as workflow overrides beyond the four built-in seeds.
     func customDictationOverrideApps() -> [(bundleID: String, name: String)] {
         let seedIDs = Set(AppModel.dictationOverrideApps.map(\.bundleID))
         let map = dictationWorkflows()
@@ -102,10 +101,6 @@ extension AppModel {
     func wireDictationController() {
         dictationController.appModel = self
         dictationController.indicatorStyle = dictationIndicatorStyle
-        observeDictationController()
-    }
-
-    private func observeDictationController() {
         dictationController.$state
             .receive(on: RunLoop.main)
             .sink { [weak self] state in self?.dictationState = state }
@@ -120,7 +115,7 @@ extension AppModel {
             .store(in: &dictationCancellables)
     }
 
-    func restartDictationForWorkflowChange() {
+    func restartDictation() {
         guard dictationEnabled, dictationController.isRunning else { return }
         stopDictation()
         startDictation()
@@ -155,11 +150,6 @@ extension AppModel {
         dictationController.setMode(dictationMode)
     }
 
-    func restartDictationForKeyChange() {
-        guard dictationEnabled else { return }
-        stopDictation()
-        startDictation()
-    }
 
     private func currentDictationCleanupPrompt() -> Prompt? {
         guard let uuid = UUID(uuidString: dictationCleanupPromptID) else { return nil }

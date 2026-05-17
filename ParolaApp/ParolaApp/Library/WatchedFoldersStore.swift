@@ -132,15 +132,13 @@ final class WatchedFoldersStore: ObservableObject {
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: "watchedFolders"),
-              let stored = try? JSONDecoder().decode([WatchedFolder].self, from: data) else { return }
-        folders = stored
+        if let stored = AppModel.readJSON([WatchedFolder].self, forKey: "watchedFolders") {
+            folders = stored
+        }
     }
 
     private func save() {
-        if let data = try? JSONEncoder().encode(folders) {
-            UserDefaults.standard.set(data, forKey: "watchedFolders")
-        }
+        AppModel.writeJSON(folders, forKey: "watchedFolders")
     }
 
     func dismissError() {
