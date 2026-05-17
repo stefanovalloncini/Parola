@@ -7,15 +7,13 @@ extension AppModel {
     static let snippetsDefaultsKey = "snippets"
 
     func loadSnippets() {
-        guard let data = UserDefaults.standard.data(forKey: AppModel.snippetsDefaultsKey),
-              let decoded = try? JSONDecoder().decode([Snippet].self, from: data) else { return }
-        snippets = decoded
+        if let decoded = AppModel.readJSON([Snippet].self, forKey: AppModel.snippetsDefaultsKey) {
+            snippets = decoded
+        }
     }
 
     func saveSnippets() {
-        if let data = try? JSONEncoder().encode(snippets) {
-            UserDefaults.standard.set(data, forKey: AppModel.snippetsDefaultsKey)
-        }
+        AppModel.writeJSON(snippets, forKey: AppModel.snippetsDefaultsKey)
     }
 
     func makeSnippetExpander() -> SnippetExpander {

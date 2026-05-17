@@ -267,6 +267,17 @@ final class AppModel: ObservableObject {
         return UserDefaults.standard.integer(forKey: key)
     }
 
+    static func readJSON<T: Decodable>(_ type: T.Type, forKey key: String) -> T? {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+
+    static func writeJSON<T: Encodable>(_ value: T, forKey key: String) {
+        if let data = try? JSONEncoder().encode(value) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+
     // MARK: - Meeting detection
 
     @Published var meetingDetectedApp: String?
@@ -529,14 +540,8 @@ final class AppModel: ObservableObject {
                 phase = .ready
                 refreshModelList()
                 persistToLibrary(processed, audioSource: fileURL)
-            } catch is CancellationError {
-                phase = .idle
             } catch {
-                if Task.isCancelled {
-                    phase = .idle
-                } else {
-                    phase = .failed(message: error.localizedDescription)
-                }
+                applyTranscriptionError(error)
             }
             self.fileTranscribeTask = nil
         }
@@ -711,14 +716,8 @@ final class AppModel: ObservableObject {
                 phase = .ready
                 refreshModelList()
                 persistToLibrary(processed, audioSource: audioURL)
-            } catch is CancellationError {
-                phase = .idle
             } catch {
-                if Task.isCancelled {
-                    phase = .idle
-                } else {
-                    phase = .failed(message: error.localizedDescription)
-                }
+                applyTranscriptionError(error)
             }
             self.youtubeTranscribeTask = nil
         }
@@ -738,14 +737,8 @@ final class AppModel: ObservableObject {
                 transcript = processed
                 phase = .ready
                 persistToLibrary(processed, audioSource: nil)
-            } catch is CancellationError {
-                phase = .idle
             } catch {
-                if Task.isCancelled {
-                    phase = .idle
-                } else {
-                    phase = .failed(message: error.localizedDescription)
-                }
+                applyTranscriptionError(error)
             }
             self.youtubeSubsTask = nil
         }
@@ -758,6 +751,14 @@ final class AppModel: ObservableObject {
         }
         youtubeSheetOpen = false
         return url
+    }
+
+    private func applyTranscriptionError(_ error: Error) {
+        if error is CancellationError || Task.isCancelled {
+            phase = .idle
+        } else {
+            phase = .failed(message: error.localizedDescription)
+        }
     }
 
     func dismissError() {
