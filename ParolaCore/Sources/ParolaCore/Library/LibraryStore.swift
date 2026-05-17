@@ -31,10 +31,6 @@ public actor LibraryStore {
         self.libraryURL = libraryURL
         self.extraIndexer = extraIndexer
         try? FileManager.default.createDirectory(at: libraryURL, withIntermediateDirectories: true)
-        var url = libraryURL
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = false
-        try? url.setResourceValues(values)
         let indexURL = libraryURL.appendingPathComponent(".search-index.json")
         self.searchIndex = LibrarySearchIndex(indexURL: indexURL)
     }
@@ -190,9 +186,13 @@ public actor LibraryStore {
         primeCaches()
         let toPurge = (cachedDeleted ?? []).filter { ($0.deletedAt ?? .distantFuture) < cutoff }
         for entry in toPurge {
-            try? FileManager.default.removeItem(at: entry.bundleURL)
-            await searchIndex.remove(entry.id)
-            if let extraIndexer { await extraIndexer.deindex(id: entry.id) }
+            do {
+                try FileManager.default.removeItem(at: entry.bundleURL)
+                await searchIndex.remove(entry.id)
+                if let extraIndexer { await extraIndexer.deindex(id: entry.id) }
+            } catch {
+                continue
+            }
         }
         invalidateListCaches()
     }
