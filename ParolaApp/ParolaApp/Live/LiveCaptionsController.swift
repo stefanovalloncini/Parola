@@ -74,6 +74,7 @@ final class LiveCaptionsController: ObservableObject {
         }
         session = nil
         consumer?.cancel()
+        await consumer?.value
         consumer = nil
         hideWindow()
     }
@@ -98,7 +99,11 @@ final class LiveCaptionsController: ObservableObject {
     private func showWindow() {
         if panel == nil {
             panel = LiveCaptionsWindow.make { [weak self] in
-                LiveCaptionsView(controller: self ?? LiveCaptionsController())
+                if let self {
+                    LiveCaptionsView(controller: self)
+                } else {
+                    EmptyView()
+                }
             }
         }
         panel?.center()
