@@ -76,4 +76,29 @@ struct ModelCatalogTests {
         #expect(caps?.supportedLanguages.isEnglishOnly == true)
         #expect(caps?.supportsTranslate == false)
     }
+
+    @Test("staticCapabilities returns nil for an unknown engine")
+    func staticCapsUnknownEngineNil() {
+        let phantom = ModelVariant(
+            id: "phantom",
+            displayName: "Phantom",
+            tagline: "n/a",
+            engineID: EngineID("unknown-future-engine"),
+            sizeBytes: 0,
+            downloadSource: ModelDownloadSource(huggingFaceRepo: "x/y", subpath: ""),
+            category: .compact,
+            speedTier: .balanced,
+            qualityTier: .good
+        )
+        #expect(ModelCatalog.staticCapabilities(for: phantom) == nil)
+    }
+
+    @Test("staticCapabilities returns tightened defaults for known engines")
+    func staticCapsKnown() {
+        guard let parakeet = ModelCatalog.variant(id: "nvidia_parakeet-tdt-0.6b-v2") else {
+            Issue.record("variant missing"); return
+        }
+        let caps = ModelCatalog.staticCapabilities(for: parakeet)
+        #expect(caps?.supportedLanguages.isEnglishOnly == true)
+    }
 }

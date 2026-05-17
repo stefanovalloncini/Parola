@@ -116,13 +116,13 @@ public enum AudioDevices {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var cfStr: CFString = "" as CFString
-        var size = UInt32(MemoryLayout<CFString>.size)
+        var cfStr: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         let result = withUnsafeMutablePointer(to: &cfStr) { pointer in
             AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, pointer)
         }
-        guard result == noErr else { return nil }
-        return cfStr as String
+        guard result == noErr, let cf = cfStr?.takeRetainedValue() else { return nil }
+        return cf as String
     }
     #endif
 }

@@ -4,10 +4,12 @@ import Foundation
 enum YouTubeProcess {
     static func waitWithTimeout(_ process: Process, seconds: Int) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask { await waitForExit(process) }
+            group.addTask {
+                await waitForExit(process)
+            }
             group.addTask {
                 try await Task.sleep(for: .seconds(seconds))
-                process.terminate()
+                if process.isRunning { process.terminate() }
                 throw ParolaError.captureUnavailable("yt-dlp exceeded \(seconds)s timeout")
             }
             try await group.next()
@@ -15,13 +17,17 @@ enum YouTubeProcess {
         }
     }
 
+    /// `Process.waitUntilExit()` is blocking. Running it on a detached task moves the block
+    /// off the cooperative pool. Cancellation is honoured by the surrounding task group:
+    /// the timeout branch calls `terminate()` which unblocks `waitUntilExit()`.
     private static func waitForExit(_ process: Process) async {
+        let task = Task.detached(priority: .utility) {
+            process.waitUntilExit()
+        }
         await withTaskCancellationHandler {
-            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-                process.terminationHandler = { _ in cont.resume() }
-            }
+            await task.value
         } onCancel: {
-            process.terminate()
+            if process.isRunning { process.terminate() }
         }
     }
 
@@ -48,6 +54,37 @@ enum YouTubeProcess {
         let existing = env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
         env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/opt/local/bin:\(existing)"
         return env
+    }
+}
+
+/// Drains a `Pipe`'s read side on a background task so the producing process never blocks
+/// on a full pipe buffer (typically 64 KB). Read `data()` after the process exits.
+final class PipeDrain: @unchecked Sendable {
+    private let buffer = NSMutableData()
+    private let lock = NSLock()
+    private let didFinish = DispatchSemaphore(value: 0)
+
+    init(pipe: Pipe) {
+        let handle = pipe.fileHandleForReading
+        handle.readabilityHandler = { [weak self] fh in
+            let chunk = fh.availableData
+            if chunk.isEmpty {
+                fh.readabilityHandler = nil
+                self?.didFinish.signal()
+                return
+            }
+            guard let self else { return }
+            self.lock.lock()
+            self.buffer.append(chunk)
+            self.lock.unlock()
+        }
+    }
+
+    func data(timeout: DispatchTime = .now() + 2.0) -> Data {
+        _ = didFinish.wait(timeout: timeout)
+        lock.lock()
+        defer { lock.unlock() }
+        return Data(buffer)
     }
 }
 #endif

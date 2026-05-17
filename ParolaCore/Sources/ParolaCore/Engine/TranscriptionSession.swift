@@ -45,19 +45,13 @@ public actor TranscriptionSession {
         }
         try Task.checkCancellation()
         cancelIdleTimer()
-        try await ensureTranscriber(for: engineID)
-        guard let transcriber else {
-            throw ParolaError.engineNotRegistered(engineID.rawValue)
-        }
-        try await transcriber.load(model: modelName)
+        let activeTranscriber = try await ensureTranscriber(for: engineID)
+        try await activeTranscriber.load(model: modelName)
         try Task.checkCancellation()
 
         let audioURL = try await source.prepare()
         try Task.checkCancellation()
-        guard self.transcriberEngineID == engineID else {
-            throw ParolaError.transcriptionFailed("model was unloaded during transcribe")
-        }
-        var transcript = try await transcriber.transcribe(url: audioURL, options: options)
+        var transcript = try await activeTranscriber.transcribe(url: audioURL, options: options)
         if options.diarize {
             try Task.checkCancellation()
             transcript = try await diarizer.diarize(
@@ -78,6 +72,11 @@ public actor TranscriptionSession {
         transcriber = nil
         transcriberEngineID = nil
         await diarizer.unload()
+    }
+
+    /// Signals the currently loaded transcriber to abort any in-flight work.
+    public func cancelInFlight() async {
+        await transcriber?.cancelInFlight()
     }
 
     public func currentModel() async -> String? {
@@ -113,15 +112,17 @@ public actor TranscriptionSession {
         }
     }
 
-    private func ensureTranscriber(for engineID: EngineID) async throws {
-        if transcriber != nil, transcriberEngineID == engineID {
-            return
+    private func ensureTranscriber(for engineID: EngineID) async throws -> any Transcriber {
+        if let existing = transcriber, transcriberEngineID == engineID {
+            return existing
         }
         if let old = transcriber {
             await old.unload()
         }
-        transcriber = try await registry.transcriber(for: engineID, store: modelStore)
+        let fresh = try await registry.transcriber(for: engineID, store: modelStore)
+        transcriber = fresh
         transcriberEngineID = engineID
+        return fresh
     }
 
     private func defaultModelName() -> String {

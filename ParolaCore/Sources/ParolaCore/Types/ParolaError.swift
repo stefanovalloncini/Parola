@@ -34,7 +34,7 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
         case .ioError(let reason):
             return reason
         case .engineNotRegistered(let id):
-            return "Engine \"\(id)\" is not registered. Call ParolaCore.bootstrap() before transcribing."
+            return "Engine \"\(id)\" is not registered. Call ParolaCoreBootstrap.registerBuiltInEngines() before transcribing."
         case .unsupportedForEngine(let detail):
             return "Unsupported for selected engine: \(detail)"
         }

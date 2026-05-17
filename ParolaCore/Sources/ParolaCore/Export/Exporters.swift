@@ -8,6 +8,7 @@ public enum ExportFormat: String, CaseIterable, Sendable, Codable {
     case md
     case html
     case csv
+    case tsv
     case docx
     case pdf
 
@@ -41,6 +42,7 @@ public enum Exporters {
         case .md:   return MarkdownExporter()
         case .html: return HtmlExporter()
         case .csv:  return CsvExporter()
+        case .tsv:  return TsvExporter()
         case .docx: return DocxExporter()
         case .pdf:  return PdfExporter()
         }

@@ -114,7 +114,10 @@ public final class ModelStore: Sendable {
         if let entry = ModelCatalog.variant(id: variant), entry.engineID == .appleSpeech {
             return true
         }
-        return FileManager.default.fileExists(atPath: installedURL(for: variant).path)
+        let url = installedURL(for: variant)
+        guard FileManager.default.fileExists(atPath: url.path) else { return false }
+        let sidecar = url.appendingPathComponent(HuggingFaceDownloader.sidecarFilename)
+        return !FileManager.default.fileExists(atPath: sidecar.path)
     }
 
     /// Downloads a model variant into our cache directory. If already present, returns immediately.
@@ -164,7 +167,12 @@ public final class ModelStore: Sendable {
         progress: (@Sendable (Double) -> Void)?
     ) async throws -> URL {
         let destination = installedURL(for: source)
+        let alreadyExisted = FileManager.default.fileExists(atPath: destination.path)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        if !alreadyExisted {
+            let placeholder = DownloadSidecar(repo: source.huggingFaceRepo, revision: "main", files: [:])
+            try? placeholder.write(to: destination.appendingPathComponent(HuggingFaceDownloader.sidecarFilename))
+        }
         do {
             try await HuggingFaceDownloader.snapshot(
                 repo: source.huggingFaceRepo,
@@ -174,6 +182,8 @@ public final class ModelStore: Sendable {
             )
             progress?(1.0)
             return destination
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw ParolaError.modelDownloadFailed(source.huggingFaceRepo, underlying: String(describing: error))
         }
