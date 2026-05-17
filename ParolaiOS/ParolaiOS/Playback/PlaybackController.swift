@@ -15,6 +15,7 @@ final class PlaybackController {
 
     @ObservationIgnored private var player: AVPlayer?
     @ObservationIgnored private var timeObserver: Any?
+    @ObservationIgnored private var durationTask: Task<Void, Never>?
 
     var hasAudio: Bool { player != nil }
 
@@ -27,8 +28,10 @@ final class PlaybackController {
         let player = AVPlayer(playerItem: item)
         self.player = player
 
-        Task { [weak self] in
+        durationTask?.cancel()
+        durationTask = Task { [weak self] in
             let seconds = try? await item.asset.load(.duration).seconds
+            guard !Task.isCancelled else { return }
             self?.duration = seconds ?? 0
         }
 
@@ -84,6 +87,8 @@ final class PlaybackController {
     #endif
 
     private func tearDown() {
+        durationTask?.cancel()
+        durationTask = nil
         if let timeObserver, let player {
             player.removeTimeObserver(timeObserver)
         }
