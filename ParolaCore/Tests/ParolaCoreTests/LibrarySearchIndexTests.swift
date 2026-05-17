@@ -61,6 +61,7 @@ struct LibrarySearchIndexTests {
     func snapshotRoundTrip() async throws {
         let (index1, url) = makeTempIndex()
         await index1.index(id: "e1", title: "Notes", text: "Sprint planning", createdAt: Date())
+        await index1.flush()
         let index2 = LibrarySearchIndex(indexURL: url)
         let matches = await index2.search("sprint")
         #expect(matches.contains(where: { $0.entryID == "e1" }))
@@ -91,5 +92,29 @@ struct LibrarySearchIndexTests {
         // Both match; e2's text has both tokens, e1's title has both. Either way matches must come back ranked.
         #expect(matches.count == 2)
         #expect(matches.first!.score >= matches.last!.score)
+    }
+
+    @Test("match snippet includes highlight ranges around each hit")
+    func snippetHighlights() async throws {
+        let (index, _) = makeTempIndex()
+        let body = "Quarterly review of sprint planning and sprint retro outcomes."
+        await index.index(id: "e1", title: "Notes", text: body, createdAt: Date())
+        let matches = await index.search("sprint")
+        let match = try #require(matches.first(where: { $0.entryID == "e1" }))
+        #expect(match.highlights.count >= 1)
+        for highlight in match.highlights {
+            let start = match.snippet.index(match.snippet.startIndex, offsetBy: highlight.start)
+            let end = match.snippet.index(start, offsetBy: highlight.length)
+            #expect(match.snippet[start..<end].lowercased() == "sprint")
+        }
+    }
+
+    @Test("flush persists pending debounced writes")
+    func flushPersists() async throws {
+        let (index1, url) = makeTempIndex()
+        await index1.index(id: "e1", title: "Notes", text: "Sprint planning", createdAt: Date())
+        await index1.flush()
+        let exists = FileManager.default.fileExists(atPath: url.path)
+        #expect(exists)
     }
 }

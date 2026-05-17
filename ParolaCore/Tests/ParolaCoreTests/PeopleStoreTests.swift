@@ -112,4 +112,52 @@ struct PeopleStoreTests {
         let renamed = transcript.renamingSpeaker("SPEAKER_01", to: "  ")
         #expect(renamed.segments.first?.speaker == "SPEAKER_01")
     }
+
+    @Test("rename preserves usage count and lastUsedAt")
+    func renamePreservesHistory() async throws {
+        let store = PeopleStore(storageURL: makeTempURL())
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        _ = await store.recordUsage(name: "Stefano", at: base)
+        _ = await store.recordUsage(name: "Stefano", at: base.addingTimeInterval(60))
+        let original = await store.people.first!
+        let renamed = try #require(await store.rename(original.id, to: "Steve"))
+        #expect(renamed.name == "Steve")
+        #expect(renamed.usageCount == 2)
+        #expect(renamed.lastUsedAt == base.addingTimeInterval(60))
+    }
+
+    @Test("rename to empty string is a no-op")
+    func renameEmptyNoop() async throws {
+        let store = PeopleStore(storageURL: makeTempURL())
+        let p = await store.recordUsage(name: "Stefano")
+        let result = await store.rename(p.id, to: "  ")
+        #expect(result == nil)
+        let people = await store.people
+        #expect(people.first?.name == "Stefano")
+    }
+
+    @Test("rename merges into an existing person when the target name matches")
+    func renameMergesDuplicate() async throws {
+        let store = PeopleStore(storageURL: makeTempURL())
+        let a = await store.recordUsage(name: "SPEAKER_01")
+        _ = await store.recordUsage(name: "Stefano")
+        _ = await store.recordUsage(name: "Stefano")
+        _ = await store.rename(a.id, to: "Stefano")
+        let people = await store.people
+        #expect(people.count == 1)
+        #expect(people.first?.name == "Stefano")
+        #expect(people.first?.usageCount == 3)
+    }
+
+    @Test("recordUsage folds composed-vs-decomposed unicode")
+    func diacriticNormalization() async throws {
+        let store = PeopleStore(storageURL: makeTempURL())
+        let composed = "Jos\u{00e9}"        // é precomposed
+        let decomposed = "Jose\u{0301}"      // é decomposed
+        _ = await store.recordUsage(name: composed)
+        _ = await store.recordUsage(name: decomposed)
+        let people = await store.people
+        #expect(people.count == 1)
+        #expect(people.first?.usageCount == 2)
+    }
 }
