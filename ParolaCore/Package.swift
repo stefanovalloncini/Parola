@@ -24,7 +24,8 @@ let package = Package(
                 .product(name: "WhisperKit", package: "WhisperKit"),
                 .product(name: "SpeakerKit", package: "WhisperKit"),
                 .product(name: "FluidAudio", package: "FluidAudio"),
-            ]
+            ],
+            resources: [.process("Resources")]
         ),
         .target(
             name: "ParolaMCP",

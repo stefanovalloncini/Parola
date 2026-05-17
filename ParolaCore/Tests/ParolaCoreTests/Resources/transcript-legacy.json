@@ -1,0 +1,12 @@
+{
+  "language": "en",
+  "modelName": "openai_whisper-tiny",
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.0,
+      "end": 1.2,
+      "text": "Hello, world."
+    }
+  ]
+}

@@ -52,6 +52,9 @@ public struct TranscriptSegment: Codable, Hashable, Sendable, Identifiable {
 }
 
 public struct Transcript: Codable, Hashable, Sendable {
+    public static let currentSchemaVersion = 1
+
+    public var schemaVersion: Int
     public var segments: [TranscriptSegment]
     public var language: String
     public var modelName: String
@@ -61,6 +64,7 @@ public struct Transcript: Codable, Hashable, Sendable {
     public var chatHistory: [ChatMessage]?
 
     public init(
+        schemaVersion: Int = Transcript.currentSchemaVersion,
         segments: [TranscriptSegment],
         language: String,
         modelName: String,
@@ -69,6 +73,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         summary: Summary? = nil,
         chatHistory: [ChatMessage]? = nil
     ) {
+        self.schemaVersion = schemaVersion
         self.segments = segments
         self.language = language
         self.modelName = modelName
@@ -76,6 +81,18 @@ public struct Transcript: Codable, Hashable, Sendable {
         self.durationSeconds = durationSeconds
         self.summary = summary
         self.chatHistory = chatHistory
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        segments = try c.decode([TranscriptSegment].self, forKey: .segments)
+        language = try c.decode(String.self, forKey: .language)
+        modelName = try c.decode(String.self, forKey: .modelName)
+        sourceURL = try c.decodeIfPresent(URL.self, forKey: .sourceURL)
+        durationSeconds = try c.decodeIfPresent(Double.self, forKey: .durationSeconds)
+        summary = try c.decodeIfPresent(Summary.self, forKey: .summary)
+        chatHistory = try c.decodeIfPresent([ChatMessage].self, forKey: .chatHistory)
     }
 
     public var text: String {
