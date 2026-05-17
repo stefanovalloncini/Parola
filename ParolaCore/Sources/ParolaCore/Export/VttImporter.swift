@@ -14,7 +14,6 @@ public enum VttImporter {
         var i = 0
         var nextID = 0
 
-        // Skip the WEBVTT header block (one or more non-blank lines), then a blank.
         while i < lines.count, !lines[i].trimmingCharacters(in: .whitespaces).isEmpty {
             i += 1
         }
@@ -90,20 +89,9 @@ public enum VttImporter {
     }
 
     static func parseTimestamp(_ s: String) -> Double? {
-        let trimmed = s.trimmingCharacters(in: .whitespaces)
-        let parts = trimmed.components(separatedBy: ":")
-        guard parts.count >= 2 else { return nil }
-
-        if parts.count == 3, let h = Int(parts[0]), let m = Int(parts[1]), let sec = Double(parts[2]) {
-            return Double(h) * 3600 + Double(m) * 60 + sec
-        }
-        if parts.count == 2, let m = Int(parts[0]), let sec = Double(parts[1]) {
-            return Double(m) * 60 + sec
-        }
-        return nil
+        Format.parseClockTimestamp(s)
     }
 
-    /// Strips inline cue tags like `<v Stefano>`, `<i>`, `<00:00:01.000>`.
     static func stripInlineTags(_ line: String) -> String {
         guard line.contains("<") else { return line }
         var out = ""

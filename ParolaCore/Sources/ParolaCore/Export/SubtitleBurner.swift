@@ -5,11 +5,7 @@ import CoreGraphics
 import CoreText
 import QuartzCore
 
-/// Burns transcript segments into a video as open captions using AVFoundation.
-///
-/// Native rendering — no `ffmpeg`. Each segment becomes a `CATextLayer` whose opacity
-/// is keyframed to its `start`/`end` time. The composed asset is exported to H.264 + AAC
-/// via `AVAssetExportSession`.
+/// Burns transcript segments into a video as open captions. Pure AVFoundation, no `ffmpeg` dependency.
 public enum SubtitleBurner {
     public struct Style: Sendable {
         public var fontName: String

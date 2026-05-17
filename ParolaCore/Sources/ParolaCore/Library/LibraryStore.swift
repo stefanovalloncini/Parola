@@ -111,23 +111,8 @@ public actor LibraryStore {
         )
         invalidateListCaches()
         let entry = try makeEntry(bundleURL: bundleURL.appendingPathExtension("parola"))
-        await searchIndex.index(id: entry.id, title: entry.title, text: transcript.text, createdAt: entry.createdAt)
-        scheduleExtraIndex(id: entry.id, title: entry.title, text: transcript.text, createdAt: entry.createdAt)
+        await indexEntry(entry, transcriptText: transcript.text)
         return entry
-    }
-
-    private func scheduleExtraIndex(id: String, title: String, text: String, createdAt: Date) {
-        guard let extraIndexer else { return }
-        Task.detached(priority: .utility) {
-            await extraIndexer.index(id: id, title: title, text: text, createdAt: createdAt)
-        }
-    }
-
-    private func scheduleExtraDeindex(id: String) {
-        guard let extraIndexer else { return }
-        Task.detached(priority: .utility) {
-            await extraIndexer.deindex(id: id)
-        }
     }
 
     public func adopt(parolaBundle url: URL) async throws -> LibraryEntry {
@@ -144,9 +129,27 @@ public actor LibraryStore {
         }
         invalidateListCaches()
         let entry = try makeEntry(bundleURL: target)
-        await searchIndex.index(id: entry.id, title: entry.title, text: sourceDoc.transcript.text, createdAt: entry.createdAt)
-        scheduleExtraIndex(id: entry.id, title: entry.title, text: sourceDoc.transcript.text, createdAt: entry.createdAt)
+        await indexEntry(entry, transcriptText: sourceDoc.transcript.text)
         return entry
+    }
+
+    private func indexEntry(_ entry: LibraryEntry, transcriptText: String) async {
+        await searchIndex.index(id: entry.id, title: entry.title, text: transcriptText, createdAt: entry.createdAt)
+        guard let extraIndexer else { return }
+        let id = entry.id
+        let title = entry.title
+        let createdAt = entry.createdAt
+        Task.detached(priority: .utility) {
+            await extraIndexer.index(id: id, title: title, text: transcriptText, createdAt: createdAt)
+        }
+    }
+
+    private func deindexEntry(id: String) async {
+        await searchIndex.remove(id)
+        guard let extraIndexer else { return }
+        Task.detached(priority: .utility) {
+            await extraIndexer.deindex(id: id)
+        }
     }
 
     /// Overwrites the transcript.json inside an existing bundle. Bumps the manifest `updatedAt`.
@@ -203,8 +206,7 @@ public actor LibraryStore {
         try FileManager.default.removeItem(at: bundleURL)
         invalidateListCaches()
         if cachedLoaded?.id == id { cachedLoaded = nil }
-        await searchIndex.remove(id)
-        scheduleExtraDeindex(id: id)
+        await deindexEntry(id: id)
     }
 
     public struct VerificationReport: Sendable, Equatable {
@@ -288,8 +290,7 @@ public actor LibraryStore {
         for entry in toPurge {
             do {
                 try FileManager.default.removeItem(at: entry.bundleURL)
-                await searchIndex.remove(entry.id)
-                scheduleExtraDeindex(id: entry.id)
+                await deindexEntry(id: entry.id)
             } catch {
                 continue
             }

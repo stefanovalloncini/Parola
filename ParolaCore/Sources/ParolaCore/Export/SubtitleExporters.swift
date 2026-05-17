@@ -32,13 +32,7 @@ public struct SrtExporter: TranscriptExporter {
     }
 
     static func srtTimestamp(_ seconds: Double) -> String {
-        let clamped = max(0, seconds)
-        let total = Int((clamped * 1000).rounded())
-        let ms = total % 1000
-        let s = (total / 1000) % 60
-        let m = (total / 60_000) % 60
-        let h = total / 3_600_000
-        return String(format: "%02d:%02d:%02d,%03d", h, m, s, ms)
+        Format.subtitleTimestamp(seconds, msSeparator: ",")
     }
 }
 
@@ -65,12 +59,6 @@ public struct VttExporter: TranscriptExporter {
     }
 
     static func vttTimestamp(_ seconds: Double) -> String {
-        let clamped = max(0, seconds)
-        let total = Int((clamped * 1000).rounded())
-        let ms = total % 1000
-        let s = (total / 1000) % 60
-        let m = (total / 60_000) % 60
-        let h = total / 3_600_000
-        return String(format: "%02d:%02d:%02d.%03d", h, m, s, ms)
+        Format.subtitleTimestamp(seconds, msSeparator: ".")
     }
 }

@@ -100,7 +100,7 @@ public actor LibrarySearchIndex {
         Set(entries.keys)
     }
 
-    /// Forces a synchronous-style flush of any pending debounced save. Use before app termination.
+    /// Writes any pending debounced snapshot to disk. Call before app termination.
     public func flush() async {
         let task = pendingSaveTask
         pendingSaveTask = nil

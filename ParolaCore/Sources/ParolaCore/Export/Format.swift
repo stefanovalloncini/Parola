@@ -10,6 +10,29 @@ public enum Format {
         return String(format: "%02d:%02d:%02d", h, m, s)
     }
 
+    /// Formats seconds as `HH:MM:SS<sep>mmm`. SRT uses `,` as separator, VTT uses `.`.
+    public static func subtitleTimestamp(_ seconds: Double, msSeparator: Character) -> String {
+        let total = Int((max(0, seconds) * 1000).rounded())
+        let ms = total % 1000
+        let s = (total / 1000) % 60
+        let m = (total / 60_000) % 60
+        let h = total / 3_600_000
+        return String(format: "%02d:%02d:%02d\(msSeparator)%03d", h, m, s, ms)
+    }
+
+    /// Parses `HH:MM:SS.mmm` or `MM:SS.mmm` style timestamps. Treats `,` as equivalent to `.`.
+    public static func parseClockTimestamp(_ s: String) -> Double? {
+        let trimmed = s.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        let parts = trimmed.components(separatedBy: ":")
+        if parts.count == 3, let h = Int(parts[0]), let m = Int(parts[1]), let sec = Double(parts[2]) {
+            return Double(h) * 3600 + Double(m) * 60 + sec
+        }
+        if parts.count == 2, let m = Int(parts[0]), let sec = Double(parts[1]) {
+            return Double(m) * 60 + sec
+        }
+        return nil
+    }
+
     public static func escapeHTML(_ s: String) -> String {
         s.replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")
