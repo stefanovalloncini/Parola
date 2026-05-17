@@ -4,9 +4,14 @@ import ParolaCore
 
 extension AppModel {
     func refreshLibrary() {
-        Task {
-            libraryEntries = await library.list()
-            deletedEntries = await library.listDeleted()
+        refreshTask?.cancel()
+        refreshTask = Task { [weak self] in
+            guard let self else { return }
+            let active = await library.list()
+            let deleted = await library.listDeleted()
+            guard !Task.isCancelled else { return }
+            self.libraryEntries = active
+            self.deletedEntries = deleted
         }
     }
 

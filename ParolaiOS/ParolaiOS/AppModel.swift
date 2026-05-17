@@ -30,6 +30,7 @@ final class AppModel: ObservableObject {
     let peopleStore = PeopleStore()
 
     var searchTask: Task<Void, Never>?
+    var refreshTask: Task<Void, Never>?
 
     static let trashRetentionDays = 30
 
