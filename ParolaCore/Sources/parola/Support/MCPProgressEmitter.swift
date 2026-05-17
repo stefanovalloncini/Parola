@@ -1,9 +1,6 @@
 import Foundation
 
-/// Emits NDJSON progress lines on stderr and a single JSON result on stdout when
-/// `--mcp` is set. The shapes mirror MCP `ContentBlock` semantics so an external
-/// MCP client can shell out to the CLI and stream events without going through
-/// the in-app bridge. Progress events live on stderr; the final payload goes to stdout.
+/// Emits MCP-shaped NDJSON progress on stderr and a single result block on stdout when `--mcp` is set.
 public struct MCPProgressEmitter: Sendable {
     public enum Stage: String, Sendable {
         case downloading

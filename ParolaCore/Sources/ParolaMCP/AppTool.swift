@@ -1,8 +1,6 @@
 import Foundation
 
-/// One MCP tool that proxies to the running Parola.app's debug bridge.
-/// `bridgeCmd` is the command name the bridge dispatches on; `properties` declares
-/// both the JSON schema published to MCP clients and the arg keys forwarded over the wire.
+/// MCP tool that proxies to the running Parola.app's debug bridge. `properties` doubles as JSON schema and the allow-list of arg keys forwarded over the wire.
 public struct AppTool: Sendable {
     public let name: String
     public let bridgeCmd: String

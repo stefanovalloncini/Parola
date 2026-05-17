@@ -1,8 +1,7 @@
 import Foundation
 import ParolaCore
 
-/// JSON-RPC handler for the Parola MCP server. Owns the engine session and proxies
-/// app-bridge calls. Used by both `parola mcp` and the legacy `parola-mcp` binary.
+/// JSON-RPC handler for the Parola MCP server. Owns the engine session and proxies app-bridge calls.
 public actor MCPServer {
     public static let supportedProtocolVersions: Set<String> = ["2024-11-05", "2025-03-26"]
     public static let preferredProtocolVersion: String = "2024-11-05"

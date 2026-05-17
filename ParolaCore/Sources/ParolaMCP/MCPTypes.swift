@@ -86,8 +86,7 @@ public struct AnyEncodable: Encodable, @unchecked Sendable {
         _encode = value.encode(to:)
     }
     public init(_ value: Any) {
-        // AnyEncodable is the gate type for JSON encoding; the closure runs synchronously
-        // when an Encoder asks for it, never across actor hops.
+        // nonisolated(unsafe): the closure runs synchronously inside `encode(to:)`, never hops actors.
         nonisolated(unsafe) let captured = value
         _encode = { encoder in
             var container = encoder.singleValueContainer()

@@ -17,7 +17,6 @@ extension JSONEncoder {
     }
 }
 
-/// Renders a simple progress bar to stderr. Drops repeated percents.
 actor ProgressReporter {
     private let label: String
     private var lastPercent: Int = -1
@@ -50,7 +49,6 @@ actor ProgressReporter {
     }
 }
 
-/// Awaits SIGINT, or `seconds` elapsed if a duration was provided. Whichever fires first.
 func awaitStop(seconds: Double?) async {
     let stop = AsyncSignalStream(signal: SIGINT)
     let timer: Task<Void, Never>? = seconds.map { secs in
@@ -63,10 +61,7 @@ func awaitStop(seconds: Double?) async {
     timer?.cancel()
 }
 
-/// Awaits a single delivery of a Unix signal (e.g. SIGINT) using async/await.
-///
-/// Unchecked Sendable: the DispatchSemaphore is its own synchronization; `source` is
-/// `let`-constant and `DispatchSourceSignal` is documented as safe to share.
+/// Unchecked Sendable: `semaphore` is its own synchronization; `source` is `let` and `DispatchSourceSignal` is thread-safe.
 final class AsyncSignalStream: @unchecked Sendable {
     private let semaphore = DispatchSemaphore(value: 0)
     private let source: DispatchSourceSignal

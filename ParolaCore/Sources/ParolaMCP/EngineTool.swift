@@ -1,8 +1,6 @@
 import Foundation
 
-/// Engine-level MCP tools served directly from `parola-mcp` (no running app required).
-/// The executable target switches on this enum exhaustively — adding a case forces the
-/// dispatch to grow a matching implementation, so registration and handling can't drift.
+/// MCP tools served directly by the engine — no running app required. Exhaustively switched in `MCPServer.invoke` so registration and handling stay in sync.
 public enum EngineTool: String, CaseIterable, Sendable {
     case transcribe       = "parola_transcribe"
     case listModels       = "parola_list_models"
