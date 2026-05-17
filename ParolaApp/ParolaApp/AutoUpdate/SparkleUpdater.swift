@@ -24,8 +24,7 @@ enum SparkleChannel: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Allow-list passed to Sparkle for this channel. `stable` returns an empty
-    /// set, which Sparkle treats as "no channel filter, ship items with no channel attribute".
+    /// Empty set means "no channel filter — items without a channel attribute only".
     var allowedChannels: Set<String> {
         switch self {
         case .stable: return []

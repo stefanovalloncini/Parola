@@ -3,8 +3,6 @@ import Foundation
 import ParolaCore
 import SwiftUI
 
-/// Owns the dictation runtime: coordinator, HUD, hotkey, level + partial streams.
-/// AppModel stores the user-facing settings and asks this controller to apply them.
 @MainActor
 final class DictationController: ObservableObject {
     @Published private(set) var state: DictationCoordinator.State = .idle

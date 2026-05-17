@@ -339,13 +339,9 @@ final class AppModel: ObservableObject {
     }
 
     private var testBridge: ParolaTestBridge?
-    /// `true` if the MCP automation bridge is currently listening. Debug builds opt in by default;
-    /// Release builds require an explicit toggle in Settings → MCP & Automation.
     @Published private(set) var automationBridgeRunning: Bool = false
     @Published private(set) var automationBridgePort: UInt16?
 
-    /// User-controlled toggle. Default differs by configuration so notarised binaries don't
-    /// start a local TCP listener without consent.
     @AppStorage("automationBridgeEnabled") var automationBridgeEnabled: Bool = AppModel.defaultBridgeEnabled
 
     static var defaultBridgeEnabled: Bool {
@@ -410,8 +406,8 @@ final class AppModel: ObservableObject {
         refreshModelList()
         refreshYtDlpAvailability()
         refreshLibrary()
-        _ = watchedFolders   // touch lazy var to start watchers on launch
-        _ = meetingDetector  // touch lazy var to start NSWorkspace observation
+        _ = watchedFolders
+        _ = meetingDetector
         wireDictationController()
         if dictationEnabled { startDictation() }
         SparkleUpdater.shared.channel = sparkleChannel
@@ -441,7 +437,7 @@ final class AppModel: ObservableObject {
                 refreshLibrary()
                 selectedEntryID = entry.id
             } catch {
-                // Don't fail the transcription if library save fails; the user still has the in-memory result.
+                // best-effort: transcript stays in memory if library save fails
             }
             if let audioSource {
                 runAutoExports(transcript: result, sourceURL: audioSource)

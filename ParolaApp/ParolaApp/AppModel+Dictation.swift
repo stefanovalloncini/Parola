@@ -78,7 +78,6 @@ extension AppModel {
         }
     }
 
-    /// Bundle IDs the user has configured as workflow overrides beyond the four built-in seeds.
     func customDictationOverrideApps() -> [(bundleID: String, name: String)] {
         let seedIDs = Set(AppModel.dictationOverrideApps.map(\.bundleID))
         let map = dictationWorkflows()
