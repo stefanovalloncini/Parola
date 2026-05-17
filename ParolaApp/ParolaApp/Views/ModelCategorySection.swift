@@ -12,7 +12,7 @@ struct ModelsCategory: Identifiable {
             id: "apple-speech",
             title: "Apple Speech",
             description: "On-device speech recognition built into macOS.",
-            symbol: "applelogo",
+            symbol: "waveform.and.mic",
             tint: .secondary
         ),
         .init(

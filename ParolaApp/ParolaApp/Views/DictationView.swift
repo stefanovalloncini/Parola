@@ -189,6 +189,7 @@ private struct WaveformBars: View {
     private static let spacing: CGFloat = 2
 
     @State private var idlePulse = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(alignment: .center, spacing: Self.spacing) {
@@ -200,8 +201,11 @@ private struct WaveformBars: View {
             }
         }
         .frame(height: Self.maxHeight)
-        .onAppear { idlePulse = true }
-        .animation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: idlePulse)
+        .onAppear { if !reduceMotion { idlePulse = true } }
+        .animation(
+            reduceMotion ? nil : .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
+            value: idlePulse
+        )
     }
 
     private func barHeight(at index: Int) -> CGFloat {
@@ -217,12 +221,17 @@ private struct WaveformBars: View {
 
 private struct SpinningRing: View {
     @State private var rotate = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         Circle()
             .trim(from: 0, to: 0.7)
             .stroke(Color.white.opacity(0.9), style: StrokeStyle(lineWidth: 2, lineCap: .round))
             .rotationEffect(.degrees(rotate ? 360 : 0))
-            .animation(.linear(duration: 0.9).repeatForever(autoreverses: false), value: rotate)
-            .onAppear { rotate = true }
+            .animation(
+                reduceMotion ? nil : .linear(duration: 0.9).repeatForever(autoreverses: false),
+                value: rotate
+            )
+            .onAppear { if !reduceMotion { rotate = true } }
     }
 }

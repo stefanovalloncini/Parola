@@ -4,13 +4,12 @@ import ParolaCore
 
 extension AppModel {
 
-    func recordChat(history: [ChatMessage]) {
-        guard var transcript = self.transcript else { return }
+    func recordChat(history: [ChatMessage], for entryID: LibraryEntry.ID?) {
+        guard let entryID, entryID == selectedEntryID, var transcript = self.transcript else { return }
         transcript.chatHistory = history
         self.transcript = transcript
-        guard let id = selectedEntryID else { return }
         Task { [library] in
-            try? await library.updateTranscript(transcript, for: id)
+            try? await library.updateTranscript(transcript, for: entryID)
         }
     }
 

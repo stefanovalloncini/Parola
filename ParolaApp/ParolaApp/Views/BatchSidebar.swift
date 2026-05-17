@@ -21,15 +21,15 @@ struct BatchSidebar: View {
 
             Divider()
 
-            List(selection: Binding(
-                get: { model.selectedBatchJobID },
-                set: { id in if let id { model.selectBatchJob(id) } }
-            )) {
+            List(selection: $model.selectedBatchJobID) {
                 ForEach(model.batchJobs) { job in
-                    BatchRow(job: job).tag(job.id)
+                    BatchRow(job: job).tag(BatchJob.ID?.some(job.id))
                 }
             }
             .listStyle(.sidebar)
+            .onChange(of: model.selectedBatchJobID) { _, newValue in
+                if let id = newValue { model.selectBatchJob(id) }
+            }
         }
     }
 }

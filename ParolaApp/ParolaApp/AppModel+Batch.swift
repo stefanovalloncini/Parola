@@ -3,7 +3,41 @@ import SwiftUI
 import AppKit
 import ParolaCore
 
+struct BatchExportFormatOptions: Codable, Hashable, Sendable {
+    var writeToSourceFolder: Bool
+    var includeTimestamps: Bool
+
+    static let defaults = BatchExportFormatOptions(writeToSourceFolder: true, includeTimestamps: false)
+}
+
 extension AppModel {
+
+    var batchExportFormatOptions: [String: BatchExportFormatOptions] {
+        get {
+            guard let data = batchExportFormatOptionsJSON.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([String: BatchExportFormatOptions].self, from: data)
+            else { return [:] }
+            return decoded
+        }
+        set {
+            let data = (try? JSONEncoder().encode(newValue)) ?? Data()
+            batchExportFormatOptionsJSON = String(data: data, encoding: .utf8) ?? "{}"
+        }
+    }
+
+    func options(for format: ExportFormat) -> BatchExportFormatOptions {
+        if let stored = batchExportFormatOptions[format.rawValue] { return stored }
+        return BatchExportFormatOptions(
+            writeToSourceFolder: batchExportToSourceFolder,
+            includeTimestamps: batchExportIncludeTimestamps
+        )
+    }
+
+    func setOptions(_ options: BatchExportFormatOptions, for format: ExportFormat) {
+        var current = batchExportFormatOptions
+        current[format.rawValue] = options
+        batchExportFormatOptions = current
+    }
 
     var batchExportFormats: [ExportFormat] {
         get {
@@ -32,6 +66,7 @@ extension AppModel {
         let jobs = urls.map { BatchJob(url: $0) }
         batchJobs = jobs
         selectedBatchJobID = jobs.first?.id
+        route = .batch
 
         let queue = BatchQueue()
         let opts = currentOptions
@@ -85,10 +120,16 @@ extension AppModel {
 
     private func writeBatchExports(transcript: Transcript, sourceURL: URL) {
         let formats = batchExportFormats
-        guard !formats.isEmpty, batchExportToSourceFolder else { return }
+        guard !formats.isEmpty else { return }
+        let plans: [(ExportFormat, URL)] = formats.compactMap { format in
+            let opts = options(for: format)
+            guard opts.writeToSourceFolder else { return nil }
+            let url = sourceURL.deletingPathExtension().appendingPathExtension(format.fileExtension)
+            return (format, url)
+        }
+        guard !plans.isEmpty else { return }
         Task.detached {
-            for format in formats {
-                let target = sourceURL.deletingPathExtension().appendingPathExtension(format.fileExtension)
+            for (format, target) in plans {
                 do {
                     let data = try Exporters.exporter(for: format).render(transcript)
                     try data.write(to: target, options: .atomic)
@@ -207,5 +248,37 @@ extension AppModel {
         installPlayer(for: job.url)
         phase = .ready
         route = .transcript
+    }
+
+    func reorderPendingBatchJobs(from source: IndexSet, to destination: Int) {
+        let pendingIndices = batchJobs.indices.filter { batchJobs[$0].status == .pending }
+        guard !pendingIndices.isEmpty else { return }
+        var pending = pendingIndices.map { batchJobs[$0] }
+        pending.move(fromOffsets: source, toOffset: destination)
+        for (pendingPosition, originalIndex) in pendingIndices.enumerated() {
+            batchJobs[originalIndex] = pending[pendingPosition]
+        }
+    }
+
+    func moveBatchJobToTop(_ id: BatchJob.ID) {
+        guard let idx = batchJobs.firstIndex(where: { $0.id == id }) else { return }
+        guard batchJobs[idx].status == .pending else { return }
+        let firstPending = batchJobs.firstIndex(where: { $0.status == .pending }) ?? idx
+        if idx != firstPending {
+            let job = batchJobs.remove(at: idx)
+            batchJobs.insert(job, at: firstPending)
+        }
+    }
+
+    func moveBatchJob(_ id: BatchJob.ID, before targetID: BatchJob.ID) {
+        guard id != targetID else { return }
+        guard let sourceIdx = batchJobs.firstIndex(where: { $0.id == id }),
+              batchJobs[sourceIdx].status == .pending else { return }
+        let job = batchJobs.remove(at: sourceIdx)
+        guard let targetIdx = batchJobs.firstIndex(where: { $0.id == targetID }) else {
+            batchJobs.append(job)
+            return
+        }
+        batchJobs.insert(job, at: targetIdx)
     }
 }

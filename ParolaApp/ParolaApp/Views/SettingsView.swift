@@ -132,7 +132,7 @@ private struct SidebarGroup: Identifiable {
 private let sidebarGroups: [SidebarGroup] = [
     SidebarGroup(title: nil, routes: [.general, .customization, .watchedFolders, .recordMeetings, .shortcuts]),
     SidebarGroup(title: "AUDIO & VIDEO", routes: [.microphone, .liveCaptions, .dictation, .snippets]),
-    SidebarGroup(title: "TRANSCRIPTION", routes: [.localModels, .cloudModels, .transcriptionDefaults, .translation, .ignoredSegments, .findReplace]),
+    SidebarGroup(title: "TRANSCRIPTION", routes: [.localModels, .transcriptionDefaults, .translation, .ignoredSegments, .findReplace]),
     SidebarGroup(title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport, .integrations]),
     SidebarGroup(title: "AI", routes: [.prompts]),
     SidebarGroup(title: "AUTOMATION", routes: [.automation, .updates]),
@@ -147,7 +147,7 @@ private struct SettingsSidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SearchPill(text: $search)
+            SettingsSearchPill(text: $search)
                 .padding(.horizontal, 12)
                 .padding(.top, 14)
                 .padding(.bottom, 10)
@@ -156,7 +156,7 @@ private struct SettingsSidebar: View {
                     ForEach(filteredGroups) { group in
                         if let title = group.title {
                             Text(title)
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
                                 .padding(.horizontal, 16)
                                 .padding(.top, 4)
@@ -194,17 +194,17 @@ private struct SettingsSidebar: View {
     }
 }
 
-private struct SearchPill: View {
+private struct SettingsSearchPill: View {
     @Binding var text: String
 
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .regular))
+                .font(.caption)
                 .foregroundStyle(.secondary)
             TextField("Search Settings…", text: $text)
                 .textFieldStyle(.plain)
-                .font(.system(size: 12))
+                .font(.caption)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -226,11 +226,11 @@ private struct SidebarRow: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: route.symbol)
-                    .font(.system(size: 13))
+                    .font(.subheadline)
                     .frame(width: 16)
                     .foregroundStyle(selected ? Color.white : Color.secondary)
                 Text(route.label)
-                    .font(.system(size: 13))
+                    .font(.subheadline)
                     .foregroundStyle(selected ? Color.white : Color.primary)
                 Spacer(minLength: 0)
             }
@@ -264,7 +264,7 @@ private struct SettingsDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 Text(route.label)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .padding(.top, 20)
                 content
                 Spacer(minLength: 24)
@@ -356,10 +356,10 @@ struct SettingRow<Trailing: View>: View {
             }
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(size: 13))
+                    Text(title).font(.subheadline)
                     if let description {
                         Text(description)
-                            .font(.system(size: 11))
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -376,7 +376,7 @@ struct SettingHelper: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(.system(size: 11))
+            .font(.caption)
             .italic()
             .foregroundStyle(.secondary)
             .padding(.horizontal, 4)

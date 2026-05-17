@@ -18,7 +18,6 @@ struct LiveCaptionsView: View {
             }
             .opacity(opacity)
             .contextMenu { settingsMenu }
-            .animation(.easeOut(duration: 0.22), value: caption)
     }
 
     @ViewBuilder
@@ -44,7 +43,7 @@ struct LiveCaptionsView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .id(caption)
-                .transition(.opacity)
+                .transition(.opacity.animation(.easeOut(duration: 0.22)))
                 .accessibilityLabel(caption)
                 .accessibilityAddTraits(.updatesFrequently)
         }
@@ -79,12 +78,17 @@ struct LiveCaptionsView: View {
         .background(Capsule().fill(chipFill(translating: translating)))
     }
 
-    private func chipFill(translating: Bool) -> some ShapeStyle {
-        translating ? AnyShapeStyle(DS.Color.accent) : AnyShapeStyle(Color.white.opacity(0.12))
+    private func chipFill(translating: Bool) -> Color {
+        translating ? DS.Color.accent : Color.white.opacity(0.12)
     }
 
     @ViewBuilder
     private var settingsMenu: some View {
+        Menu("Style") {
+            Button("Cinema") { apply(.cinema) }
+            Button("Compact") { apply(.compact) }
+            Button("Subtle") { apply(.subtle) }
+        }
         Menu("Opacity") {
             Button("100%") { opacity = 1.0 }
             Button("85%") { opacity = 0.85 }
@@ -99,11 +103,38 @@ struct LiveCaptionsView: View {
         }
     }
 
+    private func apply(_ preset: LiveCaptionStylePreset) {
+        opacity = preset.opacity
+        fontSize = preset.fontSize
+    }
+
     private var caption: String {
         let last = controller.state.confirmedLines.last
         let partial = controller.state.partial.trimmingCharacters(in: .whitespacesAndNewlines)
         return [last, partial.isEmpty ? nil : partial]
             .compactMap { $0 }
             .joined(separator: " ")
+    }
+}
+
+enum LiveCaptionStylePreset {
+    case cinema
+    case compact
+    case subtle
+
+    var opacity: Double {
+        switch self {
+        case .cinema: return 1.0
+        case .compact: return 0.95
+        case .subtle: return 0.7
+        }
+    }
+
+    var fontSize: Double {
+        switch self {
+        case .cinema: return 32
+        case .compact: return 20
+        case .subtle: return 22
+        }
     }
 }

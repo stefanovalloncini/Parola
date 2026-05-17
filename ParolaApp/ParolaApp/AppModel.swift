@@ -40,6 +40,7 @@ final class AppModel: ObservableObject {
     @Published var route: Route = .transcript
     @Published var phase: Phase = .idle
     @Published var transcript: Transcript?
+    @Published var showingTrash: Bool = false
     @Published var currentSegmentID: TranscriptSegment.ID?
     @Published var currentWordID: WordTiming.ID?
 
@@ -59,6 +60,7 @@ final class AppModel: ObservableObject {
     @AppStorage("batchExportFormats") var batchExportFormatsRaw: String = "txt,srt"
     @AppStorage("batchExportToSourceFolder") var batchExportToSourceFolder: Bool = true
     @AppStorage("batchExportIncludeTimestamps") var batchExportIncludeTimestamps: Bool = false
+    @AppStorage("batchExportFormatOptions") var batchExportFormatOptionsJSON: String = "{}"
 
     @Published var findIsOpen: Bool = false
     @Published var findQuery: String = "" { didSet { scheduleRecomputeMatches() } }
@@ -77,6 +79,17 @@ final class AppModel: ObservableObject {
     @AppStorage("selectedModel") var selectedModel: String = "openai_whisper-tiny"
     @AppStorage("selectedLanguageRaw") private var selectedLanguageRaw: String = ""
     @AppStorage("translate") var translate: Bool = false
+
+    private var cachedSelectedModel: String = ""
+    private var cachedCapabilities: EngineCapabilities = .whisperKitDefaults
+
+    var selectedModelCapabilities: EngineCapabilities {
+        if cachedSelectedModel != selectedModel {
+            cachedSelectedModel = selectedModel
+            cachedCapabilities = ModelCatalog.staticCapabilities(forID: selectedModel) ?? .whisperKitDefaults
+        }
+        return cachedCapabilities
+    }
 
     var selectedLanguage: String? {
         get { selectedLanguageRaw.isEmpty ? nil : selectedLanguageRaw }

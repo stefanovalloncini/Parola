@@ -5,12 +5,15 @@ struct MacRecentlyDeletedView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var confirmingPurge: LibraryEntry.ID?
+    @State private var confirmingPurgeBulk: Set<LibraryEntry.ID> = []
     @State private var confirmingEmpty = false
     @State private var searchText = ""
     @State private var dateFilter: RecentlyDeletedDateFilter = .all
     @State private var categoryFilter: RecentlyDeletedCategoryFilter = .all
     @State private var sortOption: RecentlyDeletedSort = .recentlyDeleted
     @State private var previews: [LibraryEntry.ID: String] = [:]
+    @State private var selection: Set<LibraryEntry.ID> = []
+    @State private var lastSelected: LibraryEntry.ID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,6 +27,9 @@ struct MacRecentlyDeletedView: View {
                 dateFilter: $dateFilter,
                 categoryFilter: $categoryFilter
             )
+            if !selection.isEmpty {
+                selectionBar
+            }
             Divider().opacity(0.5)
             if model.deletedEntries.isEmpty {
                 empty
@@ -32,6 +38,10 @@ struct MacRecentlyDeletedView: View {
             } else {
                 list
             }
+        }
+        .onChange(of: model.deletedEntries) { _, entries in
+            let live = Set(entries.map(\.id))
+            previews = previews.filter { live.contains($0.key) }
         }
         .frame(minWidth: 620, minHeight: 460)
         .background(DS.Color.surface)
@@ -51,6 +61,22 @@ struct MacRecentlyDeletedView: View {
             Text("This can't be undone.")
         }
         .confirmationDialog(
+            "Delete \(confirmingPurgeBulk.count) items permanently?",
+            isPresented: Binding(
+                get: { !confirmingPurgeBulk.isEmpty },
+                set: { if !$0 { confirmingPurgeBulk = [] } }
+            )
+        ) {
+            Button("Delete permanently", role: .destructive) {
+                for id in confirmingPurgeBulk { model.purgeEntry(id) }
+                confirmingPurgeBulk = []
+                selection = []
+            }
+            Button("Cancel", role: .cancel) { confirmingPurgeBulk = [] }
+        } message: {
+            Text("This can't be undone.")
+        }
+        .confirmationDialog(
             "Empty Recently Deleted?",
             isPresented: $confirmingEmpty
         ) {
@@ -61,6 +87,33 @@ struct MacRecentlyDeletedView: View {
         } message: {
             Text("All \(model.deletedEntries.count) items will be deleted for good.")
         }
+    }
+
+    private var selectionBar: some View {
+        HStack(spacing: DS.Spacing.regular) {
+            Text("\(selection.count) selected")
+                .font(DS.Font.body.weight(.medium))
+            Spacer()
+            Button {
+                for id in selection { model.restoreEntry(id) }
+                selection = []
+            } label: {
+                Label("Restore", systemImage: "arrow.uturn.backward")
+            }
+            .buttonStyle(.bordered)
+            Button(role: .destructive) {
+                confirmingPurgeBulk = selection
+            } label: {
+                Label("Delete permanently", systemImage: "trash")
+            }
+            .buttonStyle(.bordered)
+            Button("Clear selection") { selection = [] }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.small)
+        .background(DS.Color.surfaceElevated)
     }
 
     private var list: some View {
@@ -91,9 +144,10 @@ struct MacRecentlyDeletedView: View {
                     RecentlyDeletedRow(
                         entry: entry,
                         preview: previews[entry.id],
+                        isSelected: selection.contains(entry.id),
                         onRestore: { model.restoreEntry(entry.id) },
                         onPurge: { confirmingPurge = entry.id },
-                        onTap: { model.loadEntry(entry.id) }
+                        onTap: { handleTap(entry: entry, modifiers: NSEvent.modifierFlags) }
                     )
                     .task(id: entry.id) {
                         await loadPreview(for: entry)
@@ -176,6 +230,40 @@ struct MacRecentlyDeletedView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM yyyy"
         return formatter.string(from: date)
+    }
+
+    private func handleTap(entry: LibraryEntry, modifiers: NSEvent.ModifierFlags) {
+        if modifiers.contains(.command) {
+            toggle(entry.id)
+            lastSelected = entry.id
+            return
+        }
+        if modifiers.contains(.shift), let anchor = lastSelected {
+            extendSelection(from: anchor, to: entry.id)
+            return
+        }
+        if !selection.isEmpty {
+            selection = [entry.id]
+            lastSelected = entry.id
+            return
+        }
+        model.loadEntry(entry.id)
+    }
+
+    private func toggle(_ id: LibraryEntry.ID) {
+        if selection.contains(id) {
+            selection.remove(id)
+        } else {
+            selection.insert(id)
+        }
+    }
+
+    private func extendSelection(from anchor: LibraryEntry.ID, to current: LibraryEntry.ID) {
+        let ordered = sorted
+        guard let a = ordered.firstIndex(where: { $0.id == anchor }),
+              let b = ordered.firstIndex(where: { $0.id == current }) else { return }
+        let range = (min(a, b)...max(a, b)).map { ordered[$0].id }
+        selection.formUnion(range)
     }
 
     private func loadPreview(for entry: LibraryEntry) async {

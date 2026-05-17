@@ -49,6 +49,7 @@ struct ParolaApp: App {
                 Button("Find…") { model.toggleFind() }
                     .keyboardShortcut("f", modifiers: [.command])
                     .disabled(model.transcript == nil)
+                FocusChatComposerCommand()
             }
             CommandMenu("Captions") {
                 Button(model.liveCaptions.isActive ? "Stop Live Captions" : "Start Live Captions") {
