@@ -36,6 +36,8 @@ struct RecordingPane: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { startedAt = Date() }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Recording from \(source.label.lowercased()), \(stateLabel.lowercased())")
     }
 }
 

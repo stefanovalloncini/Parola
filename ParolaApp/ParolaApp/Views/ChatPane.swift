@@ -200,6 +200,8 @@ private struct ChatBubble: View {
             }
         }
         .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(message.role == .user ? "You" : "Assistant"): \(message.text)")
     }
 
     private var bubble: some View {
