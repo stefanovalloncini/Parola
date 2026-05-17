@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Bump the Parola version, regenerate Xcode projects, commit, and tag.
+# Bump the Parola version, regenerate Xcode projects, build, test, commit, and tag.
 #
-# Usage: scripts/bump.sh X.Y.Z [--dry-run]
+# Usage: scripts/bump.sh X.Y.Z [--dry-run] [--skip-tests]
 #
 # Updates:
 #   ParolaCore/Sources/ParolaCore/Parola.swift   (version literal)
 #   ParolaApp/project.yml                         (MARKETING_VERSION + CURRENT_PROJECT_VERSION)
 #   ParolaiOS/project.yml                         (same)
 # Regenerates both .xcodeproj files via xcodegen.
+# Runs swift build, swift test, and an xcodebuild build for the macOS app.
 # Commits the change with subject "release vX.Y.Z" and creates annotated tag vX.Y.Z.
 #
 # Does NOT push. When ready: git push --follow-tags origin main
@@ -16,18 +17,21 @@ set -euo pipefail
 
 NEW="${1:-}"
 DRY_RUN=0
+SKIP_TESTS=0
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
+    --skip-tests) SKIP_TESTS=1 ;;
   esac
 done
 
 if [[ ! "$NEW" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   cat <<EOF
-Usage: scripts/bump.sh <X.Y.Z> [--dry-run]
+Usage: scripts/bump.sh <X.Y.Z> [--dry-run] [--skip-tests]
 
-  X.Y.Z      Semver. Must be greater than the current version.
-  --dry-run  Show the diff but don't write, commit, or tag.
+  X.Y.Z         Semver. Must be greater than the current version.
+  --dry-run     Show the diff but don't write, commit, or tag.
+  --skip-tests  Skip the swift test + xcodebuild gate. Use only if you've just run them.
 
 Examples:
   scripts/bump.sh 0.2.0
@@ -51,6 +55,18 @@ if [ "$DRY_RUN" -eq 0 ]; then
     exit 1
   fi
 fi
+
+for yml in ParolaApp/project.yml ParolaiOS/project.yml; do
+  if ! grep -qE 'MARKETING_VERSION: +"[0-9]+\.[0-9]+\.[0-9]+"' "$yml"; then
+    echo "✘ $yml does not use quoted MARKETING_VERSION (e.g. MARKETING_VERSION: \"X.Y.Z\")."
+    echo "  bump.sh's sed only matches the quoted form. Fix the file first."
+    exit 1
+  fi
+  if ! grep -qE 'CURRENT_PROJECT_VERSION: +"[0-9]+"' "$yml"; then
+    echo "✘ $yml does not use quoted CURRENT_PROJECT_VERSION (e.g. CURRENT_PROJECT_VERSION: \"42\")."
+    exit 1
+  fi
+done
 
 CURRENT=$(grep -E 'MARKETING_VERSION:' ParolaApp/project.yml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 SWIFT_CURRENT=$(grep -E 'public static let version' ParolaCore/Sources/ParolaCore/Parola.swift | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
@@ -106,8 +122,38 @@ for yml in ParolaApp/project.yml ParolaiOS/project.yml; do
     "$yml"
 done
 
+NEW_IN_FILE=$(grep -E 'MARKETING_VERSION:' ParolaApp/project.yml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+if [ "$NEW_IN_FILE" != "$NEW" ]; then
+  echo "✘ sed did not update MARKETING_VERSION (file still shows $NEW_IN_FILE)."
+  echo "  Reverting changes."
+  git checkout -- ParolaCore/Sources/ParolaCore/Parola.swift ParolaApp/project.yml ParolaiOS/project.yml
+  exit 1
+fi
+
 (cd ParolaApp && xcodegen generate >/dev/null)
 (cd ParolaiOS && xcodegen generate >/dev/null)
+
+if [ "$SKIP_TESTS" -eq 0 ]; then
+  echo "▶ Verifying ParolaCore builds and tests pass…"
+  if ! (cd ParolaCore && swift build); then
+    echo "✘ swift build failed for ParolaCore. Not tagging."
+    exit 1
+  fi
+  if ! (cd ParolaCore && swift test); then
+    echo "✘ swift test failed for ParolaCore. Not tagging."
+    exit 1
+  fi
+
+  echo "▶ Verifying ParolaApp builds…"
+  if ! xcodebuild \
+        -project ParolaApp/ParolaApp.xcodeproj \
+        -scheme ParolaApp \
+        -configuration Debug \
+        build CODE_SIGNING_ALLOWED=NO | xcpretty; then
+    echo "✘ xcodebuild failed for ParolaApp. Not tagging."
+    exit 1
+  fi
+fi
 
 git add \
   ParolaCore/Sources/ParolaCore/Parola.swift \

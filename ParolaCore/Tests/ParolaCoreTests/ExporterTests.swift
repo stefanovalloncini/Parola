@@ -235,7 +235,7 @@ struct ExporterTests {
 
     @Test("renderText throws for binary docx")
     func renderTextThrowsForBinary() throws {
-        #expect(throws: Error.self) { _ = try DocxExporter().renderText(sample()) }
+        #expect(throws: ParolaError.self) { _ = try DocxExporter().renderText(sample()) }
     }
 
     @Test("Zip.crc32 matches known values")
@@ -286,6 +286,6 @@ struct ExporterTests {
 
     @Test("renderText throws for binary pdf")
     func renderTextThrowsForPdf() throws {
-        #expect(throws: Error.self) { _ = try PdfExporter().renderText(sample()) }
+        #expect(throws: ParolaError.self) { _ = try PdfExporter().renderText(sample()) }
     }
 }

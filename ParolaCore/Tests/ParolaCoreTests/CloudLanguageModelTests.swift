@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-@Suite("BYOK cloud language model")
+@Suite("BYOK cloud language model", .tags(.networking))
 struct CloudLanguageModelTests {
     @Test("OpenAI request has bearer auth, JSON body with role messages, and POSTs to /chat/completions")
     func openAIRequest() async throws {

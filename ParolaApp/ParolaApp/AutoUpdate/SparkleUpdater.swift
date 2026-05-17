@@ -23,6 +23,16 @@ enum SparkleChannel: String, CaseIterable, Identifiable {
         case .daily:  return "Every main-branch build. Expect bugs."
         }
     }
+
+    /// Allow-list passed to Sparkle for this channel. `stable` returns an empty
+    /// set, which Sparkle treats as "no channel filter, ship items with no channel attribute".
+    var allowedChannels: Set<String> {
+        switch self {
+        case .stable: return []
+        case .rc:     return ["rc"]
+        case .daily:  return ["rc", "daily"]
+        }
+    }
 }
 
 @MainActor
@@ -84,10 +94,6 @@ private final class ChannelAwareDriver: NSObject, SPUUpdaterDelegate {
     }
 
     func allowedChannels(for updater: SPUUpdater) -> Set<String> {
-        switch channel {
-        case .stable: return []
-        case .rc:     return ["rc"]
-        case .daily:  return ["rc", "daily"]
-        }
+        channel.allowedChannels
     }
 }

@@ -139,3 +139,32 @@ targets:
     dependencies:
       - package: ParolaCore
         product: ParolaCore
+
+  ParolaAppTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: ParolaAppTests
+    dependencies:
+      - target: ParolaApp
+      - package: ParolaCore
+        product: ParolaCore
+      - package: Sparkle
+        product: Sparkle
+    settings:
+      base:
+        PRODUCT_NAME: ParolaAppTests
+        SWIFT_STRICT_CONCURRENCY: complete
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Parola.app/Contents/MacOS/Parola"
+
+schemes:
+  ParolaApp:
+    build:
+      targets:
+        ParolaApp: all
+        ParolaAppTests: [test]
+    test:
+      targets:
+        - ParolaAppTests

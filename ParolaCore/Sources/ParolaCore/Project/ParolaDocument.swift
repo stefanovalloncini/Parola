@@ -119,7 +119,11 @@ public struct ParolaDocument: Sendable {
         guard fm.fileExists(atPath: url.path) else {
             throw ParolaError.ioError("Parola document does not exist: \(url.path)")
         }
-        let manifest: Manifest = try readJSON(at: url.appendingPathComponent("manifest.json"))
+        let manifestURL = url.appendingPathComponent("manifest.json")
+        guard fm.fileExists(atPath: manifestURL.path) else {
+            throw ParolaError.ioError("Parola document is missing manifest.json: \(url.path)")
+        }
+        let manifest: Manifest = try readJSON(at: manifestURL)
         guard manifest.version <= Manifest.currentVersion else {
             throw ParolaError.ioError("Parola document version \(manifest.version) is newer than this app understands.")
         }

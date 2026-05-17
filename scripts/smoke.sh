@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # End-to-end smoke test for the parola CLI.
 # Synthesizes speech, transcribes it, checks the output contains expected keywords.
+#
+# First run downloads openai_whisper-tiny (~75 MB). CI runners should pre-cache
+# ~/Documents/huggingface/argmaxinc/whisperkit-coreml/openai_whisper-tiny
+# to skip the download.
+#
+# The keywords below are common English words that tiny consistently transcribes
+# correctly. Proper nouns (Parola, Whisper, Apple) mis-transcribe at tiny size,
+# so the asserts target plainer vocabulary.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -28,7 +36,7 @@ echo "── Output ──"
 echo "$OUT"
 echo "────────────"
 
-EXPECT_KEYWORDS=("Whisper" "Apple")
+EXPECT_KEYWORDS=("transcribe" "audio" "model")
 FAILED=0
 for kw in "${EXPECT_KEYWORDS[@]}"; do
   if ! echo "$OUT" | grep -qi "$kw"; then

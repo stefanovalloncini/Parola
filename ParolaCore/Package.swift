@@ -39,12 +39,18 @@ let package = Package(
         ),
         .executableTarget(
             name: "parola-mcp",
-            dependencies: ["ParolaCore", "ParolaMCP"]
+            dependencies: ["ParolaMCP"]
         ),
         .testTarget(
             name: "ParolaCoreTests",
             dependencies: ["ParolaCore"],
-            resources: [.process("Resources")]
+            resources: [
+                .process("Resources/sample.srt"),
+                .process("Resources/sample.vtt"),
+                .process("Resources/sample-crlf.srt"),
+                .copy("Resources/tiny.parola"),
+                .copy("Resources/expected"),
+            ]
         ),
         .testTarget(
             name: "ParolaMCPTests",

@@ -1,15 +1,25 @@
 import Foundation
+import os
 import Testing
 @testable import ParolaCore
 
-@Suite("Engine memory footprint")
+final class LiveCounter: Sendable {
+    private let lock = OSAllocatedUnfairLock(initialState: 0)
+    func increment() { lock.withLock { $0 += 1 } }
+    func decrement() { lock.withLock { $0 -= 1 } }
+    func reset() { lock.withLock { $0 = 0 } }
+    var count: Int { lock.withLock { $0 } }
+}
+
+@Suite("Engine memory footprint", .serialized, .tags(.slow))
 struct MemoryFootprintTests {
+    static let counter = LiveCounter()
+
     actor TrackedTranscriber: Transcriber {
         static let engineID = EngineID("tracked")
         static let capabilities = EngineCapabilities.whisperKitDefaults
-        nonisolated(unsafe) static var liveCount: Int = 0
-        init() { Self.liveCount += 1 }
-        deinit { Self.liveCount -= 1 }
+        init() { MemoryFootprintTests.counter.increment() }
+        deinit { MemoryFootprintTests.counter.decrement() }
         func load(model: String) async throws {}
         func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
             Transcript(segments: [], language: "en", modelName: "tracked", sourceURL: url)
@@ -20,7 +30,7 @@ struct MemoryFootprintTests {
 
     @Test("registry resolution does not retain transcribers across cycles")
     func registryNoRetain() async throws {
-        TrackedTranscriber.liveCount = 0
+        Self.counter.reset()
         let registry = EngineRegistry()
         await registry.register(
             engineID: TrackedTranscriber.engineID,
@@ -28,15 +38,20 @@ struct MemoryFootprintTests {
         ) { _ in TrackedTranscriber() }
 
         let store = ModelStore(modelsDirectory: FileManager.default.temporaryDirectory.appendingPathComponent("mem-\(UUID().uuidString)"))
-        for _ in 0..<5 {
-            autoreleasepool {
-                Task {
-                    let _ = try? await registry.transcriber(for: TrackedTranscriber.engineID, store: store)
+
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<5 {
+                group.addTask {
+                    _ = try? await registry.transcriber(for: TrackedTranscriber.engineID, store: store)
                 }
             }
         }
-        try? await Task.sleep(nanoseconds: 100_000_000)
-        #expect(TrackedTranscriber.liveCount <= 5, "live count is \(TrackedTranscriber.liveCount)")
+
+        for _ in 0..<20 {
+            if Self.counter.count == 0 { break }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        #expect(Self.counter.count == 0, "transcribers leaked across registry resolution: \(Self.counter.count) still alive")
     }
 
     @Test("resident memory of TranscriptionSession is bounded after idle-unload",
@@ -54,11 +69,11 @@ struct MemoryFootprintTests {
         ) { _ in TrackedTranscriber() }
         let session = TranscriptionSession(modelStore: store, registry: registry, idleTimeout: 0.25)
 
-        TrackedTranscriber.liveCount = 0
+        Self.counter.reset()
         for _ in 0..<3 {
             await session.unloadModel()
         }
-        #expect(TrackedTranscriber.liveCount == 0)
+        #expect(Self.counter.count == 0)
     }
 
     @Test("resident size from mach_task_basic_info is reportable",
@@ -69,8 +84,7 @@ struct MemoryFootprintTests {
     }
 }
 
-/// Returns the process's current resident set size in bytes via mach_task_basic_info.
-/// Returns 0 if the call fails.
+/// Process RSS via mach_task_basic_info, in bytes. Returns 0 on failure.
 func currentResidentBytes() -> UInt64 {
     var info = mach_task_basic_info()
     var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info_data_t>.size / MemoryLayout<natural_t>.size)

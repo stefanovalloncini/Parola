@@ -56,4 +56,19 @@ Synthesizes test speech with `say`, transcribes it with the `tiny` model, assert
 
 ```sh
 cd ParolaCore && swift test
+
+# Run the macOS app's unit tests through Xcode:
+xcodebuild -project ParolaApp/ParolaApp.xcodeproj \
+    -scheme ParolaApp -destination 'platform=macOS' test
 ```
+
+GitHub Actions runs both suites on every push and PR (see `.github/workflows/test.yml`).
+
+### Pre-commit hook (optional)
+
+```sh
+git config core.hooksPath .githooks
+```
+
+This runs a fast subset of `swift test` on every commit that touches Swift sources.
+Skip once with `git commit --no-verify`.

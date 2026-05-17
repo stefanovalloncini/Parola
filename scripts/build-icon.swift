@@ -3,9 +3,36 @@ import AppKit
 import CoreGraphics
 
 // Generates the macOS AppIcon set for Parola.
-// Run from the repo root: `swift scripts/build-icon.swift`
+// Run from the repo root: `swift scripts/build-icon.swift [--force]`
+//
+// The PNGs are committed. Without --force, the script refuses to overwrite
+// them — a stray run would otherwise silently change the brand icon.
+
+let args = CommandLine.arguments
+let force = args.contains("--force") || args.contains("-f")
+
+if args.contains("--help") || args.contains("-h") {
+    print("""
+    Usage: swift scripts/build-icon.swift [--force]
+
+      --force, -f   Overwrite committed AppIcon.appiconset PNGs.
+
+    The generated icons are committed to the repo. Run this only when changing
+    the brand icon, and commit the regenerated files together with whatever
+    drove the change.
+    """)
+    exit(0)
+}
 
 let outDir = URL(fileURLWithPath: "ParolaApp/ParolaApp/Resources/Assets.xcassets/AppIcon.appiconset")
+
+let existingPNGs = (try? FileManager.default.contentsOfDirectory(at: outDir, includingPropertiesForKeys: nil)
+    .filter { $0.pathExtension == "png" }) ?? []
+if !existingPNGs.isEmpty && !force {
+    print("✘ \(outDir.path) already has \(existingPNGs.count) committed PNGs.")
+    print("  Re-run with --force to overwrite them.")
+    exit(1)
+}
 
 let sizes: [(name: String, pixels: Int)] = [
     ("icon_16x16.png",       16),

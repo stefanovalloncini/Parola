@@ -2,7 +2,7 @@ import Testing
 import Foundation
 @testable import ParolaCore
 
-@Suite("LibraryStore")
+@Suite("LibraryStore", .tags(.fileSystem))
 struct LibraryStoreTests {
     private func makeTempLibrary() throws -> (LibraryStore, URL) {
         let tmp = FileManager.default.temporaryDirectory

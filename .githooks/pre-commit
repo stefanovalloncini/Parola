@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Run a fast subset of ParolaCore's swift test on every commit.
+#
+# Install:
+#   git config core.hooksPath .githooks
+#
+# Skip for one commit:
+#   git commit --no-verify ...
+#
+# Skip permanently for this repo:
+#   git config core.hooksPath ""
+#
+# The hook only runs when Swift sources changed. Tests are filtered by Tag —
+# anything tagged .slow is skipped (see ParolaCore/Tests/ParolaCoreTests/Tags.swift).
+set -euo pipefail
+
+REPO="$(git rev-parse --show-toplevel)"
+cd "$REPO"
+
+STAGED_SWIFT=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.swift$' || true)
+if [ -z "$STAGED_SWIFT" ]; then
+    exit 0
+fi
+
+echo "▶ Pre-commit: running swift test (excluding .slow) on ParolaCore…"
+
+cd ParolaCore
+if ! swift build --target ParolaCoreTests >/dev/null 2>&1; then
+    echo "✘ swift build failed. Fix compile errors before committing."
+    swift build --target ParolaCoreTests
+    exit 1
+fi
+
+if ! swift test --skip MemoryFootprintTests --parallel; then
+    echo "✘ swift test failed. Fix the failing tests before committing."
+    echo "  To bypass once (not recommended): git commit --no-verify"
+    exit 1
+fi
+
+echo "✓ Pre-commit: tests green."

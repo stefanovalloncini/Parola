@@ -1,0 +1,8 @@
+{
+  "category" : "transcription",
+  "createdAt" : "2030-01-01T00:00:00Z",
+  "language" : "en",
+  "modelName" : "openai_whisper-tiny",
+  "originalAudioName" : "",
+  "version" : 1
+}
