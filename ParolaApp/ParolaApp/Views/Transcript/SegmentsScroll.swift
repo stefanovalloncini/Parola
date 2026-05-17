@@ -127,6 +127,8 @@ struct SegmentCard: View {
     @State private var hovering: Bool = false
     @State private var isEditing: Bool = false
     @State private var draftText: String = ""
+    @State private var renamingSpeaker: Bool = false
+    @State private var draftSpeakerName: String = ""
     @FocusState private var editingFocus: Bool
 
     private let radius: CGFloat = 12
@@ -145,6 +147,12 @@ struct SegmentCard: View {
                     Text(speaker)
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.speakerColor(for: speaker))
+                        .contextMenu {
+                            Button("Rename \(speaker)…") {
+                                draftSpeakerName = speaker
+                                renamingSpeaker = true
+                            }
+                        }
                 }
             }
         }
@@ -170,6 +178,15 @@ struct SegmentCard: View {
         }
         .onTapGesture {
             if !isEditing { model.seek(to: segment) }
+        }
+        .alert("Rename speaker", isPresented: $renamingSpeaker, presenting: segment.speaker) { current in
+            TextField("Name", text: $draftSpeakerName)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") {
+                let trimmed = draftSpeakerName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty, trimmed != current else { return }
+                model.applySpeakerRenames([current: trimmed])
+            }
         }
     }
 
