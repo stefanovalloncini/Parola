@@ -60,7 +60,11 @@ struct RootView: View {
             }
             .navigationTitle("Parola")
             .toolbar { toolbarItems }
-            .searchable(text: $searchText, prompt: "Search transcripts")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search transcripts"
+            )
             .onChange(of: searchText) { _, newValue in model.search(newValue) }
             .navigationDestination(item: $selectedEntry) { id in
                 TranscriptDetailView(entryID: id)
@@ -77,7 +81,11 @@ struct RootView: View {
             }
             .navigationTitle("Parola")
             .toolbar { toolbarItems }
-            .searchable(text: $searchText, prompt: "Search transcripts")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Search transcripts"
+            )
             .onChange(of: searchText) { _, newValue in model.search(newValue) }
         } detail: {
             if let id = selectedEntry {

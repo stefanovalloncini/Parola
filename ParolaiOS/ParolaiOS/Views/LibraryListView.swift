@@ -4,40 +4,128 @@ import ParolaCore
 struct LibraryListView: View {
     @EnvironmentObject var model: AppModel
     @Binding var selection: LibraryEntry.ID?
+    @State private var category: EntryCategory?
+    @State private var sortOrder: SortOrder = .newestFirst
+
+    enum SortOrder: String, CaseIterable, Identifiable {
+        case newestFirst
+        case oldestFirst
+        case titleAscending
+        case titleDescending
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .newestFirst: return "Newest first"
+            case .oldestFirst: return "Oldest first"
+            case .titleAscending: return "Title A→Z"
+            case .titleDescending: return "Title Z→A"
+            }
+        }
+    }
 
     private var displayed: [LibraryEntry] {
-        model.searchResults ?? model.libraryEntries
+        let base = model.searchResults ?? model.libraryEntries
+        let filtered = category.map { c in base.filter { $0.category == c } } ?? base
+        return sort(filtered)
+    }
+
+    private func sort(_ entries: [LibraryEntry]) -> [LibraryEntry] {
+        switch sortOrder {
+        case .newestFirst:
+            return entries.sorted { $0.createdAt > $1.createdAt }
+        case .oldestFirst:
+            return entries.sorted { $0.createdAt < $1.createdAt }
+        case .titleAscending:
+            return entries.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        case .titleDescending:
+            return entries.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
+        }
     }
 
     private var isSearching: Bool { model.searchResults != nil }
 
     var body: some View {
-        Group {
-            if displayed.isEmpty {
-                if isSearching {
-                    ContentUnavailableView.search
-                } else {
-                    EmptyLibraryView()
-                }
+        VStack(spacing: 0) {
+            filterChips
+            content
+        }
+        .toolbar { sortMenu }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if displayed.isEmpty {
+            if isSearching {
+                ContentUnavailableView.search
+            } else if category != nil {
+                ContentUnavailableView(
+                    "No entries in this category",
+                    systemImage: "tray",
+                    description: Text("Pick another filter to see more.")
+                )
             } else {
-                List(selection: $selection) {
-                    ForEach(EntryCategory.allCases, id: \.self) { category in
-                        let entries = displayed.filter { $0.category == category }
-                        if !entries.isEmpty {
-                            Section(Self.label(for: category)) {
-                                ForEach(entries) { entry in
-                                    row(entry).tag(entry.id)
-                                }
-                                .onDelete { offsets in
-                                    let ids = offsets.map { entries[$0].id }
-                                    for id in ids { model.deleteEntry(id) }
-                                }
+                EmptyLibraryView()
+            }
+        } else {
+            List(selection: $selection) {
+                ForEach(EntryCategory.allCases, id: \.self) { category in
+                    let entries = displayed.filter { $0.category == category }
+                    if !entries.isEmpty {
+                        Section(Self.label(for: category)) {
+                            ForEach(entries) { entry in
+                                row(entry).tag(entry.id)
+                            }
+                            .onDelete { offsets in
+                                let ids = offsets.map { entries[$0].id }
+                                for id in ids { model.deleteEntry(id) }
                             }
                         }
                     }
                 }
-                .listStyle(.plain)
             }
+            .listStyle(.plain)
+        }
+    }
+
+    private var filterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                chip(label: "All", value: nil)
+                ForEach(EntryCategory.allCases, id: \.self) { c in
+                    chip(label: Self.label(for: c), value: c)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private func chip(label: String, value: EntryCategory?) -> some View {
+        let selected = category == value
+        return Button(label) {
+            category = value
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .buttonBorderShape(.capsule)
+        .tint(selected ? .accentColor : .secondary)
+    }
+
+    @ToolbarContentBuilder
+    private var sortMenu: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                Picker("Sort", selection: $sortOrder) {
+                    ForEach(SortOrder.allCases) { order in
+                        Text(order.label).tag(order)
+                    }
+                }
+            } label: {
+                Image(systemName: "arrow.up.arrow.down")
+            }
+            .accessibilityLabel(Text("Sort"))
         }
     }
 
