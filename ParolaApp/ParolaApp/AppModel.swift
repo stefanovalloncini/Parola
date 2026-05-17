@@ -454,7 +454,7 @@ final class AppModel: ObservableObject {
             if chunk.isEmpty {
                 fh.readabilityHandler = nil
             } else {
-                buffer.append(chunk)
+                Task { await buffer.append(chunk) }
             }
         }
 
@@ -467,12 +467,14 @@ final class AppModel: ObservableObject {
         return await withCheckedContinuation { cont in
             proc.terminationHandler = { p in
                 pipe.fileHandleForReading.readabilityHandler = nil
-                let output = buffer.string()
-                if p.terminationStatus == 0 {
-                    cont.resume(returning: .success)
-                } else {
-                    let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                    cont.resume(returning: .failure(detail.isEmpty ? "brew exited with status \(p.terminationStatus)." : detail))
+                Task {
+                    let output = await buffer.string()
+                    if p.terminationStatus == 0 {
+                        cont.resume(returning: .success)
+                    } else {
+                        let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                        cont.resume(returning: .failure(detail.isEmpty ? "brew exited with status \(p.terminationStatus)." : detail))
+                    }
                 }
             }
         }
@@ -802,17 +804,14 @@ final class AppModel: ObservableObject {
     }
 }
 
-private final class ProcessOutputBuffer: @unchecked Sendable {
+private actor ProcessOutputBuffer {
     private var data = Data()
-    private let lock = NSLock()
 
     func append(_ chunk: Data) {
-        lock.lock(); defer { lock.unlock() }
         data.append(chunk)
     }
 
     func string() -> String {
-        lock.lock(); defer { lock.unlock() }
-        return String(data: data, encoding: .utf8) ?? ""
+        String(decoding: data, as: UTF8.self)
     }
 }
