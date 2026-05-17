@@ -9,12 +9,29 @@ struct TranscriptDetailView: View {
     @State private var loadError: String?
     @State private var showingChat: Bool = false
     @State private var showingSpeakers: Bool = false
+    @State private var query: String = ""
+    @State private var currentMatchIndex: Int = 0
+    @State private var selectedSpeaker: String?
 
     var body: some View {
         Group {
             if let loaded {
+                let speakers = loaded.document.transcript.uniqueSpeakers
+                let filtered = filteredSegments(in: loaded.document.transcript)
+                let matchIDs = matchingSegmentIDs(in: filtered)
                 VStack(spacing: 0) {
-                    TranscriptScrollView(loaded: loaded)
+                    if speakers.count >= 2 {
+                        SpeakerChipRow(
+                            speakers: speakers,
+                            selection: $selectedSpeaker
+                        )
+                    }
+                    TranscriptScrollView(
+                        segments: filtered,
+                        query: trimmedQuery,
+                        matchingIDs: matchIDs,
+                        targetMatchID: targetMatchID(in: matchIDs)
+                    )
                     if playback.hasAudio {
                         PlayerBar()
                     }
@@ -49,7 +66,24 @@ struct TranscriptDetailView: View {
                     ToolbarItem(placement: .topBarTrailing) {
                         ShareLink(item: loaded.document.transcript.text)
                     }
+                    ToolbarItemGroup(placement: .keyboard) {
+                        if !matchIDs.isEmpty {
+                            Text("\(currentMatchIndex + 1) / \(matchIDs.count)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button {
+                                advanceMatch(total: matchIDs.count)
+                            } label: {
+                                Image(systemName: "chevron.down")
+                            }
+                            .accessibilityLabel(Text("Next match"))
+                        }
+                    }
                 }
+                .searchable(text: $query, prompt: "Search transcript")
+                .onChange(of: query) { _, _ in currentMatchIndex = 0 }
+                .onChange(of: selectedSpeaker) { _, _ in currentMatchIndex = 0 }
                 .sheet(isPresented: $showingChat) {
                     ChatSheet(entry: loaded.entry, transcript: loaded.document.transcript)
                         .environmentObject(model)
@@ -86,21 +120,97 @@ struct TranscriptDetailView: View {
         }
         .onDisappear { playback.pause() }
     }
+
+    private var trimmedQuery: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func filteredSegments(in transcript: Transcript) -> [TranscriptSegment] {
+        guard let speaker = selectedSpeaker else { return transcript.segments }
+        return transcript.segments.filter { $0.speaker == speaker }
+    }
+
+    private func matchingSegmentIDs(in segments: [TranscriptSegment]) -> [TranscriptSegment.ID] {
+        let q = trimmedQuery
+        guard !q.isEmpty else { return [] }
+        return segments
+            .filter { $0.text.range(of: q, options: .caseInsensitive) != nil }
+            .map(\.id)
+    }
+
+    private func targetMatchID(in matches: [TranscriptSegment.ID]) -> TranscriptSegment.ID? {
+        guard !matches.isEmpty else { return nil }
+        let safeIndex = min(max(0, currentMatchIndex), matches.count - 1)
+        return matches[safeIndex]
+    }
+
+    private func advanceMatch(total: Int) {
+        guard total > 0 else { return }
+        currentMatchIndex = (currentMatchIndex + 1) % total
+    }
+}
+
+private struct SpeakerChipRow: View {
+    let speakers: [String]
+    @Binding var selection: String?
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                Chip(label: "All", isSelected: selection == nil) { selection = nil }
+                ForEach(speakers, id: \.self) { speaker in
+                    Chip(label: speaker, isSelected: selection == speaker) {
+                        selection = (selection == speaker) ? nil : speaker
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 6)
+        }
+        .background(.bar)
+    }
+
+    private struct Chip: View {
+        let label: String
+        let isSelected: Bool
+        let action: () -> Void
+
+        var body: some View {
+            Button(action: action) {
+                Text(label)
+                    .font(.subheadline)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule().fill(isSelected ? Color.accentColor : Color(.secondarySystemFill))
+                    )
+                    .foregroundStyle(isSelected ? Color.white : Color.primary)
+            }
+            .buttonStyle(.plain)
+        }
+    }
 }
 
 private struct TranscriptScrollView: View {
-    let loaded: LoadedEntry
+    let segments: [TranscriptSegment]
+    let query: String
+    let matchingIDs: [TranscriptSegment.ID]
+    let targetMatchID: TranscriptSegment.ID?
     @Environment(PlaybackController.self) private var playback
+
+    private var matchSet: Set<TranscriptSegment.ID> { Set(matchingIDs) }
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
-                    ForEach(loaded.document.transcript.segments) { segment in
+                    ForEach(segments) { segment in
                         SegmentView(
                             segment: segment,
                             activeSegmentID: playback.currentSegmentID,
-                            activeWordID: playback.currentWordID
+                            activeWordID: playback.currentWordID,
+                            query: query,
+                            isDimmed: !query.isEmpty && !matchSet.contains(segment.id)
                         )
                         .id(segment.id)
                     }
@@ -108,6 +218,12 @@ private struct TranscriptScrollView: View {
                 .padding()
             }
             .onChange(of: playback.currentSegmentID) { _, id in
+                guard let id else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(id, anchor: .center)
+                }
+            }
+            .onChange(of: targetMatchID) { _, id in
                 guard let id else { return }
                 withAnimation(.easeInOut(duration: 0.2)) {
                     proxy.scrollTo(id, anchor: .center)
@@ -121,11 +237,15 @@ private struct SegmentView: View, Equatable {
     let segment: TranscriptSegment
     let activeSegmentID: TranscriptSegment.ID?
     let activeWordID: WordTiming.ID?
+    let query: String
+    let isDimmed: Bool
 
     nonisolated static func == (lhs: SegmentView, rhs: SegmentView) -> Bool {
         lhs.segment.id == rhs.segment.id
             && lhs.activeSegmentID == rhs.activeSegmentID
             && lhs.activeWordID == rhs.activeWordID
+            && lhs.query == rhs.query
+            && lhs.isDimmed == rhs.isDimmed
     }
 
     private var isActive: Bool { activeSegmentID == segment.id }
@@ -136,11 +256,12 @@ private struct SegmentView: View, Equatable {
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
             if let words = segment.words, !words.isEmpty {
-                WordsView(words: words, activeWordID: activeWordID)
+                WordsView(words: words, activeWordID: activeWordID, query: query)
             } else {
-                SegmentTextView(text: segment.text, start: segment.start, isActive: isActive)
+                SegmentTextView(text: segment.text, start: segment.start, isActive: isActive, query: query)
             }
         }
+        .opacity(isDimmed ? 0.4 : 1)
     }
 
     private func timestamp(_ s: Double) -> String {
@@ -154,10 +275,11 @@ private struct SegmentTextView: View {
     let text: String
     let start: Double
     let isActive: Bool
+    let query: String
     @Environment(PlaybackController.self) private var playback
 
     var body: some View {
-        Text(text.trimmingCharacters(in: .whitespaces))
+        Text(highlighted(text: text.trimmingCharacters(in: .whitespaces), query: query))
             .onTapGesture { playback.seek(to: start) }
             .padding(6)
             .background(isActive ? Color.accentColor.opacity(0.15) : .clear)
@@ -168,11 +290,16 @@ private struct SegmentTextView: View {
 private struct WordsView: View {
     let words: [WordTiming]
     let activeWordID: WordTiming.ID?
+    let query: String
 
     var body: some View {
         FlowLayout(spacing: 4) {
             ForEach(words) { word in
-                WordChip(word: word, isActive: word.id == activeWordID)
+                WordChip(
+                    word: word,
+                    isActive: word.id == activeWordID,
+                    isMatch: !query.isEmpty && word.word.range(of: query, options: .caseInsensitive) != nil
+                )
             }
         }
     }
@@ -181,19 +308,41 @@ private struct WordsView: View {
 private struct WordChip: View, Equatable {
     let word: WordTiming
     let isActive: Bool
+    let isMatch: Bool
     @Environment(PlaybackController.self) private var playback
 
     nonisolated static func == (lhs: WordChip, rhs: WordChip) -> Bool {
-        lhs.word.id == rhs.word.id && lhs.isActive == rhs.isActive
+        lhs.word.id == rhs.word.id && lhs.isActive == rhs.isActive && lhs.isMatch == rhs.isMatch
     }
 
     var body: some View {
         Text(word.word)
+            .fontWeight(isMatch ? .semibold : .regular)
             .padding(.horizontal, 4).padding(.vertical, 2)
-            .background(isActive ? Color.accentColor.opacity(0.35) : .clear)
+            .background(background)
             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             .onTapGesture { playback.seek(to: word.start) }
     }
+
+    private var background: Color {
+        if isMatch { return Color.yellow.opacity(0.55) }
+        if isActive { return Color.accentColor.opacity(0.35) }
+        return .clear
+    }
+}
+
+private func highlighted(text: String, query: String) -> AttributedString {
+    var attributed = AttributedString(text)
+    guard !query.isEmpty else { return attributed }
+    var searchStart = text.startIndex
+    while let range = text.range(of: query, options: .caseInsensitive, range: searchStart..<text.endIndex) {
+        if let attrRange = Range(range, in: attributed) {
+            attributed[attrRange].backgroundColor = .yellow.opacity(0.55)
+            attributed[attrRange].font = .body.bold()
+        }
+        searchStart = range.upperBound
+    }
+    return attributed
 }
 
 private struct FlowLayout: Layout {
