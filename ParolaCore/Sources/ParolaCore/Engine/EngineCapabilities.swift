@@ -8,6 +8,7 @@ public struct EngineID: RawRepresentable, Hashable, Sendable, Codable, CustomStr
 
     public static let whisperKit = EngineID("whisperkit")
     public static let parakeet = EngineID("parakeet")
+    public static let appleSpeech = EngineID("apple-speech")
 }
 
 public enum SupportedLanguages: Sendable, Hashable {
@@ -65,6 +66,14 @@ public struct EngineCapabilities: Sendable, Hashable {
         supportsInitialPrompt: false,
         supportsWordTimestamps: true,
         supportsDiarization: true
+    )
+
+    public static let appleSpeechDefaults = EngineCapabilities(
+        supportedLanguages: .all,
+        supportsTranslate: false,
+        supportsInitialPrompt: false,
+        supportsWordTimestamps: true,
+        supportsDiarization: false
     )
 
     /// Combine engine capabilities with a per-variant language tightening.

@@ -1,7 +1,30 @@
 import Foundation
 
 public enum ModelCatalog {
-    public static let all: [ModelVariant] = [
+    public static let all: [ModelVariant] = appleSpeechVariants() + curated
+
+    private static func appleSpeechVariants() -> [ModelVariant] {
+        guard #available(macOS 26.0, iOS 26.0, *) else { return [] }
+        return [
+            ModelVariant(
+                id: AppleSpeechTranscriber.syntheticModelID,
+                displayName: "Apple Speech (system)",
+                tagline: "Built into macOS · no download · 50+ locales",
+                engineID: .appleSpeech,
+                sizeBytes: 0,
+                downloadSource: ModelDownloadSource(
+                    huggingFaceRepo: "apple/speech-analyzer",
+                    subpath: ""
+                ),
+                category: .recommended,
+                speedTier: .fastest,
+                qualityTier: .better,
+                badges: ["No download", "System"]
+            )
+        ]
+    }
+
+    private static let curated: [ModelVariant] = [
         ModelVariant(
             id: "openai_whisper-large-v3_turbo",
             displayName: "Whisper Large v3 Turbo",
@@ -133,9 +156,10 @@ public enum ModelCatalog {
     public static func staticCapabilities(for variant: ModelVariant) -> EngineCapabilities {
         let base: EngineCapabilities
         switch variant.engineID {
-        case .whisperKit: base = .whisperKitDefaults
-        case .parakeet:   base = .parakeetDefaults
-        default:          base = .whisperKitDefaults
+        case .whisperKit:  base = .whisperKitDefaults
+        case .parakeet:    base = .parakeetDefaults
+        case .appleSpeech: base = .appleSpeechDefaults
+        default:           base = .whisperKitDefaults
         }
         return base.tightened(by: variant.languageScope)
     }

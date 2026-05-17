@@ -111,7 +111,10 @@ public final class ModelStore: Sendable {
     }
 
     public func isInstalled(_ variant: String) -> Bool {
-        FileManager.default.fileExists(atPath: installedURL(for: variant).path)
+        if let entry = ModelCatalog.variant(id: variant), entry.engineID == .appleSpeech {
+            return true
+        }
+        return FileManager.default.fileExists(atPath: installedURL(for: variant).path)
     }
 
     /// Downloads a model variant into our cache directory. If already present, returns immediately.
@@ -132,6 +135,9 @@ public final class ModelStore: Sendable {
             return try await downloadViaWhisperKit(variant: variant, progress: progress)
         case .parakeet:
             return try await downloadViaHuggingFace(source: entry.downloadSource, progress: progress)
+        case .appleSpeech:
+            progress?(1.0)
+            return installedURL(for: entry.downloadSource)
         default:
             return try await downloadViaHuggingFace(source: entry.downloadSource, progress: progress)
         }

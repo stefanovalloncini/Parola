@@ -106,6 +106,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Parola uses Apple Speech to transcribe audio locally when you pick the Apple Speech engine.</string>
 	<key>NSSystemAudioCaptureUsageDescription</key>
 	<string>Parola captures system audio so it can transcribe what's playing on your Mac.</string>
 	<key>UTExportedTypeDeclarations</key>

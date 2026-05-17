@@ -16,5 +16,13 @@ public enum ParolaCoreBootstrap {
         ) { store in
             ParakeetTranscriber(modelStore: store)
         }
+        if #available(macOS 26.0, iOS 26.0, *) {
+            await registry.register(
+                engineID: AppleSpeechTranscriber.engineID,
+                capabilities: AppleSpeechTranscriber.capabilities
+            ) { store in
+                AppleSpeechTranscriber(modelStore: store)
+            }
+        }
     }
 }

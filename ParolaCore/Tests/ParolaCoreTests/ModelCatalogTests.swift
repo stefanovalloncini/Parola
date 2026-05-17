@@ -4,11 +4,10 @@ import Testing
 
 @Suite("Model catalog")
 struct ModelCatalogTests {
-    @Test("catalog includes Whisper Large v3 Turbo as the Recommended entry")
+    @Test("catalog includes Whisper Large v3 Turbo as a Recommended entry")
     func recommendedIsTurbo() {
         let recommended = ModelCatalog.all.filter { $0.category == .recommended }
         #expect(recommended.contains { $0.id == "openai_whisper-large-v3_turbo" })
-        #expect(recommended.count == 1)
     }
 
     @Test("Parakeet TDT 0.6B v2 is in the Fastest category and English-only")
@@ -25,10 +24,13 @@ struct ModelCatalogTests {
 
     @Test("every variant ships either a recognized engine or a non-empty download source")
     func everyVariantWellFormed() {
+        let known: Set<EngineID> = [.whisperKit, .parakeet, .appleSpeech]
         for variant in ModelCatalog.all {
-            #expect(!variant.downloadSource.huggingFaceRepo.isEmpty, "variant \(variant.id) has empty repo")
             #expect(!variant.displayName.isEmpty, "variant \(variant.id) has empty displayName")
-            #expect([EngineID.whisperKit, .parakeet].contains(variant.engineID), "variant \(variant.id) uses unknown engine \(variant.engineID)")
+            #expect(known.contains(variant.engineID), "variant \(variant.id) uses unknown engine \(variant.engineID)")
+            if variant.engineID != .appleSpeech {
+                #expect(!variant.downloadSource.huggingFaceRepo.isEmpty, "variant \(variant.id) has empty repo")
+            }
         }
     }
 
