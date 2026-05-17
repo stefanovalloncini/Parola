@@ -1,0 +1,94 @@
+import SwiftUI
+import ParolaCore
+
+struct ConfidenceSection: View {
+    @EnvironmentObject var model: AppModel
+    @State private var expanded = false
+
+    private var transcript: Transcript? { model.transcript }
+
+    private var overall: Double? {
+        guard let transcript else { return nil }
+        return SegmentConfidence.transcriptAverage(for: transcript)
+    }
+
+    private var lows: [TranscriptSegment] {
+        guard let transcript else { return [] }
+        return SegmentConfidence.lowConfidence(segments: transcript.segments)
+    }
+
+    var body: some View {
+        if let overall {
+            InfoSection(title: "Confidence") {
+                summaryRow(overall: overall)
+                if !lows.isEmpty {
+                    DisclosureGroup(isExpanded: $expanded) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(lows) { seg in
+                                lowRow(seg)
+                            }
+                        }
+                        .padding(.top, 4)
+                    } label: {
+                        Text("\(lows.count) low-confidence segment\(lows.count == 1 ? "" : "s")")
+                            .font(DS.Font.body)
+                            .foregroundStyle(DS.Color.secondaryText)
+                    }
+                }
+            }
+        }
+    }
+
+    private func summaryRow(overall: Double) -> some View {
+        HStack(spacing: DS.Spacing.small) {
+            Circle()
+                .fill(color(for: overall))
+                .frame(width: 10, height: 10)
+            Text("Overall")
+                .font(DS.Font.body)
+            Spacer()
+            Text(percentLabel(overall))
+                .font(DS.Font.body.monospacedDigit())
+                .foregroundStyle(DS.Color.secondaryText)
+        }
+    }
+
+    private func lowRow(_ seg: TranscriptSegment) -> some View {
+        Button {
+            model.seek(to: seg)
+        } label: {
+            HStack(spacing: DS.Spacing.tight) {
+                Text(Timecode.format(seg.start))
+                    .font(DS.Font.captionMono)
+                    .foregroundStyle(DS.Color.accent)
+                    .frame(width: 50, alignment: .leading)
+                Text(seg.text)
+                    .font(DS.Font.caption)
+                    .foregroundStyle(DS.Color.primaryText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 0)
+                if let value = SegmentConfidence.average(for: seg) {
+                    Text(percentLabel(value))
+                        .font(DS.Font.caption.monospacedDigit())
+                        .foregroundStyle(DS.Color.secondaryText)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Jump to \(Timecode.format(seg.start))")
+    }
+
+    private func color(for value: Double) -> Color {
+        switch SegmentConfidence.bucket(for: value) {
+        case .low: return DS.Palette.warning
+        case .medium: return DS.Color.accent.opacity(0.7)
+        case .high: return DS.Palette.success
+        }
+    }
+
+    private func percentLabel(_ value: Double) -> String {
+        "\(Int((value * 100).rounded()))%"
+    }
+}
