@@ -23,8 +23,7 @@ public actor EngineRegistry {
     }
 
     /// Test-only seam. Calling this on `EngineRegistry.shared` wipes engine registrations
-    /// for the whole process and is a foot-gun outside of focused setup. Prefer a local
-    /// `EngineRegistry()` instance in tests.
+    /// for the whole process. Prefer a local `EngineRegistry()` instance in tests.
     public func unregisterAll() {
         entries.removeAll()
     }
