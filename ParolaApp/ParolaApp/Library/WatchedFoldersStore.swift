@@ -55,14 +55,18 @@ final class WatchedFoldersStore: ObservableObject {
     }
 
     func removeFolder(_ id: UUID) {
-        if let watcher = watchers.removeValue(forKey: id) {
-            Task { await watcher.stop() }
-        }
-        if let url = scopedURLs.removeValue(forKey: id) {
-            url.stopAccessingSecurityScopedResource()
-        }
+        let watcher = watchers.removeValue(forKey: id)
+        let scopedURL = scopedURLs.removeValue(forKey: id)
         folders.removeAll { $0.id == id }
         save()
+        if let watcher {
+            Task { @MainActor in
+                await watcher.stop()
+                scopedURL?.stopAccessingSecurityScopedResource()
+            }
+        } else {
+            scopedURL?.stopAccessingSecurityScopedResource()
+        }
     }
 
     private func startWatcher(for folder: WatchedFolder) {
