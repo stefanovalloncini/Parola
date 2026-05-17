@@ -2,14 +2,76 @@ import Foundation
 import SwiftUI
 import ParolaCore
 
+enum LibrarySortOrder: String, CaseIterable, Identifiable {
+    case newest
+    case oldest
+    case titleAZ
+    case titleZA
+    case longest
+    case shortest
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .newest: return "Newest first"
+        case .oldest: return "Oldest first"
+        case .titleAZ: return "Title A→Z"
+        case .titleZA: return "Title Z→A"
+        case .longest: return "Longest first"
+        case .shortest: return "Shortest first"
+        }
+    }
+}
+
 extension AppModel {
 
     func refreshLibrary() {
         Task { [weak self] in
             guard let self else { return }
-            libraryEntries = await library.list()
+            let active = await library.list()
             deletedEntries = await library.listDeleted()
+            refreshBundleSizes(for: active)
+            libraryEntries = sortedLibraryEntries(active)
         }
+    }
+
+    func reapplyLibrarySort() {
+        libraryEntries = sortedLibraryEntries(libraryEntries)
+    }
+
+    func sortedLibraryEntries(_ entries: [LibraryEntry]) -> [LibraryEntry] {
+        switch librarySortOrder {
+        case .newest:
+            return entries.sorted { $0.createdAt > $1.createdAt }
+        case .oldest:
+            return entries.sorted { $0.createdAt < $1.createdAt }
+        case .titleAZ:
+            return entries.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        case .titleZA:
+            return entries.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
+        case .longest:
+            return entries.sorted { (libraryBundleSizes[$0.id] ?? 0) > (libraryBundleSizes[$1.id] ?? 0) }
+        case .shortest:
+            return entries.sorted { (libraryBundleSizes[$0.id] ?? 0) < (libraryBundleSizes[$1.id] ?? 0) }
+        }
+    }
+
+    private func refreshBundleSizes(for entries: [LibraryEntry]) {
+        let fm = FileManager.default
+        var sizes: [String: Int64] = [:]
+        for entry in entries {
+            let contents = (try? fm.contentsOfDirectory(at: entry.bundleURL, includingPropertiesForKeys: nil)) ?? []
+            let audio = contents.first(where: { $0.lastPathComponent.hasPrefix("audio.") })
+            if let audio,
+               let values = try? audio.resourceValues(forKeys: [.fileSizeKey]),
+               let size = values.fileSize {
+                sizes[entry.id] = Int64(size)
+            } else {
+                sizes[entry.id] = 0
+            }
+        }
+        libraryBundleSizes = sizes
     }
 
     func deleteEntry(_ id: LibraryEntry.ID) {
