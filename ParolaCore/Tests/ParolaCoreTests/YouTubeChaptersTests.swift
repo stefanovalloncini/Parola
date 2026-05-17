@@ -4,12 +4,8 @@ import Testing
 
 @Suite("YouTube chapters generator")
 struct YouTubeChaptersTests {
-    private actor MockModel: LanguageModel {
-        var receivedPrompt: String = ""
-        func respond(to prompt: String) async throws -> String {
-            receivedPrompt = prompt
-            return "00:00 Intro\n02:34 Setup\n05:12 Demo"
-        }
+    private func makeModel() -> MockLanguageModel {
+        MockLanguageModel(scriptedResponses: ["00:00 Intro\n02:34 Setup\n05:12 Demo"])
     }
 
     private func makeTranscript() -> Transcript {
@@ -26,7 +22,7 @@ struct YouTubeChaptersTests {
 
     @Test("generator dispatches via the language model and returns its output")
     func generates() async throws {
-        let model = MockModel()
+        let model = makeModel()
         let result = try await YouTubeChapters.generate(for: makeTranscript(), model: model)
         #expect(result.contains("00:00 Intro"))
         #expect(result.contains("02:34 Setup"))
@@ -34,9 +30,9 @@ struct YouTubeChaptersTests {
 
     @Test("prompt embeds timestamped transcript text")
     func promptShape() async throws {
-        let model = MockModel()
+        let model = makeModel()
         _ = try await YouTubeChapters.generate(for: makeTranscript(), model: model)
-        let prompt = await model.receivedPrompt
+        let prompt = await model.receivedPrompts.last ?? ""
         #expect(prompt.contains("Welcome to the show."))
         #expect(prompt.contains("00:00"))
         #expect(prompt.contains("02:34"))
@@ -54,9 +50,9 @@ struct YouTubeChaptersTests {
             language: "en",
             modelName: "tiny"
         )
-        let model = MockModel()
+        let model = makeModel()
         _ = try await YouTubeChapters.generate(for: transcript, model: model)
-        let prompt = await model.receivedPrompt
+        let prompt = await model.receivedPrompts.last ?? ""
         #expect(prompt.contains("1:01:40"))
     }
 }
