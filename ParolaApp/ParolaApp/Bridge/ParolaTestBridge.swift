@@ -82,25 +82,53 @@ final class ParolaTestBridge {
             var buf = buffer
             if let data = data { buf.append(data) }
 
-            while let nl = buf.firstIndex(of: 0x0A) {
-                let lineData = buf.subdata(in: buf.startIndex..<nl)
-                buf.removeSubrange(buf.startIndex...nl)
+            let lines = Self.consumeLines(buffer: &buf)
+            for lineData in lines {
                 Task { @MainActor in
                     let response = await self.handle(line: lineData)
                     var out = response
                     out.append(0x0A)
-                    conn.send(content: out, completion: .contentProcessed { _ in })
+                    let endsConnection = isComplete
+                    conn.send(content: out, isComplete: endsConnection, completion: .contentProcessed { sendErr in
+                        if let sendErr {
+                            FileHandle.standardError.write(
+                                Data("[ParolaTestBridge] send error: \(sendErr)\n".utf8)
+                            )
+                        }
+                        if endsConnection {
+                            conn.cancel()
+                        }
+                    })
                 }
             }
 
-            if error != nil || isComplete {
+            if let error {
+                FileHandle.standardError.write(
+                    Data("[ParolaTestBridge] receive error: \(error)\n".utf8)
+                )
                 conn.cancel()
+                return
+            }
+            if isComplete {
+                if lines.isEmpty {
+                    conn.cancel()
+                }
                 return
             }
             Task { @MainActor in
                 self.receiveLoop(conn, buffer: buf)
             }
         }
+    }
+
+    private static func consumeLines(buffer: inout Data) -> [Data] {
+        var out: [Data] = []
+        while let nl = buffer.firstIndex(of: 0x0A) {
+            let lineData = buffer.subdata(in: buffer.startIndex..<nl)
+            buffer.removeSubrange(buffer.startIndex...nl)
+            if !lineData.isEmpty { out.append(lineData) }
+        }
+        return out
     }
 
     private func handle(line: Data) async -> Data {
