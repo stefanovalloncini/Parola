@@ -19,4 +19,12 @@ public protocol DictationRecorder: Sendable {
     func start() async throws
     /// Stops recording and transcribes the captured audio. Returns the transcript text.
     func stopAndTranscribe() async throws -> String
+    /// Emits a normalised 0...1 amplitude per captured audio buffer while recording.
+    func levels() async -> AsyncStream<Float>
+}
+
+public extension DictationRecorder {
+    func levels() async -> AsyncStream<Float> {
+        AsyncStream { $0.finish() }
+    }
 }

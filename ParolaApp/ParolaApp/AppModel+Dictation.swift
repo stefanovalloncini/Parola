@@ -109,10 +109,15 @@ extension AppModel {
         switch state {
         case .idle:
             hideDictationHUD()
-        case .listening, .transcribing:
+        case .listening:
             showDictationHUD(state: state)
+            startDictationLevelStream()
+        case .transcribing:
+            showDictationHUD(state: state)
+            stopDictationLevelStream()
         case .failed:
             showDictationHUD(state: state)
+            stopDictationLevelStream()
             Task {
                 try? await Task.sleep(for: .seconds(3))
                 if case .failed = self.dictationState { self.hideDictationHUD() }
@@ -120,15 +125,38 @@ extension AppModel {
         }
     }
 
+    private func startDictationLevelStream() {
+        guard let coord = dictationCoordinator else { return }
+        dictationLevelTask?.cancel()
+        dictationLevelTask = Task { [weak self] in
+            let stream = await coord.levels()
+            for await level in stream {
+                await MainActor.run {
+                    guard let self else { return }
+                    if abs(self.dictationAudioLevel - level) > 0.01 {
+                        self.dictationAudioLevel = level
+                    }
+                }
+            }
+        }
+    }
+
+    private func stopDictationLevelStream() {
+        dictationLevelTask?.cancel()
+        dictationLevelTask = nil
+        dictationAudioLevel = 0
+    }
+
     private func showDictationHUD(state: DictationCoordinator.State) {
         if dictationHUD == nil {
-            dictationHUD = DictationHUD.make { [weak self] in
-                DictationView(state: self?.dictationState ?? .idle)
+            let model = self
+            dictationHUD = DictationHUD.make {
+                DictationView(state: model.dictationState, model: model)
             }
         }
         if let panel = dictationHUD {
             if let host = panel.contentView as? NSHostingView<DictationView> {
-                host.rootView = DictationView(state: state)
+                host.rootView = DictationView(state: state, model: self)
             }
             if let screen = NSScreen.main {
                 let frame = screen.visibleFrame
@@ -142,6 +170,7 @@ extension AppModel {
     }
 
     private func hideDictationHUD() {
+        stopDictationLevelStream()
         dictationHUD?.orderOut(nil)
     }
 }
