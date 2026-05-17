@@ -91,7 +91,7 @@ struct QueueView: View {
                 }
             }
         } label: {
-            Image(systemName: "chevron.up.arrow.down")
+            Image(systemName: "arrow.up.arrow.down")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 26)

@@ -128,7 +128,7 @@ struct IgnoredSegmentsPane: View {
                 }
             }
         } label: {
-            Image(systemName: "chevron.up.arrow.down")
+            Image(systemName: "arrow.up.arrow.down")
                 .font(.system(size: 12, weight: .medium))
         }
         .menuStyle(.borderlessButton)

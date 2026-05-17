@@ -149,7 +149,7 @@ struct MacLibrarySidebar: View {
                 }
             }
         } label: {
-            Image(systemName: "chevron.up.arrow.down")
+            Image(systemName: "arrow.up.arrow.down")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 22, height: 22)
