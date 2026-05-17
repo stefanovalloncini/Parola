@@ -14,6 +14,7 @@ struct TranslationPane: View {
                 }
             }
             SettingHelper(text: "Whisper translates from the detected source language into English.")
+            ResetPaneButton(scope: .translation)
         }
     }
 }

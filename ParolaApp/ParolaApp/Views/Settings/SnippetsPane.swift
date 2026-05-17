@@ -41,6 +41,7 @@ struct SnippetsPane: View {
             }
 
             placeholderHelp
+            ResetPaneButton(scope: .snippets)
         }
     }
 
@@ -103,12 +104,21 @@ private struct SnippetRow: View {
     let isFirst: Bool
     let onDelete: () -> Void
 
+    private var canEnable: Bool {
+        !snippet.trigger.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if !isFirst { Divider().padding(.leading, 16) }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Toggle("", isOn: $snippet.enabled).labelsHidden()
+                    Toggle("", isOn: Binding(
+                        get: { snippet.enabled && canEnable },
+                        set: { if canEnable { snippet.enabled = $0 } }
+                    ))
+                    .labelsHidden()
+                    .disabled(!canEnable)
                     TextField("trigger phrase", text: $snippet.trigger)
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: 200)
