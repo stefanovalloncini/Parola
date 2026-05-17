@@ -5,6 +5,7 @@ import ParolaCore
 struct BatchView: View {
     @EnvironmentObject var model: AppModel
     @State private var isDropping: Bool = false
+    @AppStorage("batch.exportPaneVisible") private var exportPaneVisible: Bool = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -13,8 +14,10 @@ struct BatchView: View {
             HSplitView {
                 queuePane
                     .frame(minWidth: 360, idealWidth: 560)
-                exportPane
-                    .frame(minWidth: 280, idealWidth: 380)
+                if exportPaneVisible {
+                    exportPane
+                        .frame(minWidth: 280, idealWidth: 380)
+                }
             }
         }
     }
@@ -63,6 +66,17 @@ struct BatchView: View {
             .tint(DS.Color.accent)
             .controlSize(.regular)
             .help("Choose which formats to write next to each transcribed file.")
+
+            Button {
+                exportPaneVisible.toggle()
+            } label: {
+                Image(systemName: exportPaneVisible ? "sidebar.right" : "sidebar.right")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(exportPaneVisible ? DS.Color.accent : DS.Color.secondaryText)
+                    .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.borderless)
+            .help(exportPaneVisible ? "Hide export options" : "Show export options")
         }
         .padding(.horizontal, DS.Spacing.large)
         .padding(.vertical, DS.Spacing.regular)

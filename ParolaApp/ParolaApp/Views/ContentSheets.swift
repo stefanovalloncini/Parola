@@ -3,12 +3,12 @@ import ParolaCore
 
 struct ContentSheetsModifier: ViewModifier {
     @EnvironmentObject var model: AppModel
-    @Binding var showingTrash: Bool
+    @State private var meetingAppSnapshot: String = ""
 
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $model.youtubeSheetOpen) { YouTubeURLSheet() }
-            .sheet(isPresented: $showingTrash) { MacRecentlyDeletedView() }
+            .sheet(isPresented: $model.showingTrash) { MacRecentlyDeletedView() }
             .sheet(item: $model.promptOutput) { output in
                 PromptOutputSheet(output: output)
             }
@@ -17,8 +17,11 @@ struct ContentSheetsModifier: ViewModifier {
                     SpeakersSheet(transcript: transcript)
                 }
             }
+            .onChange(of: model.meetingDetectedApp) { _, name in
+                if let name { meetingAppSnapshot = name }
+            }
             .alert(
-                "\(model.meetingDetectedApp ?? "") just launched",
+                "\(meetingAppSnapshot) just launched",
                 isPresented: Binding(
                     get: { model.meetingDetectedApp != nil },
                     set: { if !$0 { model.dismissMeetingPrompt() } }
@@ -50,7 +53,7 @@ struct ContentSheetsModifier: ViewModifier {
 }
 
 extension View {
-    func contentSheets(showingTrash: Binding<Bool>) -> some View {
-        modifier(ContentSheetsModifier(showingTrash: showingTrash))
+    func contentSheets() -> some View {
+        modifier(ContentSheetsModifier())
     }
 }

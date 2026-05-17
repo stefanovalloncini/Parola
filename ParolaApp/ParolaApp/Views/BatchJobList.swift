@@ -6,6 +6,7 @@ struct BatchJobList: View {
     @EnvironmentObject var model: AppModel
     @State private var searchText = ""
     @State private var sortOrder: BatchSortOrder = .addedFirst
+    @FocusState private var focusedJob: BatchJob.ID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,7 +25,7 @@ struct BatchJobList: View {
             .padding(.bottom, DS.Spacing.small)
 
             HStack(spacing: DS.Spacing.small) {
-                searchField
+                SearchPill(text: $searchText, placeholder: "Search files…")
                 sortMenu
             }
             .padding(.horizontal, DS.Spacing.large)
@@ -66,15 +67,13 @@ struct BatchJobList: View {
                                     .foregroundStyle(DS.Color.secondaryText)
                                     .padding(.top, DS.Spacing.small)
                                 ForEach(group.jobs) { job in
-                                    BatchJobRow(job: job)
-                                        .onTapGesture { model.selectBatchJob(job.id) }
+                                    rowWithKeyboardSupport(job: job)
                                 }
                             }
                         }
                     } else {
                         ForEach(sorted(matches)) { job in
-                            BatchJobRow(job: job)
-                                .onTapGesture { model.selectBatchJob(job.id) }
+                            rowWithKeyboardSupport(job: job)
                         }
                     }
                 }
@@ -84,31 +83,34 @@ struct BatchJobList: View {
         }
     }
 
-    private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField("Search files…", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+    private func rowWithKeyboardSupport(job: BatchJob) -> some View {
+        let isPending = job.status == .pending
+        return BatchJobRow(job: job)
+            .focusable(true)
+            .focused($focusedJob, equals: job.id)
+            .onTapGesture { model.selectBatchJob(job.id) }
+            .onKeyPress(.return) { model.selectBatchJob(job.id); return .handled }
+            .onKeyPress(.delete) { model.cancelBatchJob(job.id); return .handled }
+            .modifier(PendingBatchJobReorder(jobID: job.id, isPending: isPending))
+            .contextMenu {
+                if isPending {
+                    Button("Move to top") { model.moveBatchJobToTop(job.id) }
                 }
-                .buttonStyle(.plain)
+                if job.status == .done {
+                    Button("Open transcript") { model.openBatchJobTranscript(job.id) }
+                }
+                Button(job.status == .transcribing ? "Cancel" : "Remove", role: .destructive) {
+                    model.cancelBatchJob(job.id)
+                }
             }
+    }
+
+    @ViewBuilder
+    private func dropTargetOverlay(visible: Bool) -> some View {
+        if visible {
+            RoundedRectangle(cornerRadius: DS.Radius.regular)
+                .strokeBorder(DS.Color.accent, lineWidth: 2)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        )
     }
 
     private var sortMenu: some View {
@@ -174,6 +176,41 @@ struct BatchJobList: View {
 
     private func fileSize(_ url: URL) -> Int {
         (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+    }
+}
+
+private struct PendingBatchJobReorder: ViewModifier {
+    let jobID: BatchJob.ID
+    let isPending: Bool
+    @EnvironmentObject var model: AppModel
+    @State private var isTargeted = false
+
+    func body(content: Content) -> some View {
+        if isPending {
+            content
+                .draggable(BatchJobDragPayload(jobID: jobID))
+                .dropDestination(for: BatchJobDragPayload.self) { items, _ in
+                    guard let payload = items.first else { return false }
+                    model.moveBatchJob(payload.jobID, before: jobID)
+                    return true
+                } isTargeted: { isTargeted = $0 }
+                .overlay {
+                    if isTargeted {
+                        RoundedRectangle(cornerRadius: DS.Radius.regular)
+                            .strokeBorder(DS.Color.accent, lineWidth: 2)
+                    }
+                }
+        } else {
+            content
+        }
+    }
+}
+
+struct BatchJobDragPayload: Codable, Transferable {
+    let jobID: UUID
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .data)
     }
 }
 

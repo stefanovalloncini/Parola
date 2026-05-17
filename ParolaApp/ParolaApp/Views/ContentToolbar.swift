@@ -3,7 +3,6 @@ import ParolaCore
 
 struct ContentToolbar: ToolbarContent {
     @EnvironmentObject var model: AppModel
-    @Binding var showingTrash: Bool
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: .navigation) {
@@ -32,7 +31,7 @@ struct ContentToolbar: ToolbarContent {
                 .help("Open the batch transcription page.")
             }
             if !model.deletedEntries.isEmpty {
-                Button { showingTrash = true } label: {
+                Button { model.showingTrash = true } label: {
                     Label("Recently Deleted", systemImage: "trash")
                 }
                 .help("Show Recently Deleted")
@@ -67,14 +66,11 @@ struct ContentToolbar: ToolbarContent {
         }
     }
 
-    private var selectedModelCapabilities: EngineCapabilities {
-        ModelCatalog.staticCapabilities(forID: model.selectedModel) ?? .whisperKitDefaults
-    }
     private var selectedModelIsEnglishOnly: Bool {
-        selectedModelCapabilities.supportedLanguages.isEnglishOnly
+        model.selectedModelCapabilities.supportedLanguages.isEnglishOnly
     }
     private var selectedModelSupportsTranslate: Bool {
-        selectedModelCapabilities.supportsTranslate
+        model.selectedModelCapabilities.supportsTranslate
     }
 
     private var isBusy: Bool {
