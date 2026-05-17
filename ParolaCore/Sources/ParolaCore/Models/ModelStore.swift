@@ -13,16 +13,11 @@ public final class ModelStore: Sendable {
     private let modelsDirectory: URL
 
     public init(modelsDirectory: URL? = nil) {
-        if let dir = modelsDirectory {
-            self.modelsDirectory = dir
-        } else {
-            let appSupport = FileManager.default
-                .urls(for: .applicationSupportDirectory, in: .userDomainMask)
-                .first!
-                .appendingPathComponent("Parola", isDirectory: true)
-                .appendingPathComponent("Models", isDirectory: true)
-            self.modelsDirectory = appSupport
-        }
+        self.modelsDirectory = modelsDirectory ?? FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first!
+            .appendingPathComponent("Parola", isDirectory: true)
+            .appendingPathComponent("Models", isDirectory: true)
         try? FileManager.default.createDirectory(at: self.modelsDirectory, withIntermediateDirectories: true)
     }
 
@@ -56,14 +51,7 @@ public final class ModelStore: Sendable {
         ManagedConfiguration.shared.filterAllowed(ModelCatalog.all).map { variant in
             let url = installedURL(for: variant.downloadSource)
             let installed = FileManager.default.fileExists(atPath: url.path)
-            return ModelInfo(
-                name: variant.id,
-                label: variant.displayName,
-                approximateSizeBytes: Int(variant.sizeBytes),
-                isMultilingual: variant.languageScope == nil,
-                isInstalled: installed,
-                installedURL: installed ? url : nil
-            )
+            return modelInfo(for: variant, url: installed ? url : nil, isInstalled: installed)
         }
     }
 
@@ -75,14 +63,7 @@ public final class ModelStore: Sendable {
         for variant in ModelCatalog.all {
             let url = installedURL(for: variant.downloadSource)
             if fm.fileExists(atPath: url.path) {
-                seen[variant.id] = ModelInfo(
-                    name: variant.id,
-                    label: variant.displayName,
-                    approximateSizeBytes: Int(variant.sizeBytes),
-                    isMultilingual: variant.languageScope == nil,
-                    isInstalled: true,
-                    installedURL: url
-                )
+                seen[variant.id] = modelInfo(for: variant, url: url, isInstalled: true)
             }
         }
 
@@ -108,6 +89,17 @@ public final class ModelStore: Sendable {
         }
 
         return seen.values.sorted { $0.name < $1.name }
+    }
+
+    private func modelInfo(for variant: ModelVariant, url: URL?, isInstalled: Bool) -> ModelInfo {
+        ModelInfo(
+            name: variant.id,
+            label: variant.displayName,
+            approximateSizeBytes: Int(variant.sizeBytes),
+            isMultilingual: variant.languageScope == nil,
+            isInstalled: isInstalled,
+            installedURL: url
+        )
     }
 
     public func isInstalled(_ variant: String) -> Bool {

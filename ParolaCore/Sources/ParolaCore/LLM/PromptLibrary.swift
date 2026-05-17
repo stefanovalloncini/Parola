@@ -68,11 +68,10 @@ public actor PromptLibrary {
 
     @discardableResult
     public func removeUserPrompt(_ id: UUID) -> Bool {
-        let before = userPrompts.count
-        userPrompts.removeAll { $0.id == id }
-        let removed = userPrompts.count != before
-        if removed { save() }
-        return removed
+        guard let idx = userPrompts.firstIndex(where: { $0.id == id }) else { return false }
+        userPrompts.remove(at: idx)
+        save()
+        return true
     }
 
     public func dismissOutdatedBuiltIn(_ id: UUID) {

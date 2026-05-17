@@ -67,15 +67,14 @@ enum HuggingFaceDownloader {
                 try? sidecar.write(to: sidecarURL)
                 throw CancellationError()
             }
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let httpStatus = (response as? HTTPURLResponse)?.statusCode
+            guard let httpStatus, (200..<300).contains(httpStatus) else {
                 throw ParolaError.modelDownloadFailed(
                     repo,
-                    underlying: "HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1) for \(entry.path)"
+                    underlying: "HTTP \(httpStatus ?? -1) for \(entry.path)"
                 )
             }
-            if FileManager.default.fileExists(atPath: localURL.path) {
-                try? FileManager.default.removeItem(at: localURL)
-            }
+            try? FileManager.default.removeItem(at: localURL)
             try FileManager.default.moveItem(at: tmp, to: localURL)
 
             if let expected = entry.expectedSHA256 {
@@ -143,8 +142,9 @@ enum HuggingFaceDownloader {
         var request = URLRequest(url: endpoint)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw ParolaError.modelDownloadFailed(repo, underlying: "Tree HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+        let httpStatus = (response as? HTTPURLResponse)?.statusCode
+        guard let httpStatus, (200..<300).contains(httpStatus) else {
+            throw ParolaError.modelDownloadFailed(repo, underlying: "Tree HTTP \(httpStatus ?? -1)")
         }
         let entries = try JSONDecoder().decode([TreeEntry].self, from: data)
 
