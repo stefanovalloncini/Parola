@@ -86,8 +86,8 @@ public struct ParolaDocument: Sendable {
         self.manifest = manifest
     }
 
-    /// Writes a `.parola` bundle atomically. If `to` doesn't end in `.parola`, the extension is appended.
-    /// Pass `audioURL: nil` for transcript-only bundles (live recordings without saved audio).
+    /// Writes a `.parola` bundle atomically. The `.parola` extension is appended if missing.
+    /// `audioURL: nil` produces a transcript-only bundle.
     @discardableResult
     public static func write(
         transcript: Transcript,
@@ -145,8 +145,7 @@ public struct ParolaDocument: Sendable {
         return target
     }
 
-    /// Rewrites the manifest of an existing `.parola` bundle in place.
-    /// Used by soft-delete, restore, and category-edit flows — no audio or transcript I/O.
+    /// Rewrites the manifest of an existing `.parola` bundle in place. Does not touch audio or transcript files.
     public static func updateManifest(
         at bundleURL: URL,
         transform: (inout Manifest) throws -> Void

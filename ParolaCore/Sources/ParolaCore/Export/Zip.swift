@@ -1,7 +1,6 @@
 import Foundation
 
-/// Minimal ZIP writer for stored (uncompressed) entries.
-/// Used by `DocxExporter` to assemble OOXML packages without a third-party dependency.
+/// Minimal ZIP writer for stored (uncompressed) entries. Used by `DocxExporter`.
 public enum Zip {
     public struct File: Sendable {
         public let name: String

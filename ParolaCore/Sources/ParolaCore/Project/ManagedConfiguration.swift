@@ -1,8 +1,7 @@
 import Foundation
 
-/// Reads MDM-pushed configuration from the standard `com.apple.configuration.managed`
-/// UserDefaults domain. All accessors are nil/false when no policy is set.
-// UserDefaults isn't Sendable but is thread-safe on Darwin; this struct only reads from it.
+/// Reads MDM-pushed configuration from the standard `com.apple.configuration.managed` UserDefaults domain.
+/// `@unchecked Sendable` is safe because this only reads from `UserDefaults`, which is thread-safe on Darwin.
 public struct ManagedConfiguration: @unchecked Sendable {
     public enum Key: String, Sendable, CaseIterable {
         case defaultModel
