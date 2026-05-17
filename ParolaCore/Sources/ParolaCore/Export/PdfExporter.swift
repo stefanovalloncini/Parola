@@ -38,8 +38,9 @@ public struct PdfExporter: TranscriptExporter {
             )
             CTFrameDraw(frame, context)
             let visible = CTFrameGetVisibleStringRange(frame)
-            startIndex += visible.length
             context.endPDFPage()
+            guard visible.length > 0 else { break }
+            startIndex += visible.length
         } while startIndex < totalLength
 
         context.closePDF()
