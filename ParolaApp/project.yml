@@ -23,6 +23,9 @@ settings:
 packages:
   ParolaCore:
     path: ../ParolaCore
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.0"
 targets:
   ParolaApp:
     type: application
@@ -50,6 +53,10 @@ targets:
         NSSystemAudioCaptureUsageDescription: Parola captures system audio so it can transcribe what's playing on your Mac.
         NSAppleEventsUsageDescription: Allow Parola to handle file actions.
         NSSpeechRecognitionUsageDescription: Parola uses Apple Speech to transcribe audio locally when you pick the Apple Speech engine.
+        SUEnableAutomaticChecks: YES
+        SUFeedURL: ""
+        SUPublicEDKey: ""
+        SUScheduledCheckInterval: 86400
         CFBundleDocumentTypes:
           - CFBundleTypeName: Audio
             CFBundleTypeRole: Viewer
@@ -101,6 +108,8 @@ targets:
     dependencies:
       - package: ParolaCore
         product: ParolaCore
+      - package: Sparkle
+        product: Sparkle
       - target: ParolaQuickLook
         embed: true
 

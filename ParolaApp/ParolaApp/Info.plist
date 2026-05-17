@@ -110,6 +110,14 @@
 	<string>Parola uses Apple Speech to transcribe audio locally when you pick the Apple Speech engine.</string>
 	<key>NSSystemAudioCaptureUsageDescription</key>
 	<string>Parola captures system audio so it can transcribe what's playing on your Mac.</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string></string>
+	<key>SUPublicEDKey</key>
+	<string></string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

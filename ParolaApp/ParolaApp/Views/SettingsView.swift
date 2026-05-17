@@ -28,6 +28,7 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     case exportFormats, batchExport, autoExport, integrations
     case services, prompts
     case automation
+    case updates
     case advanced, about
 
     var id: String { rawValue }
@@ -56,6 +57,7 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .services: return "Services"
         case .prompts: return "Prompts"
         case .automation: return "MCP & Automation"
+        case .updates: return "Updates"
         case .advanced: return "Advanced"
         case .about: return "About"
         }
@@ -85,6 +87,7 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .services: return "sparkles"
         case .prompts: return "text.cursor"
         case .automation: return "bolt.horizontal.circle"
+        case .updates: return "arrow.down.circle"
         case .advanced: return "wrench.and.screwdriver"
         case .about: return "info.circle"
         }
@@ -103,7 +106,7 @@ private let sidebarGroups: [SidebarGroup] = [
     SidebarGroup(title: "TRANSCRIPTION", routes: [.localModels, .cloudModels, .people, .translation, .ignoredSegments, .findReplace]),
     SidebarGroup(title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport, .integrations]),
     SidebarGroup(title: "AI", routes: [.services, .prompts]),
-    SidebarGroup(title: "AUTOMATION", routes: [.automation]),
+    SidebarGroup(title: "AUTOMATION", routes: [.automation, .updates]),
     SidebarGroup(title: nil, routes: [.advanced, .about])
 ]
 
@@ -261,6 +264,7 @@ private struct SettingsDetail: View {
         case .services: ServicesPane()
         case .prompts: PromptsPane()
         case .automation: AutomationPane()
+        case .updates: UpdatesPane()
         case .advanced: AdvancedPane()
         case .about: AboutPane()
         }
