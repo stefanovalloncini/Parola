@@ -35,12 +35,13 @@ let package = Package(
             name: "parola",
             dependencies: [
                 "ParolaCore",
+                "ParolaMCP",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
         .executableTarget(
             name: "parola-mcp",
-            dependencies: ["ParolaCore", "ParolaMCP"]
+            dependencies: ["ParolaMCP"]
         ),
         .testTarget(
             name: "ParolaCoreTests",

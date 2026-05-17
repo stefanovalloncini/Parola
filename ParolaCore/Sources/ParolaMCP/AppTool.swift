@@ -164,6 +164,20 @@ public enum AppTools {
             required: []
         ),
         AppTool(
+            name: "parola_app_dictate",
+            bridgeCmd: "startDictation",
+            description: "Start a push-to-talk dictation session in the running app. Equivalent to pressing the dictation hotkey.",
+            properties: [],
+            required: []
+        ),
+        AppTool(
+            name: "parola_app_dictate_stop",
+            bridgeCmd: "stopDictation",
+            description: "End the current dictation session and insert the cleaned-up text at the cursor.",
+            properties: [],
+            required: []
+        ),
+        AppTool(
             name: "parola_app_set_translate",
             bridgeCmd: "setTranslate",
             description: "Toggle translate-to-English mode for the next transcription. 'on' is required.",

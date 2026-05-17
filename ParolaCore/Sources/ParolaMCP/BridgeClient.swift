@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// Talks to the in-app `ParolaTestBridge` over TCP loopback. Discovers the port
@@ -18,6 +19,10 @@ public struct BridgeClient: BridgeProtocol {
     private let portFileURL: URL
     private let timeout: TimeInterval
 
+    /// Bumped when the wire format breaks. The bridge echoes back its own version
+    /// so clients can detect skew between parola-mcp and a stale running app build.
+    public static let clientVersion: Int = 1
+
     public init(timeout: TimeInterval = 30) {
         let caches = (try? FileManager.default.url(
             for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: false
@@ -29,8 +34,47 @@ public struct BridgeClient: BridgeProtocol {
     }
 
     public func call(_ cmd: String, argsJSON: Data) async throws -> String {
-        guard let port = readPort() else { throw BridgeNotRunning() }
+        let port = try readPort()
+        let payload = encodeRequest(cmd: cmd, argsJSON: argsJSON)
+        let timeout = self.timeout
 
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let response = try BridgeClient.exchange(
+                        host: "127.0.0.1",
+                        port: port,
+                        request: payload,
+                        timeout: timeout
+                    )
+                    let text = try BridgeClient.parse(response: response)
+                    continuation.resume(returning: text)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    private func readPort() throws -> Int {
+        guard let raw = try? String(contentsOf: portFileURL, encoding: .utf8),
+              let port = Int(raw.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            throw BridgeNotRunning()
+        }
+        return port
+    }
+
+    private func encodeRequest(cmd: String, argsJSON: Data) -> Data {
+        let argsBytes = argsJSON.isEmpty ? Data("{}".utf8) : argsJSON
+        let id = UUID().uuidString
+        var out = Data()
+        out.append(Data("{\"id\":\"\(id)\",\"version\":\(BridgeClient.clientVersion),\"cmd\":\"\(cmd)\",\"args\":".utf8))
+        out.append(argsBytes)
+        out.append(Data("}\n".utf8))
+        return out
+    }
+
+    private static func exchange(host: String, port: Int, request: Data, timeout: TimeInterval) throws -> Data {
         let socketFD = socket(AF_INET, SOCK_STREAM, 0)
         guard socketFD >= 0 else { throw BridgeFailure(message: "socket() failed") }
         defer { close(socketFD) }
@@ -38,7 +82,7 @@ public struct BridgeClient: BridgeProtocol {
         var addr = sockaddr_in()
         addr.sin_family = sa_family_t(AF_INET)
         addr.sin_port = in_port_t(port).bigEndian
-        addr.sin_addr.s_addr = inet_addr("127.0.0.1")
+        addr.sin_addr.s_addr = inet_addr(host)
 
         let connectResult = withUnsafePointer(to: &addr) { ptr -> Int32 in
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
@@ -50,18 +94,11 @@ public struct BridgeClient: BridgeProtocol {
         var tv = timeval(tv_sec: Int(timeout), tv_usec: 0)
         _ = setsockopt(socketFD, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
 
-        let argsBytes = argsJSON.isEmpty ? Data("{}".utf8) : argsJSON
-        let id = UUID().uuidString
-        var requestData = Data()
-        requestData.append(Data("{\"id\":\"\(id)\",\"cmd\":\"\(cmd)\",\"args\":".utf8))
-        requestData.append(argsBytes)
-        requestData.append(Data("}\n".utf8))
-
-        try requestData.withUnsafeBytes { rawBuf in
+        try request.withUnsafeBytes { rawBuf in
             let base = rawBuf.bindMemory(to: UInt8.self).baseAddress!
             var sent = 0
-            while sent < requestData.count {
-                let n = send(socketFD, base + sent, requestData.count - sent, 0)
+            while sent < request.count {
+                let n = send(socketFD, base + sent, request.count - sent, 0)
                 if n <= 0 { throw BridgeFailure(message: "send() failed (n=\(n))") }
                 sent += n
             }
@@ -74,28 +111,35 @@ public struct BridgeClient: BridgeProtocol {
                 recv(socketFD, ptr.baseAddress!, ptr.count, 0)
             }
             if n <= 0 { break }
-            buffer.append(chunk, count: n)
-            if buffer.contains(0x0A) { break }
+            let received = chunk.prefix(n)
+            buffer.append(contentsOf: received)
+            if received.contains(0x0A) { break }
         }
+        return buffer
+    }
 
-        guard !buffer.isEmpty else { throw BridgeFailure(message: "bridge closed connection before responding") }
-        let nl = buffer.firstIndex(of: 0x0A) ?? buffer.endIndex
-        let lineData = buffer.subdata(in: buffer.startIndex..<nl)
+    private static func parse(response: Data) throws -> String {
+        guard !response.isEmpty else {
+            throw BridgeFailure(message: "bridge closed connection before responding")
+        }
+        let nl = response.firstIndex(of: 0x0A) ?? response.endIndex
+        let lineData = response.subdata(in: response.startIndex..<nl)
 
         let object = try JSONSerialization.jsonObject(with: lineData)
         guard let dict = object as? [String: Any] else {
             throw BridgeFailure(message: "malformed response: \(String(decoding: lineData, as: UTF8.self))")
+        }
+        if let serverVersion = dict["serverVersion"] as? Int,
+           serverVersion < BridgeClient.clientVersion {
+            throw BridgeFailure(
+                message: "incompatible bridge: app advertises v\(serverVersion), parola-mcp expects v\(BridgeClient.clientVersion). Rebuild Parola.app."
+            )
         }
         if let ok = dict["ok"] as? Bool, ok {
             return BridgeJSON.string(dict["result"] ?? NSNull())
         }
         let message = (dict["error"] as? String) ?? "unknown bridge error"
         throw BridgeFailure(message: message)
-    }
-
-    private func readPort() -> Int? {
-        guard let raw = try? String(contentsOf: portFileURL, encoding: .utf8) else { return nil }
-        return Int(raw.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 }
 

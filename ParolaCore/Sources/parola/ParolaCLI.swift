@@ -17,6 +17,7 @@ struct ParolaCLI: AsyncParsableCommand {
             Burn.self,
             Bench.self,
             Library.self,
+            MCP.self,
         ],
         defaultSubcommand: Transcribe.self
     )

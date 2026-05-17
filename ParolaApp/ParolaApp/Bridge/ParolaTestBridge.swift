@@ -13,6 +13,8 @@ import ParolaCore
 /// local listener without explicit consent.
 @MainActor
 final class ParolaTestBridge {
+    static let serverVersion: Int = 1
+
     private let listener: NWListener
     private weak var model: AppModel?
     private let portFileURL: URL
@@ -142,16 +144,36 @@ final class ParolaTestBridge {
             cmd = obj["cmd"] as? String ?? ""
             args = obj["args"] as? [String: Any] ?? [:]
         } catch {
-            return Self.encode(["id": "", "ok": false, "error": "invalid JSON: \(error.localizedDescription)"])
+            return Self.encode([
+                "id": "",
+                "ok": false,
+                "serverVersion": Self.serverVersion,
+                "error": "invalid JSON: \(error.localizedDescription)",
+            ])
         }
 
         do {
             let result = try await dispatch(cmd: cmd, args: args)
-            return Self.encode(["id": id, "ok": true, "result": result])
+            return Self.encode([
+                "id": id,
+                "ok": true,
+                "serverVersion": Self.serverVersion,
+                "result": result,
+            ])
         } catch let bridgeError as BridgeError {
-            return Self.encode(["id": id, "ok": false, "error": bridgeError.message])
+            return Self.encode([
+                "id": id,
+                "ok": false,
+                "serverVersion": Self.serverVersion,
+                "error": bridgeError.message,
+            ])
         } catch {
-            return Self.encode(["id": id, "ok": false, "error": "\(error)"])
+            return Self.encode([
+                "id": id,
+                "ok": false,
+                "serverVersion": Self.serverVersion,
+                "error": "\(error)",
+            ])
         }
     }
 
@@ -161,6 +183,13 @@ final class ParolaTestBridge {
         switch cmd {
         case "ping":
             return ["pong": true]
+
+        case "_handshake":
+            return [
+                "serverVersion": Self.serverVersion,
+                "appVersion": Parola.version,
+                "commands": Self.knownCommands,
+            ] as [String: Any]
 
         case "getState":
             return state(of: model)
@@ -220,6 +249,14 @@ final class ParolaTestBridge {
 
         case "stopRecording":
             model.stopRecordingAndTranscribe()
+            return ["stopped": true]
+
+        case "startDictation":
+            model.startDictationFromIntent()
+            return ["started": true]
+
+        case "stopDictation":
+            model.stopDictationFromIntent()
             return ["stopped": true]
 
         case "setTranslate":
@@ -643,6 +680,25 @@ final class ParolaTestBridge {
     private static func encode(_ payload: [String: Any]) -> Data {
         (try? JSONSerialization.data(withJSONObject: payload)) ?? Data("{}".utf8)
     }
+
+    static let knownCommands: [String] = [
+        "_handshake", "ping", "getState",
+        "selectModel", "setLanguage", "setTheme", "setRoute", "setLibraryFilter",
+        "transcribeYouTube", "fetchYouTubeSubs",
+        "startRecording", "stopRecording", "startDictation", "stopDictation",
+        "setTranslate", "setUseStreaming", "toggleLiveCaptions",
+        "openYouTubeSheet", "closeYouTubeSheet",
+        "dismissError", "cancel", "clearTranscript",
+        "listEntries", "loadEntry", "deleteEntry",
+        "downloadModel", "deleteModel", "exportTranscript",
+        "screenshot", "listPrompts", "runPrompt", "getPromptOutput",
+        "transcribeFile",
+        "startBatch", "addBatchFiles", "clearBatch", "selectBatchJob", "getBatchJobs",
+        "summarizeLatestEntry", "revealCacheDirectory",
+        "getSettings", "setSetting", "openSettings", "closeSettings",
+        "listDeletedEntries", "restoreEntry", "purgeEntry", "search",
+        "listWindows", "waitForPhase", "getTranscript",
+    ]
 }
 
 private struct BridgeError: Error {

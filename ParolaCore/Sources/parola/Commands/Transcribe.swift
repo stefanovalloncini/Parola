@@ -53,6 +53,9 @@ struct Transcribe: AsyncParsableCommand {
     @Flag(name: .long, help: "Generate a summary and chapter markers via the on-device LLM (macOS 26+ / iOS 26+).")
     var summarise: Bool = false
 
+    @Flag(name: .long, help: "Emit NDJSON progress on stderr and one MCP-shaped JSON content block on stdout.")
+    var mcp: Bool = false
+
     func run() async throws {
         guard !inputs.isEmpty else {
             throw ValidationError("At least one input file is required.")
@@ -103,16 +106,20 @@ struct Transcribe: AsyncParsableCommand {
     }
 
     private func transcribeSingle(input: ResolvedInput, options: TranscriptionOptions) async throws {
+        let emitter = MCPProgressEmitter(enabled: mcp)
+
         if case .youtube(let url) = input, preferExistingSubs {
             stderr("Fetching captions from \(url.absoluteString)…")
+            emitter.progress(.downloading, detail: url.absoluteString)
             let transcript = try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: language)
-            try emitTranscript(transcript, sourceURL: url)
+            try emitTranscript(transcript, sourceURL: url, emitter: emitter)
             return
         }
 
         let session = TranscriptionSession()
         let progress = ProgressReporter(label: "downloading \(model)")
         if verbose { stderr("Loading model \(model)…") }
+        emitter.progress(.loading, detail: model)
 
         let source: any AudioSource
         let sourceURL: URL
@@ -122,15 +129,20 @@ struct Transcribe: AsyncParsableCommand {
             sourceURL = url
         case .youtube(let url):
             stderr("Downloading audio from \(url.absoluteString)…")
+            emitter.progress(.downloading, detail: url.absoluteString)
             let yt = try YouTubeAudioSource(url: url)
             source = yt
             sourceURL = try await yt.prepare()
         }
 
+        emitter.progress(.transcribing, detail: sourceURL.lastPathComponent)
         var transcript = try await session.transcribe(
             source: source,
             options: options,
-            downloadProgress: { p in progress.update(p) }
+            downloadProgress: { p in
+                progress.update(p)
+                emitter.progress(.downloading, fraction: p, detail: model)
+            }
         )
         progress.finish()
 
@@ -141,12 +153,17 @@ struct Transcribe: AsyncParsableCommand {
                 stderr("warning: summary skipped — \(error.localizedDescription)")
             }
         }
-        try emitTranscript(transcript, sourceURL: sourceURL)
+        try emitTranscript(transcript, sourceURL: sourceURL, emitter: emitter)
     }
 
-    private func emitTranscript(_ transcript: Transcript, sourceURL: URL) throws {
+    private func emitTranscript(_ transcript: Transcript, sourceURL: URL, emitter: MCPProgressEmitter) throws {
         let exporter = Exporters.exporter(for: format)
-        if let output {
+        emitter.progress(.exporting, detail: format.rawValue)
+
+        if mcp {
+            let rendered = try exporter.renderText(transcript)
+            emitter.result(text: rendered)
+        } else if let output {
             let outURL = URL(fileURLWithPath: output)
             let data = try exporter.render(transcript)
             try data.write(to: outURL, options: .atomic)
@@ -165,6 +182,7 @@ struct Transcribe: AsyncParsableCommand {
             )
             stderr("Saved bundle to \(bundle.path)")
         }
+        emitter.progress(.finished, fraction: 1.0)
     }
 
     private func transcribeBatch(urls: [URL], options: TranscriptionOptions) async throws {
