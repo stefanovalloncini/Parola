@@ -1,4 +1,6 @@
 import Foundation
+import CoreML
+import WhisperKit
 
 public enum TranscriptionTask: String, Codable, Sendable, CaseIterable {
     case transcribe
@@ -23,6 +25,13 @@ public struct TranscriptionOptions: Sendable {
     /// Hint for the diarizer when known. Nil → auto-detect.
     public var expectedSpeakers: Int?
 
+    /// Override WhisperKit's chunking strategy. Nil keeps the engine default.
+    public var chunkingStrategy: ChunkingStrategy?
+
+    /// Core ML compute units for the WhisperKit model. Nil keeps the engine default.
+    /// Changing this between calls forces the model to reload.
+    public var computeUnits: MLComputeUnits?
+
     public init(
         model: String? = nil,
         language: String? = nil,
@@ -31,7 +40,9 @@ public struct TranscriptionOptions: Sendable {
         verbose: Bool = false,
         initialPrompt: String? = nil,
         diarize: Bool = false,
-        expectedSpeakers: Int? = nil
+        expectedSpeakers: Int? = nil,
+        chunkingStrategy: ChunkingStrategy? = nil,
+        computeUnits: MLComputeUnits? = nil
     ) {
         self.model = model
         self.language = language
@@ -41,6 +52,8 @@ public struct TranscriptionOptions: Sendable {
         self.initialPrompt = initialPrompt
         self.diarize = diarize
         self.expectedSpeakers = expectedSpeakers
+        self.chunkingStrategy = chunkingStrategy
+        self.computeUnits = computeUnits
     }
 
     public static let `default` = TranscriptionOptions()
