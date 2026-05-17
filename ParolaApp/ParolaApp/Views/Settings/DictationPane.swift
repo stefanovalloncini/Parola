@@ -3,6 +3,7 @@ import ParolaCore
 
 struct DictationPane: View {
     @EnvironmentObject var model: AppModel
+    @State private var customApps: [(bundleID: String, name: String)] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -22,15 +23,12 @@ struct DictationPane: View {
                     .pickerStyle(.menu)
                     .frame(width: 200)
                 }
-                SettingRow("Activation key") {
-                    Picker("", selection: $model.dictationKeyCode) {
-                        ForEach(DictationHotkey.allCases, id: \.rawValue) { key in
-                            Text(key.displayName).tag(key.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 200)
+                SettingRow("Activation key",
+                           description: "Click to record any key combination.") {
+                    HotkeyRecorder(
+                        keyCode: $model.dictationKeyCode,
+                        modifierRawValue: $model.dictationKeyModifiers
+                    )
                 }
                 SettingRow("Indicator style",
                            description: model.dictationIndicatorStyle.description) {
@@ -58,12 +56,31 @@ struct DictationPane: View {
             SettingHelper(text: "Requires Input Monitoring permission. The HUD shows a live waveform while you speak.")
 
             SettingsSection("Per-app workflows") {
-                let apps = AppModel.dictationOverrideApps
-                ForEach(Array(apps.enumerated()), id: \.element.bundleID) { idx, app in
-                    WorkflowRow(app: app, isFirst: idx == 0)
+                let seeds = AppModel.dictationOverrideApps
+                ForEach(Array(seeds.enumerated()), id: \.element.bundleID) { idx, app in
+                    WorkflowRow(app: app, isFirst: idx == 0, isRemovable: false)
+                }
+                ForEach(Array(customApps.enumerated()), id: \.element.bundleID) { _, app in
+                    WorkflowRow(app: app, isFirst: false, isRemovable: true)
                 }
             }
+            HStack {
+                Button {
+                    model.presentAddDictationAppPanel()
+                    customApps = model.customDictationOverrideApps()
+                } label: {
+                    Label("Add app…", systemImage: "plus.circle")
+                }
+                Spacer()
+            }
             SettingHelper(text: "When the frontmost app matches, dictation uses these overrides. Prompt cleans up the text after transcription; language hints the engine before it.")
+            ResetPaneButton(scope: .dictation)
+        }
+        .onAppear {
+            customApps = model.customDictationOverrideApps()
+        }
+        .onChange(of: model.dictationPerAppOverridesJSON) { _, _ in
+            customApps = model.customDictationOverrideApps()
         }
     }
 
@@ -75,6 +92,7 @@ struct DictationPane: View {
 private struct WorkflowRow: View {
     let app: (bundleID: String, name: String)
     let isFirst: Bool
+    let isRemovable: Bool
     @EnvironmentObject var model: AppModel
 
     var body: some View {
@@ -105,6 +123,15 @@ private struct WorkflowRow: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .frame(width: 130)
+
+                if isRemovable {
+                    Button(role: .destructive) {
+                        model.removeDictationOverride(for: app.bundleID)
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                }
             }
         }
     }

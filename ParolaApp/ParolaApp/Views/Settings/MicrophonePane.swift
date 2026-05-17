@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import ParolaCore
 
 struct MicrophonePane: View {
@@ -6,6 +7,7 @@ struct MicrophonePane: View {
     @State private var devices: [AudioInputDevice] = []
     @State private var preview: MicPreviewController?
     @State private var level: Float = 0
+    @State private var startError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -29,7 +31,11 @@ struct MicrophonePane: View {
                         .frame(width: 220, height: 18)
                 }
             }
+            if let startError {
+                MicErrorBanner(message: startError)
+            }
             SettingHelper(text: "Streaming WhisperKit dictation always uses the system default mic. Other modes follow this picker.")
+            ResetPaneButton(scope: .microphone)
         }
         .onAppear {
             devices = AudioDevices.inputDevices()
@@ -44,13 +50,19 @@ struct MicrophonePane: View {
 
     private func startPreview() {
         stopPreview()
-        let controller = MicPreviewController(deviceUID: model.preferredInputDeviceUID) { newLevel in
-            Task { @MainActor in
-                if abs(self.level - newLevel) > 0.01 { self.level = newLevel }
+        startError = nil
+        let controller = MicPreviewController(deviceUID: model.preferredInputDeviceUID)
+        preview = controller
+        Task {
+            do {
+                let stream = try await controller.start()
+                for await value in stream {
+                    if abs(level - value) > 0.01 { level = value }
+                }
+            } catch {
+                startError = error.localizedDescription
             }
         }
-        preview = controller
-        Task { await controller.start() }
     }
 
     private func stopPreview() {
@@ -66,38 +78,67 @@ struct MicrophonePane: View {
 @MainActor
 private final class MicPreviewController {
     let source: MicAudioSource
-    let onLevel: @Sendable (Float) -> Void
-    var levelTask: Task<Void, Never>?
-    var started = false
+    private var started = false
 
-    init(deviceUID: String?, onLevel: @escaping @Sendable (Float) -> Void) {
+    init(deviceUID: String?) {
         self.source = MicAudioSource(deviceUID: deviceUID)
-        self.onLevel = onLevel
     }
 
-    func start() async {
-        do {
-            try await source.start()
-            started = true
-        } catch {
-            return
-        }
-        let stream = await source.levels()
-        let cb = onLevel
-        levelTask = Task {
-            for await value in stream {
-                cb(value)
-            }
-        }
+    func start() async throws -> AsyncStream<Float> {
+        try await source.start()
+        started = true
+        return await source.levels()
     }
 
     func stop() async {
-        levelTask?.cancel()
-        levelTask = nil
         if started {
             await source.cancel()
             started = false
         }
+    }
+}
+
+private struct MicErrorBanner: View {
+    let message: String
+
+    private var hint: String {
+        let lower = message.lowercased()
+        if lower.contains("permission") || lower.contains("denied") || lower.contains("authoriz") {
+            return "Open System Settings → Privacy & Security → Microphone and grant Parola access."
+        }
+        return "Pick a different device or reconnect the current one."
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(DS.Palette.warning)
+                Text("Couldn't open microphone")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            Text(message)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+            Text(hint)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            if message.lowercased().contains("permission") || message.lowercased().contains("denied") || message.lowercased().contains("authoriz") {
+                Button("Open System Settings…") {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                .controlSize(.small)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(DS.Palette.warning.opacity(0.10))
+        )
     }
 }
 

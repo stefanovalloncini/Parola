@@ -164,6 +164,15 @@ final class AppModel: ObservableObject {
         didSet { restartDictationForKeyChange() }
     }
 
+    @AppStorage("dictationKeyModifiers") var dictationKeyModifiers: Int = 0 {
+        didSet { restartDictationForKeyChange() }
+    }
+
+    var dictationModifierFlags: NSEvent.ModifierFlags {
+        NSEvent.ModifierFlags(rawValue: UInt(dictationKeyModifiers))
+            .intersection(.deviceIndependentFlagsMask)
+    }
+
     @AppStorage("dictationIndicatorStyleRaw") var dictationIndicatorStyleRaw: String = DictationIndicatorStyle.overlay.rawValue {
         didSet { applyIndicatorStyleChange() }
     }
@@ -283,6 +292,7 @@ final class AppModel: ObservableObject {
     /// `true` if the MCP automation bridge is currently listening. Debug builds opt in by default;
     /// Release builds require an explicit toggle in Settings → MCP & Automation.
     @Published private(set) var automationBridgeRunning: Bool = false
+    @Published private(set) var automationBridgePort: UInt16?
 
     /// User-controlled toggle. Default differs by configuration so notarised binaries don't
     /// start a local TCP listener without consent.
@@ -296,10 +306,41 @@ final class AppModel: ObservableObject {
         #endif
     }
 
+    // MARK: - Sparkle
+
+    @AppStorage("sparkleChannel") var sparkleChannelRaw: String = SparkleChannel.stable.rawValue {
+        didSet { applySparkleChannelChange() }
+    }
+
+    @AppStorage("sparkleAutomatic") var sparkleAutomatic: Bool = true {
+        didSet { SparkleUpdater.shared.automaticallyChecks = sparkleAutomatic }
+    }
+
+    var sparkleChannel: SparkleChannel {
+        SparkleChannel(rawValue: sparkleChannelRaw) ?? .stable
+    }
+
+    private func applySparkleChannelChange() {
+        SparkleUpdater.shared.channel = sparkleChannel
+    }
+
+    // MARK: - Live captions translation
+
+    @AppStorage("liveCaptionsTranslate") var liveCaptionsTranslate: Bool = false {
+        didSet { applyLiveCaptionsTranslateChange() }
+    }
+
+    private func applyLiveCaptionsTranslateChange() {
+        let enabled = liveCaptionsTranslate
+        Task { await liveCaptions.setTranslate(enabled) }
+    }
+
     func startAutomationBridge() {
         guard testBridge == nil else { return }
         guard let bridge = try? ParolaTestBridge(model: self) else { return }
-        bridge.start()
+        bridge.start { [weak self] port in
+            self?.automationBridgePort = port
+        }
         testBridge = bridge
         automationBridgeRunning = true
     }
@@ -308,6 +349,7 @@ final class AppModel: ObservableObject {
         testBridge?.stop()
         testBridge = nil
         automationBridgeRunning = false
+        automationBridgePort = nil
     }
 
     init() {
@@ -321,6 +363,10 @@ final class AppModel: ObservableObject {
         _ = watchedFolders   // touch lazy var to start watchers on launch
         _ = meetingDetector  // touch lazy var to start NSWorkspace observation
         if dictationEnabled { startDictation() }
+        SparkleUpdater.shared.channel = sparkleChannel
+        SparkleUpdater.shared.automaticallyChecks = sparkleAutomatic
+        let initialTranslate = liveCaptionsTranslate
+        Task { [weak self] in await self?.liveCaptions.setTranslate(initialTranslate) }
         if automationBridgeEnabled {
             startAutomationBridge()
         }

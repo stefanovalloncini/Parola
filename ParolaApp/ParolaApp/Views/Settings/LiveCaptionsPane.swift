@@ -10,13 +10,8 @@ struct LiveCaptionsPane: View {
                 SettingRow("Translate to English",
                            description: "Translate captions live as you speak.",
                            isFirst: true) {
-                    Toggle("", isOn: Binding(
-                        get: { model.liveCaptions.translateToEnglish },
-                        set: { newValue in
-                            Task { await model.liveCaptions.setTranslate(newValue) }
-                        }
-                    ))
-                    .labelsHidden()
+                    Toggle("", isOn: $model.liveCaptionsTranslate)
+                        .labelsHidden()
                 }
                 SettingRow("Status") {
                     Text(model.liveCaptions.isActive ? "Running" : "Stopped")
@@ -24,6 +19,7 @@ struct LiveCaptionsPane: View {
                 }
             }
             SettingHelper(text: "Start and stop live captions from the Captions menu (⇧⌘L).")
+            ResetPaneButton(scope: .liveCaptions)
         }
     }
 }

@@ -17,6 +17,7 @@ final class ParolaTestBridge {
     private weak var model: AppModel?
     private let portFileURL: URL
     private var connections: [ObjectIdentifier: NWConnection] = [:]
+    private var onPortReady: (@MainActor (UInt16) -> Void)?
 
     init(model: AppModel) throws {
         self.model = model
@@ -34,7 +35,8 @@ final class ParolaTestBridge {
         self.portFileURL = dir.appendingPathComponent("bridge.port")
     }
 
-    func start() {
+    func start(onPortReady: (@MainActor (UInt16) -> Void)? = nil) {
+        self.onPortReady = onPortReady
         listener.stateUpdateHandler = { [weak self] state in
             guard let self else { return }
             if case .ready = state, let port = self.listener.port {
@@ -43,6 +45,10 @@ final class ParolaTestBridge {
                 FileHandle.standardError.write(
                     Data("[ParolaTestBridge] listening on 127.0.0.1:\(portString)\n".utf8)
                 )
+                let value = port.rawValue
+                Task { @MainActor [weak self] in
+                    self?.onPortReady?(value)
+                }
             }
         }
         listener.newConnectionHandler = { [weak self] conn in

@@ -5,9 +5,17 @@ struct WatchedFoldersPane: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
+        WatchedFoldersPaneBody(store: model.watchedFolders)
+    }
+}
+
+private struct WatchedFoldersPaneBody: View {
+    @ObservedObject var store: WatchedFoldersStore
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             SettingsSection {
-                if model.watchedFolders.folders.isEmpty {
+                if store.folders.isEmpty {
                     HStack {
                         Text("No watched folders yet.")
                             .foregroundStyle(.secondary)
@@ -16,28 +24,72 @@ struct WatchedFoldersPane: View {
                     }
                     .padding(16)
                 } else {
-                    ForEach(Array(model.watchedFolders.folders.enumerated()), id: \.element.id) { idx, folder in
-                        SettingRow(folder.displayName,
-                                   description: folder.displayPath,
-                                   isFirst: idx == 0) {
-                            Button {
-                                model.watchedFolders.removeFolder(folder.id)
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .buttonStyle(.borderless)
-                        }
+                    ForEach(Array(store.folders.enumerated()), id: \.element.id) { idx, folder in
+                        WatchedFolderRow(store: store, folder: folder, isFirst: idx == 0)
                     }
                 }
             }
 
+            if let error = store.lastError {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(DS.Palette.warning)
+                    Text(error)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                    Button("Dismiss") { store.dismissError() }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(DS.Palette.warning.opacity(0.10))
+                )
+            }
+
             Button {
-                model.watchedFolders.presentAddFolderPanel()
+                store.presentAddFolderPanel()
             } label: {
                 Label("Add Folder…", systemImage: "plus.circle")
             }
 
             SettingHelper(text: "New files dropped into a watched folder are transcribed automatically. Existing files are ignored.")
+            ResetPaneButton(scope: .watchedFolders)
+        }
+    }
+}
+
+private struct WatchedFolderRow: View {
+    @ObservedObject var store: WatchedFoldersStore
+    let folder: WatchedFolder
+    let isFirst: Bool
+
+    var body: some View {
+        let stale = store.isStale(folder.id)
+        SettingRow(folder.displayName,
+                   description: folder.displayPath,
+                   isFirst: isFirst) {
+            HStack(spacing: 6) {
+                if stale {
+                    Label("Stale", systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(DS.Palette.warning)
+                    Button("Re-add") {
+                        store.reattach(folder.id)
+                    }
+                    .controlSize(.small)
+                }
+                Button {
+                    store.removeFolder(folder.id)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+            }
         }
     }
 }
