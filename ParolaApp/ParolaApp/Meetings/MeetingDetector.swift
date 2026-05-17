@@ -19,7 +19,7 @@ final class MeetingDetector: ObservableObject {
 
     private let onDetected: @MainActor (String) -> Void
     private var lastFiredAt: Date?
-    private var observerTokens: [NSObjectProtocol] = []
+    nonisolated(unsafe) private var observerTokens: [NSObjectProtocol] = []
 
     init(onDetected: @escaping @MainActor (String) -> Void) {
         self.onDetected = onDetected
