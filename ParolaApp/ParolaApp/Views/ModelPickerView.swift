@@ -133,20 +133,14 @@ struct ModelPickerView: View {
     }
 
     static func shortLabel(for displayName: String) -> String {
-        let replacements: [(String, String)] = [
-            ("Whisper Large v3 Turbo", "Whisper Turbo"),
-            ("Whisper Large v3", "Whisper Large"),
-            ("Whisper Small", "Whisper Small"),
-            ("Whisper Base", "Whisper Base"),
-            ("Whisper Tiny (English)", "Whisper Tiny EN"),
-            ("Whisper Tiny", "Whisper Tiny"),
-            ("Parakeet TDT 0.6B v2", "Parakeet v2"),
-            ("Parakeet TDT 0.6B v3", "Parakeet v3"),
-            ("Distil Whisper Large v3", "Distil Large"),
+        let replacements: [String: String] = [
+            "Whisper Large v3 Turbo": "Whisper Turbo",
+            "Whisper Large v3": "Whisper Large",
+            "Whisper Tiny (English)": "Whisper Tiny EN",
+            "Parakeet TDT 0.6B v2": "Parakeet v2",
+            "Parakeet TDT 0.6B v3": "Parakeet v3",
+            "Distil Whisper Large v3": "Distil Large",
         ]
-        for (long, short) in replacements where displayName == long {
-            return short
-        }
-        return displayName
+        return replacements[displayName] ?? displayName
     }
 }
