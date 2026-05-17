@@ -116,19 +116,7 @@ extension AppModel {
         selectedEntryID = nil
         transcript = nil
         sourceFileURL = nil
-        if let obs = playerTimeObserver, let player {
-            player.removeTimeObserver(obs)
-        }
-        playerTimeObserver = nil
-        timeControlObserver?.invalidate()
-        timeControlObserver = nil
-        player?.pause()
-        player = nil
-        hasVideo = false
-        currentTimeSeconds = 0
-        isPlaying = false
-        currentSegmentID = nil
-        currentWordID = nil
+        tearDownPlayer()
         if case .ready = phase { phase = .idle }
     }
 
@@ -142,8 +130,7 @@ extension AppModel {
                 if let audioURL = loaded.document.audioURL {
                     installPlayer(for: audioURL)
                 } else {
-                    player?.pause()
-                    player = nil
+                    tearDownPlayer()
                 }
                 phase = .ready
             } catch {

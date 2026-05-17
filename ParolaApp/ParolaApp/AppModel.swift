@@ -184,14 +184,14 @@ final class AppModel: ObservableObject {
     @Published var dictationKeyCode: Int = AppModel.readInt("dictationKeyCode", default: 96) {
         didSet {
             UserDefaults.standard.set(dictationKeyCode, forKey: "dictationKeyCode")
-            restartDictationForKeyChange()
+            restartDictation()
         }
     }
 
     @Published var dictationKeyModifiers: Int = AppModel.readInt("dictationKeyModifiers", default: 0) {
         didSet {
             UserDefaults.standard.set(dictationKeyModifiers, forKey: "dictationKeyModifiers")
-            restartDictationForKeyChange()
+            restartDictation()
         }
     }
 
@@ -240,7 +240,7 @@ final class AppModel: ObservableObject {
         didSet {
             UserDefaults.standard.set(dictationPerAppOverridesJSON, forKey: "dictationPerAppOverridesJSON")
             applyDictationCleanupPromptChange()
-            restartDictationForWorkflowChange()
+            restartDictation()
         }
     }
 
@@ -321,18 +321,15 @@ final class AppModel: ObservableObject {
         youtubeTranscribeTask = nil
         youtubeSubsTask?.cancel()
         youtubeSubsTask = nil
-        if let consumer = streamingConsumer {
-            consumer.cancel()
-            streamingConsumer = nil
-        }
+        streamingConsumer?.cancel()
+        streamingConsumer = nil
         if let s = streamingSession {
             streamingSession = nil
             Task { await s.stop() }
         }
-        if liveSource != nil {
-            let source = liveSource
+        if let source = liveSource {
             liveSource = nil
-            Task { await source?.cancel() }
+            Task { await source.cancel() }
         }
         pendingRecordingCategory = .transcription
         phase = .idle
@@ -914,8 +911,7 @@ final class AppModel: ObservableObject {
             if let audio = doc.audioURL {
                 installPlayer(for: audio)
             } else {
-                player?.pause()
-                player = nil
+                tearDownPlayer()
             }
             phase = .ready
             recomputeMatches()

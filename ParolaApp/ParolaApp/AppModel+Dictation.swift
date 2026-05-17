@@ -119,7 +119,7 @@ extension AppModel {
             .store(in: &dictationCancellables)
     }
 
-    func restartDictationForWorkflowChange() {
+    func restartDictation() {
         guard dictationEnabled, dictationController.isRunning else { return }
         stopDictation()
         startDictation()
@@ -154,11 +154,6 @@ extension AppModel {
         dictationController.setMode(dictationMode)
     }
 
-    func restartDictationForKeyChange() {
-        guard dictationEnabled else { return }
-        stopDictation()
-        startDictation()
-    }
 
     private func currentDictationCleanupPrompt() -> Prompt? {
         guard let uuid = UUID(uuidString: dictationCleanupPromptID) else { return nil }
