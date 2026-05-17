@@ -45,8 +45,8 @@ public enum BatchEvent: Sendable {
 
 /// Sequentially transcribes a list of files through a single ``TranscriptionSession``.
 ///
-/// One worker on purpose: WhisperKit only loads one model at a time and we prefer
-/// keeping the cache warm to lighting up two copies in parallel.
+/// One worker on purpose: WhisperKit only loads one model at a time, so keeping the cache
+/// warm beats lighting up two copies in parallel.
 public actor BatchQueue {
     private let session: TranscriptionSession
 

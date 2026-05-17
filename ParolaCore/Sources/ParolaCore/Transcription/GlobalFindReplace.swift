@@ -42,26 +42,39 @@ public enum GlobalFindReplace {
         rules: [FindReplaceRule],
         to segments: [TranscriptSegment]
     ) -> [TranscriptSegment] {
-        let active = rules.filter { $0.enabled && !$0.find.isEmpty }
+        let active = rules
+            .filter { $0.enabled && !$0.find.isEmpty }
+            .map { CompiledRule($0) }
         guard !active.isEmpty else { return segments }
         return segments.map { seg in
             var copy = seg
             copy.text = active.reduce(seg.text) { current, rule in
-                applyRule(rule, to: current)
+                rule.apply(to: current)
             }
             return copy
         }
     }
 
-    private static func applyRule(_ rule: FindReplaceRule, to text: String) -> String {
-        if rule.regex {
-            let options: NSRegularExpression.Options = rule.caseSensitive ? [] : [.caseInsensitive]
-            guard let re = try? NSRegularExpression(pattern: rule.find, options: options) else {
-                return text
+    private struct CompiledRule {
+        let rule: FindReplaceRule
+        let regex: NSRegularExpression?
+
+        init(_ rule: FindReplaceRule) {
+            self.rule = rule
+            if rule.regex {
+                let options: NSRegularExpression.Options = rule.caseSensitive ? [] : [.caseInsensitive]
+                self.regex = try? NSRegularExpression(pattern: rule.find, options: options)
+            } else {
+                self.regex = nil
             }
-            let range = NSRange(text.startIndex..., in: text)
-            return re.stringByReplacingMatches(in: text, range: range, withTemplate: rule.replace)
-        } else {
+        }
+
+        func apply(to text: String) -> String {
+            if let regex {
+                let range = NSRange(text.startIndex..., in: text)
+                return regex.stringByReplacingMatches(in: text, range: range, withTemplate: rule.replace)
+            }
+            if rule.regex { return text }
             let options: NSString.CompareOptions = rule.caseSensitive ? [] : [.caseInsensitive]
             return text.replacingOccurrences(of: rule.find, with: rule.replace, options: options)
         }

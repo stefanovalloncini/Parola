@@ -59,6 +59,8 @@ enum YouTubeProcess {
 
 /// Drains a `Pipe`'s read side on a background task so the producing process never blocks
 /// on a full pipe buffer (typically 64 KB). Read `data()` after the process exits.
+///
+/// Unchecked Sendable: the only mutable state is `buffer`, guarded by `lock` on every access.
 final class PipeDrain: @unchecked Sendable {
     private let buffer = NSMutableData()
     private let lock = NSLock()

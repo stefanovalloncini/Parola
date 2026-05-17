@@ -21,10 +21,12 @@ public enum IgnoredSegments {
         rules: [IgnoredSegmentRule],
         to segments: [TranscriptSegment]
     ) -> [TranscriptSegment] {
-        let patterns = rules
-            .filter(\.enabled)
-            .map { $0.pattern.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-            .filter { !$0.isEmpty }
+        let patterns: Set<String> = Set(
+            rules
+                .filter(\.enabled)
+                .map { $0.pattern.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+                .filter { !$0.isEmpty }
+        )
         guard !patterns.isEmpty else { return segments }
         return segments.filter { seg in
             let normalized = seg.text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()

@@ -65,9 +65,7 @@ public actor WhisperKitTranscriber: Transcriber {
             do {
                 try await load(model: current, computeUnits: requested)
             } catch {
-                whisperKit = nil
-                loadedModel = nil
-                loadedComputeUnits = nil
+                unload()
                 throw error
             }
         }
@@ -142,7 +140,7 @@ public actor WhisperKitTranscriber: Transcriber {
 }
 
 /// Tokenizes a user-supplied prompt into the format WhisperKit's decoder expects.
-/// Returns nil when the prompt is missing, empty, or the tokenizer isn't ready.
+/// Returns nil when there's no prompt to tokenize or when the tokenizer isn't ready.
 func promptTokens(_ prompt: String?, tokenizer: WhisperTokenizer?) -> [Int]? {
     guard let prompt, let tokenizer else { return nil }
     let trimmed = prompt.trimmingCharacters(in: .whitespaces)

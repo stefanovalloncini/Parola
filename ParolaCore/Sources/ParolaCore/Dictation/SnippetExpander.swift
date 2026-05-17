@@ -67,6 +67,7 @@ public struct SnippetExpander: TextPostProcessor {
             return expandDeferred ? snippet.expandAtInsert : !snippet.expandAtInsert
         }
         guard !active.isEmpty else { return text }
+        let timestamp = now()
         var result = text
         for snippet in active {
             let expanded = Self.expand(
@@ -74,7 +75,7 @@ public struct SnippetExpander: TextPostProcessor {
                 clipboard: clipboard,
                 selection: selection,
                 appContext: appContext,
-                now: now()
+                now: timestamp
             )
             result = Self.replace(trigger: snippet.trigger, in: result, with: expanded)
         }
@@ -119,25 +120,22 @@ public struct SnippetExpander: TextPostProcessor {
     ) -> String {
         var out = replacement
         if out.contains("{{DATE}}") {
-            out = out.replacingOccurrences(of: "{{DATE}}", with: localizedDate(now))
+            out = out.replacingOccurrences(of: "{{DATE}}", with: longDateFormatter.string(from: now))
         }
         if out.contains("{{TIME}}") {
-            out = out.replacingOccurrences(of: "{{TIME}}", with: localizedTime(now))
+            out = out.replacingOccurrences(of: "{{TIME}}", with: shortTimeFormatter.string(from: now))
         }
         if out.contains("{{ISODATE}}") {
-            out = out.replacingOccurrences(of: "{{ISODATE}}", with: isoDate(now))
+            out = out.replacingOccurrences(of: "{{ISODATE}}", with: isoDateFormatter.string(from: now))
         }
         if out.contains("{{CLIPBOARD}}") {
-            let pasted = clipboard.currentText() ?? ""
-            out = out.replacingOccurrences(of: "{{CLIPBOARD}}", with: pasted)
+            out = out.replacingOccurrences(of: "{{CLIPBOARD}}", with: clipboard.currentText() ?? "")
         }
         if out.contains("{{SELECTION}}") {
-            let sel = selection.currentSelection() ?? ""
-            out = out.replacingOccurrences(of: "{{SELECTION}}", with: sel)
+            out = out.replacingOccurrences(of: "{{SELECTION}}", with: selection.currentSelection() ?? "")
         }
         if out.contains("{{APP}}") {
-            let app = appContext.frontmostAppName() ?? ""
-            out = out.replacingOccurrences(of: "{{APP}}", with: app)
+            out = out.replacingOccurrences(of: "{{APP}}", with: appContext.frontmostAppName() ?? "")
         }
         if out.contains("{{CURSOR}}") {
             out = out.replacingOccurrences(of: "{{CURSOR}}", with: SnippetMarker.cursor)
@@ -165,16 +163,4 @@ public struct SnippetExpander: TextPostProcessor {
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
-
-    private static func localizedDate(_ date: Date) -> String {
-        longDateFormatter.string(from: date)
-    }
-
-    private static func localizedTime(_ date: Date) -> String {
-        shortTimeFormatter.string(from: date)
-    }
-
-    private static func isoDate(_ date: Date) -> String {
-        isoDateFormatter.string(from: date)
-    }
 }
