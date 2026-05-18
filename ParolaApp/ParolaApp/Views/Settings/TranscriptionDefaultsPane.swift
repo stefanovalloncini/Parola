@@ -59,6 +59,7 @@ struct TranscriptionDefaultsPane: View {
             }
 
             ResetPaneButton(scope: .transcriptionDefaults)
+            ResetAllSettingsButton()
         }
     }
 

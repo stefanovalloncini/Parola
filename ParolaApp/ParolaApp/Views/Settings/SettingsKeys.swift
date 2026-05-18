@@ -169,8 +169,49 @@ enum SettingsResetService {
         }
         NotificationCenter.default.post(name: .parolaSettingsReset, object: scope)
     }
+
+    @MainActor
+    static func resetAll() {
+        let defaults = UserDefaults.standard
+        for scope in SettingsPaneScope.allCases {
+            for key in scope.defaultsKeys {
+                defaults.removeObject(forKey: key)
+            }
+        }
+        NotificationCenter.default.post(name: .parolaSettingsReset, object: nil)
+    }
 }
 
 extension Notification.Name {
     static let parolaSettingsReset = Notification.Name("ParolaSettingsResetNotification")
+}
+
+struct ResetAllSettingsButton: View {
+    @State private var confirming = false
+
+    var body: some View {
+        HStack {
+            Spacer()
+            Button(role: .destructive) {
+                confirming = true
+            } label: {
+                Text("Reset all Parola settings")
+            }
+            .controlSize(.small)
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+        }
+        .confirmationDialog(
+            "Reset every Parola setting?",
+            isPresented: $confirming,
+            titleVisibility: .visible
+        ) {
+            Button("Reset all", role: .destructive) {
+                SettingsResetService.resetAll()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Clears every saved preference. Library entries, models, and dictation prompts are kept.")
+        }
+    }
 }
