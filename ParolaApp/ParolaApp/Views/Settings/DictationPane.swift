@@ -87,6 +87,10 @@ struct DictationPane: View {
                     .pickerStyle(.menu)
                     .frame(width: 200)
                 }
+                SettingRow("Strip self-corrections",
+                           description: "Drops \"scratch that\", \"wait, no\", and collapses \", I mean,\" hedges.") {
+                    Toggle("", isOn: $model.dictationStripSelfCorrections).labelsHidden()
+                }
             }
             SettingHelper(text: "Requires Input Monitoring permission. The HUD shows a live waveform while you speak.")
 

@@ -175,6 +175,9 @@ extension AppModel {
             overrides: currentDictationOverrides()
         )
         var chain: [any TextPostProcessor] = []
+        if dictationStripSelfCorrections {
+            chain.append(SelfCorrectionCleaner())
+        }
         if correctionRules.contains(where: { $0.enabled && !$0.from.isEmpty }) {
             chain.append(CorrectionRuleSet(rules: correctionRules))
         }
