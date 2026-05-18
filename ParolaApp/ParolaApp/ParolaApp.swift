@@ -128,6 +128,10 @@ struct ParolaApp: App {
                 Button("Copy with Timestamps") { model.copyTranscriptToPasteboard(withTimestamps: true) }
                     .keyboardShortcut("c", modifiers: [.command, .option])
                     .disabled(model.transcript == nil)
+                Button("Copy as SRT") { model.copyTranscriptAsFormat(.srt) }
+                    .disabled(model.transcript == nil)
+                Button("Copy as Markdown") { model.copyTranscriptAsFormat(.md) }
+                    .disabled(model.transcript == nil)
                 Button("Export Segment Notes…") { model.exportSegmentNotesAsMarkdown() }
                     .disabled(model.transcript == nil)
                 Divider()

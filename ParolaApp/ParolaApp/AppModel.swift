@@ -1187,6 +1187,16 @@ final class AppModel: ObservableObject {
         NSPasteboard.general.setString(text, forType: .string)
     }
 
+    func copyTranscriptAsFormat(_ format: ExportFormat) {
+        guard let transcript else { return }
+        guard let data = try? makeExporter(for: format).render(transcript),
+              let text = String(data: data, encoding: .utf8) else {
+            return
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
     func printTranscript() {
         guard let transcript else { return }
         let title = sourceFileURL?.deletingPathExtension().lastPathComponent ?? "Transcript"
