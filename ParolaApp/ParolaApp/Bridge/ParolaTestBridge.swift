@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import Network
+import ScreenCaptureKit
 import Security
 import ParolaCore
 
@@ -407,7 +408,7 @@ final class ParolaTestBridge {
         case "screenshot":
             let requested = (args["path"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             let target = try resolveScreenshotPath(requested)
-            return try captureMainWindow(path: target.path)
+            return try await captureMainWindow(path: target.path)
 
         case "listPrompts":
             let prompts = await model.promptLibrary.allPrompts
@@ -642,19 +643,26 @@ final class ParolaTestBridge {
         return dir.appendingPathComponent(bare)
     }
 
-    private func captureMainWindow(path: String) throws -> [String: Any] {
+    private func captureMainWindow(path: String) async throws -> [String: Any] {
         guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil && !$0.isMiniaturized && $0.frame.size.width > 200 }) else {
             throw BridgeError("no visible main window to capture")
         }
         let windowID = CGWindowID(window.windowNumber)
-        guard let cgImage = CGWindowListCreateImage(
-            .null,
-            .optionIncludingWindow,
-            windowID,
-            [.boundsIgnoreFraming, .bestResolution]
-        ) else {
-            throw BridgeError("CGWindowListCreateImage returned nil — Screen Recording permission may be missing")
+        let windowTitle = window.title
+        let scale = window.backingScaleFactor
+
+        let content = try await SCShareableContent.current
+        guard let scWindow = content.windows.first(where: { $0.windowID == windowID }) else {
+            throw BridgeError("window \(windowID) not visible to ScreenCaptureKit — Screen Recording permission may be missing")
         }
+
+        let filter = SCContentFilter(desktopIndependentWindow: scWindow)
+        let config = SCStreamConfiguration()
+        config.width = Int(scWindow.frame.width * scale)
+        config.height = Int(scWindow.frame.height * scale)
+        config.showsCursor = false
+
+        let cgImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
         let pixelWidth = cgImage.width
         let pixelHeight = cgImage.height
         let rep = NSBitmapImageRep(cgImage: cgImage)
@@ -668,7 +676,7 @@ final class ParolaTestBridge {
             "width": pixelWidth,
             "height": pixelHeight,
             "bytes": pngData.count,
-            "windowTitle": window.title,
+            "windowTitle": windowTitle,
         ]
     }
 
