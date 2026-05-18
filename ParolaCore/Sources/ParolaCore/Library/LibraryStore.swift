@@ -171,6 +171,22 @@ public actor LibraryStore {
         if cachedLoaded?.id == id { cachedLoaded = nil }
     }
 
+    /// Replaces the labels on a library entry. Empty array clears them.
+    public func setLabels(_ labels: [String], for id: LibraryEntry.ID) throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.labels = labels.compactMap { name -> String? in
+                let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : trimmed
+            }
+        }
+        invalidateListCaches()
+        if cachedLoaded?.id == id { cachedLoaded = nil }
+    }
+
     /// Soft-deletes by stamping `deletedAt`. The bundle stays on disk so it can be restored.
     public func delete(_ id: LibraryEntry.ID, at now: Date = Date()) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)

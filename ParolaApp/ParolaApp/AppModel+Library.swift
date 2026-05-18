@@ -74,6 +74,29 @@ extension AppModel {
         libraryBundleSizes = sizes
     }
 
+    func setLabels(_ labels: [String], for id: LibraryEntry.ID) {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await library.setLabels(labels, for: id)
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+            refreshLibrary()
+        }
+    }
+
+    var allKnownLabels: [String] {
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for entry in libraryEntries {
+            for label in entry.labels {
+                if seen.insert(label).inserted { ordered.append(label) }
+            }
+        }
+        return ordered.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
     func deleteEntry(_ id: LibraryEntry.ID) {
         Task { [weak self] in
             guard let self else { return }

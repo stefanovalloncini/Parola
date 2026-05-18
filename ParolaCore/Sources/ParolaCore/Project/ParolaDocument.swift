@@ -14,6 +14,7 @@ public struct ParolaDocument: Sendable {
         public var deletedAt: Date?
         public var updatedAt: Date?
         public var audioFilename: String?
+        public var labels: [String]
 
         public init(
             version: Int = Manifest.currentVersion,
@@ -24,7 +25,8 @@ public struct ParolaDocument: Sendable {
             category: EntryCategory = .transcription,
             deletedAt: Date? = nil,
             updatedAt: Date? = nil,
-            audioFilename: String? = nil
+            audioFilename: String? = nil,
+            labels: [String] = []
         ) {
             self.version = version
             self.createdAt = createdAt
@@ -35,6 +37,7 @@ public struct ParolaDocument: Sendable {
             self.deletedAt = deletedAt
             self.updatedAt = updatedAt
             self.audioFilename = audioFilename
+            self.labels = labels
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -47,6 +50,7 @@ public struct ParolaDocument: Sendable {
             case deletedAt
             case updatedAt
             case audioFilename
+            case labels
         }
 
         public init(from decoder: any Decoder) throws {
@@ -60,6 +64,7 @@ public struct ParolaDocument: Sendable {
             deletedAt = try c.decodeIfPresent(Date.self, forKey: .deletedAt)
             updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt)
             audioFilename = try c.decodeIfPresent(String.self, forKey: .audioFilename)
+            labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -73,6 +78,9 @@ public struct ParolaDocument: Sendable {
             try c.encodeIfPresent(deletedAt, forKey: .deletedAt)
             try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
             try c.encodeIfPresent(audioFilename, forKey: .audioFilename)
+            if !labels.isEmpty {
+                try c.encode(labels, forKey: .labels)
+            }
         }
     }
 
