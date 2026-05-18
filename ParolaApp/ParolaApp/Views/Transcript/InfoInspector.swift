@@ -27,6 +27,9 @@ struct InfoInspector: View {
                 InfoRow(icon: "text.word.spacing", label: "Words", value: "\(wordCount)")
                 InfoRow(icon: "text.alignleft", label: "Sentences", value: "\(sentenceCount)")
                 InfoRow(icon: "book", label: "Reading time", value: readingTimeLabel)
+                if speakerCount > 0 {
+                    InfoRow(icon: "person.2", label: "Speakers", value: "\(speakerCount)")
+                }
             }
 
             if model.transcript != nil {
@@ -65,6 +68,10 @@ struct InfoInspector: View {
 
     private var charCount: Int {
         model.transcript?.text.count ?? 0
+    }
+
+    private var speakerCount: Int {
+        model.transcript?.uniqueSpeakers.count ?? 0
     }
 
     private var readingTimeLabel: String {
