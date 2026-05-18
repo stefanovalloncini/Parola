@@ -219,6 +219,12 @@ struct MacRecentlyDeletedView: View {
         return order.map { ($0, bucketed[$0] ?? []) }
     }
 
+    private static let monthYearFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        return f
+    }()
+
     private func bucket(for date: Date?) -> String {
         guard let date else { return "Unknown" }
         let cal = Calendar.current
@@ -227,9 +233,7 @@ struct MacRecentlyDeletedView: View {
         let days = cal.dateComponents([.day], from: cal.startOfDay(for: date), to: cal.startOfDay(for: Date())).day ?? 0
         if days < 7 { return "Earlier This Week" }
         if days < 30 { return "Earlier This Month" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
-        return formatter.string(from: date)
+        return Self.monthYearFormatter.string(from: date)
     }
 
     private func handleTap(entry: LibraryEntry, modifiers: NSEvent.ModifierFlags) {
