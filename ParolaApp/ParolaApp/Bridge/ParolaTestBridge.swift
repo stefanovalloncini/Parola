@@ -82,8 +82,10 @@ final class ParolaTestBridge {
         connections.removeAll()
         for task in connectionTasks.values { task.cancel() }
         connectionTasks.removeAll()
-        try? FileManager.default.removeItem(at: portFileURL)
-        try? FileManager.default.removeItem(at: tokenFileURL)
+        if let written = try? String(contentsOf: tokenFileURL, encoding: .utf8), written == authToken {
+            try? FileManager.default.removeItem(at: portFileURL)
+            try? FileManager.default.removeItem(at: tokenFileURL)
+        }
     }
 
     private func accept(_ conn: NWConnection) {
