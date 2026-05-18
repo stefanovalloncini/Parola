@@ -99,7 +99,7 @@ extension AppModel {
     }
 
     func togglePinned(for id: LibraryEntry.ID) {
-        let current = libraryEntries.first { $0.id == id }?.pinned ?? false
+        let current = libraryEntry(id: id)?.pinned ?? false
         Task { [weak self] in
             guard let self else { return }
             do {
@@ -137,10 +137,7 @@ extension AppModel {
     }
 
     func currentSegmentNote(for segmentID: Int) -> String? {
-        guard let id = selectedEntryID,
-              let entry = libraryEntries.first(where: { $0.id == id }) else {
-            return nil
-        }
+        guard let id = selectedEntryID, let entry = libraryEntry(id: id) else { return nil }
         return entry.note(forSegment: segmentID)
     }
 

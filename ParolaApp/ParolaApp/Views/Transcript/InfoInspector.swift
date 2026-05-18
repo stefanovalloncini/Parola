@@ -6,7 +6,7 @@ struct InfoInspector: View {
 
     private var entry: LibraryEntry? {
         guard let id = model.selectedEntryID else { return nil }
-        return model.libraryEntries.first { $0.id == id }
+        return model.libraryEntry(id: id)
     }
 
     var body: some View {

@@ -88,7 +88,7 @@ struct TranscriptPane: View {
             return url.deletingPathExtension().lastPathComponent
         }
         if let entryID = model.selectedEntryID,
-           let entry = model.libraryEntries.first(where: { $0.id == entryID }) {
+           let entry = model.libraryEntry(id: entryID) {
             return entry.title
         }
         return "Untitled"

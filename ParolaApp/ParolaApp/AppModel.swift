@@ -372,10 +372,21 @@ final class AppModel: ObservableObject {
     // MARK: - Library
 
     let library = LibraryStore()
-    @Published var libraryEntries: [LibraryEntry] = []
+    @Published var libraryEntries: [LibraryEntry] = [] {
+        didSet { rebuildLibraryIndex() }
+    }
     @Published var deletedEntries: [LibraryEntry] = []
     @Published var searchResults: [LibraryEntry]?
     @Published var selectedEntryID: LibraryEntry.ID?
+    private var libraryEntriesByID: [String: LibraryEntry] = [:]
+
+    private func rebuildLibraryIndex() {
+        libraryEntriesByID = Dictionary(uniqueKeysWithValues: libraryEntries.map { ($0.id, $0) })
+    }
+
+    func libraryEntry(id: LibraryEntry.ID) -> LibraryEntry? {
+        libraryEntriesByID[id]
+    }
     @Published var libraryFilter: EntryCategory?
     @Published var librarySortOrder: LibrarySortOrder = .newest {
         didSet { reapplyLibrarySort() }
@@ -1234,7 +1245,7 @@ final class AppModel: ObservableObject {
     func exportSegmentNotesAsMarkdown() {
         guard let transcript,
               let entryID = selectedEntryID,
-              let entry = libraryEntries.first(where: { $0.id == entryID }) else {
+              let entry = libraryEntry(id: entryID) else {
             return
         }
         let notes = entry.segmentNotes

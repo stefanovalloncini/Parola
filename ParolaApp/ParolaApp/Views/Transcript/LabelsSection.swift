@@ -7,7 +7,7 @@ struct LabelsSection: View {
 
     private var entry: LibraryEntry? {
         guard let id = model.selectedEntryID else { return nil }
-        return model.libraryEntries.first { $0.id == id }
+        return model.libraryEntry(id: id)
     }
 
     private var labels: [String] { entry?.labels ?? [] }
