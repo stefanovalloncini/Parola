@@ -24,6 +24,7 @@ struct ShortcutCatalog {
             Entry(label: "Export as TXT",          keys: "⌘ E"),
             Entry(label: "Print Transcript",       keys: "⌘ P"),
             Entry(label: "Focus Chat Composer",    keys: "⌘ L"),
+            Entry(label: "Toggle Inspector",       keys: "⌘ ⇧ I"),
         ]),
         Section(title: "Navigation", entries: [
             Entry(label: "Open Settings",          keys: "⌘ ,"),

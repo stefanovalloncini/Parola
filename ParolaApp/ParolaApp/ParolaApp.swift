@@ -72,6 +72,16 @@ struct ParolaApp: App {
                     .keyboardShortcut("s")
                     .disabled(model.transcript == nil)
             }
+            CommandGroup(after: .sidebar) {
+                Button("Toggle Inspector") {
+                    UserDefaults.standard.set(
+                        !UserDefaults.standard.bool(forKey: "inspectorVisible"),
+                        forKey: "inspectorVisible"
+                    )
+                }
+                .keyboardShortcut("i", modifiers: [.command, .shift])
+                .disabled(model.transcript == nil)
+            }
             CommandGroup(after: .textEditing) {
                 Button("Find…") { model.toggleFind() }
                     .keyboardShortcut("f", modifiers: [.command])
