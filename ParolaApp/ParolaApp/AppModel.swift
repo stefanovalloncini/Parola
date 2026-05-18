@@ -1018,6 +1018,15 @@ final class AppModel: ObservableObject {
         if findIsOpen { scheduleRecomputeMatches() }
     }
 
+    func deleteSegment(id: TranscriptSegment.ID) {
+        guard var t = transcript else { return }
+        let before = t.segments.count
+        t.segments.removeAll { $0.id == id }
+        guard t.segments.count != before else { return }
+        transcript = t
+        if findIsOpen { scheduleRecomputeMatches() }
+    }
+
     func nudgeSegmentStart(id: TranscriptSegment.ID, frames: Int) {
         guard var t = transcript else { return }
         t.segments = SegmentTimingNudge.nudgeStart(

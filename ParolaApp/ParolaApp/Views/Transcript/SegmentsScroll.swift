@@ -294,6 +294,9 @@ struct SegmentCard: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(draggablePayload, forType: .string)
             }
+            cardButton(systemName: "trash", help: "Delete segment") {
+                model.deleteSegment(id: segment.id)
+            }
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
