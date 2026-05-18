@@ -12,25 +12,48 @@ struct WordFrequencySection: View {
     var body: some View {
         if !entries.isEmpty {
             InfoSection(title: "Top words") {
-                VStack(alignment: .leading, spacing: 2) {
+                let maxCount = entries.first?.count ?? 1
+                VStack(alignment: .leading, spacing: 4) {
                     ForEach(entries) { entry in
-                        HStack {
-                            Text(entry.word)
-                                .font(DS.Font.body)
-                                .foregroundStyle(DS.Color.primaryText)
-                            Spacer()
-                            Text("\(entry.count)")
-                                .font(DS.Font.caption.monospacedDigit())
-                                .foregroundStyle(DS.Color.secondaryText)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 1)
-                                .background(
-                                    Capsule().fill(DS.Color.accent.opacity(0.10))
-                                )
-                        }
+                        WordFrequencyBar(
+                            word: entry.word,
+                            count: entry.count,
+                            fraction: Double(entry.count) / Double(max(1, maxCount))
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+private struct WordFrequencyBar: View {
+    let word: String
+    let count: Int
+    let fraction: Double
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(word)
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.primaryText)
+                .frame(width: 80, alignment: .leading)
+                .lineLimit(1)
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(DS.Color.accent.opacity(0.10))
+                    Capsule()
+                        .fill(DS.Color.accent.opacity(0.55))
+                        .frame(width: max(2, proxy.size.width * fraction))
+                }
+            }
+            .frame(height: 8)
+            Text("\(count)")
+                .font(DS.Font.captionMono)
+                .foregroundStyle(DS.Color.secondaryText)
+                .frame(width: 24, alignment: .trailing)
+        }
+        .padding(.vertical, 1)
     }
 }
