@@ -96,11 +96,14 @@ struct ModelCardRow: View {
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)
                         .help("Delete this model from disk")
+                        .accessibilityLabel("Delete \(variant.displayName)")
+                        .accessibilityIdentifier("model.\(variant.id).delete")
                     }
                     Button(action: primaryAction) {
                         Text("Activate")
                     }
                     .buttonStyle(ModelPillButtonStyle())
+                    .accessibilityIdentifier("model.\(variant.id).activate")
                 }
             case .available:
                 Button(action: primaryAction) {
@@ -110,6 +113,7 @@ struct ModelCardRow: View {
                     }
                 }
                 .buttonStyle(ModelPillButtonStyle())
+                .accessibilityIdentifier("model.\(variant.id).download")
             case .downloading(let progress):
                 HStack(spacing: 8) {
                     ProgressView(value: progress)

@@ -19,6 +19,7 @@ struct ContentToolbar: ToolbarContent {
                 }
                 .toggleStyle(.button)
                 .help("Translate to English instead of transcribing in the source language.")
+                .accessibilityIdentifier("toolbar.translate")
             }
             Toggle(isOn: $model.diarize) {
                 HStack(spacing: 4) {
@@ -28,6 +29,7 @@ struct ContentToolbar: ToolbarContent {
             }
             .toggleStyle(.button)
             .help("Identify multiple speakers in the audio (slower).")
+            .accessibilityIdentifier("toolbar.diarize")
         }
         ToolbarItemGroup(placement: .primaryAction) {
             if model.route != .batch {
@@ -37,12 +39,14 @@ struct ContentToolbar: ToolbarContent {
                     Label("Batch", systemImage: "square.stack.3d.up")
                 }
                 .help("Open the batch transcription page.")
+                .accessibilityIdentifier("toolbar.batch")
             }
             if !model.deletedEntries.isEmpty {
                 Button { model.showingTrash = true } label: {
                     Label("Recently Deleted", systemImage: "trash")
                 }
                 .help("Show Recently Deleted")
+                .accessibilityIdentifier("toolbar.recentlyDeleted")
             }
             Button {
                 model.youtubeSheetOpen = true
@@ -51,15 +55,19 @@ struct ContentToolbar: ToolbarContent {
             }
             .disabled(isBusy)
             .help("Transcribe from a YouTube URL.")
+            .accessibilityIdentifier("toolbar.youtube")
 
             Menu {
                 Button("Microphone") { model.startRecording(source: .microphone) }
+                    .accessibilityIdentifier("toolbar.record.microphone")
                 Button("System audio") { model.startRecording(source: .systemAudio) }
+                    .accessibilityIdentifier("toolbar.record.system")
             } label: {
                 Label("Record", systemImage: "mic.fill")
             }
             .disabled(isBusy)
             .help("Record from the microphone or system audio.")
+            .accessibilityIdentifier("toolbar.record")
 
             PromptsMenu()
                 .disabled(model.transcript == nil || model.isRunningPrompt)
@@ -71,6 +79,7 @@ struct ContentToolbar: ToolbarContent {
             }
             .disabled(isBusy)
             .help("Open an audio or video file.")
+            .accessibilityIdentifier("toolbar.openFile")
         }
     }
 

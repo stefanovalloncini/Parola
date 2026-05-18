@@ -333,6 +333,8 @@ struct ModelsSettingsPane: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .help("Delete this folder from disk")
+                .accessibilityLabel("Delete \(entry.name)")
+                .accessibilityIdentifier("orphan.\(entry.name).delete")
             }
         }
         .padding(.horizontal, 12)
