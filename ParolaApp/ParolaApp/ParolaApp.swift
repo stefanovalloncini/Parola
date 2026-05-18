@@ -107,6 +107,13 @@ struct ParolaApp: App {
                 .keyboardShortcut("p", modifiers: [.command, .shift])
             }
             CommandMenu("Transcript") {
+                Button("Copy Plain Text") { model.copyTranscriptToPasteboard(withTimestamps: false) }
+                    .keyboardShortcut("c", modifiers: [.command, .shift])
+                    .disabled(model.transcript == nil)
+                Button("Copy with Timestamps") { model.copyTranscriptToPasteboard(withTimestamps: true) }
+                    .keyboardShortcut("c", modifiers: [.command, .option])
+                    .disabled(model.transcript == nil)
+                Divider()
                 Button("Export as TXT…") { model.exportRequest(.txt) }
                     .keyboardShortcut("e", modifiers: [.command])
                     .disabled(model.transcript == nil)

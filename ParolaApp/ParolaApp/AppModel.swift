@@ -1134,6 +1134,18 @@ final class AppModel: ObservableObject {
         pendingExport = format
     }
 
+    func copyTranscriptToPasteboard(withTimestamps: Bool) {
+        guard let transcript else { return }
+        let text: String
+        if withTimestamps {
+            text = TranscriptTimestampedText.render(transcript)
+        } else {
+            text = transcript.text
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
     func printTranscript() {
         guard let transcript else { return }
         let title = sourceFileURL?.deletingPathExtension().lastPathComponent ?? "Transcript"
