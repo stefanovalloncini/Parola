@@ -64,6 +64,9 @@ struct LibraryListView: View {
                                     }
                                 }
                             }
+                            Button("Reveal in Finder") {
+                                NSWorkspace.shared.activateFileViewerSelecting([entry.bundleURL])
+                            }
                             Button("Rename…") {
                                 renameDraft = entry.title
                                 renamingEntry = entry
