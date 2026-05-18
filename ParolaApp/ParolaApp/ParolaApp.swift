@@ -122,6 +122,15 @@ struct ParolaApp: App {
                 Button("Export as JSON…") { model.exportRequest(.json) }
                     .disabled(model.transcript == nil)
                 Divider()
+                Button("Open in New Window") {
+                    if let t = model.transcript {
+                        let title = model.sourceFileURL?.deletingPathExtension().lastPathComponent ?? "Transcript"
+                        TranscriptWindowController.shared.open(transcript: t, title: title)
+                    }
+                }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+                .disabled(model.transcript == nil)
+                Divider()
                 Button("Print Transcript…") { model.printTranscript() }
                     .keyboardShortcut("p", modifiers: [.command])
                     .disabled(model.transcript == nil)
