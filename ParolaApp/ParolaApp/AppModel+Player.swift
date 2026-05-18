@@ -52,7 +52,14 @@ extension AppModel {
 
     private func updateCurrentSegment(time: Double) {
         guard let segments = transcript?.segments else { return }
-        let match = segments.first(where: { time >= $0.start && time <= $0.end })
+        let match: TranscriptSegment?
+        if let cached = currentSegmentID,
+           let idx = segments.firstIndex(where: { $0.id == cached }),
+           time >= segments[idx].start && time <= segments[idx].end {
+            match = segments[idx]
+        } else {
+            match = segments.binarySearchSegment(coveringTime: time)
+        }
         if currentSegmentID != match?.id {
             currentSegmentID = match?.id
         }
