@@ -40,6 +40,19 @@ struct MediaBar: View {
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 96, alignment: .trailing)
 
+            Button { model.skipSilences.toggle() } label: {
+                Image(systemName: model.skipSilences ? "forward.end.fill" : "forward.end")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(model.skipSilences ? DS.Color.accent : .secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule().fill(model.skipSilences ? DS.Color.accent.opacity(0.14) : Color.clear)
+                    )
+            }
+            .buttonStyle(.plain)
+            .help(model.skipSilences ? "Skip silences (on)" : "Skip silences")
+
             Menu {
                 ForEach(speeds, id: \.self) { s in
                     Button {

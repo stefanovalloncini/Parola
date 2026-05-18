@@ -33,6 +33,7 @@ extension AppModel {
             Task { @MainActor in
                 self?.currentTimeSeconds = seconds
                 self?.updateCurrentSegment(time: seconds)
+                self?.maybeSkipSilence(currentTime: seconds)
             }
         }
         timeControlObserver = p.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
@@ -73,6 +74,24 @@ extension AppModel {
         let t = CMTime(seconds: chapter.start, preferredTimescale: 600)
         player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
         player.play()
+    }
+
+    func maybeSkipSilence(currentTime: Double) {
+        guard skipSilences,
+              let player,
+              player.timeControlStatus == .playing,
+              let segments = transcript?.segments,
+              !segments.isEmpty else {
+            return
+        }
+        guard let currentSegment = segments.first(where: { currentTime >= $0.start && currentTime <= $0.end }),
+              let nextSegment = segments.first(where: { $0.start > currentSegment.end + 0.4 }) else {
+            return
+        }
+        let gap = nextSegment.start - currentSegment.end
+        guard gap >= 0.5 else { return }
+        let target = CMTime(seconds: nextSegment.start, preferredTimescale: 600)
+        player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
     func seekTo(seconds: Double) {
