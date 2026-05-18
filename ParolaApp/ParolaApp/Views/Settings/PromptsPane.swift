@@ -124,13 +124,20 @@ struct PromptsPane: View {
                 id: draft.id,
                 name: trimmed,
                 instructions: draft.instructions,
-                isBuiltIn: false
+                isBuiltIn: false,
+                triggerWords: draft.parsedTriggerWords
             )
             await model.promptLibrary.updateUserPrompt(updated)
         } else {
-            _ = await model.promptLibrary.addUserPrompt(name: trimmed, instructions: draft.instructions)
+            let created = await model.promptLibrary.addUserPrompt(name: trimmed, instructions: draft.instructions)
+            if !draft.parsedTriggerWords.isEmpty {
+                var withTriggers = created
+                withTriggers.triggerWords = draft.parsedTriggerWords
+                await model.promptLibrary.updateUserPrompt(withTriggers)
+            }
         }
         await reload()
+        await model.refreshDictationTriggerPrompts()
     }
 
     @MainActor
@@ -140,6 +147,7 @@ struct PromptsPane: View {
         Task {
             await model.promptLibrary.removeUserPrompt(id)
             await reload()
+            await model.refreshDictationTriggerPrompts()
         }
     }
 
@@ -194,12 +202,21 @@ final class PromptEditDraft: Identifiable, ObservableObject {
     let isExisting: Bool
     @Published var name: String
     @Published var instructions: String
+    @Published var triggerWordsText: String
 
     init(prompt: Prompt) {
         self.id = prompt.id
         self.isExisting = !prompt.name.isEmpty
         self.name = prompt.name
         self.instructions = prompt.instructions
+        self.triggerWordsText = prompt.triggerWords.joined(separator: ", ")
+    }
+
+    var parsedTriggerWords: [String] {
+        triggerWordsText
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 }
 
@@ -232,6 +249,15 @@ private struct PromptEditor: View {
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .strokeBorder(Color.secondary.opacity(0.3))
                     )
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Trigger words").font(.caption).foregroundStyle(.secondary)
+                TextField("summary, recap", text: $draft.triggerWordsText)
+                    .textFieldStyle(.roundedBorder)
+                Text("Words that switch to this prompt for one dictation. Separate with commas.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             HStack {

@@ -6,23 +6,26 @@ public struct Prompt: Codable, Sendable, Identifiable, Hashable {
     public var instructions: String
     public var isBuiltIn: Bool
     public var version: Int
+    public var triggerWords: [String]
 
     public init(
         id: UUID = UUID(),
         name: String,
         instructions: String,
         isBuiltIn: Bool = false,
-        version: Int = 1
+        version: Int = 1,
+        triggerWords: [String] = []
     ) {
         self.id = id
         self.name = name
         self.instructions = instructions
         self.isBuiltIn = isBuiltIn
         self.version = version
+        self.triggerWords = triggerWords
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, instructions, isBuiltIn, version
+        case id, name, instructions, isBuiltIn, version, triggerWords
     }
 
     public init(from decoder: Decoder) throws {
@@ -32,6 +35,17 @@ public struct Prompt: Codable, Sendable, Identifiable, Hashable {
         instructions = try c.decode(String.self, forKey: .instructions)
         isBuiltIn = try c.decodeIfPresent(Bool.self, forKey: .isBuiltIn) ?? false
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        triggerWords = try c.decodeIfPresent([String].self, forKey: .triggerWords) ?? []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(instructions, forKey: .instructions)
+        try c.encode(isBuiltIn, forKey: .isBuiltIn)
+        try c.encode(version, forKey: .version)
+        try c.encode(triggerWords, forKey: .triggerWords)
     }
 }
 

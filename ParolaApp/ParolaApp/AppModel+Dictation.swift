@@ -175,7 +175,8 @@ extension AppModel {
     private func currentDictationProcessor() -> any TextPostProcessor {
         let prompt = PromptDictationProcessor(
             defaultPrompt: currentDictationCleanupPrompt(),
-            overrides: currentDictationOverrides()
+            overrides: currentDictationOverrides(),
+            triggerPrompts: cachedDictationTriggerPrompts
         )
         var chain: [any TextPostProcessor] = []
         if dictationStripSelfCorrections {
@@ -194,6 +195,15 @@ extension AppModel {
     func applyDictationCleanupPromptChange() {
         guard dictationController.isRunning else { return }
         dictationController.setPostProcessor(currentDictationProcessor())
+    }
+
+    func refreshDictationTriggerPrompts() async {
+        let user = await promptLibrary.userPrompts
+        let prompts = (Prompt.builtIns + user).filter { !$0.triggerWords.isEmpty }
+        await MainActor.run {
+            self.cachedDictationTriggerPrompts = prompts
+            self.applyDictationCleanupPromptChange()
+        }
     }
 
     func startDictationFromIntent() {

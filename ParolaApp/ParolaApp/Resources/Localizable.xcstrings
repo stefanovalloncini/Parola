@@ -8225,6 +8225,39 @@
           }
         }
       }
+    },
+    "Trigger words": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parole trigger"
+          }
+        }
+      }
+    },
+    "summary, recap": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "riepilogo, sintesi"
+          }
+        }
+      }
+    },
+    "Words that switch to this prompt for one dictation. Separate with commas.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parole che attivano questo prompt per una sola dettatura. Separale con la virgola."
+          }
+        }
+      }
     }
   },
   "version": "1.1"
