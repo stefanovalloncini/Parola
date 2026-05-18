@@ -33,13 +33,12 @@ struct SegmentsScroll: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {
-                    if let t = model.transcript {
+                    if model.transcript != nil {
                         let speakers = model.transcriptSpeakers
                         if speakers.count >= 2 {
                             SpeakerFilterRow(speakers: speakers, selection: speakerFilterBinding)
                                 .padding(.bottom, DS.Spacing.tight)
                         }
-                        let _ = t // visibleSegmentsCache is kept in sync via onChange below
                         ForEach(visibleSegmentsCache) { seg in
                             SegmentCard(
                                 segment: seg,

@@ -38,7 +38,7 @@ struct LibraryListView: View {
         }
     }
 
-    private func recomputeDerived() {
+    private func recomputeEntries() {
         let inCategory = model.libraryEntries.filter { $0.category == category }
         entries = inCategory
             .filter { entry in
@@ -53,9 +53,12 @@ struct LibraryListView: View {
                 if lhs.pinned != rhs.pinned { return lhs.pinned }
                 return lhs.createdAt > rhs.createdAt
             }
+    }
+
+    private func recomputeLabelOptions() {
         var seen = Set<String>()
         var ordered: [String] = []
-        for entry in inCategory {
+        for entry in model.libraryEntries where entry.category == category {
             for label in entry.labels {
                 if seen.insert(label).inserted { ordered.append(label) }
             }
@@ -115,13 +118,17 @@ struct LibraryListView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { recomputeDerived() }
+        .onAppear {
+            recomputeEntries()
+            recomputeLabelOptions()
+        }
         .onChange(of: model.libraryVersion) { _, _ in
-            recomputeDerived()
+            recomputeEntries()
+            recomputeLabelOptions()
             selection = selection.intersection(Set(entries.map(\.id)))
         }
-        .onChange(of: labelFilter) { _, _ in recomputeDerived() }
-        .onChange(of: dateRangeFilter) { _, _ in recomputeDerived() }
+        .onChange(of: labelFilter) { _, _ in recomputeEntries() }
+        .onChange(of: dateRangeFilter) { _, _ in recomputeEntries() }
         .alert("Delete \(selection.count) entries?", isPresented: $pendingBulkDelete) {
             Button("Cancel", role: .cancel) {}
                 .accessibilityIdentifier("alert.bulkDelete.cancel")

@@ -14,7 +14,7 @@ final class LiveCaptionsController: ObservableObject {
     private var consumer: Task<Void, Never>?
     private var lastOptions: TranscriptionOptions?
 
-    deinit {
+    isolated deinit {
         consumer?.cancel()
     }
 
