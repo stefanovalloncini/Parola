@@ -14,6 +14,23 @@ public extension URL {
         if path.hasPrefix("/embed/") { return true }
         return false
     }
+
+    /// True if this URL is on a host that yt-dlp can fetch from.
+    var isYtDlpSupported: Bool {
+        if isYouTubeVideo { return true }
+        guard let host = host?.lowercased() else { return false }
+        let suffixes = [
+            "vimeo.com",
+            "twitter.com", "x.com", "t.co",
+            "tiktok.com",
+            "soundcloud.com",
+            "facebook.com", "fb.watch",
+            "instagram.com",
+            "twitch.tv",
+            "reddit.com", "v.redd.it",
+        ]
+        return suffixes.contains { host == $0 || host.hasSuffix(".\($0)") }
+    }
 }
 
 #if os(macOS)
@@ -30,8 +47,8 @@ public actor YouTubeAudioSource: AudioSource {
     private var runningProcess: Process?
 
     public init(url: URL, timeoutSeconds: Int = 120) throws {
-        guard url.isYouTubeVideo else {
-            throw ParolaError.captureUnavailable("not a YouTube URL: \(url.absoluteString)")
+        guard url.isYtDlpSupported else {
+            throw ParolaError.captureUnavailable("URL not supported by yt-dlp: \(url.absoluteString)")
         }
         self.url = url
         self.timeoutSeconds = timeoutSeconds

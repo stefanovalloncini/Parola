@@ -11,7 +11,7 @@ struct YouTubeURLSheet: View {
         SheetFrame(
             icon: "play.rectangle.fill",
             iconTint: DS.Color.accent,
-            title: "Add YouTube URL",
+            title: "Add video URL",
             onClose: { dismiss() },
             content: { contentBody },
             footer: { footerBody }
@@ -21,7 +21,7 @@ struct YouTubeURLSheet: View {
             if urlDraft.isEmpty,
                let clipboard = NSPasteboard.general.string(forType: .string),
                let url = URL(string: clipboard.trimmingCharacters(in: .whitespacesAndNewlines)),
-               url.isYouTubeVideo {
+               url.isYtDlpSupported {
                 urlDraft = url.absoluteString
             }
             fieldFocused = true
@@ -31,7 +31,7 @@ struct YouTubeURLSheet: View {
     private var contentBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.regular) {
-                Text("Paste a link — Parola downloads the audio locally with yt-dlp.")
+                Text("Paste a link from YouTube, Vimeo, X, TikTok, SoundCloud, or any yt-dlp source. Parola downloads the audio locally.")
                     .font(DS.Font.body)
                     .foregroundStyle(DS.Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)

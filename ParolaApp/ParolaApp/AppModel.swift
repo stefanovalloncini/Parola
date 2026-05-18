@@ -834,8 +834,8 @@ final class AppModel: ObservableObject {
     }
 
     private func makeYouTubeURL(_ urlString: String) -> URL? {
-        guard let url = URL(string: urlString), url.isYouTubeVideo else {
-            phase = .failed(message: "That doesn't look like a YouTube URL.")
+        guard let url = URL(string: urlString), url.isYtDlpSupported else {
+            phase = .failed(message: "That URL isn't on a host yt-dlp can fetch.")
             return nil
         }
         youtubeSheetOpen = false
