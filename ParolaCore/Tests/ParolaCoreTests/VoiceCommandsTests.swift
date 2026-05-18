@@ -46,4 +46,26 @@ struct VoiceCommandsTests {
     func multipleCommands() {
         #expect(VoiceCommands.applyTo("a comma b period") == "a, b.")
     }
+
+    @Test("italian punto becomes a period")
+    func italianPeriod() {
+        #expect(VoiceCommands.applyTo("ciao punto come stai") == "ciao. come stai")
+    }
+
+    @Test("italian virgola becomes a comma")
+    func italianComma() {
+        #expect(VoiceCommands.applyTo("ciao virgola amico") == "ciao, amico")
+    }
+
+    @Test("italian a capo becomes a newline")
+    func italianNewLine() {
+        let out = VoiceCommands.applyTo("primo a capo secondo")
+        #expect(out == "primo\nsecondo")
+    }
+
+    @Test("italian punto e virgola is matched as a multi-word phrase")
+    func italianSemicolon() {
+        let out = VoiceCommands.applyTo("uno punto e virgola due")
+        #expect(out == "uno; due")
+    }
 }

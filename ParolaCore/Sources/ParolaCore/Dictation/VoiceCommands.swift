@@ -2,13 +2,22 @@ import Foundation
 
 public enum VoiceCommands {
     private static let phrases: [(phrase: String, replacement: String)] = [
+        ("nuovo paragrafo", "\n\n"),
         ("new paragraph", "\n\n"),
+        ("punto interrogativo", "?"),
+        ("punto di domanda", "?"),
+        ("punto esclamativo", "!"),
+        ("punto e virgola", ";"),
+        ("a capo", "\n"),
         ("new line", "\n"),
+        ("due punti", ":"),
         ("question mark", "?"),
         ("exclamation mark", "!"),
         ("exclamation point", "!"),
         ("full stop", "."),
+        ("punto", "."),
         ("period", "."),
+        ("virgola", ","),
         ("comma", ","),
         ("semicolon", ";"),
         ("colon", ":"),
