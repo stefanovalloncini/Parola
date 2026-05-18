@@ -45,6 +45,7 @@ final class AppModel: ObservableObject {
             let speakers = transcript?.uniqueSpeakers ?? []
             if speakers != transcriptSpeakers { transcriptSpeakers = speakers }
             transcriptVersion &+= 1
+            if findIsOpen { scheduleRecomputeMatches() }
         }
     }
     @Published private(set) var transcriptSpeakers: [String] = []
@@ -1186,7 +1187,6 @@ final class AppModel: ObservableObject {
         guard let idx = t.segments.firstIndex(where: { $0.id == id }) else { return }
         t.segments[idx].text = newText
         transcript = t
-        if findIsOpen { scheduleRecomputeMatches() }
     }
 
     func deleteSegment(id: TranscriptSegment.ID) {
@@ -1195,7 +1195,6 @@ final class AppModel: ObservableObject {
         t.segments.removeAll { $0.id == id }
         guard t.segments.count != before else { return }
         transcript = t
-        if findIsOpen { scheduleRecomputeMatches() }
     }
 
     func nudgeSegmentStart(id: TranscriptSegment.ID, frames: Int) {
