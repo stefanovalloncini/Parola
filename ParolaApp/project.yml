@@ -94,6 +94,10 @@ targets:
             NSSendTypes:
               - public.file-url
               - NSFilenamesPboardType
+        CFBundleURLTypes:
+          - CFBundleURLName: app.parola.url
+            CFBundleURLSchemes:
+              - parola
     entitlements:
       path: ParolaApp/Parola.entitlements
       properties:

@@ -3,9 +3,29 @@ import ParolaCore
 
 struct GeneralPane: View {
     @EnvironmentObject var model: AppModel
+    @State private var launchAtLogin: Bool = LaunchAtLogin.isEnabled
+    @State private var launchAtLoginError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            SettingsSection("Startup") {
+                SettingRow("Open at login",
+                           description: launchAtLoginError ?? "Launches Parola in the background when you sign in.",
+                           isFirst: true) {
+                    Toggle("", isOn: $launchAtLogin)
+                        .labelsHidden()
+                        .onChange(of: launchAtLogin) { _, newValue in
+                            do {
+                                try LaunchAtLogin.setEnabled(newValue)
+                                launchAtLoginError = nil
+                            } catch {
+                                launchAtLogin = LaunchAtLogin.isEnabled
+                                launchAtLoginError = error.localizedDescription
+                            }
+                        }
+                }
+            }
+
             SettingsSection {
                 SettingRow("Highlight the word being spoken",
                            description: "Bolds and tints the current word as audio plays.",
