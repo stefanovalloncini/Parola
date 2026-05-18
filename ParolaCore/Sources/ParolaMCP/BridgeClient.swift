@@ -98,7 +98,9 @@ public struct BridgeClient: BridgeProtocol {
         _ = setsockopt(socketFD, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
 
         try request.withUnsafeBytes { rawBuf in
-            let base = rawBuf.bindMemory(to: UInt8.self).baseAddress!
+            guard let base = rawBuf.bindMemory(to: UInt8.self).baseAddress else {
+                throw BridgeFailure(message: "send() failed (empty request buffer)")
+            }
             var sent = 0
             while sent < request.count {
                 let n = send(socketFD, base + sent, request.count - sent, 0)
@@ -110,8 +112,9 @@ public struct BridgeClient: BridgeProtocol {
         var buffer = Data()
         var chunk = [UInt8](repeating: 0, count: 4096)
         while true {
-            let n = chunk.withUnsafeMutableBufferPointer { ptr in
-                recv(socketFD, ptr.baseAddress!, ptr.count, 0)
+            let n = chunk.withUnsafeMutableBufferPointer { ptr -> Int in
+                guard let base = ptr.baseAddress else { return 0 }
+                return recv(socketFD, base, ptr.count, 0)
             }
             if n <= 0 { break }
             let received = chunk.prefix(n)
