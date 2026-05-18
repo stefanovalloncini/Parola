@@ -33,6 +33,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSUpdateDynamicServices()
         SparkleUpdater.shared.start()
     }
+
+    func applicationDidResignActive(_ notification: Notification) {
+        model?.handleAppResignedActive()
+    }
 }
 
 @MainActor

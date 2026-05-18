@@ -33,6 +33,15 @@ struct TranscriptionDefaultsPane: View {
                 }
             }
             SettingHelper(text: "The main-window toolbar overrides these per transcript.")
+
+            SettingsSection("Playback") {
+                SettingRow("Pause when app is hidden",
+                           description: "Pauses the player when you switch to another app.",
+                           isFirst: true) {
+                    Toggle("", isOn: $model.pausePlayerOnAppHidden).labelsHidden()
+                }
+            }
+
             ResetPaneButton(scope: .transcriptionDefaults)
         }
     }

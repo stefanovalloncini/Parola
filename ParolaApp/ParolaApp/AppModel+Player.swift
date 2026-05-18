@@ -76,6 +76,15 @@ extension AppModel {
         player.play()
     }
 
+    func handleAppResignedActive() {
+        guard pausePlayerOnAppHidden,
+              let player,
+              player.timeControlStatus == .playing else {
+            return
+        }
+        player.pause()
+    }
+
     func maybeSkipSilence(currentTime: Double) {
         guard skipSilences,
               let player,

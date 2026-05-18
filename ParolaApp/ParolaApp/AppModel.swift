@@ -57,6 +57,7 @@ final class AppModel: ObservableObject {
     @AppStorage("subtitleCaptionLength") var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue
     @AppStorage("transcriptCompact") var transcriptCompact: Bool = false
     @AppStorage("skipSilences") var skipSilences: Bool = false
+    @AppStorage("pausePlayerOnAppHidden") var pausePlayerOnAppHidden: Bool = false
     @AppStorage("markdownTimestamps") var markdownTimestamps: Bool = false
     @AppStorage("htmlExportTheme") var htmlExportThemeRaw: String = HtmlExportTheme.light.rawValue
     @AppStorage("recentFiles") var recentFilesRaw: String = "[]"
