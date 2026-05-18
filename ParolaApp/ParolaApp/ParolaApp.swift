@@ -126,6 +126,7 @@ struct ParolaApp: App {
                 .keyboardShortcut("i", modifiers: [.command, .shift])
                 .disabled(model.transcript == nil)
                 Toggle("Always on Top", isOn: $model.mainWindowAlwaysOnTop)
+                MiniPlayerCommand()
             }
             CommandGroup(after: .textEditing) {
                 Button("Find…") { model.toggleFind() }
@@ -224,6 +225,13 @@ struct ParolaApp: App {
                 .environmentObject(liveCaptions)
                 .frame(minWidth: 880, idealWidth: 900, maxWidth: .infinity, minHeight: 600, idealHeight: 640, maxHeight: .infinity)
         }
+
+        Window("Mini Player", id: "mini-player") {
+            MiniPlayerWindow()
+                .environmentObject(model)
+        }
+        .windowResizability(.contentSize)
+        .defaultSize(width: 360, height: 90)
     }
 }
 
