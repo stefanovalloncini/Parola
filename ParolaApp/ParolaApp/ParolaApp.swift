@@ -39,6 +39,9 @@ struct ParolaApp: App {
                 .onChange(of: model.appTheme) { _, newValue in
                     applyAppAppearance(newValue)
                 }
+                .onChange(of: model.phase) { _, newValue in
+                    appDelegate.updateDockBadge(for: newValue)
+                }
                 .onOpenURL { url in model.transcribe(fileURL: url) }
                 .sheet(isPresented: $shortcutSheetOpen) { ShortcutCheatSheet() }
                 .sheet(isPresented: $aboutSheetOpen) { AboutSheet() }

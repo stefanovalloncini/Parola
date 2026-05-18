@@ -37,6 +37,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidResignActive(_ notification: Notification) {
         model?.handleAppResignedActive()
     }
+
+    func updateDockBadge(for phase: AppModel.Phase) {
+        let label: String
+        switch phase {
+        case .idle, .ready, .failed:
+            label = ""
+        case .downloadingModel(_, let progress):
+            label = "\(Int(progress * 100))%"
+        case .loadingModel:
+            label = "…"
+        case .transcribing:
+            label = "•"
+        case .recording:
+            label = "REC"
+        }
+        NSApp.dockTile.badgeLabel = label.isEmpty ? nil : label
+    }
 }
 
 @MainActor
