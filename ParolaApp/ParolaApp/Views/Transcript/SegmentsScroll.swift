@@ -35,9 +35,18 @@ struct SegmentsScroll: View {
                             SpeakerFilterRow(speakers: speakers, selection: speakerFilterBinding)
                                 .padding(.bottom, DS.Spacing.tight)
                         }
-                        ForEach(visibleSegments(in: t)) { seg in
+                        let segs = visibleSegments(in: t)
+                        let pauseByPrev = Dictionary(
+                            uniqueKeysWithValues: SegmentPauses
+                                .detect(segments: segs, thresholdSeconds: 3.0)
+                                .map { ($0.afterSegmentID, $0.durationSeconds) }
+                        )
+                        ForEach(segs) { seg in
                             SegmentCard(segment: seg, isCurrent: seg.id == model.currentSegmentID)
                                 .id(seg.id)
+                            if let gap = pauseByPrev[seg.id] {
+                                LongPauseDivider(seconds: gap)
+                            }
                         }
                     }
                 }
@@ -136,6 +145,41 @@ private struct SpeakerChip: View {
         if isSelected { return DS.Color.accent }
         if hovering { return DS.Color.surfaceElevated.opacity(0.85) }
         return DS.Color.surfaceElevated
+    }
+}
+
+private struct LongPauseDivider: View {
+    let seconds: Double
+
+    private var label: String {
+        if seconds < 60 { return String(format: "%.0fs silence", seconds) }
+        return String(format: "%.1fm silence", seconds / 60)
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            line
+            HStack(spacing: 4) {
+                Image(systemName: "moon.zzz")
+                    .font(.system(size: 9, weight: .semibold))
+                Text(label)
+                    .font(DS.Font.captionMono)
+            }
+            .foregroundStyle(DS.Color.secondaryText)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(
+                Capsule().fill(DS.Color.surfaceElevated)
+            )
+            line
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var line: some View {
+        Rectangle()
+            .fill(DS.Color.separator.opacity(0.5))
+            .frame(height: 1)
     }
 }
 
