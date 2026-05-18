@@ -10,6 +10,21 @@ public struct JsonExporter: TranscriptExporter {
     }
 }
 
+public struct JsonLinesExporter: TranscriptExporter {
+    public let format: ExportFormat = .jsonl
+    public init() {}
+    public func render(_ transcript: Transcript) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        var data = Data()
+        for segment in transcript.segments {
+            data.append(try encoder.encode(segment))
+            data.append(0x0A)
+        }
+        return data
+    }
+}
+
 public enum HtmlExportTheme: String, Sendable, Codable, CaseIterable, Identifiable {
     case light
     case dark

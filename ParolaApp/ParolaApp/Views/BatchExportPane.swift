@@ -117,6 +117,7 @@ struct BatchFormatCard: View {
         case .srt: return "SubRip Subtitles"
         case .vtt: return "WebVTT Subtitles"
         case .json: return "JSON"
+        case .jsonl: return "JSON Lines"
         case .md: return "Markdown"
         case .html: return "HTML"
         case .csv: return "CSV"

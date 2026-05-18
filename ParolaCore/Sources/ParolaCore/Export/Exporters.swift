@@ -5,6 +5,7 @@ public enum ExportFormat: String, CaseIterable, Sendable, Codable {
     case srt
     case vtt
     case json
+    case jsonl
     case md
     case html
     case csv
@@ -39,6 +40,7 @@ public enum Exporters {
         case .srt:  return SrtExporter()
         case .vtt:  return VttExporter()
         case .json: return JsonExporter()
+        case .jsonl: return JsonLinesExporter()
         case .md:   return MarkdownExporter()
         case .html: return HtmlExporter()
         case .csv:  return CsvExporter()

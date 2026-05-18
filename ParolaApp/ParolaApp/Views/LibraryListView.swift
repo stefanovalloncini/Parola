@@ -142,6 +142,7 @@ struct LibraryListView: View {
                     Button("WebVTT (.vtt)") { model.bulkExportEntries(ids: selection, format: .vtt) }
                     Button("CSV (.csv)") { model.bulkExportEntries(ids: selection, format: .csv) }
                     Button("JSON (.json)") { model.bulkExportEntries(ids: selection, format: .json) }
+                    Button("JSON Lines (.jsonl)") { model.bulkExportEntries(ids: selection, format: .jsonl) }
                     Button("HTML (.html)") { model.bulkExportEntries(ids: selection, format: .html) }
                 } label: {
                     Label("Export \(selection.count)", systemImage: "square.and.arrow.up")
