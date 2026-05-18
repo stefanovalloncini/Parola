@@ -24,7 +24,7 @@ final class MenuBarController {
     private func scheduleRefresh() {
         guard !rebuildPending else { return }
         rebuildPending = true
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor [weak self] in
             self?.rebuildPending = false
             self?.refresh()
         }

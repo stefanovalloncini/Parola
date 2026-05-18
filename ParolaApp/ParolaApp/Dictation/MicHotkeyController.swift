@@ -22,7 +22,7 @@ final class MicHotkeyController {
     private func scheduleReapply() {
         guard !reapplyPending else { return }
         reapplyPending = true
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self else { return }
             self.reapplyPending = false
             self.reapplyFromModel()
