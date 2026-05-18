@@ -6,6 +6,7 @@ struct SegmentsScroll: View {
     @State private var hoveredSpeaker: String?
     @State private var pauseByPrev: [Int: Double] = [:]
     @State private var confidenceByID: [Int: SegmentConfidence.Bucket] = [:]
+    @State private var visibleSegmentsCache: [TranscriptSegment] = []
 
     private var speakerFilterBinding: Binding<String?> {
         Binding(
@@ -38,8 +39,8 @@ struct SegmentsScroll: View {
                             SpeakerFilterRow(speakers: speakers, selection: speakerFilterBinding)
                                 .padding(.bottom, DS.Spacing.tight)
                         }
-                        let segs = visibleSegments(in: t)
-                        ForEach(segs) { seg in
+                        let _ = t // visibleSegmentsCache is kept in sync via onChange below
+                        ForEach(visibleSegmentsCache) { seg in
                             SegmentCard(
                                 segment: seg,
                                 isCurrent: seg.id == model.currentSegmentID,
@@ -74,9 +75,19 @@ struct SegmentsScroll: View {
                     speakerFilterBinding.wrappedValue = nil
                 }
             }
-            .onAppear { recomputeDerived() }
-            .onChange(of: model.transcript?.segments.count ?? 0) { _, _ in recomputeDerived() }
-            .onChange(of: model.selectedEntryID) { _, _ in recomputeDerived() }
+            .onAppear {
+                recomputeDerived()
+                recomputeVisible()
+            }
+            .onChange(of: model.transcriptVersion) { _, _ in
+                recomputeDerived()
+                recomputeVisible()
+            }
+            .onChange(of: model.selectedEntryID) { _, _ in
+                recomputeDerived()
+                recomputeVisible()
+            }
+            .onChange(of: speakerFilter) { _, _ in recomputeVisible() }
         }
     }
 
@@ -100,9 +111,16 @@ struct SegmentsScroll: View {
         confidenceByID = buckets
     }
 
-    private func visibleSegments(in transcript: Transcript) -> [TranscriptSegment] {
-        guard let speakerFilter else { return transcript.segments }
-        return transcript.segments.filter { $0.speaker == speakerFilter }
+    private func recomputeVisible() {
+        guard let segments = model.transcript?.segments else {
+            visibleSegmentsCache = []
+            return
+        }
+        if let filter = speakerFilter {
+            visibleSegmentsCache = segments.filter { $0.speaker == filter }
+        } else {
+            visibleSegmentsCache = segments
+        }
     }
 
     private func opacity(for segment: TranscriptSegment) -> Double {
