@@ -38,6 +38,7 @@ struct ModelsSettingsPane: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 storageRow
+                libraryUsageRow
                 controls
                 content
             }
@@ -47,6 +48,27 @@ struct ModelsSettingsPane: View {
         }
         .background(DS.Color.surface)
         .task { model.refreshModelList() }
+    }
+
+    private var libraryUsageRow: some View {
+        let totalBytes = model.libraryBundleSizes.values.reduce(Int64(0), +)
+        return HStack(spacing: 8) {
+            Image(systemName: "tray.full")
+                .foregroundStyle(.secondary)
+            Text("Library:")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text("\(model.libraryEntries.count) entries · \(ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file))")
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(.primary)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(0.04))
+        )
     }
 
     private var storageRow: some View {
