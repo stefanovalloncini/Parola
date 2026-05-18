@@ -69,20 +69,29 @@ extension AppModel {
     }
 
     private func refreshBundleSizes(for entries: [LibraryEntry]) {
-        let fm = FileManager.default
-        var sizes: [String: Int64] = [:]
-        for entry in entries {
-            let contents = (try? fm.contentsOfDirectory(at: entry.bundleURL, includingPropertiesForKeys: nil)) ?? []
-            let audio = contents.first(where: { $0.lastPathComponent.hasPrefix("audio.") })
-            if let audio,
-               let values = try? audio.resourceValues(forKeys: [.fileSizeKey]),
-               let size = values.fileSize {
-                sizes[entry.id] = Int64(size)
-            } else {
-                sizes[entry.id] = 0
+        let bundles = entries.map { (id: $0.id, url: $0.bundleURL) }
+        Task.detached(priority: .utility) { [weak self] in
+            let fm = FileManager.default
+            var sizes: [String: Int64] = [:]
+            for bundle in bundles {
+                let contents = (try? fm.contentsOfDirectory(at: bundle.url, includingPropertiesForKeys: nil)) ?? []
+                let audio = contents.first(where: { $0.lastPathComponent.hasPrefix("audio.") })
+                if let audio,
+                   let values = try? audio.resourceValues(forKeys: [.fileSizeKey]),
+                   let size = values.fileSize {
+                    sizes[bundle.id] = Int64(size)
+                } else {
+                    sizes[bundle.id] = 0
+                }
+            }
+            await MainActor.run {
+                guard let self else { return }
+                self.libraryBundleSizes = sizes
+                if self.librarySortOrder == .longest || self.librarySortOrder == .shortest {
+                    self.reapplyLibrarySort()
+                }
             }
         }
-        libraryBundleSizes = sizes
     }
 
     func setLabels(_ labels: [String], for id: LibraryEntry.ID) {
