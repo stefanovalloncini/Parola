@@ -34,6 +34,7 @@ struct FindBar: View {
                     .textFieldStyle(.plain)
                     .focused($queryFocused)
                     .onSubmit { model.goToNextMatch() }
+                    .accessibilityIdentifier("find.query")
                 if !model.findQuery.isEmpty {
                     Text(matchSummary)
                         .font(DS.Font.captionMono)
@@ -49,12 +50,14 @@ struct FindBar: View {
                     disabled: model.matches.isEmpty
                 ) { model.goToPreviousMatch() }
                     .keyboardShortcut("g", modifiers: [.command, .shift])
+                    .accessibilityIdentifier("find.prev")
                 FindIconButton(
                     systemName: "chevron.down",
                     help: "Next match",
                     disabled: model.matches.isEmpty
                 ) { model.goToNextMatch() }
                     .keyboardShortcut("g", modifiers: [.command])
+                    .accessibilityIdentifier("find.next")
             }
 
             FindToggleButton(
@@ -84,6 +87,8 @@ struct FindBar: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.escape, modifiers: [])
             .help("Close find")
+            .accessibilityLabel("Close find")
+            .accessibilityIdentifier("find.close")
         }
     }
 
@@ -96,6 +101,7 @@ struct FindBar: View {
                 TextField("Replace", text: $model.findReplacement)
                     .textFieldStyle(.plain)
                     .focused($replaceFocused)
+                    .accessibilityIdentifier("find.replacement")
             }
 
             Button("Replace") { model.replaceCurrentMatch() }
@@ -103,6 +109,7 @@ struct FindBar: View {
                 .controlSize(.small)
                 .keyboardShortcut("=", modifiers: [.command])
                 .disabled(model.matches.isEmpty)
+                .accessibilityIdentifier("find.replace")
 
             Button("Replace All") { model.replaceAllMatches() }
                 .buttonStyle(.borderedProminent)
@@ -110,6 +117,7 @@ struct FindBar: View {
                 .tint(DS.Color.accent)
                 .keyboardShortcut("e", modifiers: [.command, .option])
                 .disabled(model.matches.isEmpty)
+                .accessibilityIdentifier("find.replaceAll")
         }
         .padding(.leading, 2)
     }

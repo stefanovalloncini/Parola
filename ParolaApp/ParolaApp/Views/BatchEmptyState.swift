@@ -33,6 +33,7 @@ struct BatchEmptyState: View {
             .tint(DS.Color.accent)
             .controlSize(.large)
             .padding(.top, DS.Spacing.small)
+            .accessibilityIdentifier("batch.openFiles")
         }
         .frame(maxWidth: 460)
         .padding(DS.Spacing.large)

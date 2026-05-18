@@ -4,11 +4,13 @@ struct SearchPill: View {
     @Binding var text: String
     var placeholder: String
     var prompt: String?
+    var identifier: String
 
-    init(text: Binding<String>, placeholder: String = "Search", prompt: String? = nil) {
+    init(text: Binding<String>, placeholder: String = "Search", prompt: String? = nil, identifier: String = "search.field") {
         self._text = text
         self.placeholder = placeholder
         self.prompt = prompt
+        self.identifier = identifier
     }
 
     var body: some View {
@@ -19,6 +21,7 @@ struct SearchPill: View {
             TextField(placeholder, text: $text, prompt: prompt.map(Text.init))
                 .textFieldStyle(.plain)
                 .font(.subheadline)
+                .accessibilityIdentifier(identifier)
             if !text.isEmpty {
                 Button {
                     text = ""

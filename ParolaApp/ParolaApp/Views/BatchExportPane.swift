@@ -69,6 +69,8 @@ struct BatchFormatCard: View {
                     }
                     .buttonStyle(.plain)
                     .help("Remove this format")
+                    .accessibilityLabel("Remove \(format.fileExtension.uppercased())")
+                    .accessibilityIdentifier("batch.format.\(format.fileExtension).delete")
                 }
                 .contentShape(Rectangle())
             }
@@ -87,6 +89,7 @@ struct BatchFormatCard: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                             .tint(DS.Color.accent)
+                            .accessibilityIdentifier("batch.format.\(format.fileExtension).toggle")
                     }
                     if format == .md || format == .html {
                         BatchSettingRow(

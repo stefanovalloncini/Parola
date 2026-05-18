@@ -22,6 +22,8 @@ struct MediaBar: View {
             }
             .buttonStyle(.plain)
             .help(model.isPlaying ? "Pause" : "Play")
+            .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
+            .accessibilityIdentifier("transcript.player.playPause")
 
             ScrubberTrack(
                 progress: progress,
@@ -33,6 +35,7 @@ struct MediaBar: View {
                 }
             )
             .frame(height: 18)
+            .accessibilityIdentifier("transcript.player.scrub")
 
             Text(timeLabel(current: progress, total: duration))
                 .font(.system(size: 12, design: .monospaced))
@@ -84,6 +87,7 @@ struct MediaBar: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .help("Playback speed")
+            .accessibilityIdentifier("transcript.player.speed")
         }
         .padding(.horizontal, DS.Spacing.regular)
         .frame(height: 52)

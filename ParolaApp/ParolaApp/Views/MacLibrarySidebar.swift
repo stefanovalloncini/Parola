@@ -29,6 +29,7 @@ struct MacLibrarySidebar: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
                     SidebarRow(
+                        id: "library.home",
                         title: "Home",
                         systemImage: "house.fill",
                         isSelected: selectedRoute == .home,
@@ -39,6 +40,7 @@ struct MacLibrarySidebar: View {
                     }
 
                     SidebarRow(
+                        id: "library.queue",
                         title: "Queue",
                         systemImage: "list.bullet.indent",
                         isSelected: selectedRoute == .queue,
@@ -49,6 +51,7 @@ struct MacLibrarySidebar: View {
                     }
 
                     SidebarRow(
+                        id: "library.recentlyDeleted",
                         title: "Recently Deleted",
                         systemImage: "trash",
                         isSelected: model.showingTrash
@@ -59,6 +62,7 @@ struct MacLibrarySidebar: View {
                     SectionLabel("People").padding(.top, 14)
 
                     SidebarRow(
+                        id: "library.addPeople",
                         title: "Add People",
                         systemImage: "person.fill.badge.plus",
                         isSelected: model.showingSpeakersSheet
@@ -97,16 +101,16 @@ struct MacLibrarySidebar: View {
         HStack(spacing: 6) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
-                    FilterChip(title: "All", isSelected: model.libraryFilter == nil) {
+                    FilterChip(id: "library.filter.all", title: "All", isSelected: model.libraryFilter == nil) {
                         model.libraryFilter = nil
                     }
-                    FilterChip(title: "Transcriptions", isSelected: model.libraryFilter == .transcription) {
+                    FilterChip(id: "library.filter.transcriptions", title: "Transcriptions", isSelected: model.libraryFilter == .transcription) {
                         model.libraryFilter = .transcription
                     }
-                    FilterChip(title: "Meetings", isSelected: model.libraryFilter == .meeting) {
+                    FilterChip(id: "library.filter.meetings", title: "Meetings", isSelected: model.libraryFilter == .meeting) {
                         model.libraryFilter = .meeting
                     }
-                    FilterChip(title: "Dictations", isSelected: model.libraryFilter == .dictation) {
+                    FilterChip(id: "library.filter.dictations", title: "Dictations", isSelected: model.libraryFilter == .dictation) {
                         model.libraryFilter = .dictation
                     }
                 }
@@ -143,6 +147,7 @@ struct MacLibrarySidebar: View {
             PillRowContent(title: "Settings", systemImage: "gearshape.fill")
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("library.settings")
     }
 }
 
@@ -154,6 +159,7 @@ private enum SidebarRoute: Hashable {
 }
 
 private struct SidebarRow: View {
+    let id: String
     let title: LocalizedStringKey
     let systemImage: String
     let isSelected: Bool
@@ -196,6 +202,7 @@ private struct SidebarRow: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
+        .accessibilityIdentifier(id)
     }
 
     @ViewBuilder
@@ -211,6 +218,7 @@ private struct SidebarRow: View {
 }
 
 private struct FilterChip: View {
+    let id: String
     let title: LocalizedStringKey
     let isSelected: Bool
     let action: () -> Void
@@ -231,6 +239,7 @@ private struct FilterChip: View {
         }
         .buttonStyle(.plain)
         .onHover { isHovering = $0 }
+        .accessibilityIdentifier(id)
     }
 
     private var background: Color {

@@ -66,6 +66,7 @@ struct BatchView: View {
             .tint(DS.Color.accent)
             .controlSize(.regular)
             .help("Choose which formats to write next to each transcribed file.")
+            .accessibilityIdentifier("batch.addFormat")
 
             Button {
                 exportPaneVisible.toggle()

@@ -87,6 +87,7 @@ struct LibraryListView: View {
                             Button(entry.pinned ? "Unpin" : "Pin") {
                                 model.togglePinned(for: entry.id)
                             }
+                            .accessibilityIdentifier("library.row.\(entry.id).\(entry.pinned ? "unpin" : "pin")")
                             Menu("Move to") {
                                 ForEach(EntryCategory.allCases.filter { $0 != entry.category }, id: \.self) { target in
                                     Button(libraryCategoryName(target)) {
@@ -94,17 +95,22 @@ struct LibraryListView: View {
                                     }
                                 }
                             }
+                            .accessibilityIdentifier("library.row.\(entry.id).moveTo")
                             Button("Reveal in Finder") {
                                 NSWorkspace.shared.activateFileViewerSelecting([entry.bundleURL])
                             }
+                            .accessibilityIdentifier("library.row.\(entry.id).revealInFinder")
                             Button("Rename…") {
                                 renameDraft = entry.title
                                 renamingEntry = entry
                             }
+                            .accessibilityIdentifier("library.row.\(entry.id).rename")
                             Button("Delete", role: .destructive) {
                                 model.deleteEntry(entry.id)
                             }
+                            .accessibilityIdentifier("library.row.\(entry.id).delete")
                         }
+                        .accessibilityIdentifier("library.row.\(entry.id)")
                 }
                 .listStyle(.inset)
             }
@@ -116,7 +122,9 @@ struct LibraryListView: View {
         }
         .alert("Delete \(selection.count) entries?", isPresented: $pendingBulkDelete) {
             Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("alert.bulkDelete.cancel")
             Button("Delete", role: .destructive) { performBulkDelete() }
+                .accessibilityIdentifier("alert.bulkDelete.confirm")
         } message: {
             Text("They'll move to Recently Deleted.")
         }
@@ -129,12 +137,14 @@ struct LibraryListView: View {
         ) {
             TextField("Title", text: $renameDraft)
             Button("Cancel", role: .cancel) { renamingEntry = nil }
+                .accessibilityIdentifier("alert.rename.cancel")
             Button("Rename") {
                 if let id = renamingEntry?.id {
                     model.renameEntry(id, to: renameDraft)
                 }
                 renamingEntry = nil
             }
+            .accessibilityIdentifier("alert.rename.confirm")
         }
     }
 

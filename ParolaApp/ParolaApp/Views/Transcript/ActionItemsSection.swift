@@ -37,6 +37,7 @@ struct ActionItemsSection: View {
         Button("Find action items") { model.extractActionItems() }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            .accessibilityIdentifier("transcript.inspector.actionItems")
     }
 
     private var actionsRow: some View {

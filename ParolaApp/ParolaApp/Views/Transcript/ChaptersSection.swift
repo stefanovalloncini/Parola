@@ -37,6 +37,7 @@ struct ChaptersSection: View {
         Button("Generate chapters") { model.extractSmartChapters() }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            .accessibilityIdentifier("transcript.inspector.chapters")
     }
 
     private var actionsRow: some View {
