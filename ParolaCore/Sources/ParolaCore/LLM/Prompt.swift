@@ -93,6 +93,20 @@ public extension Prompt {
             isBuiltIn: true,
             version: 1
         ),
+        Prompt(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000009")!,
+            name: "Note",
+            instructions: "Turn the dictated text below into a short personal note. One or two lines. No salutation, no signature, no bullets unless the speaker explicitly listed items.",
+            isBuiltIn: true,
+            version: 1
+        ),
+        Prompt(
+            id: UUID(uuidString: "00000000-0000-0000-0000-00000000000A")!,
+            name: "Code comment",
+            instructions: "Turn the dictated text below into a single-line code comment. Lowercase first word unless it's a proper noun. No trailing period. Drop filler.",
+            isBuiltIn: true,
+            version: 1
+        ),
     ]
 
     static let rewritePresets: [Prompt] = {

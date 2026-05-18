@@ -42,5 +42,17 @@ public extension DictationModePreset {
             promptID: Prompt.builtIns.first { $0.name == "Professional tone" }?.id,
             isBuiltIn: true
         ),
+        DictationModePreset(
+            id: UUID(uuidString: "00000000-0000-0000-0000-0000000000A4")!,
+            name: "Note",
+            promptID: Prompt.builtIns.first { $0.name == "Note" }?.id,
+            isBuiltIn: true
+        ),
+        DictationModePreset(
+            id: UUID(uuidString: "00000000-0000-0000-0000-0000000000A5")!,
+            name: "Code",
+            promptID: Prompt.builtIns.first { $0.name == "Code comment" }?.id,
+            isBuiltIn: true
+        ),
     ]
 }
