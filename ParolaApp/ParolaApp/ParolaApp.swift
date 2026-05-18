@@ -19,6 +19,7 @@ struct ParolaApp: App {
     @StateObject private var liveCaptions = LiveCaptionsController()
     @StateObject private var scratchpad = ScratchpadController()
     @State private var shortcutSheetOpen = false
+    @State private var aboutSheetOpen = false
     @State private var micHotkey = MicHotkeyController()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
@@ -40,6 +41,7 @@ struct ParolaApp: App {
                 }
                 .onOpenURL { url in model.transcribe(fileURL: url) }
                 .sheet(isPresented: $shortcutSheetOpen) { ShortcutCheatSheet() }
+                .sheet(isPresented: $aboutSheetOpen) { AboutSheet() }
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
@@ -49,6 +51,7 @@ struct ParolaApp: App {
             CommandGroup(replacing: .help) {
                 Button("Keyboard Shortcuts…") { shortcutSheetOpen = true }
                     .keyboardShortcut("/", modifiers: [.command])
+                Button("About Parola…") { aboutSheetOpen = true }
             }
             CommandGroup(replacing: .newItem) {
                 Button("Open Audio…") { model.presentOpenPanel() }
