@@ -290,9 +290,9 @@ struct SegmentCard: View {
                 SegmentTimingPopover(segment: segment)
                     .environmentObject(model)
             }
-            cardButton(systemName: "doc.on.doc", help: "Copy segment") {
+            cardButton(systemName: "doc.on.doc", help: "Copy segment with timestamp") {
                 NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(segment.text, forType: .string)
+                NSPasteboard.general.setString(draggablePayload, forType: .string)
             }
         }
         .padding(.horizontal, 6)
