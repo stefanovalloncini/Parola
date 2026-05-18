@@ -1,4 +1,5 @@
 import SwiftUI
+import ParolaCore
 
 struct TranscriptHeaderBar: View {
     @EnvironmentObject var model: AppModel
@@ -9,6 +10,8 @@ struct TranscriptHeaderBar: View {
     let onOpenChat: () -> Void
 
     @State private var outlineOpen = false
+    @State private var jumpOpen = false
+    @State private var jumpDraft = ""
 
     var body: some View {
         HStack(spacing: DS.Spacing.small) {
@@ -29,6 +32,15 @@ struct TranscriptHeaderBar: View {
                     outlineOpen = false
                 }
                 .environmentObject(model)
+            }
+
+            Button { jumpOpen.toggle() } label: {
+                Image(systemName: "clock.arrow.circlepath")
+            }
+            .buttonStyle(.borderless)
+            .help("Jump to time")
+            .popover(isPresented: $jumpOpen, arrowEdge: .bottom) {
+                jumpPopover
             }
 
             Button { toggleSpeak() } label: {
@@ -77,5 +89,28 @@ struct TranscriptHeaderBar: View {
         } else if let text = model.transcript?.text {
             speaker.speak(text, languageCode: model.transcript?.language)
         }
+    }
+
+    private var jumpPopover: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Jump to time").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                TextField("mm:ss", text: $jumpDraft)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 100)
+                    .onSubmit { commitJump() }
+                Button("Go", action: commitJump)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(Timecode.parse(jumpDraft) == nil)
+            }
+        }
+        .padding(12)
+    }
+
+    private func commitJump() {
+        guard let seconds = Timecode.parse(jumpDraft) else { return }
+        model.seekTo(seconds: seconds)
+        jumpDraft = ""
+        jumpOpen = false
     }
 }
