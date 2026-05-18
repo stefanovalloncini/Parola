@@ -200,6 +200,7 @@ final class AppModel: ObservableObject {
     @Published var isExtractingActionItems: Bool = false
     @Published var smartChapters: [Chapter] = []
     @Published var isExtractingChapters: Bool = false
+    @Published var entrySpeakerFilters: [String: String] = [:]
 
     struct PromptOutput: Identifiable {
         let id = UUID()

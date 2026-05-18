@@ -3,7 +3,27 @@ import ParolaCore
 
 struct SegmentsScroll: View {
     @EnvironmentObject var model: AppModel
-    @State private var speakerFilter: String?
+
+    private var speakerFilterBinding: Binding<String?> {
+        Binding(
+            get: {
+                guard let entryID = model.selectedEntryID else { return nil }
+                return model.entrySpeakerFilters[entryID]
+            },
+            set: { newValue in
+                guard let entryID = model.selectedEntryID else { return }
+                if let newValue {
+                    model.entrySpeakerFilters[entryID] = newValue
+                } else {
+                    model.entrySpeakerFilters.removeValue(forKey: entryID)
+                }
+            }
+        )
+    }
+
+    private var speakerFilter: String? {
+        speakerFilterBinding.wrappedValue
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -12,7 +32,7 @@ struct SegmentsScroll: View {
                     if let t = model.transcript {
                         let speakers = t.uniqueSpeakers
                         if speakers.count >= 2 {
-                            SpeakerFilterRow(speakers: speakers, selection: $speakerFilter)
+                            SpeakerFilterRow(speakers: speakers, selection: speakerFilterBinding)
                                 .padding(.bottom, DS.Spacing.tight)
                         }
                         ForEach(visibleSegments(in: t)) { seg in
@@ -34,11 +54,11 @@ struct SegmentsScroll: View {
                 if newValue != nil, model.findIsOpen { model.toggleFind() }
             }
             .onChange(of: model.findIsOpen) { _, isOpen in
-                if isOpen { speakerFilter = nil }
+                if isOpen { speakerFilterBinding.wrappedValue = nil }
             }
             .onChange(of: model.transcript?.uniqueSpeakers ?? []) { _, speakers in
                 if let current = speakerFilter, !speakers.contains(current) {
-                    speakerFilter = nil
+                    speakerFilterBinding.wrappedValue = nil
                 }
             }
         }
