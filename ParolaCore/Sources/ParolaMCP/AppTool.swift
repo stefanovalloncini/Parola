@@ -62,6 +62,7 @@ public struct AppTool: Sendable {
         var props: [String: Any] = [:]
         for p in properties { props[p.name] = p.schema }
         schema["properties"] = props
+        schema["additionalProperties"] = false
         if !required.isEmpty { schema["required"] = required }
         return MCPTool(name: name, description: description, inputSchema: AnyEncodable(schema))
     }
