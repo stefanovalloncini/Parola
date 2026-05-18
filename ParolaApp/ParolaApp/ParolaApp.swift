@@ -19,6 +19,33 @@ private func applyAlwaysOnTop(_ on: Bool) {
     }
 }
 
+@MainActor
+private func handleOpen(_ url: URL, model: AppModel) {
+    if url.isFileURL {
+        model.transcribe(fileURL: url)
+        return
+    }
+    guard url.scheme?.lowercased() == "parola" else { return }
+    let host = (url.host ?? url.path.split(separator: "/").first.map(String.init) ?? "").lowercased()
+    let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+        .queryItems?
+        .reduce(into: [String: String]()) { dict, item in
+            if let value = item.value { dict[item.name] = value }
+        } ?? [:]
+    switch host {
+    case "transcribe":
+        if let path = query["path"] {
+            model.transcribe(fileURL: URL(fileURLWithPath: (path as NSString).expandingTildeInPath))
+        }
+    case "dictate":
+        model.startDictationFromIntent()
+    case "stop":
+        model.stopDictationFromIntent()
+    default:
+        break
+    }
+}
+
 @main
 struct ParolaApp: App {
     @StateObject private var model = AppModel()
@@ -51,7 +78,7 @@ struct ParolaApp: App {
                 .onChange(of: model.mainWindowAlwaysOnTop) { _, on in
                     applyAlwaysOnTop(on)
                 }
-                .onOpenURL { url in model.transcribe(fileURL: url) }
+                .onOpenURL { url in handleOpen(url, model: model) }
                 .sheet(isPresented: $shortcutSheetOpen) { ShortcutCheatSheet() }
                 .sheet(isPresented: $aboutSheetOpen) { AboutSheet() }
         }
