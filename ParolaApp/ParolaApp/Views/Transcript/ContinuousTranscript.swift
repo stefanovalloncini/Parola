@@ -71,6 +71,7 @@ struct ContinuousParagraph: View {
         var attr = AttributedString()
         let currentID = model.currentSegmentID
         let segments = transcript.segments
+        let useSpeakerColor = transcript.uniqueSpeakers.count >= 2
 
         for (idx, seg) in segments.enumerated() {
             let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -78,6 +79,8 @@ struct ContinuousParagraph: View {
             var piece = AttributedString(body + (idx == segments.count - 1 ? "" : " "))
             if seg.id == currentID {
                 piece.foregroundColor = DS.Color.accent
+            } else if useSpeakerColor, let speaker = seg.speaker {
+                piece.foregroundColor = DS.speakerColor(for: speaker)
             }
             attr.append(piece)
         }
