@@ -206,6 +206,15 @@ private struct LibraryRow: View {
     let entry: LibraryEntry
     let sizeBytes: Int64?
 
+    private var languageLabel: String? {
+        let code = entry.language.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !code.isEmpty else { return nil }
+        if let localized = Locale.current.localizedString(forLanguageCode: code) {
+            return localized.capitalized
+        }
+        return code.uppercased()
+    }
+
     var body: some View {
         HStack(spacing: DS.Spacing.regular) {
             VStack(alignment: .leading, spacing: 2) {
@@ -226,6 +235,11 @@ private struct LibraryRow: View {
                         Text("·")
                             .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
                         Text(ByteCountFormatter.string(fromByteCount: sizeBytes, countStyle: .file))
+                    }
+                    if let lang = languageLabel {
+                        Text("·")
+                            .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
+                        Text(lang)
                     }
                 }
                 .font(DS.Font.caption)
