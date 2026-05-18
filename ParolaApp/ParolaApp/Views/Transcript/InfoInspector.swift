@@ -33,6 +33,7 @@ struct InfoInspector: View {
                 ConfidenceSection()
                 ChaptersSection()
                 ActionItemsSection()
+                WordFrequencySection()
             }
         }
     }
