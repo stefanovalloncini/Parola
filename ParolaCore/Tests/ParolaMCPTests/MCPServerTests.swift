@@ -100,8 +100,8 @@ struct MCPServerTests {
         #expect(error["code"] as? Int == RPCErrorCode.invalidParams)
     }
 
-    @Test("tools/call against an unknown tool returns invalidParams")
-    func toolsCallUnknownToolReturnsInvalidParams() async throws {
+    @Test("tools/call against an unknown tool wraps the failure in isError content")
+    func toolsCallUnknownToolWrappedInIsError() async throws {
         let server = makeServer()
         let request = JSONRPCRequest(
             jsonrpc: "2.0",
@@ -114,8 +114,12 @@ struct MCPServerTests {
         )
         let response = try await server.handle(request)
         let json = try encode(response)
-        let error = try #require(json["error"] as? [String: Any])
-        #expect(error["code"] as? Int == RPCErrorCode.invalidParams)
+        let result = try #require(json["result"] as? [String: Any])
+        #expect(result["isError"] as? Bool == true)
+        let content = try #require(result["content"] as? [[String: Any]])
+        let firstBlock = try #require(content.first)
+        #expect(firstBlock["type"] as? String == "text")
+        #expect((firstBlock["text"] as? String)?.contains("parola_nothing_here") == true)
     }
 
     @Test("tools/call wraps tool errors as isError content rather than an envelope error")

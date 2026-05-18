@@ -79,10 +79,9 @@ public actor MCPServer {
             } else if let appTool = AppTools.byName[name] {
                 result = try await appTool.invoke(args: args, bridge: bridge)
             } else {
-                return JSONRPCResponse.failure(
+                return JSONRPCResponse.success(
                     id: request.id,
-                    code: RPCErrorCode.invalidParams,
-                    message: "Unknown tool: \(name)"
+                    result: MCPToolCallResult(text: "Unknown tool: \(name)", isError: true)
                 )
             }
             return JSONRPCResponse.success(id: request.id, result: result)
