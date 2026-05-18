@@ -46,6 +46,18 @@ struct MicrophonePane: View {
                         .frame(width: 120)
                     }
                 }
+                SettingRow("Count-in",
+                           description: "Shows a 3-2-1 countdown before recording starts. Press Esc to cancel.") {
+                    Picker("", selection: $model.recordingCountInSeconds) {
+                        Text("Off").tag(0)
+                        Text("3 seconds").tag(3)
+                        Text("5 seconds").tag(5)
+                        Text("10 seconds").tag(10)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 140)
+                }
             }
             if let startError {
                 MicErrorBanner(message: startError)

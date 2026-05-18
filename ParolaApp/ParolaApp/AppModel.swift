@@ -73,6 +73,9 @@ final class AppModel: ObservableObject {
     @AppStorage("dictationPasteDelayMs") var dictationPasteDelayMs: Int = 0
     @AppStorage("recordingMaxMinutes") var recordingMaxMinutes: Int = 0
     @AppStorage("showMenuBarExtra") var showMenuBarExtra: Bool = false
+    @AppStorage("recordingCountInSeconds") var recordingCountInSeconds: Int = 0
+    @Published var recordingCountdown: Int? = nil
+    private var countdownTask: Task<Void, Never>?
 
     var recentFiles: [URL] {
         get {
@@ -867,6 +870,38 @@ final class AppModel: ObservableObject {
     // MARK: - Recording
 
     func startRecording(source: RecordSource) {
+        let countIn = max(0, recordingCountInSeconds)
+        if countIn > 0 {
+            beginCountIn(seconds: countIn) { [weak self] in
+                self?.beginRecordingNow(source: source)
+            }
+        } else {
+            beginRecordingNow(source: source)
+        }
+    }
+
+    private func beginCountIn(seconds: Int, then: @escaping () -> Void) {
+        countdownTask?.cancel()
+        recordingCountdown = seconds
+        countdownTask = Task { @MainActor [weak self] in
+            for value in stride(from: seconds, to: 0, by: -1) {
+                guard !Task.isCancelled else { return }
+                self?.recordingCountdown = value
+                try? await Task.sleep(for: .seconds(1))
+            }
+            guard !Task.isCancelled else { return }
+            self?.recordingCountdown = nil
+            then()
+        }
+    }
+
+    func cancelRecordingCountdown() {
+        countdownTask?.cancel()
+        countdownTask = nil
+        recordingCountdown = nil
+    }
+
+    private func beginRecordingNow(source: RecordSource) {
         if source == .microphone && useStreaming {
             startStreamingMic()
             return
