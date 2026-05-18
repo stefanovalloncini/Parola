@@ -201,6 +201,35 @@ extension AppModel {
         if case .ready = phase { phase = .idle }
     }
 
+    func bulkExportEntries(ids: Set<LibraryEntry.ID>, format: ExportFormat) {
+        guard !ids.isEmpty else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Export here"
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+        let entriesByID = Dictionary(uniqueKeysWithValues: libraryEntries.map { ($0.id, $0) })
+        let targets = ids.compactMap { entriesByID[$0] }
+        let exporter = makeExporter(for: format)
+        Task { [library, weak self] in
+            for entry in targets {
+                do {
+                    let loaded = try await library.load(entry.id)
+                    let data = try exporter.render(loaded.document.transcript)
+                    let safe = entry.title.replacingOccurrences(of: "/", with: "-")
+                    let url = folder.appendingPathComponent("\(safe).\(format.fileExtension)")
+                    try data.write(to: url, options: .atomic)
+                } catch {
+                    await MainActor.run { [weak self] in
+                        self?.phase = .failed(message: "Export of \(entry.title) failed: \(error.localizedDescription)")
+                    }
+                    return
+                }
+            }
+        }
+    }
+
     func loadEntry(_ id: LibraryEntry.ID) {
         Task { [weak self] in
             guard let self else { return }

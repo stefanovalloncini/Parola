@@ -134,6 +134,20 @@ struct LibraryListView: View {
             }
             Spacer()
             if !selection.isEmpty {
+                Menu {
+                    Button("Plain Text (.txt)") { model.bulkExportEntries(ids: selection, format: .txt) }
+                    Button("Markdown (.md)") { model.bulkExportEntries(ids: selection, format: .md) }
+                    Button("Subtitles (.srt)") { model.bulkExportEntries(ids: selection, format: .srt) }
+                    Button("WebVTT (.vtt)") { model.bulkExportEntries(ids: selection, format: .vtt) }
+                    Button("CSV (.csv)") { model.bulkExportEntries(ids: selection, format: .csv) }
+                    Button("JSON (.json)") { model.bulkExportEntries(ids: selection, format: .json) }
+                    Button("HTML (.html)") { model.bulkExportEntries(ids: selection, format: .html) }
+                } label: {
+                    Label("Export \(selection.count)", systemImage: "square.and.arrow.up")
+                }
+                .menuStyle(.borderlessButton)
+                .controlSize(.small)
+                .fixedSize()
                 Button(role: .destructive) {
                     pendingBulkDelete = true
                 } label: {
