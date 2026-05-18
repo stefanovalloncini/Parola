@@ -51,6 +51,18 @@ struct ParolaApp: App {
             CommandGroup(replacing: .newItem) {
                 Button("Open Audio…") { model.presentOpenPanel() }
                     .keyboardShortcut("o")
+                Menu("Open Recent") {
+                    let recents = model.recentFiles
+                    if recents.isEmpty {
+                        Text("No Recent Files")
+                    } else {
+                        ForEach(recents, id: \.self) { url in
+                            Button(url.lastPathComponent) { model.transcribe(fileURL: url) }
+                        }
+                        Divider()
+                        Button("Clear Menu") { model.clearRecentFiles() }
+                    }
+                }
                 Button("Save As Parola Document…") { model.saveProjectDocument() }
                     .keyboardShortcut("s")
                     .disabled(model.transcript == nil)

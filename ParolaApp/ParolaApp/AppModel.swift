@@ -55,6 +55,31 @@ final class AppModel: ObservableObject {
     @AppStorage("diarize") var diarize: Bool = false
     @AppStorage("subtitleFPS") var subtitleFPS: Double = 30
     @AppStorage("subtitleCaptionLength") var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue
+    @AppStorage("recentFiles") var recentFilesRaw: String = "[]"
+
+    var recentFiles: [URL] {
+        get {
+            var list = RecentFilesList(capacity: 10)
+            list.decode(recentFilesRaw)
+            return list.urls
+        }
+        set {
+            var list = RecentFilesList(capacity: 10)
+            for url in newValue.reversed() { list.note(url) }
+            recentFilesRaw = list.encoded
+        }
+    }
+
+    func noteRecentFile(_ url: URL) {
+        var list = RecentFilesList(capacity: 10)
+        list.decode(recentFilesRaw)
+        list.note(url)
+        recentFilesRaw = list.encoded
+    }
+
+    func clearRecentFiles() {
+        recentFilesRaw = "[]"
+    }
 
     @Published var batchJobs: [BatchJob] = []
     @Published var selectedBatchJobID: BatchJob.ID?
@@ -522,6 +547,7 @@ final class AppModel: ObservableObject {
             openProjectDocument(at: fileURL)
             return
         }
+        noteRecentFile(fileURL)
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
 
