@@ -71,6 +71,7 @@ final class AppModel: ObservableObject {
     @AppStorage("micHotkeyEnabled") var micHotkeyEnabled: Bool = false
     @AppStorage("dictationStripSelfCorrections") var dictationStripSelfCorrections: Bool = false
     @AppStorage("dictationPasteDelayMs") var dictationPasteDelayMs: Int = 0
+    @AppStorage("recordingMaxMinutes") var recordingMaxMinutes: Int = 0
 
     var recentFiles: [URL] {
         get {
@@ -334,6 +335,7 @@ final class AppModel: ObservableObject {
     var recordingLevelTask: Task<Void, Never>?
     var silenceDetector: SilenceDetector = SilenceDetector(threshold: 8)
     var silenceWatchTask: Task<Void, Never>?
+    var recordingAutoStopTask: Task<Void, Never>?
 
     private static func readString(_ key: String, default fallback: String) -> String {
         UserDefaults.standard.string(forKey: key) ?? fallback
@@ -883,9 +885,22 @@ final class AppModel: ObservableObject {
                     liveSource = sys
                     observeRecordingLevels(from: sys)
                 }
+                scheduleRecordingAutoStop()
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
+        }
+    }
+
+    private func scheduleRecordingAutoStop() {
+        recordingAutoStopTask?.cancel()
+        let limit = recordingMaxMinutes
+        guard limit > 0 else { return }
+        recordingAutoStopTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(limit * 60))
+            guard !Task.isCancelled, let self else { return }
+            guard case .recording = self.phase else { return }
+            self.stopRecordingAndTranscribe()
         }
     }
 
@@ -954,6 +969,7 @@ final class AppModel: ObservableObject {
         liveVoiceActive = false
         phase = .recording(source: .microphone)
         startSilenceWatch()
+        scheduleRecordingAutoStop()
 
         let opts = currentOptions
         let progress = makeDownloadProgressHandler()
@@ -996,6 +1012,8 @@ final class AppModel: ObservableObject {
     }
 
     func stopRecordingAndTranscribe() {
+        recordingAutoStopTask?.cancel()
+        recordingAutoStopTask = nil
         if let s = streamingSession {
             Task { @MainActor in
                 await s.stop()
