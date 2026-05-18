@@ -13,6 +13,7 @@ struct ModelPickerView: View {
         PillPickerButton(icon: "cpu", caption: "Model", value: currentLabel) {
             VStack(spacing: 0) {
                 searchField
+                    .onAppear { model.prewarmSelectedModel() }
                     .padding(.horizontal, 10)
                     .padding(.top, 4)
                     .padding(.bottom, 6)

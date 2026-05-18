@@ -64,6 +64,22 @@ public actor TranscriptionSession {
         return transcript
     }
 
+    /// Best-effort warm-up: bootstraps the engine and loads the requested model if it's installed.
+    /// Silently no-ops if the model isn't downloaded or load fails — pre-warming is opportunistic.
+    public func prewarm(modelName: String) async {
+        await ensureBootstrap()
+        guard modelStore.isInstalled(modelName) else { return }
+        let engineID = ModelCatalog.variant(id: modelName)?.engineID ?? .whisperKit
+        do {
+            cancelIdleTimer()
+            let active = try await ensureTranscriber(for: engineID)
+            try await active.load(model: modelName)
+            scheduleIdleUnload()
+        } catch {
+            // Prewarm failures are non-fatal.
+        }
+    }
+
     public func unloadModel() async {
         cancelIdleTimer()
         if let transcriber {

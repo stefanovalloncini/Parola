@@ -547,6 +547,14 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func prewarmSelectedModel() {
+        let name = selectedModel
+        guard store.isInstalled(name) else { return }
+        Task.detached { [session] in
+            await session.prewarm(modelName: name)
+        }
+    }
+
     func downloadModel(_ name: String) {
         Task {
             do {
