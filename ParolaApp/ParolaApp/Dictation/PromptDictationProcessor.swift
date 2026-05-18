@@ -12,16 +12,17 @@ struct PromptDictationProcessor: TextPostProcessor {
     }
 
     func process(_ text: String) async -> String {
+        let preprocessed = VoiceCommands.applyTo(text)
         let bundleID = await frontmostBundleID()
         let prompt: Prompt? = (bundleID.flatMap { overrides[$0] }) ?? defaultPrompt
-        guard let prompt else { return text }
+        guard let prompt else { return preprocessed }
         do {
             let model = try LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
-            let result = try await PromptRunner.run(prompt, on: text, model: model)
+            let result = try await PromptRunner.run(prompt, on: preprocessed, model: model)
             let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? text : trimmed
+            return trimmed.isEmpty ? preprocessed : trimmed
         } catch {
-            return text
+            return preprocessed
         }
     }
 
