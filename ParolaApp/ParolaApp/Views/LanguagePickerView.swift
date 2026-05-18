@@ -3,31 +3,39 @@ import SwiftUI
 struct LanguagePickerView: View {
     @EnvironmentObject var model: AppModel
 
-    private let languages: [(code: String?, name: String)] = [
-        (nil, "Auto-detect"),
-        ("en", "English"),
-        ("it", "Italian"),
-        ("es", "Spanish"),
-        ("fr", "French"),
-        ("de", "German"),
-        ("pt", "Portuguese"),
-        ("nl", "Dutch"),
-        ("ja", "Japanese"),
-        ("zh", "Chinese"),
-        ("ko", "Korean"),
-        ("ar", "Arabic"),
-        ("ru", "Russian"),
-        ("hi", "Hindi"),
+    private let codes: [String] = [
+        "en", "it", "es", "fr", "de", "pt", "nl", "ja", "zh", "ko", "ar", "ru", "hi",
+    ]
+
+    private let fallbackNames: [String: String] = [
+        "en": "English",
+        "it": "Italian",
+        "es": "Spanish",
+        "fr": "French",
+        "de": "German",
+        "pt": "Portuguese",
+        "nl": "Dutch",
+        "ja": "Japanese",
+        "zh": "Chinese",
+        "ko": "Korean",
+        "ar": "Arabic",
+        "ru": "Russian",
+        "hi": "Hindi",
     ]
 
     var body: some View {
-        PillPickerButton(icon: "globe", caption: "Language", value: currentLabel) {
+        PillPickerButton(icon: "globe", caption: String(localized: "Language"), value: currentLabel) {
             VStack(spacing: 0) {
-                ForEach(languages, id: \.name) { lang in
+                PillPopoverRow(
+                    title: autoLabel,
+                    isSelected: model.selectedLanguage == nil,
+                    action: { model.selectedLanguage = nil }
+                )
+                ForEach(codes, id: \.self) { code in
                     PillPopoverRow(
-                        title: lang.name,
-                        isSelected: lang.code == model.selectedLanguage,
-                        action: { model.selectedLanguage = lang.code }
+                        title: displayName(for: code),
+                        isSelected: code == model.selectedLanguage,
+                        action: { model.selectedLanguage = code }
                     )
                 }
             }
@@ -36,9 +44,17 @@ struct LanguagePickerView: View {
     }
 
     private var currentLabel: String {
-        if let code = model.selectedLanguage {
-            return languages.first { $0.code == code }?.name ?? code
+        guard let code = model.selectedLanguage else { return autoLabel }
+        return displayName(for: code)
+    }
+
+    private var autoLabel: String { String(localized: "Auto") }
+
+    private func displayName(for code: String) -> String {
+        let fallback = fallbackNames[code] ?? code
+        guard let localized = Locale.current.localizedString(forLanguageCode: code) else {
+            return fallback
         }
-        return "Auto-detect"
+        return localized.capitalized(with: Locale.current)
     }
 }
