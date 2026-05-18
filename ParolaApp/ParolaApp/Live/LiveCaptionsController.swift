@@ -9,9 +9,12 @@ final class LiveCaptionsController: ObservableObject {
     @Published var translateToEnglish: Bool = false
 
     private var panel: NSPanel?
+    private var presenterWindow: NSWindow?
     private var session: StreamingTranscriptionSession?
     private var consumer: Task<Void, Never>?
     private var lastOptions: TranscriptionOptions?
+
+    var isPresenterOpen: Bool { presenterWindow != nil }
 
     var isActive: Bool { state.isActive }
 
@@ -105,5 +108,40 @@ final class LiveCaptionsController: ObservableObject {
 
     private func hideWindow() {
         panel?.orderOut(nil)
+    }
+
+    func togglePresenter() {
+        if presenterWindow != nil {
+            closePresenter()
+        } else {
+            openPresenter()
+        }
+    }
+
+    private func openPresenter() {
+        let screen = NSScreen.main ?? NSScreen.screens.first
+        let frame = screen?.frame ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
+        let window = NSWindow(
+            contentRect: frame,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.level = .mainMenu
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        window.backgroundColor = .black
+        window.isOpaque = true
+        window.hasShadow = false
+        window.contentView = NSHostingView(rootView: PresenterCaptionsView(controller: self) { [weak self] in
+            self?.closePresenter()
+        })
+        presenterWindow = window
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    private func closePresenter() {
+        presenterWindow?.orderOut(nil)
+        presenterWindow = nil
     }
 }

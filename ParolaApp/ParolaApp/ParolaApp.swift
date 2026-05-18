@@ -65,6 +65,11 @@ struct ParolaApp: App {
                         Task { await liveCaptions.setTranslate(newValue) }
                     }
                 ))
+                Divider()
+                Button(liveCaptions.isPresenterOpen ? "Exit Presenter" : "Enter Presenter Mode") {
+                    liveCaptions.togglePresenter()
+                }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
             }
             CommandMenu("Transcript") {
                 Button("Export as TXT…") { model.exportRequest(.txt) }
