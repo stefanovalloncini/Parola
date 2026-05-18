@@ -30,6 +30,21 @@ struct ModelPickerView: View {
                         .padding(.vertical, 10)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
+                    if let pinned = pinnedVariant {
+                        PillPopoverSectionHeader(title: "Pinned")
+                        let installed = isInstalled(pinned)
+                        PillPopoverRow(
+                            title: pinned.displayName,
+                            isSelected: pinned.id == model.selectedModel,
+                            trailingText: DS.formatBytes(Int(pinned.sizeBytes)),
+                            leadingSystemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle",
+                            leadingTint: installed ? .green : .secondary,
+                            action: { select(variant: pinned) }
+                        )
+                        .contextMenu {
+                            Button("Unpin") { model.pinnedModel = "" }
+                        }
+                    }
                     ForEach(filtered, id: \.0) { category, variants in
                         PillPopoverSectionHeader(title: category.displayName)
                         ForEach(variants, id: \.id) { variant in
@@ -42,6 +57,13 @@ struct ModelPickerView: View {
                                 leadingTint: installed ? .green : .secondary,
                                 action: { select(variant: variant) }
                             )
+                            .contextMenu {
+                                if model.pinnedModel == variant.id {
+                                    Button("Unpin") { model.pinnedModel = "" }
+                                } else {
+                                    Button("Pin to top") { model.pinnedModel = variant.id }
+                                }
+                            }
                         }
                     }
                 }
@@ -105,6 +127,11 @@ struct ModelPickerView: View {
             }
             return matches.isEmpty ? nil : (category, matches)
         }
+    }
+
+    private var pinnedVariant: ModelVariant? {
+        guard !model.pinnedModel.isEmpty else { return nil }
+        return ModelCatalog.variant(id: model.pinnedModel)
     }
 
     private func isInstalled(_ variant: ModelVariant) -> Bool {

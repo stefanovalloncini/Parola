@@ -63,6 +63,7 @@ final class AppModel: ObservableObject {
     @AppStorage("dictationHudOpacity") var dictationHudOpacity: Double = 1.0
     @AppStorage("lastFindQuery") var lastFindQuery: String = ""
     @AppStorage("parola.userPrivacyMode") var userPrivacyMode: Bool = false
+    @AppStorage("pinnedModel") var pinnedModel: String = ""
     @AppStorage("recentFiles") var recentFilesRaw: String = "[]"
     @AppStorage("micHotkeyKeyCode") var micHotkeyKeyCode: Int = 15 // kVK_ANSI_R
     @AppStorage("micHotkeyModifiers") var micHotkeyModifiers: Int = 786721 // ⌃⌥⌘
