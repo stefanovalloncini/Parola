@@ -17,6 +17,37 @@ extension AppModel {
         AppModel.writeJSON(snippets, forKey: AppModel.snippetsDefaultsKey)
     }
 
+    func exportSnippetsToFile() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "parola-snippets.json"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let data = try encoder.encode(snippets)
+            try data.write(to: url, options: .atomic)
+        } catch {
+            phase = .failed(message: "Export failed: \(error.localizedDescription)")
+        }
+    }
+
+    func importSnippetsFromFile() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            let imported = try JSONDecoder().decode([Snippet].self, from: data)
+            let existing = Set(snippets.map { $0.trigger.lowercased() })
+            let merged = snippets + imported.filter { !existing.contains($0.trigger.lowercased()) }
+            snippets = merged
+        } catch {
+            phase = .failed(message: "Import failed: \(error.localizedDescription)")
+        }
+    }
+
     func loadCorrectionRules() {
         if let decoded = AppModel.readJSON([CorrectionRule].self, forKey: AppModel.correctionRulesDefaultsKey) {
             correctionRules = decoded

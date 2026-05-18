@@ -34,10 +34,24 @@ struct SnippetsPane: View {
                 }
             }
 
-            Button {
-                model.snippets.append(Snippet(trigger: "", replacement: ""))
-            } label: {
-                Label("Add snippet", systemImage: "plus.circle")
+            HStack(spacing: 8) {
+                Button {
+                    model.snippets.append(Snippet(trigger: "", replacement: ""))
+                } label: {
+                    Label("Add snippet", systemImage: "plus.circle")
+                }
+                Spacer()
+                Button {
+                    model.importSnippetsFromFile()
+                } label: {
+                    Label("Import…", systemImage: "square.and.arrow.down")
+                }
+                Button {
+                    model.exportSnippetsToFile()
+                } label: {
+                    Label("Export…", systemImage: "square.and.arrow.up")
+                }
+                .disabled(model.snippets.isEmpty)
             }
 
             placeholderHelp
