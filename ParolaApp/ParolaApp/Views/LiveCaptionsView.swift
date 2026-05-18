@@ -29,9 +29,9 @@ struct LiveCaptionsView: View {
                 .multilineTextAlignment(.center)
         } else if caption.isEmpty {
             HStack(spacing: 8) {
-                Image(systemName: "waveform")
+                Image(systemName: controller.state.isLoading ? "arrow.down.circle" : "waveform")
                     .symbolEffect(.variableColor.iterative, isActive: controller.state.isActive)
-                Text("Listening")
+                Text(controller.state.isLoading ? "Loading model" : "Listening")
             }
             .font(.system(size: fontSize - 6, weight: .medium))
             .foregroundStyle(.white.opacity(0.55))

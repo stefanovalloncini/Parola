@@ -39,11 +39,11 @@ struct PresenterCaptionsView: View {
                 .multilineTextAlignment(.center)
         } else if caption.isEmpty {
             VStack(spacing: 24) {
-                Image(systemName: "waveform")
+                Image(systemName: controller.state.isLoading ? "arrow.down.circle" : "waveform")
                     .font(.system(size: fontSize / 2))
                     .foregroundStyle(.white.opacity(0.4))
                     .symbolEffect(.variableColor.iterative, isActive: controller.state.isActive)
-                Text("Waiting for speech…")
+                Text(controller.state.isLoading ? "Loading model…" : "Waiting for speech…")
                     .font(.system(size: fontSize / 2.4, weight: .medium))
                     .foregroundStyle(.white.opacity(0.5))
             }

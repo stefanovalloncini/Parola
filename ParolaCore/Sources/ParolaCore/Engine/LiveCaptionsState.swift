@@ -5,6 +5,7 @@ public struct LiveCaptionsState: Sendable, Equatable {
     public var partial: String
     public var maxLines: Int
     public var isActive: Bool
+    public var isLoading: Bool
     public var error: String?
 
     public init(
@@ -12,12 +13,14 @@ public struct LiveCaptionsState: Sendable, Equatable {
         partial: String = "",
         maxLines: Int = 4,
         isActive: Bool = false,
+        isLoading: Bool = false,
         error: String? = nil
     ) {
         self.confirmedLines = confirmedLines
         self.partial = partial
         self.maxLines = maxLines
         self.isActive = isActive
+        self.isLoading = isLoading
         self.error = error
     }
 
@@ -47,6 +50,7 @@ public struct LiveCaptionsState: Sendable, Equatable {
         case .failed(let msg):
             error = msg
             isActive = false
+            isLoading = false
         case .finished:
             partial = ""
         }
@@ -56,5 +60,6 @@ public struct LiveCaptionsState: Sendable, Equatable {
         confirmedLines = []
         partial = ""
         error = nil
+        isLoading = false
     }
 }

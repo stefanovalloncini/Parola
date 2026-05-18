@@ -3859,6 +3859,28 @@
         }
       }
     },
+    "Loading model": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Caricamento modello"
+          }
+        }
+      }
+    },
+    "Loading model…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Caricamento modello…"
+          }
+        }
+      }
+    },
     "Loading preview…": {
       "extractionState": "manual",
       "localizations": {

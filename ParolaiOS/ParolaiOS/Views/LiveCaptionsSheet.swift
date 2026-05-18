@@ -20,11 +20,11 @@ struct LiveCaptionsSheet: View {
                         Task { await start() }
                     }
                 } else if state.displayedText.isEmpty {
-                    Image(systemName: "waveform")
+                    Image(systemName: state.isLoading ? "arrow.down.circle" : "waveform")
                         .font(.system(size: 48))
                         .foregroundStyle(.tint)
                         .symbolEffect(.variableColor.iterative, options: .repeating)
-                    Text("Listening…")
+                    Text(state.isLoading ? "Loading model…" : "Listening…")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                 } else {
@@ -68,6 +68,7 @@ struct LiveCaptionsSheet: View {
         configureAudioSession()
         state.reset()
         state.isActive = true
+        state.isLoading = true
 
         let s = StreamingTranscriptionSession()
         session = s
@@ -80,6 +81,7 @@ struct LiveCaptionsSheet: View {
             do {
                 guard let session else { return }
                 let events = try await session.start(options: options, downloadProgress: { _ in })
+                await MainActor.run { state.isLoading = false }
                 for await event in events {
                     await MainActor.run {
                         state.apply(event)
@@ -89,6 +91,7 @@ struct LiveCaptionsSheet: View {
                 await MainActor.run {
                     state.error = error.localizedDescription
                     state.isActive = false
+                    state.isLoading = false
                 }
             }
         }
@@ -102,6 +105,7 @@ struct LiveCaptionsSheet: View {
         }
         session = nil
         state.isActive = false
+        state.isLoading = false
     }
 
     private func configureAudioSession() {
