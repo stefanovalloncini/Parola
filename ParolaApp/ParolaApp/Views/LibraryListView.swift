@@ -215,6 +215,18 @@ private struct LibraryRow: View {
         return code.uppercased()
     }
 
+    private var tooltip: String {
+        var parts: [String] = [entry.title]
+        parts.append(entry.createdAt.formatted(date: .long, time: .shortened))
+        if !entry.labels.isEmpty {
+            parts.append("Labels: \(entry.labels.joined(separator: ", "))")
+        }
+        if entry.pinned {
+            parts.append("Pinned")
+        }
+        return parts.joined(separator: "\n")
+    }
+
     var body: some View {
         HStack(spacing: DS.Spacing.regular) {
             VStack(alignment: .leading, spacing: 2) {
@@ -248,5 +260,6 @@ private struct LibraryRow: View {
             Spacer()
         }
         .padding(.vertical, DS.Spacing.tight)
+        .help(tooltip)
     }
 }
