@@ -17,6 +17,7 @@ private func applyAppAppearance(_ theme: String) {
 struct ParolaApp: App {
     @StateObject private var model = AppModel()
     @StateObject private var liveCaptions = LiveCaptionsController()
+    @StateObject private var scratchpad = ScratchpadController()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
@@ -55,6 +56,11 @@ struct ParolaApp: App {
                 FocusChatComposerCommand()
             }
             CommandMenu("Captions") {
+                Button(scratchpad.isOpen ? "Hide Scratchpad" : "Show Scratchpad") {
+                    scratchpad.toggle()
+                }
+                .keyboardShortcut("k", modifiers: [.command, .shift])
+                Divider()
                 Button(liveCaptions.isActive ? "Stop Live Captions" : "Start Live Captions") {
                     model.toggleLiveCaptions()
                 }
