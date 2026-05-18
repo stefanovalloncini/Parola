@@ -25,6 +25,7 @@ struct InfoInspector: View {
                 InfoRow(icon: "cpu", label: "Engine", value: engineLabel)
                 InfoRow(icon: "character", label: "Characters", value: "\(charCount)")
                 InfoRow(icon: "text.word.spacing", label: "Words", value: "\(wordCount)")
+                InfoRow(icon: "text.alignleft", label: "Sentences", value: "\(sentenceCount)")
             }
 
             if model.transcript != nil {
@@ -63,6 +64,11 @@ struct InfoInspector: View {
 
     private var charCount: Int {
         model.transcript?.text.count ?? 0
+    }
+
+    private var sentenceCount: Int {
+        guard let text = model.transcript?.text else { return 0 }
+        return SentenceCounter.count(text)
     }
 
     private var wordCount: Int {
