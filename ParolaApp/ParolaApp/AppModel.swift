@@ -1136,6 +1136,21 @@ final class AppModel: ObservableObject {
         pendingExport = format
     }
 
+    func exportSegmentNotesAsMarkdown() {
+        guard let transcript,
+              let entryID = selectedEntryID,
+              let entry = libraryEntries.first(where: { $0.id == entryID }) else {
+            return
+        }
+        let notes = entry.segmentNotes
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.plainText]
+        panel.nameFieldStringValue = "\(entry.title)-notes.md"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let body = NotesMarkdownRenderer.render(transcript: transcript, notes: notes, title: entry.title)
+        try? body.data(using: .utf8)?.write(to: url, options: .atomic)
+    }
+
     func copyTranscriptToPasteboard(withTimestamps: Bool) {
         guard let transcript else { return }
         let text: String
