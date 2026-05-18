@@ -55,7 +55,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     var searchKeywords: [String] {
         switch self {
         case .general: return ["karaoke", "highlight", "word timestamps", "streaming", "diarize", "speakers", "vocabulary", "prompt"]
-        case .customization: return ["appearance", "theme", "light", "dark", "density", "sidebar", "monospaced"]
+        case .customization: return ["appearance", "theme", "light", "dark", "density", "sidebar", "monospaced", "accent", "color", "terracotta"]
         case .watchedFolders: return ["watch", "folder", "auto", "drop"]
         case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect"]
         case .microphone: return ["mic", "input device", "vu", "level", "preview"]
@@ -83,7 +83,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .general:
             return ["useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt", "diarize"]
         case .customization:
-            return ["appTheme", "monospacedTimestamps", "sidebarDensity"]
+            return ["appTheme", "monospacedTimestamps", "sidebarDensity", "appAccentColor"]
         case .watchedFolders:
             return ["watchedFolders"]
         case .recordMeetings:

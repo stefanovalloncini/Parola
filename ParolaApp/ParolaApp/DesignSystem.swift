@@ -32,7 +32,7 @@ enum DS {
     }
 
     enum Color {
-        static let accent = SwiftUI.Color("AccentColor", bundle: .main)
+        static var accent: SwiftUI.Color { AppAccent.current.color }
         static let primaryText = SwiftUI.Color.primary
         static let secondaryText = SwiftUI.Color.secondary
         static let surface = SwiftUI.Color(nsColor: .windowBackgroundColor)
