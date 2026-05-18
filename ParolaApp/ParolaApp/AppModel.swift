@@ -40,7 +40,13 @@ final class AppModel: ObservableObject {
 
     @Published var route: Route = .transcript
     @Published var phase: Phase = .idle
-    @Published var transcript: Transcript?
+    @Published var transcript: Transcript? {
+        didSet {
+            let speakers = transcript?.uniqueSpeakers ?? []
+            if speakers != transcriptSpeakers { transcriptSpeakers = speakers }
+        }
+    }
+    @Published private(set) var transcriptSpeakers: [String] = []
     @Published var showingTrash: Bool = false
     @Published var currentSegmentID: TranscriptSegment.ID?
     @Published var currentWordID: WordTiming.ID?

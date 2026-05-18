@@ -33,7 +33,7 @@ struct SegmentsScroll: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {
                     if let t = model.transcript {
-                        let speakers = t.uniqueSpeakers
+                        let speakers = model.transcriptSpeakers
                         if speakers.count >= 2 {
                             SpeakerFilterRow(speakers: speakers, selection: speakerFilterBinding)
                                 .padding(.bottom, DS.Spacing.tight)
@@ -69,7 +69,7 @@ struct SegmentsScroll: View {
             .onChange(of: model.findIsOpen) { _, isOpen in
                 if isOpen { speakerFilterBinding.wrappedValue = nil }
             }
-            .onChange(of: model.transcript?.uniqueSpeakers ?? []) { _, speakers in
+            .onChange(of: model.transcriptSpeakers) { _, speakers in
                 if let current = speakerFilter, !speakers.contains(current) {
                     speakerFilterBinding.wrappedValue = nil
                 }

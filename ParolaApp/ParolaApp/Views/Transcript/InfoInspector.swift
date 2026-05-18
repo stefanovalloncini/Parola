@@ -75,7 +75,7 @@ struct InfoInspector: View {
     }
 
     private var speakerCount: Int {
-        model.transcript?.uniqueSpeakers.count ?? 0
+        model.transcriptSpeakers.count
     }
 
     private var fillerCount: Int {
