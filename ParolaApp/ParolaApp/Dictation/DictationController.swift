@@ -185,12 +185,15 @@ final class DictationController: ObservableObject {
         guard let model = appModel else { return }
         if hud == nil {
             hud = DictationHUD.make { [weak self] in
-                DictationView(state: self?.state ?? .idle, model: model)
+                guard let self else {
+                    return DictationView(state: .idle, model: model, controller: DictationController())
+                }
+                return DictationView(state: self.state, model: model, controller: self)
             }
         }
         guard let panel = hud else { return }
         if let host = panel.contentView as? NSHostingView<DictationView> {
-            host.rootView = DictationView(state: state, model: model)
+            host.rootView = DictationView(state: state, model: model, controller: self)
         }
         panel.setFrame(preferredHUDFrame(), display: true, animate: false)
         panel.orderFrontRegardless()

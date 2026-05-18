@@ -332,8 +332,6 @@ final class AppModel: ObservableObject {
     var dictationCancellables: Set<AnyCancellable> = []
 
     @Published var dictationState: DictationCoordinator.State = .idle
-    @Published var dictationAudioLevel: Float = 0
-    @Published var dictationPartialText: String = ""
     @Published var recordingAudioLevel: Float = 0
     @Published var recordingIsSilent: Bool = false
     var recordingLevelTask: Task<Void, Never>?

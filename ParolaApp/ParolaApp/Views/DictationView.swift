@@ -4,6 +4,7 @@ import ParolaCore
 struct DictationView: View {
     let state: DictationCoordinator.State
     @ObservedObject var model: AppModel
+    @ObservedObject var controller: DictationController
     var onStop: (() -> Void)?
 
     @State private var startedAt: Date = Date()
@@ -24,7 +25,7 @@ struct DictationView: View {
     }
 
     private var hasPartial: Bool {
-        !model.dictationPartialText.isEmpty
+        !controller.partialText.isEmpty
     }
 
     private var overlayBody: some View {
@@ -48,7 +49,7 @@ struct DictationView: View {
             }
             .frame(height: 32)
             if hasPartial {
-                Text(model.dictationPartialText)
+                Text(controller.partialText)
                     .font(.system(size: 12))
                     .foregroundStyle(.white.opacity(0.85))
                     .lineLimit(2)
@@ -115,7 +116,7 @@ struct DictationView: View {
     }
 
     private var notchLabel: String {
-        if hasPartial { return model.dictationPartialText }
+        if hasPartial { return controller.partialText }
         return label
     }
 
@@ -125,7 +126,7 @@ struct DictationView: View {
         case .idle:
             Circle().fill(Color.gray.opacity(0.6)).frame(width: 14, height: 14)
         case .listening:
-            WaveformBars(level: model.dictationAudioLevel)
+            WaveformBars(level: controller.audioLevel)
         case .transcribing:
             SpinningRing().frame(width: 14, height: 14)
         case .failed:
@@ -139,7 +140,7 @@ struct DictationView: View {
     private var overlayIndicator: some View {
         switch state {
         case .listening:
-            WaveformHistory(level: model.dictationAudioLevel, capacity: 18, maxHeight: 20)
+            WaveformHistory(level: controller.audioLevel, capacity: 18, maxHeight: 20)
                 .frame(height: 22)
                 .fixedSize(horizontal: true, vertical: true)
         default:

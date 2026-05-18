@@ -105,14 +105,6 @@ extension AppModel {
             .receive(on: RunLoop.main)
             .sink { [weak self] state in self?.dictationState = state }
             .store(in: &dictationCancellables)
-        dictationController.$audioLevel
-            .receive(on: RunLoop.main)
-            .sink { [weak self] level in self?.dictationAudioLevel = level }
-            .store(in: &dictationCancellables)
-        dictationController.$partialText
-            .receive(on: RunLoop.main)
-            .sink { [weak self] text in self?.dictationPartialText = text }
-            .store(in: &dictationCancellables)
     }
 
     func restartDictation() {
