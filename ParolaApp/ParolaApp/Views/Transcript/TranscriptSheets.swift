@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SummarySheet: View {
+    @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -8,6 +9,15 @@ struct SummarySheet: View {
             HStack {
                 Text("Summary").font(DS.Font.heading)
                 Spacer()
+                if let text = summaryText {
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(text, forType: .string)
+                    } label: {
+                        Label("Copy", systemImage: "doc.on.doc")
+                    }
+                    .keyboardShortcut("c", modifiers: [.command, .shift])
+                }
                 Button("Done") { dismiss() }
                     .keyboardShortcut(.escape, modifiers: [])
             }
@@ -16,6 +26,11 @@ struct SummarySheet: View {
             SummaryPane()
         }
         .frame(minWidth: 520, minHeight: 480)
+    }
+
+    private var summaryText: String? {
+        guard let summary = model.transcript?.summary, !summary.text.isEmpty else { return nil }
+        return summary.text
     }
 }
 
