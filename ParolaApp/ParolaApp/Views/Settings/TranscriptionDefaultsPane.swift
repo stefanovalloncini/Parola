@@ -31,6 +31,14 @@ struct TranscriptionDefaultsPane: View {
                     .pickerStyle(.menu)
                     .frame(minWidth: 220)
                 }
+                SettingRow("Word timestamps",
+                           description: "Captures the start and end time of each word. Required for karaoke highlight.") {
+                    Toggle("", isOn: $model.wordTimestamps).labelsHidden()
+                }
+                SettingRow("Diarize speakers",
+                           description: "Identify multiple speakers in the audio (slower).") {
+                    Toggle("", isOn: $model.diarize).labelsHidden()
+                }
             }
             SettingHelper(text: "The main-window toolbar overrides these per transcript.")
 
