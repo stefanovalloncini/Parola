@@ -22,6 +22,11 @@ public struct LibraryEntry: Identifiable, Hashable, Sendable {
     public var deletedAt: Date? { manifest.deletedAt }
     public var updatedAt: Date? { manifest.updatedAt }
     public var labels: [String] { manifest.labels }
+    public var segmentNotes: [String: String] { manifest.segmentNotes }
+
+    public func note(forSegment id: Int) -> String? {
+        manifest.segmentNotes[String(id)]
+    }
 
     public static func == (lhs: LibraryEntry, rhs: LibraryEntry) -> Bool { lhs.id == rhs.id }
     public func hash(into hasher: inout Hasher) { hasher.combine(id) }

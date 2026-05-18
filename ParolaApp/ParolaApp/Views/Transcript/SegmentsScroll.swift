@@ -129,6 +129,8 @@ struct SegmentCard: View {
     @State private var draftText: String = ""
     @State private var renamingSpeaker: Bool = false
     @State private var draftSpeakerName: String = ""
+    @State private var editingNote: Bool = false
+    @State private var draftNote: String = ""
     @FocusState private var editingFocus: Bool
 
     private let radius: CGFloat = 12
@@ -154,6 +156,9 @@ struct SegmentCard: View {
                             }
                         }
                 }
+            }
+            if let note = model.currentSegmentNote(for: segment.id), !note.isEmpty {
+                noteRow(text: note)
             }
         }
         .padding(.horizontal, DS.Spacing.regular)
@@ -188,6 +193,43 @@ struct SegmentCard: View {
                 model.applySpeakerRenames([current: trimmed])
             }
         }
+        .alert("Segment note", isPresented: $editingNote) {
+            TextField("Note", text: $draftNote)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                model.setSegmentNote(draftNote, segmentID: segment.id)
+            }
+            if model.currentSegmentNote(for: segment.id) != nil {
+                Button("Delete", role: .destructive) {
+                    model.setSegmentNote(nil, segmentID: segment.id)
+                }
+            }
+        }
+    }
+
+    private func beginEditingNote() {
+        draftNote = model.currentSegmentNote(for: segment.id) ?? ""
+        editingNote = true
+    }
+
+    @ViewBuilder
+    private func noteRow(text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "note.text")
+                .font(.system(size: 10))
+                .foregroundStyle(DS.Color.accent)
+            Text(text)
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.primaryText.opacity(0.85))
+                .lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(DS.Color.accent.opacity(0.08))
+        )
     }
 
     private var cardBackground: Color {
@@ -236,6 +278,7 @@ struct SegmentCard: View {
     private var actionStrip: some View {
         HStack(spacing: 2) {
             cardButton(systemName: "pencil", help: "Edit") { beginEditing() }
+            cardButton(systemName: "note.text", help: "Add note") { beginEditingNote() }
             cardButton(systemName: "play.fill", help: "Play from here") {
                 model.seek(to: segment)
             }

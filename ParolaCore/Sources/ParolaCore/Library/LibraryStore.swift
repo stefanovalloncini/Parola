@@ -171,6 +171,25 @@ public actor LibraryStore {
         if cachedLoaded?.id == id { cachedLoaded = nil }
     }
 
+    /// Sets a note for a segment within an entry. Pass `nil` or empty to clear it.
+    public func setSegmentNote(_ note: String?, segmentID: Int, for id: LibraryEntry.ID) throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            let key = String(segmentID)
+            let trimmed = note?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let trimmed, !trimmed.isEmpty {
+                manifest.segmentNotes[key] = trimmed
+            } else {
+                manifest.segmentNotes.removeValue(forKey: key)
+            }
+        }
+        invalidateListCaches()
+        if cachedLoaded?.id == id { cachedLoaded = nil }
+    }
+
     /// Replaces the labels on a library entry. Empty array clears them.
     public func setLabels(_ labels: [String], for id: LibraryEntry.ID) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)

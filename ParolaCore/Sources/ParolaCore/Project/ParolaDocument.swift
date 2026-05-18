@@ -15,6 +15,7 @@ public struct ParolaDocument: Sendable {
         public var updatedAt: Date?
         public var audioFilename: String?
         public var labels: [String]
+        public var segmentNotes: [String: String]
 
         public init(
             version: Int = Manifest.currentVersion,
@@ -26,7 +27,8 @@ public struct ParolaDocument: Sendable {
             deletedAt: Date? = nil,
             updatedAt: Date? = nil,
             audioFilename: String? = nil,
-            labels: [String] = []
+            labels: [String] = [],
+            segmentNotes: [String: String] = [:]
         ) {
             self.version = version
             self.createdAt = createdAt
@@ -38,6 +40,7 @@ public struct ParolaDocument: Sendable {
             self.updatedAt = updatedAt
             self.audioFilename = audioFilename
             self.labels = labels
+            self.segmentNotes = segmentNotes
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -51,6 +54,7 @@ public struct ParolaDocument: Sendable {
             case updatedAt
             case audioFilename
             case labels
+            case segmentNotes
         }
 
         public init(from decoder: any Decoder) throws {
@@ -65,6 +69,7 @@ public struct ParolaDocument: Sendable {
             updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt)
             audioFilename = try c.decodeIfPresent(String.self, forKey: .audioFilename)
             labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
+            segmentNotes = try c.decodeIfPresent([String: String].self, forKey: .segmentNotes) ?? [:]
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -80,6 +85,9 @@ public struct ParolaDocument: Sendable {
             try c.encodeIfPresent(audioFilename, forKey: .audioFilename)
             if !labels.isEmpty {
                 try c.encode(labels, forKey: .labels)
+            }
+            if !segmentNotes.isEmpty {
+                try c.encode(segmentNotes, forKey: .segmentNotes)
             }
         }
     }

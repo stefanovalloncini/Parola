@@ -86,6 +86,27 @@ extension AppModel {
         }
     }
 
+    func setSegmentNote(_ note: String?, segmentID: Int) {
+        guard let entryID = selectedEntryID else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await library.setSegmentNote(note, segmentID: segmentID, for: entryID)
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+            refreshLibrary()
+        }
+    }
+
+    func currentSegmentNote(for segmentID: Int) -> String? {
+        guard let id = selectedEntryID,
+              let entry = libraryEntries.first(where: { $0.id == id }) else {
+            return nil
+        }
+        return entry.note(forSegment: segmentID)
+    }
+
     var allKnownLabels: [String] {
         var seen = Set<String>()
         var ordered: [String] = []
