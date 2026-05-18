@@ -13,6 +13,12 @@ private func applyAppAppearance(_ theme: String) {
     NSApp.appearance = appearance
 }
 
+private func applyAlwaysOnTop(_ on: Bool) {
+    for window in NSApp.windows where window.title == "Parola" || window.styleMask.contains(.titled) && window.isVisible {
+        window.level = on ? .floating : .normal
+    }
+}
+
 @main
 struct ParolaApp: App {
     @StateObject private var model = AppModel()
@@ -41,6 +47,9 @@ struct ParolaApp: App {
                 }
                 .onChange(of: model.phase) { _, newValue in
                     appDelegate.updateDockBadge(for: newValue)
+                }
+                .onChange(of: model.mainWindowAlwaysOnTop) { _, on in
+                    applyAlwaysOnTop(on)
                 }
                 .onOpenURL { url in model.transcribe(fileURL: url) }
                 .sheet(isPresented: $shortcutSheetOpen) { ShortcutCheatSheet() }
@@ -84,6 +93,7 @@ struct ParolaApp: App {
                 }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
                 .disabled(model.transcript == nil)
+                Toggle("Always on Top", isOn: $model.mainWindowAlwaysOnTop)
             }
             CommandGroup(after: .textEditing) {
                 Button("Find…") { model.toggleFind() }

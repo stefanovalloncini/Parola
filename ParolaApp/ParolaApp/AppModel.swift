@@ -64,6 +64,7 @@ final class AppModel: ObservableObject {
     @AppStorage("lastFindQuery") var lastFindQuery: String = ""
     @AppStorage("parola.userPrivacyMode") var userPrivacyMode: Bool = false
     @AppStorage("pinnedModel") var pinnedModel: String = ""
+    @AppStorage("mainWindowAlwaysOnTop") var mainWindowAlwaysOnTop: Bool = false
     @AppStorage("recentFiles") var recentFilesRaw: String = "[]"
     @AppStorage("micHotkeyKeyCode") var micHotkeyKeyCode: Int = 15 // kVK_ANSI_R
     @AppStorage("micHotkeyModifiers") var micHotkeyModifiers: Int = 786721 // ⌃⌥⌘
