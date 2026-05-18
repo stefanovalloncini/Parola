@@ -5,8 +5,24 @@ struct DictationPane: View {
     @EnvironmentObject var model: AppModel
     @State private var customApps: [(bundleID: String, name: String)] = []
 
+    private var currentModeName: String? {
+        let id = model.dictationCleanupPromptID
+        if id.isEmpty {
+            return DictationModePreset.builtIns.first { $0.promptID == nil }?.name
+        }
+        guard let uuid = UUID(uuidString: id) else { return nil }
+        if let preset = DictationModePreset.builtIns.first(where: { $0.promptID == uuid }) {
+            return preset.name
+        }
+        return Prompt.builtIns.first(where: { $0.id == uuid })?.name
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            DictationHUDPreview(
+                style: model.dictationIndicatorStyle,
+                modeName: currentModeName
+            )
             SettingsSection {
                 SettingRow("Enable dictation",
                            description: modeDescription,
