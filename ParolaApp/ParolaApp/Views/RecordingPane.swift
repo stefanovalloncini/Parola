@@ -31,6 +31,7 @@ struct RecordingPane: View {
                     .padding(.horizontal, DS.Spacing.large)
                     .padding(.top, DS.Spacing.large)
                     .padding(.bottom, DS.Spacing.medium)
+                if model.recordingIsSilent { silenceBanner }
                 Divider()
                 LiveTranscriptView()
             } else {
@@ -41,6 +42,25 @@ struct RecordingPane: View {
         .onAppear { startedAt = Date() }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Recording from \(source.label.lowercased()), \(stateLabel.lowercased())")
+    }
+
+    private var silenceBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "speaker.slash.fill")
+                .foregroundStyle(.white)
+            Text("No voice detected — check your microphone.")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white)
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(
+            Capsule().fill(DS.Palette.warning.opacity(0.85))
+        )
+        .padding(.horizontal, DS.Spacing.large)
+        .padding(.bottom, DS.Spacing.medium)
+        .transition(.opacity)
     }
 }
 

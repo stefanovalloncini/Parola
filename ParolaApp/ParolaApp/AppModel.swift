@@ -308,7 +308,10 @@ final class AppModel: ObservableObject {
     @Published var dictationAudioLevel: Float = 0
     @Published var dictationPartialText: String = ""
     @Published var recordingAudioLevel: Float = 0
+    @Published var recordingIsSilent: Bool = false
     var recordingLevelTask: Task<Void, Never>?
+    var silenceDetector: SilenceDetector = SilenceDetector(threshold: 8)
+    var silenceWatchTask: Task<Void, Never>?
 
     private static func readString(_ key: String, default fallback: String) -> String {
         UserDefaults.standard.string(forKey: key) ?? fallback
@@ -887,6 +890,31 @@ final class AppModel: ObservableObject {
         recordingAudioLevel = 0
     }
 
+    private func updateSilenceFlag() {
+        let alert = silenceDetector.shouldAlert()
+        if recordingIsSilent != alert { recordingIsSilent = alert }
+    }
+
+    private func startSilenceWatch() {
+        stopSilenceWatch()
+        silenceDetector.reset()
+        recordingIsSilent = false
+        silenceWatchTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 750_000_000)
+                if Task.isCancelled { return }
+                self?.updateSilenceFlag()
+            }
+        }
+    }
+
+    private func stopSilenceWatch() {
+        silenceWatchTask?.cancel()
+        silenceWatchTask = nil
+        silenceDetector.reset()
+        recordingIsSilent = false
+    }
+
     private func startStreamingMic() {
         let s = StreamingTranscriptionSession()
         streamingSession = s
@@ -894,6 +922,7 @@ final class AppModel: ObservableObject {
         livePartialText = ""
         liveVoiceActive = false
         phase = .recording(source: .microphone)
+        startSilenceWatch()
 
         let opts = currentOptions
         let progress = makeDownloadProgressHandler()
@@ -920,6 +949,8 @@ final class AppModel: ObservableObject {
             if !livePartialText.isEmpty { livePartialText = "" }
         case .voiceActivity(let active):
             if liveVoiceActive != active { liveVoiceActive = active }
+            silenceDetector.note(active: active)
+            updateSilenceFlag()
         case .warning:
             break
         case .failed(let msg):
@@ -941,6 +972,7 @@ final class AppModel: ObservableObject {
                 streamingConsumer?.cancel()
                 streamingConsumer = nil
                 stopRecordingLevelObserver()
+                stopSilenceWatch()
             }
             return
         }
