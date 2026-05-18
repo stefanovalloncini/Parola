@@ -157,12 +157,23 @@ struct LibraryListView: View {
                 }
                 .controlSize(.small)
             }
-            Text("\(entries.count)")
+            Text(totalsLabel)
                 .font(DS.Font.captionMono)
                 .foregroundStyle(DS.Color.secondaryText)
         }
         .padding(.horizontal, DS.Spacing.large)
         .padding(.vertical, DS.Spacing.regular)
+    }
+
+    private var totalsLabel: String {
+        let bytes = entries.reduce(Int64(0)) { acc, entry in
+            acc + (model.libraryBundleSizes[entry.id] ?? 0)
+        }
+        if bytes > 0 {
+            let size = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+            return "\(entries.count) · \(size)"
+        }
+        return "\(entries.count)"
     }
 
     private func performBulkDelete() {

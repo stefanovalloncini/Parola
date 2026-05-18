@@ -18,8 +18,8 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
         case .oldest: return "Oldest first"
         case .titleAZ: return "Title A→Z"
         case .titleZA: return "Title Z→A"
-        case .longest: return "Longest first"
-        case .shortest: return "Shortest first"
+        case .longest: return "Largest first"
+        case .shortest: return "Smallest first"
         }
     }
 }
