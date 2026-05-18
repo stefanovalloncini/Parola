@@ -240,6 +240,15 @@ struct SegmentCard: View {
             RoundedRectangle(cornerRadius: radius)
                 .stroke(borderColor, lineWidth: isCurrent ? 1.5 : 1)
         )
+        .overlay(alignment: .leading) {
+            if let bucket = confidenceBucket {
+                Rectangle()
+                    .fill(confidenceColor(bucket))
+                    .frame(width: 3)
+                    .padding(.vertical, 4)
+                    .help(confidenceTooltip(bucket))
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: radius))
         .contentShape(Rectangle())
         .draggable(draggablePayload)
@@ -299,6 +308,27 @@ struct SegmentCard: View {
 
     private var cardBackground: Color {
         isCurrent ? DS.Color.accent.opacity(0.10) : DS.Color.surfaceElevated
+    }
+
+    private var confidenceBucket: SegmentConfidence.Bucket? {
+        guard let value = SegmentConfidence.average(for: segment) else { return nil }
+        return SegmentConfidence.bucket(for: value)
+    }
+
+    private func confidenceColor(_ bucket: SegmentConfidence.Bucket) -> Color {
+        switch bucket {
+        case .high:   return DS.Palette.success.opacity(0.7)
+        case .medium: return DS.Palette.warning.opacity(0.7)
+        case .low:    return Color.red.opacity(0.7)
+        }
+    }
+
+    private func confidenceTooltip(_ bucket: SegmentConfidence.Bucket) -> String {
+        switch bucket {
+        case .high:   return "High confidence"
+        case .medium: return "Medium confidence — review"
+        case .low:    return "Low confidence — likely transcription errors"
+        }
     }
 
     private var borderColor: Color {
