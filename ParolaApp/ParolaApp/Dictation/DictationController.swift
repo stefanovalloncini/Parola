@@ -40,6 +40,11 @@ final class DictationController: ObservableObject {
     private var levelTask: Task<Void, Never>?
     private var partialTask: Task<Void, Never>?
 
+    deinit {
+        levelTask?.cancel()
+        partialTask?.cancel()
+    }
+
     func start(configuration: Configuration) {
         guard coordinator == nil else { return }
         self.configuration = configuration

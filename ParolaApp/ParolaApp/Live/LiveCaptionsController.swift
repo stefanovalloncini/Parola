@@ -14,6 +14,10 @@ final class LiveCaptionsController: ObservableObject {
     private var consumer: Task<Void, Never>?
     private var lastOptions: TranscriptionOptions?
 
+    deinit {
+        consumer?.cancel()
+    }
+
     var isPresenterOpen: Bool { presenterWindow != nil }
 
     var isActive: Bool { state.isActive }
