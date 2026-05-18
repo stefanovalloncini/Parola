@@ -80,9 +80,14 @@ private struct OutlineRow: View {
                         .foregroundStyle(DS.Color.primaryText)
                         .multilineTextAlignment(.leading)
                     if let speaker = entry.speaker {
-                        Text(speaker)
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(DS.Color.secondaryText)
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(DS.speakerColor(for: speaker))
+                                .frame(width: 5, height: 5)
+                            Text(speaker)
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(DS.Color.secondaryText)
+                        }
                     }
                 }
                 Spacer(minLength: 0)
