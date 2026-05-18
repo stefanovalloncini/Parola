@@ -12,9 +12,21 @@ struct AboutSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Parola")
                         .font(.system(size: 22, weight: .semibold))
-                    Text("Version \(Self.versionString)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Text("Version \(Self.versionString)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        if let channel = Self.channelLabel {
+                            Text(channel)
+                                .font(.system(size: 10, weight: .semibold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1)
+                                .background(
+                                    Capsule().fill(DS.Color.accent.opacity(0.18))
+                                )
+                                .foregroundStyle(DS.Color.accent)
+                        }
+                    }
                 }
                 Spacer()
             }
@@ -46,6 +58,18 @@ struct AboutSheet: View {
         let short = info?["CFBundleShortVersionString"] as? String ?? "?"
         let build = info?["CFBundleVersion"] as? String ?? "?"
         return "\(short) (\(build))"
+    }
+
+    private static var channelLabel: String? {
+        #if DEBUG
+        return "DEBUG"
+        #else
+        guard let receiptURL = Bundle.main.appStoreReceiptURL else { return nil }
+        let path = receiptURL.path
+        if path.contains("sandboxReceipt") { return "TESTFLIGHT" }
+        if FileManager.default.fileExists(atPath: path) { return "APP STORE" }
+        return nil
+        #endif
     }
 
     private func creditRow(title: String, value: String) -> some View {
