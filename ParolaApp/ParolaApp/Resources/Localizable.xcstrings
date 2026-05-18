@@ -492,13 +492,13 @@
         }
       }
     },
-    "About Parola…": {
+    "About Parola": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Su Parola…"
+            "value": "Informazioni su Parola"
           }
         }
       }

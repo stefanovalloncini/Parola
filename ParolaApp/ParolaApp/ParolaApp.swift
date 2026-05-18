@@ -96,6 +96,9 @@ struct ParolaApp: App {
         .windowResizability(.contentSize)
         .defaultSize(width: 1180, height: 760)
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About Parola") { aboutSheetOpen = true }
+            }
             CommandGroup(replacing: .help) {
                 Button("Keyboard Shortcuts…") { shortcutSheetOpen = true }
                     .keyboardShortcut("/", modifiers: [.command])
@@ -104,7 +107,6 @@ struct ParolaApp: App {
                         NSWorkspace.shared.open(url)
                     }
                 }
-                Button("About Parola…") { aboutSheetOpen = true }
             }
             CommandGroup(replacing: .newItem) {
                 Button("Open Audio…") { model.presentOpenPanel() }
