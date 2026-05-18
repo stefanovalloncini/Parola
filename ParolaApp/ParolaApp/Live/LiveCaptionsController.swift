@@ -45,6 +45,7 @@ final class LiveCaptionsController: ObservableObject {
         lastOptions = options
         state.reset()
         state.isActive = true
+        state.isLoading = true
 
         let s = StreamingTranscriptionSession()
         session = s
@@ -53,6 +54,7 @@ final class LiveCaptionsController: ObservableObject {
         consumer = Task { [weak self] in
             do {
                 let events = try await s.start(options: options, downloadProgress: { _ in })
+                self?.state.isLoading = false
                 for await event in events {
                     self?.handle(event)
                 }
@@ -65,6 +67,7 @@ final class LiveCaptionsController: ObservableObject {
     func stop() async {
         guard state.isActive else { return }
         state.isActive = false
+        state.isLoading = false
         if let s = session {
             await s.stop()
         }
@@ -88,6 +91,7 @@ final class LiveCaptionsController: ObservableObject {
     private func handleError(_ message: String) {
         state.error = message
         state.isActive = false
+        state.isLoading = false
         hideWindow()
         session = nil
     }
