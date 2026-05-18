@@ -11,9 +11,15 @@ struct BatchJobList: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("\(model.batchJobs.count) file\(model.batchJobs.count == 1 ? "" : "s")")
-                    .font(DS.Font.caption)
-                    .foregroundStyle(DS.Color.secondaryText)
+                Group {
+                    if model.batchJobs.count == 1 {
+                        Text("1 file")
+                    } else {
+                        Text("\(model.batchJobs.count) files")
+                    }
+                }
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.secondaryText)
                 Spacer()
                 Button("Clear") { model.clearBatch() }
                     .buttonStyle(.borderless)
@@ -125,7 +131,7 @@ struct BatchJobList: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Sort: \(sortOrder.title)")
+        .help("Sort: \(sortOrder.localizedTitle)")
     }
 
     private var filteredJobs: [BatchJob] {
@@ -215,7 +221,7 @@ enum BatchSortOrder: CaseIterable, Hashable {
     case smallestFirst
     case status
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .addedFirst: return "Added first"
         case .addedLast: return "Added last"
@@ -226,6 +232,18 @@ enum BatchSortOrder: CaseIterable, Hashable {
         case .status: return "Status"
         }
     }
+
+    var localizedTitle: String {
+        switch self {
+        case .addedFirst: return String(localized: "Added first")
+        case .addedLast: return String(localized: "Added last")
+        case .nameAsc: return String(localized: "Name A→Z")
+        case .nameDesc: return String(localized: "Name Z→A")
+        case .largestFirst: return String(localized: "Largest first")
+        case .smallestFirst: return String(localized: "Smallest first")
+        case .status: return String(localized: "Status")
+        }
+    }
 }
 
 struct BatchStatusGroup {
@@ -234,11 +252,11 @@ struct BatchStatusGroup {
 
     var title: String {
         switch status {
-        case .pending: return "Queued"
-        case .transcribing: return "Transcribing"
-        case .done: return "Complete"
-        case .failed: return "Failed"
-        case .cancelled: return "Cancelled"
+        case .pending: return String(localized: "Queued")
+        case .transcribing: return String(localized: "Transcribing")
+        case .done: return String(localized: "Complete")
+        case .failed: return String(localized: "Failed")
+        case .cancelled: return String(localized: "Cancelled")
         }
     }
 }
@@ -282,14 +300,15 @@ struct BatchJobRow: View {
 
     private var statusText: String {
         switch job.status {
-        case .pending: return "Queued"
+        case .pending: return String(localized: "Queued")
         case .transcribing:
-            return job.progress > 0
-                ? "Transcribing \(Int(job.progress * 100))%"
-                : "Transcribing…"
-        case .done: return "Complete"
-        case .failed: return job.error ?? "Failed"
-        case .cancelled: return "Cancelled"
+            if job.progress > 0 {
+                return String(localized: "Transcribing \(Int(job.progress * 100))%")
+            }
+            return String(localized: "Transcribing…")
+        case .done: return String(localized: "Complete")
+        case .failed: return job.error ?? String(localized: "Failed")
+        case .cancelled: return String(localized: "Cancelled")
         }
     }
 

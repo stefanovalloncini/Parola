@@ -9,17 +9,17 @@ enum DictationIndicatorStyle: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .overlay: return "Overlay"
-        case .notch:   return "Notch"
-        case .minimal: return "Minimal"
+        case .overlay: return String(localized: "Overlay")
+        case .notch:   return String(localized: "Notch")
+        case .minimal: return String(localized: "Minimal")
         }
     }
 
     var description: String {
         switch self {
-        case .overlay: return "Floating pill near the bottom of the screen."
-        case .notch:   return "Discreet bar pinned under the MacBook notch."
-        case .minimal: return "Tiny dot in the bottom-right corner."
+        case .overlay: return String(localized: "Floating pill near the bottom of the screen.")
+        case .notch:   return String(localized: "Discreet bar pinned under the MacBook notch.")
+        case .minimal: return String(localized: "Tiny dot in the bottom-right corner.")
         }
     }
 }

@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct ProgressPane: View {
-    let title: String
+    let title: LocalizedStringKey
     let progress: Double?
     @State private var eta = ETACalculator()
     @State private var etaLabel: String?
@@ -22,7 +22,7 @@ struct ProgressPane: View {
                         .font(DS.Font.captionMono)
                         .foregroundStyle(DS.Color.secondaryText)
                     if let etaLabel {
-                        Text("·")
+                        Text(verbatim: "·")
                             .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
                         Text("\(etaLabel) left")
                             .font(DS.Font.captionMono)

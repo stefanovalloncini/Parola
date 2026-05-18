@@ -5,7 +5,7 @@ struct ChaptersSection: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        InfoSection(title: titleLabel) {
+        InfoSection(titleVerbatim: titleLabel) {
             if model.isExtractingChapters {
                 progressRow
             } else if model.smartChapters.isEmpty {
@@ -20,8 +20,8 @@ struct ChaptersSection: View {
     }
 
     private var titleLabel: String {
-        if model.smartChapters.isEmpty { return "Chapters" }
-        return "Chapters · \(model.smartChapters.count)"
+        if model.smartChapters.isEmpty { return String(localized: "Chapters") }
+        return String(localized: "Chapters · \(model.smartChapters.count)")
     }
 
     private var progressRow: some View {

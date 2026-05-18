@@ -25,7 +25,7 @@ struct IntegrationsPane: View {
 
 private struct ToolStatusRow: View {
     let name: String
-    let description: String
+    let description: LocalizedStringKey
     let available: Bool
     let installing: Bool
     let error: String?
@@ -39,7 +39,7 @@ private struct ToolStatusRow: View {
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: available ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                         .foregroundStyle(available ? Color.green : Color.orange)
-                    Text(name).font(.body.weight(.semibold))
+                    Text(verbatim: name).font(.body.weight(.semibold))
                     Text(available ? "Installed" : "Not installed")
                         .font(.caption)
                         .foregroundStyle(.secondary)

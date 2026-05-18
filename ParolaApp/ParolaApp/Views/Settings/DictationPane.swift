@@ -25,7 +25,7 @@ struct DictationPane: View {
             )
             SettingsSection {
                 SettingRow("Enable dictation",
-                           description: modeDescription,
+                           descriptionVerbatim: modeDescription,
                            isFirst: true) {
                     Toggle("", isOn: $model.dictationEnabled).labelsHidden()
                 }
@@ -47,7 +47,7 @@ struct DictationPane: View {
                     )
                 }
                 SettingRow("Indicator style",
-                           description: model.dictationIndicatorStyle.description) {
+                           descriptionVerbatim: model.dictationIndicatorStyle.description) {
                     Picker("", selection: $model.dictationIndicatorStyleRaw) {
                         ForEach(DictationIndicatorStyle.allCases) { style in
                             Text(style.displayName).tag(style.rawValue)
@@ -149,7 +149,7 @@ private struct WorkflowRow: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        SettingRow(app.name, isFirst: isFirst) {
+        SettingRow(titleVerbatim: app.name, isFirst: isFirst) {
             HStack(spacing: 10) {
                 Picker("", selection: Binding(
                     get: { model.dictationOverridePromptID(for: app.bundleID) },

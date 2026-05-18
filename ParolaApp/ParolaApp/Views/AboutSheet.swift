@@ -82,13 +82,13 @@ struct AboutSheet: View {
         return "\(installed.count) · \(ByteCountFormatter.string(fromByteCount: Int64(total), countStyle: .file))"
     }
 
-    private func creditRow(title: String, value: String) -> some View {
+    private func creditRow(title: LocalizedStringKey, value: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(title)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 90, alignment: .leading)
-            Text(value)
+            Text(verbatim: value)
                 .font(.system(size: 12))
                 .foregroundStyle(.primary)
         }

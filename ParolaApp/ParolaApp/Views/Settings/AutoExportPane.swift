@@ -154,7 +154,7 @@ enum AutoExportSort: CaseIterable {
     case enabledFirst
     case disabledFirst
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .originalOrder: return "Original order"
         case .sourceAscending: return "Source A→Z"
@@ -212,8 +212,8 @@ private struct AutoExportRuleRow: View {
     private var summary: String {
         let exts = rule.sourceExtensions.sorted().joined(separator: ", ")
         let fmts = rule.outputFormats.map(\.rawValue).sorted().joined(separator: ", ")
-        let left = exts.isEmpty ? "any" : exts
-        let right = fmts.isEmpty ? "nothing" : fmts
+        let left = exts.isEmpty ? String(localized: "any") : exts
+        let right = fmts.isEmpty ? String(localized: "nothing") : fmts
         return "\(left) → \(right)"
     }
 }

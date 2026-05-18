@@ -3,7 +3,7 @@ import SwiftUI
 struct SheetFrame<Content: View, Footer: View>: View {
     let icon: String
     let iconTint: Color
-    let title: String
+    private let titleText: Text
     let onClose: () -> Void
     let content: Content
     let footer: Footer?
@@ -11,14 +11,30 @@ struct SheetFrame<Content: View, Footer: View>: View {
     init(
         icon: String,
         iconTint: Color = DS.Color.accent,
-        title: String,
+        title: LocalizedStringKey,
         onClose: @escaping () -> Void,
         @ViewBuilder content: () -> Content,
         @ViewBuilder footer: () -> Footer
     ) {
         self.icon = icon
         self.iconTint = iconTint
-        self.title = title
+        self.titleText = Text(title)
+        self.onClose = onClose
+        self.content = content()
+        self.footer = footer()
+    }
+
+    init(
+        icon: String,
+        iconTint: Color = DS.Color.accent,
+        titleVerbatim: String,
+        onClose: @escaping () -> Void,
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder footer: () -> Footer
+    ) {
+        self.icon = icon
+        self.iconTint = iconTint
+        self.titleText = Text(titleVerbatim)
         self.onClose = onClose
         self.content = content()
         self.footer = footer()
@@ -51,7 +67,7 @@ struct SheetFrame<Content: View, Footer: View>: View {
                 .background(iconTint.opacity(0.16))
                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
 
-            Text(title)
+            titleText
                 .font(.title3.weight(.semibold))
                 .lineLimit(1)
 
@@ -78,13 +94,28 @@ extension SheetFrame where Footer == EmptyView {
     init(
         icon: String,
         iconTint: Color = DS.Color.accent,
-        title: String,
+        title: LocalizedStringKey,
         onClose: @escaping () -> Void,
         @ViewBuilder content: () -> Content
     ) {
         self.icon = icon
         self.iconTint = iconTint
-        self.title = title
+        self.titleText = Text(title)
+        self.onClose = onClose
+        self.content = content()
+        self.footer = nil
+    }
+
+    init(
+        icon: String,
+        iconTint: Color = DS.Color.accent,
+        titleVerbatim: String,
+        onClose: @escaping () -> Void,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.icon = icon
+        self.iconTint = iconTint
+        self.titleText = Text(titleVerbatim)
         self.onClose = onClose
         self.content = content()
         self.footer = nil

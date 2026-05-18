@@ -91,7 +91,7 @@ struct TranscriptPane: View {
            let entry = model.libraryEntry(id: entryID) {
             return entry.title
         }
-        return "Untitled"
+        return String(localized: "Untitled")
     }
 
     private func advanceToNext() {

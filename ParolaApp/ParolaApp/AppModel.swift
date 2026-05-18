@@ -26,8 +26,8 @@ final class AppModel: ObservableObject {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .microphone: return "Microphone"
-            case .systemAudio: return "System audio"
+            case .microphone: return String(localized: "Microphone")
+            case .systemAudio: return String(localized: "System audio")
             }
         }
     }

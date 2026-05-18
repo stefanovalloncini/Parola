@@ -49,12 +49,12 @@ struct SummaryPane: View {
         let modelName = model.transcript?.modelName ?? ""
 
         return HStack(spacing: 6) {
-            metaLabel("\(words) words")
+            metaLabel(Text("\(words) words"))
             dot
-            metaLabel("\(chars) chars")
+            metaLabel(Text("\(chars) chars"))
             if !modelName.isEmpty {
                 dot
-                metaLabel(modelName)
+                metaLabel(Text(verbatim: modelName))
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -63,13 +63,13 @@ struct SummaryPane: View {
     }
 
     private var dot: some View {
-        Text("·")
+        Text(verbatim: "·")
             .font(DS.Font.captionMono)
             .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
     }
 
-    private func metaLabel(_ text: String) -> some View {
-        Text(text)
+    private func metaLabel(_ text: Text) -> some View {
+        text
             .font(DS.Font.captionMono)
             .foregroundStyle(DS.Color.secondaryText)
     }
@@ -197,9 +197,15 @@ private struct SummaryEmpty: View {
                 .foregroundStyle(DS.Color.accent)
                 .opacity(isWorking ? 0.4 : 1)
 
-            Text(isWorking ? "Generating summary…" : "No summary yet")
-                .font(DS.Font.heading)
-                .foregroundStyle(DS.Color.primaryText)
+            Group {
+                if isWorking {
+                    Text("Generating summary…")
+                } else {
+                    Text("No summary yet")
+                }
+            }
+            .font(DS.Font.heading)
+            .foregroundStyle(DS.Color.primaryText)
 
             if !isWorking {
                 Text("Generate a short overview with chapter markers you can jump to.")

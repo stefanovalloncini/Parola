@@ -119,7 +119,7 @@ enum IgnoredSegmentsSort: CaseIterable {
     case enabledFirst
     case disabledFirst
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .originalOrder: return "Original order"
         case .patternAscending: return "Pattern A→Z"

@@ -58,13 +58,13 @@ struct TranscriptHeaderBar: View {
                 Image(systemName: speaker.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
             }
             .buttonStyle(.borderless)
-            .help(speaker.isSpeaking ? "Stop reading" : "Read aloud")
+            .modifier(SpeakHelpModifier(isSpeaking: speaker.isSpeaking))
 
             Button { model.transcriptCompact.toggle() } label: {
                 Image(systemName: model.transcriptCompact ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
             }
             .buttonStyle(.borderless)
-            .help(model.transcriptCompact ? "Expanded view" : "Compact view")
+            .modifier(CompactHelpModifier(isCompact: model.transcriptCompact))
 
             Button(action: onOpenSummary) {
                 Image(systemName: "sparkles")
@@ -128,5 +128,27 @@ struct TranscriptHeaderBar: View {
         model.seekTo(seconds: seconds)
         jumpDraft = ""
         jumpOpen = false
+    }
+}
+
+private struct SpeakHelpModifier: ViewModifier {
+    let isSpeaking: Bool
+    func body(content: Content) -> some View {
+        if isSpeaking {
+            content.help("Stop reading")
+        } else {
+            content.help("Read aloud")
+        }
+    }
+}
+
+private struct CompactHelpModifier: ViewModifier {
+    let isCompact: Bool
+    func body(content: Content) -> some View {
+        if isCompact {
+            content.help("Expanded view")
+        } else {
+            content.help("Compact view")
+        }
     }
 }

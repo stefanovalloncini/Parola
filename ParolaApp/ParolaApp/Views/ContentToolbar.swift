@@ -9,7 +9,7 @@ struct ContentToolbar: ToolbarContent {
             ModelPickerView()
             LanguagePickerView()
                 .disabled(selectedModelIsEnglishOnly)
-                .help(selectedModelIsEnglishOnly ? "This model is English-only." : "")
+                .modifier(EnglishOnlyHelpModifier(isEnglishOnly: selectedModelIsEnglishOnly))
             if selectedModelSupportsTranslate {
                 Toggle(isOn: $model.translate) {
                     HStack(spacing: 4) {
@@ -94,6 +94,17 @@ struct ContentToolbar: ToolbarContent {
         switch model.phase {
         case .idle, .ready, .failed: return false
         default: return true
+        }
+    }
+}
+
+private struct EnglishOnlyHelpModifier: ViewModifier {
+    let isEnglishOnly: Bool
+    func body(content: Content) -> some View {
+        if isEnglishOnly {
+            content.help("This model is English-only.")
+        } else {
+            content
         }
     }
 }

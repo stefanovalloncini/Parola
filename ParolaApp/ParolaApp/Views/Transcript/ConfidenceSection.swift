@@ -30,9 +30,15 @@ struct ConfidenceSection: View {
                         }
                         .padding(.top, 4)
                     } label: {
-                        Text("\(lows.count) low-confidence segment\(lows.count == 1 ? "" : "s")")
-                            .font(DS.Font.body)
-                            .foregroundStyle(DS.Color.secondaryText)
+                        Group {
+                            if lows.count == 1 {
+                                Text("1 low-confidence segment")
+                            } else {
+                                Text("\(lows.count) low-confidence segments")
+                            }
+                        }
+                        .font(DS.Font.body)
+                        .foregroundStyle(DS.Color.secondaryText)
                     }
                 }
             }

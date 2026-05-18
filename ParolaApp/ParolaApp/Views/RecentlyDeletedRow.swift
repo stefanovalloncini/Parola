@@ -65,8 +65,8 @@ struct RecentlyDeletedRow: View {
 
     var previewText: String {
         if let preview, !preview.isEmpty { return preview }
-        if preview == nil { return "Loading preview…" }
-        return "No transcript text."
+        if preview == nil { return String(localized: "Loading preview…") }
+        return String(localized: "No transcript text.")
     }
 
     private var rowFill: Color {
@@ -126,7 +126,7 @@ struct RecentlyDeletedRow: View {
 
 struct RecentlyDeletedCardIconButton: View {
     let systemName: String
-    let help: String
+    let help: LocalizedStringKey
     var tint: Color = .primary
     let action: () -> Void
 

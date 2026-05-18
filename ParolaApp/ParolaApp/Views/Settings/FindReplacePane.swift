@@ -134,7 +134,7 @@ struct FindReplacePane: View {
     enum StatusFilter: CaseIterable {
         case all, enabled, disabled
 
-        var label: String {
+        var label: LocalizedStringKey {
             switch self {
             case .all: return "All"
             case .enabled: return "Enabled"
@@ -146,7 +146,7 @@ struct FindReplacePane: View {
     enum SortOption: CaseIterable {
         case original, findAZ, findZA, enabledFirst
 
-        var label: String {
+        var label: LocalizedStringKey {
             switch self {
             case .original: return "Original order"
             case .findAZ: return "Find A→Z"
@@ -158,7 +158,7 @@ struct FindReplacePane: View {
 }
 
 private struct FilterChip: View {
-    let title: String
+    let title: LocalizedStringKey
     let isSelected: Bool
     let action: () -> Void
 

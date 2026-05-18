@@ -146,7 +146,7 @@ struct PromptsPane: View {
     enum SortOption: CaseIterable {
         case builtInFirst, nameAZ, nameZA
 
-        var label: String {
+        var label: LocalizedStringKey {
             switch self {
             case .builtInFirst: return "Built-in first"
             case .nameAZ: return "Name A→Z"
@@ -163,7 +163,7 @@ private struct PromptRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        SettingRow(prompt.name, isFirst: isFirst) {
+        SettingRow(titleVerbatim: prompt.name, isFirst: isFirst) {
             HStack(spacing: 6) {
                 Text(prompt.isBuiltIn ? "Built-in" : "Custom")
                     .font(.caption)
@@ -210,8 +210,11 @@ private struct PromptEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(draft.isExisting ? "Edit Prompt" : "New Prompt")
-                .font(.title3.weight(.semibold))
+            if draft.isExisting {
+                Text("Edit Prompt").font(.title3.weight(.semibold))
+            } else {
+                Text("New Prompt").font(.title3.weight(.semibold))
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Name").font(.caption).foregroundStyle(.secondary)

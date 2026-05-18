@@ -123,14 +123,14 @@ struct FindBar: View {
     }
 
     private var matchSummary: String {
-        if model.matches.isEmpty { return "No matches" }
-        return "\(model.currentMatchIndex + 1) of \(model.matches.count)"
+        if model.matches.isEmpty { return String(localized: "No matches") }
+        return String(localized: "\(model.currentMatchIndex + 1) of \(model.matches.count)")
     }
 }
 
 private struct FindIconButton: View {
     let systemName: String
-    let help: String
+    let help: LocalizedStringKey
     var disabled: Bool = false
     let action: () -> Void
 
@@ -158,7 +158,7 @@ private struct FindIconButton: View {
 private struct FindToggleButton: View {
     let systemName: String
     let isOn: Bool
-    let help: String
+    let help: LocalizedStringKey
     let action: () -> Void
 
     @State private var hovered = false

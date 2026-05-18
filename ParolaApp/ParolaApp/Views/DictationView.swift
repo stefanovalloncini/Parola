@@ -205,10 +205,10 @@ struct DictationView: View {
 
     private var label: String {
         switch state {
-        case .idle: return "Ready"
-        case .listening: return "Listening"
-        case .transcribing: return "Transcribing"
-        case .failed: return "Failed"
+        case .idle: return String(localized: "Ready")
+        case .listening: return String(localized: "Listening")
+        case .transcribing: return String(localized: "Transcribing")
+        case .failed: return String(localized: "Failed")
         }
     }
 }

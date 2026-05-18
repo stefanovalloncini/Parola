@@ -10,7 +10,7 @@ struct GeneralPane: View {
         VStack(alignment: .leading, spacing: 16) {
             SettingsSection("Startup") {
                 SettingRow("Open at login",
-                           description: launchAtLoginError ?? "Launches Parola in the background when you sign in.",
+                           descriptionVerbatim: launchAtLoginError ?? String(localized: "Launches Parola in the background when you sign in."),
                            isFirst: true) {
                     Toggle("", isOn: $launchAtLogin)
                         .labelsHidden()

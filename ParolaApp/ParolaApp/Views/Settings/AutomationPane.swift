@@ -90,7 +90,7 @@ struct AutomationPane: View {
                                 .foregroundStyle(.secondary)
                             HStack(spacing: 8) {
                                 Button("Reveal in Finder") { reveal(path: path) }
-                                Button("Copy path") { copy(path, label: "Path copied") }
+                                Button("Copy path") { copy(path, label: String(localized: "Path copied")) }
                             }
                         } else {
                             HStack(spacing: 6) {
@@ -125,7 +125,7 @@ struct AutomationPane: View {
                                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                                     .fill(Color.primary.opacity(0.05))
                             )
-                            Button("Copy snippet") { copy(snippet, label: "Snippet copied") }
+                            Button("Copy snippet") { copy(snippet, label: String(localized: "Snippet copied")) }
                         }
                         .padding(16)
                     }
@@ -169,12 +169,12 @@ struct AutomationPane: View {
 
     private var bridgeBlurb: String {
         if model.automationBridgeRunning {
-            return "parola-mcp can now connect over loopback and expose Parola actions to MCP clients. Anyone on this Mac can connect — turn it off if you're sharing the machine."
+            return String(localized: "parola-mcp can now connect over loopback and expose Parola actions to MCP clients. Anyone on this Mac can connect — turn it off if you're sharing the machine.")
         }
         #if DEBUG
-        return "Debug builds default the bridge on for development. Toggle it off to ship the same workflow as a Release user."
+        return String(localized: "Debug builds default the bridge on for development. Toggle it off to ship the same workflow as a Release user.")
         #else
-        return "Release builds keep the bridge off by default so notarised binaries don't open a local listener without consent. Turn it on when you want to drive Parola from Claude Code / Codex / a custom MCP client."
+        return String(localized: "Release builds keep the bridge off by default so notarised binaries don't open a local listener without consent. Turn it on when you want to drive Parola from Claude Code / Codex / a custom MCP client.")
         #endif
     }
 

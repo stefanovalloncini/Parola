@@ -5,7 +5,7 @@ struct ActionItemsSection: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        InfoSection(title: titleLabel) {
+        InfoSection(titleVerbatim: titleLabel) {
             if model.isExtractingActionItems {
                 progressRow
             } else if model.actionItems.isEmpty {
@@ -20,8 +20,8 @@ struct ActionItemsSection: View {
     }
 
     private var titleLabel: String {
-        if model.actionItems.isEmpty { return "Action Items" }
-        return "Action Items · \(model.actionItems.count)"
+        if model.actionItems.isEmpty { return String(localized: "Action Items") }
+        return String(localized: "Action Items · \(model.actionItems.count)")
     }
 
     private var progressRow: some View {

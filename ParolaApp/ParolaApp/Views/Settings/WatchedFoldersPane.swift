@@ -70,8 +70,8 @@ private struct WatchedFolderRow: View {
 
     var body: some View {
         let stale = store.isStale(folder.id)
-        SettingRow(folder.displayName,
-                   description: folder.displayPath,
+        SettingRow(titleVerbatim: folder.displayName,
+                   descriptionVerbatim: folder.displayPath,
                    isFirst: isFirst) {
             HStack(spacing: 6) {
                 if stale {

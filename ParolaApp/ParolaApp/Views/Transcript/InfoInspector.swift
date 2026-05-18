@@ -48,7 +48,7 @@ struct InfoInspector: View {
     }
 
     private var languageLabel: String {
-        guard let code = model.transcript?.language, !code.isEmpty else { return "Auto" }
+        guard let code = model.transcript?.language, !code.isEmpty else { return String(localized: "Auto") }
         return Locale.current.localizedString(forLanguageCode: code) ?? code.uppercased()
     }
 
@@ -99,12 +99,22 @@ struct InfoInspector: View {
 }
 
 struct InfoSection<Content: View>: View {
-    let title: String
+    private let titleText: Text
     @ViewBuilder var content: () -> Content
+
+    init(title: LocalizedStringKey, @ViewBuilder content: @escaping () -> Content) {
+        self.titleText = Text(title)
+        self.content = content
+    }
+
+    init(titleVerbatim: String, @ViewBuilder content: @escaping () -> Content) {
+        self.titleText = Text(titleVerbatim)
+        self.content = content
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            Text(title)
+            titleText
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.secondaryText)
                 .textCase(.uppercase)
@@ -116,7 +126,7 @@ struct InfoSection<Content: View>: View {
 
 struct InfoRow: View {
     let icon: String
-    let label: String
+    let label: LocalizedStringKey
     let value: String
 
     var body: some View {

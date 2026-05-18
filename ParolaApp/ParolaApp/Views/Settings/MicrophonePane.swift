@@ -18,8 +18,11 @@ struct MicrophonePane: View {
                     Picker("", selection: $model.inputDeviceUID) {
                         Text("System default").tag("")
                         ForEach(devices) { device in
-                            Text(device.isDefault ? "\(device.name) (default)" : device.name)
-                                .tag(device.uid)
+                            if device.isDefault {
+                                Text("\(device.name) (default)").tag(device.uid)
+                            } else {
+                                Text(verbatim: device.name).tag(device.uid)
+                            }
                         }
                     }
                     .labelsHidden()
@@ -132,9 +135,9 @@ private struct MicErrorBanner: View {
     private var hint: String {
         let lower = message.lowercased()
         if lower.contains("permission") || lower.contains("denied") || lower.contains("authoriz") {
-            return "Open System Settings → Privacy & Security → Microphone and grant Parola access."
+            return String(localized: "Open System Settings → Privacy & Security → Microphone and grant Parola access.")
         }
-        return "Pick a different device or reconnect the current one."
+        return String(localized: "Pick a different device or reconnect the current one.")
     }
 
     var body: some View {

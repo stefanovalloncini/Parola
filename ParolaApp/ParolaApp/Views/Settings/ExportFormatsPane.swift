@@ -7,8 +7,8 @@ struct ExportFormatsPane: View {
             SettingsSection {
                 let formats = ExportFormat.allCases
                 ForEach(Array(formats.enumerated()), id: \.element) { idx, format in
-                    SettingRow(format.rawValue.uppercased(), isFirst: idx == 0) {
-                        Text(".\(format.fileExtension)").foregroundStyle(.secondary)
+                    SettingRow(titleVerbatim: format.rawValue.uppercased(), isFirst: idx == 0) {
+                        Text(verbatim: ".\(format.fileExtension)").foregroundStyle(.secondary)
                     }
                 }
             }

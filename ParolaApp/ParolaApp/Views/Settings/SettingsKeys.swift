@@ -51,6 +51,32 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         }
     }
 
+    var localizedLabel: String {
+        switch self {
+        case .general: return String(localized: "General")
+        case .customization: return String(localized: "Customization")
+        case .watchedFolders: return String(localized: "Watched Folders")
+        case .recordMeetings: return String(localized: "Record Meetings")
+        case .microphone: return String(localized: "Microphone")
+        case .liveCaptions: return String(localized: "Live Captions")
+        case .dictation: return String(localized: "Dictation")
+        case .snippets: return String(localized: "Snippets")
+        case .corrections: return String(localized: "Corrections")
+        case .translation: return String(localized: "Translation")
+        case .transcriptionDefaults: return String(localized: "Transcription Defaults")
+        case .ignoredSegments: return String(localized: "Ignored Segments")
+        case .findReplace: return String(localized: "Find & Replace")
+        case .exportFormats: return String(localized: "Export Formats")
+        case .batchExport: return String(localized: "Batch Export")
+        case .autoExport: return String(localized: "Auto-Export")
+        case .integrations: return String(localized: "Integrations")
+        case .prompts: return String(localized: "Prompts")
+        case .automation: return String(localized: "MCP & Automation")
+        case .updates: return String(localized: "Updates")
+        case .advanced: return String(localized: "Advanced")
+        }
+    }
+
     /// Search keywords surfaced by the sidebar search beyond the label match.
     var searchKeywords: [String] {
         switch self {
@@ -150,7 +176,7 @@ struct ResetPaneButton: View {
                 .foregroundStyle(.secondary)
             }
             .confirmationDialog(
-                "Reset \(scope.label) to defaults?",
+                String(localized: "Reset \(scope.localizedLabel) to defaults?"),
                 isPresented: $confirming,
                 titleVisibility: .visible
             ) {

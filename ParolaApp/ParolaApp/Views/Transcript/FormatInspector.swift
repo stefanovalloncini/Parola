@@ -85,7 +85,7 @@ struct FormatInspector: View {
 }
 
 struct DisplayModeCard: View {
-    let title: String
+    let title: LocalizedStringKey
     let icon: String
     let isSelected: Bool
     let action: () -> Void

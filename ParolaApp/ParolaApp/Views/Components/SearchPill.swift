@@ -2,11 +2,11 @@ import SwiftUI
 
 struct SearchPill: View {
     @Binding var text: String
-    var placeholder: String
+    var placeholder: LocalizedStringKey
     var prompt: String?
     var identifier: String
 
-    init(text: Binding<String>, placeholder: String = "Search", prompt: String? = nil, identifier: String = "search.field") {
+    init(text: Binding<String>, placeholder: LocalizedStringKey = "Search", prompt: String? = nil, identifier: String = "search.field") {
         self._text = text
         self.placeholder = placeholder
         self.prompt = prompt

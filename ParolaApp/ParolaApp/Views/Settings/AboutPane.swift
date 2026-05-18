@@ -49,6 +49,9 @@ struct AboutPane: View {
         let info = Bundle.main.infoDictionary
         let marketing = (info?["CFBundleShortVersionString"] as? String) ?? Parola.version
         let build = (info?["CFBundleVersion"] as? String) ?? ""
-        return build.isEmpty ? "Version \(marketing)" : "Version \(marketing) (\(build))"
+        if build.isEmpty {
+            return String(localized: "Version \(marketing)")
+        }
+        return String(localized: "Version \(marketing) (\(build))")
     }
 }

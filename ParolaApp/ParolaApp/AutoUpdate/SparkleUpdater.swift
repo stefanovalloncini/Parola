@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Sparkle
 
 enum SparkleChannel: String, CaseIterable, Identifiable {
@@ -8,7 +9,7 @@ enum SparkleChannel: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var displayName: String {
+    var displayName: LocalizedStringKey {
         switch self {
         case .stable: return "Stable"
         case .rc:     return "Release candidates"
@@ -16,7 +17,7 @@ enum SparkleChannel: String, CaseIterable, Identifiable {
         }
     }
 
-    var description: String {
+    var description: LocalizedStringKey {
         switch self {
         case .stable: return "Production releases only. Recommended."
         case .rc:     return "Stable plus release candidates ahead of each ship."

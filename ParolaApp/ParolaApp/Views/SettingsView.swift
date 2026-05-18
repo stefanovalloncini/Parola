@@ -62,6 +62,35 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    var localizedLabelKey: LocalizedStringKey {
+        switch self {
+        case .general: return "General"
+        case .customization: return "Customization"
+        case .watchedFolders: return "Watched Folders"
+        case .recordMeetings: return "Record Meetings"
+        case .shortcuts: return "Shortcuts"
+        case .microphone: return "Microphone"
+        case .liveCaptions: return "Live Captions"
+        case .dictation: return "Dictation"
+        case .snippets: return "Snippets"
+        case .corrections: return "Corrections"
+        case .localModels: return "Local Models"
+        case .transcriptionDefaults: return "Transcription Defaults"
+        case .translation: return "Translation"
+        case .ignoredSegments: return "Ignored Segments"
+        case .findReplace: return "Find & Replace"
+        case .exportFormats: return "Export Formats"
+        case .batchExport: return "Batch Export"
+        case .autoExport: return "Auto-Export"
+        case .integrations: return "Integrations"
+        case .prompts: return "Prompts"
+        case .automation: return "MCP & Automation"
+        case .updates: return "Updates"
+        case .advanced: return "Advanced"
+        case .about: return "About"
+        }
+    }
+
     var symbol: String {
         switch self {
         case .general: return "gearshape"
@@ -123,19 +152,22 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
 
 private struct SidebarGroup: Identifiable {
     let id = UUID()
-    let title: String?
+    let title: LocalizedStringKey?
     let routes: [SettingsRoute]
 }
 
-private let sidebarGroups: [SidebarGroup] = [
-    SidebarGroup(title: nil, routes: [.general, .customization, .watchedFolders, .recordMeetings, .shortcuts]),
-    SidebarGroup(title: "AUDIO & VIDEO", routes: [.microphone, .liveCaptions, .dictation, .snippets, .corrections]),
-    SidebarGroup(title: "TRANSCRIPTION", routes: [.localModels, .transcriptionDefaults, .translation, .ignoredSegments, .findReplace]),
-    SidebarGroup(title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport, .integrations]),
-    SidebarGroup(title: "AI", routes: [.prompts]),
-    SidebarGroup(title: "AUTOMATION", routes: [.automation, .updates]),
-    SidebarGroup(title: nil, routes: [.advanced, .about])
-]
+@MainActor
+private var sidebarGroups: [SidebarGroup] {
+    [
+        SidebarGroup(title: nil, routes: [.general, .customization, .watchedFolders, .recordMeetings, .shortcuts]),
+        SidebarGroup(title: "AUDIO & VIDEO", routes: [.microphone, .liveCaptions, .dictation, .snippets, .corrections]),
+        SidebarGroup(title: "TRANSCRIPTION", routes: [.localModels, .transcriptionDefaults, .translation, .ignoredSegments, .findReplace]),
+        SidebarGroup(title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport, .integrations]),
+        SidebarGroup(title: "AI", routes: [.prompts]),
+        SidebarGroup(title: "AUTOMATION", routes: [.automation, .updates]),
+        SidebarGroup(title: nil, routes: [.advanced, .about])
+    ]
+}
 
 // MARK: - Sidebar
 
@@ -206,7 +238,7 @@ private struct SidebarRow: View {
                     .font(.subheadline)
                     .frame(width: 16)
                     .foregroundStyle(selected ? Color.white : Color.secondary)
-                Text(route.label)
+                Text(route.localizedLabelKey)
                     .font(.subheadline)
                     .foregroundStyle(selected ? Color.white : Color.primary)
                 Spacer(minLength: 0)
@@ -242,7 +274,7 @@ private struct SettingsDetail: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                Text(route.label)
+                Text(route.localizedLabelKey)
                     .font(.title3.weight(.semibold))
                     .padding(.top, 20)
                 content
@@ -288,10 +320,10 @@ private struct SettingsDetail: View {
 // MARK: - Section & row primitives
 
 struct SettingsSection<Content: View>: View {
-    let title: String?
+    let title: LocalizedStringKey?
     @ViewBuilder var content: Content
 
-    init(_ title: String? = nil, @ViewBuilder content: () -> Content) {
+    init(_ title: LocalizedStringKey? = nil, @ViewBuilder content: () -> Content) {
         self.title = title
         self.content = content()
     }
@@ -315,14 +347,35 @@ struct SettingsSection<Content: View>: View {
 }
 
 struct SettingRow<Trailing: View>: View {
-    let title: String
-    let description: String?
+    private let titleText: Text
+    private let descriptionText: Text?
     @ViewBuilder var trailing: Trailing
     let isFirst: Bool
 
-    init(_ title: String, description: String? = nil, isFirst: Bool = false, @ViewBuilder trailing: () -> Trailing) {
-        self.title = title
-        self.description = description
+    init(_ title: LocalizedStringKey, description: LocalizedStringKey? = nil, isFirst: Bool = false, @ViewBuilder trailing: () -> Trailing) {
+        self.titleText = Text(title)
+        self.descriptionText = description.map { Text($0) }
+        self.trailing = trailing()
+        self.isFirst = isFirst
+    }
+
+    init(_ title: LocalizedStringKey, descriptionVerbatim: String?, isFirst: Bool = false, @ViewBuilder trailing: () -> Trailing) {
+        self.titleText = Text(title)
+        self.descriptionText = descriptionVerbatim.map { Text($0) }
+        self.trailing = trailing()
+        self.isFirst = isFirst
+    }
+
+    init(titleVerbatim: String, description: LocalizedStringKey? = nil, isFirst: Bool = false, @ViewBuilder trailing: () -> Trailing) {
+        self.titleText = Text(titleVerbatim)
+        self.descriptionText = description.map { Text($0) }
+        self.trailing = trailing()
+        self.isFirst = isFirst
+    }
+
+    init(titleVerbatim: String, descriptionVerbatim: String?, isFirst: Bool = false, @ViewBuilder trailing: () -> Trailing) {
+        self.titleText = Text(titleVerbatim)
+        self.descriptionText = descriptionVerbatim.map { Text($0) }
         self.trailing = trailing()
         self.isFirst = isFirst
     }
@@ -334,9 +387,9 @@ struct SettingRow<Trailing: View>: View {
             }
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.subheadline)
-                    if let description {
-                        Text(description)
+                    titleText.font(.subheadline)
+                    if let descriptionText {
+                        descriptionText
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -351,7 +404,7 @@ struct SettingRow<Trailing: View>: View {
 }
 
 struct SettingHelper: View {
-    let text: String
+    let text: LocalizedStringKey
     var body: some View {
         Text(text)
             .font(.caption)

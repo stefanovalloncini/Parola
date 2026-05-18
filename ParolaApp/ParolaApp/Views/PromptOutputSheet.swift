@@ -11,7 +11,7 @@ struct PromptOutputSheet: View {
         SheetFrame(
             icon: iconName,
             iconTint: DS.Color.accent,
-            title: output.promptName,
+            titleVerbatim: output.promptName,
             onClose: { dismiss() },
             content: { contentBody },
             footer: { footerBody }

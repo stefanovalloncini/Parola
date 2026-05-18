@@ -7,8 +7,12 @@ struct RecordingPane: View {
     @State private var startedAt: Date = Date()
 
     private var isStreaming: Bool { source == .microphone && model.useStreaming }
-    private var stateLabel: String { model.liveVoiceActive ? "Listening" : "Standing by" }
-    private var stopTitle: String { isStreaming ? "Finish" : "Stop" }
+    private var stateLabel: String {
+        model.liveVoiceActive ? String(localized: "Listening") : String(localized: "Standing by")
+    }
+    private var stopTitle: String {
+        isStreaming ? String(localized: "Finish") : String(localized: "Stop")
+    }
     private var showsWaveform: Bool { source == .microphone }
 
     @ViewBuilder

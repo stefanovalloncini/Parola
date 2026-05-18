@@ -31,7 +31,7 @@ struct PromptsMenu: View {
             }
         }
         .menuIndicator(.hidden)
-        .help(model.isRunningPrompt ? "Running prompt…" : "Run a prompt against the transcript")
+        .modifier(PromptsMenuHelp(isRunning: model.isRunningPrompt))
         .accessibilityIdentifier("toolbar.prompts")
         .task {
             userPrompts = await model.promptLibrary.userPrompts
@@ -43,5 +43,16 @@ struct PromptsMenu: View {
             .lowercased()
             .replacingOccurrences(of: " ", with: "_")
             .filter { $0.isLetter || $0.isNumber || $0 == "_" }
+    }
+}
+
+private struct PromptsMenuHelp: ViewModifier {
+    let isRunning: Bool
+    func body(content: Content) -> some View {
+        if isRunning {
+            content.help("Running prompt…")
+        } else {
+            content.help("Run a prompt against the transcript")
+        }
     }
 }

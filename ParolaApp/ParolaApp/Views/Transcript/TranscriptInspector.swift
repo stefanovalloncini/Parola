@@ -64,7 +64,7 @@ struct InspectorModeIcon: View {
 }
 
 struct InspectorGroup<Content: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -79,7 +79,7 @@ struct InspectorGroup<Content: View>: View {
 }
 
 struct InspectorDisclosureRow<Content: View>: View {
-    let title: String
+    let title: LocalizedStringKey
     @Binding var isExpanded: Bool
     @ViewBuilder var content: () -> Content
 

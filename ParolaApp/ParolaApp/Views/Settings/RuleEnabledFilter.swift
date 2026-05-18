@@ -5,7 +5,7 @@ enum RuleEnabledFilter: CaseIterable {
     case enabled
     case disabled
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
         case .all: return "All"
         case .enabled: return "Enabled"
