@@ -82,6 +82,8 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Parola records audio from the microphone to transcribe it locally.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Parola reads the frontmost window so the dictation cleanup AI has more context about what you're working on. You can disable this in Settings.</string>
 	<key>NSServices</key>
 	<array>
 		<dict>

@@ -35,6 +35,23 @@
         }
       }
     },
+    "NSScreenCaptureUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parola reads the frontmost window so the dictation cleanup AI has more context about what you're working on. You can disable this in Settings."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parola legge la finestra in primo piano per dare alla pulizia AI della dettatura più contesto su ciò su cui stai lavorando. Puoi disattivarlo nelle Impostazioni."
+          }
+        }
+      }
+    },
     "NSSpeechRecognitionUsageDescription" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -173,10 +173,20 @@ extension AppModel {
     }
 
     private func currentDictationProcessor() -> any TextPostProcessor {
+        let contextConfig = DictationContextConfig(
+            selectionEnabled: dictationContextSelection,
+            clipboardEnabled: dictationContextClipboard,
+            screenEnabled: dictationContextScreen
+        )
+        let contextProvider: DictationContextProvider? = contextConfig.isAllDisabled
+            ? nil
+            : DictationContextProvider(source: MacContextSource())
         let prompt = PromptDictationProcessor(
             defaultPrompt: currentDictationCleanupPrompt(),
             overrides: currentDictationOverrides(),
-            triggerPrompts: cachedDictationTriggerPrompts
+            triggerPrompts: cachedDictationTriggerPrompts,
+            contextProvider: contextProvider,
+            contextConfig: contextConfig
         )
         var chain: [any TextPostProcessor] = []
         if dictationStripSelfCorrections {

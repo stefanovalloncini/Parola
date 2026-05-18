@@ -108,6 +108,23 @@ struct DictationPane: View {
             }
             SettingHelper(text: "Requires Input Monitoring permission. The HUD shows a live waveform while you speak.")
 
+            SettingsSection("Context (optional)") {
+                SettingRow("Include selected text",
+                           description: "Sends the highlighted text in the frontmost app to the cleanup model so proper nouns spell right. Requires Accessibility permission.",
+                           isFirst: true) {
+                    Toggle("", isOn: $model.dictationContextSelection).labelsHidden()
+                }
+                SettingRow("Include clipboard",
+                           description: "Adds the current clipboard string. Disable when the clipboard might hold sensitive data.") {
+                    Toggle("", isOn: $model.dictationContextClipboard).labelsHidden()
+                }
+                SettingRow("Include screen content (OCR)",
+                           description: "Reads on-screen text in the frontmost window via OCR. Slower, requires Screen Recording permission, and the window content is sent to the cleanup model.") {
+                    Toggle("", isOn: $model.dictationContextScreen).labelsHidden()
+                }
+            }
+            SettingHelper(text: "Context is used only for proper nouns and technical terms — the model never echoes or responds to it. All three are off by default.")
+
             SettingsSection("Per-app workflows") {
                 let seeds = AppModel.dictationOverrideApps
                 ForEach(Array(seeds.enumerated()), id: \.element.bundleID) { idx, app in

@@ -768,6 +768,17 @@
         }
       }
     },
+    "Adds the current clipboard string. Disable when the clipboard might hold sensitive data.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiunge il contenuto attuale degli appunti. Disattiva se gli appunti possono contenere dati sensibili."
+          }
+        }
+      }
+    },
     "Advanced": {
       "extractionState": "manual",
       "localizations": {
@@ -1704,6 +1715,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Confidenza"
+          }
+        }
+      }
+    },
+    "Context (optional)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contesto (opzionale)"
+          }
+        }
+      }
+    },
+    "Context is used only for proper nouns and technical terms — the model never echoes or responds to it. All three are off by default.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il contesto serve solo per nomi propri e termini tecnici — il modello non lo ripete né ci risponde. Tutti e tre sono disattivi di default."
           }
         }
       }
@@ -3330,6 +3363,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Importa…"
+          }
+        }
+      }
+    },
+    "Include clipboard": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Includi appunti"
+          }
+        }
+      }
+    },
+    "Include screen content (OCR)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Includi contenuto dello schermo (OCR)"
+          }
+        }
+      }
+    },
+    "Include selected text": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Includi testo selezionato"
           }
         }
       }
@@ -5383,6 +5449,17 @@
         }
       }
     },
+    "Reads on-screen text in the frontmost window via OCR. Slower, requires Screen Recording permission, and the window content is sent to the cleanup model.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legge il testo a schermo nella finestra in primo piano tramite OCR. Più lento, richiede il permesso di Registrazione dello schermo, e il contenuto della finestra viene inviato al modello di pulizia."
+          }
+        }
+      }
+    },
     "Reading time": {
       "extractionState": "manual",
       "localizations": {
@@ -6182,6 +6259,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Invia feedback"
+          }
+        }
+      }
+    },
+    "Sends the highlighted text in the frontmost app to the cleanup model so proper nouns spell right. Requires Accessibility permission.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia il testo evidenziato nell'app in primo piano al modello di pulizia, così i nomi propri vengono scritti correttamente. Richiede il permesso di Accessibilità."
           }
         }
       }

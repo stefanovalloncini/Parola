@@ -51,6 +51,7 @@ targets:
         NSSystemAudioCaptureUsageDescription: Parola captures system audio so it can transcribe what's playing on your Mac.
         NSAppleEventsUsageDescription: Allow Parola to handle file actions.
         NSSpeechRecognitionUsageDescription: Parola uses Apple Speech to transcribe audio locally when you pick the Apple Speech engine.
+        NSScreenCaptureUsageDescription: Parola reads the frontmost window so the dictation cleanup AI has more context about what you're working on. You can disable this in Settings.
         SUEnableAutomaticChecks: YES
         SUFeedURL: ""
         SUPublicEDKey: ""

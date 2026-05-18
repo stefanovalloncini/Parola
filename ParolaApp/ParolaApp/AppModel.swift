@@ -71,6 +71,9 @@ final class AppModel: ObservableObject {
     @AppStorage("micHotkeyEnabled") var micHotkeyEnabled: Bool = false
     @AppStorage("dictationStripSelfCorrections") var dictationStripSelfCorrections: Bool = false
     @AppStorage("dictationPasteDelayMs") var dictationPasteDelayMs: Int = 0
+    @AppStorage("dictationContextSelection") var dictationContextSelection: Bool = false
+    @AppStorage("dictationContextClipboard") var dictationContextClipboard: Bool = false
+    @AppStorage("dictationContextScreen") var dictationContextScreen: Bool = false
     @AppStorage("recordingMaxMinutes") var recordingMaxMinutes: Int = 0
     @AppStorage("showMenuBarExtra") var showMenuBarExtra: Bool = false
     @AppStorage("recordingCountInSeconds") var recordingCountInSeconds: Int = 0
