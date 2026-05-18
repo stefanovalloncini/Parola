@@ -6,6 +6,9 @@ final class MenuBarController {
     private weak var model: AppModel?
     private var statusItem: NSStatusItem?
     private var cancellables: Set<AnyCancellable> = []
+    private var lastVisibility: Bool = false
+    private var lastSnapshotKey: String = ""
+    private var rebuildPending = false
 
     func bind(_ model: AppModel) {
         self.model = model
@@ -13,15 +16,42 @@ final class MenuBarController {
         model.objectWillChange
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                DispatchQueue.main.async { self?.refresh() }
+                self?.scheduleRefresh()
             }
             .store(in: &cancellables)
     }
 
+    private func scheduleRefresh() {
+        guard !rebuildPending else { return }
+        rebuildPending = true
+        DispatchQueue.main.async { [weak self] in
+            self?.rebuildPending = false
+            self?.refresh()
+        }
+    }
+
     private func refresh() {
         guard let model else { return }
-        applyVisibility(model.showMenuBarExtra)
+        if model.showMenuBarExtra != lastVisibility {
+            applyVisibility(model.showMenuBarExtra)
+            lastVisibility = model.showMenuBarExtra
+        }
+        guard model.showMenuBarExtra else { return }
+        let key = snapshotKey(for: model)
+        guard key != lastSnapshotKey else { return }
+        lastSnapshotKey = key
         rebuildMenu()
+    }
+
+    private func snapshotKey(for model: AppModel) -> String {
+        let dictation = model.dictationEnabled ? "1" : "0"
+        let pinned = model.libraryEntries.lazy.filter(\.pinned).prefix(5).map(\.id).joined(separator: ",")
+        let recent = model.libraryEntries
+            .sorted { $0.createdAt > $1.createdAt }
+            .prefix(8)
+            .map(\.id)
+            .joined(separator: ",")
+        return "\(dictation)|\(pinned)|\(recent)"
     }
 
     private func applyVisibility(_ visible: Bool) {

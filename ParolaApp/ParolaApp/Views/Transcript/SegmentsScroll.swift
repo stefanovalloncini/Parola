@@ -4,6 +4,8 @@ import ParolaCore
 struct SegmentsScroll: View {
     @EnvironmentObject var model: AppModel
     @State private var hoveredSpeaker: String?
+    @State private var pauseByPrev: [Int: Double] = [:]
+    @State private var confidenceByID: [Int: SegmentConfidence.Bucket] = [:]
 
     private var speakerFilterBinding: Binding<String?> {
         Binding(
@@ -37,16 +39,12 @@ struct SegmentsScroll: View {
                                 .padding(.bottom, DS.Spacing.tight)
                         }
                         let segs = visibleSegments(in: t)
-                        let pauseByPrev = Dictionary(
-                            uniqueKeysWithValues: SegmentPauses
-                                .detect(segments: segs, thresholdSeconds: 3.0)
-                                .map { ($0.afterSegmentID, $0.durationSeconds) }
-                        )
                         ForEach(segs) { seg in
                             SegmentCard(
                                 segment: seg,
                                 isCurrent: seg.id == model.currentSegmentID,
-                                hoveredSpeaker: $hoveredSpeaker
+                                hoveredSpeaker: $hoveredSpeaker,
+                                confidenceBucket: confidenceByID[seg.id]
                             )
                             .id(seg.id)
                             .opacity(opacity(for: seg))
@@ -76,7 +74,30 @@ struct SegmentsScroll: View {
                     speakerFilterBinding.wrappedValue = nil
                 }
             }
+            .onAppear { recomputeDerived() }
+            .onChange(of: model.transcript?.segments.count ?? 0) { _, _ in recomputeDerived() }
+            .onChange(of: model.selectedEntryID) { _, _ in recomputeDerived() }
         }
+    }
+
+    private func recomputeDerived() {
+        guard let segments = model.transcript?.segments else {
+            pauseByPrev = [:]
+            confidenceByID = [:]
+            return
+        }
+        pauseByPrev = Dictionary(
+            uniqueKeysWithValues: SegmentPauses
+                .detect(segments: segments, thresholdSeconds: 3.0)
+                .map { ($0.afterSegmentID, $0.durationSeconds) }
+        )
+        var buckets: [Int: SegmentConfidence.Bucket] = [:]
+        for segment in segments {
+            if let value = SegmentConfidence.average(for: segment) {
+                buckets[segment.id] = SegmentConfidence.bucket(for: value)
+            }
+        }
+        confidenceByID = buckets
     }
 
     private func visibleSegments(in transcript: Transcript) -> [TranscriptSegment] {
@@ -198,6 +219,7 @@ struct SegmentCard: View {
     let segment: TranscriptSegment
     let isCurrent: Bool
     var hoveredSpeaker: Binding<String?> = .constant(nil)
+    var confidenceBucket: SegmentConfidence.Bucket? = nil
 
     @EnvironmentObject var model: AppModel
     @State private var hovering: Bool = false
@@ -261,7 +283,7 @@ struct SegmentCard: View {
                     .fill(confidenceColor(bucket))
                     .frame(width: 3)
                     .padding(.vertical, 4)
-                    .help(confidenceTooltip(bucket))
+                    .accessibilityHidden(true)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: radius))
@@ -325,24 +347,11 @@ struct SegmentCard: View {
         isCurrent ? DS.Color.accent.opacity(0.10) : DS.Color.surfaceElevated
     }
 
-    private var confidenceBucket: SegmentConfidence.Bucket? {
-        guard let value = SegmentConfidence.average(for: segment) else { return nil }
-        return SegmentConfidence.bucket(for: value)
-    }
-
     private func confidenceColor(_ bucket: SegmentConfidence.Bucket) -> Color {
         switch bucket {
         case .high:   return DS.Palette.success.opacity(0.7)
         case .medium: return DS.Palette.warning.opacity(0.7)
         case .low:    return Color.red.opacity(0.7)
-        }
-    }
-
-    private func confidenceTooltip(_ bucket: SegmentConfidence.Bucket) -> String {
-        switch bucket {
-        case .high:   return "High confidence"
-        case .medium: return "Medium confidence — review"
-        case .low:    return "Low confidence — likely transcription errors"
         }
     }
 
