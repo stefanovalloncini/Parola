@@ -10,6 +10,31 @@ struct LibraryListView: View {
     @State private var renamingEntry: LibraryEntry?
     @State private var renameDraft: String = ""
     @State private var labelFilter: String?
+    @State private var dateRangeFilter: DateRangeFilter = .all
+
+    private enum DateRangeFilter: String, CaseIterable, Identifiable {
+        case all, today, week, month, year
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .all: return "Any time"
+            case .today: return "Today"
+            case .week: return "Last 7 days"
+            case .month: return "Last 30 days"
+            case .year: return "Last year"
+            }
+        }
+        var cutoff: Date? {
+            let cal = Calendar.current
+            switch self {
+            case .all: return nil
+            case .today: return cal.startOfDay(for: Date())
+            case .week: return cal.date(byAdding: .day, value: -7, to: Date())
+            case .month: return cal.date(byAdding: .day, value: -30, to: Date())
+            case .year: return cal.date(byAdding: .year, value: -1, to: Date())
+            }
+        }
+    }
 
     private var entries: [LibraryEntry] {
         model.libraryEntries
@@ -17,6 +42,10 @@ struct LibraryListView: View {
             .filter { entry in
                 guard let labelFilter else { return true }
                 return entry.labels.contains { $0.localizedCaseInsensitiveCompare(labelFilter) == .orderedSame }
+            }
+            .filter { entry in
+                guard let cutoff = dateRangeFilter.cutoff else { return true }
+                return entry.createdAt >= cutoff
             }
             .sorted { lhs, rhs in
                 if lhs.pinned != rhs.pinned { return lhs.pinned }
@@ -133,6 +162,21 @@ struct LibraryListView: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
             }
+            Menu {
+                ForEach(DateRangeFilter.allCases) { option in
+                    Button(option.label) { dateRangeFilter = option }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "calendar")
+                    Text(dateRangeFilter.label)
+                }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(dateRangeFilter == .all ? .secondary : DS.Color.accent)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
             Spacer()
             if !selection.isEmpty {
                 Menu {
