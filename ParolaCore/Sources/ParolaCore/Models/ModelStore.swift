@@ -12,13 +12,26 @@ public final class ModelStore: Sendable {
 
     private let modelsDirectory: URL
 
+    public static let storageOverrideKey = "parola.modelsStoragePath"
+
     public init(modelsDirectory: URL? = nil) {
-        self.modelsDirectory = modelsDirectory ?? FileManager.default
+        if let modelsDirectory {
+            self.modelsDirectory = modelsDirectory
+        } else if let raw = UserDefaults.standard.string(forKey: Self.storageOverrideKey),
+                  !raw.trimmingCharacters(in: .whitespaces).isEmpty {
+            self.modelsDirectory = URL(fileURLWithPath: (raw as NSString).expandingTildeInPath, isDirectory: true)
+        } else {
+            self.modelsDirectory = Self.defaultDirectory
+        }
+        try? FileManager.default.createDirectory(at: self.modelsDirectory, withIntermediateDirectories: true)
+    }
+
+    public static var defaultDirectory: URL {
+        FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first!
             .appendingPathComponent("Parola", isDirectory: true)
             .appendingPathComponent("Models", isDirectory: true)
-        try? FileManager.default.createDirectory(at: self.modelsDirectory, withIntermediateDirectories: true)
     }
 
     public var directory: URL { modelsDirectory }
