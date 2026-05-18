@@ -5,6 +5,9 @@ struct LibraryListView: View {
     @EnvironmentObject var model: AppModel
     let category: EntryCategory
 
+    @State private var selection: Set<LibraryEntry.ID> = []
+    @State private var pendingBulkDelete = false
+
     private var entries: [LibraryEntry] {
         model.libraryEntries
             .filter { $0.category == category }
@@ -18,10 +21,10 @@ struct LibraryListView: View {
             if entries.isEmpty {
                 emptyState
             } else {
-                List(entries) { entry in
+                List(entries, id: \.id, selection: $selection) { entry in
                     LibraryRow(entry: entry)
                         .contentShape(Rectangle())
-                        .onTapGesture {
+                        .onTapGesture(count: 2) {
                             model.loadEntry(entry.id)
                             model.libraryFilter = nil
                         }
@@ -39,20 +42,46 @@ struct LibraryListView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onChange(of: entries.map(\.id)) { _, ids in
+            let valid = Set(ids)
+            selection = selection.intersection(valid)
+        }
+        .alert("Delete \(selection.count) entries?", isPresented: $pendingBulkDelete) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) { performBulkDelete() }
+        } message: {
+            Text("They'll move to Recently Deleted.")
+        }
     }
 
     private var header: some View {
-        HStack {
+        HStack(spacing: DS.Spacing.regular) {
             Text(headerTitle)
                 .font(DS.Font.title)
                 .foregroundStyle(DS.Color.primaryText)
             Spacer()
+            if !selection.isEmpty {
+                Button(role: .destructive) {
+                    pendingBulkDelete = true
+                } label: {
+                    Label("Delete \(selection.count)", systemImage: "trash")
+                }
+                .controlSize(.small)
+            }
             Text("\(entries.count)")
                 .font(DS.Font.captionMono)
                 .foregroundStyle(DS.Color.secondaryText)
         }
         .padding(.horizontal, DS.Spacing.large)
         .padding(.vertical, DS.Spacing.regular)
+    }
+
+    private func performBulkDelete() {
+        let targets = selection
+        selection.removeAll()
+        for id in targets {
+            model.deleteEntry(id)
+        }
     }
 
     private var emptyState: some View {
