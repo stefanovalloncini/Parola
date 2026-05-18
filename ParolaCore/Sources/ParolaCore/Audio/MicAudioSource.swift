@@ -171,8 +171,7 @@ public actor MicAudioSource: AudioSource {
     }
 }
 
-// Unchecked Sendable: each box owns a freshly-copied PCM buffer and is handed off to a single
-// consumer (the actor's write(box:)), which then uses it synchronously inside convert(to:error:).
+/// Unchecked Sendable: each box owns a freshly-copied PCM buffer, handed off once to a single consumer.
 private final class BufferBox: @unchecked Sendable {
     let buffer: AVAudioPCMBuffer
     var consumed = false
