@@ -1,4 +1,5 @@
 import SwiftUI
+import ParolaCore
 
 struct EmptyDropZone: View {
     @EnvironmentObject var model: AppModel
@@ -9,6 +10,9 @@ struct EmptyDropZone: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.large) {
+                if !model.libraryEntries.isEmpty {
+                    LibraryStatsCard(summary: LibrarySummary(entries: model.libraryEntries))
+                }
                 LazyVGrid(columns: columns, alignment: .leading, spacing: DS.Spacing.regular) {
                     ActionCard(
                         title: "Open File",
@@ -70,6 +74,53 @@ struct EmptyDropZone: View {
             .padding(.vertical, DS.Spacing.large)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct LibraryStatsCard: View {
+    let summary: LibrarySummary
+
+    var body: some View {
+        HStack(spacing: 0) {
+            stat(label: "Total", value: summary.total)
+            divider
+            stat(label: "Transcriptions", value: summary.transcriptions)
+            divider
+            stat(label: "Meetings", value: summary.meetings)
+            divider
+            stat(label: "Dictations", value: summary.dictations)
+            divider
+            stat(label: "Pinned", value: summary.pinned)
+        }
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.regular)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(DS.Color.surfaceElevated)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(DS.Color.separator.opacity(0.5), lineWidth: 1)
+        )
+    }
+
+    private func stat(label: String, value: Int) -> some View {
+        VStack(alignment: .center, spacing: 4) {
+            Text("\(value)")
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .foregroundStyle(DS.Color.primaryText)
+            Text(label)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(DS.Color.secondaryText)
+                .textCase(.uppercase)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(DS.Color.separator.opacity(0.4))
+            .frame(width: 1, height: 32)
     }
 }
 
