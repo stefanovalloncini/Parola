@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TranscriptHeaderBar: View {
     @EnvironmentObject var model: AppModel
+    @StateObject private var speaker = TranscriptSpeaker()
     let title: String
     let onAdvance: () -> Void
     let onOpenSummary: () -> Void
@@ -30,6 +31,12 @@ struct TranscriptHeaderBar: View {
                 .environmentObject(model)
             }
 
+            Button { toggleSpeak() } label: {
+                Image(systemName: speaker.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
+            }
+            .buttonStyle(.borderless)
+            .help(speaker.isSpeaking ? "Stop reading" : "Read aloud")
+
             Button(action: onOpenSummary) {
                 Image(systemName: "sparkles")
             }
@@ -56,5 +63,13 @@ struct TranscriptHeaderBar: View {
         }
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.small)
+    }
+
+    private func toggleSpeak() {
+        if speaker.isSpeaking {
+            speaker.stop()
+        } else if let text = model.transcript?.text {
+            speaker.speak(text, languageCode: model.transcript?.language)
+        }
     }
 }
