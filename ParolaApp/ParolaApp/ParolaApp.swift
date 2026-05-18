@@ -71,6 +71,12 @@ struct ParolaApp: App {
                 Button("Find…") { model.toggleFind() }
                     .keyboardShortcut("f", modifiers: [.command])
                     .disabled(model.transcript == nil)
+                Button("Find Next") { model.goToNextMatch() }
+                    .keyboardShortcut("g", modifiers: [.command])
+                    .disabled(!model.findIsOpen || model.matches.isEmpty)
+                Button("Find Previous") { model.goToPreviousMatch() }
+                    .keyboardShortcut("g", modifiers: [.command, .shift])
+                    .disabled(!model.findIsOpen || model.matches.isEmpty)
                 FocusChatComposerCommand()
             }
             CommandMenu("Captions") {
