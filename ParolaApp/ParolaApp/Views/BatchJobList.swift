@@ -157,9 +157,11 @@ struct BatchJobList: View {
                 $0.url.lastPathComponent.localizedCaseInsensitiveCompare($1.url.lastPathComponent) == .orderedDescending
             }
         case .largestFirst:
-            return jobs.sorted { fileSize($0.url) > fileSize($1.url) }
+            let sizes = jobs.reduce(into: [BatchJob.ID: Int]()) { $0[$1.id] = fileSize($1.url) }
+            return jobs.sorted { (sizes[$0.id] ?? 0) > (sizes[$1.id] ?? 0) }
         case .smallestFirst:
-            return jobs.sorted { fileSize($0.url) < fileSize($1.url) }
+            let sizes = jobs.reduce(into: [BatchJob.ID: Int]()) { $0[$1.id] = fileSize($1.url) }
+            return jobs.sorted { (sizes[$0.id] ?? 0) < (sizes[$1.id] ?? 0) }
         }
     }
 
