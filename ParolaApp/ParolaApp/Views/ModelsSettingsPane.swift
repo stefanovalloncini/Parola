@@ -7,6 +7,13 @@ struct ModelsSettingsPane: View {
     @State private var searchText = ""
     @State private var installFilter: InstallFilter = .all
     @State private var sortOption: SortOption = .recommended
+    @State private var pendingDeletion: PendingDeletion?
+
+    private struct PendingDeletion: Identifiable {
+        let id: String
+        let displayName: String
+        let sizeBytes: Int64?
+    }
 
     enum InstallFilter: String, CaseIterable, Identifiable {
         case all, installed, available
@@ -38,6 +45,7 @@ struct ModelsSettingsPane: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 storageRow
+                modelsUsageRow
                 libraryUsageRow
                 controls
                 content
@@ -48,6 +56,54 @@ struct ModelsSettingsPane: View {
         }
         .background(DS.Color.surface)
         .task { model.refreshModelList() }
+        .confirmationDialog(
+            confirmationTitle,
+            isPresented: Binding(
+                get: { pendingDeletion != nil },
+                set: { if !$0 { pendingDeletion = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingDeletion
+        ) { item in
+            Button("Delete from disk", role: .destructive) {
+                model.deleteModel(item.id)
+                pendingDeletion = nil
+            }
+            Button("Cancel", role: .cancel) { pendingDeletion = nil }
+        } message: { item in
+            if let bytes = item.sizeBytes {
+                Text("This will remove \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)) from disk. You can re-download it later.")
+            } else {
+                Text("This will remove the model from disk. You can re-download it later.")
+            }
+        }
+    }
+
+    private var confirmationTitle: String {
+        guard let item = pendingDeletion else { return "Delete model?" }
+        return "Delete \(item.displayName)?"
+    }
+
+    private var modelsUsageRow: some View {
+        let totalBytes = model.modelSizes.values.reduce(Int64(0), +)
+        let installedCount = model.availableModels.filter(\.isInstalled).count
+        return HStack(spacing: 8) {
+            Image(systemName: "cpu")
+                .foregroundStyle(.secondary)
+            Text("Models on disk:")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text("\(installedCount) installed · \(ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file))")
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(.primary)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(0.04))
+        )
     }
 
     private var libraryUsageRow: some View {
@@ -194,7 +250,7 @@ struct ModelsSettingsPane: View {
         let recommended = filteredRecommendedVariants
         let categories = installFilter == .all ? filteredCategories : []
 
-        if installed.isEmpty && recommended.isEmpty && categories.isEmpty {
+        if installed.isEmpty && recommended.isEmpty && categories.isEmpty && orphans.isEmpty {
             ContentUnavailableView.search(text: searchText)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 40)
@@ -202,6 +258,9 @@ struct ModelsSettingsPane: View {
             VStack(alignment: .leading, spacing: 28) {
                 if !installed.isEmpty || installFilter == .installed {
                     downloadedSection(installed)
+                }
+                if !orphans.isEmpty {
+                    orphansSection(orphans)
                 }
                 if !recommended.isEmpty || installFilter == .available {
                     recommendedSection(recommended)
@@ -211,6 +270,74 @@ struct ModelsSettingsPane: View {
                 }
             }
         }
+    }
+
+    private var orphans: [ModelInfo] {
+        guard installFilter != .available else { return [] }
+        let catalogIDs = Set(ModelCatalog.all.map(\.id))
+        let needle = searchNeedle
+        return model.availableModels.filter { info in
+            guard info.isInstalled, !catalogIDs.contains(info.name) else { return false }
+            guard let needle else { return true }
+            return info.name.lowercased().contains(needle)
+        }
+    }
+
+    private func orphansSection(_ entries: [ModelInfo]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("Other Files on Disk", count: entries.count)
+            Text("These directories aren't in the current model catalog — usually leftovers from older app versions. Safe to delete.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            LazyVStack(spacing: 8) {
+                ForEach(entries) { entry in
+                    orphanRow(entry)
+                }
+            }
+        }
+    }
+
+    private func orphanRow(_ entry: ModelInfo) -> some View {
+        let displaySize = model.modelSizes[entry.name]
+            ?? entry.approximateSizeBytes.map { Int64($0) }
+        let isDeleting = model.modelsBeingDeleted.contains(entry.name)
+        return HStack(spacing: 12) {
+            Image(systemName: "tray.full")
+                .foregroundStyle(.secondary)
+                .frame(width: 24, height: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.name)
+                    .font(.subheadline)
+                if let bytes = displaySize {
+                    Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            if isDeleting {
+                ProgressView().controlSize(.small)
+                Text("Deleting…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Button {
+                    pendingDeletion = PendingDeletion(
+                        id: entry.name,
+                        displayName: entry.name,
+                        sizeBytes: displaySize
+                    )
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Delete this folder from disk")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     // MARK: - Downloaded
@@ -226,7 +353,16 @@ struct ModelsSettingsPane: View {
                         ModelCardRow(
                             variant: variant,
                             kind: model.selectedModel == variant.id ? .active : .installed,
-                            primaryAction: { model.selectedModel = variant.id }
+                            actualSizeBytes: model.modelSizes[variant.id],
+                            isDeleting: model.modelsBeingDeleted.contains(variant.id),
+                            primaryAction: { model.selectedModel = variant.id },
+                            deleteAction: model.selectedModel == variant.id ? nil : {
+                                pendingDeletion = PendingDeletion(
+                                    id: variant.id,
+                                    displayName: variant.displayName,
+                                    sizeBytes: model.modelSizes[variant.id] ?? Int64(variant.sizeBytes)
+                                )
+                            }
                         )
                     }
                 }

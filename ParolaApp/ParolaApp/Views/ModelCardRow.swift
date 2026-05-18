@@ -11,7 +11,10 @@ struct ModelCardRow: View {
 
     let variant: ModelVariant
     let kind: Kind
+    var actualSizeBytes: Int64? = nil
+    var isDeleting: Bool = false
     let primaryAction: () -> Void
+    var deleteAction: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -40,6 +43,20 @@ struct ModelCardRow: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(borderColor, lineWidth: borderWidth)
         )
+        .contextMenu {
+            if canDelete, let deleteAction {
+                Button(role: .destructive, action: deleteAction) {
+                    Label("Delete from disk", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    private var canDelete: Bool {
+        switch kind {
+        case .installed: return !isDeleting
+        case .active, .available, .downloading: return false
+        }
     }
 
     private var iconTile: some View {
@@ -55,39 +72,60 @@ struct ModelCardRow: View {
 
     @ViewBuilder
     private var trailing: some View {
-        switch kind {
-        case .active:
-            Image(systemName: "checkmark.circle.fill")
-                .font(.title2)
-                .foregroundStyle(DS.Color.accent)
-                .accessibilityLabel("Active model")
-        case .installed:
-            Button(action: primaryAction) {
-                Text("Activate")
-            }
-            .buttonStyle(ModelPillButtonStyle())
-        case .available:
-            Button(action: primaryAction) {
-                HStack(spacing: 5) {
-                    Image(systemName: "arrow.down")
-                    Text("Download")
-                }
-            }
-            .buttonStyle(ModelPillButtonStyle())
-        case .downloading(let progress):
-            HStack(spacing: 8) {
-                ProgressView(value: progress)
-                    .progressViewStyle(.linear)
-                    .frame(width: 80)
-                Text(progressPercent(progress))
-                    .font(.caption.monospacedDigit())
+        if isDeleting {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Deleting…")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        } else {
+            switch kind {
+            case .active:
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(DS.Color.accent)
+                    .accessibilityLabel("Active model")
+            case .installed:
+                HStack(spacing: 6) {
+                    if let deleteAction {
+                        Button(action: deleteAction) {
+                            Image(systemName: "trash")
+                                .font(.callout.weight(.semibold))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .help("Delete this model from disk")
+                    }
+                    Button(action: primaryAction) {
+                        Text("Activate")
+                    }
+                    .buttonStyle(ModelPillButtonStyle())
+                }
+            case .available:
+                Button(action: primaryAction) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "arrow.down")
+                        Text("Download")
+                    }
+                }
+                .buttonStyle(ModelPillButtonStyle())
+            case .downloading(let progress):
+                HStack(spacing: 8) {
+                    ProgressView(value: progress)
+                        .progressViewStyle(.linear)
+                        .frame(width: 80)
+                    Text(progressPercent(progress))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
 
     private var meta: String {
-        "\(engineLabel) · \(DS.formatBytes(Int(variant.sizeBytes)))"
+        let sizeBytes = actualSizeBytes.map { Int($0) } ?? Int(variant.sizeBytes)
+        return "\(engineLabel) · \(DS.formatBytes(sizeBytes))"
     }
 
     private var engineLabel: String {

@@ -551,6 +551,9 @@ final class AppModel: ObservableObject {
 
     // MARK: - Model list
 
+    @Published var modelSizes: [String: Int64] = [:]
+    @Published var modelsBeingDeleted: Set<String> = []
+
     func refreshModelList() {
         let curated = store.catalog()
         let extra = (try? store.installedModels())?.filter { ent in
@@ -561,14 +564,47 @@ final class AppModel: ObservableObject {
         if !availableModels.contains(where: { $0.name == selectedModel }) {
             selectedModel = availableModels.first?.name ?? "openai_whisper-tiny"
         }
+        refreshModelSizes()
+    }
+
+    func refreshModelSizes() {
+        let names = availableModels.filter(\.isInstalled).map(\.name)
+        let store = self.store
+        Task.detached(priority: .utility) {
+            var sizes: [String: Int64] = [:]
+            for name in names {
+                if let size = store.sizeOnDisk(name) {
+                    sizes[name] = Int64(size)
+                }
+            }
+            await MainActor.run { [weak self] in
+                self?.modelSizes = sizes
+            }
+        }
     }
 
     func deleteModel(_ name: String) {
-        do {
-            try store.delete(variant: name)
-            refreshModelList()
-        } catch {
-            phase = .failed(message: "Could not delete \(name): \(error.localizedDescription)")
+        guard !modelsBeingDeleted.contains(name) else { return }
+        modelsBeingDeleted.insert(name)
+        let store = self.store
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let result: Result<Void, Error>
+            do {
+                try store.deleteAny(idOrPath: name)
+                result = .success(())
+            } catch {
+                result = .failure(error)
+            }
+            await MainActor.run {
+                guard let self else { return }
+                self.modelsBeingDeleted.remove(name)
+                switch result {
+                case .success:
+                    self.refreshModelList()
+                case .failure(let error):
+                    self.phase = .failed(message: "Could not delete \(name): \(error.localizedDescription)")
+                }
+            }
         }
     }
 

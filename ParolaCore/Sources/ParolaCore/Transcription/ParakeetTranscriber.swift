@@ -88,6 +88,30 @@ public actor ParakeetTranscriber: Transcriber {
         }
     }
 
+    /// Downloads only the files FluidAudio needs for a Parakeet variant.
+    /// Avoids pulling sibling quantizations / older revisions stored in the same HF repo.
+    public static func download(
+        model: String,
+        to targetDir: URL,
+        progress: (@Sendable (Double) -> Void)?
+    ) async throws -> URL {
+        let version = try modelVersion(for: model)
+        try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+        do {
+            return try await AsrModels.download(
+                to: targetDir,
+                version: version,
+                progressHandler: { snapshot in
+                    progress?(snapshot.fractionCompleted)
+                }
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw ParolaError.modelDownloadFailed(model, underlying: String(describing: error))
+        }
+    }
+
     static let segmentGapThreshold: TimeInterval = 0.8
     static let maxTokensPerSegment: Int = 80
 

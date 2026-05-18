@@ -1,7 +1,6 @@
 import Foundation
 import AppKit
 import Network
-import PDFKit
 import Security
 import ParolaCore
 
@@ -644,37 +643,30 @@ final class ParolaTestBridge {
     }
 
     private func captureMainWindow(path: String) throws -> [String: Any] {
-        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil && !$0.isMiniaturized && $0.frame.size.width > 200 }),
-              let view = window.contentView else {
+        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil && !$0.isMiniaturized && $0.frame.size.width > 200 }) else {
             throw BridgeError("no visible main window to capture")
         }
-        // dataWithPDF flattens layer-backed SwiftUI subviews; bitmapImageRepForCachingDisplay
-        // produces transparent output on this codebase.
-        let pdfData = view.dataWithPDF(inside: view.bounds)
-        guard let pdfDoc = PDFDocument(data: pdfData), let page = pdfDoc.page(at: 0) else {
-            throw BridgeError("could not parse window PDF")
+        let windowID = CGWindowID(window.windowNumber)
+        guard let cgImage = CGWindowListCreateImage(
+            .null,
+            .optionIncludingWindow,
+            windowID,
+            [.boundsIgnoreFraming, .bestResolution]
+        ) else {
+            throw BridgeError("CGWindowListCreateImage returned nil — Screen Recording permission may be missing")
         }
-        let pageRect = page.bounds(for: .mediaBox)
-        let scale: CGFloat = 2.0
-        let pixelSize = NSSize(width: pageRect.width * scale, height: pageRect.height * scale)
-        let image = NSImage(size: pixelSize, flipped: false) { _ in
-            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
-            NSColor.windowBackgroundColor.setFill()
-            ctx.fill(CGRect(origin: .zero, size: pixelSize))
-            ctx.scaleBy(x: scale, y: scale)
-            page.draw(with: .mediaBox, to: ctx)
-            return true
-        }
-        guard let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff),
-              let pngData = rep.representation(using: .png, properties: [:]) else {
+        let pixelWidth = cgImage.width
+        let pixelHeight = cgImage.height
+        let rep = NSBitmapImageRep(cgImage: cgImage)
+        rep.size = NSSize(width: pixelWidth, height: pixelHeight)
+        guard let pngData = rep.representation(using: .png, properties: [:]) else {
             throw BridgeError("failed to encode PNG")
         }
         try pngData.write(to: URL(fileURLWithPath: path))
         return [
             "path": path,
-            "width": Int(pixelSize.width),
-            "height": Int(pixelSize.height),
+            "width": pixelWidth,
+            "height": pixelHeight,
             "bytes": pngData.count,
             "windowTitle": window.title,
         ]

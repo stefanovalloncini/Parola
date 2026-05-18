@@ -68,7 +68,9 @@ public final class ModelStore: Sendable {
         }
     }
 
-    /// Returns models present on disk, even if not in the curated catalog.
+    /// Returns models present on disk, even if not in the curated catalog. Includes
+    /// orphan directories left by older app versions or by engine wrappers that
+    /// used a different naming convention.
     public func installedModels() throws -> [ModelInfo] {
         let fm = FileManager.default
         var seen: [String: ModelInfo] = [:]
@@ -80,28 +82,65 @@ public final class ModelStore: Sendable {
             }
         }
 
-        let legacyRepoDir = modelsDirectory
-            .appendingPathComponent("models/argmaxinc/whisperkit-coreml", isDirectory: true)
-        if fm.fileExists(atPath: legacyRepoDir.path) {
-            let entries = (try? fm.contentsOfDirectory(at: legacyRepoDir, includingPropertiesForKeys: nil)) ?? []
-            for url in entries
-                where !url.lastPathComponent.hasPrefix(".")
-                && (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+        let catalogPaths: Set<String> = Set(ModelCatalog.all.map {
+            installedURL(for: $0.downloadSource).standardizedFileURL.path
+        })
+
+        let scanRoots: [URL] = [
+            modelsDirectory.appendingPathComponent("models/argmaxinc/whisperkit-coreml", isDirectory: true),
+            modelsDirectory.appendingPathComponent("models/FluidInference", isDirectory: true),
+        ]
+
+        for root in scanRoots {
+            guard fm.fileExists(atPath: root.path) else { continue }
+            let entries = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
+            for url in entries {
+                guard !url.lastPathComponent.hasPrefix("."),
+                      (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+                else { continue }
+                let standardPath = url.standardizedFileURL.path
+                if catalogPaths.contains(standardPath) { continue }
                 let id = url.lastPathComponent
-                if seen[id] == nil {
-                    seen[id] = ModelInfo(
-                        name: id,
-                        label: id,
-                        approximateSizeBytes: directorySize(url),
-                        isMultilingual: !id.hasSuffix(".en"),
-                        isInstalled: true,
-                        installedURL: url
-                    )
-                }
+                if seen[id] != nil { continue }
+                seen[id] = ModelInfo(
+                    name: id,
+                    label: id,
+                    approximateSizeBytes: directorySize(url),
+                    isMultilingual: !id.hasSuffix(".en"),
+                    isInstalled: true,
+                    installedURL: url
+                )
             }
         }
 
         return seen.values.sorted { $0.name < $1.name }
+    }
+
+    /// Deletes a model directory regardless of whether it's in the curated catalog.
+    /// For orphan directories (id not in the catalog), removes the on-disk folder by walking
+    /// the known repo roots — useful for cleaning up stale paths left by older releases.
+    public func deleteAny(idOrPath name: String) throws {
+        if ModelCatalog.variant(id: name) != nil {
+            try delete(variant: name)
+            return
+        }
+        let scanRoots: [URL] = [
+            modelsDirectory.appendingPathComponent("models/argmaxinc/whisperkit-coreml", isDirectory: true),
+            modelsDirectory.appendingPathComponent("models/FluidInference", isDirectory: true),
+            modelsDirectory.appendingPathComponent("models/openai", isDirectory: true),
+        ]
+        for root in scanRoots {
+            let candidate = root.appendingPathComponent(name, isDirectory: true)
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                do {
+                    try FileManager.default.removeItem(at: candidate)
+                    return
+                } catch {
+                    throw ParolaError.ioError("Failed to delete \(name): \(error.localizedDescription)")
+                }
+            }
+        }
+        throw ParolaError.modelNotFound(name)
     }
 
     private func modelInfo(for variant: ModelVariant, url: URL?, isInstalled: Bool) -> ModelInfo {
@@ -142,7 +181,11 @@ public final class ModelStore: Sendable {
         case .whisperKit:
             return try await downloadViaWhisperKit(variant: variant, progress: progress)
         case .parakeet:
-            return try await downloadViaHuggingFace(source: entry.downloadSource, progress: progress)
+            return try await ParakeetTranscriber.download(
+                model: variant,
+                to: installedURL(for: entry.downloadSource),
+                progress: progress
+            )
         case .appleSpeech:
             progress?(1.0)
             return installedURL(for: entry.downloadSource)
