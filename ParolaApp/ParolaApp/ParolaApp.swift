@@ -41,6 +41,15 @@ private func handleOpen(_ url: URL, model: AppModel) {
         model.startDictationFromIntent()
     case "stop":
         model.stopDictationFromIntent()
+    case "open":
+        if let entryID = query["entry"] {
+            model.loadEntry(entryID)
+            if let raw = query["t"], let seconds = Timecode.parse(raw) ?? Double(raw) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    model.seekTo(seconds: seconds)
+                }
+            }
+        }
     default:
         break
     }

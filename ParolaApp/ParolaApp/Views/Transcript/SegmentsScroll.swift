@@ -403,6 +403,9 @@ struct SegmentCard: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(draggablePayload, forType: .string)
             }
+            cardButton(systemName: "link", help: "Copy parola:// link to this segment") {
+                copyDeeplink()
+            }
             cardButton(systemName: "trash", help: "Delete segment") {
                 model.deleteSegment(id: segment.id)
             }
@@ -499,6 +502,20 @@ struct SegmentCard: View {
             attr.append(piece)
         }
         return Text(attr)
+    }
+
+    private func copyDeeplink() {
+        guard let entryID = model.selectedEntryID else { return }
+        var components = URLComponents()
+        components.scheme = "parola"
+        components.host = "open"
+        components.queryItems = [
+            URLQueryItem(name: "entry", value: entryID),
+            URLQueryItem(name: "t", value: String(format: "%.2f", segment.start)),
+        ]
+        guard let url = components.url else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
     }
 
     private var draggablePayload: String {
