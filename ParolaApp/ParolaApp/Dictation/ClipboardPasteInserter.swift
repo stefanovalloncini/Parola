@@ -4,7 +4,12 @@ import Foundation
 import ParolaCore
 
 struct ClipboardPasteInserter: TextInserter {
+    var preDelayMs: Int = 0
+
     func insert(_ text: String) async {
+        if preDelayMs > 0 {
+            try? await Task.sleep(for: .milliseconds(preDelayMs))
+        }
         await MainActor.run {
             let pasteboard = NSPasteboard.general
             let priorContents = pasteboard.string(forType: .string)

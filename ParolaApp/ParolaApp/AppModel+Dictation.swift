@@ -140,7 +140,8 @@ extension AppModel {
             hotkeyModifiers: dictationModifierFlags,
             mode: dictationMode,
             workflows: dictationWorkflows(),
-            postProcessor: currentDictationProcessor()
+            postProcessor: currentDictationProcessor(),
+            pasteDelayMs: max(0, min(2000, dictationPasteDelayMs))
         )
         dictationController.indicatorStyle = dictationIndicatorStyle
         dictationController.start(configuration: configuration)

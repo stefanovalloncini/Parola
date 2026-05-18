@@ -31,6 +31,7 @@ final class DictationController: ObservableObject {
         var mode: DictationMode
         var workflows: [String: DictationWorkflow]
         var postProcessor: any TextPostProcessor
+        var pasteDelayMs: Int = 0
     }
 
     private var coordinator: DictationCoordinator?
@@ -54,7 +55,9 @@ final class DictationController: ObservableObject {
                 return workflows[bundleID]
             }
         )
-        let inserter = PerAppTextInserter { @Sendable in
+        let inserter = PerAppTextInserter(
+            paste: ClipboardPasteInserter(preDelayMs: configuration.pasteDelayMs)
+        ) { @Sendable in
             let bundleID = await MainActor.run { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
             guard let bundleID, let workflow = workflows[bundleID] else { return .paste }
             return workflow.insertion ?? .paste

@@ -70,6 +70,7 @@ final class AppModel: ObservableObject {
     @AppStorage("micHotkeyModifiers") var micHotkeyModifiers: Int = 786721 // ⌃⌥⌘
     @AppStorage("micHotkeyEnabled") var micHotkeyEnabled: Bool = false
     @AppStorage("dictationStripSelfCorrections") var dictationStripSelfCorrections: Bool = false
+    @AppStorage("dictationPasteDelayMs") var dictationPasteDelayMs: Int = 0
 
     var recentFiles: [URL] {
         get {

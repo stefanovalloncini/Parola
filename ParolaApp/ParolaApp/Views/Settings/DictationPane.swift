@@ -91,6 +91,20 @@ struct DictationPane: View {
                            description: "Drops \"scratch that\", \"wait, no\", and collapses \", I mean,\" hedges.") {
                     Toggle("", isOn: $model.dictationStripSelfCorrections).labelsHidden()
                 }
+                SettingRow("Paste delay",
+                           description: "Wait this long after dictation ends before pasting. Useful when the target app needs a beat to refocus.") {
+                    HStack(spacing: 6) {
+                        Slider(value: Binding(
+                            get: { Double(model.dictationPasteDelayMs) },
+                            set: { model.dictationPasteDelayMs = Int($0) }
+                        ), in: 0...1000, step: 50)
+                        .frame(width: 160)
+                        Text("\(model.dictationPasteDelayMs) ms")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 56, alignment: .trailing)
+                    }
+                }
             }
             SettingHelper(text: "Requires Input Monitoring permission. The HUD shows a live waveform while you speak.")
 
