@@ -32,6 +32,14 @@ struct DictationView: View {
                 overlayIndicator
                 statusLabel
                     .foregroundStyle(.white)
+                if let modeName = currentModeName {
+                    Text(modeName)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(.white.opacity(0.18)))
+                }
                 Spacer(minLength: 0)
                 timer
                     .foregroundStyle(.white.opacity(0.7))
@@ -178,6 +186,18 @@ struct DictationView: View {
                 .monospacedDigit()
                 .opacity(0)
         }
+    }
+
+    private var currentModeName: String? {
+        let id = model.dictationCleanupPromptID
+        if id.isEmpty {
+            return DictationModePreset.builtIns.first { $0.promptID == nil }?.name
+        }
+        guard let uuid = UUID(uuidString: id) else { return nil }
+        if let preset = DictationModePreset.builtIns.first(where: { $0.promptID == uuid }) {
+            return preset.name
+        }
+        return Prompt.builtIns.first(where: { $0.id == uuid })?.name
     }
 
     private var label: String {
