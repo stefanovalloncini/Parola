@@ -28,6 +28,7 @@ struct ShortcutCatalog {
         Section(title: "Navigation", entries: [
             Entry(label: "Open Settings",          keys: "⌘ ,"),
             Entry(label: "Open File",              keys: "⌘ O"),
+            Entry(label: "Auto-detect Language",   keys: "⌘ ⇧ D"),
         ]),
         Section(title: "Help", entries: [
             Entry(label: "Keyboard Shortcuts",     keys: "⌘ /"),
