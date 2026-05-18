@@ -49,8 +49,11 @@ public struct ManagedConfiguration: @unchecked Sendable {
         managedDict?[Key.disableDictation.rawValue] as? Bool ?? false
     }
 
+    public static let userPrivacyModeKey = "parola.userPrivacyMode"
+
     public var disableCloudLLM: Bool {
-        managedDict?[Key.disableCloudLLM.rawValue] as? Bool ?? false
+        if managedDict?[Key.disableCloudLLM.rawValue] as? Bool == true { return true }
+        return UserDefaults.standard.bool(forKey: Self.userPrivacyModeKey)
     }
 
     public var disableModelDownloads: Bool {
