@@ -143,7 +143,7 @@ struct DictationPane: View {
                 }
                 Spacer()
             }
-            SettingHelper(text: "When the frontmost app matches, dictation uses these overrides. Prompt cleans up the text after transcription; language hints the engine before it.")
+            SettingHelper(text: "When the frontmost app matches, dictation uses these overrides. Prompt cleans up the text after transcription; language hints the engine before it. URL rules take precedence over the bundle default for supported browsers.")
             ResetPaneButton(scope: .dictation)
         }
         .onAppear {
@@ -165,56 +165,183 @@ private struct WorkflowRow: View {
     let isRemovable: Bool
     @EnvironmentObject var model: AppModel
 
+    private static let browserBundleIDs: Set<String> = [
+        "com.apple.Safari",
+        "com.google.Chrome",
+        "com.google.Chrome.canary",
+        "company.thebrowser.Browser",
+        "org.mozilla.firefox",
+        "com.brave.Browser",
+        "com.microsoft.edgemac"
+    ]
+
+    private var isBrowser: Bool { Self.browserBundleIDs.contains(app.bundleID) }
+
+    private var urlRules: [DictationWorkflow] {
+        model.urlDictationRules(for: app.bundleID)
+    }
+
     var body: some View {
         SettingRow(titleVerbatim: app.name, isFirst: isFirst) {
-            HStack(spacing: 10) {
-                Picker("", selection: Binding(
-                    get: { model.dictationOverridePromptID(for: app.bundleID) },
-                    set: { model.setDictationOverridePromptID($0, for: app.bundleID) }
-                )) {
-                    Text("Default prompt").tag("")
-                    ForEach(Prompt.builtIns) { prompt in
-                        Text(prompt.name).tag(prompt.id.uuidString)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    promptPicker
+                    languagePicker
+                    insertionPicker
+                    if isRemovable {
+                        Button(role: .destructive) {
+                            model.removeDictationOverride(for: app.bundleID)
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
                     }
                 }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .frame(width: 170)
-
-                Picker("", selection: Binding(
-                    get: { model.dictationOverrideLanguage(for: app.bundleID) },
-                    set: { model.setDictationOverrideLanguage($0, for: app.bundleID) }
-                )) {
-                    Text("Default language").tag("")
-                    ForEach(WorkflowLanguageOptions.options, id: \.code) { option in
-                        Text(option.name).tag(option.code)
+                if isBrowser {
+                    ForEach(Array(urlRules.enumerated()), id: \.offset) { idx, rule in
+                        URLRuleRow(app: app, index: idx, rule: rule)
                     }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .frame(width: 130)
-
-                Picker("", selection: Binding(
-                    get: { model.dictationOverrideInsertion(for: app.bundleID) },
-                    set: { model.setDictationOverrideInsertion($0, for: app.bundleID) }
-                )) {
-                    Text("Paste").tag(DictationInsertionMode.paste)
-                    Text("Keystrokes").tag(DictationInsertionMode.keystroke)
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .frame(width: 120)
-
-                if isRemovable {
-                    Button(role: .destructive) {
-                        model.removeDictationOverride(for: app.bundleID)
-                    } label: {
-                        Image(systemName: "trash")
+                    HStack {
+                        Button {
+                            model.addDictationURLRule(for: app.bundleID)
+                        } label: {
+                            Label("Add URL rule", systemImage: "plus.circle")
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        Spacer()
                     }
-                    .buttonStyle(.borderless)
                 }
             }
         }
+    }
+
+    private var promptPicker: some View {
+        Picker("", selection: Binding(
+            get: { model.dictationOverridePromptID(for: app.bundleID) },
+            set: { model.setDictationOverridePromptID($0, for: app.bundleID) }
+        )) {
+            Text("Default prompt").tag("")
+            ForEach(Prompt.builtIns) { prompt in
+                Text(prompt.name).tag(prompt.id.uuidString)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .frame(width: 170)
+    }
+
+    private var languagePicker: some View {
+        Picker("", selection: Binding(
+            get: { model.dictationOverrideLanguage(for: app.bundleID) },
+            set: { model.setDictationOverrideLanguage($0, for: app.bundleID) }
+        )) {
+            Text("Default language").tag("")
+            ForEach(WorkflowLanguageOptions.options, id: \.code) { option in
+                Text(option.name).tag(option.code)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .frame(width: 130)
+    }
+
+    private var insertionPicker: some View {
+        Picker("", selection: Binding(
+            get: { model.dictationOverrideInsertion(for: app.bundleID) },
+            set: { model.setDictationOverrideInsertion($0, for: app.bundleID) }
+        )) {
+            Text("Paste").tag(DictationInsertionMode.paste)
+            Text("Keystrokes").tag(DictationInsertionMode.keystroke)
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .frame(width: 120)
+    }
+}
+
+private struct URLRuleRow: View {
+    let app: (bundleID: String, name: String)
+    let index: Int
+    let rule: DictationWorkflow
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "link")
+                .foregroundStyle(.secondary)
+                .frame(width: 14)
+            TextField(
+                String(localized: "Example: gmail.com"),
+                text: Binding(
+                    get: { rule.urlPattern ?? "" },
+                    set: { newValue in
+                        model.updateDictationURLRule(for: app.bundleID, at: index) { $0.urlPattern = newValue }
+                    }
+                )
+            )
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 160)
+
+            Picker("", selection: Binding(
+                get: { rule.promptID ?? "" },
+                set: { newValue in
+                    model.updateDictationURLRule(for: app.bundleID, at: index) {
+                        $0.promptID = newValue.isEmpty ? nil : newValue
+                    }
+                }
+            )) {
+                Text("Default prompt").tag("")
+                ForEach(Prompt.builtIns) { prompt in
+                    Text(prompt.name).tag(prompt.id.uuidString)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(width: 140)
+
+            Picker("", selection: Binding(
+                get: { rule.language ?? "" },
+                set: { newValue in
+                    model.updateDictationURLRule(for: app.bundleID, at: index) {
+                        $0.language = newValue.isEmpty ? nil : newValue
+                    }
+                }
+            )) {
+                Text("Default language").tag("")
+                ForEach(WorkflowLanguageOptions.options, id: \.code) { option in
+                    Text(option.name).tag(option.code)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(width: 110)
+
+            Picker("", selection: Binding(
+                get: { rule.insertion ?? .paste },
+                set: { newValue in
+                    model.updateDictationURLRule(for: app.bundleID, at: index) {
+                        $0.insertion = (newValue == .paste) ? nil : newValue
+                    }
+                }
+            )) {
+                Text("Paste").tag(DictationInsertionMode.paste)
+                Text("Keystrokes").tag(DictationInsertionMode.keystroke)
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(width: 110)
+
+            Button(role: .destructive) {
+                model.removeDictationURLRule(for: app.bundleID, at: index)
+            } label: {
+                Image(systemName: "minus.circle")
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.leading, 6)
     }
 }
 

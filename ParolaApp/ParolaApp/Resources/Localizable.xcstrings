@@ -724,6 +724,17 @@
         }
       }
     },
+    "Add URL rule": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi regola URL"
+          }
+        }
+      }
+    },
     "Add video URL": {
       "extractionState": "manual",
       "localizations": {
@@ -2564,6 +2575,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tutto in ogni pannello Impostazioni torna ai valori di default."
+          }
+        }
+      }
+    },
+    "Example: gmail.com": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esempio: gmail.com"
           }
         }
       }
@@ -7833,13 +7855,13 @@
         }
       }
     },
-    "When the frontmost app matches, dictation uses these overrides. Prompt cleans up the text after transcription; language hints the engine before it.": {
+    "When the frontmost app matches, dictation uses these overrides. Prompt cleans up the text after transcription; language hints the engine before it. URL rules take precedence over the bundle default for supported browsers.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Quando l'app in primo piano corrisponde, la dettatura usa queste regole. Il prompt pulisce il testo dopo la trascrizione; la lingua suggerisce al motore prima della trascrizione."
+            "value": "Quando l'app in primo piano corrisponde, la dettatura usa queste regole. Il prompt pulisce il testo dopo la trascrizione; la lingua suggerisce al motore prima della trascrizione. Le regole URL hanno la precedenza sul predefinito dell'app per i browser supportati."
           }
         }
       }

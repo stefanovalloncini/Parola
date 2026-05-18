@@ -333,7 +333,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    var cachedDictationWorkflows: (json: String, map: [String: DictationWorkflow])?
+    var cachedDictationWorkflows: (json: String, map: [String: [DictationWorkflow]])?
     var cachedDictationTriggerPrompts: [Prompt] = []
 
     static let dictationOverrideApps: [(bundleID: String, name: String)] = [

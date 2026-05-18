@@ -6,12 +6,12 @@ import ParolaCore
 
 extension AppModel {
 
-    func dictationWorkflows() -> [String: DictationWorkflow] {
+    func dictationWorkflows() -> [String: [DictationWorkflow]] {
         let json = dictationPerAppOverridesJSON
         if let cached = cachedDictationWorkflows, cached.json == json {
             return cached.map
         }
-        let map: [String: DictationWorkflow]
+        let map: [String: [DictationWorkflow]]
         if let data = json.data(using: .utf8) {
             map = DictationWorkflowMap.decode(legacy: data)
         } else {
@@ -21,56 +21,118 @@ extension AppModel {
         return map
     }
 
-    func dictationWorkflow(for bundleID: String) -> DictationWorkflow {
-        dictationWorkflows()[bundleID] ?? DictationWorkflow()
+    func defaultDictationWorkflow(for bundleID: String) -> DictationWorkflow {
+        DictationWorkflowMap.defaultWorkflow(in: dictationWorkflows(), for: bundleID) ?? DictationWorkflow()
     }
 
-    func setDictationWorkflow(_ workflow: DictationWorkflow, for bundleID: String) {
-        var map = dictationWorkflows()
-        if workflow.isEmpty {
-            map.removeValue(forKey: bundleID)
-        } else {
-            map[bundleID] = workflow
-        }
+    func urlDictationRules(for bundleID: String) -> [DictationWorkflow] {
+        DictationWorkflowMap.urlRules(in: dictationWorkflows(), for: bundleID)
+    }
+
+    private func writeDictationWorkflows(_ map: [String: [DictationWorkflow]]) {
         let data = DictationWorkflowMap.encode(map)
         dictationPerAppOverridesJSON = String(decoding: data, as: UTF8.self)
     }
 
+    func setDefaultDictationWorkflow(_ workflow: DictationWorkflow, for bundleID: String) {
+        var map = dictationWorkflows()
+        var entries = map[bundleID] ?? []
+        entries.removeAll { ($0.urlPattern ?? "").isEmpty }
+        var sanitized = workflow
+        sanitized.urlPattern = nil
+        if !sanitized.isEmpty {
+            entries.insert(sanitized, at: 0)
+        }
+        if entries.isEmpty {
+            map.removeValue(forKey: bundleID)
+        } else {
+            map[bundleID] = entries
+        }
+        writeDictationWorkflows(map)
+    }
+
     func dictationOverridePromptID(for bundleID: String) -> String {
-        dictationWorkflow(for: bundleID).promptID ?? ""
+        defaultDictationWorkflow(for: bundleID).promptID ?? ""
     }
 
     func setDictationOverridePromptID(_ promptID: String, for bundleID: String) {
-        var workflow = dictationWorkflow(for: bundleID)
+        var workflow = defaultDictationWorkflow(for: bundleID)
         workflow.promptID = promptID.isEmpty ? nil : promptID
-        setDictationWorkflow(workflow, for: bundleID)
+        setDefaultDictationWorkflow(workflow, for: bundleID)
     }
 
     func dictationOverrideLanguage(for bundleID: String) -> String {
-        dictationWorkflow(for: bundleID).language ?? ""
+        defaultDictationWorkflow(for: bundleID).language ?? ""
     }
 
     func setDictationOverrideLanguage(_ language: String, for bundleID: String) {
-        var workflow = dictationWorkflow(for: bundleID)
+        var workflow = defaultDictationWorkflow(for: bundleID)
         workflow.language = language.isEmpty ? nil : language
-        setDictationWorkflow(workflow, for: bundleID)
+        setDefaultDictationWorkflow(workflow, for: bundleID)
     }
 
     func dictationOverrideInsertion(for bundleID: String) -> DictationInsertionMode {
-        dictationWorkflow(for: bundleID).insertion ?? .paste
+        defaultDictationWorkflow(for: bundleID).insertion ?? .paste
     }
 
     func setDictationOverrideInsertion(_ mode: DictationInsertionMode, for bundleID: String) {
-        var workflow = dictationWorkflow(for: bundleID)
+        var workflow = defaultDictationWorkflow(for: bundleID)
         workflow.insertion = (mode == .paste) ? nil : mode
-        setDictationWorkflow(workflow, for: bundleID)
+        setDefaultDictationWorkflow(workflow, for: bundleID)
     }
 
     func removeDictationOverride(for bundleID: String) {
         var map = dictationWorkflows()
         map.removeValue(forKey: bundleID)
-        let data = DictationWorkflowMap.encode(map)
-        dictationPerAppOverridesJSON = String(decoding: data, as: UTF8.self)
+        writeDictationWorkflows(map)
+    }
+
+    func addDictationURLRule(for bundleID: String) {
+        var map = dictationWorkflows()
+        var entries = map[bundleID] ?? []
+        entries.append(DictationWorkflow(urlPattern: ""))
+        map[bundleID] = entries
+        writeDictationWorkflows(map)
+    }
+
+    func removeDictationURLRule(for bundleID: String, at index: Int) {
+        var map = dictationWorkflows()
+        guard var entries = map[bundleID] else { return }
+        let rules = entries.enumerated().filter { !($0.element.urlPattern ?? "").isEmpty }
+        guard index >= 0, index < rules.count else { return }
+        let absoluteIndex = rules[index].offset
+        entries.remove(at: absoluteIndex)
+        if entries.isEmpty {
+            map.removeValue(forKey: bundleID)
+        } else {
+            map[bundleID] = entries
+        }
+        writeDictationWorkflows(map)
+    }
+
+    func updateDictationURLRule(
+        for bundleID: String,
+        at index: Int,
+        transform: (inout DictationWorkflow) -> Void
+    ) {
+        var map = dictationWorkflows()
+        guard var entries = map[bundleID] else { return }
+        let rules = entries.enumerated().filter { !($0.element.urlPattern ?? "").isEmpty }
+        guard index >= 0, index < rules.count else { return }
+        let absoluteIndex = rules[index].offset
+        var workflow = entries[absoluteIndex]
+        transform(&workflow)
+        if workflow.isEmpty {
+            entries.remove(at: absoluteIndex)
+        } else {
+            entries[absoluteIndex] = workflow
+        }
+        if entries.isEmpty {
+            map.removeValue(forKey: bundleID)
+        } else {
+            map[bundleID] = entries
+        }
+        writeDictationWorkflows(map)
     }
 
     func presentAddDictationAppPanel() {
@@ -81,10 +143,9 @@ extension AppModel {
         panel.message = "Pick an app to give it a custom dictation workflow."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         guard let bundle = Bundle(url: url), let bundleID = bundle.bundleIdentifier else { return }
-        var workflow = dictationWorkflow(for: bundleID)
+        let workflow = defaultDictationWorkflow(for: bundleID)
         if workflow.isEmpty {
-            workflow.promptID = ""
-            setDictationWorkflow(workflow, for: bundleID)
+            setDefaultDictationWorkflow(DictationWorkflow(promptID: ""), for: bundleID)
         }
     }
 
@@ -159,15 +220,18 @@ extension AppModel {
         return Prompt.builtIns.first { $0.id == uuid }
     }
 
-    private func currentDictationOverrides() -> [String: Prompt] {
-        var out: [String: Prompt] = [:]
-        for (bundleID, workflow) in dictationWorkflows() {
-            guard let promptID = workflow.promptID,
-                  let uuid = UUID(uuidString: promptID),
-                  let prompt = Prompt.builtIns.first(where: { $0.id == uuid }) else {
-                continue
+    private func currentDictationOverrides() -> [String: [DictationOverrideEntry]] {
+        var out: [String: [DictationOverrideEntry]] = [:]
+        for (bundleID, workflows) in dictationWorkflows() {
+            let entries: [DictationOverrideEntry] = workflows.compactMap { workflow in
+                guard let promptID = workflow.promptID,
+                      let uuid = UUID(uuidString: promptID),
+                      let prompt = Prompt.builtIns.first(where: { $0.id == uuid }) else {
+                    return nil
+                }
+                return DictationOverrideEntry(prompt: prompt, urlPattern: workflow.urlPattern)
             }
-            out[bundleID] = prompt
+            if !entries.isEmpty { out[bundleID] = entries }
         }
         return out
     }

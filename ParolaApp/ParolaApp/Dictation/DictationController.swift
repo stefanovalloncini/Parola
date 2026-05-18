@@ -30,7 +30,7 @@ final class DictationController: ObservableObject {
         var hotkeyKeyCode: Int
         var hotkeyModifiers: NSEvent.ModifierFlags = []
         var mode: DictationMode
-        var workflows: [String: DictationWorkflow]
+        var workflows: [String: [DictationWorkflow]]
         var postProcessor: any TextPostProcessor
         var pasteDelayMs: Int = 0
     }
@@ -51,32 +51,21 @@ final class DictationController: ObservableObject {
             deviceUID: configuration.deviceUID,
             streamingEnabled: configuration.streamingEnabled,
             workflowResolver: { @Sendable in
-                let bundleID = await MainActor.run { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
-                guard let bundleID else { return nil }
-                return workflows[bundleID]
+                await Self.resolveWorkflow(in: workflows)
             }
         )
         let inserter = PerAppTextInserter(
             paste: ClipboardPasteInserter(preDelayMs: configuration.pasteDelayMs)
         ) { @Sendable in
-            let bundleID = await MainActor.run { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
-            guard let bundleID, let workflow = workflows[bundleID] else { return .paste }
-            return workflow.insertion ?? .paste
-        }
-        let mediaSession = appModel?.mediaSession
-        let configProvider: (@Sendable () async -> MediaSessionConfig)? = appModel.map { model in
-            { @Sendable in
-                await MainActor.run { model.mediaSessionConfig(allowMute: true) }
-            }
+            let workflow = await Self.resolveWorkflow(in: workflows)
+            return workflow?.insertion ?? .paste
         }
         let coord = DictationCoordinator(
             hotkey: hotkey,
             recorder: recorder,
             inserter: inserter,
             postProcessor: configuration.postProcessor,
-            mode: configuration.mode,
-            mediaSession: mediaSession,
-            mediaConfigProvider: configProvider
+            mode: configuration.mode
         ) { [weak self] state in
             await MainActor.run { self?.handleStateChange(state) }
         }
@@ -245,5 +234,12 @@ final class DictationController: ObservableObject {
     private func hideHUD() {
         stopLevelStream()
         hud?.orderOut(nil)
+    }
+
+    static func resolveWorkflow(in workflows: [String: [DictationWorkflow]]) async -> DictationWorkflow? {
+        let bundleID = await MainActor.run { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
+        guard let bundleID else { return nil }
+        let url = await MainActor.run { BrowserURLResolver.shared.currentURL(for: bundleID) }
+        return DictationWorkflowMap.select(in: workflows, for: bundleID, url: url)
     }
 }

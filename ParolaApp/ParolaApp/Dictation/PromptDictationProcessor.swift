@@ -2,31 +2,39 @@ import AppKit
 import Foundation
 import ParolaCore
 
+struct DictationOverrideEntry: Sendable {
+    let prompt: Prompt
+    let urlPattern: String?
+}
+
 struct PromptDictationProcessor: TextPostProcessor {
     let defaultPrompt: Prompt?
-    let overrides: [String: Prompt]
+    let overrides: [String: [DictationOverrideEntry]]
     let triggerPrompts: [Prompt]
     let contextProvider: DictationContextProvider?
     let contextConfig: DictationContextConfig
+    let urlResolver: (@Sendable @MainActor (String) -> URL?)?
 
     init(
         defaultPrompt: Prompt?,
-        overrides: [String: Prompt],
+        overrides: [String: [DictationOverrideEntry]],
         triggerPrompts: [Prompt] = [],
         contextProvider: DictationContextProvider? = nil,
-        contextConfig: DictationContextConfig = DictationContextConfig()
+        contextConfig: DictationContextConfig = DictationContextConfig(),
+        urlResolver: (@Sendable @MainActor (String) -> URL?)? = nil
     ) {
         self.defaultPrompt = defaultPrompt
         self.overrides = overrides
         self.triggerPrompts = triggerPrompts
         self.contextProvider = contextProvider
         self.contextConfig = contextConfig
+        self.urlResolver = urlResolver ?? { bundleID in BrowserURLResolver.shared.currentURL(for: bundleID) }
     }
 
     func process(_ text: String) async -> String {
         let preprocessed = SentenceCapitalizer.applyTo(PronounCapitalizer.applyTo(VoiceCommands.applyTo(text)))
         let frontmost = await frontmostAppContext()
-        let basePrompt: Prompt? = (frontmost.bundleID.flatMap { overrides[$0] }) ?? defaultPrompt
+        let basePrompt: Prompt? = await selectOverridePrompt(bundleID: frontmost.bundleID) ?? defaultPrompt
 
         let detector = TriggerWordDetector()
         let triggered = detector.detect(preprocessed, against: triggerPrompts)
@@ -47,6 +55,29 @@ struct PromptDictationProcessor: TextPostProcessor {
         } catch {
             return input
         }
+    }
+
+    private func selectOverridePrompt(bundleID: String?) async -> Prompt? {
+        guard let bundleID, let entries = overrides[bundleID], !entries.isEmpty else { return nil }
+        let url: URL? = await resolveURL(bundleID: bundleID)
+        if let url, let match = entries.first(where: { entry in
+            guard let pattern = entry.urlPattern, !pattern.isEmpty else { return false }
+            return matches(pattern: pattern, url: url)
+        }) {
+            return match.prompt
+        }
+        return entries.first(where: { ($0.urlPattern ?? "").isEmpty })?.prompt
+    }
+
+    @MainActor
+    private func resolveURL(bundleID: String) async -> URL? {
+        urlResolver?(bundleID)
+    }
+
+    private func matches(pattern: String, url: URL) -> Bool {
+        let needle = pattern.lowercased()
+        if let host = url.host?.lowercased(), host.contains(needle) { return true }
+        return url.absoluteString.lowercased().contains(needle)
     }
 
     private func gatheredContext() async -> DictationContext {
