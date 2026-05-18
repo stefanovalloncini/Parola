@@ -23,7 +23,7 @@ public struct CloudLanguageModel: LanguageModel {
 
     public static func isSupported(_ provider: CloudLLMProviderID) -> Bool {
         switch provider {
-        case .openAI, .anthropic, .groq: return true
+        case .openAI, .anthropic, .groq, .cerebras: return true
         default: return false
         }
     }
@@ -93,6 +93,12 @@ public struct CloudLanguageModel: LanguageModel {
                 history: history,
                 streaming: streaming
             )
+        case .cerebras:
+            return try buildOpenAICompatibleRequest(
+                url: "https://api.cerebras.ai/v1/chat/completions",
+                history: history,
+                streaming: streaming
+            )
         case .anthropic:
             return try buildAnthropicRequest(history: history, streaming: streaming)
         default:
@@ -105,7 +111,7 @@ public struct CloudLanguageModel: LanguageModel {
     ) throws -> (URLRequest, @Sendable (String) -> String?) {
         let parser: @Sendable (String) -> String?
         switch provider {
-        case .openAI, .groq: parser = Self.parseOpenAIStreamLine
+        case .openAI, .groq, .cerebras: parser = Self.parseOpenAIStreamLine
         case .anthropic: parser = Self.parseAnthropicStreamLine
         default: throw CloudLLMError.unsupportedProvider(provider)
         }

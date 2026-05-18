@@ -9,8 +9,9 @@ public struct CloudLLMProviderID: RawRepresentable, Hashable, Sendable, Codable,
     public static let openAI = CloudLLMProviderID("openai")
     public static let anthropic = CloudLLMProviderID("anthropic")
     public static let groq = CloudLLMProviderID("groq")
+    public static let cerebras = CloudLLMProviderID("cerebras")
 
-    public static let allKnown: [CloudLLMProviderID] = [.openAI, .anthropic, .groq]
+    public static let allKnown: [CloudLLMProviderID] = [.openAI, .anthropic, .groq, .cerebras]
 }
 
 public struct CloudLLMProviderInfo: Sendable, Hashable {
@@ -45,12 +46,21 @@ public struct CloudLLMProviderInfo: Sendable, Hashable {
         apiKeyPlaceholder: "gsk_…",
         contextWindowTokens: 128_000
     )
+    public static let cerebras = CloudLLMProviderInfo(
+        id: .cerebras,
+        displayName: "Cerebras",
+        defaultModel: "llama-3.3-70b",
+        keychainAccount: "app.parola.cloudllm.cerebras",
+        apiKeyPlaceholder: "csk-…",
+        contextWindowTokens: 64_000
+    )
 
     public static func info(for id: CloudLLMProviderID) -> CloudLLMProviderInfo? {
         switch id {
         case .openAI: return .openAI
         case .anthropic: return .anthropic
         case .groq: return .groq
+        case .cerebras: return .cerebras
         default: return nil
         }
     }

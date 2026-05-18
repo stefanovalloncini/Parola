@@ -44,6 +44,14 @@ struct CloudLanguageModelTests {
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer gsk-test")
     }
 
+    @Test("Cerebras points to api.cerebras.ai OpenAI-compatible endpoint")
+    func cerebrasRequest() throws {
+        let model = CloudLanguageModel(provider: .cerebras, model: "llama-3.3-70b", apiKey: "csk-test")
+        let (request, _) = try model.buildRequest(prompt: "Hi")
+        #expect(request.url?.host == "api.cerebras.ai")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer csk-test")
+    }
+
     @Test("Multi-turn history populates OpenAI messages array in order")
     func openAIMultiTurnHistory() throws {
         let model = CloudLanguageModel(provider: .openAI, apiKey: "sk-test")
