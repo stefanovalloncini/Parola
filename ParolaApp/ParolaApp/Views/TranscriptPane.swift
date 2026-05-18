@@ -29,6 +29,7 @@ enum TranscriptDisplayMode: String, CaseIterable, Identifiable {
 enum InspectorMode: String, CaseIterable, Identifiable {
     case format
     case info
+    case actions
     var id: String { rawValue }
 }
 

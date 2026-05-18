@@ -17,6 +17,7 @@ struct TranscriptInspector: View {
                     switch mode {
                     case .format: FormatInspector()
                     case .info: InfoInspector()
+                    case .actions: ActionsInspector()
                     }
                 }
                 .padding(DS.Spacing.regular)
@@ -31,6 +32,8 @@ struct TranscriptInspector: View {
                 .help("Format")
             InspectorModeIcon(systemName: "info.circle", isOn: mode == .info) { mode = .info }
                 .help("Info")
+            InspectorModeIcon(systemName: "wand.and.stars", isOn: mode == .actions) { mode = .actions }
+                .help("Actions")
             Spacer()
             InspectorModeIcon(systemName: "rectangle.righthalf.filled", isOn: false) {
                 inspectorVisible = false
