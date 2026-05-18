@@ -41,8 +41,12 @@ struct DictationPane: View {
                     .pickerStyle(.menu)
                     .frame(width: 200)
                 }
+                SettingRow("Mode",
+                           description: "Quick context: how the dictated text should land.") {
+                    DictationModeRow(selectedID: $model.dictationCleanupPromptID)
+                }
                 SettingRow("Rewrite preset",
-                           description: "One-click style for the dictated text. Sets the cleanup prompt below.") {
+                           description: "Fine-tune the cleanup tone.") {
                     RewritePresetRow(selectedID: $model.dictationCleanupPromptID)
                 }
                 SettingRow("Cleanup mode") {
@@ -149,6 +153,46 @@ private struct WorkflowRow: View {
                 }
             }
         }
+    }
+}
+
+private struct DictationModeRow: View {
+    @Binding var selectedID: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(DictationModePreset.builtIns) { preset in
+                modePill(preset)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func modePill(_ preset: DictationModePreset) -> some View {
+        let targetID = preset.promptID?.uuidString ?? ""
+        let on = selectedID == targetID
+        return Button {
+            selectedID = targetID
+        } label: {
+            Text(preset.name)
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(on ? Color.white : Color.primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .frame(height: 28)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(on ? DS.Color.accent.opacity(0.85) : Color.primary.opacity(0.06))
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .strokeBorder(on ? DS.Color.accent.opacity(0.45) : Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
+                .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(preset.name) dictation mode")
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 
