@@ -7,6 +7,8 @@ struct LibraryListView: View {
 
     @State private var selection: Set<LibraryEntry.ID> = []
     @State private var pendingBulkDelete = false
+    @State private var renamingEntry: LibraryEntry?
+    @State private var renameDraft: String = ""
 
     private var entries: [LibraryEntry] {
         model.libraryEntries
@@ -33,6 +35,10 @@ struct LibraryListView: View {
                                 model.loadEntry(entry.id)
                                 model.libraryFilter = nil
                             }
+                            Button("Rename…") {
+                                renameDraft = entry.title
+                                renamingEntry = entry
+                            }
                             Button("Delete", role: .destructive) {
                                 model.deleteEntry(entry.id)
                             }
@@ -51,6 +57,22 @@ struct LibraryListView: View {
             Button("Delete", role: .destructive) { performBulkDelete() }
         } message: {
             Text("They'll move to Recently Deleted.")
+        }
+        .alert(
+            "Rename entry",
+            isPresented: Binding(
+                get: { renamingEntry != nil },
+                set: { if !$0 { renamingEntry = nil } }
+            )
+        ) {
+            TextField("Title", text: $renameDraft)
+            Button("Cancel", role: .cancel) { renamingEntry = nil }
+            Button("Rename") {
+                if let id = renamingEntry?.id {
+                    model.renameEntry(id, to: renameDraft)
+                }
+                renamingEntry = nil
+            }
         }
     }
 

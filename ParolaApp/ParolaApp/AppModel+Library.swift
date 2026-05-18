@@ -86,6 +86,18 @@ extension AppModel {
         }
     }
 
+    func renameEntry(_ id: LibraryEntry.ID, to newName: String) {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await library.renameEntry(id, to: newName)
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+            refreshLibrary()
+        }
+    }
+
     func setSegmentNote(_ note: String?, segmentID: Int) {
         guard let entryID = selectedEntryID else { return }
         Task { [weak self] in

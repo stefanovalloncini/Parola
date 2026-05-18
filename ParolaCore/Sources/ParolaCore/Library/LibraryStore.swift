@@ -171,6 +171,26 @@ public actor LibraryStore {
         if cachedLoaded?.id == id { cachedLoaded = nil }
     }
 
+    /// Renames an entry's display title by updating the manifest's `originalAudioName`.
+    public func renameEntry(_ id: LibraryEntry.ID, to newName: String) throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            let existingExtension = (manifest.originalAudioName as NSString).pathExtension
+            if existingExtension.isEmpty || trimmed.contains(".") {
+                manifest.originalAudioName = trimmed
+            } else {
+                manifest.originalAudioName = "\(trimmed).\(existingExtension)"
+            }
+        }
+        invalidateListCaches()
+        if cachedLoaded?.id == id { cachedLoaded = nil }
+    }
+
     /// Sets a note for a segment within an entry. Pass `nil` or empty to clear it.
     public func setSegmentNote(_ note: String?, segmentID: Int, for id: LibraryEntry.ID) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
