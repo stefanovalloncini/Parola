@@ -9,14 +9,30 @@ struct LibraryListView: View {
     @State private var pendingBulkDelete = false
     @State private var renamingEntry: LibraryEntry?
     @State private var renameDraft: String = ""
+    @State private var labelFilter: String?
 
     private var entries: [LibraryEntry] {
         model.libraryEntries
             .filter { $0.category == category }
+            .filter { entry in
+                guard let labelFilter else { return true }
+                return entry.labels.contains { $0.localizedCaseInsensitiveCompare(labelFilter) == .orderedSame }
+            }
             .sorted { lhs, rhs in
                 if lhs.pinned != rhs.pinned { return lhs.pinned }
                 return lhs.createdAt > rhs.createdAt
             }
+    }
+
+    private var labelOptions: [String] {
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for entry in model.libraryEntries where entry.category == category {
+            for label in entry.labels {
+                if seen.insert(label).inserted { ordered.append(label) }
+            }
+        }
+        return ordered.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
     var body: some View {
@@ -94,6 +110,25 @@ struct LibraryListView: View {
             Text(headerTitle)
                 .font(DS.Font.title)
                 .foregroundStyle(DS.Color.primaryText)
+            if !labelOptions.isEmpty {
+                Menu {
+                    Button("All labels") { labelFilter = nil }
+                    Divider()
+                    ForEach(labelOptions, id: \.self) { label in
+                        Button(label) { labelFilter = label }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "tag")
+                        Text(labelFilter ?? "All labels")
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(labelFilter == nil ? .secondary : DS.Color.accent)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+            }
             Spacer()
             if !selection.isEmpty {
                 Button(role: .destructive) {
