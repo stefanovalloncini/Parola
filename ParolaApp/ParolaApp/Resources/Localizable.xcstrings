@@ -8258,6 +8258,28 @@
           }
         }
       }
+    },
+    "Assistant mode": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modalità assistente"
+          }
+        }
+      }
+    },
+    "When on, the LLM answers your dictation instead of cleaning it up. Use this for voice Q&A.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando attivo, l'LLM risponde alla dettatura invece di pulirla. Utile per Q&A vocali."
+          }
+        }
+      }
     }
   },
   "version": "1.1"

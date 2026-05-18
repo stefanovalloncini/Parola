@@ -125,15 +125,17 @@ struct PromptsPane: View {
                 name: trimmed,
                 instructions: draft.instructions,
                 isBuiltIn: false,
-                triggerWords: draft.parsedTriggerWords
+                triggerWords: draft.parsedTriggerWords,
+                useSystemInstructions: !draft.assistantMode
             )
             await model.promptLibrary.updateUserPrompt(updated)
         } else {
             let created = await model.promptLibrary.addUserPrompt(name: trimmed, instructions: draft.instructions)
-            if !draft.parsedTriggerWords.isEmpty {
-                var withTriggers = created
-                withTriggers.triggerWords = draft.parsedTriggerWords
-                await model.promptLibrary.updateUserPrompt(withTriggers)
+            if !draft.parsedTriggerWords.isEmpty || draft.assistantMode {
+                var updated = created
+                updated.triggerWords = draft.parsedTriggerWords
+                updated.useSystemInstructions = !draft.assistantMode
+                await model.promptLibrary.updateUserPrompt(updated)
             }
         }
         await reload()
@@ -203,6 +205,7 @@ final class PromptEditDraft: Identifiable, ObservableObject {
     @Published var name: String
     @Published var instructions: String
     @Published var triggerWordsText: String
+    @Published var assistantMode: Bool
 
     init(prompt: Prompt) {
         self.id = prompt.id
@@ -210,6 +213,7 @@ final class PromptEditDraft: Identifiable, ObservableObject {
         self.name = prompt.name
         self.instructions = prompt.instructions
         self.triggerWordsText = prompt.triggerWords.joined(separator: ", ")
+        self.assistantMode = !prompt.useSystemInstructions
     }
 
     var parsedTriggerWords: [String] {
@@ -256,6 +260,13 @@ private struct PromptEditor: View {
                 TextField("summary, recap", text: $draft.triggerWordsText)
                     .textFieldStyle(.roundedBorder)
                 Text("Words that switch to this prompt for one dictation. Separate with commas.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("Assistant mode", isOn: $draft.assistantMode)
+                Text("When on, the LLM answers your dictation instead of cleaning it up. Use this for voice Q&A.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

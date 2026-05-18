@@ -55,6 +55,7 @@ struct PromptDictationProcessor: TextPostProcessor {
     }
 
     private func contextualizing(_ prompt: Prompt, with appName: String?, context: DictationContext) -> Prompt {
+        guard prompt.useSystemInstructions else { return prompt }
         var copy = prompt
         var prefixLines: [String] = []
         if let appName, !appName.isEmpty {

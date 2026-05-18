@@ -7,6 +7,7 @@ public struct Prompt: Codable, Sendable, Identifiable, Hashable {
     public var isBuiltIn: Bool
     public var version: Int
     public var triggerWords: [String]
+    public var useSystemInstructions: Bool
 
     public init(
         id: UUID = UUID(),
@@ -14,7 +15,8 @@ public struct Prompt: Codable, Sendable, Identifiable, Hashable {
         instructions: String,
         isBuiltIn: Bool = false,
         version: Int = 1,
-        triggerWords: [String] = []
+        triggerWords: [String] = [],
+        useSystemInstructions: Bool = true
     ) {
         self.id = id
         self.name = name
@@ -22,10 +24,11 @@ public struct Prompt: Codable, Sendable, Identifiable, Hashable {
         self.isBuiltIn = isBuiltIn
         self.version = version
         self.triggerWords = triggerWords
+        self.useSystemInstructions = useSystemInstructions
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, instructions, isBuiltIn, version, triggerWords
+        case id, name, instructions, isBuiltIn, version, triggerWords, useSystemInstructions
     }
 
     public init(from decoder: Decoder) throws {
@@ -36,6 +39,7 @@ public struct Prompt: Codable, Sendable, Identifiable, Hashable {
         isBuiltIn = try c.decodeIfPresent(Bool.self, forKey: .isBuiltIn) ?? false
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
         triggerWords = try c.decodeIfPresent([String].self, forKey: .triggerWords) ?? []
+        useSystemInstructions = try c.decodeIfPresent(Bool.self, forKey: .useSystemInstructions) ?? true
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -46,6 +50,7 @@ public struct Prompt: Codable, Sendable, Identifiable, Hashable {
         try c.encode(isBuiltIn, forKey: .isBuiltIn)
         try c.encode(version, forKey: .version)
         try c.encode(triggerWords, forKey: .triggerWords)
+        try c.encode(useSystemInstructions, forKey: .useSystemInstructions)
     }
 }
 
@@ -120,6 +125,15 @@ public extension Prompt {
             instructions: "Turn the dictated text below into a single-line code comment. Lowercase first word unless it's a proper noun. No trailing period. Drop filler.",
             isBuiltIn: true,
             version: 1
+        ),
+        Prompt(
+            id: UUID(uuidString: "00000000-0000-0000-0000-00000000000B")!,
+            name: "Assistant",
+            instructions: "Answer the user's spoken request below. Reply with the answer only — no preamble, no salutation, no closing. Keep it under 2 sentences unless the question genuinely needs more.",
+            isBuiltIn: true,
+            version: 1,
+            triggerWords: ["assistant", "hey assistant"],
+            useSystemInstructions: false
         ),
     ]
 
