@@ -268,19 +268,20 @@ struct MacRecentlyDeletedView: View {
 
     private func loadPreview(for entry: LibraryEntry) async {
         if previews[entry.id] != nil { return }
-        let text = await Task.detached { () -> String in
-            let bundleURL = entry.bundleURL
-            let transcriptURL = bundleURL.appendingPathComponent("transcript.json")
-            guard let data = try? Data(contentsOf: transcriptURL),
-                  let transcript = try? JSONDecoder().decode(Transcript.self, from: data)
-            else { return "" }
-            return transcript.text
-        }.value
+        let text = await readTranscriptText(at: entry.bundleURL)
         let trimmed = text
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         previews[entry.id] = trimmed.isEmpty ? "" : String(trimmed.prefix(280))
     }
+}
+
+private func readTranscriptText(at bundleURL: URL) async -> String {
+    let transcriptURL = bundleURL.appendingPathComponent("transcript.json")
+    guard let data = try? Data(contentsOf: transcriptURL),
+          let transcript = try? JSONDecoder().decode(Transcript.self, from: data)
+    else { return "" }
+    return transcript.text
 }
 
 private extension RecentlyDeletedDateFilter {
