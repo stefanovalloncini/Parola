@@ -171,6 +171,19 @@ public actor LibraryStore {
         if cachedLoaded?.id == id { cachedLoaded = nil }
     }
 
+    /// Toggles or sets the pinned flag on an entry.
+    public func setPinned(_ pinned: Bool, for id: LibraryEntry.ID) throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.pinned = pinned
+        }
+        invalidateListCaches()
+        if cachedLoaded?.id == id { cachedLoaded = nil }
+    }
+
     /// Renames an entry's display title by updating the manifest's `originalAudioName`.
     public func renameEntry(_ id: LibraryEntry.ID, to newName: String) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)

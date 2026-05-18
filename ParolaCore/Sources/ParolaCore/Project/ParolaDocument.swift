@@ -16,6 +16,7 @@ public struct ParolaDocument: Sendable {
         public var audioFilename: String?
         public var labels: [String]
         public var segmentNotes: [String: String]
+        public var pinned: Bool
 
         public init(
             version: Int = Manifest.currentVersion,
@@ -28,7 +29,8 @@ public struct ParolaDocument: Sendable {
             updatedAt: Date? = nil,
             audioFilename: String? = nil,
             labels: [String] = [],
-            segmentNotes: [String: String] = [:]
+            segmentNotes: [String: String] = [:],
+            pinned: Bool = false
         ) {
             self.version = version
             self.createdAt = createdAt
@@ -41,6 +43,7 @@ public struct ParolaDocument: Sendable {
             self.audioFilename = audioFilename
             self.labels = labels
             self.segmentNotes = segmentNotes
+            self.pinned = pinned
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -55,6 +58,7 @@ public struct ParolaDocument: Sendable {
             case audioFilename
             case labels
             case segmentNotes
+            case pinned
         }
 
         public init(from decoder: any Decoder) throws {
@@ -70,6 +74,7 @@ public struct ParolaDocument: Sendable {
             audioFilename = try c.decodeIfPresent(String.self, forKey: .audioFilename)
             labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
             segmentNotes = try c.decodeIfPresent([String: String].self, forKey: .segmentNotes) ?? [:]
+            pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -88,6 +93,9 @@ public struct ParolaDocument: Sendable {
             }
             if !segmentNotes.isEmpty {
                 try c.encode(segmentNotes, forKey: .segmentNotes)
+            }
+            if pinned {
+                try c.encode(pinned, forKey: .pinned)
             }
         }
     }

@@ -23,6 +23,7 @@ public struct LibraryEntry: Identifiable, Hashable, Sendable {
     public var updatedAt: Date? { manifest.updatedAt }
     public var labels: [String] { manifest.labels }
     public var segmentNotes: [String: String] { manifest.segmentNotes }
+    public var pinned: Bool { manifest.pinned }
 
     public func note(forSegment id: Int) -> String? {
         manifest.segmentNotes[String(id)]

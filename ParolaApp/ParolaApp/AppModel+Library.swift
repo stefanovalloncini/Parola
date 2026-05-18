@@ -86,6 +86,19 @@ extension AppModel {
         }
     }
 
+    func togglePinned(for id: LibraryEntry.ID) {
+        let current = libraryEntries.first { $0.id == id }?.pinned ?? false
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await library.setPinned(!current, for: id)
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+            refreshLibrary()
+        }
+    }
+
     func renameEntry(_ id: LibraryEntry.ID, to newName: String) {
         Task { [weak self] in
             guard let self else { return }

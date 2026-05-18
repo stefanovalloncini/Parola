@@ -13,7 +13,10 @@ struct LibraryListView: View {
     private var entries: [LibraryEntry] {
         model.libraryEntries
             .filter { $0.category == category }
-            .sorted { $0.createdAt > $1.createdAt }
+            .sorted { lhs, rhs in
+                if lhs.pinned != rhs.pinned { return lhs.pinned }
+                return lhs.createdAt > rhs.createdAt
+            }
     }
 
     var body: some View {
@@ -34,6 +37,9 @@ struct LibraryListView: View {
                             Button("Open") {
                                 model.loadEntry(entry.id)
                                 model.libraryFilter = nil
+                            }
+                            Button(entry.pinned ? "Unpin" : "Pin") {
+                                model.togglePinned(for: entry.id)
                             }
                             Button("Rename…") {
                                 renameDraft = entry.title
@@ -149,10 +155,17 @@ private struct LibraryRow: View {
     var body: some View {
         HStack(spacing: DS.Spacing.regular) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(entry.title)
-                    .font(DS.Font.body)
-                    .foregroundStyle(DS.Color.primaryText)
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    if entry.pinned {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(DS.Color.accent)
+                    }
+                    Text(entry.title)
+                        .font(DS.Font.body)
+                        .foregroundStyle(DS.Color.primaryText)
+                        .lineLimit(1)
+                }
                 Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.secondaryText)
