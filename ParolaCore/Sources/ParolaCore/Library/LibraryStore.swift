@@ -171,6 +171,19 @@ public actor LibraryStore {
         if cachedLoaded?.id == id { cachedLoaded = nil }
     }
 
+    /// Changes the category of an entry.
+    public func setCategory(_ category: EntryCategory, for id: LibraryEntry.ID) throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.category = category
+        }
+        invalidateListCaches()
+        if cachedLoaded?.id == id { cachedLoaded = nil }
+    }
+
     /// Toggles or sets the pinned flag on an entry.
     public func setPinned(_ pinned: Bool, for id: LibraryEntry.ID) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)

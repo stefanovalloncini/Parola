@@ -86,6 +86,18 @@ extension AppModel {
         }
     }
 
+    func moveEntry(_ id: LibraryEntry.ID, to category: EntryCategory) {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await library.setCategory(category, for: id)
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+            refreshLibrary()
+        }
+    }
+
     func togglePinned(for id: LibraryEntry.ID) {
         let current = libraryEntries.first { $0.id == id }?.pinned ?? false
         Task { [weak self] in

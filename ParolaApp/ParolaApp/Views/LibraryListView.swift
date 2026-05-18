@@ -41,6 +41,13 @@ struct LibraryListView: View {
                             Button(entry.pinned ? "Unpin" : "Pin") {
                                 model.togglePinned(for: entry.id)
                             }
+                            Menu("Move to") {
+                                ForEach(EntryCategory.allCases.filter { $0 != entry.category }, id: \.self) { target in
+                                    Button(libraryCategoryName(target)) {
+                                        model.moveEntry(entry.id, to: target)
+                                    }
+                                }
+                            }
                             Button("Rename…") {
                                 renameDraft = entry.title
                                 renamingEntry = entry
@@ -146,6 +153,14 @@ struct LibraryListView: View {
         case .meeting: return "person.2"
         case .dictation: return "text.cursor"
         }
+    }
+}
+
+private func libraryCategoryName(_ category: EntryCategory) -> String {
+    switch category {
+    case .transcription: return "Transcriptions"
+    case .meeting: return "Meetings"
+    case .dictation: return "Dictations"
     }
 }
 
