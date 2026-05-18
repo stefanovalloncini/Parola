@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var dictationStatusItem: DictationStatusItem?
     private var dictationSubscription: DictationSubscription?
     private let menuBar = MenuBarController()
+    private var recordingTickTask: Task<Void, Never>?
+    private var recordingStartedAt: Date?
 
     func bind(model: AppModel) {
         self.model = model
@@ -41,20 +43,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func updateDockBadge(for phase: AppModel.Phase) {
-        let label: String
         switch phase {
         case .idle, .ready, .failed:
-            label = ""
+            stopRecordingTick()
+            NSApp.dockTile.badgeLabel = nil
         case .downloadingModel(_, let progress):
-            label = "\(Int(progress * 100))%"
+            stopRecordingTick()
+            NSApp.dockTile.badgeLabel = "\(Int(progress * 100))%"
         case .loadingModel:
-            label = "…"
+            stopRecordingTick()
+            NSApp.dockTile.badgeLabel = "…"
         case .transcribing:
-            label = "•"
+            stopRecordingTick()
+            NSApp.dockTile.badgeLabel = "•"
         case .recording:
-            label = "REC"
+            startRecordingTick()
         }
-        NSApp.dockTile.badgeLabel = label.isEmpty ? nil : label
+    }
+
+    private func startRecordingTick() {
+        if recordingTickTask != nil { return }
+        recordingStartedAt = Date()
+        NSApp.dockTile.badgeLabel = "0:00"
+        recordingTickTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled, let start = self?.recordingStartedAt else { return }
+                let elapsed = Int(Date().timeIntervalSince(start))
+                let m = elapsed / 60
+                let s = elapsed % 60
+                NSApp.dockTile.badgeLabel = String(format: "%d:%02d", m, s)
+            }
+        }
+    }
+
+    private func stopRecordingTick() {
+        recordingTickTask?.cancel()
+        recordingTickTask = nil
+        recordingStartedAt = nil
     }
 }
 
