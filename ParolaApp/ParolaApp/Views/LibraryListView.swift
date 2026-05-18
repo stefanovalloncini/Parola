@@ -165,6 +165,21 @@ struct LibraryListView: View {
             Text(emptyTitle)
                 .font(DS.Font.heading)
                 .foregroundStyle(DS.Color.secondaryText)
+            HStack(spacing: 10) {
+                Button {
+                    model.presentOpenPanel()
+                } label: {
+                    Label("Open file…", systemImage: "doc.badge.plus")
+                }
+                .buttonStyle(.borderedProminent)
+                Button {
+                    model.startRecording(source: .microphone)
+                } label: {
+                    Label("Record", systemImage: "mic.fill")
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
