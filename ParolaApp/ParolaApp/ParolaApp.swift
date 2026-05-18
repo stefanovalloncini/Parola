@@ -105,6 +105,8 @@ struct ParolaApp: App {
                     liveCaptions.togglePresenter()
                 }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
+                Button("Save Captions…") { liveCaptions.saveCaptionsHistory() }
+                    .disabled(!liveCaptions.hasHistory)
             }
             CommandMenu("Transcript") {
                 Button("Copy Plain Text") { model.copyTranscriptToPasteboard(withTimestamps: false) }

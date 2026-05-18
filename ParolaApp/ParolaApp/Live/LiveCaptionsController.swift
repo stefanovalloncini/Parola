@@ -118,6 +118,25 @@ final class LiveCaptionsController: ObservableObject {
         }
     }
 
+    var hasHistory: Bool {
+        !(state.confirmedLines.isEmpty && state.partial.isEmpty)
+    }
+
+    func saveCaptionsHistory() {
+        guard hasHistory else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.plainText]
+        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        panel.nameFieldStringValue = "captions-\(stamp).txt"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        var body = state.confirmedLines.joined(separator: "\n")
+        if !state.partial.isEmpty {
+            if !body.isEmpty { body += "\n" }
+            body += state.partial
+        }
+        try? body.data(using: .utf8)?.write(to: url, options: .atomic)
+    }
+
     private func openPresenter() {
         let screen = NSScreen.main ?? NSScreen.screens.first
         let frame = screen?.frame ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
