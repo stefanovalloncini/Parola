@@ -90,6 +90,11 @@ struct ParolaApp: App {
             CommandGroup(replacing: .help) {
                 Button("Keyboard Shortcuts…") { shortcutSheetOpen = true }
                     .keyboardShortcut("/", modifiers: [.command])
+                Button("Send Feedback") {
+                    if let url = URL(string: "mailto:feedback@parola.app?subject=Parola%20feedback") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
                 Button("About Parola…") { aboutSheetOpen = true }
             }
             CommandGroup(replacing: .newItem) {
