@@ -140,7 +140,8 @@ final class AppModel: ObservableObject {
     }
     @Published var findCaseSensitive: Bool = false { didSet { scheduleRecomputeMatches() } }
     @Published var findReplacement: String = ""
-    @Published var matches: [TranscriptMatch] = []
+    @Published var matches: [TranscriptMatch] = [] { didSet { rebuildMatchesIndex() } }
+    var matchesBySegment: [Int: [TranscriptMatch]] = [:]
     @Published var currentMatchIndex: Int = 0
     var matchesDebounce: Task<Void, Never>?
 

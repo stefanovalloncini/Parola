@@ -56,11 +56,15 @@ extension AppModel {
     }
 
     func match(in segmentID: TranscriptSegment.ID) -> [TranscriptMatch] {
-        matches.filter { $0.segmentID == segmentID }
+        matchesBySegment[segmentID] ?? []
     }
 
     var currentMatch: TranscriptMatch? {
         guard !matches.isEmpty else { return nil }
         return matches[currentMatchIndex]
+    }
+
+    func rebuildMatchesIndex() {
+        matchesBySegment = Dictionary(grouping: matches, by: \.segmentID)
     }
 }
