@@ -28,6 +28,7 @@ struct InfoInspector: View {
             }
 
             if model.transcript != nil {
+                SpeakerStatsSection()
                 ConfidenceSection()
                 ChaptersSection()
                 ActionItemsSection()
