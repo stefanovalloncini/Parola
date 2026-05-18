@@ -13,6 +13,7 @@ private func applyAppAppearance(_ theme: String) {
     NSApp.appearance = appearance
 }
 
+@MainActor
 private func applyAlwaysOnTop(_ on: Bool) {
     for window in NSApp.windows where window.title == "Parola" || window.styleMask.contains(.titled) && window.isVisible {
         window.level = on ? .floating : .normal
@@ -45,7 +46,8 @@ private func handleOpen(_ url: URL, model: AppModel) {
         if let entryID = query["entry"] {
             model.loadEntry(entryID)
             if let raw = query["t"], let seconds = Timecode.parse(raw) ?? Double(raw) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(500))
                     model.seekTo(seconds: seconds)
                 }
             }
