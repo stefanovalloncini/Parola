@@ -56,6 +56,9 @@ final class AppModel: ObservableObject {
     @AppStorage("subtitleFPS") var subtitleFPS: Double = 30
     @AppStorage("subtitleCaptionLength") var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue
     @AppStorage("recentFiles") var recentFilesRaw: String = "[]"
+    @AppStorage("micHotkeyKeyCode") var micHotkeyKeyCode: Int = 15 // kVK_ANSI_R
+    @AppStorage("micHotkeyModifiers") var micHotkeyModifiers: Int = 786721 // ⌃⌥⌘
+    @AppStorage("micHotkeyEnabled") var micHotkeyEnabled: Bool = false
 
     var recentFiles: [URL] {
         get {
@@ -79,6 +82,22 @@ final class AppModel: ObservableObject {
 
     func clearRecentFiles() {
         recentFilesRaw = "[]"
+    }
+
+    func toggleMicRecording() {
+        switch phase {
+        case .recording(.microphone):
+            stopRecordingAndTranscribe()
+        case .idle, .ready, .failed:
+            startRecording(source: .microphone)
+        default:
+            return
+        }
+    }
+
+    var micHotkeyModifierFlags: NSEvent.ModifierFlags {
+        NSEvent.ModifierFlags(rawValue: UInt(micHotkeyModifiers))
+            .intersection(.deviceIndependentFlagsMask)
     }
 
     @Published var batchJobs: [BatchJob] = []

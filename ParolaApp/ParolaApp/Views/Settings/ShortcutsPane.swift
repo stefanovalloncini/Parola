@@ -22,6 +22,17 @@ struct ShortcutsPane: View {
                         modifierRawValue: $model.dictationKeyModifiers
                     )
                 }
+                SettingRow("Mic recording hotkey",
+                           description: "Start or stop mic recording from anywhere. Off by default.") {
+                    HStack(spacing: 8) {
+                        Toggle("", isOn: $model.micHotkeyEnabled).labelsHidden()
+                        HotkeyRecorder(
+                            keyCode: $model.micHotkeyKeyCode,
+                            modifierRawValue: $model.micHotkeyModifiers
+                        )
+                        .disabled(!model.micHotkeyEnabled)
+                    }
+                }
             }
             SettingHelper(text: "Menu equivalents are fixed. Dictation needs Input Monitoring permission.")
         }

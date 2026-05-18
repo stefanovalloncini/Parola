@@ -19,6 +19,7 @@ struct ParolaApp: App {
     @StateObject private var liveCaptions = LiveCaptionsController()
     @StateObject private var scratchpad = ScratchpadController()
     @State private var shortcutSheetOpen = false
+    @State private var micHotkey = MicHotkeyController()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
@@ -32,6 +33,7 @@ struct ParolaApp: App {
                     model.liveCaptions = liveCaptions
                     appDelegate.bind(model: model)
                     applyAppAppearance(model.appTheme)
+                    micHotkey.bind(model)
                 }
                 .onChange(of: model.appTheme) { _, newValue in
                     applyAppAppearance(newValue)
