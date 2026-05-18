@@ -41,6 +41,7 @@ struct InfoInspector: View {
                 ConfidenceSection()
                 ChaptersSection()
                 ActionItemsSection()
+                SpeechRateSection()
                 WordFrequencySection()
             }
         }
