@@ -58,6 +58,7 @@ final class AppModel: ObservableObject {
     @AppStorage("transcriptCompact") var transcriptCompact: Bool = false
     @AppStorage("skipSilences") var skipSilences: Bool = false
     @AppStorage("markdownTimestamps") var markdownTimestamps: Bool = false
+    @AppStorage("htmlExportTheme") var htmlExportThemeRaw: String = HtmlExportTheme.light.rawValue
     @AppStorage("recentFiles") var recentFilesRaw: String = "[]"
     @AppStorage("micHotkeyKeyCode") var micHotkeyKeyCode: Int = 15 // kVK_ANSI_R
     @AppStorage("micHotkeyModifiers") var micHotkeyModifiers: Int = 786721 // ⌃⌥⌘
@@ -1242,6 +1243,9 @@ final class AppModel: ObservableObject {
         case .srt: return SrtExporter(options: SubtitleOptions(captionLength: subtitleCaptionLength))
         case .vtt: return VttExporter(options: SubtitleOptions(captionLength: subtitleCaptionLength))
         case .md:  return MarkdownExporter(options: MarkdownOptions(showTimestamps: markdownTimestamps))
+        case .html:
+            let theme = HtmlExportTheme(rawValue: htmlExportThemeRaw) ?? .light
+            return HtmlExporter(options: HtmlOptions(theme: theme))
         default:   return Exporters.exporter(for: format)
         }
     }

@@ -10,9 +10,70 @@ public struct JsonExporter: TranscriptExporter {
     }
 }
 
+public enum HtmlExportTheme: String, Sendable, Codable, CaseIterable, Identifiable {
+    case light
+    case dark
+    case sepia
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .light: return "Light"
+        case .dark:  return "Dark"
+        case .sepia: return "Sepia"
+        }
+    }
+
+    var background: String {
+        switch self {
+        case .light: return "#ffffff"
+        case .dark:  return "#111111"
+        case .sepia: return "#f4ecd8"
+        }
+    }
+
+    var foreground: String {
+        switch self {
+        case .light: return "#111111"
+        case .dark:  return "#eeeeee"
+        case .sepia: return "#3a2d1f"
+        }
+    }
+
+    var timestamp: String {
+        switch self {
+        case .light: return "#888888"
+        case .dark:  return "#999999"
+        case .sepia: return "#9a7a48"
+        }
+    }
+}
+
+public struct HtmlOptions: Sendable, Codable, Hashable {
+    public var theme: HtmlExportTheme
+
+    public init(theme: HtmlExportTheme = .light) {
+        self.theme = theme
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        theme = try c.decodeIfPresent(HtmlExportTheme.self, forKey: .theme) ?? .light
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case theme
+    }
+}
+
 public struct HtmlExporter: TranscriptExporter {
     public let format: ExportFormat = .html
-    public init() {}
+    public let options: HtmlOptions
+
+    public init(options: HtmlOptions = HtmlOptions()) {
+        self.options = options
+    }
 
     public func render(_ transcript: Transcript) throws -> Data {
         var body = ""
@@ -27,16 +88,17 @@ public struct HtmlExporter: TranscriptExporter {
             paragraph += "\(text)</p>\n"
             body += paragraph
         }
+        let theme = options.theme
+        let css = "body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.5;background:\(theme.background);color:\(theme.foreground)}.t{color:\(theme.timestamp);font-family:ui-monospace,monospace;font-size:.85em;text-decoration:none;margin-right:.4em}.s{font-weight:600}p{margin:0 0 1em}"
         let doc = """
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"><title>Transcript</title>
-        <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.5}.t{color:#888;font-family:ui-monospace,monospace;font-size:.85em;text-decoration:none;margin-right:.4em}.s{font-weight:600}p{margin:0 0 1em}</style>
+        <style>\(css)</style>
         </head><body>
         \(body)</body></html>
         """
         return utf8(doc)
     }
-
 }
 
 public struct CsvExporter: TranscriptExporter {

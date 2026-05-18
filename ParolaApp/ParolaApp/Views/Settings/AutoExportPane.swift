@@ -70,6 +70,17 @@ struct AutoExportPane: View {
                            description: "Prefix each Markdown paragraph with its start time.") {
                     Toggle("", isOn: $model.markdownTimestamps).labelsHidden()
                 }
+                SettingRow("HTML theme",
+                           description: "Color scheme used by the HTML export.") {
+                    Picker("", selection: $model.htmlExportThemeRaw) {
+                        ForEach(HtmlExportTheme.allCases) { theme in
+                            Text(theme.displayName).tag(theme.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 160)
+                }
             }
 
             ResetPaneButton(scope: .autoExport)
