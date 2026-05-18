@@ -17,6 +17,7 @@ struct DictationView: View {
             }
         }
         .padding(4)
+        .opacity(max(0.4, min(1.0, model.dictationHudOpacity)))
         .onChange(of: state) { _, newValue in
             if case .listening = newValue { startedAt = Date() }
         }

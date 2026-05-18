@@ -60,6 +60,7 @@ final class AppModel: ObservableObject {
     @AppStorage("pausePlayerOnAppHidden") var pausePlayerOnAppHidden: Bool = false
     @AppStorage("markdownTimestamps") var markdownTimestamps: Bool = false
     @AppStorage("htmlExportTheme") var htmlExportThemeRaw: String = HtmlExportTheme.light.rawValue
+    @AppStorage("dictationHudOpacity") var dictationHudOpacity: Double = 1.0
     @AppStorage("recentFiles") var recentFilesRaw: String = "[]"
     @AppStorage("micHotkeyKeyCode") var micHotkeyKeyCode: Int = 15 // kVK_ANSI_R
     @AppStorage("micHotkeyModifiers") var micHotkeyModifiers: Int = 786721 // ⌃⌥⌘

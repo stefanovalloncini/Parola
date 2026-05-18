@@ -57,6 +57,17 @@ struct DictationPane: View {
                     .pickerStyle(.menu)
                     .frame(width: 200)
                 }
+                SettingRow("HUD opacity",
+                           description: "Make the dictation HUD translucent.") {
+                    HStack(spacing: 8) {
+                        Slider(value: $model.dictationHudOpacity, in: 0.4...1.0)
+                            .frame(width: 160)
+                        Text("\(Int(model.dictationHudOpacity * 100))%")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 40, alignment: .trailing)
+                    }
+                }
                 SettingRow("Mode",
                            description: "Quick context: how the dictated text should land.") {
                     DictationModeRow(selectedID: $model.dictationCleanupPromptID)
