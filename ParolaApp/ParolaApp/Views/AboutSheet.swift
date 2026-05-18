@@ -1,6 +1,8 @@
 import SwiftUI
+import ParolaCore
 
 struct AboutSheet: View {
+    @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -38,6 +40,7 @@ struct AboutSheet: View {
                 creditRow(title: "Local LLM", value: "Apple Foundation Models")
                 creditRow(title: "Cloud LLM", value: "OpenAI · Anthropic · Groq · Cerebras · Ollama")
                 creditRow(title: "Auto-update", value: "Sparkle")
+                creditRow(title: "Models on disk", value: modelsOnDiskLabel)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -50,7 +53,7 @@ struct AboutSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 380, height: 320)
+        .frame(width: 380, height: 360)
     }
 
     private static var versionString: String {
@@ -70,6 +73,13 @@ struct AboutSheet: View {
         if FileManager.default.fileExists(atPath: path) { return "APP STORE" }
         return nil
         #endif
+    }
+
+    private var modelsOnDiskLabel: String {
+        let installed = model.availableModels.filter { $0.isInstalled }
+        let total = installed.reduce(0) { $0 + ($1.approximateSizeBytes ?? 0) }
+        if total == 0 { return "—" }
+        return "\(installed.count) · \(ByteCountFormatter.string(fromByteCount: Int64(total), countStyle: .file))"
     }
 
     private func creditRow(title: String, value: String) -> some View {

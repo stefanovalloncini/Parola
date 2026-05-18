@@ -80,7 +80,7 @@ struct ParolaApp: App {
                 }
                 .onOpenURL { url in handleOpen(url, model: model) }
                 .sheet(isPresented: $shortcutSheetOpen) { ShortcutCheatSheet() }
-                .sheet(isPresented: $aboutSheetOpen) { AboutSheet() }
+                .sheet(isPresented: $aboutSheetOpen) { AboutSheet().environmentObject(model) }
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
