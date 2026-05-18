@@ -11,6 +11,8 @@ struct LibraryListView: View {
     @State private var renameDraft: String = ""
     @State private var labelFilter: String?
     @State private var dateRangeFilter: DateRangeFilter = .all
+    @State private var entries: [LibraryEntry] = []
+    @State private var labelOptions: [String] = []
 
     private enum DateRangeFilter: String, CaseIterable, Identifiable {
         case all, today, week, month, year
@@ -36,9 +38,9 @@ struct LibraryListView: View {
         }
     }
 
-    private var entries: [LibraryEntry] {
-        model.libraryEntries
-            .filter { $0.category == category }
+    private func recomputeDerived() {
+        let inCategory = model.libraryEntries.filter { $0.category == category }
+        entries = inCategory
             .filter { entry in
                 guard let labelFilter else { return true }
                 return entry.labels.contains { $0.localizedCaseInsensitiveCompare(labelFilter) == .orderedSame }
@@ -51,17 +53,14 @@ struct LibraryListView: View {
                 if lhs.pinned != rhs.pinned { return lhs.pinned }
                 return lhs.createdAt > rhs.createdAt
             }
-    }
-
-    private var labelOptions: [String] {
         var seen = Set<String>()
         var ordered: [String] = []
-        for entry in model.libraryEntries where entry.category == category {
+        for entry in inCategory {
             for label in entry.labels {
                 if seen.insert(label).inserted { ordered.append(label) }
             }
         }
-        return ordered.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        labelOptions = ordered.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
     var body: some View {
@@ -116,10 +115,13 @@ struct LibraryListView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onChange(of: entries.map(\.id)) { _, ids in
-            let valid = Set(ids)
-            selection = selection.intersection(valid)
+        .onAppear { recomputeDerived() }
+        .onChange(of: model.libraryVersion) { _, _ in
+            recomputeDerived()
+            selection = selection.intersection(Set(entries.map(\.id)))
         }
+        .onChange(of: labelFilter) { _, _ in recomputeDerived() }
+        .onChange(of: dateRangeFilter) { _, _ in recomputeDerived() }
         .alert("Delete \(selection.count) entries?", isPresented: $pendingBulkDelete) {
             Button("Cancel", role: .cancel) {}
                 .accessibilityIdentifier("alert.bulkDelete.cancel")

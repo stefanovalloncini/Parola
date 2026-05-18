@@ -395,8 +395,12 @@ final class AppModel: ObservableObject {
 
     let library = LibraryStore()
     @Published var libraryEntries: [LibraryEntry] = [] {
-        didSet { rebuildLibraryIndex() }
+        didSet {
+            rebuildLibraryIndex()
+            libraryVersion &+= 1
+        }
     }
+    @Published private(set) var libraryVersion: Int = 0
     @Published var deletedEntries: [LibraryEntry] = []
     @Published var searchResults: [LibraryEntry]?
     @Published var selectedEntryID: LibraryEntry.ID?
