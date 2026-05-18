@@ -101,12 +101,14 @@ struct FindBar: View {
             Button("Replace") { model.replaceCurrentMatch() }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .keyboardShortcut("=", modifiers: [.command])
                 .disabled(model.matches.isEmpty)
 
             Button("Replace All") { model.replaceAllMatches() }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
                 .tint(DS.Color.accent)
+                .keyboardShortcut("e", modifiers: [.command, .option])
                 .disabled(model.matches.isEmpty)
         }
         .padding(.leading, 2)

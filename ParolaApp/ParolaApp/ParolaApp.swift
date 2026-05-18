@@ -138,6 +138,9 @@ struct ParolaApp: App {
                 Button("Find Previous") { model.goToPreviousMatch() }
                     .keyboardShortcut("g", modifiers: [.command, .shift])
                     .disabled(!model.findIsOpen || model.matches.isEmpty)
+                Button("Replace All") { model.replaceAllMatches() }
+                    .keyboardShortcut("e", modifiers: [.command, .option])
+                    .disabled(!model.findIsOpen || model.matches.isEmpty)
                 Divider()
                 Button("Auto-detect Language") { model.selectedLanguage = nil }
                     .keyboardShortcut("d", modifiers: [.command, .shift])
