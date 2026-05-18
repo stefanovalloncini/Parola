@@ -37,21 +37,10 @@ final class MenuBarController {
             lastVisibility = model.showMenuBarExtra
         }
         guard model.showMenuBarExtra else { return }
-        let key = snapshotKey(for: model)
+        let key = "\(model.libraryVersion)|\(model.dictationEnabled ? "1" : "0")"
         guard key != lastSnapshotKey else { return }
         lastSnapshotKey = key
         rebuildMenu()
-    }
-
-    private func snapshotKey(for model: AppModel) -> String {
-        let dictation = model.dictationEnabled ? "1" : "0"
-        let pinned = model.libraryEntries.lazy.filter(\.pinned).prefix(5).map(\.id).joined(separator: ",")
-        let recent = model.libraryEntries
-            .sorted { $0.createdAt > $1.createdAt }
-            .prefix(8)
-            .map(\.id)
-            .joined(separator: ",")
-        return "\(dictation)|\(pinned)|\(recent)"
     }
 
     private func applyVisibility(_ visible: Bool) {
