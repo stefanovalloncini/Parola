@@ -22,6 +22,7 @@ public struct MediaRemotePauseAdapter: MediaPlaybackToggler {
 
 #if canImport(Darwin) && os(macOS)
 
+/// Unchecked Sendable: `dlopen` handle and function pointer are loaded once at init and read-only after.
 private final class MediaRemoteBridge: @unchecked Sendable {
     static let shared = MediaRemoteBridge()
 

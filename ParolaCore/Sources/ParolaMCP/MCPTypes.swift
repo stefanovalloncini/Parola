@@ -58,6 +58,7 @@ public enum JSONRPCID: Codable, Sendable, Hashable {
 
 // MARK: - AnyDecodable / AnyEncodable
 
+/// Unchecked Sendable: `value` is a `let` set once at init and never mutated.
 public struct AnyDecodable: Decodable, @unchecked Sendable {
     public let value: Any
 
@@ -80,6 +81,7 @@ public struct AnyDecodable: Decodable, @unchecked Sendable {
     }
 }
 
+/// Unchecked Sendable: `_encode` is an immutable `let` closure; the captured `Any` is read-only after init.
 public struct AnyEncodable: Encodable, @unchecked Sendable {
     private let _encode: (Encoder) throws -> Void
     public init<T: Encodable>(_ value: T) {

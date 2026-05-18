@@ -247,8 +247,7 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
     }
 }
 
-// Unchecked Sendable: the box is captured by the @Sendable converter callback but is touched
-// only synchronously inside the single convert(to:error:) call that creates it.
+/// Unchecked Sendable: the box is touched synchronously inside the single convert call that creates it.
 private final class AudioBufferBox: @unchecked Sendable {
     let buffer: AVAudioPCMBuffer
     var consumed = false
