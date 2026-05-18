@@ -154,7 +154,7 @@ private enum SidebarRoute: Hashable {
 }
 
 private struct SidebarRow: View {
-    let title: String
+    let title: LocalizedStringKey
     let systemImage: String
     let isSelected: Bool
     var badge: Int? = nil
@@ -211,7 +211,7 @@ private struct SidebarRow: View {
 }
 
 private struct FilterChip: View {
-    let title: String
+    let title: LocalizedStringKey
     let isSelected: Bool
     let action: () -> Void
 
@@ -241,11 +241,12 @@ private struct FilterChip: View {
 }
 
 private struct SectionLabel: View {
-    let text: String
-    init(_ text: String) { self.text = text }
+    let text: LocalizedStringKey
+    init(_ text: LocalizedStringKey) { self.text = text }
     var body: some View {
-        Text(text.uppercased())
+        Text(text)
             .font(.caption2.weight(.semibold))
+            .textCase(.uppercase)
             .tracking(0.6)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 10)
@@ -254,7 +255,7 @@ private struct SectionLabel: View {
 }
 
 private struct PillRowContent: View {
-    let title: String
+    let title: LocalizedStringKey
     let systemImage: String
 
     @State private var isHovering = false

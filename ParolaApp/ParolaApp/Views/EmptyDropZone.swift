@@ -104,7 +104,7 @@ private struct LibraryStatsCard: View {
         )
     }
 
-    private func stat(label: String, value: Int) -> some View {
+    private func stat(label: LocalizedStringKey, value: Int) -> some View {
         VStack(alignment: .center, spacing: 4) {
             Text("\(value)")
                 .font(.system(size: 22, weight: .semibold, design: .rounded))
@@ -125,7 +125,7 @@ private struct LibraryStatsCard: View {
 }
 
 struct ActionCard: View {
-    let title: String
+    let title: LocalizedStringKey
     let systemImage: String
     var isEnabled: Bool = true
     let action: () -> Void
