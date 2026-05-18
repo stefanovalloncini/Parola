@@ -23,7 +23,7 @@ struct SettingsView: View {
 
 private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     case general, customization, watchedFolders, recordMeetings, shortcuts
-    case microphone, liveCaptions, dictation, snippets
+    case microphone, liveCaptions, dictation, snippets, corrections
     case localModels, transcriptionDefaults, translation, ignoredSegments, findReplace
     case exportFormats, batchExport, autoExport, integrations
     case prompts
@@ -44,6 +44,7 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .liveCaptions: return "Live Captions"
         case .dictation: return "Dictation"
         case .snippets: return "Snippets"
+        case .corrections: return "Corrections"
         case .localModels: return "Local Models"
         case .transcriptionDefaults: return "Transcription Defaults"
         case .translation: return "Translation"
@@ -72,6 +73,7 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .liveCaptions: return "captions.bubble"
         case .dictation: return "text.bubble"
         case .snippets: return "text.append"
+        case .corrections: return "wand.and.rays"
         case .localModels: return "cpu"
         case .transcriptionDefaults: return "slider.horizontal.3"
         case .translation: return "character.book.closed"
@@ -100,6 +102,7 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .liveCaptions: return .liveCaptions
         case .dictation: return .dictation
         case .snippets: return .snippets
+        case .corrections: return .corrections
         case .localModels: return nil
         case .transcriptionDefaults: return .transcriptionDefaults
         case .translation: return .translation
@@ -126,7 +129,7 @@ private struct SidebarGroup: Identifiable {
 
 private let sidebarGroups: [SidebarGroup] = [
     SidebarGroup(title: nil, routes: [.general, .customization, .watchedFolders, .recordMeetings, .shortcuts]),
-    SidebarGroup(title: "AUDIO & VIDEO", routes: [.microphone, .liveCaptions, .dictation, .snippets]),
+    SidebarGroup(title: "AUDIO & VIDEO", routes: [.microphone, .liveCaptions, .dictation, .snippets, .corrections]),
     SidebarGroup(title: "TRANSCRIPTION", routes: [.localModels, .transcriptionDefaults, .translation, .ignoredSegments, .findReplace]),
     SidebarGroup(title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport, .integrations]),
     SidebarGroup(title: "AI", routes: [.prompts]),
@@ -260,6 +263,7 @@ private struct SettingsDetail: View {
         case .liveCaptions: LiveCaptionsPane()
         case .dictation: DictationPane()
         case .snippets: SnippetsPane()
+        case .corrections: CorrectionsPane()
         case .localModels:
             ModelsSettingsPane()
         case .transcriptionDefaults: TranscriptionDefaultsPane()

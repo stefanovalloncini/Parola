@@ -174,11 +174,15 @@ extension AppModel {
             defaultPrompt: currentDictationCleanupPrompt(),
             overrides: currentDictationOverrides()
         )
-        let snippetExpander = makeSnippetExpander()
-        if snippets.contains(where: { $0.enabled }) {
-            return CompositePostProcessor([snippetExpander, prompt])
+        var chain: [any TextPostProcessor] = []
+        if correctionRules.contains(where: { $0.enabled && !$0.from.isEmpty }) {
+            chain.append(CorrectionRuleSet(rules: correctionRules))
         }
-        return prompt
+        if snippets.contains(where: { $0.enabled }) {
+            chain.append(makeSnippetExpander())
+        }
+        chain.append(prompt)
+        return chain.count == 1 ? prompt : CompositePostProcessor(chain)
     }
 
     func applyDictationCleanupPromptChange() {

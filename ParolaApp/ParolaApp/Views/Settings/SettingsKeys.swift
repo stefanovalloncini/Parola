@@ -9,6 +9,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     case liveCaptions
     case dictation
     case snippets
+    case corrections
     case translation
     case transcriptionDefaults
     case ignoredSegments
@@ -34,6 +35,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .liveCaptions: return "Live Captions"
         case .dictation: return "Dictation"
         case .snippets: return "Snippets"
+        case .corrections: return "Corrections"
         case .translation: return "Translation"
         case .transcriptionDefaults: return "Transcription Defaults"
         case .ignoredSegments: return "Ignored Segments"
@@ -60,6 +62,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .liveCaptions: return ["captions", "translate", "live"]
         case .dictation: return ["hotkey", "f5", "push to talk", "toggle", "indicator", "notch", "overlay", "cleanup", "workflows", "per-app"]
         case .snippets: return ["snippet", "expand", "abbreviation"]
+        case .corrections: return ["correction", "fix", "replace", "dictation", "vocabulary"]
         case .translation: return ["translate", "english"]
         case .transcriptionDefaults: return ["default", "model", "language", "engine", "whisper"]
         case .ignoredSegments: return ["filler", "uh", "um", "ignore", "skip"]
@@ -101,6 +104,8 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
             ]
         case .snippets:
             return ["snippets"]
+        case .corrections:
+            return ["correctionRules"]
         case .translation:
             return ["translate"]
         case .transcriptionDefaults:

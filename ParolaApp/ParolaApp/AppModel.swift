@@ -188,6 +188,10 @@ final class AppModel: ObservableObject {
         }
     }
 
+    @Published var correctionRules: [CorrectionRule] = [] {
+        didSet { saveCorrectionRules() }
+    }
+
     // MARK: - People (speakers)
 
     let peopleStore = PeopleStore()
@@ -482,6 +486,7 @@ final class AppModel: ObservableObject {
         loadIgnoredSegmentRules()
         loadFindReplaceRules()
         loadSnippets()
+        loadCorrectionRules()
         refreshModelList()
         refreshYtDlpAvailability()
         refreshLibrary()
