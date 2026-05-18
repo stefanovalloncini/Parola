@@ -1246,6 +1246,25 @@ final class AppModel: ObservableObject {
         try? body.data(using: .utf8)?.write(to: url, options: .atomic)
     }
 
+    func shareTranscriptViaMail() {
+        guard let transcript else { return }
+        let title = sourceFileURL?.deletingPathExtension().lastPathComponent ?? "Transcript"
+        let body = transcript.segments
+            .map { seg -> String in
+                let stamp = Timecode.format(seg.start)
+                let prefix = seg.speaker.map { "\($0): " } ?? ""
+                return "\(stamp)  \(prefix)\(seg.text.trimmingCharacters(in: .whitespaces))"
+            }
+            .joined(separator: "\n\n")
+        var components = URLComponents(string: "mailto:")!
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: title),
+            URLQueryItem(name: "body", value: body),
+        ]
+        guard let url = components.url else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     func copyTranscriptToPasteboard(withTimestamps: Bool) {
         guard let transcript else { return }
         let text: String
