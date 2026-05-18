@@ -240,6 +240,20 @@ private struct LibraryRow: View {
                         .font(DS.Font.body)
                         .foregroundStyle(DS.Color.primaryText)
                         .lineLimit(1)
+                    if entry.segmentNotes.count > 0 {
+                        HStack(spacing: 2) {
+                            Image(systemName: "note.text")
+                                .font(.system(size: 9))
+                            Text("\(entry.segmentNotes.count)")
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .foregroundStyle(DS.Color.accent.opacity(0.8))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(
+                            Capsule().fill(DS.Color.accent.opacity(0.10))
+                        )
+                    }
                 }
                 HStack(spacing: 6) {
                     Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
