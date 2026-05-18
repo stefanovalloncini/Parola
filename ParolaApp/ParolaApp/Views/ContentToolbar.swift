@@ -20,6 +20,14 @@ struct ContentToolbar: ToolbarContent {
                 .toggleStyle(.button)
                 .help("Translate to English instead of transcribing in the source language.")
             }
+            Toggle(isOn: $model.diarize) {
+                HStack(spacing: 4) {
+                    Image(systemName: "person.2.wave.2")
+                    Text("Diarize")
+                }
+            }
+            .toggleStyle(.button)
+            .help("Identify multiple speakers in the audio (slower).")
         }
         ToolbarItemGroup(placement: .primaryAction) {
             if model.route != .batch {
