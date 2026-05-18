@@ -35,7 +35,6 @@ struct WaveformHistory: View {
             }
         }
         .frame(height: maxHeight)
-        .animation(.linear(duration: 0.05), value: history)
         .onAppear { history = LevelHistory(capacity: capacity) }
         .onChange(of: level) { _, newValue in
             history.append(newValue)

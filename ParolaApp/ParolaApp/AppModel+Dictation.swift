@@ -7,8 +7,18 @@ import ParolaCore
 extension AppModel {
 
     func dictationWorkflows() -> [String: DictationWorkflow] {
-        guard let data = dictationPerAppOverridesJSON.data(using: .utf8) else { return [:] }
-        return DictationWorkflowMap.decode(legacy: data)
+        let json = dictationPerAppOverridesJSON
+        if let cached = cachedDictationWorkflows, cached.json == json {
+            return cached.map
+        }
+        let map: [String: DictationWorkflow]
+        if let data = json.data(using: .utf8) {
+            map = DictationWorkflowMap.decode(legacy: data)
+        } else {
+            map = [:]
+        }
+        cachedDictationWorkflows = (json, map)
+        return map
     }
 
     func dictationWorkflow(for bundleID: String) -> DictationWorkflow {

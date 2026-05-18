@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import ParolaCore
 
@@ -126,7 +127,7 @@ struct DictationView: View {
         case .idle:
             Circle().fill(Color.gray.opacity(0.6)).frame(width: 14, height: 14)
         case .listening:
-            WaveformBars(level: controller.audioLevel)
+            LiveWaveformBars(levelSubject: controller.audioLevel)
         case .transcribing:
             SpinningRing().frame(width: 14, height: 14)
         case .failed:
@@ -140,7 +141,7 @@ struct DictationView: View {
     private var overlayIndicator: some View {
         switch state {
         case .listening:
-            WaveformHistory(level: controller.audioLevel, capacity: 18, maxHeight: 20)
+            LiveWaveformHistory(levelSubject: controller.audioLevel, capacity: 18, maxHeight: 20)
                 .frame(height: 22)
                 .fixedSize(horizontal: true, vertical: true)
         default:
@@ -212,6 +213,26 @@ struct DictationView: View {
     }
 }
 
+private struct LiveWaveformBars: View {
+    let levelSubject: CurrentValueSubject<Float, Never>
+    @State private var level: Float = 0
+    var body: some View {
+        WaveformBars(level: level)
+            .onReceive(levelSubject) { level = $0 }
+    }
+}
+
+private struct LiveWaveformHistory: View {
+    let levelSubject: CurrentValueSubject<Float, Never>
+    let capacity: Int
+    let maxHeight: CGFloat
+    @State private var level: Float = 0
+    var body: some View {
+        WaveformHistory(level: level, capacity: capacity, maxHeight: maxHeight)
+            .onReceive(levelSubject) { level = $0 }
+    }
+}
+
 private struct WaveformBars: View {
     let level: Float
 
@@ -222,30 +243,19 @@ private struct WaveformBars: View {
     private static let barWidth: CGFloat = 3
     private static let spacing: CGFloat = 2
 
-    @State private var idlePulse = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         HStack(alignment: .center, spacing: Self.spacing) {
             ForEach(0..<Self.barCount, id: \.self) { index in
                 Capsule(style: .continuous)
                     .fill(Color.white)
                     .frame(width: Self.barWidth, height: barHeight(at: index))
-                    .animation(.easeOut(duration: 0.08), value: level)
             }
         }
         .frame(height: Self.maxHeight)
-        .onAppear { if !reduceMotion { idlePulse = true } }
-        .animation(
-            reduceMotion ? nil : .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
-            value: idlePulse
-        )
     }
 
     private func barHeight(at index: Int) -> CGFloat {
-        if level <= 0.02 {
-            return idlePulse ? Self.idleHeight + 1 : Self.idleHeight
-        }
+        if level <= 0.02 { return Self.idleHeight }
         let shaped = pow(level, 0.6)
         let offset = Self.phaseOffsets[index % Self.phaseOffsets.count]
         let scaled = min(1, max(0, CGFloat(shaped * offset)))

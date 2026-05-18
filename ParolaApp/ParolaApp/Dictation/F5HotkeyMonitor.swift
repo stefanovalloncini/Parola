@@ -17,24 +17,26 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
     }
 
     nonisolated func start(handler: @escaping @Sendable (HotkeyEvent) -> Void) async {
-        await installMonitor(handler: handler)
+        await MainActor.run { self.installMonitor(handler: handler) }
     }
 
     nonisolated func stop() async {
-        await removeMonitor()
+        await MainActor.run { self.removeMonitor() }
     }
 
-    @MainActor
-    private func installMonitor(handler: @escaping @Sendable (HotkeyEvent) -> Void) async {
-        await removeMonitor()
+    private func installMonitor(handler: @escaping @Sendable (HotkeyEvent) -> Void) {
+        removeMonitor()
         let mask: NSEvent.EventTypeMask = [.keyDown, .keyUp]
+        let watchedKey = UInt16(keyCode)
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
-            Task { @MainActor [weak self] in
+            guard event.keyCode == watchedKey else { return }
+            MainActor.assumeIsolated {
                 self?.process(event: event, handler: handler)
             }
         }
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
-            Task { @MainActor [weak self] in
+            guard event.keyCode == watchedKey else { return event }
+            MainActor.assumeIsolated {
                 self?.process(event: event, handler: handler)
             }
             return event
@@ -42,7 +44,6 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
     }
 
     private func process(event: NSEvent, handler: @Sendable (HotkeyEvent) -> Void) {
-        guard event.keyCode == self.keyCode else { return }
         let needed = self.modifierMask
         if !needed.isEmpty {
             let pressed = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -63,8 +64,7 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
         }
     }
 
-    @MainActor
-    private func removeMonitor() async {
+    private func removeMonitor() {
         if let m = globalMonitor {
             NSEvent.removeMonitor(m)
             globalMonitor = nil

@@ -316,10 +316,13 @@ final class AppModel: ObservableObject {
     @Published var dictationPerAppOverridesJSON: String = AppModel.readString("dictationPerAppOverridesJSON", default: "{}") {
         didSet {
             UserDefaults.standard.set(dictationPerAppOverridesJSON, forKey: "dictationPerAppOverridesJSON")
+            cachedDictationWorkflows = nil
             applyDictationCleanupPromptChange()
             restartDictation()
         }
     }
+
+    var cachedDictationWorkflows: (json: String, map: [String: DictationWorkflow])?
 
     static let dictationOverrideApps: [(bundleID: String, name: String)] = [
         ("com.apple.mail", "Mail"),

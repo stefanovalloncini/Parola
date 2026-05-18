@@ -8,17 +8,25 @@ final class MicHotkeyController {
     private var monitor: GlobalHotkeyMonitor?
     private var cancellables: Set<AnyCancellable> = []
     private var lastConfig: (enabled: Bool, code: Int, mods: NSEvent.ModifierFlags)?
+    private var reapplyPending = false
 
     func bind(_ model: AppModel) {
         self.model = model
         reapplyFromModel()
 
         model.objectWillChange
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                DispatchQueue.main.async { self?.reapplyFromModel() }
-            }
+            .sink { [weak self] _ in self?.scheduleReapply() }
             .store(in: &cancellables)
+    }
+
+    private func scheduleReapply() {
+        guard !reapplyPending else { return }
+        reapplyPending = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.reapplyPending = false
+            self.reapplyFromModel()
+        }
     }
 
     private func reapplyFromModel() {

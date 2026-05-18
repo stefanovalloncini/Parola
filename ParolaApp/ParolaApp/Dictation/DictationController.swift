@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 import ParolaCore
 import SwiftUI
@@ -6,7 +7,7 @@ import SwiftUI
 @MainActor
 final class DictationController: ObservableObject {
     @Published private(set) var state: DictationCoordinator.State = .idle
-    @Published private(set) var audioLevel: Float = 0
+    let audioLevel = CurrentValueSubject<Float, Never>(0)
     @Published private(set) var partialText: String = "" {
         didSet { if oldValue.isEmpty != partialText.isEmpty { resizeHUDForPartial() } }
     }
@@ -139,14 +140,12 @@ final class DictationController: ObservableObject {
     private func startLevelStream() {
         guard let coord = coordinator else { return }
         levelTask?.cancel()
-        levelTask = Task { [weak self] in
+        let subject = audioLevel
+        levelTask = Task { @MainActor in
             let stream = await coord.levels()
             for await level in stream {
-                await MainActor.run {
-                    guard let self else { return }
-                    if abs(self.audioLevel - level) > 0.01 {
-                        self.audioLevel = level
-                    }
+                if abs(subject.value - level) > 0.05 {
+                    subject.send(level)
                 }
             }
         }
@@ -155,21 +154,19 @@ final class DictationController: ObservableObject {
     private func stopLevelStream() {
         levelTask?.cancel()
         levelTask = nil
-        audioLevel = 0
+        audioLevel.send(0)
     }
 
     private func startPartialStream() {
         guard let coord = coordinator else { return }
         partialTask?.cancel()
         partialText = ""
-        partialTask = Task { [weak self] in
+        partialTask = Task { @MainActor [weak self] in
             let stream = await coord.partials()
             for await text in stream {
-                await MainActor.run {
-                    guard let self else { return }
-                    if self.partialText != text {
-                        self.partialText = text
-                    }
+                guard let self else { return }
+                if self.partialText != text {
+                    self.partialText = text
                 }
             }
         }
