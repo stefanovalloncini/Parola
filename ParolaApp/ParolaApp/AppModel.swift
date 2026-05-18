@@ -297,6 +297,12 @@ final class AppModel: ObservableObject {
     @AppStorage("appTheme") var appTheme: String = "system"  // "system" | "light" | "dark"
     @AppStorage("monospacedTimestamps") var monospacedTimestamps: Bool = true
     @AppStorage("sidebarDensity") var sidebarDensity: String = "comfortable"  // "comfortable" | "compact"
+    @AppStorage(AppAccent.storageKey) var appAccentRaw: String = AppAccent.terracotta.rawValue
+
+    var appAccent: AppAccent {
+        get { AppAccent(rawValue: appAccentRaw) ?? .terracotta }
+        set { appAccentRaw = newValue.rawValue }
+    }
 
     var preferredColorScheme: ColorScheme? {
         switch appTheme {
@@ -335,7 +341,7 @@ final class AppModel: ObservableObject {
     var dictationCancellables: Set<AnyCancellable> = []
 
     @Published var dictationState: DictationCoordinator.State = .idle
-    @Published var recordingAudioLevel: Float = 0
+    let recordingAudioLevel = CurrentValueSubject<Float, Never>(0)
     @Published var recordingIsSilent: Bool = false
     var recordingLevelTask: Task<Void, Never>?
     var silenceDetector: SilenceDetector = SilenceDetector(threshold: 8)
@@ -990,12 +996,12 @@ final class AppModel: ObservableObject {
 
     private func observeRecordingLevels(from mic: MicAudioSource) {
         recordingLevelTask?.cancel()
-        recordingLevelTask = Task { @MainActor [weak self] in
+        let subject = recordingAudioLevel
+        recordingLevelTask = Task { @MainActor in
             let stream = await mic.levels()
             for await value in stream {
-                guard let self else { return }
-                if abs(self.recordingAudioLevel - value) > 0.01 {
-                    self.recordingAudioLevel = value
+                if abs(subject.value - value) > 0.05 {
+                    subject.send(value)
                 }
             }
         }
@@ -1003,12 +1009,12 @@ final class AppModel: ObservableObject {
 
     private func observeRecordingLevels(from system: SystemAudioSource) {
         recordingLevelTask?.cancel()
-        recordingLevelTask = Task { @MainActor [weak self] in
+        let subject = recordingAudioLevel
+        recordingLevelTask = Task { @MainActor in
             let stream = await system.levels()
             for await value in stream {
-                guard let self else { return }
-                if abs(self.recordingAudioLevel - value) > 0.01 {
-                    self.recordingAudioLevel = value
+                if abs(subject.value - value) > 0.05 {
+                    subject.send(value)
                 }
             }
         }
@@ -1017,7 +1023,7 @@ final class AppModel: ObservableObject {
     private func stopRecordingLevelObserver() {
         recordingLevelTask?.cancel()
         recordingLevelTask = nil
-        recordingAudioLevel = 0
+        recordingAudioLevel.send(0)
     }
 
     private func updateSilenceFlag() {

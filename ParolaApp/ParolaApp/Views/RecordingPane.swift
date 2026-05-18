@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 struct RecordingPane: View {
@@ -18,7 +19,7 @@ struct RecordingPane: View {
             startedAt: startedAt,
             isVoiceActive: model.liveVoiceActive,
             stopTitle: stopTitle,
-            audioLevel: model.recordingAudioLevel,
+            levelSubject: model.recordingAudioLevel,
             showsWaveform: showsWaveform,
             onStop: { model.stopRecordingAndTranscribe() }
         )
@@ -70,12 +71,9 @@ struct RecordingCard: View {
     let startedAt: Date
     let isVoiceActive: Bool
     let stopTitle: String
-    var audioLevel: Float = 0
+    var levelSubject: CurrentValueSubject<Float, Never>? = nil
     var showsWaveform: Bool = false
     let onStop: () -> Void
-
-    @State private var pulse = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: DS.Spacing.large) {
@@ -86,11 +84,6 @@ struct RecordingCard: View {
                 Image(systemName: "mic.fill")
                     .font(.system(size: 64, weight: .regular))
                     .foregroundStyle(DS.Color.accent)
-                    .scaleEffect(reduceMotion ? 1.0 : (pulse ? 1.05 : 1.0))
-                    .animation(
-                        reduceMotion ? nil : .easeInOut(duration: 0.7).repeatForever(autoreverses: true),
-                        value: pulse
-                    )
             }
 
             VStack(spacing: DS.Spacing.small) {
@@ -109,18 +102,10 @@ struct RecordingCard: View {
                         .font(DS.Font.heading)
                         .foregroundStyle(DS.Color.secondaryText)
                 }
-                if showsWaveform {
-                    WaveformHistory(
-                        level: audioLevel,
-                        capacity: 48,
-                        barWidth: 2,
-                        spacing: 2,
-                        maxHeight: 28,
-                        idleHeight: 3,
-                        fill: DS.Color.accent
-                    )
-                    .frame(width: 220, height: 30)
-                    .padding(.top, 2)
+                if showsWaveform, let levelSubject {
+                    LiveRecordingWaveform(levelSubject: levelSubject)
+                        .frame(width: 220, height: 30)
+                        .padding(.top, 2)
                 }
                 Text(source.label)
                     .font(DS.Font.caption)
@@ -149,7 +134,23 @@ struct RecordingCard: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(DS.Color.separator.opacity(0.6), lineWidth: 1)
         )
-        .onAppear { if !reduceMotion { pulse = true } }
+    }
+}
+
+private struct LiveRecordingWaveform: View {
+    let levelSubject: CurrentValueSubject<Float, Never>
+    @State private var level: Float = 0
+    var body: some View {
+        WaveformHistory(
+            level: level,
+            capacity: 48,
+            barWidth: 2,
+            spacing: 2,
+            maxHeight: 28,
+            idleHeight: 3,
+            fill: DS.Color.accent
+        )
+        .onReceive(levelSubject) { level = $0 }
     }
 }
 
