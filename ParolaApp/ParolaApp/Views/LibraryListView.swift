@@ -43,7 +43,7 @@ struct LibraryListView: View {
                 emptyState
             } else {
                 List(entries, id: \.id, selection: $selection) { entry in
-                    LibraryRow(entry: entry)
+                    LibraryRow(entry: entry, sizeBytes: model.libraryBundleSizes[entry.id])
                         .contentShape(Rectangle())
                         .onTapGesture(count: 2) {
                             model.loadEntry(entry.id)
@@ -204,6 +204,7 @@ private func libraryCategoryName(_ category: EntryCategory) -> String {
 
 private struct LibraryRow: View {
     let entry: LibraryEntry
+    let sizeBytes: Int64?
 
     var body: some View {
         HStack(spacing: DS.Spacing.regular) {
@@ -219,9 +220,16 @@ private struct LibraryRow: View {
                         .foregroundStyle(DS.Color.primaryText)
                         .lineLimit(1)
                 }
-                Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(DS.Font.caption)
-                    .foregroundStyle(DS.Color.secondaryText)
+                HStack(spacing: 6) {
+                    Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
+                    if let sizeBytes, sizeBytes > 0 {
+                        Text("·")
+                            .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
+                        Text(ByteCountFormatter.string(fromByteCount: sizeBytes, countStyle: .file))
+                    }
+                }
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.secondaryText)
             }
             Spacer()
         }
