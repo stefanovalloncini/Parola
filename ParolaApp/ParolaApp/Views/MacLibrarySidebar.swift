@@ -31,7 +31,8 @@ struct MacLibrarySidebar: View {
                     SidebarRow(
                         title: "Home",
                         systemImage: "house.fill",
-                        isSelected: selectedRoute == .home
+                        isSelected: selectedRoute == .home,
+                        badge: pinnedBadge
                     ) {
                         model.libraryFilter = nil
                         model.route = .transcript
@@ -84,6 +85,11 @@ struct MacLibrarySidebar: View {
 
     private var activeQueueBadge: Int? {
         let n = model.batchJobs.filter { $0.status == .pending || $0.status == .transcribing }.count
+        return n > 0 ? n : nil
+    }
+
+    private var pinnedBadge: Int? {
+        let n = model.libraryEntries.filter { $0.pinned }.count
         return n > 0 ? n : nil
     }
 
