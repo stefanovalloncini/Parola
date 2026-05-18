@@ -30,6 +30,9 @@ struct InfoInspector: View {
                 if speakerCount > 0 {
                     InfoRow(icon: "person.2", label: "Speakers", value: "\(speakerCount)")
                 }
+                if fillerCount > 0 {
+                    InfoRow(icon: "exclamationmark.bubble", label: "Filler words", value: "\(fillerCount)")
+                }
             }
 
             if model.transcript != nil {
@@ -72,6 +75,11 @@ struct InfoInspector: View {
 
     private var speakerCount: Int {
         model.transcript?.uniqueSpeakers.count ?? 0
+    }
+
+    private var fillerCount: Int {
+        guard let text = model.transcript?.text else { return 0 }
+        return FillerWordCounter.count(in: text)
     }
 
     private var readingTimeLabel: String {
