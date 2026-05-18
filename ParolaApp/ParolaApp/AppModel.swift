@@ -61,6 +61,7 @@ final class AppModel: ObservableObject {
     @AppStorage("markdownTimestamps") var markdownTimestamps: Bool = false
     @AppStorage("htmlExportTheme") var htmlExportThemeRaw: String = HtmlExportTheme.light.rawValue
     @AppStorage("dictationHudOpacity") var dictationHudOpacity: Double = 1.0
+    @AppStorage("lastFindQuery") var lastFindQuery: String = ""
     @AppStorage("recentFiles") var recentFilesRaw: String = "[]"
     @AppStorage("micHotkeyKeyCode") var micHotkeyKeyCode: Int = 15 // kVK_ANSI_R
     @AppStorage("micHotkeyModifiers") var micHotkeyModifiers: Int = 786721 // ⌃⌥⌘
@@ -116,7 +117,12 @@ final class AppModel: ObservableObject {
     @AppStorage("batchExportFormatOptions") var batchExportFormatOptionsJSON: String = "{}"
 
     @Published var findIsOpen: Bool = false
-    @Published var findQuery: String = "" { didSet { scheduleRecomputeMatches() } }
+    @Published var findQuery: String = "" {
+        didSet {
+            if !findQuery.isEmpty { lastFindQuery = findQuery }
+            scheduleRecomputeMatches()
+        }
+    }
     @Published var findCaseSensitive: Bool = false { didSet { scheduleRecomputeMatches() } }
     @Published var findReplacement: String = ""
     @Published var matches: [TranscriptMatch] = []
@@ -1047,7 +1053,11 @@ final class AppModel: ObservableObject {
 
     func toggleFind() {
         findIsOpen.toggle()
-        if !findIsOpen {
+        if findIsOpen {
+            if findQuery.isEmpty, !lastFindQuery.isEmpty {
+                findQuery = lastFindQuery
+            }
+        } else {
             findQuery = ""
             matches = []
             currentMatchIndex = 0
