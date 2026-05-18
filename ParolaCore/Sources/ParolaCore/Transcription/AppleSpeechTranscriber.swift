@@ -121,7 +121,7 @@ public actor AppleSpeechTranscriber: Transcriber {
         do {
             segments = try await withTaskCancellationHandler {
                 try Task.checkCancellation()
-                try await analyzer.analyzeSequence(from: audioFile)
+                _ = try await analyzer.analyzeSequence(from: audioFile)
                 let endTime = CMTime(
                     seconds: max(durationSeconds, 0),
                     preferredTimescale: CMTimeScale(audioFile.processingFormat.sampleRate)
