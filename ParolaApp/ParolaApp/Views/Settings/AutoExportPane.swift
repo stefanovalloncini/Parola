@@ -53,8 +53,8 @@ struct AutoExportPane: View {
 
             SettingHelper(text: "Auto-export writes additional files next to the source when transcription completes.")
 
-            SettingsSection("Subtitle captions") {
-                SettingRow("Line length",
+            SettingsSection("Export options") {
+                SettingRow("Subtitle line length",
                            description: "Applied to SRT and VTT exports.",
                            isFirst: true) {
                     Picker("", selection: $model.subtitleCaptionLengthRaw) {
@@ -65,6 +65,10 @@ struct AutoExportPane: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(width: 200)
+                }
+                SettingRow("Markdown timestamps",
+                           description: "Prefix each Markdown paragraph with its start time.") {
+                    Toggle("", isOn: $model.markdownTimestamps).labelsHidden()
                 }
             }
 

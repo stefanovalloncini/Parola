@@ -57,6 +57,7 @@ final class AppModel: ObservableObject {
     @AppStorage("subtitleCaptionLength") var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue
     @AppStorage("transcriptCompact") var transcriptCompact: Bool = false
     @AppStorage("skipSilences") var skipSilences: Bool = false
+    @AppStorage("markdownTimestamps") var markdownTimestamps: Bool = false
     @AppStorage("recentFiles") var recentFilesRaw: String = "[]"
     @AppStorage("micHotkeyKeyCode") var micHotkeyKeyCode: Int = 15 // kVK_ANSI_R
     @AppStorage("micHotkeyModifiers") var micHotkeyModifiers: Int = 786721 // ⌃⌥⌘
@@ -1225,6 +1226,7 @@ final class AppModel: ObservableObject {
         switch format {
         case .srt: return SrtExporter(options: SubtitleOptions(captionLength: subtitleCaptionLength))
         case .vtt: return VttExporter(options: SubtitleOptions(captionLength: subtitleCaptionLength))
+        case .md:  return MarkdownExporter(options: MarkdownOptions(showTimestamps: markdownTimestamps))
         default:   return Exporters.exporter(for: format)
         }
     }
