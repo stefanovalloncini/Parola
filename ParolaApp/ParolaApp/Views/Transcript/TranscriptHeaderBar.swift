@@ -19,7 +19,18 @@ struct TranscriptHeaderBar: View {
                 .font(DS.Font.heading)
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let label = languageLabel {
+                Text(label)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(DS.Color.accent)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(DS.Color.accent.opacity(0.14)))
+                    .help("Detected language")
+            }
+
+            Spacer()
 
             Button { outlineOpen.toggle() } label: {
                 Image(systemName: "list.bullet.rectangle.portrait")
@@ -89,6 +100,11 @@ struct TranscriptHeaderBar: View {
         } else if let text = model.transcript?.text {
             speaker.speak(text, languageCode: model.transcript?.language)
         }
+    }
+
+    private var languageLabel: String? {
+        guard let code = model.transcript?.language, !code.isEmpty else { return nil }
+        return code.uppercased()
     }
 
     private var jumpPopover: some View {
