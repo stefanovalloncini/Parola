@@ -22,13 +22,17 @@ struct ContinuousParagraph: View {
     @EnvironmentObject var model: AppModel
     @State private var hovering: Bool = false
     @State private var cursor: CGPoint = .zero
+    @State private var attributedCache: AttributedString = AttributedString()
 
     var body: some View {
-        attributedText
+        Text(attributedCache)
             .font(.system(size: model.transcriptCompact ? 14 : 18, weight: .regular))
             .lineSpacing(model.transcriptCompact ? 3 : 6)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .onAppear { rebuildAttributedText() }
+            .onChange(of: model.transcriptVersion) { _, _ in rebuildAttributedText() }
+            .onChange(of: model.currentSegmentID) { _, _ in rebuildAttributedText() }
             .onContinuousHover { phase in
                 switch phase {
                 case .active(let location):
@@ -66,12 +70,15 @@ struct ContinuousParagraph: View {
         return segments.first
     }
 
-    private var attributedText: Text {
-        guard let transcript = model.transcript else { return Text("") }
+    private func rebuildAttributedText() {
+        guard let transcript = model.transcript else {
+            attributedCache = AttributedString()
+            return
+        }
         var attr = AttributedString()
         let currentID = model.currentSegmentID
         let segments = transcript.segments
-        let useSpeakerColor = transcript.uniqueSpeakers.count >= 2
+        let useSpeakerColor = model.transcriptSpeakers.count >= 2
 
         for (idx, seg) in segments.enumerated() {
             let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -84,6 +91,6 @@ struct ContinuousParagraph: View {
             }
             attr.append(piece)
         }
-        return Text(attr)
+        attributedCache = attr
     }
 }

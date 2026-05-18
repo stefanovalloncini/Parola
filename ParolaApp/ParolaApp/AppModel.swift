@@ -44,9 +44,11 @@ final class AppModel: ObservableObject {
         didSet {
             let speakers = transcript?.uniqueSpeakers ?? []
             if speakers != transcriptSpeakers { transcriptSpeakers = speakers }
+            transcriptVersion &+= 1
         }
     }
     @Published private(set) var transcriptSpeakers: [String] = []
+    @Published private(set) var transcriptVersion: Int = 0
     @Published var showingTrash: Bool = false
     @Published var currentSegmentID: TranscriptSegment.ID?
     @Published var currentWordID: WordTiming.ID?
