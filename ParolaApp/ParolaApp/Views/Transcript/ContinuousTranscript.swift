@@ -25,8 +25,8 @@ struct ContinuousParagraph: View {
 
     var body: some View {
         attributedText
-            .font(.system(size: 18, weight: .regular))
-            .lineSpacing(6)
+            .font(.system(size: model.transcriptCompact ? 14 : 18, weight: .regular))
+            .lineSpacing(model.transcriptCompact ? 3 : 6)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
             .onContinuousHover { phase in

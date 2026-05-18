@@ -55,6 +55,7 @@ final class AppModel: ObservableObject {
     @AppStorage("diarize") var diarize: Bool = false
     @AppStorage("subtitleFPS") var subtitleFPS: Double = 30
     @AppStorage("subtitleCaptionLength") var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue
+    @AppStorage("transcriptCompact") var transcriptCompact: Bool = false
     @AppStorage("recentFiles") var recentFilesRaw: String = "[]"
     @AppStorage("micHotkeyKeyCode") var micHotkeyKeyCode: Int = 15 // kVK_ANSI_R
     @AppStorage("micHotkeyModifiers") var micHotkeyModifiers: Int = 786721 // ⌃⌥⌘

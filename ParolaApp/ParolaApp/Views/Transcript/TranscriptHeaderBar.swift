@@ -37,6 +37,12 @@ struct TranscriptHeaderBar: View {
             .buttonStyle(.borderless)
             .help(speaker.isSpeaking ? "Stop reading" : "Read aloud")
 
+            Button { model.transcriptCompact.toggle() } label: {
+                Image(systemName: model.transcriptCompact ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
+            }
+            .buttonStyle(.borderless)
+            .help(model.transcriptCompact ? "Expanded view" : "Compact view")
+
             Button(action: onOpenSummary) {
                 Image(systemName: "sparkles")
             }
