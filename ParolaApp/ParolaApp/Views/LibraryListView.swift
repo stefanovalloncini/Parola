@@ -45,6 +45,7 @@ struct LibraryListView: View {
                 List(entries, id: \.id, selection: $selection) { entry in
                     LibraryRow(entry: entry, sizeBytes: model.libraryBundleSizes[entry.id])
                         .contentShape(Rectangle())
+                        .draggable(entry.bundleURL)
                         .onTapGesture(count: 2) {
                             model.loadEntry(entry.id)
                             model.libraryFilter = nil
