@@ -24,6 +24,10 @@ struct GeneralPane: View {
                             }
                         }
                 }
+                SettingRow("Show menu bar icon",
+                           description: "Adds a Parola item to the system menu bar with quick actions and recent transcripts.") {
+                    Toggle("", isOn: $model.showMenuBarExtra).labelsHidden()
+                }
             }
 
             SettingsSection {

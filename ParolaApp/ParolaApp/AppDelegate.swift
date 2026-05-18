@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let provider = ServicesProvider()
     private var dictationStatusItem: DictationStatusItem?
     private var dictationSubscription: DictationSubscription?
+    private let menuBar = MenuBarController()
 
     func bind(model: AppModel) {
         self.model = model
@@ -14,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if dictationStatusItem == nil {
             dictationStatusItem = DictationStatusItem(model: model)
         }
+        menuBar.bind(model)
         if dictationSubscription == nil {
             dictationSubscription = DictationSignal.subscribe { [weak self] name in
                 Task { @MainActor [weak self] in

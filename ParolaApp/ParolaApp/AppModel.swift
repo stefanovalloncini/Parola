@@ -72,6 +72,7 @@ final class AppModel: ObservableObject {
     @AppStorage("dictationStripSelfCorrections") var dictationStripSelfCorrections: Bool = false
     @AppStorage("dictationPasteDelayMs") var dictationPasteDelayMs: Int = 0
     @AppStorage("recordingMaxMinutes") var recordingMaxMinutes: Int = 0
+    @AppStorage("showMenuBarExtra") var showMenuBarExtra: Bool = false
 
     var recentFiles: [URL] {
         get {
