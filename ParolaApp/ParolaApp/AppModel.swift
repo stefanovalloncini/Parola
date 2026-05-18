@@ -77,6 +77,8 @@ final class AppModel: ObservableObject {
     @AppStorage("recordingMaxMinutes") var recordingMaxMinutes: Int = 0
     @AppStorage("showMenuBarExtra") var showMenuBarExtra: Bool = false
     @AppStorage("recordingCountInSeconds") var recordingCountInSeconds: Int = 0
+    @AppStorage("autoMuteWhileRecording") var autoMuteWhileRecording: Bool = false
+    @AppStorage("autoPauseMediaWhileRecording") var autoPauseMediaWhileRecording: Bool = false
     @Published var recordingCountdown: Int? = nil
     private var countdownTask: Task<Void, Never>?
 
@@ -410,6 +412,14 @@ final class AppModel: ObservableObject {
 
     private let session = TranscriptionSession()
     private let store = ModelStore.shared
+    let mediaSession = MediaSession()
+
+    func mediaSessionConfig(allowMute: Bool) -> MediaSessionConfig {
+        MediaSessionConfig(
+            muteSystemAudio: allowMute && autoMuteWhileRecording,
+            pausePlayback: autoPauseMediaWhileRecording
+        )
+    }
 
     private var liveSource: AudioSource?
     private var streamingSession: StreamingTranscriptionSession?
@@ -447,6 +457,7 @@ final class AppModel: ObservableObject {
             liveSource = nil
             Task { await source.cancel() }
         }
+        Task { await mediaSession.exitRecording() }
         pendingRecordingCategory = .transcription
         phase = .idle
     }
@@ -967,7 +978,9 @@ final class AppModel: ObservableObject {
             startStreamingMic()
             return
         }
+        let config = mediaSessionConfig(allowMute: source == .microphone)
         Task {
+            await mediaSession.enterRecording(config: config)
             do {
                 phase = .recording(source: source)
                 switch source {
@@ -984,6 +997,7 @@ final class AppModel: ObservableObject {
                 }
                 scheduleRecordingAutoStop()
             } catch {
+                await mediaSession.exitRecording()
                 phase = .failed(message: error.localizedDescription)
             }
         }
@@ -1070,8 +1084,10 @@ final class AppModel: ObservableObject {
 
         let opts = currentOptions
         let progress = makeDownloadProgressHandler()
+        let config = mediaSessionConfig(allowMute: true)
 
         streamingConsumer = Task { @MainActor in
+            await mediaSession.enterRecording(config: config)
             do {
                 let events = try await s.start(options: opts, downloadProgress: progress)
                 phase = .recording(source: .microphone)
@@ -1081,6 +1097,7 @@ final class AppModel: ObservableObject {
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
+            await mediaSession.exitRecording()
         }
     }
 
@@ -1125,6 +1142,7 @@ final class AppModel: ObservableObject {
 
         guard let source = liveSource else { return }
         Task {
+            await mediaSession.exitRecording()
             do {
                 let url = try await source.prepare()
                 liveSource = nil

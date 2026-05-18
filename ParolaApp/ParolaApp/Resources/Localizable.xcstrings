@@ -8368,6 +8368,72 @@
           }
         }
       }
+    },
+    "While recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durante la registrazione"
+          }
+        }
+      }
+    },
+    "Mute system audio": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silenzia l'audio di sistema"
+          }
+        }
+      }
+    },
+    "Mutes the default output device while recording from the microphone, so playback doesn't leak into your transcript. Restores the previous mute state when recording stops.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silenzia l'uscita audio predefinita durante la registrazione dal microfono, così la riproduzione non finisce nella trascrizione. Ripristina lo stato precedente quando la registrazione finisce."
+          }
+        }
+      }
+    },
+    "Pause Music, Spotify, YouTube": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metti in pausa Music, Spotify, YouTube"
+          }
+        }
+      }
+    },
+    "Sends a pause command to whatever app is playing media when recording starts, and resumes when it stops.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia un comando di pausa all'app che sta riproducendo contenuti quando inizi a registrare, e la fa ripartire quando smetti."
+          }
+        }
+      }
+    },
+    "Both apply to dictation too. Mute is skipped when the recording source is system audio.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entrambe si applicano anche alla dettatura. La silenziatura viene saltata quando la sorgente è l'audio di sistema."
+          }
+        }
+      }
     }
   },
   "version": "1.1"

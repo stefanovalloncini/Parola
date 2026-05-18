@@ -16,6 +16,8 @@ public actor DictationCoordinator {
     private let inserter: any TextInserter
     private var postProcessor: any TextPostProcessor
     private let onStateChange: @Sendable (State) async -> Void
+    private var mediaSession: MediaSession?
+    private var mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)?
     private var eventTask: Task<Void, Never>?
     private var eventContinuation: AsyncStream<HotkeyEvent>.Continuation?
 
@@ -30,14 +32,37 @@ public actor DictationCoordinator {
         inserter: any TextInserter,
         postProcessor: any TextPostProcessor = PassThroughPostProcessor(),
         mode: DictationMode = .pushToTalk,
-        onStateChange: @escaping @Sendable (State) async -> Void = { _ in }
+        mediaSession: MediaSession? = nil,
+        mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)? = nil,
+        onStateChange: @escaping @Sendable (State) async -> Void
     ) {
         self.hotkey = hotkey
         self.recorder = recorder
         self.inserter = inserter
         self.postProcessor = postProcessor
         self.mode = mode
+        self.mediaSession = mediaSession
+        self.mediaConfigProvider = mediaConfigProvider
         self.onStateChange = onStateChange
+    }
+
+    public init(
+        hotkey: any HotkeyMonitor,
+        recorder: any DictationRecorder,
+        inserter: any TextInserter,
+        postProcessor: any TextPostProcessor = PassThroughPostProcessor(),
+        mode: DictationMode = .pushToTalk,
+        mediaSession: MediaSession? = nil,
+        mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)? = nil
+    ) {
+        self.hotkey = hotkey
+        self.recorder = recorder
+        self.inserter = inserter
+        self.postProcessor = postProcessor
+        self.mode = mode
+        self.mediaSession = mediaSession
+        self.mediaConfigProvider = mediaConfigProvider
+        self.onStateChange = { _ in }
     }
 
     deinit {
@@ -47,6 +72,11 @@ public actor DictationCoordinator {
 
     public func setPostProcessor(_ processor: any TextPostProcessor) {
         postProcessor = processor
+    }
+
+    public func setMediaSession(_ session: MediaSession?, configProvider: (@Sendable () async -> MediaSessionConfig)?) {
+        mediaSession = session
+        mediaConfigProvider = configProvider
     }
 
     public func setMode(_ newMode: DictationMode) {
@@ -88,6 +118,7 @@ public actor DictationCoordinator {
     public func abortMonitoring() async {
         await teardownMonitor()
         if case .listening = state {
+            await mediaSession?.exitRecording()
             _ = try? await recorder.stopAndTranscribe()
         }
         await setState(.idle)
@@ -170,10 +201,15 @@ public actor DictationCoordinator {
 
     private func beginListening() async {
         guard state == .idle else { return }
+        if let session = mediaSession {
+            let config = await mediaConfigProvider?() ?? .none
+            await session.enterRecording(config: config)
+        }
         do {
             try await recorder.start()
             await setState(.listening)
         } catch {
+            await mediaSession?.exitRecording()
             await setState(.failed(error.localizedDescription))
             await setState(.idle)
         }
@@ -183,6 +219,7 @@ public actor DictationCoordinator {
         guard state == .listening else { return }
         hybridLocked = false
         await setState(.transcribing)
+        await mediaSession?.exitRecording()
         do {
             let raw = try await recorder.stopAndTranscribe()
             let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)

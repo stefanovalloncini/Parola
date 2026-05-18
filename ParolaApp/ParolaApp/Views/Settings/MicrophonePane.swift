@@ -66,6 +66,19 @@ struct MicrophonePane: View {
                 MicErrorBanner(message: startError)
             }
             SettingHelper(text: "Streaming WhisperKit dictation always uses the system default mic. Other modes follow this picker.")
+
+            SettingsSection("While recording") {
+                SettingRow("Mute system audio",
+                           description: "Mutes the default output device while recording from the microphone, so playback doesn't leak into your transcript. Restores the previous mute state when recording stops.",
+                           isFirst: true) {
+                    Toggle("", isOn: $model.autoMuteWhileRecording).labelsHidden()
+                }
+                SettingRow("Pause Music, Spotify, YouTube",
+                           description: "Sends a pause command to whatever app is playing media when recording starts, and resumes when it stops.") {
+                    Toggle("", isOn: $model.autoPauseMediaWhileRecording).labelsHidden()
+                }
+            }
+            SettingHelper(text: "Both apply to dictation too. Mute is skipped when the recording source is system audio.")
             ResetPaneButton(scope: .microphone)
         }
         .onAppear {

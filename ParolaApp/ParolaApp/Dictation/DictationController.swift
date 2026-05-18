@@ -63,12 +63,20 @@ final class DictationController: ObservableObject {
             guard let bundleID, let workflow = workflows[bundleID] else { return .paste }
             return workflow.insertion ?? .paste
         }
+        let mediaSession = appModel?.mediaSession
+        let configProvider: (@Sendable () async -> MediaSessionConfig)? = appModel.map { model in
+            { @Sendable in
+                await MainActor.run { model.mediaSessionConfig(allowMute: true) }
+            }
+        }
         let coord = DictationCoordinator(
             hotkey: hotkey,
             recorder: recorder,
             inserter: inserter,
             postProcessor: configuration.postProcessor,
-            mode: configuration.mode
+            mode: configuration.mode,
+            mediaSession: mediaSession,
+            mediaConfigProvider: configProvider
         ) { [weak self] state in
             await MainActor.run { self?.handleStateChange(state) }
         }
