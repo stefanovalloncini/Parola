@@ -182,6 +182,10 @@ struct ParolaApp: App {
                 Button("Send via Mail…") { model.shareTranscriptViaMail() }
                     .keyboardShortcut("m", modifiers: [.command, .shift])
                     .disabled(model.transcript == nil)
+                Divider()
+                Button("Jump to Next Speaker") { model.jumpToNextSpeaker() }
+                    .keyboardShortcut("j", modifiers: [.command, .shift])
+                    .disabled(model.transcript == nil)
                 Button("Copy as Markdown") { model.copyTranscriptAsFormat(.md) }
                     .disabled(model.transcript == nil)
                 Button("Export Segment Notes…") { model.exportSegmentNotesAsMarkdown() }

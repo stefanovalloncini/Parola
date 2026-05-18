@@ -1246,6 +1246,26 @@ final class AppModel: ObservableObject {
         try? body.data(using: .utf8)?.write(to: url, options: .atomic)
     }
 
+    func jumpToNextSpeaker() {
+        guard let transcript, !transcript.segments.isEmpty else { return }
+        let segments = transcript.segments
+        let startIdx: Int
+        if let current = currentSegmentID,
+           let idx = segments.firstIndex(where: { $0.id == current }) {
+            startIdx = idx
+        } else {
+            startIdx = -1
+        }
+        let currentSpeaker = startIdx >= 0 ? segments[startIdx].speaker : nil
+        for offset in 1..<segments.count {
+            let idx = (startIdx + offset) % segments.count
+            if segments[idx].speaker != currentSpeaker, segments[idx].speaker != nil {
+                seek(to: segments[idx])
+                return
+            }
+        }
+    }
+
     func shareTranscriptViaMail() {
         guard let transcript else { return }
         let title = sourceFileURL?.deletingPathExtension().lastPathComponent ?? "Transcript"
