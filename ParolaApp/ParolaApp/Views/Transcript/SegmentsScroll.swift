@@ -178,6 +178,7 @@ struct SegmentCard: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: radius))
         .contentShape(Rectangle())
+        .draggable(draggablePayload)
         .onHover { hover in
             withAnimation(.easeOut(duration: 0.12)) { hovering = hover }
         }
@@ -386,6 +387,15 @@ struct SegmentCard: View {
             attr.append(piece)
         }
         return Text(attr)
+    }
+
+    private var draggablePayload: String {
+        let stamp = timestamp(segment.start)
+        let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let speaker = segment.speaker, !speaker.isEmpty {
+            return "\(stamp)  \(speaker): \(body)"
+        }
+        return "\(stamp)  \(body)"
     }
 
     private func timestamp(_ s: Double) -> String {
