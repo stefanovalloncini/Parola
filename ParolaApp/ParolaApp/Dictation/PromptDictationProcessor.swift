@@ -12,7 +12,7 @@ struct PromptDictationProcessor: TextPostProcessor {
     }
 
     func process(_ text: String) async -> String {
-        let preprocessed = SentenceCapitalizer.applyTo(VoiceCommands.applyTo(text))
+        let preprocessed = SentenceCapitalizer.applyTo(PronounCapitalizer.applyTo(VoiceCommands.applyTo(text)))
         let frontmost = await frontmostAppContext()
         let prompt: Prompt? = (frontmost.bundleID.flatMap { overrides[$0] }) ?? defaultPrompt
         guard let prompt else { return preprocessed }
