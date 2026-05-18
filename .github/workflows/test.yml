@@ -79,3 +79,67 @@ jobs:
             -destination 'platform=macOS' \
             CODE_SIGNING_ALLOWED=NO \
             test
+
+  parola-ios:
+    name: ParolaiOS (xcodebuild test)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: derived-ios-${{ runner.os }}-${{ hashFiles('ParolaiOS/project.yml', 'ParolaCore/Package.resolved') }}
+          restore-keys: |
+            derived-ios-${{ runner.os }}-
+
+      - name: Generate Xcode project
+        working-directory: ParolaiOS
+        run: xcodegen generate
+
+      - name: xcodebuild test
+        run: |
+          xcodebuild \
+            -project ParolaiOS/ParolaiOS.xcodeproj \
+            -scheme ParolaiOS \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+  smoke:
+    name: smoke.sh (CLI end-to-end)
+    needs: parola-core
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache SwiftPM build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ParolaCore/.build
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-${{ runner.os }}-${{ hashFiles('ParolaCore/Package.resolved', 'ParolaCore/Package.swift') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Cache whisper-tiny model
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Application Support/Parola/Models/models/argmaxinc/whisperkit-coreml/openai_whisper-tiny
+          key: whisper-tiny-${{ runner.os }}-v1
+
+      - name: Run smoke test
+        run: bash scripts/smoke.sh
