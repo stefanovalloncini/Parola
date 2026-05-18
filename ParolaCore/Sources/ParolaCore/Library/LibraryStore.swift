@@ -252,6 +252,19 @@ public actor LibraryStore {
         if cachedLoaded?.id == id { cachedLoaded = nil }
     }
 
+    /// Stamps the entry's `lastOpenedAt` so the library can show when it was last viewed.
+    public func markOpened(id: LibraryEntry.ID, at now: Date = Date()) throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.lastOpenedAt = now
+        }
+        invalidateListCaches()
+        if cachedLoaded?.id == id { cachedLoaded = nil }
+    }
+
     /// Soft-deletes by stamping `deletedAt`. The bundle stays on disk so it can be restored.
     public func delete(_ id: LibraryEntry.ID, at now: Date = Date()) throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)

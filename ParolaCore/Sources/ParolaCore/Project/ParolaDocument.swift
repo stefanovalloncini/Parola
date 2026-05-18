@@ -13,6 +13,7 @@ public struct ParolaDocument: Sendable {
         public var category: EntryCategory
         public var deletedAt: Date?
         public var updatedAt: Date?
+        public var lastOpenedAt: Date?
         public var audioFilename: String?
         public var labels: [String]
         public var segmentNotes: [String: String]
@@ -27,6 +28,7 @@ public struct ParolaDocument: Sendable {
             category: EntryCategory = .transcription,
             deletedAt: Date? = nil,
             updatedAt: Date? = nil,
+            lastOpenedAt: Date? = nil,
             audioFilename: String? = nil,
             labels: [String] = [],
             segmentNotes: [String: String] = [:],
@@ -40,6 +42,7 @@ public struct ParolaDocument: Sendable {
             self.category = category
             self.deletedAt = deletedAt
             self.updatedAt = updatedAt
+            self.lastOpenedAt = lastOpenedAt
             self.audioFilename = audioFilename
             self.labels = labels
             self.segmentNotes = segmentNotes
@@ -55,6 +58,7 @@ public struct ParolaDocument: Sendable {
             case category
             case deletedAt
             case updatedAt
+            case lastOpenedAt
             case audioFilename
             case labels
             case segmentNotes
@@ -71,6 +75,7 @@ public struct ParolaDocument: Sendable {
             category = try c.decodeIfPresent(EntryCategory.self, forKey: .category) ?? .transcription
             deletedAt = try c.decodeIfPresent(Date.self, forKey: .deletedAt)
             updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt)
+            lastOpenedAt = try c.decodeIfPresent(Date.self, forKey: .lastOpenedAt)
             audioFilename = try c.decodeIfPresent(String.self, forKey: .audioFilename)
             labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
             segmentNotes = try c.decodeIfPresent([String: String].self, forKey: .segmentNotes) ?? [:]
@@ -87,6 +92,7 @@ public struct ParolaDocument: Sendable {
             try c.encode(category, forKey: .category)
             try c.encodeIfPresent(deletedAt, forKey: .deletedAt)
             try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
+            try c.encodeIfPresent(lastOpenedAt, forKey: .lastOpenedAt)
             try c.encodeIfPresent(audioFilename, forKey: .audioFilename)
             if !labels.isEmpty {
                 try c.encode(labels, forKey: .labels)

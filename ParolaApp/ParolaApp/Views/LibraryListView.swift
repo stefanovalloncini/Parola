@@ -356,6 +356,11 @@ private struct LibraryRow: View {
                 }
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.secondaryText)
+                if let opened = entry.lastOpenedAt {
+                    Text("Last opened: \(opened.formatted(.relative(presentation: .named)))")
+                        .font(DS.Font.caption)
+                        .foregroundStyle(DS.Color.secondaryText.opacity(0.75))
+                }
             }
             Spacer()
         }

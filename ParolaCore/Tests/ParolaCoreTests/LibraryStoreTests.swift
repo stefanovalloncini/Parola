@@ -186,6 +186,38 @@ struct LibraryStoreTests {
         #expect(entry.deletedAt == nil)
     }
 
+    @Test("markOpened persists lastOpenedAt on the manifest")
+    func markOpenedPersistsTimestamp() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        #expect(entry.lastOpenedAt == nil)
+
+        let when = Date(timeIntervalSince1970: 1_800_000_000)
+        try await store.markOpened(id: entry.id, at: when)
+
+        let entries = await store.list()
+        let refreshed = try #require(entries.first(where: { $0.id == entry.id }))
+        #expect(refreshed.lastOpenedAt == when)
+    }
+
+    @Test("manifest without lastOpenedAt decodes with nil default")
+    func manifestDecodesMissingLastOpenedAt() throws {
+        let json = """
+        {
+          "version": 1,
+          "createdAt": "2025-01-01T00:00:00Z",
+          "originalAudioName": "demo.wav",
+          "modelName": "tiny",
+          "language": "en",
+          "category": "transcription"
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let manifest = try decoder.decode(ParolaDocument.Manifest.self, from: Data(json.utf8))
+        #expect(manifest.lastOpenedAt == nil)
+    }
+
     @Test("updateTranscript stamps updatedAt on the manifest")
     func updateTranscriptStampsUpdatedAt() async throws {
         let (store, _) = try makeTempLibrary()

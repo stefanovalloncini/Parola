@@ -21,6 +21,7 @@ public struct LibraryEntry: Identifiable, Hashable, Sendable {
     public var category: EntryCategory { manifest.category }
     public var deletedAt: Date? { manifest.deletedAt }
     public var updatedAt: Date? { manifest.updatedAt }
+    public var lastOpenedAt: Date? { manifest.lastOpenedAt }
     public var labels: [String] { manifest.labels }
     public var segmentNotes: [String: String] { manifest.segmentNotes }
     public var pinned: Bool { manifest.pinned }

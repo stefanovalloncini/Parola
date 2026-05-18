@@ -9,6 +9,7 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
     case titleZA
     case longest
     case shortest
+    case lastOpened
 
     var id: String { rawValue }
 
@@ -20,6 +21,7 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
         case .titleZA: return "Title Z→A"
         case .longest: return "Largest first"
         case .shortest: return "Smallest first"
+        case .lastOpened: return "Last opened"
         }
     }
 }
@@ -54,6 +56,15 @@ extension AppModel {
             return entries.sorted { (libraryBundleSizes[$0.id] ?? 0) > (libraryBundleSizes[$1.id] ?? 0) }
         case .shortest:
             return entries.sorted { (libraryBundleSizes[$0.id] ?? 0) < (libraryBundleSizes[$1.id] ?? 0) }
+        case .lastOpened:
+            return entries.sorted { lhs, rhs in
+                switch (lhs.lastOpenedAt, rhs.lastOpenedAt) {
+                case let (l?, r?): return l > r
+                case (_?, nil): return true
+                case (nil, _?): return false
+                case (nil, nil): return lhs.createdAt > rhs.createdAt
+                }
+            }
         }
     }
 
@@ -240,6 +251,8 @@ extension AppModel {
                     tearDownPlayer()
                 }
                 phase = .ready
+                try? await library.markOpened(id: id)
+                refreshLibrary()
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
