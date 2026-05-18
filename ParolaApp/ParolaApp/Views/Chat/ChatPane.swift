@@ -194,6 +194,10 @@ struct ChatPane: View {
                         .stroke(DS.Color.separator.opacity(0.6), lineWidth: 0.5)
                 )
                 .onSubmit(send)
+                .dropDestination(for: URL.self) { urls, _ in
+                    attachFiles(urls)
+                    return !urls.isEmpty
+                }
 
             Button(action: send) {
                 Image(systemName: "paperplane.fill")
@@ -275,6 +279,16 @@ struct ChatPane: View {
             displayedHistory = updated
             model.recordChat(history: updated, for: entryID)
         }
+    }
+
+    private func attachFiles(_ urls: [URL]) {
+        for url in urls where ChatAttachment.isReadableTextFile(url) {
+            let needsScope = url.startAccessingSecurityScopedResource()
+            defer { if needsScope { url.stopAccessingSecurityScopedResource() } }
+            guard let raw = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            input = ChatAttachment.attach(input: input, filename: url.lastPathComponent, content: raw)
+        }
+        composerFocused = true
     }
 
     private func send() {
