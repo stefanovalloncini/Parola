@@ -3,6 +3,7 @@ import ParolaCore
 
 struct SegmentsScroll: View {
     @EnvironmentObject var model: AppModel
+    @State private var hoveredSpeaker: String?
 
     private var speakerFilterBinding: Binding<String?> {
         Binding(
@@ -42,8 +43,13 @@ struct SegmentsScroll: View {
                                 .map { ($0.afterSegmentID, $0.durationSeconds) }
                         )
                         ForEach(segs) { seg in
-                            SegmentCard(segment: seg, isCurrent: seg.id == model.currentSegmentID)
-                                .id(seg.id)
+                            SegmentCard(
+                                segment: seg,
+                                isCurrent: seg.id == model.currentSegmentID,
+                                hoveredSpeaker: $hoveredSpeaker
+                            )
+                            .id(seg.id)
+                            .opacity(opacity(for: seg))
                             if let gap = pauseByPrev[seg.id] {
                                 LongPauseDivider(seconds: gap)
                             }
@@ -76,6 +82,11 @@ struct SegmentsScroll: View {
     private func visibleSegments(in transcript: Transcript) -> [TranscriptSegment] {
         guard let speakerFilter else { return transcript.segments }
         return transcript.segments.filter { $0.speaker == speakerFilter }
+    }
+
+    private func opacity(for segment: TranscriptSegment) -> Double {
+        guard let hoveredSpeaker else { return 1.0 }
+        return segment.speaker == hoveredSpeaker ? 1.0 : 0.35
     }
 }
 
@@ -186,6 +197,7 @@ private struct LongPauseDivider: View {
 struct SegmentCard: View {
     let segment: TranscriptSegment
     let isCurrent: Bool
+    var hoveredSpeaker: Binding<String?> = .constant(nil)
 
     @EnvironmentObject var model: AppModel
     @State private var hovering: Bool = false
@@ -213,6 +225,9 @@ struct SegmentCard: View {
                     Text(speaker)
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.speakerColor(for: speaker))
+                        .onHover { hovering in
+                            hoveredSpeaker.wrappedValue = hovering ? speaker : nil
+                        }
                         .contextMenu {
                             Button("Rename \(speaker)…") {
                                 draftSpeakerName = speaker
