@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ScratchpadView: View {
-    @ObservedObject var controller: ScratchpadController
+    @Bindable var controller: ScratchpadController
     @FocusState private var editorFocused: Bool
 
     var body: some View {

@@ -61,7 +61,7 @@ private func handleOpen(_ url: URL, model: AppModel) {
 struct ParolaApp: App {
     @StateObject private var model = AppModel()
     @StateObject private var liveCaptions = LiveCaptionsController()
-    @StateObject private var scratchpad = ScratchpadController()
+    @State private var scratchpad = ScratchpadController()
     @State private var shortcutSheetOpen = false
     @State private var aboutSheetOpen = false
     @State private var micHotkey = MicHotkeyController()
