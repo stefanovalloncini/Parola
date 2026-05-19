@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Observation
 import ParolaCore
 
 struct WatchedFolder: Codable, Identifiable, Hashable {
@@ -17,13 +18,14 @@ struct WatchedFolder: Codable, Identifiable, Hashable {
 }
 
 @MainActor
-final class WatchedFoldersStore: ObservableObject {
-    @Published private(set) var folders: [WatchedFolder] = []
-    @Published private(set) var lastError: String?
-    @Published private(set) var staleFolderIDs: Set<UUID> = []
-    private var watchers: [UUID: FolderWatcher] = [:]
-    private var scopedURLs: [UUID: URL] = [:]
-    private let onNewMediaFile: @MainActor (URL) -> Void
+@Observable
+final class WatchedFoldersStore {
+    private(set) var folders: [WatchedFolder] = []
+    private(set) var lastError: String?
+    private(set) var staleFolderIDs: Set<UUID> = []
+    @ObservationIgnored private var watchers: [UUID: FolderWatcher] = [:]
+    @ObservationIgnored private var scopedURLs: [UUID: URL] = [:]
+    @ObservationIgnored private let onNewMediaFile: @MainActor (URL) -> Void
 
     init(onNewMediaFile: @escaping @MainActor (URL) -> Void) {
         self.onNewMediaFile = onNewMediaFile
