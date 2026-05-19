@@ -9,8 +9,12 @@ final class MicHotkeyController {
     private var cancellables: Set<AnyCancellable> = []
     private var lastConfig: (enabled: Bool, code: Int, mods: NSEvent.ModifierFlags)?
     private var reapplyPending = false
+    private var configureTask: Task<Void, Never>?
 
     func bind(_ model: AppModel) {
+        configureTask?.cancel()
+        cancellables.removeAll()
+        lastConfig = nil
         self.model = model
         reapplyFromModel()
 
@@ -43,12 +47,14 @@ final class MicHotkeyController {
             return
         }
         lastConfig = (enabled, keyCode, modifiers)
-        Task { [weak self] in
+        configureTask?.cancel()
+        configureTask = Task { [weak self] in
             guard let self else { return }
             if let monitor = self.monitor {
                 await monitor.stop()
                 self.monitor = nil
             }
+            if Task.isCancelled { return }
             guard enabled else { return }
             let monitor = GlobalHotkeyMonitor(keyCode: keyCode, modifiers: modifiers)
             self.monitor = monitor
