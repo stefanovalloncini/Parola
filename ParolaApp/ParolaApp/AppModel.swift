@@ -373,13 +373,16 @@ final class AppModel: ObservableObject {
         return UserDefaults.standard.integer(forKey: key)
     }
 
+    private static let sharedJSONDecoder = JSONDecoder()
+    private static let sharedJSONEncoder = JSONEncoder()
+
     static func readJSON<T: Decodable>(_ type: T.Type, forKey key: String) -> T? {
         guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
-        return try? JSONDecoder().decode(T.self, from: data)
+        return try? sharedJSONDecoder.decode(T.self, from: data)
     }
 
     static func writeJSON<T: Encodable>(_ value: T, forKey key: String) {
-        if let data = try? JSONEncoder().encode(value) {
+        if let data = try? sharedJSONEncoder.encode(value) {
             UserDefaults.standard.set(data, forKey: key)
         }
     }
@@ -563,6 +566,11 @@ final class AppModel: ObservableObject {
         Task { [weak self] in
             await self?.refreshDictationTriggerPrompts()
         }
+    }
+
+    deinit {
+        recordingLevelTask?.cancel()
+        streamingConsumer?.cancel()
     }
 
     func persistToLibrary(_ result: Transcript, audioSource: URL?) {
@@ -1087,6 +1095,7 @@ final class AppModel: ObservableObject {
     }
 
     private func startStreamingMic() {
+        streamingConsumer?.cancel()
         let s = StreamingTranscriptionSession()
         streamingSession = s
         liveSegments = []
