@@ -127,53 +127,13 @@ struct ChatPane: View {
         } else if session == nil {
             ChatEmpty()
         } else {
-            messages
+            ChatMessageList(
+                history: displayedHistory,
+                searchQuery: searchQuery,
+                senderFilter: senderFilter,
+                isSending: isSending
+            )
             composer
-        }
-    }
-
-    private var filteredHistory: [ChatMessage] {
-        let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        return displayedHistory.filter { msg in
-            guard senderFilter.matches(msg.role) else { return false }
-            if trimmed.isEmpty { return true }
-            return msg.text.range(of: trimmed, options: .caseInsensitive) != nil
-        }
-    }
-
-    private var hasActiveFilter: Bool {
-        !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || senderFilter != .all
-    }
-
-    private var messages: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 4) {
-                    let visible = filteredHistory
-                    if displayedHistory.isEmpty {
-                        ChatHint()
-                            .padding(.top, DS.Spacing.xlarge)
-                    } else if hasActiveFilter && visible.isEmpty {
-                        ContentUnavailableView.search(text: searchQuery)
-                            .padding(.top, DS.Spacing.xlarge)
-                    }
-                    ForEach(visible) { msg in
-                        ChatBubble(message: msg).id(msg.id)
-                    }
-                    if isSending {
-                        ChatThinkingIndicator(isActive: isSending)
-                            .id("thinking")
-                    }
-                }
-                .padding(.horizontal, DS.Spacing.medium)
-                .padding(.vertical, DS.Spacing.regular)
-            }
-            .onChange(of: displayedHistory.count) { _, _ in
-                scrollToEnd(proxy: proxy)
-            }
-            .onChange(of: isSending) { _, sending in
-                if sending { scrollToEnd(proxy: proxy) }
-            }
         }
     }
 
@@ -236,16 +196,6 @@ struct ChatPane: View {
             searchQuery = ""
             senderFilter = .all
             searchFocused = false
-        }
-    }
-
-    private func scrollToEnd(proxy: ScrollViewProxy) {
-        withAnimation(.easeOut(duration: 0.2)) {
-            if isSending {
-                proxy.scrollTo("thinking", anchor: .bottom)
-            } else if let last = displayedHistory.last {
-                proxy.scrollTo(last.id, anchor: .bottom)
-            }
         }
     }
 
