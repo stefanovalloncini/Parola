@@ -2,10 +2,11 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class ScratchpadController: ObservableObject {
-    @Published var text: String = ""
+@Observable
+final class ScratchpadController {
+    var text: String = ""
 
-    private var panel: NSPanel?
+    @ObservationIgnored private var panel: NSPanel?
 
     var isOpen: Bool { panel != nil }
 
