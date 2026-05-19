@@ -57,6 +57,7 @@ final class AppModel: ObservableObject {
     @Published var liveSegments: [TranscriptSegment] = []
     @Published var livePartialText: String = ""
     @Published var liveVoiceActive: Bool = false
+    @Published var filePartialText: String = ""
     @AppStorage("useStreaming") var useStreaming: Bool = true
     @AppStorage("wordTimestamps") var wordTimestamps: Bool = false
     @AppStorage("karaokeHighlight") var karaokeHighlight: Bool = true
@@ -703,6 +704,7 @@ final class AppModel: ObservableObject {
         noteRecentFile(fileURL)
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
+        filePartialText = ""
 
         let task: TranscriptionTask = (translateOverride ?? translate) ? .translate : .transcribe
 
@@ -719,18 +721,30 @@ final class AppModel: ObservableObject {
                 let result = try await session.transcribe(
                     source: FileAudioSource(url: fileURL),
                     options: makeOptions(task: task),
-                    downloadProgress: makeDownloadProgressHandler()
+                    downloadProgress: makeDownloadProgressHandler(),
+                    partialHandler: makeFilePartialHandler()
                 )
                 try Task.checkCancellation()
                 let processed = postProcess(result)
                 transcript = processed
+                filePartialText = ""
                 phase = .ready
                 refreshModelList()
                 persistToLibrary(processed, audioSource: fileURL)
             } catch {
+                filePartialText = ""
                 applyTranscriptionError(error)
             }
             self.fileTranscribeTask = nil
+        }
+    }
+
+    private func makeFilePartialHandler() -> @Sendable (String) -> Void {
+        return { [weak self] text in
+            Task { @MainActor in
+                guard let self, self.filePartialText != text else { return }
+                self.filePartialText = text
+            }
         }
     }
 

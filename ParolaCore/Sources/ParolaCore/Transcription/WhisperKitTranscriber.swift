@@ -61,6 +61,14 @@ public actor WhisperKitTranscriber: Transcriber {
         url: URL,
         options: TranscriptionOptions
     ) async throws -> Transcript {
+        try await transcribe(url: url, options: options, partialHandler: nil)
+    }
+
+    public func transcribe(
+        url: URL,
+        options: TranscriptionOptions,
+        partialHandler: (@Sendable (String) -> Void)?
+    ) async throws -> Transcript {
         if let requested = options.computeUnits, requested != loadedComputeUnits, let current = loadedModel {
             do {
                 try await load(model: current, computeUnits: requested)
@@ -87,6 +95,20 @@ public actor WhisperKitTranscriber: Transcriber {
             decoding.promptTokens = tokens
             decoding.usePrefillPrompt = true
         }
+
+        let pieces = OSAllocatedUnfairLock<[String]>(initialState: [])
+        if let handler = partialHandler {
+            kit.segmentDiscoveryCallback = { @Sendable segments in
+                let text = pieces.withLock { state -> String in
+                    for segment in segments {
+                        state.append(segment.text.trimmingCharacters(in: .whitespaces))
+                    }
+                    return state.joined(separator: " ")
+                }
+                handler(text)
+            }
+        }
+        defer { kit.segmentDiscoveryCallback = nil }
 
         let results = await kit.transcribe(
             audioPaths: [url.path],
