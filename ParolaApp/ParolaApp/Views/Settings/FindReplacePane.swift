@@ -183,6 +183,8 @@ private struct FindReplaceRuleRow: View {
     let isFirst: Bool
     let onDelete: () -> Void
 
+    @State private var cachedRegexError: String?
+
     private var canEnable: Bool {
         !rule.find.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && regexError == nil
     }
@@ -191,8 +193,12 @@ private struct FindReplaceRuleRow: View {
         guard rule.regex else { return nil }
         let trimmed = rule.find.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        return cachedRegexError
+    }
+
+    private static func compile(_ pattern: String) -> String? {
         do {
-            _ = try NSRegularExpression(pattern: rule.find)
+            _ = try NSRegularExpression(pattern: pattern)
             return nil
         } catch {
             return error.localizedDescription
@@ -241,5 +247,7 @@ private struct FindReplaceRuleRow: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
         }
+        .onAppear { cachedRegexError = Self.compile(rule.find) }
+        .onChange(of: rule.find) { cachedRegexError = Self.compile(rule.find) }
     }
 }
