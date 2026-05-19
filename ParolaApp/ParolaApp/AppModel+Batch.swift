@@ -12,15 +12,18 @@ struct BatchExportFormatOptions: Codable, Hashable, Sendable {
 
 extension AppModel {
 
+    private static let batchOptionsDecoder = JSONDecoder()
+    private static let batchOptionsEncoder = JSONEncoder()
+
     var batchExportFormatOptions: [String: BatchExportFormatOptions] {
         get {
             guard let data = batchExportFormatOptionsJSON.data(using: .utf8),
-                  let decoded = try? JSONDecoder().decode([String: BatchExportFormatOptions].self, from: data)
+                  let decoded = try? Self.batchOptionsDecoder.decode([String: BatchExportFormatOptions].self, from: data)
             else { return [:] }
             return decoded
         }
         set {
-            let data = (try? JSONEncoder().encode(newValue)) ?? Data()
+            let data = (try? Self.batchOptionsEncoder.encode(newValue)) ?? Data()
             batchExportFormatOptionsJSON = String(data: data, encoding: .utf8) ?? "{}"
         }
     }
@@ -62,21 +65,11 @@ extension AppModel {
     }
 
     func startBatch(urls: [URL]) {
-        batchTask?.cancel()
         let jobs = urls.map { BatchJob(url: $0) }
         batchJobs = jobs
         selectedBatchJobID = jobs.first?.id
         route = .batch
-
-        let queue = BatchQueue()
-        let opts = currentOptions
-
-        batchTask = Task { @MainActor in
-            let events = await queue.process(jobs: jobs, options: opts)
-            for await event in events {
-                handleBatchEvent(event)
-            }
-        }
+        runBatchTask(jobs: jobs)
     }
 
     private func handleBatchEvent(_ event: BatchEvent) {
@@ -107,13 +100,18 @@ extension AppModel {
     }
 
     private func resumeBatch(pendingJobs: [BatchJob]) {
+        runBatchTask(jobs: pendingJobs)
+    }
+
+    private func runBatchTask(jobs: [BatchJob]) {
         batchTask?.cancel()
         let queue = BatchQueue()
         let opts = currentOptions
-        batchTask = Task { @MainActor in
-            let events = await queue.process(jobs: pendingJobs, options: opts)
+        batchTask = Task { @MainActor [weak self] in
+            let events = await queue.process(jobs: jobs, options: opts)
             for await event in events {
-                handleBatchEvent(event)
+                if Task.isCancelled { break }
+                self?.handleBatchEvent(event)
             }
         }
     }
@@ -223,15 +221,7 @@ extension AppModel {
         batchJobs[idx].error = nil
         batchJobs[idx].progress = 0
         batchJobs[idx].transcript = nil
-
-        let job = batchJobs[idx]
-        let opts = currentOptions
-        batchTask = Task { @MainActor in
-            let events = await BatchQueue().process(jobs: [job], options: opts)
-            for await event in events {
-                handleBatchEvent(event)
-            }
-        }
+        runBatchTask(jobs: [batchJobs[idx]])
     }
 
     func clearFinishedBatchJobs() {
