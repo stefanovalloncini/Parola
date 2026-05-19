@@ -5,6 +5,8 @@ import SwiftUI
 
 @MainActor
 final class LiveCaptionsController: ObservableObject {
+    private static let timestampFormatter = ISO8601DateFormatter()
+
     @Published var state: LiveCaptionsState = LiveCaptionsState()
     @Published var translateToEnglish: Bool = false
 
@@ -134,7 +136,7 @@ final class LiveCaptionsController: ObservableObject {
         guard hasHistory else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.plainText]
-        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let stamp = Self.timestampFormatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
         panel.nameFieldStringValue = "captions-\(stamp).txt"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         var body = state.confirmedLines.joined(separator: "\n")
