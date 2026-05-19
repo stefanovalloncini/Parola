@@ -199,13 +199,14 @@ private struct PromptRow: View {
     }
 }
 
-final class PromptEditDraft: Identifiable, ObservableObject {
+@Observable
+final class PromptEditDraft: Identifiable {
     let id: UUID
     let isExisting: Bool
-    @Published var name: String
-    @Published var instructions: String
-    @Published var triggerWordsText: String
-    @Published var assistantMode: Bool
+    var name: String
+    var instructions: String
+    var triggerWordsText: String
+    var assistantMode: Bool
 
     init(prompt: Prompt) {
         self.id = prompt.id
@@ -225,7 +226,7 @@ final class PromptEditDraft: Identifiable, ObservableObject {
 }
 
 private struct PromptEditor: View {
-    @ObservedObject var draft: PromptEditDraft
+    @Bindable var draft: PromptEditDraft
     let onCommit: (PromptEditDraft) -> Void
     let onCancel: () -> Void
 
