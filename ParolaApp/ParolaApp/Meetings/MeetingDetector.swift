@@ -1,8 +1,9 @@
 import AppKit
 import Foundation
 
+@Observable
 @MainActor
-final class MeetingDetector: ObservableObject {
+final class MeetingDetector {
     nonisolated static let knownMeetingApps: [String: String] = [
         "us.zoom.xos": "Zoom",
         "com.microsoft.teams2": "Microsoft Teams",
@@ -14,16 +15,16 @@ final class MeetingDetector: ObservableObject {
 
     static let dedupWindow: TimeInterval = 5
 
-    @Published var detectedAppName: String?
-    @Published var isEnabled: Bool {
+    var detectedAppName: String?
+    var isEnabled: Bool {
         didSet { UserDefaults.standard.set(isEnabled, forKey: Self.defaultsKey) }
     }
 
-    private let onDetected: @MainActor (String) -> Void
-    private let clock: @MainActor () -> Date
-    private var lastFiredApp: String?
-    private var lastFiredAt: Date?
-    private var observerTokens: [NSObjectProtocol] = []
+    @ObservationIgnored private let onDetected: @MainActor (String) -> Void
+    @ObservationIgnored private let clock: @MainActor () -> Date
+    @ObservationIgnored private var lastFiredApp: String?
+    @ObservationIgnored private var lastFiredAt: Date?
+    @ObservationIgnored private var observerTokens: [NSObjectProtocol] = []
 
     private static let defaultsKey = "meetingDetectorEnabled"
 
