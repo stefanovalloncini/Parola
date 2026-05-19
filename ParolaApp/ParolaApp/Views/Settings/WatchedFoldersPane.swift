@@ -10,7 +10,7 @@ struct WatchedFoldersPane: View {
 }
 
 private struct WatchedFoldersPaneBody: View {
-    @ObservedObject var store: WatchedFoldersStore
+    let store: WatchedFoldersStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -64,7 +64,7 @@ private struct WatchedFoldersPaneBody: View {
 }
 
 private struct WatchedFolderRow: View {
-    @ObservedObject var store: WatchedFoldersStore
+    let store: WatchedFoldersStore
     let folder: WatchedFolder
     let isFirst: Bool
 
