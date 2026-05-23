@@ -12,7 +12,7 @@ struct ShortcutCatalogTests {
     @Test("every section has at least one entry")
     func sectionsNonEmpty() {
         for section in ShortcutCatalog.sections {
-            #expect(!section.entries.isEmpty)
+            #expect(section.entries.isEmpty == false)
         }
     }
 
@@ -26,8 +26,8 @@ struct ShortcutCatalogTests {
     func entriesValid() {
         for section in ShortcutCatalog.sections {
             for entry in section.entries {
-                #expect(!entry.label.isEmpty)
-                #expect(!entry.keys.isEmpty)
+                #expect(entry.label.isEmpty == false)
+                #expect(entry.keys.isEmpty == false)
             }
         }
     }

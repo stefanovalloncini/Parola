@@ -31,7 +31,7 @@ struct ManagedConfigurationTests {
         let config = ManagedConfiguration(storage: storage)
         #expect(config.defaultModel == "openai_whisper-large-v3")
         #expect(config.isManaged(.defaultModel))
-        #expect(!config.isManaged(.disableYouTubeIngestion))
+        #expect(config.isManaged(.disableYouTubeIngestion) == false)
     }
 
     @Test("allowedEngines parses array of strings into EngineIDs")
@@ -64,7 +64,7 @@ struct ManagedConfigurationTests {
         #expect(config.disableDictation == false)
         #expect(config.isManaged(.disableDictation))
         #expect(config.disableModelDownloads == false)
-        #expect(!config.isManaged(.disableModelDownloads))
+        #expect(config.isManaged(.disableModelDownloads) == false)
     }
 
     @Test("filterAllowed restricts catalog by engine allowlist")
@@ -74,7 +74,7 @@ struct ManagedConfigurationTests {
         let filtered = config.filterAllowed(ModelCatalog.all)
         #expect(filtered.allSatisfy { $0.engineID == .whisperKit })
         #expect(filtered.contains { $0.engineID == .whisperKit })
-        #expect(!filtered.contains { $0.engineID == .parakeet })
+        #expect(filtered.contains { $0.engineID == .parakeet } == false)
     }
 
     @Test("filterAllowed is a no-op when no allowlist")

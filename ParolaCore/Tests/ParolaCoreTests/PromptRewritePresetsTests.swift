@@ -19,7 +19,7 @@ struct PromptRewritePresetsTests {
     func presetsBuiltIn() {
         for preset in Prompt.rewritePresets {
             #expect(preset.isBuiltIn)
-            #expect(!preset.instructions.isEmpty)
+            #expect(preset.instructions.isEmpty == false)
         }
     }
 

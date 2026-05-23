@@ -51,8 +51,8 @@ struct AssistantPromptModeTests {
         let ask = Prompt(name: "Ask", instructions: "Answer it.", useSystemInstructions: false)
         let message = PromptRunner.buildUserMessage(for: ask, text: "what is the capital of france")
         #expect(message == "what is the capital of france")
-        #expect(!message.contains("Answer it."))
-        #expect(!message.contains("Input:"))
+        #expect(message.contains("Answer it.") == false)
+        #expect(message.contains("Input:") == false)
     }
 
     @Test("PromptRunner.run uses cleanup envelope when system instructions are on")

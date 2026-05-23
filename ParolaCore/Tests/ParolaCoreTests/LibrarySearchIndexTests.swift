@@ -33,7 +33,7 @@ struct LibrarySearchIndexTests {
         await index.index(id: "e2", title: "Other", text: "Sprint review", createdAt: Date())
         await index.remove("e1")
         let matches = await index.search("planning")
-        #expect(!matches.contains(where: { $0.entryID == "e1" }))
+        #expect(matches.contains(where: { $0.entryID == "e1" }) == false)
         let stillMatches = await index.search("review")
         #expect(stillMatches.contains(where: { $0.entryID == "e2" }))
     }
@@ -52,7 +52,7 @@ struct LibrarySearchIndexTests {
         await index.index(id: "e1", title: "v1", text: "Sprint planning", createdAt: Date())
         await index.index(id: "e1", title: "v2", text: "Retro feedback", createdAt: Date())
         let oldMatches = await index.search("planning")
-        #expect(!oldMatches.contains(where: { $0.entryID == "e1" }))
+        #expect(oldMatches.contains(where: { $0.entryID == "e1" }) == false)
         let newMatches = await index.search("retro")
         #expect(newMatches.contains(where: { $0.entryID == "e1" }))
     }

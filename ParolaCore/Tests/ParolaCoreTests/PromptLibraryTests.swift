@@ -51,7 +51,7 @@ struct PromptLibraryTests {
         var builtIn = Prompt.builtIns.first!
         builtIn.name = "Hacked"
         let ok = await lib.updateUserPrompt(builtIn)
-        #expect(!ok)
+        #expect(ok == false)
     }
 
     @Test("removing a user prompt drops it")

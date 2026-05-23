@@ -52,6 +52,6 @@ struct NotesMarkdownRendererTests {
     func ignoresUnknown() {
         let t = transcript([(1, 0, "hello", nil)])
         let md = NotesMarkdownRenderer.render(transcript: t, notes: ["99": "stray"], title: "x")
-        #expect(!md.contains("stray"))
+        #expect(md.contains("stray") == false)
     }
 }

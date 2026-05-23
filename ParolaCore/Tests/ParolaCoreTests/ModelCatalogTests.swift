@@ -26,10 +26,10 @@ struct ModelCatalogTests {
     func everyVariantWellFormed() {
         let known: Set<EngineID> = [.whisperKit, .parakeet, .appleSpeech]
         for variant in ModelCatalog.all {
-            #expect(!variant.displayName.isEmpty, "variant \(variant.id) has empty displayName")
+            #expect(variant.displayName.isEmpty == false, "variant \(variant.id) has empty displayName")
             #expect(known.contains(variant.engineID), "variant \(variant.id) uses unknown engine \(variant.engineID)")
             if variant.engineID != .appleSpeech {
-                #expect(!variant.downloadSource.huggingFaceRepo.isEmpty, "variant \(variant.id) has empty repo")
+                #expect(variant.downloadSource.huggingFaceRepo.isEmpty == false, "variant \(variant.id) has empty repo")
             }
         }
     }

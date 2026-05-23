@@ -8,11 +8,11 @@ struct BundledTermPacksTests {
     func loadsBundled() throws {
         let en = try #require(BundledTermPacks.load("tech-terms-en"))
         #expect(en.locale == "en")
-        #expect(!en.rules.isEmpty)
+        #expect(en.rules.isEmpty == false)
 
         let it = try #require(BundledTermPacks.load("tech-terms-it"))
         #expect(it.locale == "it")
-        #expect(!it.rules.isEmpty)
+        #expect(it.rules.isEmpty == false)
     }
 
     @Test("all() returns every advertised identifier")

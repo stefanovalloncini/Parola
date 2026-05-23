@@ -37,7 +37,7 @@ struct SegmentNotesTests {
         )
         let data = try JSONEncoder().encode(manifest)
         let string = String(data: data, encoding: .utf8) ?? ""
-        #expect(!string.contains("segmentNotes"))
+        #expect(string.contains("segmentNotes") == false)
     }
 
     @Test("encodes and round-trips segment notes")

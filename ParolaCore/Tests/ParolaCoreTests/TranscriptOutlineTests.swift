@@ -66,6 +66,6 @@ struct TranscriptOutlineTests {
         let segments = [makeSegment(1, start: 0, text: "   ")]
         let entries = TranscriptOutline.entries(for: makeTranscript(segments: segments), chapters: [])
         #expect(entries.count == 1)
-        #expect(!entries[0].title.isEmpty)
+        #expect(entries[0].title.isEmpty == false)
     }
 }

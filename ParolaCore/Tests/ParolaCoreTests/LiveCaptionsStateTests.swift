@@ -41,7 +41,7 @@ struct LiveCaptionsStateTests {
         var s = LiveCaptionsState(isActive: true)
         s.apply(.failed("mic disconnected"))
         #expect(s.error == "mic disconnected")
-        #expect(!s.isActive)
+        #expect(s.isActive == false)
     }
 
     @Test("finished event clears partial")

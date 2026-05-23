@@ -187,7 +187,7 @@ struct CloudLanguageModelTests {
     func requestFailedErrorDescription() {
         let error = CloudLLMError.requestFailed(provider: .openAI, status: 401, body: "secret-key-leak")
         let description = error.errorDescription ?? ""
-        #expect(!description.contains("secret-key-leak"))
+        #expect(description.contains("secret-key-leak") == false)
         #expect(description.contains("401"))
         #expect(error.debugDescription.contains("secret-key-leak"))
     }
@@ -196,7 +196,7 @@ struct CloudLanguageModelTests {
     func missingAPIKeyErrorIsUIFree() {
         let error = CloudLLMError.missingAPIKey(.openAI)
         let description = error.errorDescription ?? ""
-        #expect(!description.contains("Settings"))
+        #expect(description.contains("Settings") == false)
     }
 
     @Test("CloudLLMProviderInfo.info returns metadata for known providers and nil for unknown")

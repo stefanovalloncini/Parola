@@ -38,7 +38,7 @@ struct ChatAttachmentTests {
     @Test("trims trailing whitespace from content")
     func trimsContent() {
         let out = ChatAttachment.attach(input: "", filename: "x.txt", content: "body\n\n\n")
-        #expect(!out.hasSuffix("\n\n\n"))
+        #expect(out.hasSuffix("\n\n\n") == false)
     }
 
     @Test("truncates very long content with a footer note")

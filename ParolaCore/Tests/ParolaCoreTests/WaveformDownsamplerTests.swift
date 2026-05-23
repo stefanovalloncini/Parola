@@ -46,6 +46,6 @@ struct WaveformDownsamplerTests {
         let out = WaveformDownsampler.downsample(samples, buckets: 5)
         #expect(out.count == 5)
         let nonZero = out.filter { $0 > 0 }
-        #expect(!nonZero.isEmpty)
+        #expect(nonZero.isEmpty == false)
     }
 }

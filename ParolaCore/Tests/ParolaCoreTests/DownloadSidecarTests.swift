@@ -46,7 +46,7 @@ struct DownloadSidecarTests {
         let sidecar = DownloadSidecar(repo: "x", revision: "main", files: [:])
         try sidecar.write(to: sidecarURL)
 
-        #expect(!store.isInstalled("nvidia_parakeet-tdt-0.6b-v2"))
+        #expect(store.isInstalled("nvidia_parakeet-tdt-0.6b-v2") == false)
 
         try FileManager.default.removeItem(at: sidecarURL)
         #expect(store.isInstalled("nvidia_parakeet-tdt-0.6b-v2"))

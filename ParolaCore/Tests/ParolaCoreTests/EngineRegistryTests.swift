@@ -88,8 +88,8 @@ struct EngineRegistryTests {
     func englishOnlyRejectsItalian() {
         let caps = EngineCapabilities.parakeetDefaults
         #expect(caps.supportedLanguages.allows("en"))
-        #expect(!caps.supportedLanguages.allows("it"))
-        #expect(!caps.supportedLanguages.allows(nil))
+        #expect(caps.supportedLanguages.allows("it") == false)
+        #expect(caps.supportedLanguages.allows(nil) == false)
         #expect(caps.supportedLanguages.isEnglishOnly)
     }
 
@@ -105,7 +105,7 @@ struct EngineRegistryTests {
     func tightenDisablesTranslate() {
         let tightened = EngineCapabilities.whisperKitDefaults.tightened(by: .only(["en"]))
         #expect(tightened.supportedLanguages.isEnglishOnly)
-        #expect(!tightened.supportsTranslate)
+        #expect(tightened.supportsTranslate == false)
     }
 
     @Test("tightening with .all keeps engine defaults")

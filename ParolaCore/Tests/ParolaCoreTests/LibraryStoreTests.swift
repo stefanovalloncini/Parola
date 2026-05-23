@@ -120,9 +120,9 @@ struct LibraryStoreTests {
 
         let deleted = await store.listDeleted()
         #expect(deleted.map(\.id).contains(recent.id))
-        #expect(!deleted.map(\.id).contains(old.id))
+        #expect(deleted.map(\.id).contains(old.id) == false)
         #expect(FileManager.default.fileExists(atPath: recent.bundleURL.path))
-        #expect(!FileManager.default.fileExists(atPath: old.bundleURL.path))
+        #expect(FileManager.default.fileExists(atPath: old.bundleURL.path) == false)
     }
 
     @Test("delete invalidates the list cache so the entry no longer appears")
@@ -248,7 +248,7 @@ struct LibraryStoreTests {
 
         try await store.delete(entry.id, at: Date())
         results = await store.search("sprint")
-        #expect(!results.contains(where: { $0.entryID == entry.id }))
+        #expect(results.contains(where: { $0.entryID == entry.id }) == false)
 
         try await store.restore(entry.id)
         results = await store.search("sprint")

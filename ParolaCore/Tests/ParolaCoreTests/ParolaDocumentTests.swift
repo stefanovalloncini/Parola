@@ -204,7 +204,7 @@ struct ParolaDocumentTests {
         let dest = scratch.appendingPathComponent("note")
         _ = try ParolaDocument.write(transcript: sampleTranscript(), audioURL: nil, to: dest)
         let staging = scratch.appendingPathComponent("note.parola.tmp")
-        #expect(!FileManager.default.fileExists(atPath: staging.path))
+        #expect(FileManager.default.fileExists(atPath: staging.path) == false)
     }
 
     @Test("manifest stamps audioFilename so read is deterministic with multiple audio.*")

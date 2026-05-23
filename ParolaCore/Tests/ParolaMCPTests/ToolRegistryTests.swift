@@ -15,7 +15,7 @@ struct ToolRegistryTests {
     func engineNaming() {
         for tool in EngineTool.allCases {
             #expect(tool.rawValue.hasPrefix("parola_"), "engine tool \(tool) missing prefix")
-            #expect(!tool.rawValue.hasPrefix("parola_app_"), "engine tool \(tool) collides with app namespace")
+            #expect(tool.rawValue.hasPrefix("parola_app_") == false, "engine tool \(tool) collides with app namespace")
         }
     }
 

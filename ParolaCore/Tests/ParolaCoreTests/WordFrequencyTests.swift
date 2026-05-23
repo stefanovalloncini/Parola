@@ -22,8 +22,8 @@ struct WordFrequencyTests {
     func skipsStopWords() {
         let freq = WordFrequency.compute(text: "the cat sat on the mat", limit: 5)
         let words = freq.map(\.word)
-        #expect(!words.contains("the"))
-        #expect(!words.contains("on"))
+        #expect(words.contains("the") == false)
+        #expect(words.contains("on") == false)
         #expect(words.contains("cat"))
     }
 
@@ -38,8 +38,8 @@ struct WordFrequencyTests {
     func minLength() {
         let freq = WordFrequency.compute(text: "a cat sat in a fox box", limit: 10, minLength: 3)
         let words = freq.map(\.word)
-        #expect(!words.contains("a"))
-        #expect(!words.contains("in"))
+        #expect(words.contains("a") == false)
+        #expect(words.contains("in") == false)
     }
 
     @Test("ranks by count descending")

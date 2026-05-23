@@ -37,7 +37,7 @@ struct ManifestLabelsTests {
         )
         let data = try JSONEncoder().encode(manifest)
         let string = String(data: data, encoding: .utf8) ?? ""
-        #expect(!string.contains("labels"))
+        #expect(string.contains("labels") == false)
     }
 
     @Test("encode includes labels when non-empty and round-trips")

@@ -127,8 +127,8 @@ struct DictationContextProviderTests {
         let context = DictationContext(selection: "only this", clipboard: nil, screen: nil)
         let block = context.promptBlock()
         #expect(block.contains("<CURRENTLY_SELECTED_TEXT>only this</CURRENTLY_SELECTED_TEXT>"))
-        #expect(!block.contains("<CLIPBOARD_CONTEXT>"))
-        #expect(!block.contains("<CURRENT_WINDOW_CONTEXT>"))
+        #expect(block.contains("<CLIPBOARD_CONTEXT>") == false)
+        #expect(block.contains("<CURRENT_WINDOW_CONTEXT>") == false)
     }
 
     @Test("gather with timeout returns whatever finishes first")

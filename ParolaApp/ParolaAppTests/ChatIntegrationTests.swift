@@ -124,14 +124,14 @@ struct ChatIntegrationTests {
     func attachmentExtensions() {
         #expect(ChatAttachment.isReadableTextFile(URL(fileURLWithPath: "/tmp/notes.md")))
         #expect(ChatAttachment.isReadableTextFile(URL(fileURLWithPath: "/tmp/transcript.srt")))
-        #expect(!ChatAttachment.isReadableTextFile(URL(fileURLWithPath: "/tmp/photo.png")))
+        #expect(ChatAttachment.isReadableTextFile(URL(fileURLWithPath: "/tmp/photo.png")) == false)
     }
 
     @Test("summariseTranscript flips the thinking flag when a transcript is loaded")
     func thinkingFlagStarts() {
         let model = AppModel()
         model.transcript = makeTranscript()
-        #expect(!model.isSummarising)
+        #expect(model.isSummarising == false)
 
         model.summariseTranscript()
 
@@ -145,7 +145,7 @@ struct ChatIntegrationTests {
 
         model.summariseTranscript()
 
-        #expect(!model.isSummarising)
+        #expect(model.isSummarising == false)
     }
 
     @Test("summariseTranscript ignores re-entry while already running")

@@ -24,7 +24,7 @@ struct FolderWatcherTests {
     func nonMedia() {
         for ext in ["txt", "pdf", "jpg", "swift"] {
             let url = URL(fileURLWithPath: "/tmp/sample.\(ext)")
-            #expect(!FolderWatcher.isMediaFile(url))
+            #expect(FolderWatcher.isMediaFile(url) == false)
         }
     }
 

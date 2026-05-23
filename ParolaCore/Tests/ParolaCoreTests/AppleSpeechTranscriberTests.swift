@@ -13,7 +13,7 @@ struct AppleSpeechTranscriberTests {
     @Test("pickLocale falls back to current when language is nil")
     func pickLocaleNilFallback() {
         let locale = AppleSpeechTranscriber.pickLocale(language: nil)
-        #expect(!locale.identifier.isEmpty)
+        #expect(locale.identifier.isEmpty == false)
     }
 
     @Test("synthetic model id is stable")

@@ -299,7 +299,7 @@ struct ExporterTests {
     @Test("srt without includeSpeakers omits them by default")
     func srtNoSpeakersDefault() throws {
         let out = try SrtExporter().renderText(sampleWithSpeakers())
-        #expect(!out.contains("Speaker 1:"))
+        #expect(out.contains("Speaker 1:") == false)
         #expect(out.contains("Hello world."))
     }
 
@@ -314,7 +314,7 @@ struct ExporterTests {
     @Test("vtt without includeSpeakers omits them by default")
     func vttNoSpeakersDefault() throws {
         let out = try VttExporter().renderText(sampleWithSpeakers())
-        #expect(!out.contains("<v"))
+        #expect(out.contains("<v") == false)
     }
 
     @Test("tsv emits header and tab-separated rows")
@@ -337,7 +337,7 @@ struct ExporterTests {
         let out = try TsvExporter().renderText(transcript)
         #expect(out.contains("tab\\there"))
         #expect(out.contains("line1\\nline2"))
-        #expect(!out.contains("tab\there"))
+        #expect(out.contains("tab\there") == false)
     }
 
     @Test("tsv is a recognized ExportFormat")
