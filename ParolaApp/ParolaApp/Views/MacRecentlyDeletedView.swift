@@ -280,26 +280,3 @@ struct MacRecentlyDeletedView: View {
     }
 }
 
-private func readTranscriptText(at bundleURL: URL) async -> String {
-    let transcriptURL = bundleURL.appendingPathComponent("transcript.json")
-    guard let data = try? Data(contentsOf: transcriptURL),
-          let transcript = try? JSONDecoder().decode(Transcript.self, from: data)
-    else { return "" }
-    return transcript.text
-}
-
-private extension RecentlyDeletedDateFilter {
-    func matches(_ deletedAt: Date?, now: Date) -> Bool {
-        guard self != .all else { return true }
-        guard let deletedAt else { return self == .older }
-        let cal = Calendar.current
-        let days = cal.dateComponents([.day], from: cal.startOfDay(for: deletedAt), to: cal.startOfDay(for: now)).day ?? 0
-        switch self {
-        case .all: return true
-        case .today: return cal.isDateInToday(deletedAt)
-        case .week: return days < 7
-        case .month: return days < 30
-        case .older: return days >= 30
-        }
-    }
-}
