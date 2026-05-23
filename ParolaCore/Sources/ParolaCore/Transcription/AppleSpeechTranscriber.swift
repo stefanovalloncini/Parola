@@ -16,6 +16,7 @@ public actor AppleSpeechTranscriber: Transcriber {
     private let modelStore: ModelStore
     private var loadedModel: String?
     private var inFlightCancel: (@Sendable () async -> Void)?
+    private var inFlightEpoch: Int = 0
     private let signposter = OSSignposter(subsystem: "app.parola.core", category: "engine.apple-speech")
 
     public init(modelStore: ModelStore) {
@@ -44,8 +45,18 @@ public actor AppleSpeechTranscriber: Transcriber {
         let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
         defer { signposter.endInterval("transcribe", interval) }
         let cancellation = AnalyzerCancellation()
+        let priorCancel = inFlightCancel
+        inFlightEpoch &+= 1
+        let myEpoch = inFlightEpoch
         inFlightCancel = { [weak cancellation] in await cancellation?.cancel() }
-        defer { inFlightCancel = nil }
+        if let priorCancel {
+            Task { await priorCancel() }
+        }
+        defer {
+            if inFlightEpoch == myEpoch {
+                inFlightCancel = nil
+            }
+        }
         return try await runSpeechAnalyzer(
             url: url,
             options: options,
