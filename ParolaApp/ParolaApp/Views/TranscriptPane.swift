@@ -65,10 +65,7 @@ struct TranscriptPane: View {
 
                 if inspectorVisible {
                     TranscriptInspector(
-                        mode: Binding(
-                            get: { InspectorMode(rawValue: inspectorModeRaw) ?? .format },
-                            set: { inspectorModeRaw = $0.rawValue }
-                        ),
+                        mode: inspectorModeBinding,
                         inspectorVisible: $inspectorVisible
                     )
                     .frame(minWidth: 280, idealWidth: 300, maxWidth: 340)
@@ -132,5 +129,12 @@ struct TranscriptPane: View {
         case .transcript:
             ContinuousTranscriptView()
         }
+    }
+
+    private var inspectorModeBinding: Binding<InspectorMode> {
+        Binding(
+            get: { InspectorMode(rawValue: inspectorModeRaw) ?? .format },
+            set: { inspectorModeRaw = $0.rawValue }
+        )
     }
 }

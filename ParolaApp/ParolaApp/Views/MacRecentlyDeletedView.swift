@@ -47,10 +47,7 @@ struct MacRecentlyDeletedView: View {
         .background(DS.Color.surface)
         .confirmationDialog(
             "Delete permanently?",
-            isPresented: Binding(
-                get: { confirmingPurge != nil },
-                set: { if !$0 { confirmingPurge = nil } }
-            )
+            isPresented: isPurgingSingle
         ) {
             Button("Delete permanently", role: .destructive) {
                 if let id = confirmingPurge { model.purgeEntry(id) }
@@ -62,10 +59,7 @@ struct MacRecentlyDeletedView: View {
         }
         .confirmationDialog(
             "Delete \(confirmingPurgeBulk.count) items permanently?",
-            isPresented: Binding(
-                get: { !confirmingPurgeBulk.isEmpty },
-                set: { if !$0 { confirmingPurgeBulk = [] } }
-            )
+            isPresented: isPurgingBulk
         ) {
             Button("Delete permanently", role: .destructive) {
                 for id in confirmingPurgeBulk { model.purgeEntry(id) }
@@ -277,6 +271,20 @@ struct MacRecentlyDeletedView: View {
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         previews[entry.id] = trimmed.isEmpty ? "" : String(trimmed.prefix(280))
+    }
+
+    private var isPurgingSingle: Binding<Bool> {
+        Binding(
+            get: { confirmingPurge != nil },
+            set: { if !$0 { confirmingPurge = nil } }
+        )
+    }
+
+    private var isPurgingBulk: Binding<Bool> {
+        Binding(
+            get: { !confirmingPurgeBulk.isEmpty },
+            set: { if !$0 { confirmingPurgeBulk = [] } }
+        )
     }
 }
 

@@ -95,17 +95,21 @@ private struct SnippetRow: View {
         !snippet.trigger.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var enabledBinding: Binding<Bool> {
+        Binding(
+            get: { snippet.enabled && canEnable },
+            set: { if canEnable { snippet.enabled = $0 } }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if !isFirst { Divider().padding(.leading, 16) }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Toggle("", isOn: Binding(
-                        get: { snippet.enabled && canEnable },
-                        set: { if canEnable { snippet.enabled = $0 } }
-                    ))
-                    .labelsHidden()
-                    .disabled(!canEnable)
+                    Toggle("", isOn: enabledBinding)
+                        .labelsHidden()
+                        .disabled(!canEnable)
                     TextField("trigger phrase", text: $snippet.trigger)
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: 200)

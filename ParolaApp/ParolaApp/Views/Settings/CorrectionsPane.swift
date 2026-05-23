@@ -76,16 +76,20 @@ private struct CorrectionRow: View {
         !rule.from.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var enabledBinding: Binding<Bool> {
+        Binding(
+            get: { rule.enabled && canEnable },
+            set: { if canEnable { rule.enabled = $0 } }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if !isFirst { Divider().padding(.leading, 16) }
             HStack(spacing: 8) {
-                Toggle("", isOn: Binding(
-                    get: { rule.enabled && canEnable },
-                    set: { if canEnable { rule.enabled = $0 } }
-                ))
-                .labelsHidden()
-                .disabled(!canEnable)
+                Toggle("", isOn: enabledBinding)
+                    .labelsHidden()
+                    .disabled(!canEnable)
                 TextField("heard", text: $rule.from)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 180)

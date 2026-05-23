@@ -169,12 +169,7 @@ struct ParolaApp: App {
                     model.toggleLiveCaptions()
                 }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
-                Toggle("Translate to English", isOn: Binding(
-                    get: { liveCaptions.translateToEnglish },
-                    set: { newValue in
-                        Task { await liveCaptions.setTranslate(newValue) }
-                    }
-                ))
+                Toggle("Translate to English", isOn: translateCaptionsBinding)
                 Divider()
                 Button(liveCaptions.isPresenterOpen ? "Exit Presenter" : "Enter Presenter Mode") {
                     liveCaptions.togglePresenter()
@@ -255,6 +250,15 @@ struct ParolaApp: App {
         }
         .windowResizability(.contentSize)
         .defaultSize(width: 360, height: 90)
+    }
+
+    private var translateCaptionsBinding: Binding<Bool> {
+        Binding(
+            get: { liveCaptions.translateToEnglish },
+            set: { newValue in
+                Task { await liveCaptions.setTranslate(newValue) }
+            }
+        )
     }
 }
 

@@ -58,10 +58,7 @@ struct ModelsSettingsPane: View {
         .task { model.refreshModelList() }
         .confirmationDialog(
             confirmationTitle,
-            isPresented: Binding(
-                get: { pendingDeletion != nil },
-                set: { if !$0 { pendingDeletion = nil } }
-            ),
+            isPresented: isConfirmingDelete,
             titleVisibility: .visible,
             presenting: pendingDeletion
         ) { item in
@@ -82,6 +79,13 @@ struct ModelsSettingsPane: View {
     private var confirmationTitle: String {
         guard let item = pendingDeletion else { return "Delete model?" }
         return "Delete \(item.displayName)?"
+    }
+
+    private var isConfirmingDelete: Binding<Bool> {
+        Binding(
+            get: { pendingDeletion != nil },
+            set: { if !$0 { pendingDeletion = nil } }
+        )
     }
 
     private var modelsUsageRow: some View {

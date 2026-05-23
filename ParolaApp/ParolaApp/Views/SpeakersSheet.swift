@@ -96,13 +96,17 @@ struct SpeakersSheet: View {
             Text(speaker)
                 .font(.body.weight(.medium))
                 .foregroundStyle(DS.Color.secondaryText)
-            TextField("Rename", text: Binding(
-                get: { renames[speaker] ?? speaker },
-                set: { renames[speaker] = $0 }
-            ))
-            .textFieldStyle(.roundedBorder)
-            .focused($focusedSpeaker, equals: speaker)
+            TextField("Rename", text: renameBinding(for: speaker))
+                .textFieldStyle(.roundedBorder)
+                .focused($focusedSpeaker, equals: speaker)
         }
+    }
+
+    private func renameBinding(for speaker: String) -> Binding<String> {
+        Binding(
+            get: { renames[speaker] ?? speaker },
+            set: { renames[speaker] = $0 }
+        )
     }
 
     private var activeFieldKey: String? {

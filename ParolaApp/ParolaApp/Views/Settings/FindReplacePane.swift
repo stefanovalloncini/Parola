@@ -175,6 +175,13 @@ private struct FindReplaceRuleRow: View {
         return cachedRegexError
     }
 
+    private var enabledBinding: Binding<Bool> {
+        Binding(
+            get: { rule.enabled && canEnable },
+            set: { if canEnable { rule.enabled = $0 } }
+        )
+    }
+
     private static func compile(_ pattern: String) -> String? {
         do {
             _ = try NSRegularExpression(pattern: pattern)
@@ -189,12 +196,9 @@ private struct FindReplaceRuleRow: View {
             if !isFirst { Divider().padding(.leading, 16) }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Toggle("", isOn: Binding(
-                        get: { rule.enabled && canEnable },
-                        set: { if canEnable { rule.enabled = $0 } }
-                    ))
-                    .labelsHidden()
-                    .disabled(!canEnable)
+                    Toggle("", isOn: enabledBinding)
+                        .labelsHidden()
+                        .disabled(!canEnable)
                     TextField("find", text: $rule.find)
                         .textFieldStyle(.roundedBorder)
                         .overlay(

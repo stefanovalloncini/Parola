@@ -139,16 +139,20 @@ private struct IgnoredRuleRow: View {
         !rule.pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var enabledBinding: Binding<Bool> {
+        Binding(
+            get: { rule.enabled && canEnable },
+            set: { if canEnable { rule.enabled = $0 } }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if !isFirst { Divider().padding(.leading, 16) }
             HStack(spacing: 10) {
-                Toggle("", isOn: Binding(
-                    get: { rule.enabled && canEnable },
-                    set: { if canEnable { rule.enabled = $0 } }
-                ))
-                .labelsHidden()
-                .disabled(!canEnable)
+                Toggle("", isOn: enabledBinding)
+                    .labelsHidden()
+                    .disabled(!canEnable)
                 TextField("e.g. uh, um, hmm", text: $rule.pattern)
                     .textFieldStyle(.roundedBorder)
                 Button(role: .destructive, action: onDelete) {

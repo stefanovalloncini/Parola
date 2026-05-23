@@ -60,10 +60,7 @@ struct WorkflowRow: View {
     }
 
     private var promptPicker: some View {
-        Picker("", selection: Binding(
-            get: { model.dictationOverridePromptID(for: app.bundleID) },
-            set: { model.setDictationOverridePromptID($0, for: app.bundleID) }
-        )) {
+        Picker("", selection: promptBinding) {
             Text("Default prompt").tag("")
             ForEach(Prompt.builtIns) { prompt in
                 Text(prompt.name).tag(prompt.id.uuidString)
@@ -75,10 +72,7 @@ struct WorkflowRow: View {
     }
 
     private var languagePicker: some View {
-        Picker("", selection: Binding(
-            get: { model.dictationOverrideLanguage(for: app.bundleID) },
-            set: { model.setDictationOverrideLanguage($0, for: app.bundleID) }
-        )) {
+        Picker("", selection: languageBinding) {
             Text("Default language").tag("")
             ForEach(WorkflowLanguageOptions.options, id: \.code) { option in
                 Text(option.name).tag(option.code)
@@ -90,16 +84,34 @@ struct WorkflowRow: View {
     }
 
     private var insertionPicker: some View {
-        Picker("", selection: Binding(
-            get: { model.dictationOverrideInsertion(for: app.bundleID) },
-            set: { model.setDictationOverrideInsertion($0, for: app.bundleID) }
-        )) {
+        Picker("", selection: insertionBinding) {
             Text("Paste").tag(DictationInsertionMode.paste)
             Text("Keystrokes").tag(DictationInsertionMode.keystroke)
         }
         .labelsHidden()
         .pickerStyle(.menu)
         .frame(width: 120)
+    }
+
+    private var promptBinding: Binding<String> {
+        Binding(
+            get: { model.dictationOverridePromptID(for: app.bundleID) },
+            set: { model.setDictationOverridePromptID($0, for: app.bundleID) }
+        )
+    }
+
+    private var languageBinding: Binding<String> {
+        Binding(
+            get: { model.dictationOverrideLanguage(for: app.bundleID) },
+            set: { model.setDictationOverrideLanguage($0, for: app.bundleID) }
+        )
+    }
+
+    private var insertionBinding: Binding<DictationInsertionMode> {
+        Binding(
+            get: { model.dictationOverrideInsertion(for: app.bundleID) },
+            set: { model.setDictationOverrideInsertion($0, for: app.bundleID) }
+        )
     }
 }
 

@@ -10,13 +10,8 @@ struct LiveCaptionsPane: View {
                 SettingRow("Translate to English",
                            description: "Translate captions live as you speak.",
                            isFirst: true) {
-                    Toggle("", isOn: Binding(
-                        get: { liveCaptions.translateToEnglish },
-                        set: { newValue in
-                            Task { await liveCaptions.setTranslate(newValue) }
-                        }
-                    ))
-                    .labelsHidden()
+                    Toggle("", isOn: translateBinding)
+                        .labelsHidden()
                 }
                 SettingRow("Status") {
                     Text(liveCaptions.isActive ? "Running" : "Stopped")
@@ -26,5 +21,14 @@ struct LiveCaptionsPane: View {
             SettingHelper(text: "Start and stop live captions from the Captions menu (⇧⌘L).")
             ResetPaneButton(scope: .liveCaptions)
         }
+    }
+
+    private var translateBinding: Binding<Bool> {
+        Binding(
+            get: { liveCaptions.translateToEnglish },
+            set: { newValue in
+                Task { await liveCaptions.setTranslate(newValue) }
+            }
+        )
     }
 }

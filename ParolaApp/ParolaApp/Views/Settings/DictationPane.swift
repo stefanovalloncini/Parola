@@ -94,11 +94,8 @@ struct DictationPane: View {
                 SettingRow("Paste delay",
                            description: "Wait this long after dictation ends before pasting. Useful when the target app needs a beat to refocus.") {
                     HStack(spacing: 6) {
-                        Slider(value: Binding(
-                            get: { Double(model.dictationPasteDelayMs) },
-                            set: { model.dictationPasteDelayMs = Int($0) }
-                        ), in: 0...1000, step: 50)
-                        .frame(width: 160)
+                        Slider(value: pasteDelayBinding, in: 0...1000, step: 50)
+                            .frame(width: 160)
                         Text("\(model.dictationPasteDelayMs) ms")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(.secondary)
@@ -156,5 +153,12 @@ struct DictationPane: View {
 
     private var modeDescription: String {
         model.dictationMode.description
+    }
+
+    private var pasteDelayBinding: Binding<Double> {
+        Binding(
+            get: { Double(model.dictationPasteDelayMs) },
+            set: { model.dictationPasteDelayMs = Int($0) }
+        )
     }
 }

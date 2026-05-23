@@ -22,10 +22,7 @@ struct ContentSheetsModifier: ViewModifier {
             }
             .alert(
                 "\(meetingAppSnapshot) just launched",
-                isPresented: Binding(
-                    get: { model.meetingDetectedApp != nil },
-                    set: { if !$0 { model.dismissMeetingPrompt() } }
-                )
+                isPresented: meetingPromptBinding
             ) {
                 Button("Record this meeting") { model.startMeetingRecording() }
                 Button("Not now", role: .cancel) { model.dismissMeetingPrompt() }
@@ -49,6 +46,13 @@ struct ContentSheetsModifier: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .parolaSummarizeLast)) { _ in
                 model.summarizeLatestEntry()
             }
+    }
+
+    private var meetingPromptBinding: Binding<Bool> {
+        Binding(
+            get: { model.meetingDetectedApp != nil },
+            set: { if !$0 { model.dismissMeetingPrompt() } }
+        )
     }
 }
 

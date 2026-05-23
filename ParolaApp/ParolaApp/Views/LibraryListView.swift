@@ -115,10 +115,7 @@ struct LibraryListView: View {
         }
         .alert(
             "Rename entry",
-            isPresented: Binding(
-                get: { renamingEntry != nil },
-                set: { if !$0 { renamingEntry = nil } }
-            )
+            isPresented: isRenaming
         ) {
             TextField("Title", text: $renameDraft)
             Button("Cancel", role: .cancel) { renamingEntry = nil }
@@ -192,6 +189,13 @@ struct LibraryListView: View {
         for id in targets {
             model.deleteEntry(id)
         }
+    }
+
+    private var isRenaming: Binding<Bool> {
+        Binding(
+            get: { renamingEntry != nil },
+            set: { if !$0 { renamingEntry = nil } }
+        )
     }
 
     private var emptyState: some View {
