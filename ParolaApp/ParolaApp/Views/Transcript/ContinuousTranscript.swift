@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct ContinuousTranscriptView: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         ScrollView {
@@ -19,7 +19,7 @@ struct ContinuousTranscriptView: View {
 }
 
 struct ContinuousParagraph: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var hovering: Bool = false
     @State private var cursor: CGPoint = .zero
     @State private var attributedCache: AttributedString = AttributedString()

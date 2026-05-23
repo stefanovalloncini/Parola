@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct LibraryListView: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     let category: EntryCategory
 
     @State private var selection: Set<LibraryEntry.ID> = []

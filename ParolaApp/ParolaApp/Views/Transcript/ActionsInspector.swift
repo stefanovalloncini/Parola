@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ActionsInspector: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.large) {

@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct FindBar: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var showReplace = false
     @FocusState private var queryFocused: Bool
     @FocusState private var replaceFocused: Bool
@@ -25,7 +25,8 @@ struct FindBar: View {
     }
 
     private var searchRow: some View {
-        HStack(spacing: 12) {
+        @Bindable var model = model
+        return HStack(spacing: 12) {
             BarPill {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 13, weight: .regular))
@@ -93,7 +94,8 @@ struct FindBar: View {
     }
 
     private var replaceRow: some View {
-        HStack(spacing: 12) {
+        @Bindable var model = model
+        return HStack(spacing: 12) {
             BarPill {
                 Image(systemName: "arrow.2.squarepath")
                     .font(.system(size: 13, weight: .regular))

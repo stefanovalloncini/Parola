@@ -3,14 +3,15 @@ import AppKit
 import ParolaCore
 
 struct MicrophonePane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var devices: [AudioInputDevice] = []
     @State private var preview: MicPreviewController?
     @State private var level: Float = 0
     @State private var startError: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: 12) {
             SettingsSection {
                 SettingRow("Input device",
                            description: "Used for recording and the dictation fallback path.",

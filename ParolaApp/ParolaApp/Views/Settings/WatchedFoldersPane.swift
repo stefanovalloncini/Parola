@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct WatchedFoldersPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         WatchedFoldersPaneBody(store: model.watchedFolders)

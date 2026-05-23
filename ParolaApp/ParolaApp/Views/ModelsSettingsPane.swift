@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct ModelsSettingsPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     @State private var searchText = ""
     @State private var installFilter: InstallFilter = .all
@@ -357,6 +357,6 @@ struct ModelsSettingsPane: View {
 
 #Preview("Models pane") {
     ModelsSettingsPane()
-        .environmentObject(AppModel())
+        .environment(AppModel())
         .frame(width: 580, height: 720)
 }

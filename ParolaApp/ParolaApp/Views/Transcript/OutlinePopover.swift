@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct OutlinePopover: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     let onJump: (Double) -> Void
 
     private var entries: [TranscriptOutline.Entry] {

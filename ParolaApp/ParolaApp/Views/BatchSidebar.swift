@@ -2,10 +2,11 @@ import SwiftUI
 import ParolaCore
 
 struct BatchSidebar: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("Batch — \(model.batchJobs.count) files")
                     .font(DS.Font.heading)

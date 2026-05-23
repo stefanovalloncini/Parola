@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct QueueView: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var searchText: String = ""
     @State private var sortOption: SortOption = .newestFirst
     @FocusState private var focusedJob: BatchJob.ID?

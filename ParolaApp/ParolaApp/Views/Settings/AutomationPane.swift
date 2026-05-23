@@ -3,7 +3,7 @@ import AppKit
 import ParolaCore
 
 struct AutomationPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var copyConfirmation: String?
 
     private var bundledBinaryPath: String? {
@@ -49,7 +49,8 @@ struct AutomationPane: View {
     }
 
     var body: some View {
-        ScrollView {
+        @Bindable var model = model
+        return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 SettingsSection {
                     SettingRow(

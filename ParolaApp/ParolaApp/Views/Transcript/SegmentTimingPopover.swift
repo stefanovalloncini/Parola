@@ -3,14 +3,15 @@ import ParolaCore
 
 struct SegmentTimingPopover: View {
     let segment: TranscriptSegment
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     private var current: TranscriptSegment? {
         model.transcript?.segments.first { $0.id == segment.id }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Timing")
                     .font(.system(size: 12.5, weight: .semibold))

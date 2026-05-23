@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 import ParolaCore
 
 struct BatchView: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var isDropping: Bool = false
     @AppStorage("batch.exportPaneVisible") private var exportPaneVisible: Bool = true
 

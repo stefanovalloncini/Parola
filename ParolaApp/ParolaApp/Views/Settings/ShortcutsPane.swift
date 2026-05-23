@@ -2,10 +2,11 @@ import SwiftUI
 import ParolaCore
 
 struct ShortcutsPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: 12) {
             SettingsSection("Menu equivalents") {
                 SettingRow("Open Audio…", isFirst: true) { Text("⌘O").foregroundStyle(.secondary) }
                 SettingRow("Save Document") { Text("⌘S").foregroundStyle(.secondary) }

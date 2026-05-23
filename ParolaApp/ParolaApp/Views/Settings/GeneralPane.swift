@@ -2,12 +2,13 @@ import SwiftUI
 import ParolaCore
 
 struct GeneralPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var launchAtLogin: Bool = LaunchAtLogin.isEnabled
     @State private var launchAtLoginError: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: 16) {
             SettingsSection("Startup") {
                 SettingRow("Open at login",
                            descriptionVerbatim: launchAtLoginError ?? String(localized: "Launches Parola in the background when you sign in."),

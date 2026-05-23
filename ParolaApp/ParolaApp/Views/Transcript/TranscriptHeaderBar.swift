@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct TranscriptHeaderBar: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var speaker = TranscriptSpeaker()
     let title: String
     let onAdvance: () -> Void
@@ -42,7 +42,7 @@ struct TranscriptHeaderBar: View {
                     model.seekTo(seconds: seconds)
                     outlineOpen = false
                 }
-                .environmentObject(model)
+                .environment(model)
             }
 
             Button { jumpOpen.toggle() } label: {

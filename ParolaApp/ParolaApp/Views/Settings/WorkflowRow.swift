@@ -6,7 +6,7 @@ struct WorkflowRow: View {
     let app: (bundleID: String, name: String)
     let isFirst: Bool
     let isRemovable: Bool
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     private static let browserBundleIDs: Set<String> = [
         "com.apple.Safari",

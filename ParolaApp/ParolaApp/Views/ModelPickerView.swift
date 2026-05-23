@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct ModelPickerView: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     @State private var searchText = ""
     @State private var installedOnly = false

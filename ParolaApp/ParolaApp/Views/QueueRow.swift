@@ -4,7 +4,7 @@ import ParolaCore
 struct QueueRow: View {
     let job: BatchJob
     let isFocused: Bool
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var hovered = false
 
     var body: some View {

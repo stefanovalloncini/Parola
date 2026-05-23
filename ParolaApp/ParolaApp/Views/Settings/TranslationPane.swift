@@ -2,10 +2,11 @@ import SwiftUI
 import ParolaCore
 
 struct TranslationPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: 12) {
             SettingsSection {
                 SettingRow("Translate to English by default",
                            description: "Apply translation to every new transcription unless overridden.",

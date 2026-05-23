@@ -1,26 +1,35 @@
 import AppKit
-import Combine
 import Foundation
 
 @MainActor
 final class MicHotkeyController {
     private weak var model: AppModel?
     private var monitor: GlobalHotkeyMonitor?
-    private var cancellables: Set<AnyCancellable> = []
     private var lastConfig: (enabled: Bool, code: Int, mods: NSEvent.ModifierFlags)?
     private var reapplyPending = false
     private var configureTask: Task<Void, Never>?
 
     func bind(_ model: AppModel) {
         configureTask?.cancel()
-        cancellables.removeAll()
         lastConfig = nil
         self.model = model
-        reapplyFromModel()
+        observeAndApply()
+    }
 
-        model.objectWillChange
-            .sink { [weak self] _ in self?.scheduleReapply() }
-            .store(in: &cancellables)
+    private func observeAndApply() {
+        guard let model else { return }
+        withObservationTracking {
+            _ = model.micHotkeyEnabled
+            _ = model.micHotkeyKeyCode
+            _ = model.micHotkeyModifiers
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.scheduleReapply() }
+        }
+        applyConfiguration(
+            enabled: model.micHotkeyEnabled,
+            keyCode: model.micHotkeyKeyCode,
+            modifiers: model.micHotkeyModifierFlags
+        )
     }
 
     private func scheduleReapply() {
@@ -29,17 +38,8 @@ final class MicHotkeyController {
         Task { @MainActor [weak self] in
             guard let self else { return }
             self.reapplyPending = false
-            self.reapplyFromModel()
+            self.observeAndApply()
         }
-    }
-
-    private func reapplyFromModel() {
-        guard let model else { return }
-        applyConfiguration(
-            enabled: model.micHotkeyEnabled,
-            keyCode: model.micHotkeyKeyCode,
-            modifiers: model.micHotkeyModifierFlags
-        )
     }
 
     private func applyConfiguration(enabled: Bool, keyCode: Int, modifiers: NSEvent.ModifierFlags) {

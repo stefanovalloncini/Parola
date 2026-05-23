@@ -3,7 +3,7 @@ import ParolaCore
 
 struct SummaryChapterRow: View {
     let chapter: Chapter
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var hovering = false
 
     var body: some View {

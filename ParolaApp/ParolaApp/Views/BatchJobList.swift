@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct BatchJobList: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var searchText = ""
     @State private var sortOrder: BatchSortOrder = .addedFirst
     @FocusState private var focusedJob: BatchJob.ID?
@@ -181,7 +181,7 @@ struct BatchJobList: View {
 private struct PendingBatchJobReorder: ViewModifier {
     let jobID: BatchJob.ID
     let isPending: Bool
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var isTargeted = false
 
     func body(content: Content) -> some View {

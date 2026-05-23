@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct WordFrequencySection: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var entries: [WordFrequency.Entry] = []
 
     var body: some View {

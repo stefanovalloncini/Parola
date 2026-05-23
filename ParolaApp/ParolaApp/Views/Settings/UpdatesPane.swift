@@ -1,11 +1,12 @@
 import SwiftUI
 
 struct UpdatesPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var feedConfigured: Bool = SparkleUpdater.shared.feedURLConfigured
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: 12) {
             SettingsSection {
                 SettingRow("Check automatically",
                            description: "Looks for updates in the background once a day.",

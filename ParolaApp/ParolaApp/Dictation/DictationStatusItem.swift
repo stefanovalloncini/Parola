@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import ParolaCore
 import ParolaDictation
 
@@ -7,16 +6,25 @@ import ParolaDictation
 final class DictationStatusItem {
     private let model: AppModel
     private let statusItem: NSStatusItem
-    private var cancellable: AnyCancellable?
 
     init(model: AppModel) {
         self.model = model
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         configureButton()
-        apply(state: model.dictationState)
-        cancellable = model.$dictationState.sink { [weak self] state in
-            self?.apply(state: state)
+        observeState()
+    }
+
+    private func observeState() {
+        withObservationTracking {
+            _ = model.dictationState
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.apply(state: self.model.dictationState)
+                self.observeState()
+            }
         }
+        apply(state: model.dictationState)
     }
 
     private func configureButton() {

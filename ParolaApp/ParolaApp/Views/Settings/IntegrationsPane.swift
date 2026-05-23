@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct IntegrationsPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

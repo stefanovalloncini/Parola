@@ -250,14 +250,12 @@ final class ParolaAutomationServer {
 
         case "selectModel":
             let name = try requireString(args, "name")
-            UserDefaults.standard.set(name, forKey: "selectedModel")
-            model.objectWillChange.send()
+            model.selectedModel = name
             return ["selectedModel": name]
 
         case "setLanguage":
             let code = (args["code"] as? String) ?? ""
-            UserDefaults.standard.set(code, forKey: "selectedLanguageRaw")
-            model.objectWillChange.send()
+            model.selectedLanguage = code.isEmpty ? nil : code
             return ["language": code]
 
         case "setTheme":
@@ -265,8 +263,7 @@ final class ParolaAutomationServer {
             guard ["light", "dark", "system"].contains(theme) else {
                 throw BridgeError("'theme' must be one of: light, dark, system")
             }
-            UserDefaults.standard.set(theme, forKey: "appTheme")
-            model.objectWillChange.send()
+            model.appTheme = theme
             return ["appTheme": theme]
 
         case "setRoute":
@@ -315,14 +312,12 @@ final class ParolaAutomationServer {
 
         case "setTranslate":
             let on = try requireBool(args, "on")
-            UserDefaults.standard.set(on, forKey: "translate")
-            model.objectWillChange.send()
+            model.translate = on
             return ["translate": on]
 
         case "setUseStreaming":
             let on = try requireBool(args, "on")
-            UserDefaults.standard.set(on, forKey: "useStreaming")
-            model.objectWillChange.send()
+            model.useStreaming = on
             return ["useStreaming": on]
 
         case "toggleLiveCaptions":
@@ -511,7 +506,6 @@ final class ParolaAutomationServer {
                 throw BridgeError("setting '\(key)' is not writable through the bridge")
             }
             UserDefaults.standard.set(value, forKey: key)
-            model.objectWillChange.send()
             return ["key": key, "value": value ?? NSNull()]
 
         case "openSettings":

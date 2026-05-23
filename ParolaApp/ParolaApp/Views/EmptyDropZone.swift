@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct EmptyDropZone: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @Environment(\.openSettings) private var openSettings
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: DS.Spacing.regular), count: 4)

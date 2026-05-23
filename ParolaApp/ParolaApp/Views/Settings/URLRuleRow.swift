@@ -6,7 +6,7 @@ struct URLRuleRow: View {
     let app: (bundleID: String, name: String)
     let index: Int
     let rule: DictationWorkflow
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         HStack(spacing: 8) {

@@ -2,13 +2,14 @@ import SwiftUI
 import ParolaCore
 
 struct IgnoredSegmentsPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var searchText = ""
     @State private var enabledFilter: RuleEnabledFilter = .all
     @State private var sort: IgnoredSegmentsSort = .originalOrder
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 SearchPill(text: $searchText, placeholder: "Search patterns…")
                     .frame(maxWidth: 240)

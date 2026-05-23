@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct SpeechRateSection: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var bins: [SpeechRateBin] = []
 
     var body: some View {

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SummarySheet: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {

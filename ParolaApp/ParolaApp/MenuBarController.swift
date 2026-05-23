@@ -1,11 +1,9 @@
 import AppKit
-import Combine
 
 @MainActor
 final class MenuBarController {
     private weak var model: AppModel?
     private var statusItem: NSStatusItem?
-    private var cancellables: Set<AnyCancellable> = []
     private var lastVisibility: Bool = false
     private var lastSnapshotKey: String = ""
     private var rebuildPending = false
@@ -13,12 +11,20 @@ final class MenuBarController {
     func bind(_ model: AppModel) {
         self.model = model
         applyVisibility(model.showMenuBarExtra)
-        model.objectWillChange
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.scheduleRefresh()
-            }
-            .store(in: &cancellables)
+        observeAndRefresh()
+    }
+
+    private func observeAndRefresh() {
+        guard let model else { return }
+        withObservationTracking {
+            _ = model.showMenuBarExtra
+            _ = model.libraryVersion
+            _ = model.dictationEnabled
+            _ = model.libraryEntries
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.scheduleRefresh() }
+        }
+        refresh()
     }
 
     private func scheduleRefresh() {
@@ -26,7 +32,7 @@ final class MenuBarController {
         rebuildPending = true
         Task { @MainActor [weak self] in
             self?.rebuildPending = false
-            self?.refresh()
+            self?.observeAndRefresh()
         }
     }
 

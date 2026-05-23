@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct SummaryPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         VStack(spacing: 0) {

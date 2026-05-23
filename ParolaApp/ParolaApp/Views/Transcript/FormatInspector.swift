@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct FormatInspector: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @AppStorage("transcriptDisplayMode") private var displayModeRaw: String = TranscriptDisplayMode.transcript.rawValue
     @State private var newSpeaker: String = ""
 

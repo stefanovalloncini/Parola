@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct FindReplacePane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var searchText: String = ""
     @State private var statusFilter: StatusFilter = .all
     @State private var sortOption: SortOption = .original
@@ -96,6 +96,7 @@ struct FindReplacePane: View {
 
     private func binding(for id: FindReplaceRule.ID) -> Binding<FindReplaceRule>? {
         guard let idx = model.findReplaceRules.firstIndex(where: { $0.id == id }) else { return nil }
+        @Bindable var model = model
         return $model.findReplaceRules[idx]
     }
 

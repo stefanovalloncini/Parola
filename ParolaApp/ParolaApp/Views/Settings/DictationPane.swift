@@ -3,7 +3,7 @@ import ParolaCore
 import ParolaDictation
 
 struct DictationPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var customApps: [(bundleID: String, name: String)] = []
 
     private var currentModeName: String? {
@@ -19,7 +19,8 @@ struct DictationPane: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: 16) {
             DictationHUDPreview(
                 style: model.dictationIndicatorStyle,
                 modeName: currentModeName

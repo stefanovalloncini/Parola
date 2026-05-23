@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct MacLibrarySidebar: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var searchText = ""
 
     private var selectedRoute: SidebarRoute {
@@ -120,7 +120,8 @@ struct MacLibrarySidebar: View {
     }
 
     private var sortMenu: some View {
-        Menu {
+        @Bindable var model = model
+        return Menu {
             Picker("Sort", selection: $model.librarySortOrder) {
                 ForEach(LibrarySortOrder.allCases) { order in
                     Text(order.label).tag(order)

@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct LabelsSection: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var draftLabel: String = ""
 
     private var entry: LibraryEntry? {

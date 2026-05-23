@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 import ParolaCore
 
 struct BatchJobRow: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     let job: BatchJob
 
     private var kind: BatchMediaKind { BatchMediaKind(url: job.url) }

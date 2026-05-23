@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct BatchExportPanel: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         ScrollView {
@@ -40,7 +40,7 @@ struct BatchExportPanel: View {
 }
 
 struct BatchFormatCard: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     let format: ExportFormat
     @State private var isExpanded: Bool = true
 

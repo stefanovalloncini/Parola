@@ -2,11 +2,12 @@ import SwiftUI
 import ParolaCore
 
 struct ContentSheetsModifier: ViewModifier {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var meetingAppSnapshot: String = ""
 
     func body(content: Content) -> some View {
-        content
+        @Bindable var model = model
+        return content
             .sheet(isPresented: $model.youtubeSheetOpen) { YouTubeURLSheet() }
             .sheet(isPresented: $model.showingTrash) { MacRecentlyDeletedView() }
             .sheet(item: $model.promptOutput) { output in

@@ -3,7 +3,7 @@ import ParolaCore
 import ParolaDictation
 
 struct CorrectionsPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var searchText: String = ""
 
     var body: some View {
@@ -56,6 +56,7 @@ struct CorrectionsPane: View {
 
     private func binding(for id: CorrectionRule.ID) -> Binding<CorrectionRule>? {
         guard let idx = model.correctionRules.firstIndex(where: { $0.id == id }) else { return nil }
+        @Bindable var model = model
         return $model.correctionRules[idx]
     }
 

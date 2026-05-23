@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct BatchEmptyState: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     let isDropping: Bool
 
     var body: some View {

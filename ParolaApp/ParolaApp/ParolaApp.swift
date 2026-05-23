@@ -59,7 +59,7 @@ private func handleOpen(_ url: URL, model: AppModel) {
 
 @main
 struct ParolaApp: App {
-    @StateObject private var model = AppModel()
+    @State private var model = AppModel()
     @State private var liveCaptions = LiveCaptionsController()
     @State private var scratchpad = ScratchpadController()
     @State private var shortcutSheetOpen = false
@@ -70,7 +70,7 @@ struct ParolaApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(model)
+                .environment(model)
                 .environment(liveCaptions)
                 .frame(minWidth: 920, minHeight: 600)
                 .preferredColorScheme(model.preferredColorScheme)
@@ -91,7 +91,7 @@ struct ParolaApp: App {
                 }
                 .onOpenURL { url in handleOpen(url, model: model) }
                 .sheet(isPresented: $shortcutSheetOpen) { ShortcutCheatSheet() }
-                .sheet(isPresented: $aboutSheetOpen) { AboutSheet().environmentObject(model) }
+                .sheet(isPresented: $aboutSheetOpen) { AboutSheet().environment(model) }
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified(showsTitle: false))
@@ -130,6 +130,7 @@ struct ParolaApp: App {
                     .disabled(model.transcript == nil)
             }
             CommandGroup(after: .sidebar) {
+                @Bindable var model = model
                 Button("Toggle Inspector") {
                     UserDefaults.standard.set(
                         !UserDefaults.standard.bool(forKey: "inspectorVisible"),
@@ -239,14 +240,14 @@ struct ParolaApp: App {
 
         Settings {
             SettingsView()
-                .environmentObject(model)
+                .environment(model)
                 .environment(liveCaptions)
                 .frame(minWidth: 880, idealWidth: 900, maxWidth: .infinity, minHeight: 600, idealHeight: 640, maxHeight: .infinity)
         }
 
         Window("Mini Player", id: "mini-player") {
             MiniPlayerWindow()
-                .environmentObject(model)
+                .environment(model)
         }
         .windowResizability(.contentSize)
         .defaultSize(width: 360, height: 90)

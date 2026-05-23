@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct TranscriptInspector: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @Binding var mode: InspectorMode
     @Binding var inspectorVisible: Bool
 

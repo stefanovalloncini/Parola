@@ -2,12 +2,14 @@ import Combine
 import Foundation
 import SwiftUI
 import AVFoundation
+import Observation
 import UniformTypeIdentifiers
 import ParolaCore
 import ParolaDictation
 
 @MainActor
-final class AppModel: ObservableObject {
+@Observable
+final class AppModel {
 
     // MARK: - State
 
@@ -39,9 +41,9 @@ final class AppModel: ObservableObject {
         case queue
     }
 
-    @Published var route: Route = .transcript
-    @Published var phase: Phase = .idle
-    @Published var transcript: Transcript? {
+    var route: Route = .transcript
+    var phase: Phase = .idle
+    var transcript: Transcript? {
         didSet {
             let speakers = transcript?.uniqueSpeakers ?? []
             if speakers != transcriptSpeakers { transcriptSpeakers = speakers }
@@ -49,49 +51,49 @@ final class AppModel: ObservableObject {
             if findIsOpen { scheduleRecomputeMatches() }
         }
     }
-    @Published private(set) var transcriptSpeakers: [String] = []
-    @Published private(set) var transcriptVersion: Int = 0
-    @Published var showingTrash: Bool = false
-    @Published var currentSegmentID: TranscriptSegment.ID?
-    @Published var currentWordID: WordTiming.ID?
+    private(set) var transcriptSpeakers: [String] = []
+    private(set) var transcriptVersion: Int = 0
+    var showingTrash: Bool = false
+    var currentSegmentID: TranscriptSegment.ID?
+    var currentWordID: WordTiming.ID?
 
-    @Published var liveSegments: [TranscriptSegment] = []
-    @Published var livePartialText: String = ""
-    @Published var liveVoiceActive: Bool = false
-    @Published var filePartialText: String = ""
-    @AppStorage("useStreaming") var useStreaming: Bool = true
-    @AppStorage("wordTimestamps") var wordTimestamps: Bool = false
-    @AppStorage("karaokeHighlight") var karaokeHighlight: Bool = true
-    @AppStorage("initialPrompt") var initialPrompt: String = ""
-    @AppStorage("diarize") var diarize: Bool = false
-    @AppStorage("subtitleFPS") var subtitleFPS: Double = 30
-    @AppStorage("subtitleCaptionLength") var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue
-    @AppStorage("transcriptCompact") var transcriptCompact: Bool = false
-    @AppStorage("skipSilences") var skipSilences: Bool = false
-    @AppStorage("pausePlayerOnAppHidden") var pausePlayerOnAppHidden: Bool = false
-    @AppStorage("markdownTimestamps") var markdownTimestamps: Bool = false
-    @AppStorage("htmlExportTheme") var htmlExportThemeRaw: String = HtmlExportTheme.light.rawValue
-    @AppStorage("dictationHudOpacity") var dictationHudOpacity: Double = 1.0
-    @AppStorage("lastFindQuery") var lastFindQuery: String = ""
-    @AppStorage("parola.userPrivacyMode") var userPrivacyMode: Bool = false
-    @AppStorage("pinnedModel") var pinnedModel: String = ""
-    @AppStorage("mainWindowAlwaysOnTop") var mainWindowAlwaysOnTop: Bool = false
-    @AppStorage("recentFiles") var recentFilesRaw: String = "[]"
-    @AppStorage("micHotkeyKeyCode") var micHotkeyKeyCode: Int = 15 // kVK_ANSI_R
-    @AppStorage("micHotkeyModifiers") var micHotkeyModifiers: Int = 786721 // ⌃⌥⌘
-    @AppStorage("micHotkeyEnabled") var micHotkeyEnabled: Bool = false
-    @AppStorage("dictationStripSelfCorrections") var dictationStripSelfCorrections: Bool = false
-    @AppStorage("dictationPasteDelayMs") var dictationPasteDelayMs: Int = 0
-    @AppStorage("dictationContextSelection") var dictationContextSelection: Bool = false
-    @AppStorage("dictationContextClipboard") var dictationContextClipboard: Bool = false
-    @AppStorage("dictationContextScreen") var dictationContextScreen: Bool = false
-    @AppStorage("recordingMaxMinutes") var recordingMaxMinutes: Int = 0
-    @AppStorage("showMenuBarExtra") var showMenuBarExtra: Bool = false
-    @AppStorage("recordingCountInSeconds") var recordingCountInSeconds: Int = 0
-    @AppStorage("autoMuteWhileRecording") var autoMuteWhileRecording: Bool = false
-    @AppStorage("autoPauseMediaWhileRecording") var autoPauseMediaWhileRecording: Bool = false
-    @Published var recordingCountdown: Int? = nil
-    private var countdownTask: Task<Void, Never>?
+    var liveSegments: [TranscriptSegment] = []
+    var livePartialText: String = ""
+    var liveVoiceActive: Bool = false
+    var filePartialText: String = ""
+    @ObservationIgnored @AppStorage("useStreaming") var useStreaming: Bool = true
+    @ObservationIgnored @AppStorage("wordTimestamps") var wordTimestamps: Bool = false
+    @ObservationIgnored @AppStorage("karaokeHighlight") var karaokeHighlight: Bool = true
+    @ObservationIgnored @AppStorage("initialPrompt") var initialPrompt: String = ""
+    @ObservationIgnored @AppStorage("diarize") var diarize: Bool = false
+    @ObservationIgnored @AppStorage("subtitleFPS") var subtitleFPS: Double = 30
+    @ObservationIgnored @AppStorage("subtitleCaptionLength") var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue
+    @ObservationIgnored @AppStorage("transcriptCompact") var transcriptCompact: Bool = false
+    @ObservationIgnored @AppStorage("skipSilences") var skipSilences: Bool = false
+    @ObservationIgnored @AppStorage("pausePlayerOnAppHidden") var pausePlayerOnAppHidden: Bool = false
+    @ObservationIgnored @AppStorage("markdownTimestamps") var markdownTimestamps: Bool = false
+    @ObservationIgnored @AppStorage("htmlExportTheme") var htmlExportThemeRaw: String = HtmlExportTheme.light.rawValue
+    @ObservationIgnored @AppStorage("dictationHudOpacity") var dictationHudOpacity: Double = 1.0
+    @ObservationIgnored @AppStorage("lastFindQuery") var lastFindQuery: String = ""
+    @ObservationIgnored @AppStorage("parola.userPrivacyMode") var userPrivacyMode: Bool = false
+    @ObservationIgnored @AppStorage("pinnedModel") var pinnedModel: String = ""
+    @ObservationIgnored @AppStorage("mainWindowAlwaysOnTop") var mainWindowAlwaysOnTop: Bool = false
+    @ObservationIgnored @AppStorage("recentFiles") var recentFilesRaw: String = "[]"
+    @ObservationIgnored @AppStorage("micHotkeyKeyCode") var micHotkeyKeyCode: Int = 15 // kVK_ANSI_R
+    @ObservationIgnored @AppStorage("micHotkeyModifiers") var micHotkeyModifiers: Int = 786721 // ⌃⌥⌘
+    @ObservationIgnored @AppStorage("micHotkeyEnabled") var micHotkeyEnabled: Bool = false
+    @ObservationIgnored @AppStorage("dictationStripSelfCorrections") var dictationStripSelfCorrections: Bool = false
+    @ObservationIgnored @AppStorage("dictationPasteDelayMs") var dictationPasteDelayMs: Int = 0
+    @ObservationIgnored @AppStorage("dictationContextSelection") var dictationContextSelection: Bool = false
+    @ObservationIgnored @AppStorage("dictationContextClipboard") var dictationContextClipboard: Bool = false
+    @ObservationIgnored @AppStorage("dictationContextScreen") var dictationContextScreen: Bool = false
+    @ObservationIgnored @AppStorage("recordingMaxMinutes") var recordingMaxMinutes: Int = 0
+    @ObservationIgnored @AppStorage("showMenuBarExtra") var showMenuBarExtra: Bool = false
+    @ObservationIgnored @AppStorage("recordingCountInSeconds") var recordingCountInSeconds: Int = 0
+    @ObservationIgnored @AppStorage("autoMuteWhileRecording") var autoMuteWhileRecording: Bool = false
+    @ObservationIgnored @AppStorage("autoPauseMediaWhileRecording") var autoPauseMediaWhileRecording: Bool = false
+    var recordingCountdown: Int? = nil
+    @ObservationIgnored private var countdownTask: Task<Void, Never>?
 
     var recentFiles: [URL] {
         get {
@@ -133,41 +135,41 @@ final class AppModel: ObservableObject {
             .intersection(.deviceIndependentFlagsMask)
     }
 
-    @Published var batchJobs: [BatchJob] = []
-    @Published var selectedBatchJobID: BatchJob.ID?
-    var batchTask: Task<Void, Never>?
+    var batchJobs: [BatchJob] = []
+    var selectedBatchJobID: BatchJob.ID?
+    @ObservationIgnored var batchTask: Task<Void, Never>?
 
-    @AppStorage("batchExportFormats") var batchExportFormatsRaw: String = "txt,srt"
-    @AppStorage("batchExportToSourceFolder") var batchExportToSourceFolder: Bool = true
-    @AppStorage("batchExportIncludeTimestamps") var batchExportIncludeTimestamps: Bool = false
-    @AppStorage("batchExportFormatOptions") var batchExportFormatOptionsJSON: String = "{}"
+    @ObservationIgnored @AppStorage("batchExportFormats") var batchExportFormatsRaw: String = "txt,srt"
+    @ObservationIgnored @AppStorage("batchExportToSourceFolder") var batchExportToSourceFolder: Bool = true
+    @ObservationIgnored @AppStorage("batchExportIncludeTimestamps") var batchExportIncludeTimestamps: Bool = false
+    @ObservationIgnored @AppStorage("batchExportFormatOptions") var batchExportFormatOptionsJSON: String = "{}"
 
-    @Published var findIsOpen: Bool = false
-    @Published var findQuery: String = "" {
+    var findIsOpen: Bool = false
+    var findQuery: String = "" {
         didSet {
             if !findQuery.isEmpty { lastFindQuery = findQuery }
             scheduleRecomputeMatches()
         }
     }
-    @Published var findCaseSensitive: Bool = false { didSet { scheduleRecomputeMatches() } }
-    @Published var findReplacement: String = ""
-    @Published var matches: [TranscriptMatch] = [] { didSet { rebuildMatchesIndex() } }
-    var matchesBySegment: [Int: [TranscriptMatch]] = [:]
-    @Published var currentMatchIndex: Int = 0
-    var matchesDebounce: Task<Void, Never>?
+    var findCaseSensitive: Bool = false { didSet { scheduleRecomputeMatches() } }
+    var findReplacement: String = ""
+    var matches: [TranscriptMatch] = [] { didSet { rebuildMatchesIndex() } }
+    @ObservationIgnored var matchesBySegment: [Int: [TranscriptMatch]] = [:]
+    var currentMatchIndex: Int = 0
+    @ObservationIgnored var matchesDebounce: Task<Void, Never>?
 
-    @AppStorage("inputDeviceUID") var inputDeviceUID: String = ""
+    @ObservationIgnored @AppStorage("inputDeviceUID") var inputDeviceUID: String = ""
 
     var preferredInputDeviceUID: String? {
         inputDeviceUID.isEmpty ? nil : inputDeviceUID
     }
 
-    @AppStorage("selectedModel") var selectedModel: String = "openai_whisper-tiny"
-    @AppStorage("selectedLanguageRaw") private var selectedLanguageRaw: String = ""
-    @AppStorage("translate") var translate: Bool = false
+    @ObservationIgnored @AppStorage("selectedModel") var selectedModel: String = "openai_whisper-tiny"
+    @ObservationIgnored @AppStorage("selectedLanguageRaw") private var selectedLanguageRaw: String = ""
+    @ObservationIgnored @AppStorage("translate") var translate: Bool = false
 
-    private var cachedSelectedModel: String = ""
-    private var cachedCapabilities: EngineCapabilities = .whisperKitDefaults
+    @ObservationIgnored private var cachedSelectedModel: String = ""
+    @ObservationIgnored private var cachedCapabilities: EngineCapabilities = .whisperKitDefaults
 
     var selectedModelCapabilities: EngineCapabilities {
         if cachedSelectedModel != selectedModel {
@@ -182,55 +184,55 @@ final class AppModel: ObservableObject {
         set { selectedLanguageRaw = newValue ?? "" }
     }
 
-    @Published var availableModels: [ModelInfo] = []
-    @Published var sourceFileURL: URL?
+    var availableModels: [ModelInfo] = []
+    var sourceFileURL: URL?
 
-    @Published var player: AVPlayer?
-    @Published var hasVideo: Bool = false
-    @Published var currentTimeSeconds: Double = 0
-    @Published var isPlaying: Bool = false
-    var playerTimeObserver: Any?
-    var timeControlObserver: NSKeyValueObservation?
-    var playerInstallToken: Int = 0
+    var player: AVPlayer?
+    var hasVideo: Bool = false
+    var currentTimeSeconds: Double = 0
+    var isPlaying: Bool = false
+    @ObservationIgnored var playerTimeObserver: Any?
+    @ObservationIgnored var timeControlObserver: NSKeyValueObservation?
+    @ObservationIgnored var playerInstallToken: Int = 0
 
-    @Published var pendingExport: ExportFormat?
+    var pendingExport: ExportFormat?
 
     // MARK: - Post-process rules
 
-    @Published var ignoredSegmentRules: [IgnoredSegmentRule] = [] {
+    var ignoredSegmentRules: [IgnoredSegmentRule] = [] {
         didSet { saveIgnoredSegmentRules() }
     }
 
-    @Published var findReplaceRules: [FindReplaceRule] = [] {
+    var findReplaceRules: [FindReplaceRule] = [] {
         didSet { saveFindReplaceRules() }
     }
 
-    @Published var snippets: [Snippet] = [] {
+    var snippets: [Snippet] = [] {
         didSet {
             saveSnippets()
             applyDictationCleanupPromptChange()
         }
     }
 
-    @Published var correctionRules: [CorrectionRule] = [] {
+    var correctionRules: [CorrectionRule] = [] {
         didSet { saveCorrectionRules() }
     }
 
     // MARK: - People (speakers)
 
-    let peopleStore = PeopleStore()
-    @Published var showingSpeakersSheet: Bool = false
+    @ObservationIgnored let peopleStore = PeopleStore()
+    var showingSpeakersSheet: Bool = false
 
     // MARK: - Prompt library
 
-    let promptLibrary = PromptLibrary()
-    @Published var promptOutput: PromptOutput?
-    @Published var isRunningPrompt: Bool = false
-    @Published var actionItems: [ActionItem] = []
-    @Published var isExtractingActionItems: Bool = false
-    @Published var smartChapters: [Chapter] = []
-    @Published var isExtractingChapters: Bool = false
-    @Published var entrySpeakerFilters: [String: String] = [:]
+    @ObservationIgnored let promptLibrary = PromptLibrary()
+    var promptOutput: PromptOutput?
+    var isRunningPrompt: Bool = false
+    var actionItems: [ActionItem] = []
+    var isExtractingActionItems: Bool = false
+    var smartChapters: [Chapter] = []
+    var isExtractingChapters: Bool = false
+    var entrySpeakerFilters: [String: String] = [:]
 
     struct PromptOutput: Identifiable {
         let id = UUID()
@@ -240,19 +242,19 @@ final class AppModel: ObservableObject {
 
     // MARK: - Auto-export rules
 
-    @Published var autoExportRules: [AutoExportRule] = [] {
+    var autoExportRules: [AutoExportRule] = [] {
         didSet { saveAutoExportRules() }
     }
 
     // MARK: - Watched folders
 
-    lazy var watchedFolders: WatchedFoldersStore = WatchedFoldersStore { [weak self] url in
+    @ObservationIgnored lazy var watchedFolders: WatchedFoldersStore = WatchedFoldersStore { [weak self] url in
         self?.transcribe(fileURL: url)
     }
 
     // MARK: - Live captions
 
-    weak var liveCaptions: LiveCaptionsController?
+    @ObservationIgnored weak var liveCaptions: LiveCaptionsController?
 
     func toggleLiveCaptions() {
         guard let liveCaptions else { return }
@@ -261,28 +263,28 @@ final class AppModel: ObservableObject {
 
     // MARK: - Dictation
 
-    @Published var dictationEnabled: Bool = false {
+    var dictationEnabled: Bool = false {
         didSet {
             defaults.set(dictationEnabled, forKey: "dictationEnabled")
             applyDictationEnabledChange()
         }
     }
 
-    @Published var dictationModeRaw: String = DictationMode.pushToTalk.rawValue {
+    var dictationModeRaw: String = DictationMode.pushToTalk.rawValue {
         didSet {
             defaults.set(dictationModeRaw, forKey: "dictationModeRaw")
             applyDictationModeChange()
         }
     }
 
-    @Published var dictationKeyCode: Int = 96 {
+    var dictationKeyCode: Int = 96 {
         didSet {
             defaults.set(dictationKeyCode, forKey: "dictationKeyCode")
             restartDictation()
         }
     }
 
-    @Published var dictationKeyModifiers: Int = 0 {
+    var dictationKeyModifiers: Int = 0 {
         didSet {
             defaults.set(dictationKeyModifiers, forKey: "dictationKeyModifiers")
             restartDictation()
@@ -294,7 +296,7 @@ final class AppModel: ObservableObject {
             .intersection(.deviceIndependentFlagsMask)
     }
 
-    @Published var dictationIndicatorStyleRaw: String = DictationIndicatorStyle.overlay.rawValue {
+    var dictationIndicatorStyleRaw: String = DictationIndicatorStyle.overlay.rawValue {
         didSet {
             defaults.set(dictationIndicatorStyleRaw, forKey: "dictationIndicatorStyleRaw")
             applyIndicatorStyleChange()
@@ -311,10 +313,10 @@ final class AppModel: ObservableObject {
 
     // MARK: - Customization
 
-    @AppStorage("appTheme") var appTheme: String = "system"  // "system" | "light" | "dark"
-    @AppStorage("monospacedTimestamps") var monospacedTimestamps: Bool = true
-    @AppStorage("sidebarDensity") var sidebarDensity: String = "comfortable"  // "comfortable" | "compact"
-    @AppStorage(AppAccent.storageKey) var appAccentRaw: String = AppAccent.terracotta.rawValue
+    @ObservationIgnored @AppStorage("appTheme") var appTheme: String = "system"  // "system" | "light" | "dark"
+    @ObservationIgnored @AppStorage("monospacedTimestamps") var monospacedTimestamps: Bool = true
+    @ObservationIgnored @AppStorage("sidebarDensity") var sidebarDensity: String = "comfortable"  // "comfortable" | "compact"
+    @ObservationIgnored @AppStorage(AppAccent.storageKey) var appAccentRaw: String = AppAccent.terracotta.rawValue
 
     var appAccent: AppAccent {
         get { AppAccent(rawValue: appAccentRaw) ?? .terracotta }
@@ -329,14 +331,14 @@ final class AppModel: ObservableObject {
         }
     }
 
-    @Published var dictationCleanupPromptID: String = "" {
+    var dictationCleanupPromptID: String = "" {
         didSet {
             defaults.set(dictationCleanupPromptID, forKey: "dictationCleanupPromptID")
             applyDictationCleanupPromptChange()
         }
     }
 
-    @Published var dictationPerAppOverridesJSON: String = "{}" {
+    var dictationPerAppOverridesJSON: String = "{}" {
         didSet {
             defaults.set(dictationPerAppOverridesJSON, forKey: "dictationPerAppOverridesJSON")
             cachedDictationWorkflows = nil
@@ -345,8 +347,8 @@ final class AppModel: ObservableObject {
         }
     }
 
-    var cachedDictationWorkflows: (json: String, map: [String: [DictationWorkflow]])?
-    var cachedDictationTriggerPrompts: [Prompt] = []
+    @ObservationIgnored var cachedDictationWorkflows: (json: String, map: [String: [DictationWorkflow]])?
+    @ObservationIgnored var cachedDictationTriggerPrompts: [Prompt] = []
 
     static let dictationOverrideApps: [(bundleID: String, name: String)] = [
         ("com.apple.mail", "Mail"),
@@ -355,15 +357,15 @@ final class AppModel: ObservableObject {
         ("com.apple.Notes", "Notes"),
     ]
 
-    let dictationController = DictationController()
+    @ObservationIgnored let dictationController = DictationController()
 
-    @Published var dictationState: DictationCoordinator.State = .idle
-    let recordingAudioLevel = CurrentValueSubject<Float, Never>(0)
-    @Published var recordingIsSilent: Bool = false
-    var recordingLevelTask: Task<Void, Never>?
-    var silenceDetector: SilenceDetector = SilenceDetector(threshold: 8)
-    var silenceWatchTask: Task<Void, Never>?
-    var recordingAutoStopTask: Task<Void, Never>?
+    var dictationState: DictationCoordinator.State = .idle
+    @ObservationIgnored let recordingAudioLevel = CurrentValueSubject<Float, Never>(0)
+    var recordingIsSilent: Bool = false
+    @ObservationIgnored var recordingLevelTask: Task<Void, Never>?
+    @ObservationIgnored var silenceDetector: SilenceDetector = SilenceDetector(threshold: 8)
+    @ObservationIgnored var silenceWatchTask: Task<Void, Never>?
+    @ObservationIgnored var recordingAutoStopTask: Task<Void, Never>?
 
     private func readString(_ key: String, default fallback: String) -> String {
         defaults.string(forKey: key) ?? fallback
@@ -390,26 +392,26 @@ final class AppModel: ObservableObject {
 
     // MARK: - Meeting detection
 
-    @Published var meetingDetectedApp: String?
-    var pendingRecordingCategory: EntryCategory = .transcription
-    lazy var meetingDetector: MeetingDetector = MeetingDetector { [weak self] appName in
+    var meetingDetectedApp: String?
+    @ObservationIgnored var pendingRecordingCategory: EntryCategory = .transcription
+    @ObservationIgnored lazy var meetingDetector: MeetingDetector = MeetingDetector { [weak self] appName in
         self?.meetingDetectedApp = appName
     }
 
     // MARK: - Library
 
-    let library = LibraryStore()
-    @Published var libraryEntries: [LibraryEntry] = [] {
+    @ObservationIgnored let library = LibraryStore()
+    var libraryEntries: [LibraryEntry] = [] {
         didSet {
             rebuildLibraryIndex()
             libraryVersion &+= 1
         }
     }
-    @Published private(set) var libraryVersion: Int = 0
-    @Published var deletedEntries: [LibraryEntry] = []
-    @Published var searchResults: [LibraryEntry]?
-    @Published var selectedEntryID: LibraryEntry.ID?
-    private var libraryEntriesByID: [String: LibraryEntry] = [:]
+    private(set) var libraryVersion: Int = 0
+    var deletedEntries: [LibraryEntry] = []
+    var searchResults: [LibraryEntry]?
+    var selectedEntryID: LibraryEntry.ID?
+    @ObservationIgnored private var libraryEntriesByID: [String: LibraryEntry] = [:]
 
     private func rebuildLibraryIndex() {
         libraryEntriesByID = Dictionary(uniqueKeysWithValues: libraryEntries.map { ($0.id, $0) })
@@ -418,19 +420,19 @@ final class AppModel: ObservableObject {
     func libraryEntry(id: LibraryEntry.ID) -> LibraryEntry? {
         libraryEntriesByID[id]
     }
-    @Published var libraryFilter: EntryCategory?
-    @Published var librarySortOrder: LibrarySortOrder = .newest {
+    var libraryFilter: EntryCategory?
+    var librarySortOrder: LibrarySortOrder = .newest {
         didSet { reapplyLibrarySort() }
     }
-    var libraryBundleSizes: [String: Int64] = [:]
-    var searchTask: Task<Void, Never>?
+    @ObservationIgnored var libraryBundleSizes: [String: Int64] = [:]
+    @ObservationIgnored var searchTask: Task<Void, Never>?
     static let trashRetentionDays = 30
 
     // MARK: - Engine
 
-    private let session = TranscriptionSession()
-    private let store = ModelStore.shared
-    let mediaSession = MediaSession()
+    @ObservationIgnored private let session = TranscriptionSession()
+    @ObservationIgnored private let store = ModelStore.shared
+    @ObservationIgnored let mediaSession = MediaSession()
 
     func mediaSessionConfig(allowMute: Bool) -> MediaSessionConfig {
         MediaSessionConfig(
@@ -439,13 +441,13 @@ final class AppModel: ObservableObject {
         )
     }
 
-    private var liveSource: AudioSource?
-    private var streamingSession: StreamingTranscriptionSession?
-    private var streamingConsumer: Task<Void, Never>?
-    private var fileTranscribeTask: Task<Void, Never>?
-    private var youtubeTranscribeTask: Task<Void, Never>?
-    private var youtubeSubsTask: Task<Void, Never>?
-    private var lastDownloadPercent: Int = -1
+    @ObservationIgnored private var liveSource: AudioSource?
+    @ObservationIgnored private var streamingSession: StreamingTranscriptionSession?
+    @ObservationIgnored private var streamingConsumer: Task<Void, Never>?
+    @ObservationIgnored private var fileTranscribeTask: Task<Void, Never>?
+    @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>?
+    @ObservationIgnored private var youtubeSubsTask: Task<Void, Never>?
+    @ObservationIgnored private var lastDownloadPercent: Int = -1
 
     var canCancel: Bool {
         if batchTask != nil { return true }
@@ -480,11 +482,11 @@ final class AppModel: ObservableObject {
         phase = .idle
     }
 
-    private var testBridge: ParolaAutomationServer?
-    @Published private(set) var automationBridgeRunning: Bool = false
-    @Published private(set) var automationBridgePort: UInt16?
+    @ObservationIgnored private var testBridge: ParolaAutomationServer?
+    private(set) var automationBridgeRunning: Bool = false
+    private(set) var automationBridgePort: UInt16?
 
-    @AppStorage("automationBridgeEnabled") var automationBridgeEnabled: Bool = AppModel.defaultBridgeEnabled
+    @ObservationIgnored @AppStorage("automationBridgeEnabled") var automationBridgeEnabled: Bool = AppModel.defaultBridgeEnabled
 
     static var defaultBridgeEnabled: Bool {
         #if DEBUG
@@ -496,11 +498,11 @@ final class AppModel: ObservableObject {
 
     // MARK: - Sparkle
 
-    @AppStorage("sparkleChannel") var sparkleChannelRaw: String = SparkleChannel.stable.rawValue {
+    @ObservationIgnored @AppStorage("sparkleChannel") var sparkleChannelRaw: String = SparkleChannel.stable.rawValue {
         didSet { applySparkleChannelChange() }
     }
 
-    @AppStorage("sparkleAutomatic") var sparkleAutomatic: Bool = true {
+    @ObservationIgnored @AppStorage("sparkleAutomatic") var sparkleAutomatic: Bool = true {
         didSet { SparkleUpdater.shared.automaticallyChecks = sparkleAutomatic }
     }
 
@@ -514,7 +516,7 @@ final class AppModel: ObservableObject {
 
     // MARK: - Live captions translation
 
-    @AppStorage("liveCaptionsTranslate") var liveCaptionsTranslate: Bool = false {
+    @ObservationIgnored @AppStorage("liveCaptionsTranslate") var liveCaptionsTranslate: Bool = false {
         didSet { applyLiveCaptionsTranslateChange() }
     }
 
@@ -540,19 +542,17 @@ final class AppModel: ObservableObject {
         automationBridgePort = nil
     }
 
-    let defaults: UserDefaults
+    @ObservationIgnored let defaults: UserDefaults
 
     init(skipBootstrap: Bool = false, defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        _dictationEnabled = Published(initialValue: defaults.bool(forKey: "dictationEnabled"))
-        _dictationModeRaw = Published(initialValue: defaults.string(forKey: "dictationModeRaw") ?? DictationMode.pushToTalk.rawValue)
-        let storedKeyCode = defaults.object(forKey: "dictationKeyCode") == nil ? 96 : defaults.integer(forKey: "dictationKeyCode")
-        _dictationKeyCode = Published(initialValue: storedKeyCode)
-        let storedModifiers = defaults.object(forKey: "dictationKeyModifiers") == nil ? 0 : defaults.integer(forKey: "dictationKeyModifiers")
-        _dictationKeyModifiers = Published(initialValue: storedModifiers)
-        _dictationIndicatorStyleRaw = Published(initialValue: defaults.string(forKey: "dictationIndicatorStyleRaw") ?? DictationIndicatorStyle.overlay.rawValue)
-        _dictationCleanupPromptID = Published(initialValue: defaults.string(forKey: "dictationCleanupPromptID") ?? "")
-        _dictationPerAppOverridesJSON = Published(initialValue: defaults.string(forKey: "dictationPerAppOverridesJSON") ?? "{}")
+        self.dictationEnabled = defaults.bool(forKey: "dictationEnabled")
+        self.dictationModeRaw = defaults.string(forKey: "dictationModeRaw") ?? DictationMode.pushToTalk.rawValue
+        self.dictationKeyCode = defaults.object(forKey: "dictationKeyCode") == nil ? 96 : defaults.integer(forKey: "dictationKeyCode")
+        self.dictationKeyModifiers = defaults.object(forKey: "dictationKeyModifiers") == nil ? 0 : defaults.integer(forKey: "dictationKeyModifiers")
+        self.dictationIndicatorStyleRaw = defaults.string(forKey: "dictationIndicatorStyleRaw") ?? DictationIndicatorStyle.overlay.rawValue
+        self.dictationCleanupPromptID = defaults.string(forKey: "dictationCleanupPromptID") ?? ""
+        self.dictationPerAppOverridesJSON = defaults.string(forKey: "dictationPerAppOverridesJSON") ?? "{}"
         loadAutoExportRules()
         loadIgnoredSegmentRules()
         loadFindReplaceRules()
@@ -611,8 +611,8 @@ final class AppModel: ObservableObject {
 
     // MARK: - Model list
 
-    @Published var modelSizes: [String: Int64] = [:]
-    @Published var modelsBeingDeleted: Set<String> = []
+    var modelSizes: [String: Int64] = [:]
+    var modelsBeingDeleted: Set<String> = []
 
     func refreshModelList() {
         let curated = store.catalog()
@@ -792,10 +792,10 @@ final class AppModel: ObservableObject {
 
     // MARK: - YouTube URL
 
-    @Published var youtubeSheetOpen: Bool = false
-    @Published var ytDlpAvailable: Bool = false
-    @Published var ytDlpInstalling: Bool = false
-    @Published var ytDlpInstallError: String?
+    var youtubeSheetOpen: Bool = false
+    var ytDlpAvailable: Bool = false
+    var ytDlpInstalling: Bool = false
+    var ytDlpInstallError: String?
 
     func refreshYtDlpAvailability() {
         ytDlpAvailable = Self.findYtDlp() != nil
@@ -1297,9 +1297,9 @@ final class AppModel: ObservableObject {
 
     // MARK: - Summary
 
-    @Published var isSummarising: Bool = false
-    @Published var summaryError: String?
-    private var summaryGeneration: Int = 0
+    var isSummarising: Bool = false
+    var summaryError: String?
+    @ObservationIgnored private var summaryGeneration: Int = 0
 
     func summariseTranscript() {
         guard let transcript, !isSummarising else { return }

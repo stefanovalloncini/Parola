@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LanguagePickerView: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     private let codes: [String] = [
         "en", "it", "es", "fr", "de", "pt", "nl", "ja", "zh", "ko", "ar", "ru", "hi",

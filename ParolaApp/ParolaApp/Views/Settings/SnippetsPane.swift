@@ -3,7 +3,7 @@ import ParolaCore
 import ParolaDictation
 
 struct SnippetsPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var searchText: String = ""
 
     var body: some View {
@@ -70,6 +70,7 @@ struct SnippetsPane: View {
 
     private func binding(for id: Snippet.ID) -> Binding<Snippet>? {
         guard let idx = model.snippets.firstIndex(where: { $0.id == id }) else { return nil }
+        @Bindable var model = model
         return $model.snippets[idx]
     }
 

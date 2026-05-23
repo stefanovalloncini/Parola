@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct AdvancedPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var resetAllConfirming = false
 
     var body: some View {

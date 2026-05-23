@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct PromptsMenu: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var userPrompts: [Prompt] = []
 
     var body: some View {

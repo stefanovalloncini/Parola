@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ErrorPane: View {
     let message: String
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     var body: some View {
         ContentUnavailableView {
             Label("Something went wrong", systemImage: "exclamationmark.triangle")

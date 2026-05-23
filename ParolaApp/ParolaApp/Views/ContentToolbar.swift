@@ -2,9 +2,10 @@ import SwiftUI
 import ParolaCore
 
 struct ContentToolbar: ToolbarContent {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some ToolbarContent {
+        @Bindable var model = model
         ToolbarItemGroup(placement: .navigation) {
             ModelPickerView()
             LanguagePickerView()

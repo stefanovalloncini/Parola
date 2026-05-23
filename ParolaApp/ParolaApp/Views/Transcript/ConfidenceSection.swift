@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct ConfidenceSection: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var expanded = false
 
     private var transcript: Transcript? { model.transcript }

@@ -2,7 +2,7 @@ import SwiftUI
 import AVKit
 
 struct MediaBar: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @AppStorage("playbackRate") private var playbackRate: Double = 1.0
     @State private var scrubbingTo: Double?
 

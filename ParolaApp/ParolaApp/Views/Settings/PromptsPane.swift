@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct PromptsPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var searchText: String = ""
     @State private var sortOption: SortOption = .builtInFirst
     @State private var userPrompts: [Prompt] = []

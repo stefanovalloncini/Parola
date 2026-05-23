@@ -2,10 +2,11 @@ import SwiftUI
 import ParolaCore
 
 struct TranscriptionDefaultsPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: 12) {
             SettingsSection {
                 SettingRow("Default model",
                            description: "Used when you start a transcription without picking one in the toolbar.",

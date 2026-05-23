@@ -61,7 +61,7 @@ enum RecentlyDeletedSort: String, CaseIterable, Identifiable {
 }
 
 struct RecentlyDeletedToolbar: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @Binding var searchText: String
     @Binding var sortOption: RecentlyDeletedSort
     @Binding var confirmingEmpty: Bool

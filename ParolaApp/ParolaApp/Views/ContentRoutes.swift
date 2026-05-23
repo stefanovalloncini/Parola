@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentRoutes: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         content

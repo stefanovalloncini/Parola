@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct SegmentsScroll: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var hoveredSpeaker: String?
     @State private var pauseByPrev: [Int: Double] = [:]
     @State private var confidenceByID: [Int: SegmentConfidence.Bucket] = [:]

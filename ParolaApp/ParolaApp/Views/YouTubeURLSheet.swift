@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct YouTubeURLSheet: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var urlDraft: String = ""
     @FocusState private var fieldFocused: Bool
@@ -84,7 +84,7 @@ struct YouTubeURLSheet: View {
 }
 
 private struct YtDlpBanner: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {

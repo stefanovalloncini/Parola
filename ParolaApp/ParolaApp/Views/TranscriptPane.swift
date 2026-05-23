@@ -34,7 +34,7 @@ enum InspectorMode: String, CaseIterable, Identifiable {
 }
 
 struct TranscriptPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @AppStorage("inspectorVisible") private var inspectorVisible: Bool = true
     @AppStorage("inspectorMode") private var inspectorModeRaw: String = InspectorMode.format.rawValue
     @AppStorage("transcriptDisplayMode") private var displayModeRaw: String = TranscriptDisplayMode.transcript.rawValue
@@ -73,10 +73,10 @@ struct TranscriptPane: View {
             }
         }
         .sheet(isPresented: $summarySheetOpen) {
-            SummarySheet().environmentObject(model)
+            SummarySheet().environment(model)
         }
         .sheet(isPresented: $chatSheetOpen) {
-            ChatSheet().environmentObject(model)
+            ChatSheet().environment(model)
         }
     }
 

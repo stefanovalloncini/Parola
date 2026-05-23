@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct SettingsView: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var route: SettingsRoute = .general
     @State private var search: String = ""
 
@@ -269,7 +269,7 @@ private struct SidebarRow: View {
 
 private struct SettingsDetail: View {
     let route: SettingsRoute
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         ScrollView {

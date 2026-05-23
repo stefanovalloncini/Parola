@@ -5,7 +5,7 @@ import ParolaDictation
 
 struct DictationView: View {
     let state: DictationCoordinator.State
-    @ObservedObject var model: AppModel
+    let model: AppModel
     @Bindable var controller: DictationController
     var onStop: (() -> Void)?
 

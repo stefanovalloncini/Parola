@@ -3,7 +3,7 @@ import SwiftUI
 
 struct RecordingPane: View {
     let source: AppModel.RecordSource
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var startedAt: Date = Date()
 
     private var isStreaming: Bool { source == .microphone && model.useStreaming }
@@ -159,7 +159,7 @@ private struct LiveRecordingWaveform: View {
 }
 
 struct LiveTranscriptView: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         ScrollViewReader { proxy in

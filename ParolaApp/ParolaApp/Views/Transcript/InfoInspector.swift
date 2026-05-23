@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct InfoInspector: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     private var entry: LibraryEntry? {
         guard let id = model.selectedEntryID else { return nil }

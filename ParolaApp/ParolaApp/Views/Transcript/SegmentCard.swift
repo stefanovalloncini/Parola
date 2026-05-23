@@ -7,7 +7,7 @@ struct SegmentCard: View {
     var hoveredSpeaker: Binding<String?> = .constant(nil)
     var confidenceBucket: SegmentConfidence.Bucket? = nil
 
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var hovering: Bool = false
     @State private var isEditing: Bool = false
     @State private var draftText: String = ""
@@ -192,7 +192,7 @@ struct SegmentCard: View {
             }
             .popover(isPresented: $timingPopoverOpen, arrowEdge: .top) {
                 SegmentTimingPopover(segment: segment)
-                    .environmentObject(model)
+                    .environment(model)
             }
             cardButton(systemName: "doc.on.doc", help: "Copy segment with timestamp") {
                 NSPasteboard.general.clearContents()

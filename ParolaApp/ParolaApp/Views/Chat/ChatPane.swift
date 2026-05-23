@@ -23,7 +23,7 @@ extension FocusedValues {
 }
 
 struct ChatPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @AppStorage("chat.searchExpanded") private var isSearchingPersisted: Bool = false
     @State private var session: TranscriptChatSession?
     @State private var sessionError: String?

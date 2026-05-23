@@ -3,7 +3,7 @@ import AVKit
 import AppKit
 
 struct MiniPlayerWindow: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         VStack(spacing: 8) {
