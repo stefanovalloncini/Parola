@@ -136,20 +136,13 @@ public actor LibraryStore {
     private func indexEntry(_ entry: LibraryEntry, transcriptText: String) async {
         await searchIndex.index(id: entry.id, title: entry.title, text: transcriptText, createdAt: entry.createdAt)
         guard let extraIndexer else { return }
-        let id = entry.id
-        let title = entry.title
-        let createdAt = entry.createdAt
-        Task.detached(priority: .utility) {
-            await extraIndexer.index(id: id, title: title, text: transcriptText, createdAt: createdAt)
-        }
+        await extraIndexer.index(id: entry.id, title: entry.title, text: transcriptText, createdAt: entry.createdAt)
     }
 
     private func deindexEntry(id: String) async {
         await searchIndex.remove(id)
         guard let extraIndexer else { return }
-        Task.detached(priority: .utility) {
-            await extraIndexer.deindex(id: id)
-        }
+        await extraIndexer.deindex(id: id)
     }
 
     /// Overwrites the transcript.json inside an existing bundle. Bumps the manifest `updatedAt`.
