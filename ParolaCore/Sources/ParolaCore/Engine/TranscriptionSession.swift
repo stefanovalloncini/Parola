@@ -14,6 +14,7 @@ public actor TranscriptionSession {
     private var transcriber: (any Transcriber)?
     private var transcriberEngineID: EngineID?
     private var idleTask: Task<Void, Never>?
+    private var idleEpoch: Int = 0
 
     public init(
         modelStore: ModelStore = .shared,
@@ -160,11 +161,18 @@ public actor TranscriptionSession {
     private func scheduleIdleUnload() {
         cancelIdleTimer()
         let timeout = idleTimeout
+        idleEpoch &+= 1
+        let myEpoch = idleEpoch
         idleTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(timeout))
-            guard !Task.isCancelled else { return }
-            await self?.unloadModel()
+            if Task.isCancelled { return }
+            await self?.unloadIfIdle(epoch: myEpoch)
         }
+    }
+
+    private func unloadIfIdle(epoch: Int) async {
+        guard epoch == idleEpoch else { return }
+        await unloadModel()
     }
 
     private func cancelIdleTimer() {
