@@ -539,7 +539,7 @@ final class AppModel: ObservableObject {
         automationBridgePort = nil
     }
 
-    init() {
+    init(skipBootstrap: Bool = false) {
         loadAutoExportRules()
         loadIgnoredSegmentRules()
         loadFindReplaceRules()
@@ -551,6 +551,7 @@ final class AppModel: ObservableObject {
         _ = watchedFolders
         _ = meetingDetector
         wireDictationController()
+        if skipBootstrap { return }
         if dictationEnabled { startDictation() }
         SparkleUpdater.shared.channel = sparkleChannel
         SparkleUpdater.shared.automaticallyChecks = sparkleAutomatic
