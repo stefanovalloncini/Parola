@@ -75,16 +75,17 @@ struct AutoExportTests {
     @MainActor
     @Test("auto-export rules round-trip through the JSON helpers")
     func rulesRoundTripThroughUserDefaults() {
-        let key = "autoExportTests.rules.\(UUID().uuidString)"
-        defer { UserDefaults.standard.removeObject(forKey: key) }
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let model = AppModel(skipBootstrap: true, defaults: defaults)
+        let key = "autoExportTests.rules"
 
         let written = [
             AutoExportRule(sourceExtensions: ["mp4", "mov"], outputFormats: [.srt, .vtt]),
             AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.txt], enabled: false),
         ]
-        AppModel.writeJSON(written, forKey: key)
+        model.writeJSON(written, forKey: key)
 
-        let read = AppModel.readJSON([AutoExportRule].self, forKey: key)
+        let read = model.readJSON([AutoExportRule].self, forKey: key)
         #expect(read?.count == 2)
         #expect(read?.first?.sourceExtensions == ["mp4", "mov"])
         #expect(read?.first?.outputFormats == [.srt, .vtt])
@@ -94,8 +95,10 @@ struct AutoExportTests {
     @MainActor
     @Test("readJSON returns nil when the defaults key is absent")
     func readJSONMissingKey() {
-        let key = "autoExportTests.absent.\(UUID().uuidString)"
-        let result = AppModel.readJSON([AutoExportRule].self, forKey: key)
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let model = AppModel(skipBootstrap: true, defaults: defaults)
+        let key = "autoExportTests.absent"
+        let result = model.readJSON([AutoExportRule].self, forKey: key)
         #expect(result == nil)
     }
 

@@ -15,6 +15,14 @@ struct AppModelBatchTests {
         BatchJob(url: makeURL(name), status: status)
     }
 
+    private func makeIsolatedDefaults() -> UserDefaults {
+        UserDefaults(suiteName: "test-\(UUID())")!
+    }
+
+    private func makeModel() -> AppModel {
+        AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults())
+    }
+
     private static func makeTranscript() -> Transcript {
         Transcript(
             segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hi")],
@@ -25,7 +33,7 @@ struct AppModelBatchTests {
 
     @Test("addBatchExportFormat appends new formats and ignores duplicates")
     func addBatchFormatsDeduplicates() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.batchExportFormats = []
 
         model.addBatchExportFormat(.srt)
@@ -37,7 +45,7 @@ struct AppModelBatchTests {
 
     @Test("removeBatchExportFormat strips a format from the list")
     func removeBatchFormat() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.batchExportFormats = [.srt, .txt, .vtt]
 
         model.removeBatchExportFormat(.txt)
@@ -47,7 +55,7 @@ struct AppModelBatchTests {
 
     @Test("options(for:) falls back to global defaults when no per-format entry exists")
     func optionsFallback() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.batchExportFormatOptionsJSON = "{}"
         model.batchExportToSourceFolder = false
         model.batchExportIncludeTimestamps = true
@@ -60,7 +68,7 @@ struct AppModelBatchTests {
 
     @Test("setOptions writes a per-format override that overrides the defaults")
     func setOptionsRoundTrip() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.batchExportFormatOptionsJSON = "{}"
         model.batchExportToSourceFolder = false
 
@@ -74,7 +82,7 @@ struct AppModelBatchTests {
 
     @Test("reorderPendingBatchJobs moves only pending jobs and preserves their ids")
     func reorderPreservesIDs() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         let a = Self.makeJob("a")
         let b = Self.makeJob("b")
         let c = Self.makeJob("c")
@@ -87,7 +95,7 @@ struct AppModelBatchTests {
 
     @Test("reorderPendingBatchJobs keeps non-pending jobs in place")
     func reorderSkipsNonPending() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         let done = Self.makeJob("done", status: .done)
         let p1 = Self.makeJob("p1")
         let p2 = Self.makeJob("p2")
@@ -104,7 +112,7 @@ struct AppModelBatchTests {
 
     @Test("moveBatchJobToTop reorders within pending slice and is a no-op for non-pending")
     func moveJobToTop() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         let p1 = Self.makeJob("p1")
         let p2 = Self.makeJob("p2")
         let p3 = Self.makeJob("p3")
@@ -122,7 +130,7 @@ struct AppModelBatchTests {
 
     @Test("moveBatchJob(before:) places a pending job ahead of the target")
     func moveJobBefore() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         let a = Self.makeJob("a")
         let b = Self.makeJob("b")
         let c = Self.makeJob("c")
@@ -135,7 +143,7 @@ struct AppModelBatchTests {
 
     @Test("retryBatchJob resets a failed job to pending and clears its error")
     func retryFailedJob() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         let failed = BatchJob(
             url: Self.makeURL("a"),
             status: .failed,
@@ -157,7 +165,7 @@ struct AppModelBatchTests {
 
     @Test("cancelBatchJob removes a non-running job from the list")
     func cancelRemovesFinishedJob() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         let done = Self.makeJob("done", status: .done)
         let pending = Self.makeJob("p")
         model.batchJobs = [done, pending]
@@ -171,7 +179,7 @@ struct AppModelBatchTests {
 
     @Test("clearFinishedBatchJobs keeps pending and running jobs only")
     func clearFinishedKeepsActive() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         let done = Self.makeJob("done", status: .done)
         let failed = Self.makeJob("fail", status: .failed)
         let cancelled = Self.makeJob("cancel", status: .cancelled)
@@ -189,7 +197,7 @@ struct AppModelBatchTests {
 
     @Test("clearBatch wipes jobs and selection")
     func clearWipesEverything() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.batchJobs = [Self.makeJob("a"), Self.makeJob("b")]
         model.selectedBatchJobID = model.batchJobs[0].id
 
@@ -202,7 +210,7 @@ struct AppModelBatchTests {
 
     @Test("cancelAllInFlightBatchJobs marks pending and transcribing as cancelled")
     func cancelAllInFlight() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         let done = Self.makeJob("done", status: .done)
         let pending = Self.makeJob("pending")
         let running = Self.makeJob("run", status: .transcribing)
@@ -217,7 +225,7 @@ struct AppModelBatchTests {
 
     @Test("batchIsRunning is true only while a job is transcribing")
     func batchIsRunningFlag() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         #expect(model.batchIsRunning == false)
 
         model.batchJobs = [Self.makeJob("p")]
@@ -229,7 +237,7 @@ struct AppModelBatchTests {
 
     @Test("BatchExportFormatOptions encodes and decodes through the JSON sidecar")
     func formatOptionsRoundTrip() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.batchExportFormatOptionsJSON = "{}"
 
         let options: [String: BatchExportFormatOptions] = [

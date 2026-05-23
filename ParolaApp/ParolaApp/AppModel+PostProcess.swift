@@ -5,23 +5,23 @@ import ParolaCore
 extension AppModel {
 
     func loadIgnoredSegmentRules() {
-        if let rules = AppModel.readJSON([IgnoredSegmentRule].self, forKey: "ignoredSegmentRules") {
+        if let rules = readJSON([IgnoredSegmentRule].self, forKey: "ignoredSegmentRules") {
             ignoredSegmentRules = rules
         }
     }
 
     func saveIgnoredSegmentRules() {
-        AppModel.writeJSON(ignoredSegmentRules, forKey: "ignoredSegmentRules")
+        writeJSON(ignoredSegmentRules, forKey: "ignoredSegmentRules")
     }
 
     func loadFindReplaceRules() {
-        if let rules = AppModel.readJSON([FindReplaceRule].self, forKey: "findReplaceRules") {
+        if let rules = readJSON([FindReplaceRule].self, forKey: "findReplaceRules") {
             findReplaceRules = rules
         }
     }
 
     func saveFindReplaceRules() {
-        AppModel.writeJSON(findReplaceRules, forKey: "findReplaceRules")
+        writeJSON(findReplaceRules, forKey: "findReplaceRules")
     }
 
     func postProcess(_ transcript: Transcript) -> Transcript {

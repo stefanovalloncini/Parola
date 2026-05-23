@@ -7,8 +7,12 @@ import ParolaCore
 @Suite("AppModel dictation")
 struct AppModelDictationTests {
 
+    private func makeIsolatedDefaults() -> UserDefaults {
+        UserDefaults(suiteName: "test-\(UUID())")!
+    }
+
     private func makeModel() -> AppModel {
-        let model = AppModel(skipBootstrap: true)
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults())
         model.dictationPerAppOverridesJSON = "{}"
         return model
     }

@@ -5,13 +5,13 @@ import ParolaCore
 extension AppModel {
 
     func loadAutoExportRules() {
-        if let rules = AppModel.readJSON([AutoExportRule].self, forKey: "autoExportRules") {
+        if let rules = readJSON([AutoExportRule].self, forKey: "autoExportRules") {
             autoExportRules = rules
         }
     }
 
     func saveAutoExportRules() {
-        AppModel.writeJSON(autoExportRules, forKey: "autoExportRules")
+        writeJSON(autoExportRules, forKey: "autoExportRules")
     }
 
     func runAutoExports(transcript: Transcript, sourceURL: URL) {

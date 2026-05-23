@@ -21,9 +21,17 @@ struct AppModelPlayerTests {
             .appendingPathComponent("AppModelPlayerTests-\(UUID().uuidString).m4a")
     }
 
+    private func makeIsolatedDefaults() -> UserDefaults {
+        UserDefaults(suiteName: "test-\(UUID())")!
+    }
+
+    private func makeModel() -> AppModel {
+        AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults())
+    }
+
     @Test("installPlayer creates a player and resets per-install state")
     func installPlayerCreatesPlayer() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.currentSegmentID = 99
         model.currentWordID = "stale"
         model.currentTimeSeconds = 42
@@ -41,7 +49,7 @@ struct AppModelPlayerTests {
 
     @Test("installPlayer bumps the install token so stale work is ignored")
     func installPlayerBumpsToken() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         let before = model.playerInstallToken
 
         model.installPlayer(for: Self.makeURL())
@@ -51,7 +59,7 @@ struct AppModelPlayerTests {
 
     @Test("tearDownPlayer clears player and all derived state")
     func tearDownClearsState() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.installPlayer(for: Self.makeURL())
         model.currentSegmentID = 1
         model.currentWordID = "w"
@@ -71,7 +79,7 @@ struct AppModelPlayerTests {
 
     @Test("tearDownPlayer is a no-op when no player is installed")
     func tearDownNoOp() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
 
         model.tearDownPlayer()
 
@@ -81,7 +89,7 @@ struct AppModelPlayerTests {
 
     @Test("installPlayer twice tears down the first player")
     func reinstallPlayer() throws {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.installPlayer(for: Self.makeURL())
         let first = try #require(model.player)
 
@@ -93,7 +101,7 @@ struct AppModelPlayerTests {
 
     @Test("seek without a player is a no-op")
     func seekSegmentWithoutPlayer() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         let segment = TranscriptSegment(id: 1, start: 1, end: 2, text: "x")
 
         model.seek(to: segment)
@@ -103,7 +111,7 @@ struct AppModelPlayerTests {
 
     @Test("seekTo(seconds:) without a player is a no-op")
     func seekSecondsWithoutPlayer() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
 
         model.seekTo(seconds: 30)
 
@@ -112,7 +120,7 @@ struct AppModelPlayerTests {
 
     @Test("seekTo(chapter:) without a player is a no-op")
     func seekChapterWithoutPlayer() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         let chapter = Chapter(title: "Intro", start: 12)
 
         model.seekTo(chapter: chapter)
@@ -122,7 +130,7 @@ struct AppModelPlayerTests {
 
     @Test("maybeSkipSilence does nothing when skipSilences is off")
     func skipSilenceDisabledByPreference() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.skipSilences = false
         model.transcript = Self.makeTranscript([(0, 0, 1), (1, 5, 6)])
         model.installPlayer(for: Self.makeURL())
@@ -135,7 +143,7 @@ struct AppModelPlayerTests {
 
     @Test("maybeSkipSilence bails out without a transcript")
     func skipSilenceNoTranscript() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.skipSilences = true
         model.transcript = nil
         model.installPlayer(for: Self.makeURL())
@@ -147,7 +155,7 @@ struct AppModelPlayerTests {
 
     @Test("maybeSkipSilence bails out without a player")
     func skipSilenceNoPlayer() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.skipSilences = true
         model.transcript = Self.makeTranscript([(0, 0, 1), (1, 5, 6)])
 
@@ -158,7 +166,7 @@ struct AppModelPlayerTests {
 
     @Test("handleAppResignedActive does nothing when pause-on-hide is off")
     func handleResignedDisabled() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.pausePlayerOnAppHidden = false
         model.installPlayer(for: Self.makeURL())
 
@@ -169,7 +177,7 @@ struct AppModelPlayerTests {
 
     @Test("handleAppResignedActive does nothing when there is no player")
     func handleResignedNoPlayer() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.pausePlayerOnAppHidden = true
 
         model.handleAppResignedActive()

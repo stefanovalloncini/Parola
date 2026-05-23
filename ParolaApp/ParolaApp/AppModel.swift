@@ -260,30 +260,30 @@ final class AppModel: ObservableObject {
 
     // MARK: - Dictation
 
-    @Published var dictationEnabled: Bool = UserDefaults.standard.bool(forKey: "dictationEnabled") {
+    @Published var dictationEnabled: Bool = false {
         didSet {
-            UserDefaults.standard.set(dictationEnabled, forKey: "dictationEnabled")
+            defaults.set(dictationEnabled, forKey: "dictationEnabled")
             applyDictationEnabledChange()
         }
     }
 
-    @Published var dictationModeRaw: String = AppModel.readString("dictationModeRaw", default: DictationMode.pushToTalk.rawValue) {
+    @Published var dictationModeRaw: String = DictationMode.pushToTalk.rawValue {
         didSet {
-            UserDefaults.standard.set(dictationModeRaw, forKey: "dictationModeRaw")
+            defaults.set(dictationModeRaw, forKey: "dictationModeRaw")
             applyDictationModeChange()
         }
     }
 
-    @Published var dictationKeyCode: Int = AppModel.readInt("dictationKeyCode", default: 96) {
+    @Published var dictationKeyCode: Int = 96 {
         didSet {
-            UserDefaults.standard.set(dictationKeyCode, forKey: "dictationKeyCode")
+            defaults.set(dictationKeyCode, forKey: "dictationKeyCode")
             restartDictation()
         }
     }
 
-    @Published var dictationKeyModifiers: Int = AppModel.readInt("dictationKeyModifiers", default: 0) {
+    @Published var dictationKeyModifiers: Int = 0 {
         didSet {
-            UserDefaults.standard.set(dictationKeyModifiers, forKey: "dictationKeyModifiers")
+            defaults.set(dictationKeyModifiers, forKey: "dictationKeyModifiers")
             restartDictation()
         }
     }
@@ -293,9 +293,9 @@ final class AppModel: ObservableObject {
             .intersection(.deviceIndependentFlagsMask)
     }
 
-    @Published var dictationIndicatorStyleRaw: String = AppModel.readString("dictationIndicatorStyleRaw", default: DictationIndicatorStyle.overlay.rawValue) {
+    @Published var dictationIndicatorStyleRaw: String = DictationIndicatorStyle.overlay.rawValue {
         didSet {
-            UserDefaults.standard.set(dictationIndicatorStyleRaw, forKey: "dictationIndicatorStyleRaw")
+            defaults.set(dictationIndicatorStyleRaw, forKey: "dictationIndicatorStyleRaw")
             applyIndicatorStyleChange()
         }
     }
@@ -328,16 +328,16 @@ final class AppModel: ObservableObject {
         }
     }
 
-    @Published var dictationCleanupPromptID: String = AppModel.readString("dictationCleanupPromptID", default: "") {
+    @Published var dictationCleanupPromptID: String = "" {
         didSet {
-            UserDefaults.standard.set(dictationCleanupPromptID, forKey: "dictationCleanupPromptID")
+            defaults.set(dictationCleanupPromptID, forKey: "dictationCleanupPromptID")
             applyDictationCleanupPromptChange()
         }
     }
 
-    @Published var dictationPerAppOverridesJSON: String = AppModel.readString("dictationPerAppOverridesJSON", default: "{}") {
+    @Published var dictationPerAppOverridesJSON: String = "{}" {
         didSet {
-            UserDefaults.standard.set(dictationPerAppOverridesJSON, forKey: "dictationPerAppOverridesJSON")
+            defaults.set(dictationPerAppOverridesJSON, forKey: "dictationPerAppOverridesJSON")
             cachedDictationWorkflows = nil
             applyDictationCleanupPromptChange()
             restartDictation()
@@ -364,26 +364,26 @@ final class AppModel: ObservableObject {
     var silenceWatchTask: Task<Void, Never>?
     var recordingAutoStopTask: Task<Void, Never>?
 
-    private static func readString(_ key: String, default fallback: String) -> String {
-        UserDefaults.standard.string(forKey: key) ?? fallback
+    private func readString(_ key: String, default fallback: String) -> String {
+        defaults.string(forKey: key) ?? fallback
     }
 
-    private static func readInt(_ key: String, default fallback: Int) -> Int {
-        if UserDefaults.standard.object(forKey: key) == nil { return fallback }
-        return UserDefaults.standard.integer(forKey: key)
+    private func readInt(_ key: String, default fallback: Int) -> Int {
+        if defaults.object(forKey: key) == nil { return fallback }
+        return defaults.integer(forKey: key)
     }
 
     private static let sharedJSONDecoder = JSONDecoder()
     private static let sharedJSONEncoder = JSONEncoder()
 
-    static func readJSON<T: Decodable>(_ type: T.Type, forKey key: String) -> T? {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
-        return try? sharedJSONDecoder.decode(T.self, from: data)
+    func readJSON<T: Decodable>(_ type: T.Type, forKey key: String) -> T? {
+        guard let data = defaults.data(forKey: key) else { return nil }
+        return try? AppModel.sharedJSONDecoder.decode(T.self, from: data)
     }
 
-    static func writeJSON<T: Encodable>(_ value: T, forKey key: String) {
-        if let data = try? sharedJSONEncoder.encode(value) {
-            UserDefaults.standard.set(data, forKey: key)
+    func writeJSON<T: Encodable>(_ value: T, forKey key: String) {
+        if let data = try? AppModel.sharedJSONEncoder.encode(value) {
+            defaults.set(data, forKey: key)
         }
     }
 
@@ -539,7 +539,19 @@ final class AppModel: ObservableObject {
         automationBridgePort = nil
     }
 
-    init(skipBootstrap: Bool = false) {
+    let defaults: UserDefaults
+
+    init(skipBootstrap: Bool = false, defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        _dictationEnabled = Published(initialValue: defaults.bool(forKey: "dictationEnabled"))
+        _dictationModeRaw = Published(initialValue: defaults.string(forKey: "dictationModeRaw") ?? DictationMode.pushToTalk.rawValue)
+        let storedKeyCode = defaults.object(forKey: "dictationKeyCode") == nil ? 96 : defaults.integer(forKey: "dictationKeyCode")
+        _dictationKeyCode = Published(initialValue: storedKeyCode)
+        let storedModifiers = defaults.object(forKey: "dictationKeyModifiers") == nil ? 0 : defaults.integer(forKey: "dictationKeyModifiers")
+        _dictationKeyModifiers = Published(initialValue: storedModifiers)
+        _dictationIndicatorStyleRaw = Published(initialValue: defaults.string(forKey: "dictationIndicatorStyleRaw") ?? DictationIndicatorStyle.overlay.rawValue)
+        _dictationCleanupPromptID = Published(initialValue: defaults.string(forKey: "dictationCleanupPromptID") ?? "")
+        _dictationPerAppOverridesJSON = Published(initialValue: defaults.string(forKey: "dictationPerAppOverridesJSON") ?? "{}")
         loadAutoExportRules()
         loadIgnoredSegmentRules()
         loadFindReplaceRules()

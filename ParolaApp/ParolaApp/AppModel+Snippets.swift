@@ -8,13 +8,13 @@ extension AppModel {
     static let correctionRulesDefaultsKey = "correctionRules"
 
     func loadSnippets() {
-        if let decoded = AppModel.readJSON([Snippet].self, forKey: AppModel.snippetsDefaultsKey) {
+        if let decoded = readJSON([Snippet].self, forKey: AppModel.snippetsDefaultsKey) {
             snippets = decoded
         }
     }
 
     func saveSnippets() {
-        AppModel.writeJSON(snippets, forKey: AppModel.snippetsDefaultsKey)
+        writeJSON(snippets, forKey: AppModel.snippetsDefaultsKey)
     }
 
     func exportSnippetsToFile() {
@@ -60,13 +60,13 @@ extension AppModel {
     }
 
     func loadCorrectionRules() {
-        if let decoded = AppModel.readJSON([CorrectionRule].self, forKey: AppModel.correctionRulesDefaultsKey) {
+        if let decoded = readJSON([CorrectionRule].self, forKey: AppModel.correctionRulesDefaultsKey) {
             correctionRules = decoded
         }
     }
 
     func saveCorrectionRules() {
-        AppModel.writeJSON(correctionRules, forKey: AppModel.correctionRulesDefaultsKey)
+        writeJSON(correctionRules, forKey: AppModel.correctionRulesDefaultsKey)
     }
 
     func makeSnippetExpander() -> SnippetExpander {

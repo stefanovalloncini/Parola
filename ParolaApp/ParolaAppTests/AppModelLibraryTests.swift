@@ -36,9 +36,17 @@ struct AppModelLibraryTests {
         ]
     }
 
+    private func makeIsolatedDefaults() -> UserDefaults {
+        UserDefaults(suiteName: "test-\(UUID())")!
+    }
+
+    private func makeModel() -> AppModel {
+        AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults())
+    }
+
     @Test("newest sort orders by createdAt descending")
     func sortNewest() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.librarySortOrder = .newest
 
         let sorted = model.sortedLibraryEntries(Self.fixture()).map(\.id)
@@ -48,7 +56,7 @@ struct AppModelLibraryTests {
 
     @Test("oldest sort orders by createdAt ascending")
     func sortOldest() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.librarySortOrder = .oldest
 
         let sorted = model.sortedLibraryEntries(Self.fixture()).map(\.id)
@@ -58,7 +66,7 @@ struct AppModelLibraryTests {
 
     @Test("titleAZ sort uses case-insensitive comparison")
     func sortTitleAZ() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.librarySortOrder = .titleAZ
 
         let sorted = model.sortedLibraryEntries(Self.fixture()).map(\.id)
@@ -68,7 +76,7 @@ struct AppModelLibraryTests {
 
     @Test("titleZA sort is reverse of A→Z")
     func sortTitleZA() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.librarySortOrder = .titleZA
 
         let sorted = model.sortedLibraryEntries(Self.fixture()).map(\.id)
@@ -78,7 +86,7 @@ struct AppModelLibraryTests {
 
     @Test("longest sort uses bundle sizes, biggest first, zero for missing")
     func sortLongest() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.librarySortOrder = .longest
         model.libraryBundleSizes = ["a": 100, "b": 999, "c": 50]
 
@@ -89,7 +97,7 @@ struct AppModelLibraryTests {
 
     @Test("shortest sort uses bundle sizes, smallest first")
     func sortShortest() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.librarySortOrder = .shortest
         model.libraryBundleSizes = ["a": 100, "b": 999, "c": 50]
 
@@ -106,7 +114,7 @@ struct AppModelLibraryTests {
             Self.entry(id: "c", title: "C", createdAt: Self.baseDate.addingTimeInterval(200), lastOpenedAt: Self.baseDate.addingTimeInterval(2000)),
             Self.entry(id: "d", title: "D", createdAt: Self.baseDate.addingTimeInterval(50)),
         ]
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.librarySortOrder = .lastOpened
 
         let sorted = model.sortedLibraryEntries(entries).map(\.id)
@@ -117,7 +125,7 @@ struct AppModelLibraryTests {
 
     @Test("changing sort order reapplies the sort onto libraryEntries")
     func sortChangeReappliesOrder() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.libraryEntries = Self.fixture()
 
         model.librarySortOrder = .titleAZ
@@ -132,7 +140,7 @@ struct AppModelLibraryTests {
             Self.entry(id: "2", title: "y", createdAt: Self.baseDate, labels: ["Alpha", "Beta"]),
             Self.entry(id: "3", title: "z", createdAt: Self.baseDate, labels: []),
         ]
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.libraryEntries = entries
 
         let labels = model.allKnownLabels
@@ -142,7 +150,7 @@ struct AppModelLibraryTests {
 
     @Test("allKnownLabels is empty when no entry has labels")
     func knownLabelsEmpty() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.libraryEntries = [Self.entry(id: "1", title: "x", createdAt: Self.baseDate)]
 
         #expect(model.allKnownLabels.isEmpty)
@@ -150,7 +158,7 @@ struct AppModelLibraryTests {
 
     @Test("search with an empty query clears searchResults and skips the debounce")
     func searchEmptyQueryClearsResults() {
-        let model = AppModel(skipBootstrap: true)
+        let model = makeModel()
         model.searchResults = [Self.entry(id: "stale", title: "stale", createdAt: Self.baseDate)]
 
         model.search("   ")
