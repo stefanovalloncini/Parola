@@ -65,14 +65,19 @@ struct InspectorModeIcon: View {
 
 struct InspectorGroup<Content: View>: View {
     let title: LocalizedStringKey
-    @ViewBuilder var content: () -> Content
+    let content: Content
+
+    init(title: LocalizedStringKey, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             Text(title)
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.secondaryText)
-            content()
+            content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -81,7 +86,13 @@ struct InspectorGroup<Content: View>: View {
 struct InspectorDisclosureRow<Content: View>: View {
     let title: LocalizedStringKey
     @Binding var isExpanded: Bool
-    @ViewBuilder var content: () -> Content
+    let content: Content
+
+    init(title: LocalizedStringKey, isExpanded: Binding<Bool>, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self._isExpanded = isExpanded
+        self.content = content()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
@@ -97,7 +108,7 @@ struct InspectorDisclosureRow<Content: View>: View {
             .buttonStyle(.plain)
 
             if isExpanded {
-                content()
+                content
             }
         }
     }

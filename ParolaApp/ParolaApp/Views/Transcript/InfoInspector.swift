@@ -100,16 +100,16 @@ struct InfoInspector: View {
 
 struct InfoSection<Content: View>: View {
     private let titleText: Text
-    @ViewBuilder var content: () -> Content
+    private let content: Content
 
-    init(title: LocalizedStringKey, @ViewBuilder content: @escaping () -> Content) {
+    init(title: LocalizedStringKey, @ViewBuilder content: () -> Content) {
         self.titleText = Text(title)
-        self.content = content
+        self.content = content()
     }
 
-    init(titleVerbatim: String, @ViewBuilder content: @escaping () -> Content) {
+    init(titleVerbatim: String, @ViewBuilder content: () -> Content) {
         self.titleText = Text(titleVerbatim)
-        self.content = content
+        self.content = content()
     }
 
     var body: some View {
@@ -118,7 +118,7 @@ struct InfoSection<Content: View>: View {
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.secondaryText)
                 .textCase(.uppercase)
-            content()
+            content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
