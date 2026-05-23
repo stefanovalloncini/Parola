@@ -1,12 +1,12 @@
 import Foundation
 
-public enum VoicePrintMatcher {
-    public struct Match: Equatable, Sendable {
-        public let print: VoicePrint
-        public let score: Float
+enum VoicePrintMatcher {
+    struct Match: Equatable, Sendable {
+        let print: VoicePrint
+        let score: Float
     }
 
-    public static func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Float {
+    static func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Float {
         guard a.count == b.count, !a.isEmpty else { return 0 }
         var dot: Float = 0
         var magA: Float = 0
@@ -20,7 +20,7 @@ public enum VoicePrintMatcher {
         return dot / (sqrt(magA) * sqrt(magB))
     }
 
-    public static func bestMatch(
+    static func bestMatch(
         for embedding: [Float],
         in prints: [VoicePrint],
         threshold: Float
@@ -36,7 +36,7 @@ public enum VoicePrintMatcher {
         return best
     }
 
-    public static func centroid(of embeddings: [[Float]]) -> [Float] {
+    static func centroid(of embeddings: [[Float]]) -> [Float] {
         guard let first = embeddings.first else { return [] }
         var out = [Float](repeating: 0, count: first.count)
         var counted = 0

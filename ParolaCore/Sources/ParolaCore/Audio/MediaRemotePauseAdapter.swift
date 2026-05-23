@@ -4,16 +4,16 @@ import Foundation
 import Darwin
 #endif
 
-public struct MediaRemotePauseAdapter: MediaPlaybackToggler {
-    public init() {}
+struct MediaRemotePauseAdapter: MediaPlaybackToggler {
+    init() {}
 
-    public func pause() async {
+    func pause() async {
         #if canImport(Darwin) && os(macOS)
         MediaRemoteBridge.shared.send(command: MediaRemoteBridge.pauseCommand)
         #endif
     }
 
-    public func play() async {
+    func play() async {
         #if canImport(Darwin) && os(macOS)
         MediaRemoteBridge.shared.send(command: MediaRemoteBridge.playCommand)
         #endif

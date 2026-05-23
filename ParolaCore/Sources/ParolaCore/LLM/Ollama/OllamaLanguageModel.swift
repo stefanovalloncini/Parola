@@ -1,8 +1,8 @@
 import Foundation
 
-public struct OllamaLanguageModel: LanguageModel {
-    public static let defaultEndpoint = URL(string: "http://localhost:11434")!
-    public static let defaultModel = "llama3"
+struct OllamaLanguageModel: LanguageModel {
+    static let defaultEndpoint = URL(string: "http://localhost:11434")!
+    static let defaultModel = "llama3"
 
     private static let streamingSession: URLSession = {
         let config = URLSessionConfiguration.default
@@ -16,7 +16,7 @@ public struct OllamaLanguageModel: LanguageModel {
     private let instructions: String
     private let session: URLSession
 
-    public init(
+    init(
         model: String = OllamaLanguageModel.defaultModel,
         endpoint: URL = OllamaLanguageModel.defaultEndpoint,
         instructions: String = "You're a helpful assistant.",
@@ -28,7 +28,7 @@ public struct OllamaLanguageModel: LanguageModel {
         self.session = session ?? Self.streamingSession
     }
 
-    public func respond(history: [ChatTurn]) async throws -> String {
+    func respond(history: [ChatTurn]) async throws -> String {
         let (request, decode) = try buildRequest(history: history, streaming: false)
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
@@ -41,7 +41,7 @@ public struct OllamaLanguageModel: LanguageModel {
         return try decode(data)
     }
 
-    public func stream(history: [ChatTurn]) -> AsyncThrowingStream<String, Error> {
+    func stream(history: [ChatTurn]) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -117,11 +117,11 @@ public struct OllamaLanguageModel: LanguageModel {
     }
 }
 
-public enum OllamaError: Error, LocalizedError, Sendable {
+enum OllamaError: Error, LocalizedError, Sendable {
     case malformedResponse
     case requestFailed(status: Int, body: String)
 
-    public var errorDescription: String? {
+    var errorDescription: String? {
         switch self {
         case .malformedResponse:
             return "Ollama responded with an unexpected payload."

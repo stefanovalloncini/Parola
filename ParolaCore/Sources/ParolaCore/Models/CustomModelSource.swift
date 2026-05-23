@@ -1,19 +1,19 @@
 import Foundation
 
-public struct CustomModelSource: Equatable, Sendable, Hashable {
-    public let repo: String
-    public let revision: String
+struct CustomModelSource: Equatable, Sendable, Hashable {
+    let repo: String
+    let revision: String
 
-    public init(repo: String, revision: String = "main") {
+    init(repo: String, revision: String = "main") {
         self.repo = repo
         self.revision = revision
     }
 
-    public var displayName: String {
+    var displayName: String {
         repo.split(separator: "/").last.map(String.init) ?? repo
     }
 
-    public static func parse(_ input: String) -> CustomModelSource? {
+    static func parse(_ input: String) -> CustomModelSource? {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 

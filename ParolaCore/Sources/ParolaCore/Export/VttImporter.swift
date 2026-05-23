@@ -1,14 +1,13 @@
 import Foundation
 
-/// Parses WebVTT (.vtt) subtitle files into a ``Transcript``.
-public enum VttImporter {
-    public static func parse(contentsOf url: URL) throws -> Transcript {
+enum VttImporter {
+    static func parse(contentsOf url: URL) throws -> Transcript {
         let data = try Data(contentsOf: url)
         let raw = String(decoding: data, as: UTF8.self)
         return parse(raw)
     }
 
-    public static func parse(_ raw: String) -> Transcript {
+    static func parse(_ raw: String) -> Transcript {
         let lines = raw.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
         var segments: [TranscriptSegment] = []
         var i = 0

@@ -2,16 +2,16 @@ import CoreGraphics
 import CoreText
 import Foundation
 
-public struct PdfExporter: TranscriptExporter {
-    public let format: ExportFormat = .pdf
-    public init() {}
+struct PdfExporter: TranscriptExporter {
+    let format: ExportFormat = .pdf
+    init() {}
 
     private static let pageWidth: CGFloat = 612    // US Letter
     private static let pageHeight: CGFloat = 792
     private static let margin: CGFloat = 54        // 0.75 inch
     private static let segmentsPerChunk: Int = 64
 
-    public func render(_ transcript: Transcript) throws -> Data {
+    func render(_ transcript: Transcript) throws -> Data {
         var mediaBox = CGRect(x: 0, y: 0, width: Self.pageWidth, height: Self.pageHeight)
         let pdfData = NSMutableData()
         guard let consumer = CGDataConsumer(data: pdfData) else {

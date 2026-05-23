@@ -30,7 +30,7 @@ public actor DictationCoordinator {
         hotkey: any HotkeyMonitor,
         recorder: any DictationRecorder,
         inserter: any TextInserter,
-        postProcessor: any TextPostProcessor = PassThroughPostProcessor(),
+        postProcessor: (any TextPostProcessor)? = nil,
         mode: DictationMode = .pushToTalk,
         mediaSession: MediaSession? = nil,
         mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)? = nil,
@@ -39,7 +39,7 @@ public actor DictationCoordinator {
         self.hotkey = hotkey
         self.recorder = recorder
         self.inserter = inserter
-        self.postProcessor = postProcessor
+        self.postProcessor = postProcessor ?? PassThroughPostProcessor()
         self.mode = mode
         self.mediaSession = mediaSession
         self.mediaConfigProvider = mediaConfigProvider
@@ -50,7 +50,7 @@ public actor DictationCoordinator {
         hotkey: any HotkeyMonitor,
         recorder: any DictationRecorder,
         inserter: any TextInserter,
-        postProcessor: any TextPostProcessor = PassThroughPostProcessor(),
+        postProcessor: (any TextPostProcessor)? = nil,
         mode: DictationMode = .pushToTalk,
         mediaSession: MediaSession? = nil,
         mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)? = nil
@@ -58,7 +58,7 @@ public actor DictationCoordinator {
         self.hotkey = hotkey
         self.recorder = recorder
         self.inserter = inserter
-        self.postProcessor = postProcessor
+        self.postProcessor = postProcessor ?? PassThroughPostProcessor()
         self.mode = mode
         self.mediaSession = mediaSession
         self.mediaConfigProvider = mediaConfigProvider

@@ -1,18 +1,18 @@
 import Foundation
 
 /// Minimal ZIP writer for stored (uncompressed) entries. Used by `DocxExporter`.
-public enum Zip {
-    public struct File: Sendable {
-        public let name: String
-        public let data: Data
+enum Zip {
+    struct File: Sendable {
+        let name: String
+        let data: Data
 
-        public init(name: String, data: Data) {
+        init(name: String, data: Data) {
             self.name = name
             self.data = data
         }
     }
 
-    public static func archive(_ files: [File]) -> Data {
+    static func archive(_ files: [File]) -> Data {
         var bytes = Data()
         var centralDirectory = Data()
 
@@ -72,7 +72,7 @@ public enum Zip {
         return bytes
     }
 
-    public static func crc32(_ data: Data) -> UInt32 {
+    static func crc32(_ data: Data) -> UInt32 {
         var crc: UInt32 = 0xFFFFFFFF
         for byte in data {
             crc ^= UInt32(byte)

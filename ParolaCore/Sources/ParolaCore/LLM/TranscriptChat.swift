@@ -84,20 +84,20 @@ public enum TranscriptChat {
 
 #if canImport(FoundationModels)
 @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
-public struct FoundationLanguageModel: LanguageModel {
+struct FoundationLanguageModel: LanguageModel {
     private let instructions: String
 
-    public init(instructions: String) {
+    init(instructions: String) {
         self.instructions = instructions
     }
 
-    public func respond(history: [ChatTurn]) async throws -> String {
+    func respond(history: [ChatTurn]) async throws -> String {
         let (session, prompt) = try makeSession(history: history)
         let r = try await session.respond(to: prompt)
         return r.content
     }
 
-    public func stream(history: [ChatTurn]) -> AsyncThrowingStream<String, Error> {
+    func stream(history: [ChatTurn]) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {

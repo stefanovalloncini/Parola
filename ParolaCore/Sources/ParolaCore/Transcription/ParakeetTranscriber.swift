@@ -4,20 +4,20 @@ import os
 
 /// Parakeet TDT engine wrapper. Loads a CoreML Parakeet model on Apple Silicon via FluidAudio
 /// and runs ASR on the Apple Neural Engine.
-public actor ParakeetTranscriber: Transcriber {
-    public static let engineID = EngineID.parakeet
-    public static let capabilities = EngineCapabilities.parakeetDefaults
+actor ParakeetTranscriber: Transcriber {
+    static let engineID = EngineID.parakeet
+    static let capabilities = EngineCapabilities.parakeetDefaults
 
     private let modelStore: ModelStore
     private var loadedModel: String?
     private var manager: AsrManager?
     private let signposter = OSSignposter(subsystem: "app.parola.core", category: "engine.parakeet")
 
-    public init(modelStore: ModelStore) {
+    init(modelStore: ModelStore) {
         self.modelStore = modelStore
     }
 
-    public func load(model: String) async throws {
+    func load(model: String) async throws {
         if loadedModel == model, manager != nil { return }
         let interval = signposter.beginInterval("load", "model=\(model, privacy: .public)")
         defer { signposter.endInterval("load", interval) }
@@ -37,7 +37,7 @@ public actor ParakeetTranscriber: Transcriber {
         }
     }
 
-    public func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+    func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
         guard let asr = manager, let modelName = loadedModel else {
             throw ParolaError.transcriptionFailed("Parakeet model not loaded")
         }
@@ -68,14 +68,14 @@ public actor ParakeetTranscriber: Transcriber {
         )
     }
 
-    public func unload() async {
+    func unload() async {
         let interval = signposter.beginInterval("unload")
         defer { signposter.endInterval("unload", interval) }
         manager = nil
         loadedModel = nil
     }
 
-    public func loadedModelName() async -> String? { loadedModel }
+    func loadedModelName() async -> String? { loadedModel }
 
     static func modelVersion(for model: String) throws -> AsrModelVersion {
         switch model {
@@ -90,7 +90,7 @@ public actor ParakeetTranscriber: Transcriber {
 
     /// Downloads only the files FluidAudio needs for a Parakeet variant.
     /// Avoids pulling sibling quantizations / older revisions stored in the same HF repo.
-    public static func download(
+    static func download(
         model: String,
         to targetDir: URL,
         progress: (@Sendable (Double) -> Void)?

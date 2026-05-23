@@ -1,12 +1,12 @@
 import Foundation
 
-public enum TokenBudget {
-    public static func estimateTokens(_ text: String) -> Int {
+enum TokenBudget {
+    static func estimateTokens(_ text: String) -> Int {
         let charCount = text.count
         return max(1, Int((Double(charCount) / 4.0).rounded(.up)))
     }
 
-    public static func estimateTokens(forHistory turns: [ChatTurn], system: String) -> Int {
+    static func estimateTokens(forHistory turns: [ChatTurn], system: String) -> Int {
         var total = estimateTokens(system)
         for turn in turns {
             total += estimateTokens(turn.text) + 4
@@ -14,7 +14,7 @@ public enum TokenBudget {
         return total
     }
 
-    public static func check(
+    static func check(
         history: [ChatTurn],
         system: String,
         provider: CloudLLMProviderID,

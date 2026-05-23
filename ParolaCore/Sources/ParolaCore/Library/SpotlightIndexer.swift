@@ -3,14 +3,14 @@ import Foundation
 import os
 import UniformTypeIdentifiers
 
-public struct SpotlightIndexer: LibraryIndexer {
-    public static let domainID = "com.parola.library"
+struct SpotlightIndexer: LibraryIndexer {
+    static let domainID = "com.parola.library"
 
     private static let log = Logger(subsystem: "com.parola.library", category: "spotlight")
 
-    public init() {}
+    init() {}
 
-    public func index(id: String, title: String, text: String, createdAt: Date) async {
+    func index(id: String, title: String, text: String, createdAt: Date) async {
         let attributes = CSSearchableItemAttributeSet(contentType: .text)
         attributes.title = title
         attributes.contentDescription = String(text.prefix(200))
@@ -27,7 +27,7 @@ public struct SpotlightIndexer: LibraryIndexer {
         }
     }
 
-    public func deindex(id: String) async {
+    func deindex(id: String) async {
         do {
             try await CSSearchableIndex.default().deleteSearchableItems(withIdentifiers: [id])
         } catch {

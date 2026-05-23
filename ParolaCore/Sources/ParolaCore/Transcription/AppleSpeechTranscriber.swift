@@ -7,11 +7,11 @@ import os
 import Speech
 #endif
 
-public actor AppleSpeechTranscriber: Transcriber {
-    public static let engineID = EngineID.appleSpeech
-    public static let capabilities = EngineCapabilities.appleSpeechDefaults
+actor AppleSpeechTranscriber: Transcriber {
+    static let engineID = EngineID.appleSpeech
+    static let capabilities = EngineCapabilities.appleSpeechDefaults
 
-    public static let syntheticModelID = "apple-speech-analyzer"
+    static let syntheticModelID = "apple-speech-analyzer"
 
     private let modelStore: ModelStore
     private var loadedModel: String?
@@ -19,17 +19,17 @@ public actor AppleSpeechTranscriber: Transcriber {
     private var inFlightEpoch: Int = 0
     private let signposter = OSSignposter(subsystem: "app.parola.core", category: "engine.apple-speech")
 
-    public init(modelStore: ModelStore) {
+    init(modelStore: ModelStore) {
         self.modelStore = modelStore
     }
 
-    public func load(model: String) async throws {
+    func load(model: String) async throws {
         let interval = signposter.beginInterval("load", "model=\(model, privacy: .public)")
         defer { signposter.endInterval("load", interval) }
         loadedModel = model
     }
 
-    public func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+    func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
         guard let modelName = loadedModel else {
             throw ParolaError.transcriptionFailed("Apple Speech engine not loaded")
         }
@@ -68,18 +68,18 @@ public actor AppleSpeechTranscriber: Transcriber {
         #endif
     }
 
-    public func cancelInFlight() async {
+    func cancelInFlight() async {
         await inFlightCancel?()
     }
 
-    public func unload() async {
+    func unload() async {
         let interval = signposter.beginInterval("unload")
         defer { signposter.endInterval("unload", interval) }
         await cancelInFlight()
         loadedModel = nil
     }
 
-    public func loadedModelName() async -> String? { loadedModel }
+    func loadedModelName() async -> String? { loadedModel }
 
     @available(macOS 26.0, iOS 26.0, *)
     private func runSpeechAnalyzer(

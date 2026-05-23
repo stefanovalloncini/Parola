@@ -10,10 +10,10 @@ public struct JsonExporter: TranscriptExporter {
     }
 }
 
-public struct JsonLinesExporter: TranscriptExporter {
-    public let format: ExportFormat = .jsonl
-    public init() {}
-    public func render(_ transcript: Transcript) throws -> Data {
+struct JsonLinesExporter: TranscriptExporter {
+    let format: ExportFormat = .jsonl
+    init() {}
+    func render(_ transcript: Transcript) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         var data = Data()
@@ -116,11 +116,11 @@ public struct HtmlExporter: TranscriptExporter {
     }
 }
 
-public struct CsvExporter: TranscriptExporter {
-    public let format: ExportFormat = .csv
-    public init() {}
+struct CsvExporter: TranscriptExporter {
+    let format: ExportFormat = .csv
+    init() {}
 
-    public func render(_ transcript: Transcript) throws -> Data {
+    func render(_ transcript: Transcript) throws -> Data {
         var out = "start_seconds,end_seconds,speaker,text\n"
         for seg in transcript.segments {
             let speaker = seg.speaker ?? ""
@@ -138,11 +138,11 @@ public struct CsvExporter: TranscriptExporter {
     }
 }
 
-public struct DocxExporter: TranscriptExporter {
-    public let format: ExportFormat = .docx
-    public init() {}
+struct DocxExporter: TranscriptExporter {
+    let format: ExportFormat = .docx
+    init() {}
 
-    public func render(_ transcript: Transcript) throws -> Data {
+    func render(_ transcript: Transcript) throws -> Data {
         let document = buildDocumentXML(transcript)
         let files: [Zip.File] = [
             Zip.File(name: "[Content_Types].xml", data: utf8(Self.contentTypesXML)),

@@ -1,14 +1,14 @@
 import Foundation
 
-public actor VoicePrintStore {
-    public static var defaultStorageURL: URL {
+actor VoicePrintStore {
+    static var defaultStorageURL: URL {
         URL.applicationSupportDirectory.appending(path: "Parola/VoicePrints.json")
     }
 
     private let storageURL: URL
-    public private(set) var allPrints: [VoicePrint]
+    private(set) var allPrints: [VoicePrint]
 
-    public init(storageURL: URL = VoicePrintStore.defaultStorageURL) {
+    init(storageURL: URL = VoicePrintStore.defaultStorageURL) {
         self.storageURL = storageURL
         if let data = try? Data(contentsOf: storageURL),
            let decoded = try? JSONDecoder().decode([VoicePrint].self, from: data) {
@@ -19,7 +19,7 @@ public actor VoicePrintStore {
     }
 
     @discardableResult
-    public func enroll(name: String, embedding: [Float], at date: Date = Date()) -> VoicePrint {
+    func enroll(name: String, embedding: [Float], at date: Date = Date()) -> VoicePrint {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let key = Self.normalize(trimmed)
         if let index = allPrints.firstIndex(where: { Self.normalize($0.name) == key }) {
@@ -42,12 +42,12 @@ public actor VoicePrintStore {
         return print
     }
 
-    public func suggest(for embedding: [Float], threshold: Float = 0.75) -> VoicePrint? {
+    func suggest(for embedding: [Float], threshold: Float = 0.75) -> VoicePrint? {
         VoicePrintMatcher.bestMatch(for: embedding, in: allPrints, threshold: threshold)?.print
     }
 
     @discardableResult
-    public func forget(name: String) -> Bool {
+    func forget(name: String) -> Bool {
         let key = Self.normalize(name.trimmingCharacters(in: .whitespacesAndNewlines))
         let before = allPrints.count
         allPrints.removeAll { Self.normalize($0.name) == key }

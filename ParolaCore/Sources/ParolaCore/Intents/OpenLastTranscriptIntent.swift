@@ -1,10 +1,10 @@
 import AppIntents
 import Foundation
 
-public enum ParolaIntentError: LocalizedError {
+enum ParolaIntentError: LocalizedError {
     case noTranscripts
 
-    public var errorDescription: String? {
+    var errorDescription: String? {
         switch self {
         case .noTranscripts:
             return "There's nothing in your library yet."

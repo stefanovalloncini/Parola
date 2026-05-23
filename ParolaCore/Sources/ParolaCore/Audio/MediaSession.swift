@@ -35,11 +35,11 @@ public actor MediaSession {
     private var pauseIssued: Bool = false
 
     public init(
-        muter: any SystemAudioMuter = CoreAudioMute(),
-        player: any MediaPlaybackToggler = MediaRemotePauseAdapter()
+        muter: (any SystemAudioMuter)? = nil,
+        player: (any MediaPlaybackToggler)? = nil
     ) {
-        self.muter = muter
-        self.player = player
+        self.muter = muter ?? CoreAudioMute()
+        self.player = player ?? MediaRemotePauseAdapter()
     }
 
     public func enterRecording(config: MediaSessionConfig) async {

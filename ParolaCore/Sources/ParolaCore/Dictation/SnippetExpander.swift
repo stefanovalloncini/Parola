@@ -4,9 +4,9 @@ public protocol ClipboardReader: Sendable {
     func currentText() -> String?
 }
 
-public struct EmptyClipboardReader: ClipboardReader {
-    public init() {}
-    public func currentText() -> String? { nil }
+struct EmptyClipboardReader: ClipboardReader {
+    init() {}
+    func currentText() -> String? { nil }
 }
 
 /// Reads the current text selection from the frontmost app. Implemented in the macOS app
@@ -15,9 +15,9 @@ public protocol SelectionReader: Sendable {
     func currentSelection() -> String?
 }
 
-public struct EmptySelectionReader: SelectionReader {
-    public init() {}
-    public func currentSelection() -> String? { nil }
+struct EmptySelectionReader: SelectionReader {
+    init() {}
+    func currentSelection() -> String? { nil }
 }
 
 /// Reads the frontmost app's display name or bundle id. The macOS app wires this with
@@ -26,15 +26,15 @@ public protocol AppContextReader: Sendable {
     func frontmostAppName() -> String?
 }
 
-public struct EmptyAppContextReader: AppContextReader {
-    public init() {}
-    public func frontmostAppName() -> String? { nil }
+struct EmptyAppContextReader: AppContextReader {
+    init() {}
+    func frontmostAppName() -> String? { nil }
 }
 
 /// Sentinel inserted in place of `{{CURSOR}}` during expansion. The inserter splits the
 /// final string on this marker and positions the cursor between the two halves.
-public enum SnippetMarker {
-    public static let cursor = "\u{E000}__PAROLA_CURSOR__\u{E001}"
+enum SnippetMarker {
+    static let cursor = "\u{E000}__PAROLA_CURSOR__\u{E001}"
 }
 
 public struct SnippetExpander: TextPostProcessor {
@@ -47,16 +47,16 @@ public struct SnippetExpander: TextPostProcessor {
 
     public init(
         snippets: [Snippet],
-        clipboard: any ClipboardReader = EmptyClipboardReader(),
-        selection: any SelectionReader = EmptySelectionReader(),
-        appContext: any AppContextReader = EmptyAppContextReader(),
+        clipboard: (any ClipboardReader)? = nil,
+        selection: (any SelectionReader)? = nil,
+        appContext: (any AppContextReader)? = nil,
         now: @escaping @Sendable () -> Date = { Date() },
         expandDeferred: Bool = false
     ) {
         self.snippets = snippets
-        self.clipboard = clipboard
-        self.selection = selection
-        self.appContext = appContext
+        self.clipboard = clipboard ?? EmptyClipboardReader()
+        self.selection = selection ?? EmptySelectionReader()
+        self.appContext = appContext ?? EmptyAppContextReader()
         self.now = now
         self.expandDeferred = expandDeferred
     }
@@ -111,7 +111,7 @@ public struct SnippetExpander: TextPostProcessor {
         return "\\b\(escaped)\\b"
     }
 
-    public static func expand(
+    static func expand(
         _ replacement: String,
         clipboard: any ClipboardReader,
         selection: any SelectionReader = EmptySelectionReader(),

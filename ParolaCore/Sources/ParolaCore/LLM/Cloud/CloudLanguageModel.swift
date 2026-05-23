@@ -1,6 +1,6 @@
 import Foundation
 
-public struct CloudLanguageModel: LanguageModel {
+struct CloudLanguageModel: LanguageModel {
     private static let streamingSession: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 60
@@ -14,7 +14,7 @@ public struct CloudLanguageModel: LanguageModel {
     private let instructions: String
     private let session: URLSession
 
-    public init(
+    init(
         provider: CloudLLMProviderID,
         model: String? = nil,
         apiKey: String,
@@ -28,14 +28,14 @@ public struct CloudLanguageModel: LanguageModel {
         self.session = session ?? Self.streamingSession
     }
 
-    public static func isSupported(_ provider: CloudLLMProviderID) -> Bool {
+    static func isSupported(_ provider: CloudLLMProviderID) -> Bool {
         switch provider {
         case .openAI, .anthropic, .groq, .cerebras: return true
         default: return false
         }
     }
 
-    public func respond(history: [ChatTurn]) async throws -> String {
+    func respond(history: [ChatTurn]) async throws -> String {
         try TokenBudget.check(history: history, system: instructions, provider: provider)
         let (request, decode) = try buildRequest(history: history, streaming: false)
         let (data, response) = try await session.data(for: request)
@@ -49,7 +49,7 @@ public struct CloudLanguageModel: LanguageModel {
         return try decode(data)
     }
 
-    public func stream(history: [ChatTurn]) -> AsyncThrowingStream<String, Error> {
+    func stream(history: [ChatTurn]) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {

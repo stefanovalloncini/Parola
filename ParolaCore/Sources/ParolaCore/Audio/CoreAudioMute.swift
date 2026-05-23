@@ -4,10 +4,10 @@ import Foundation
 import CoreAudio
 #endif
 
-public struct CoreAudioMute: SystemAudioMuter {
-    public init() {}
+struct CoreAudioMute: SystemAudioMuter {
+    init() {}
 
-    public func isMuted() async -> Bool {
+    func isMuted() async -> Bool {
         #if canImport(CoreAudio) && os(macOS)
         guard let device = Self.defaultOutputDeviceID() else { return false }
         var value: UInt32 = 0
@@ -24,7 +24,7 @@ public struct CoreAudioMute: SystemAudioMuter {
         #endif
     }
 
-    public func setMuted(_ muted: Bool) async {
+    func setMuted(_ muted: Bool) async {
         #if canImport(CoreAudio) && os(macOS)
         guard let device = Self.defaultOutputDeviceID() else { return }
         var value: UInt32 = muted ? 1 : 0

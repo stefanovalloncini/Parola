@@ -1,7 +1,7 @@
 import Foundation
 
-public enum WaveformDownsampler {
-    public static func downsample(_ samples: [Float], buckets: Int) -> [Float] {
+enum WaveformDownsampler {
+    static func downsample(_ samples: [Float], buckets: Int) -> [Float] {
         guard buckets > 0, !samples.isEmpty else { return [] }
         var result = [Float](repeating: 0, count: buckets)
         let count = samples.count

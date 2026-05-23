@@ -4,9 +4,9 @@ import CoreML
 import os
 
 /// Thin async wrapper over WhisperKit. Owns one WhisperKit instance at a time.
-public actor WhisperKitTranscriber: Transcriber {
-    public static let engineID = EngineID.whisperKit
-    public static let capabilities = EngineCapabilities.whisperKitDefaults
+actor WhisperKitTranscriber: Transcriber {
+    static let engineID = EngineID.whisperKit
+    static let capabilities = EngineCapabilities.whisperKitDefaults
 
     private var whisperKit: WhisperKit?
     private var loadedModel: String?
@@ -14,15 +14,15 @@ public actor WhisperKitTranscriber: Transcriber {
     private let modelStore: ModelStore
     private let signposter = OSSignposter(subsystem: "app.parola.core", category: "engine.whisperkit")
 
-    public init(modelStore: ModelStore) {
+    init(modelStore: ModelStore) {
         self.modelStore = modelStore
     }
 
-    public func load(model: String) async throws {
+    func load(model: String) async throws {
         try await load(model: model, computeUnits: nil)
     }
 
-    public func load(model: String, computeUnits: MLComputeUnits?) async throws {
+    func load(model: String, computeUnits: MLComputeUnits?) async throws {
         if loadedModel == model, loadedComputeUnits == computeUnits, whisperKit != nil { return }
         let interval = signposter.beginInterval("load", "model=\(model, privacy: .public)")
         defer { signposter.endInterval("load", interval) }
@@ -47,7 +47,7 @@ public actor WhisperKitTranscriber: Transcriber {
         }
     }
 
-    public func unload() {
+    func unload() {
         let interval = signposter.beginInterval("unload")
         defer { signposter.endInterval("unload", interval) }
         whisperKit = nil
@@ -55,16 +55,16 @@ public actor WhisperKitTranscriber: Transcriber {
         loadedComputeUnits = nil
     }
 
-    public func loadedModelName() -> String? { loadedModel }
+    func loadedModelName() -> String? { loadedModel }
 
-    public func transcribe(
+    func transcribe(
         url: URL,
         options: TranscriptionOptions
     ) async throws -> Transcript {
         try await transcribe(url: url, options: options, partialHandler: nil)
     }
 
-    public func transcribe(
+    func transcribe(
         url: URL,
         options: TranscriptionOptions,
         partialHandler: (@Sendable (String) -> Void)?

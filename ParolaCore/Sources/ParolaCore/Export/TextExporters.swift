@@ -1,9 +1,9 @@
 import Foundation
 
-public struct TxtExporter: TranscriptExporter {
-    public let format: ExportFormat = .txt
-    public init() {}
-    public func render(_ transcript: Transcript) throws -> Data {
+struct TxtExporter: TranscriptExporter {
+    let format: ExportFormat = .txt
+    init() {}
+    func render(_ transcript: Transcript) throws -> Data {
         let text = transcript.segments
             .map { $0.text.trimmingCharacters(in: .whitespaces) }
             .joined(separator: "\n")
@@ -46,11 +46,11 @@ public struct MarkdownExporter: TranscriptExporter {
     }
 }
 
-public struct TsvExporter: TranscriptExporter {
-    public let format: ExportFormat = .tsv
-    public init() {}
+struct TsvExporter: TranscriptExporter {
+    let format: ExportFormat = .tsv
+    init() {}
 
-    public func render(_ transcript: Transcript) throws -> Data {
+    func render(_ transcript: Transcript) throws -> Data {
         var out = "start_seconds\tend_seconds\tspeaker\ttext\n"
         for seg in transcript.segments {
             let speaker = Self.escape(seg.speaker ?? "")

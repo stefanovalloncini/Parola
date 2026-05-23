@@ -36,8 +36,8 @@ public enum LanguageModelFactory {
     }
 
     public static func makeOllama(
-        model: String = OllamaLanguageModel.defaultModel,
-        endpoint: URL = OllamaLanguageModel.defaultEndpoint,
+        model: String = "llama3",
+        endpoint: URL = URL(string: "http://localhost:11434")!,
         instructions: String = "You're a helpful assistant."
     ) -> any LanguageModel {
         OllamaLanguageModel(model: model, endpoint: endpoint, instructions: instructions)

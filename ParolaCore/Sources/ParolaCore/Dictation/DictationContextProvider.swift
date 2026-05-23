@@ -6,11 +6,11 @@ public protocol DictationContextSource: Sendable {
     func windowOCR() async -> String?
 }
 
-public struct EmptyDictationContextSource: DictationContextSource {
-    public init() {}
-    public func currentSelection() async -> String? { nil }
-    public func clipboardContents() async -> String? { nil }
-    public func windowOCR() async -> String? { nil }
+struct EmptyDictationContextSource: DictationContextSource {
+    init() {}
+    func currentSelection() async -> String? { nil }
+    func clipboardContents() async -> String? { nil }
+    func windowOCR() async -> String? { nil }
 }
 
 public struct DictationContextConfig: Sendable, Hashable {
@@ -72,8 +72,8 @@ public actor DictationContextProvider {
 
     private let source: any DictationContextSource
 
-    public init(source: any DictationContextSource = EmptyDictationContextSource()) {
-        self.source = source
+    public init(source: (any DictationContextSource)? = nil) {
+        self.source = source ?? EmptyDictationContextSource()
     }
 
     public func gather(_ config: DictationContextConfig) async -> DictationContext {
