@@ -14,9 +14,10 @@ enum HuggingFaceDownloader {
         subpath: String?,
         destination: URL,
         revision: String = "main",
+        urlSession: URLSession = .shared,
         progress: (@Sendable (Double) -> Void)?
     ) async throws {
-        let files = try await listFiles(repo: repo, path: subpath, revision: revision)
+        let files = try await listFiles(repo: repo, path: subpath, revision: revision, urlSession: urlSession)
         guard !files.isEmpty else {
             throw ParolaError.modelDownloadFailed(repo, underlying: "No files listed for repo")
         }
@@ -62,7 +63,7 @@ enum HuggingFaceDownloader {
             let fileURL = try resolveURL(repo: repo, path: entry.path, revision: revision)
             let (tmp, response): (URL, URLResponse)
             do {
-                (tmp, response) = try await URLSession.shared.download(from: fileURL, delegate: delegate)
+                (tmp, response) = try await urlSession.download(from: fileURL, delegate: delegate)
             } catch is CancellationError {
                 try? sidecar.write(to: sidecarURL)
                 throw CancellationError()
@@ -132,6 +133,7 @@ enum HuggingFaceDownloader {
         repo: String,
         path: String?,
         revision: String,
+        urlSession: URLSession = .shared,
         prefixToStrip: String? = nil
     ) async throws -> [ListedFile] {
         try Task.checkCancellation()
@@ -141,7 +143,7 @@ enum HuggingFaceDownloader {
 
         var request = URLRequest(url: endpoint)
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await urlSession.data(for: request)
         let httpStatus = (response as? HTTPURLResponse)?.statusCode
         guard let httpStatus, (200..<300).contains(httpStatus) else {
             throw ParolaError.modelDownloadFailed(repo, underlying: "Tree HTTP \(httpStatus ?? -1)")
@@ -165,6 +167,7 @@ enum HuggingFaceDownloader {
                     repo: repo,
                     path: entry.path,
                     revision: revision,
+                    urlSession: urlSession,
                     prefixToStrip: strip
                 )
                 result.append(contentsOf: sub)
