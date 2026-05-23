@@ -9,7 +9,7 @@ import ParolaCore
 /// `{id, cmd, args, auth}` → `{id, ok, result|error}`. Writes the port to
 /// `~/Library/Caches/Parola/bridge.port` and the auth token to `bridge.token` on start.
 @MainActor
-final class ParolaTestBridge {
+final class ParolaAutomationServer {
     static let serverVersion: Int = 1
 
     private let listener: NWListener
@@ -62,7 +62,7 @@ final class ParolaTestBridge {
                         ofItemAtPath: self.tokenFileURL.path
                     )
                     FileHandle.standardError.write(
-                        Data("[ParolaTestBridge] listening on 127.0.0.1:\(portString)\n".utf8)
+                        Data("[ParolaAutomationServer] listening on 127.0.0.1:\(portString)\n".utf8)
                     )
                     self.onPortReady?(port.rawValue)
                 }
@@ -126,7 +126,7 @@ final class ParolaTestBridge {
                 }
             } catch {
                 FileHandle.standardError.write(
-                    Data("[ParolaTestBridge] receive error: \(error)\n".utf8)
+                    Data("[ParolaAutomationServer] receive error: \(error)\n".utf8)
                 )
                 conn.cancel()
                 return
@@ -151,7 +151,7 @@ final class ParolaTestBridge {
             conn.send(content: data, isComplete: ending, completion: .contentProcessed { sendErr in
                 if let sendErr {
                     FileHandle.standardError.write(
-                        Data("[ParolaTestBridge] send error: \(sendErr)\n".utf8)
+                        Data("[ParolaAutomationServer] send error: \(sendErr)\n".utf8)
                     )
                 }
                 if ending {

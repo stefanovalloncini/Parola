@@ -479,7 +479,7 @@ final class AppModel: ObservableObject {
         phase = .idle
     }
 
-    private var testBridge: ParolaTestBridge?
+    private var testBridge: ParolaAutomationServer?
     @Published private(set) var automationBridgeRunning: Bool = false
     @Published private(set) var automationBridgePort: UInt16?
 
@@ -524,7 +524,7 @@ final class AppModel: ObservableObject {
 
     func startAutomationBridge() {
         guard testBridge == nil else { return }
-        guard let bridge = try? ParolaTestBridge(model: self) else { return }
+        guard let bridge = try? ParolaAutomationServer(model: self) else { return }
         bridge.start { [weak self] port in
             self?.automationBridgePort = port
         }

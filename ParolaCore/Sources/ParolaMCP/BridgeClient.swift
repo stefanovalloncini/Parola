@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-/// Talks to the in-app `ParolaTestBridge` over TCP loopback. One request per call:
+/// Talks to the in-app `ParolaAutomationServer` over TCP loopback. One request per call:
 /// reads the port + auth token from `~/Library/Caches/Parola/`, opens a socket,
 /// sends a line, reads a line, closes.
 public struct BridgeClient: BridgeProtocol {
