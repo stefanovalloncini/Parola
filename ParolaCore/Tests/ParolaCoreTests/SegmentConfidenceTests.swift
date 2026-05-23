@@ -24,14 +24,19 @@ struct SegmentConfidenceTests {
         #expect(conf == 0.7)
     }
 
-    @Test("bucket maps to low / medium / high")
-    func buckets() {
-        #expect(SegmentConfidence.bucket(for: 0.4) == .low)
-        #expect(SegmentConfidence.bucket(for: 0.69) == .low)
-        #expect(SegmentConfidence.bucket(for: 0.7) == .medium)
-        #expect(SegmentConfidence.bucket(for: 0.85) == .medium)
-        #expect(SegmentConfidence.bucket(for: 0.9) == .high)
-        #expect(SegmentConfidence.bucket(for: 1.0) == .high)
+    @Test(
+        "bucket maps probability to low / medium / high",
+        arguments: [
+            (probability: 0.4, expected: SegmentConfidence.Bucket.low),
+            (probability: 0.69, expected: .low),
+            (probability: 0.7, expected: .medium),
+            (probability: 0.85, expected: .medium),
+            (probability: 0.9, expected: .high),
+            (probability: 1.0, expected: .high),
+        ]
+    )
+    func bucket(probability: Double, expected: SegmentConfidence.Bucket) {
+        #expect(SegmentConfidence.bucket(for: probability) == expected)
     }
 
     @Test("transcript-wide average is the per-segment mean ignoring nils")

@@ -4,72 +4,49 @@ import Testing
 
 @Suite("YouTube URL detection")
 struct YouTubeURLTests {
-    @Test("classic watch URL")
-    func watch() {
-        let url = URL(string: "https://www.youtube.com/watch?v=dQw4w9WgXcQ")!
-        #expect(url.isYouTubeVideo)
-    }
-
-    @Test("youtu.be short URL")
-    func youtuBe() {
-        let url = URL(string: "https://youtu.be/dQw4w9WgXcQ")!
-        #expect(url.isYouTubeVideo)
-    }
-
-    @Test("mobile m.youtube.com")
-    func mobile() {
-        let url = URL(string: "https://m.youtube.com/watch?v=abc")!
-        #expect(url.isYouTubeVideo)
-    }
-
-    @Test("YouTube shorts")
-    func shorts() {
-        let url = URL(string: "https://www.youtube.com/shorts/abc123")!
-        #expect(url.isYouTubeVideo)
-    }
-
-    @Test("YouTube music")
-    func music() {
-        let url = URL(string: "https://music.youtube.com/watch?v=abc")!
-        #expect(url.isYouTubeVideo)
-    }
-
-    @Test("youtube.com homepage is not a video")
-    func homepage() {
-        let url = URL(string: "https://www.youtube.com/")!
-        #expect(url.isYouTubeVideo == false)
-    }
-
-    @Test("vimeo is not YouTube")
-    func vimeo() {
-        let url = URL(string: "https://vimeo.com/12345")!
-        #expect(url.isYouTubeVideo == false)
+    @Test(
+        "classifies isYouTubeVideo",
+        arguments: [
+            (name: "classic watch URL", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", isYouTube: true),
+            (name: "youtu.be short URL", url: "https://youtu.be/dQw4w9WgXcQ", isYouTube: true),
+            (name: "mobile m.youtube.com", url: "https://m.youtube.com/watch?v=abc", isYouTube: true),
+            (name: "YouTube shorts", url: "https://www.youtube.com/shorts/abc123", isYouTube: true),
+            (name: "YouTube music", url: "https://music.youtube.com/watch?v=abc", isYouTube: true),
+            (name: "youtube.com homepage", url: "https://www.youtube.com/", isYouTube: false),
+            (name: "vimeo", url: "https://vimeo.com/12345", isYouTube: false),
+        ]
+    )
+    func isYouTubeVideo(name: String, url: String, isYouTube: Bool) throws {
+        let parsed = try #require(URL(string: url))
+        #expect(parsed.isYouTubeVideo == isYouTube)
     }
 
     @Test("file URL is not YouTube")
-    func fileURL() {
+    func fileURLIsNotYouTube() {
         let url = URL(fileURLWithPath: "/tmp/x.mp4")
         #expect(url.isYouTubeVideo == false)
     }
 
-    @Test("yt-dlp accepts youtube")
-    func ytDlpYouTube() {
-        #expect(URL(string: "https://www.youtube.com/watch?v=abc")!.isYtDlpSupported)
+    @Test(
+        "classifies isYtDlpSupported",
+        arguments: [
+            (name: "youtube", url: "https://www.youtube.com/watch?v=abc", supported: true),
+            (name: "vimeo", url: "https://vimeo.com/12345", supported: true),
+            (name: "x", url: "https://x.com/user/status/9", supported: true),
+            (name: "twitter", url: "https://twitter.com/user/status/9", supported: true),
+            (name: "tiktok", url: "https://www.tiktok.com/@u/video/9", supported: true),
+            (name: "soundcloud", url: "https://soundcloud.com/u/track", supported: true),
+            (name: "facebook", url: "https://www.facebook.com/u/videos/9", supported: true),
+            (name: "arbitrary URL", url: "https://example.com/audio.mp3", supported: false),
+        ]
+    )
+    func isYtDlpSupported(name: String, url: String, supported: Bool) throws {
+        let parsed = try #require(URL(string: url))
+        #expect(parsed.isYtDlpSupported == supported)
     }
 
-    @Test("yt-dlp accepts vimeo, x, tiktok, soundcloud")
-    func ytDlpOthers() {
-        #expect(URL(string: "https://vimeo.com/12345")!.isYtDlpSupported)
-        #expect(URL(string: "https://x.com/user/status/9")!.isYtDlpSupported)
-        #expect(URL(string: "https://twitter.com/user/status/9")!.isYtDlpSupported)
-        #expect(URL(string: "https://www.tiktok.com/@u/video/9")!.isYtDlpSupported)
-        #expect(URL(string: "https://soundcloud.com/u/track")!.isYtDlpSupported)
-        #expect(URL(string: "https://www.facebook.com/u/videos/9")!.isYtDlpSupported)
-    }
-
-    @Test("yt-dlp rejects file and arbitrary URLs")
-    func ytDlpRejects() {
+    @Test("yt-dlp rejects file URLs")
+    func ytDlpRejectsFileURL() {
         #expect(URL(fileURLWithPath: "/tmp/x.mp4").isYtDlpSupported == false)
-        #expect(URL(string: "https://example.com/audio.mp3")!.isYtDlpSupported == false)
     }
 }
