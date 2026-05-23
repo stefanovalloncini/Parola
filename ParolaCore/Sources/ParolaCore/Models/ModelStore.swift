@@ -1,5 +1,4 @@
 import Foundation
-import WhisperKit
 
 /// Manages the on-disk cache of transcription models.
 ///
@@ -168,46 +167,29 @@ public final class ModelStore: Sendable {
     /// - Parameter progress: 0.0–1.0 progress callback (best-effort).
     public func download(
         variant: String,
-        progress: (@Sendable (Double) -> Void)? = nil
+        progress: (@Sendable (Double) -> Void)? = nil,
+        registry: EngineRegistry = .shared
     ) async throws -> URL {
         if isInstalled(variant) {
             progress?(1.0)
             return installedURL(for: variant)
         }
         guard let entry = ModelCatalog.variant(id: variant) else {
-            return try await downloadViaWhisperKit(variant: variant, progress: progress)
-        }
-        switch entry.engineID {
-        case .whisperKit:
-            return try await downloadViaWhisperKit(variant: variant, progress: progress)
-        case .parakeet:
-            return try await ParakeetTranscriber.download(
-                model: variant,
-                to: installedURL(for: entry.downloadSource),
+            if let downloader = await registry.downloader(for: .whisperKit) {
+                return try await downloader(variant, self, progress)
+            }
+            return try await downloadViaHuggingFace(
+                source: ModelDownloadSource(
+                    huggingFaceRepo: "argmaxinc/whisperkit-coreml",
+                    subpath: variant
+                ),
                 progress: progress
             )
-        case .appleSpeech:
-            progress?(1.0)
-            return installedURL(for: entry.downloadSource)
-        default:
-            return try await downloadViaHuggingFace(source: entry.downloadSource, progress: progress)
         }
-    }
-
-    private func downloadViaWhisperKit(
-        variant: String,
-        progress: (@Sendable (Double) -> Void)?
-    ) async throws -> URL {
-        do {
-            return try await WhisperKit.download(
-                variant: variant,
-                downloadBase: modelsDirectory,
-                useBackgroundSession: false,
-                progressCallback: { p in progress?(p.fractionCompleted) }
-            )
-        } catch {
-            throw ParolaError.modelDownloadFailed(variant, underlying: String(describing: error))
+        if let downloader = await registry.downloader(for: entry.engineID) {
+            return try await downloader(variant, self, progress)
         }
+        return try await downloadViaHuggingFace(source: entry.downloadSource, progress: progress)
     }
 
     private func downloadViaHuggingFace(

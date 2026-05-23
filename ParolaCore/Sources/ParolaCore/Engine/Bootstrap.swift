@@ -6,23 +6,38 @@ public enum ParolaCoreBootstrap {
     public static func registerBuiltInEngines(registry: EngineRegistry = .shared) async {
         await registry.register(
             engineID: WhisperKitTranscriber.engineID,
-            capabilities: WhisperKitTranscriber.capabilities
-        ) { store in
-            WhisperKitTranscriber(modelStore: store)
-        }
+            capabilities: WhisperKitTranscriber.capabilities,
+            factory: { store in WhisperKitTranscriber(modelStore: store) },
+            downloader: { variant, store, progress in
+                try await WhisperKitTranscriber.download(
+                    variant: variant,
+                    downloadBase: store.directory,
+                    progress: progress
+                )
+            }
+        )
         await registry.register(
             engineID: ParakeetTranscriber.engineID,
-            capabilities: ParakeetTranscriber.capabilities
-        ) { store in
-            ParakeetTranscriber(modelStore: store)
-        }
+            capabilities: ParakeetTranscriber.capabilities,
+            factory: { store in ParakeetTranscriber(modelStore: store) },
+            downloader: { variant, store, progress in
+                try await ParakeetTranscriber.download(
+                    model: variant,
+                    to: store.installedURL(for: variant),
+                    progress: progress
+                )
+            }
+        )
         if #available(macOS 26.0, iOS 26.0, *) {
             await registry.register(
                 engineID: AppleSpeechTranscriber.engineID,
-                capabilities: AppleSpeechTranscriber.capabilities
-            ) { store in
-                AppleSpeechTranscriber(modelStore: store)
-            }
+                capabilities: AppleSpeechTranscriber.capabilities,
+                factory: { store in AppleSpeechTranscriber(modelStore: store) },
+                downloader: { variant, store, progress in
+                    progress?(1.0)
+                    return store.installedURL(for: variant)
+                }
+            )
         }
     }
 }

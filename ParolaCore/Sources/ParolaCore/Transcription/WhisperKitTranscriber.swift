@@ -57,6 +57,23 @@ actor WhisperKitTranscriber: Transcriber {
 
     func loadedModelName() -> String? { loadedModel }
 
+    static func download(
+        variant: String,
+        downloadBase: URL,
+        progress: (@Sendable (Double) -> Void)?
+    ) async throws -> URL {
+        do {
+            return try await WhisperKit.download(
+                variant: variant,
+                downloadBase: downloadBase,
+                useBackgroundSession: false,
+                progressCallback: { p in progress?(p.fractionCompleted) }
+            )
+        } catch {
+            throw ParolaError.modelDownloadFailed(variant, underlying: String(describing: error))
+        }
+    }
+
     func transcribe(
         url: URL,
         options: TranscriptionOptions

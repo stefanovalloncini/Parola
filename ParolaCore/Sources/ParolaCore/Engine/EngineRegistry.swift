@@ -4,10 +4,16 @@ public actor EngineRegistry {
     public static let shared = EngineRegistry()
 
     public typealias Factory = @Sendable (ModelStore) -> any Transcriber
+    public typealias Downloader = @Sendable (
+        String,
+        ModelStore,
+        (@Sendable (Double) -> Void)?
+    ) async throws -> URL
 
     private struct Entry {
         let capabilities: EngineCapabilities
         let factory: Factory
+        let downloader: Downloader?
     }
 
     private var entries: [EngineID: Entry] = [:]
@@ -17,9 +23,14 @@ public actor EngineRegistry {
     public func register(
         engineID: EngineID,
         capabilities: EngineCapabilities,
-        factory: @escaping Factory
+        factory: @escaping Factory,
+        downloader: Downloader? = nil
     ) {
-        entries[engineID] = Entry(capabilities: capabilities, factory: factory)
+        entries[engineID] = Entry(
+            capabilities: capabilities,
+            factory: factory,
+            downloader: downloader
+        )
     }
 
     /// Test-only seam. Calling this on `EngineRegistry.shared` wipes engine registrations
@@ -37,6 +48,10 @@ public actor EngineRegistry {
 
     public func capabilities(for engineID: EngineID) -> EngineCapabilities? {
         entries[engineID]?.capabilities
+    }
+
+    public func downloader(for engineID: EngineID) -> Downloader? {
+        entries[engineID]?.downloader
     }
 
     public func registeredEngines() -> [EngineID] {
