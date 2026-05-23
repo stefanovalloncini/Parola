@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import ParolaCore
+import ParolaDictation
 
 extension AppModel {
 

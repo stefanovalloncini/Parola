@@ -3,6 +3,7 @@ import ApplicationServices
 import CoreGraphics
 import Foundation
 import ParolaCore
+import ParolaDictation
 import ScreenCaptureKit
 import Vision
 

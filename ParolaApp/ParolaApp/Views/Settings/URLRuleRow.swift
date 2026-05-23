@@ -1,5 +1,6 @@
 import SwiftUI
 import ParolaCore
+import ParolaDictation
 
 struct URLRuleRow: View {
     let app: (bundleID: String, name: String)

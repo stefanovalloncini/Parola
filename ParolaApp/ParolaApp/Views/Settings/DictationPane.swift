@@ -1,5 +1,6 @@
 import SwiftUI
 import ParolaCore
+import ParolaDictation
 
 struct DictationPane: View {
     @EnvironmentObject var model: AppModel

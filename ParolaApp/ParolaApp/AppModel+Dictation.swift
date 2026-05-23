@@ -3,6 +3,7 @@ import Foundation
 import SwiftUI
 import AppKit
 import ParolaCore
+import ParolaDictation
 
 extension AppModel {
 

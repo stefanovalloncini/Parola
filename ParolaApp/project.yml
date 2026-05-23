@@ -111,6 +111,8 @@ targets:
     dependencies:
       - package: ParolaCore
         product: ParolaCore
+      - package: ParolaCore
+        product: ParolaDictation
       - package: Sparkle
         product: Sparkle
       - target: ParolaQuickLook
@@ -142,6 +144,8 @@ targets:
     dependencies:
       - package: ParolaCore
         product: ParolaCore
+      - package: ParolaCore
+        product: ParolaDictation
 
   ParolaAppTests:
     type: bundle.unit-test
@@ -152,6 +156,8 @@ targets:
       - target: ParolaApp
       - package: ParolaCore
         product: ParolaCore
+      - package: ParolaCore
+        product: ParolaDictation
       - package: Sparkle
         product: Sparkle
     settings:

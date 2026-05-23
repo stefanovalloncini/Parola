@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 
 public struct DictationModePreset: Codable, Sendable, Identifiable, Hashable {
     public let id: UUID

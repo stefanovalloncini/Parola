@@ -1,6 +1,7 @@
 import Combine
 import SwiftUI
 import ParolaCore
+import ParolaDictation
 
 struct DictationView: View {
     let state: DictationCoordinator.State

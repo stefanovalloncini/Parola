@@ -4,6 +4,7 @@ import SwiftUI
 import AVFoundation
 import UniformTypeIdentifiers
 import ParolaCore
+import ParolaDictation
 
 @MainActor
 final class AppModel: ObservableObject {

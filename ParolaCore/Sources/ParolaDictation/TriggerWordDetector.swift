@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 
 public struct TriggerWordDetector: Sendable {
     public struct Match: Sendable, Hashable {

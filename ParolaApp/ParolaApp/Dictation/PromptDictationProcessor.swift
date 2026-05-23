@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import ParolaCore
+import ParolaDictation
 
 struct DictationOverrideEntry: Sendable {
     let prompt: Prompt

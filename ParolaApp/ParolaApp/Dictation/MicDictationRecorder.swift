@@ -1,5 +1,6 @@
 import Foundation
 import ParolaCore
+import ParolaDictation
 
 actor MicDictationRecorder: DictationRecorder {
     private let model: String?

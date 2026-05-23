@@ -1,5 +1,6 @@
 import SwiftUI
 import ParolaCore
+import ParolaDictation
 
 struct CorrectionsPane: View {
     @EnvironmentObject var model: AppModel

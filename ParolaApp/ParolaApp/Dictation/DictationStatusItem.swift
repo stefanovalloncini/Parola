@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import ParolaCore
+import ParolaDictation
 
 @MainActor
 final class DictationStatusItem {

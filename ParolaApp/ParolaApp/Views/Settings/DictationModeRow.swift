@@ -1,5 +1,6 @@
 import SwiftUI
 import ParolaCore
+import ParolaDictation
 
 struct DictationModeRow: View {
     @Binding var selectedID: String

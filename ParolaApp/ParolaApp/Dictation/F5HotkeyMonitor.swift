@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import Foundation
 import ParolaCore
+import ParolaDictation
 
 @MainActor
 final class GlobalHotkeyMonitor: HotkeyMonitor {

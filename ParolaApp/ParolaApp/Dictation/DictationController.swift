@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import Foundation
 import ParolaCore
+import ParolaDictation
 import SwiftUI
 
 @MainActor

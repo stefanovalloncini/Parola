@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import Foundation
 import ParolaCore
+import ParolaDictation
 
 struct ClipboardPasteInserter: TextInserter {
     var preDelayMs: Int = 0

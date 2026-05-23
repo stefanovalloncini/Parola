@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import Foundation
 import ParolaCore
+import ParolaDictation
 
 struct KeystrokeTextInserter: TextInserter {
     func insert(_ text: String) async {

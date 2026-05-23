@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 
 public actor DictationCoordinator {
     public enum State: Sendable, Equatable {

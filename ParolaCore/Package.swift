@@ -9,6 +9,7 @@ let package = Package(
     ],
     products: [
         .library(name: "ParolaCore", targets: ["ParolaCore"]),
+        .library(name: "ParolaDictation", targets: ["ParolaDictation"]),
         .executable(name: "parola", targets: ["parola"]),
         .executable(name: "parola-mcp", targets: ["parola-mcp"]),
     ],
@@ -28,6 +29,10 @@ let package = Package(
             resources: [.process("Resources")]
         ),
         .target(
+            name: "ParolaDictation",
+            dependencies: ["ParolaCore"]
+        ),
+        .target(
             name: "ParolaMCP",
             dependencies: ["ParolaCore"]
         ),
@@ -45,7 +50,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ParolaCoreTests",
-            dependencies: ["ParolaCore"],
+            dependencies: ["ParolaCore", "ParolaDictation"],
             resources: [
                 .process("Resources/sample.srt"),
                 .process("Resources/sample.vtt"),

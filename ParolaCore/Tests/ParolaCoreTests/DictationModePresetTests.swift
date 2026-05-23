@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import ParolaCore
+@testable import ParolaDictation
 
 @Suite("Dictation mode preset")
 struct DictationModePresetTests {

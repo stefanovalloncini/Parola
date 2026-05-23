@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import ParolaCore
+@testable import ParolaDictation
 
 struct StubClipboard: ClipboardReader {
     let value: String?
