@@ -1,0 +1,45 @@
+import SwiftUI
+import ParolaCore
+
+struct OrphansRow: View {
+    let entry: ModelInfo
+    let displaySize: Int64?
+    let isDeleting: Bool
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "tray.full")
+                .foregroundStyle(.secondary)
+                .frame(width: 24, height: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.name)
+                    .font(.subheadline)
+                if let bytes = displaySize {
+                    Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            if isDeleting {
+                ProgressView().controlSize(.small)
+                Text("Deleting…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Delete this folder from disk")
+                .accessibilityLabel("Delete \(entry.name)")
+                .accessibilityIdentifier("orphan.\(entry.name).delete")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}

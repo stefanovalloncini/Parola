@@ -44,7 +44,7 @@ struct ModelsSettingsPane: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                storageRow
+                StorageRow()
                 modelsUsageRow
                 libraryUsageRow
                 controls
@@ -87,110 +87,20 @@ struct ModelsSettingsPane: View {
     private var modelsUsageRow: some View {
         let totalBytes = model.modelSizes.values.reduce(Int64(0), +)
         let installedCount = model.availableModels.filter(\.isInstalled).count
-        return HStack(spacing: 8) {
-            Image(systemName: "cpu")
-                .foregroundStyle(.secondary)
-            Text("Models on disk:")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            Text("\(installedCount) installed · \(ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file))")
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.primary)
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.primary.opacity(0.04))
+        return UsageRow(
+            icon: "cpu",
+            label: "Models on disk:",
+            value: "\(installedCount) installed · \(ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file))"
         )
     }
 
     private var libraryUsageRow: some View {
         let totalBytes = model.libraryBundleSizes.values.reduce(Int64(0), +)
-        return HStack(spacing: 8) {
-            Image(systemName: "tray.full")
-                .foregroundStyle(.secondary)
-            Text("Library:")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            Text("\(model.libraryEntries.count) entries · \(ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file))")
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.primary)
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.primary.opacity(0.04))
+        return UsageRow(
+            icon: "tray.full",
+            label: "Library:",
+            value: "\(model.libraryEntries.count) entries · \(ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file))"
         )
-    }
-
-    private var storageRow: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "folder")
-                .foregroundStyle(.secondary)
-            Text("Storage:")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-            Text(storageDisplayPath)
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer()
-            Button("Choose…") { chooseStorage() }
-                .controlSize(.small)
-            if isCustomStorage {
-                Button("Use Default") { resetStorage() }
-                    .controlSize(.small)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.primary.opacity(0.04))
-        )
-    }
-
-    private var storageDisplayPath: String {
-        let custom = UserDefaults.standard.string(forKey: ModelStore.storageOverrideKey)
-        if let custom, !custom.trimmingCharacters(in: .whitespaces).isEmpty {
-            return (custom as NSString).abbreviatingWithTildeInPath
-        }
-        return (ModelStore.defaultDirectory.path as NSString).abbreviatingWithTildeInPath
-    }
-
-    private var isCustomStorage: Bool {
-        UserDefaults.standard.string(forKey: ModelStore.storageOverrideKey)?
-            .trimmingCharacters(in: .whitespaces).isEmpty == false
-    }
-
-    private func chooseStorage() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.title = "Choose models folder"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        UserDefaults.standard.set(url.path, forKey: ModelStore.storageOverrideKey)
-        showRestartAlert()
-    }
-
-    private func resetStorage() {
-        UserDefaults.standard.removeObject(forKey: ModelStore.storageOverrideKey)
-        showRestartAlert()
-    }
-
-    private func showRestartAlert() {
-        let alert = NSAlert()
-        alert.messageText = "Restart required"
-        alert.informativeText = "Quit and relaunch Parola for the new models folder to take effect."
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
     }
 
     // MARK: - Controls
@@ -231,9 +141,11 @@ struct ModelsSettingsPane: View {
     private var chipsRow: some View {
         HStack(spacing: 6) {
             ForEach(InstallFilter.allCases) { filter in
-                FilterChip(
-                    label: filter.label,
-                    isOn: installFilter == filter
+                Chip(
+                    title: LocalizedStringKey(filter.label),
+                    isSelected: installFilter == filter,
+                    size: .regular,
+                    weight: .semibold
                 ) {
                     installFilter = filter
                 }
@@ -291,55 +203,22 @@ struct ModelsSettingsPane: View {
                 .foregroundStyle(.secondary)
             LazyVStack(spacing: 8) {
                 ForEach(entries) { entry in
-                    orphanRow(entry)
+                    let displaySize = model.modelSizes[entry.name]
+                        ?? entry.approximateSizeBytes.map { Int64($0) }
+                    OrphansRow(
+                        entry: entry,
+                        displaySize: displaySize,
+                        isDeleting: model.modelsBeingDeleted.contains(entry.name)
+                    ) {
+                        pendingDeletion = PendingDeletion(
+                            id: entry.name,
+                            displayName: entry.name,
+                            sizeBytes: displaySize
+                        )
+                    }
                 }
             }
         }
-    }
-
-    private func orphanRow(_ entry: ModelInfo) -> some View {
-        let displaySize = model.modelSizes[entry.name]
-            ?? entry.approximateSizeBytes.map { Int64($0) }
-        let isDeleting = model.modelsBeingDeleted.contains(entry.name)
-        return HStack(spacing: 12) {
-            Image(systemName: "tray.full")
-                .foregroundStyle(.secondary)
-                .frame(width: 24, height: 24)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.name)
-                    .font(.subheadline)
-                if let bytes = displaySize {
-                    Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            if isDeleting {
-                ProgressView().controlSize(.small)
-                Text("Deleting…")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                Button {
-                    pendingDeletion = PendingDeletion(
-                        id: entry.name,
-                        displayName: entry.name,
-                        sizeBytes: displaySize
-                    )
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help("Delete this folder from disk")
-                .accessibilityLabel("Delete \(entry.name)")
-                .accessibilityIdentifier("orphan.\(entry.name).delete")
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     // MARK: - Downloaded
@@ -348,17 +227,18 @@ struct ModelsSettingsPane: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Downloaded", count: variants.count)
             if variants.isEmpty {
-                emptyDownloaded
+                DownloadedEmpty()
             } else {
                 LazyVStack(spacing: 10) {
                     ForEach(variants) { variant in
-                        ModelCardRow(
+                        let isActive = model.selectedModel == variant.id
+                        DownloadedRow(
                             variant: variant,
-                            kind: model.selectedModel == variant.id ? .active : .installed,
+                            isActive: isActive,
                             actualSizeBytes: model.modelSizes[variant.id],
                             isDeleting: model.modelsBeingDeleted.contains(variant.id),
-                            primaryAction: { model.selectedModel = variant.id },
-                            deleteAction: model.selectedModel == variant.id ? nil : {
+                            onActivate: { model.selectedModel = variant.id },
+                            onRequestDelete: isActive ? nil : {
                                 pendingDeletion = PendingDeletion(
                                     id: variant.id,
                                     displayName: variant.displayName,
@@ -372,18 +252,6 @@ struct ModelsSettingsPane: View {
         }
     }
 
-    private var emptyDownloaded: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "tray")
-                .foregroundStyle(.secondary)
-            Text("No models on disk yet. Pick one from Recommended below.")
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(14)
-        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-
     // MARK: - Recommended
 
     private func recommendedSection(_ variants: [ModelVariant]) -> some View {
@@ -391,11 +259,12 @@ struct ModelsSettingsPane: View {
             sectionHeader("Recommended Models", count: variants.count)
             LazyVStack(spacing: 10) {
                 ForEach(variants) { variant in
-                    ModelCardRow(
+                    RecommendedRow(
                         variant: variant,
-                        kind: downloadKind(for: variant),
-                        primaryAction: { model.downloadModel(variant.id) }
-                    )
+                        kind: downloadKind(for: variant)
+                    ) {
+                        model.downloadModel(variant.id)
+                    }
                 }
             }
         }
@@ -479,41 +348,6 @@ struct ModelsSettingsPane: View {
             }
             Spacer()
         }
-    }
-}
-
-private struct FilterChip: View {
-    let label: String
-    let isOn: Bool
-    let action: () -> Void
-
-    @State private var hovered = false
-
-    var body: some View {
-        Button(action: action) {
-            Text(label)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(isOn ? Color.white : Color.primary.opacity(0.85))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 5)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(background)
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .strokeBorder(DS.Color.separator.opacity(isOn ? 0 : 0.4), lineWidth: 0.5)
-                )
-                .contentShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .onHover { hovered = $0 }
-    }
-
-    private var background: Color {
-        if isOn { return DS.Color.accent }
-        if hovered { return DS.Color.surfaceElevated }
-        return DS.Color.surfaceElevated.opacity(0.6)
     }
 }
 
