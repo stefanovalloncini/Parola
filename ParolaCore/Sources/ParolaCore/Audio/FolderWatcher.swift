@@ -13,15 +13,18 @@ public actor FolderWatcher {
         public var recursive: Bool
         public var settledInterval: Duration
         public var clock: any FolderWatcherClock
+        public var scheduler: any FolderWatcherScheduler
 
         public init(
             recursive: Bool = true,
             settledInterval: Duration = .milliseconds(750),
-            clock: any FolderWatcherClock = SystemFolderWatcherClock()
+            clock: any FolderWatcherClock = SystemFolderWatcherClock(),
+            scheduler: any FolderWatcherScheduler = SystemFolderWatcherScheduler()
         ) {
             self.recursive = recursive
             self.settledInterval = settledInterval
             self.clock = clock
+            self.scheduler = scheduler
         }
     }
 
@@ -123,9 +126,11 @@ public actor FolderWatcher {
     private func schedulePendingCheck() {
         if settledTask != nil { return }
         let interval = options.settledInterval
+        let scheduler = options.scheduler
         settledTask = Task { [weak self] in
-            try? await Task.sleep(for: interval)
-            await self?.processPending()
+            try? await scheduler.runTick(after: interval) { [weak self] in
+                await self?.processPending()
+            }
         }
     }
 
@@ -189,4 +194,16 @@ public protocol FolderWatcherClock: Sendable {
 public struct SystemFolderWatcherClock: FolderWatcherClock {
     public init() {}
     public func now() -> Date { Date() }
+}
+
+public protocol FolderWatcherScheduler: Sendable {
+    func runTick(after interval: Duration, _ body: @Sendable @escaping () async -> Void) async throws
+}
+
+public struct SystemFolderWatcherScheduler: FolderWatcherScheduler {
+    public init() {}
+    public func runTick(after interval: Duration, _ body: @Sendable @escaping () async -> Void) async throws {
+        try await Task.sleep(for: interval)
+        await body()
+    }
 }

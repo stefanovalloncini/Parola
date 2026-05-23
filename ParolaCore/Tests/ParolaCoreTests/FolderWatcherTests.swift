@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Testing
 @testable import ParolaCore
 
@@ -41,25 +42,31 @@ struct FolderWatcherTests {
         let subdir = tempDir.appendingPathComponent("nested")
         try FileManager.default.createDirectory(at: subdir, withIntermediateDirectories: true)
 
-        let inserted = Container<URL>()
+        let inserted = CollectedURLs()
+        let scheduler = ManualScheduler()
+        let clock = FixedClock(start: Date())
         let options = FolderWatcher.Options(
             recursive: true,
             settledInterval: .milliseconds(50),
-            clock: SystemFolderWatcherClock()
+            clock: clock,
+            scheduler: scheduler
         )
         let watcher = FolderWatcher(folderURL: tempDir, options: options) { url in
-            Task { await inserted.append(url) }
+            inserted.append(url)
         }
         await watcher.start()
 
         let nestedFile = subdir.appendingPathComponent("clip.wav")
         try Data(count: 1024).write(to: nestedFile)
-        // Wait so the file's mtime is older than the settled cutoff.
-        try await Task.sleep(for: .milliseconds(150))
+        try FileManager.default.setAttributes(
+            [.modificationDate: clock.start.addingTimeInterval(-10)],
+            ofItemAtPath: nestedFile.path
+        )
         await watcher.checkForNewFiles()
-        try await Task.sleep(for: .milliseconds(250))
+        try await scheduler.advanceAndWait()
         await watcher.stop()
-        let captured = await inserted.snapshot()
+
+        let captured = inserted.snapshot()
         #expect(captured.contains(where: { $0.lastPathComponent == "clip.wav" }))
     }
 
@@ -68,33 +75,43 @@ struct FolderWatcherTests {
         let tempDir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
-        let inserted = Container<URL>()
+        let inserted = CollectedURLs()
+        let scheduler = ManualScheduler()
+        let clock = FixedClock(start: Date())
         let options = FolderWatcher.Options(
             recursive: false,
             settledInterval: .milliseconds(200),
-            clock: SystemFolderWatcherClock()
+            clock: clock,
+            scheduler: scheduler
         )
         let watcher = FolderWatcher(folderURL: tempDir, options: options) { url in
-            Task { await inserted.append(url) }
+            inserted.append(url)
         }
         await watcher.start()
 
         let partial = tempDir.appendingPathComponent("growing.mp3")
         try Data(count: 256).write(to: partial)
         await watcher.checkForNewFiles()
-        // Keep mutating so each settled tick sees an updated mtime/size.
-        for _ in 0..<5 {
-            try await Task.sleep(for: .milliseconds(150))
-            try Data(count: 256 * (1 + Int.random(in: 1...4))).write(to: partial)
+
+        for chunk in 1...3 {
+            try Data(count: 256 * (1 + chunk)).write(to: partial)
+            try FileManager.default.setAttributes(
+                [.modificationDate: clock.start],
+                ofItemAtPath: partial.path
+            )
+            try await scheduler.advanceAndWait()
         }
-        let afterChurn = await inserted.snapshot()
-        #expect(afterChurn.isEmpty, "still-growing file should not have been emitted")
-        // Stop mutating; the file is now stable. Wait for the settled interval to elapse.
-        try await Task.sleep(for: .milliseconds(500))
+        #expect(inserted.snapshot().isEmpty, "still-growing file should not have been emitted")
+
+        try FileManager.default.setAttributes(
+            [.modificationDate: clock.start.addingTimeInterval(-10)],
+            ofItemAtPath: partial.path
+        )
         await watcher.checkForNewFiles()
-        try await Task.sleep(for: .milliseconds(500))
+        try await scheduler.advanceAndWait()
         await watcher.stop()
-        let final = await inserted.snapshot()
+
+        let final = inserted.snapshot()
         #expect(final.contains(where: { $0.lastPathComponent == "growing.mp3" }))
     }
 
@@ -104,16 +121,16 @@ struct FolderWatcherTests {
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
-
-    private func waitForFolderEvent() async {
-        try? await Task.sleep(for: .milliseconds(40))
-    }
 }
 
-actor Container<T: Sendable> {
-    private var items: [T] = []
-    func append(_ item: T) { items.append(item) }
-    func snapshot() -> [T] { items }
+final class CollectedURLs: Sendable {
+    private let storage = OSAllocatedUnfairLock<[URL]>(initialState: [])
+    func append(_ url: URL) {
+        storage.withLock { $0.append(url) }
+    }
+    func snapshot() -> [URL] {
+        storage.withLock { $0 }
+    }
 }
 
 struct FixedClock: FolderWatcherClock {
@@ -121,3 +138,42 @@ struct FixedClock: FolderWatcherClock {
     func now() -> Date { start }
 }
 
+actor ManualScheduler: FolderWatcherScheduler {
+    private var parked: [CheckedContinuation<Void, Never>] = []
+    private var done: [CheckedContinuation<Void, Never>] = []
+    private var arrivalWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func runTick(after interval: Duration, _ body: @Sendable @escaping () async -> Void) async throws {
+        await park()
+        await body()
+        await signalDone()
+    }
+
+    func advanceAndWait() async throws {
+        if parked.isEmpty {
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                arrivalWaiters.append(cont)
+            }
+        }
+        let go = parked.removeFirst()
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            done.append(cont)
+            go.resume()
+        }
+    }
+
+    private func park() async {
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            parked.append(cont)
+            if let waiter = arrivalWaiters.first {
+                arrivalWaiters.removeFirst()
+                waiter.resume()
+            }
+        }
+    }
+
+    private func signalDone() {
+        guard !done.isEmpty else { return }
+        done.removeFirst().resume()
+    }
+}
