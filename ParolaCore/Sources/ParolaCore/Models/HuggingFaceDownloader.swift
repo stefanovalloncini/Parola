@@ -203,6 +203,7 @@ enum HuggingFaceDownloader {
         var hasher = SHA256()
         let chunkSize = 1 << 20
         while true {
+            try Task.checkCancellation()
             let more = autoreleasepool { () -> Bool in
                 let chunk = handle.readData(ofLength: chunkSize)
                 guard !chunk.isEmpty else { return false }
