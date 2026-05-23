@@ -46,4 +46,208 @@ struct BatchQueueTests {
             Issue.record("expected .cancelled")
         }
     }
+
+    @Test("mid-job CancellationError surfaces as .cancelled, not .failed")
+    func midJobCancellationYieldsCancelled() async throws {
+        let setup = try await makeQueue(behavior: .cancel)
+        let job = BatchJob(url: setup.audioURL)
+        let events = await setup.queue.process(
+            jobs: [job],
+            options: TranscriptionOptions(model: "openai_whisper-tiny")
+        )
+
+        var startedID: UUID?
+        var cancelledID: UUID?
+        var sawFailed = false
+        var sawFinished = false
+        for await event in events {
+            switch event {
+            case .started(let id): startedID = id
+            case .cancelled(let id): cancelledID = id
+            case .failed: sawFailed = true
+            case .finished: sawFinished = true
+            case .completed: break
+            }
+        }
+
+        #expect(startedID == job.id)
+        #expect(cancelledID == job.id)
+        #expect(sawFailed == false)
+        #expect(sawFinished)
+    }
+
+    @Test("cancelling the consuming task tears down the in-flight session via onTermination")
+    func consumerCancellationTearsDownInFlight() async throws {
+        let setup = try await makeQueue(behavior: .hang)
+        let job = BatchJob(url: setup.audioURL)
+
+        let started = ObservedFirstStart()
+        let consumer = Task {
+            let events = await setup.queue.process(
+                jobs: [job],
+                options: TranscriptionOptions(model: "openai_whisper-tiny")
+            )
+            for await event in events {
+                if case .started = event { await started.fire() }
+            }
+        }
+        for _ in 0..<40 {
+            if await started.didFire { break }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        consumer.cancel()
+        _ = await consumer.value
+
+        for _ in 0..<40 {
+            let cancelled = await setup.factory.cancelledCount
+            if cancelled > 0 { break }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        let cancelled = await setup.factory.cancelledCount
+        #expect(cancelled >= 1, "cancelInFlight should fire when the consuming task is cancelled")
+    }
+
+    @Test("finished always trails the last per-job event in a multi-job run")
+    func finishedTrailsAllJobEvents() async throws {
+        let setup = try await makeQueue(behavior: .succeed)
+        let jobs = [
+            BatchJob(url: setup.audioURL),
+            BatchJob(url: setup.audioURL),
+            BatchJob(url: setup.audioURL),
+        ]
+        let events = await setup.queue.process(
+            jobs: jobs,
+            options: TranscriptionOptions(model: "openai_whisper-tiny")
+        )
+
+        var ordered: [String] = []
+        for await event in events {
+            switch event {
+            case .started: ordered.append("started")
+            case .completed: ordered.append("completed")
+            case .failed: ordered.append("failed")
+            case .cancelled: ordered.append("cancelled")
+            case .finished: ordered.append("finished")
+            }
+        }
+        #expect(ordered.last == "finished")
+        #expect(ordered.count == jobs.count * 2 + 1)
+    }
+
+    @Test("started, completed, finished events fire for a single happy-path job")
+    func happyPathOrdering() async throws {
+        let setup = try await makeQueue(behavior: .succeed)
+        let job = BatchJob(url: setup.audioURL)
+        let events = await setup.queue.process(
+            jobs: [job],
+            options: TranscriptionOptions(model: "openai_whisper-tiny")
+        )
+
+        var startedID: UUID?
+        var completedID: UUID?
+        var sawFinished = false
+        for await event in events {
+            switch event {
+            case .started(let id): startedID = id
+            case .completed(let id, _): completedID = id
+            case .finished: sawFinished = true
+            default: break
+            }
+        }
+        #expect(startedID == job.id)
+        #expect(completedID == job.id)
+        #expect(sawFinished)
+    }
+
+    private struct QueueSetup {
+        let queue: BatchQueue
+        let factory: StubFactory
+        let audioURL: URL
+    }
+
+    private func makeQueue(behavior: StubTranscriber.Behavior) async throws -> QueueSetup {
+        let factory = StubFactory(behavior: behavior)
+        let registry = EngineRegistry()
+        await registry.register(
+            engineID: .whisperKit,
+            capabilities: .whisperKitDefaults
+        ) { [factory] _ in
+            StubTranscriber(behavior: behavior, factory: factory)
+        }
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-batch-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let store = ModelStore(modelsDirectory: dir)
+        let installedDir = store.installedURL(for: "openai_whisper-tiny")
+        try FileManager.default.createDirectory(at: installedDir, withIntermediateDirectories: true)
+        let session = TranscriptionSession(modelStore: store, registry: registry, idleTimeout: 5)
+        let queue = BatchQueue(session: session)
+        let audioURL = dir.appendingPathComponent("input.wav")
+        try Data("RIFFstub".utf8).write(to: audioURL)
+        return QueueSetup(queue: queue, factory: factory, audioURL: audioURL)
+    }
+}
+
+actor ObservedFirstStart {
+    private(set) var didFire = false
+    func fire() { didFire = true }
+}
+
+actor StubFactory {
+    var cancelledCount = 0
+    init(behavior: StubTranscriber.Behavior) {}
+    func recordCancellation() { cancelledCount += 1 }
+}
+
+actor StubTranscriber: Transcriber {
+    enum Behavior: Sendable {
+        case succeed
+        case cancel
+        case hang
+    }
+
+    static let engineID = EngineID("stub-engine")
+    static let capabilities = EngineCapabilities.whisperKitDefaults
+
+    private let behavior: Behavior
+    private let factory: StubFactory
+    private var loaded: String?
+    private var inFlight: Task<Transcript, Error>?
+
+    init(behavior: Behavior, factory: StubFactory) {
+        self.behavior = behavior
+        self.factory = factory
+    }
+
+    func load(model: String) async throws { loaded = model }
+    func unload() async { loaded = nil }
+    func loadedModelName() async -> String? { loaded }
+
+    func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+        switch behavior {
+        case .succeed:
+            return Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "ok")],
+                language: "en",
+                modelName: loaded ?? "?",
+                sourceURL: url,
+                durationSeconds: 1
+            )
+        case .cancel:
+            throw CancellationError()
+        case .hang:
+            let task = Task<Transcript, Error> {
+                try await Task.sleep(for: .seconds(60))
+                throw CancellationError()
+            }
+            inFlight = task
+            return try await task.value
+        }
+    }
+
+    func cancelInFlight() async {
+        inFlight?.cancel()
+        inFlight = nil
+        await factory.recordCancellation()
+    }
 }

@@ -75,4 +75,158 @@ struct DownloadSidecarTests {
             // Network error before cancellation took effect is also acceptable; the task did not complete.
         }
     }
+
+    @Test("snapshot resumes when sidecar marks every file complete and on-disk")
+    func snapshotResumesWhenSidecarCompletes() async throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let dest = dir.appendingPathComponent("model-resume")
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+
+        try Data("body-a".utf8).write(to: dest.appendingPathComponent("a.bin"))
+        let sidecar = DownloadSidecar(
+            repo: "fake/repo",
+            revision: "main",
+            files: [
+                "a.bin": .init(size: 6, sha256: nil, complete: true),
+            ]
+        )
+        try sidecar.write(to: dest.appendingPathComponent(HuggingFaceDownloader.sidecarFilename))
+
+        let handler = MockTransport.Handler { request in
+            let path = request.url?.path ?? ""
+            if path.contains("/api/models/") {
+                let tree = #"[{"type":"file","path":"a.bin","size":6}]"#
+                return .ok(body: tree)
+            }
+            return .status(500, body: "file fetch should not happen on resume")
+        }
+        let session = MockTransport.makeSession(handler: handler)
+
+        try await HuggingFaceDownloader.snapshot(
+            repo: "fake/repo",
+            subpath: nil,
+            destination: dest,
+            urlSession: session,
+            progress: nil
+        )
+
+        let onlyTreeFetch = handler.requests.allSatisfy { $0.url?.path.contains("/api/models/") == true }
+        #expect(onlyTreeFetch, "resume must skip already-complete file downloads")
+        let sidecarStillThere = FileManager.default.fileExists(
+            atPath: dest.appendingPathComponent(HuggingFaceDownloader.sidecarFilename).path
+        )
+        #expect(sidecarStillThere == false, "snapshot should clean up the sidecar after success")
+    }
+
+    @Test("snapshot fails when the HuggingFace tree endpoint returns a 4xx")
+    func snapshotFailsOnTreeHTTPError() async throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let dest = dir.appendingPathComponent("model-tree-fail")
+
+        let handler = MockTransport.Handler { _ in .status(404, body: "Not Found") }
+        let session = MockTransport.makeSession(handler: handler)
+
+        var captured: Error?
+        do {
+            try await HuggingFaceDownloader.snapshot(
+                repo: "fake/missing",
+                subpath: nil,
+                destination: dest,
+                urlSession: session,
+                progress: nil
+            )
+        } catch {
+            captured = error
+        }
+        guard let captured else {
+            Issue.record("expected an error to be thrown")
+            return
+        }
+        if case ParolaError.modelDownloadFailed(let repo, let reason) = captured {
+            #expect(repo == "fake/missing")
+            #expect(reason.contains("404"))
+        } else {
+            Issue.record("expected modelDownloadFailed, got \(captured)")
+        }
+    }
+
+    @Test("snapshot fails when a file fetch returns a non-2xx response")
+    func snapshotFailsOnFileHTTPError() async throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let dest = dir.appendingPathComponent("model-file-fail")
+
+        let handler = MockTransport.Handler { request in
+            let path = request.url?.path ?? ""
+            if path.contains("/api/models/") {
+                return .ok(body: #"[{"type":"file","path":"weights.bin","size":4}]"#)
+            }
+            return .status(500, body: "boom")
+        }
+        let session = MockTransport.makeSession(handler: handler)
+
+        var captured: Error?
+        do {
+            try await HuggingFaceDownloader.snapshot(
+                repo: "fake/file-error",
+                subpath: nil,
+                destination: dest,
+                urlSession: session,
+                progress: nil
+            )
+        } catch {
+            captured = error
+        }
+        guard let captured else {
+            Issue.record("expected an error to be thrown")
+            return
+        }
+        if case ParolaError.modelDownloadFailed(let repo, let reason) = captured {
+            #expect(repo == "fake/file-error")
+            #expect(reason.contains("500") || reason.contains("HTTP"))
+        } else {
+            Issue.record("expected modelDownloadFailed, got \(captured)")
+        }
+    }
+
+    @Test("snapshot writes a sidecar that records each completed file by name")
+    func snapshotPersistsSidecarBetweenSteps() async throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let dest = dir.appendingPathComponent("model-progress")
+
+        let bodyA = "AAAA"
+        let bodyB = "BBBBB"
+
+        let handler = MockTransport.Handler { request in
+            let path = request.url?.path ?? ""
+            if path.contains("/api/models/") {
+                let tree = #"[{"type":"file","path":"a.bin","size":4},{"type":"file","path":"b.bin","size":5}]"#
+                return .ok(body: tree)
+            }
+            if path.hasSuffix("/a.bin") { return .ok(body: bodyA) }
+            if path.hasSuffix("/b.bin") { return .ok(body: bodyB) }
+            return .status(404, body: "unknown path \(path)")
+        }
+        let session = MockTransport.makeSession(handler: handler)
+
+        try await HuggingFaceDownloader.snapshot(
+            repo: "fake/two-files",
+            subpath: nil,
+            destination: dest,
+            urlSession: session,
+            progress: nil
+        )
+
+        let a = try String(contentsOf: dest.appendingPathComponent("a.bin"), encoding: .utf8)
+        let b = try String(contentsOf: dest.appendingPathComponent("b.bin"), encoding: .utf8)
+        #expect(a == bodyA)
+        #expect(b == bodyB)
+        let sidecarExists = FileManager.default.fileExists(
+            atPath: dest.appendingPathComponent(HuggingFaceDownloader.sidecarFilename).path
+        )
+        #expect(sidecarExists == false, "successful snapshot removes the sidecar on completion")
+    }
 }

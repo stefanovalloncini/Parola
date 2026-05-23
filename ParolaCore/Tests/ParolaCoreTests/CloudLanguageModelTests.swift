@@ -206,4 +206,194 @@ struct CloudLanguageModelTests {
         #expect(CloudLLMProviderInfo.info(for: .groq)?.displayName == "Groq")
         #expect(CloudLLMProviderInfo.info(for: CloudLLMProviderID("unknown")) == nil)
     }
+
+    @Test("respond decodes a 200 OpenAI body and returns the assistant message")
+    func respondReturnsAssistantMessage() async throws {
+        let handler = MockTransport.Handler { _ in
+            .ok(body: #"{"choices":[{"message":{"content":"hello back"}}]}"#)
+        }
+        let session = MockTransport.makeSession(handler: handler)
+        let model = CloudLanguageModel(provider: .openAI, apiKey: "k", session: session)
+
+        let reply = try await model.respond(history: [ChatTurn(role: .user, text: "hi")])
+        #expect(reply == "hello back")
+    }
+
+    @Test("respond throws requestFailed and captures the body on 500")
+    func respondCapturesBodyOn500() async throws {
+        let handler = MockTransport.Handler { _ in
+            .status(500, body: "internal explosion")
+        }
+        let session = MockTransport.makeSession(handler: handler)
+        let model = CloudLanguageModel(provider: .openAI, apiKey: "k", session: session)
+
+        var captured: CloudLLMError?
+        do {
+            _ = try await model.respond(history: [ChatTurn(role: .user, text: "hi")])
+        } catch let error as CloudLLMError {
+            captured = error
+        }
+        switch captured {
+        case let .requestFailed(provider, status, body)?:
+            #expect(provider == .openAI)
+            #expect(status == 500)
+            #expect(body.contains("internal explosion"))
+        default:
+            Issue.record("expected .requestFailed, got \(String(describing: captured))")
+        }
+    }
+
+    @Test("stream walks SSE chunks from the wire and yields decoded text in order")
+    func streamYieldsDecodedSSEChunks() async throws {
+        let sse = [
+            #"data: {"choices":[{"delta":{"content":"Hel"}}]}"#,
+            #"data: {"choices":[{"delta":{"content":"lo"}}]}"#,
+            #"data: {"choices":[{"delta":{"content":" world"}}]}"#,
+            "data: [DONE]",
+        ].joined(separator: "\n\n") + "\n\n"
+        let handler = MockTransport.Handler { _ in .ok(body: sse) }
+        let session = MockTransport.makeSession(handler: handler)
+        let model = CloudLanguageModel(provider: .openAI, apiKey: "k", session: session)
+
+        var chunks: [String] = []
+        for try await chunk in model.stream(history: [ChatTurn(role: .user, text: "hi")]) {
+            chunks.append(chunk)
+        }
+        #expect(chunks == ["Hel", "lo", " world"])
+    }
+
+    @Test("stream throws requestFailed on a 5xx and includes the error body")
+    func streamCapturesBodyOn500() async throws {
+        let handler = MockTransport.Handler { _ in .status(503, body: "service down") }
+        let session = MockTransport.makeSession(handler: handler)
+        let model = CloudLanguageModel(provider: .openAI, apiKey: "k", session: session)
+
+        var captured: CloudLLMError?
+        do {
+            for try await _ in model.stream(history: [ChatTurn(role: .user, text: "hi")]) {}
+        } catch let error as CloudLLMError {
+            captured = error
+        }
+        switch captured {
+        case let .requestFailed(provider, status, body)?:
+            #expect(provider == .openAI)
+            #expect(status == 503)
+            #expect(body.contains("service down"))
+        default:
+            Issue.record("expected .requestFailed, got \(String(describing: captured))")
+        }
+    }
+
+    @Test("respond throws tokenBudgetExceeded before any network call when history exceeds context")
+    func respondRejectsOverBudget() async throws {
+        let handler = MockTransport.Handler { _ in .ok(body: "{}") }
+        let session = MockTransport.makeSession(handler: handler)
+        let model = CloudLanguageModel(provider: .cerebras, apiKey: "k", session: session)
+
+        let oversized = String(repeating: "x", count: 64_000 * 4 * 2)
+        var captured: CloudLLMError?
+        do {
+            _ = try await model.respond(history: [ChatTurn(role: .user, text: oversized)])
+        } catch let error as CloudLLMError {
+            captured = error
+        }
+        switch captured {
+        case .tokenBudgetExceeded: break
+        default: Issue.record("expected tokenBudgetExceeded, got \(String(describing: captured))")
+        }
+        #expect(handler.requestCount == 0, "token-budget guard must short-circuit before any URL request")
+    }
 }
+
+enum MockTransport {
+    struct StoredResponse: Sendable {
+        let statusCode: Int
+        let body: Data
+        let headers: [String: String]
+
+        static func ok(body: String) -> StoredResponse {
+            StoredResponse(statusCode: 200, body: Data(body.utf8), headers: [:])
+        }
+        static func status(_ status: Int, body: String) -> StoredResponse {
+            StoredResponse(statusCode: status, body: Data(body.utf8), headers: [:])
+        }
+    }
+
+    final class Handler: @unchecked Sendable {
+        private let respond: @Sendable (URLRequest) -> StoredResponse
+        private let lock = NSLock()
+        private var seenRequests: [URLRequest] = []
+
+        init(respond: @escaping @Sendable (URLRequest) -> StoredResponse) {
+            self.respond = respond
+        }
+
+        func handle(_ request: URLRequest) -> StoredResponse {
+            lock.lock(); defer { lock.unlock() }
+            seenRequests.append(request)
+            return respond(request)
+        }
+
+        var requestCount: Int {
+            lock.lock(); defer { lock.unlock() }
+            return seenRequests.count
+        }
+
+        var requests: [URLRequest] {
+            lock.lock(); defer { lock.unlock() }
+            return seenRequests
+        }
+    }
+
+    nonisolated(unsafe) static var handlersByID: [UUID: Handler] = [:]
+    static let lock = NSLock()
+
+    static func makeSession(handler: Handler) -> URLSession {
+        let id = UUID()
+        lock.lock()
+        handlersByID[id] = handler
+        lock.unlock()
+
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockTransportProtocol.self]
+        config.httpAdditionalHeaders = [MockTransportProtocol.handlerHeader: id.uuidString]
+        return URLSession(configuration: config)
+    }
+
+    static func handler(for id: UUID) -> Handler? {
+        lock.lock(); defer { lock.unlock() }
+        return handlersByID[id]
+    }
+}
+
+final class MockTransportProtocol: URLProtocol, @unchecked Sendable {
+    static let handlerHeader = "X-Mock-Handler-ID"
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        request.value(forHTTPHeaderField: handlerHeader) != nil
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let idString = request.value(forHTTPHeaderField: Self.handlerHeader),
+              let id = UUID(uuidString: idString),
+              let handler = MockTransport.handler(for: id) else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+            return
+        }
+        let stored = handler.handle(request)
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: stored.statusCode,
+            httpVersion: "HTTP/1.1",
+            headerFields: stored.headers
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: stored.body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
