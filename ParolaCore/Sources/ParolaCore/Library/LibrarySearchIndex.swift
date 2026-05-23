@@ -188,6 +188,7 @@ public actor LibrarySearchIndex {
         let debounce = saveDebounce
         pendingSaveTask = Task { [weak self] in
             try? await Task.sleep(for: debounce)
+            if Task.isCancelled { return }
             await self?.persistAfterDebounce()
         }
     }
