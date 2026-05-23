@@ -104,7 +104,15 @@ public actor MicAudioSource: AudioSource {
         }
 
         engine.prepare()
-        try engine.start()
+        do {
+            try engine.start()
+        } catch {
+            inputNode.removeTap(onBus: 0)
+            cont.finish()
+            consumer.cancel()
+            session = nil
+            throw error
+        }
     }
 
     private static func copy(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
