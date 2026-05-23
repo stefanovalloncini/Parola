@@ -23,6 +23,7 @@ public actor TranscriptChatSession {
     private let model: any LanguageModel
     public let transcript: Transcript
     public private(set) var history: [ChatMessage]
+    private var inFlight: Task<Void, Never>?
 
     public init(transcript: Transcript, history: [ChatMessage] = [], model: any LanguageModel) {
         self.transcript = transcript
@@ -51,25 +52,7 @@ public actor TranscriptChatSession {
     public nonisolated func stream(_ message: String) -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task { [self] in
-                do {
-                    let turns = await prepareTurns(for: message)
-                    let user = ChatMessage(role: .user, text: message)
-                    var collected = ""
-                    for try await delta in model.stream(history: turns) {
-                        try Task.checkCancellation()
-                        collected += delta
-                        continuation.yield(.delta(delta))
-                    }
-                    let assistant = ChatMessage(
-                        role: .assistant,
-                        text: collected.trimmingCharacters(in: .whitespacesAndNewlines)
-                    )
-                    await appendTurn(user: user, assistant: assistant)
-                    continuation.yield(.completed(assistant))
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: FailureReason.modelError(error.localizedDescription))
-                }
+                await self.runSerialStream(message: message, continuation: continuation)
             }
             continuation.onTermination = { _ in task.cancel() }
         }
@@ -79,12 +62,43 @@ public actor TranscriptChatSession {
         history = []
     }
 
-    private func prepareTurns(for message: String) -> [ChatTurn] {
-        (history + [ChatMessage(role: .user, text: message)]).map(ChatTurn.init)
+    private func runSerialStream(
+        message: String,
+        continuation: AsyncThrowingStream<StreamEvent, Error>.Continuation
+    ) async {
+        let prior = inFlight
+        let current = Task { [self] in
+            await prior?.value
+            await self.runStreamBody(message: message, continuation: continuation)
+        }
+        inFlight = current
+        await current.value
     }
 
-    private func appendTurn(user: ChatMessage, assistant: ChatMessage) {
-        history.append(user)
-        history.append(assistant)
+    private func runStreamBody(
+        message: String,
+        continuation: AsyncThrowingStream<StreamEvent, Error>.Continuation
+    ) async {
+        do {
+            try Task.checkCancellation()
+            let user = ChatMessage(role: .user, text: message)
+            let turns = (history + [user]).map(ChatTurn.init)
+            var collected = ""
+            for try await delta in model.stream(history: turns) {
+                try Task.checkCancellation()
+                collected += delta
+                continuation.yield(.delta(delta))
+            }
+            let assistant = ChatMessage(
+                role: .assistant,
+                text: collected.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            history.append(user)
+            history.append(assistant)
+            continuation.yield(.completed(assistant))
+            continuation.finish()
+        } catch {
+            continuation.finish(throwing: FailureReason.modelError(error.localizedDescription))
+        }
     }
 }
