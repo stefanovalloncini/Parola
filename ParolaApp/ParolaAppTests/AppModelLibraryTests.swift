@@ -1,0 +1,174 @@
+import Foundation
+import Testing
+@testable import Parola
+import ParolaCore
+
+@MainActor
+@Suite("AppModel library")
+struct AppModelLibraryTests {
+
+    private static let baseDate = Date(timeIntervalSince1970: 1_700_000_000)
+
+    private static func entry(
+        id: String,
+        title: String,
+        createdAt: Date,
+        lastOpenedAt: Date? = nil,
+        labels: [String] = []
+    ) -> LibraryEntry {
+        let manifest = ParolaDocument.Manifest(
+            createdAt: createdAt,
+            originalAudioName: "\(title).m4a",
+            modelName: "stub",
+            language: "en",
+            lastOpenedAt: lastOpenedAt,
+            labels: labels
+        )
+        let bundleURL = URL(fileURLWithPath: "/tmp/AppModelLibraryTests/\(id).parola")
+        return LibraryEntry(id: id, bundleURL: bundleURL, manifest: manifest)
+    }
+
+    private static func fixture() -> [LibraryEntry] {
+        [
+            entry(id: "a", title: "Banana", createdAt: baseDate.addingTimeInterval(100)),
+            entry(id: "b", title: "apple", createdAt: baseDate.addingTimeInterval(200)),
+            entry(id: "c", title: "Cherry", createdAt: baseDate.addingTimeInterval(300)),
+        ]
+    }
+
+    @Test("newest sort orders by createdAt descending")
+    func sortNewest() {
+        let model = AppModel(skipBootstrap: true)
+        model.librarySortOrder = .newest
+
+        let sorted = model.sortedLibraryEntries(Self.fixture()).map(\.id)
+
+        #expect(sorted == ["c", "b", "a"])
+    }
+
+    @Test("oldest sort orders by createdAt ascending")
+    func sortOldest() {
+        let model = AppModel(skipBootstrap: true)
+        model.librarySortOrder = .oldest
+
+        let sorted = model.sortedLibraryEntries(Self.fixture()).map(\.id)
+
+        #expect(sorted == ["a", "b", "c"])
+    }
+
+    @Test("titleAZ sort uses case-insensitive comparison")
+    func sortTitleAZ() {
+        let model = AppModel(skipBootstrap: true)
+        model.librarySortOrder = .titleAZ
+
+        let sorted = model.sortedLibraryEntries(Self.fixture()).map(\.id)
+
+        #expect(sorted == ["b", "a", "c"])
+    }
+
+    @Test("titleZA sort is reverse of A→Z")
+    func sortTitleZA() {
+        let model = AppModel(skipBootstrap: true)
+        model.librarySortOrder = .titleZA
+
+        let sorted = model.sortedLibraryEntries(Self.fixture()).map(\.id)
+
+        #expect(sorted == ["c", "a", "b"])
+    }
+
+    @Test("longest sort uses bundle sizes, biggest first, zero for missing")
+    func sortLongest() {
+        let model = AppModel(skipBootstrap: true)
+        model.librarySortOrder = .longest
+        model.libraryBundleSizes = ["a": 100, "b": 999, "c": 50]
+
+        let sorted = model.sortedLibraryEntries(Self.fixture()).map(\.id)
+
+        #expect(sorted == ["b", "a", "c"])
+    }
+
+    @Test("shortest sort uses bundle sizes, smallest first")
+    func sortShortest() {
+        let model = AppModel(skipBootstrap: true)
+        model.librarySortOrder = .shortest
+        model.libraryBundleSizes = ["a": 100, "b": 999, "c": 50]
+
+        let sorted = model.sortedLibraryEntries(Self.fixture()).map(\.id)
+
+        #expect(sorted == ["c", "a", "b"])
+    }
+
+    @Test("lastOpened sort puts opened entries first, then unopened by createdAt desc")
+    func sortLastOpened() {
+        let entries = [
+            Self.entry(id: "a", title: "A", createdAt: Self.baseDate),
+            Self.entry(id: "b", title: "B", createdAt: Self.baseDate.addingTimeInterval(100), lastOpenedAt: Self.baseDate.addingTimeInterval(1000)),
+            Self.entry(id: "c", title: "C", createdAt: Self.baseDate.addingTimeInterval(200), lastOpenedAt: Self.baseDate.addingTimeInterval(2000)),
+            Self.entry(id: "d", title: "D", createdAt: Self.baseDate.addingTimeInterval(50)),
+        ]
+        let model = AppModel(skipBootstrap: true)
+        model.librarySortOrder = .lastOpened
+
+        let sorted = model.sortedLibraryEntries(entries).map(\.id)
+
+        #expect(sorted.prefix(2) == ["c", "b"])
+        #expect(sorted.suffix(2) == ["d", "a"])
+    }
+
+    @Test("changing sort order reapplies the sort onto libraryEntries")
+    func sortChangeReappliesOrder() {
+        let model = AppModel(skipBootstrap: true)
+        model.libraryEntries = Self.fixture()
+
+        model.librarySortOrder = .titleAZ
+
+        #expect(model.libraryEntries.map(\.id) == ["b", "a", "c"])
+    }
+
+    @Test("allKnownLabels deduplicates by exact value and sorts case-insensitively")
+    func knownLabels() {
+        let entries = [
+            Self.entry(id: "1", title: "x", createdAt: Self.baseDate, labels: ["zeta", "Alpha"]),
+            Self.entry(id: "2", title: "y", createdAt: Self.baseDate, labels: ["Alpha", "Beta"]),
+            Self.entry(id: "3", title: "z", createdAt: Self.baseDate, labels: []),
+        ]
+        let model = AppModel(skipBootstrap: true)
+        model.libraryEntries = entries
+
+        let labels = model.allKnownLabels
+
+        #expect(labels == ["Alpha", "Beta", "zeta"])
+    }
+
+    @Test("allKnownLabels is empty when no entry has labels")
+    func knownLabelsEmpty() {
+        let model = AppModel(skipBootstrap: true)
+        model.libraryEntries = [Self.entry(id: "1", title: "x", createdAt: Self.baseDate)]
+
+        #expect(model.allKnownLabels.isEmpty)
+    }
+
+    @Test("search with an empty query clears searchResults and skips the debounce")
+    func searchEmptyQueryClearsResults() {
+        let model = AppModel(skipBootstrap: true)
+        model.searchResults = [Self.entry(id: "stale", title: "stale", createdAt: Self.baseDate)]
+
+        model.search("   ")
+
+        #expect(model.searchResults == nil)
+    }
+
+    @Test("LibrarySortOrder exposes a label for every case")
+    func sortOrderLabels() {
+        for order in LibrarySortOrder.allCases {
+            #expect(order.label.isEmpty == false)
+            #expect(order.id == order.rawValue)
+        }
+    }
+
+    @Test("LibrarySortOrder cases are all distinct")
+    func sortOrderRawsUnique() {
+        let raws = LibrarySortOrder.allCases.map(\.rawValue)
+        #expect(Set(raws).count == raws.count)
+    }
+}

@@ -1,0 +1,179 @@
+import Foundation
+import Testing
+import AVFoundation
+@testable import Parola
+import ParolaCore
+
+@MainActor
+@Suite("AppModel player")
+struct AppModelPlayerTests {
+
+    private static func makeSegments(_ pairs: [(id: Int, start: Double, end: Double)]) -> [TranscriptSegment] {
+        pairs.map { TranscriptSegment(id: $0.id, start: $0.start, end: $0.end, text: "seg-\($0.id)") }
+    }
+
+    private static func makeTranscript(_ pairs: [(id: Int, start: Double, end: Double)]) -> Transcript {
+        Transcript(segments: makeSegments(pairs), language: "en", modelName: "stub")
+    }
+
+    private static func makeURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("AppModelPlayerTests-\(UUID().uuidString).m4a")
+    }
+
+    @Test("installPlayer creates a player and resets per-install state")
+    func installPlayerCreatesPlayer() {
+        let model = AppModel(skipBootstrap: true)
+        model.currentSegmentID = 99
+        model.currentWordID = "stale"
+        model.currentTimeSeconds = 42
+        model.isPlaying = true
+
+        model.installPlayer(for: Self.makeURL())
+
+        #expect(model.player != nil)
+        #expect(model.currentSegmentID == nil)
+        #expect(model.currentWordID == nil)
+        #expect(model.currentTimeSeconds == 0)
+        #expect(model.isPlaying == false)
+        #expect(model.hasVideo == false)
+    }
+
+    @Test("installPlayer bumps the install token so stale work is ignored")
+    func installPlayerBumpsToken() {
+        let model = AppModel(skipBootstrap: true)
+        let before = model.playerInstallToken
+
+        model.installPlayer(for: Self.makeURL())
+
+        #expect(model.playerInstallToken == before &+ 1)
+    }
+
+    @Test("tearDownPlayer clears player and all derived state")
+    func tearDownClearsState() {
+        let model = AppModel(skipBootstrap: true)
+        model.installPlayer(for: Self.makeURL())
+        model.currentSegmentID = 1
+        model.currentWordID = "w"
+        model.currentTimeSeconds = 5
+        model.isPlaying = true
+        model.hasVideo = true
+
+        model.tearDownPlayer()
+
+        #expect(model.player == nil)
+        #expect(model.currentSegmentID == nil)
+        #expect(model.currentWordID == nil)
+        #expect(model.currentTimeSeconds == 0)
+        #expect(model.isPlaying == false)
+        #expect(model.hasVideo == false)
+    }
+
+    @Test("tearDownPlayer is a no-op when no player is installed")
+    func tearDownNoOp() {
+        let model = AppModel(skipBootstrap: true)
+
+        model.tearDownPlayer()
+
+        #expect(model.player == nil)
+        #expect(model.currentSegmentID == nil)
+    }
+
+    @Test("installPlayer twice tears down the first player")
+    func reinstallPlayer() throws {
+        let model = AppModel(skipBootstrap: true)
+        model.installPlayer(for: Self.makeURL())
+        let first = try #require(model.player)
+
+        model.installPlayer(for: Self.makeURL())
+
+        #expect(model.player !== first)
+        #expect(model.player != nil)
+    }
+
+    @Test("seek without a player is a no-op")
+    func seekSegmentWithoutPlayer() {
+        let model = AppModel(skipBootstrap: true)
+        let segment = TranscriptSegment(id: 1, start: 1, end: 2, text: "x")
+
+        model.seek(to: segment)
+
+        #expect(model.player == nil)
+    }
+
+    @Test("seekTo(seconds:) without a player is a no-op")
+    func seekSecondsWithoutPlayer() {
+        let model = AppModel(skipBootstrap: true)
+
+        model.seekTo(seconds: 30)
+
+        #expect(model.player == nil)
+    }
+
+    @Test("seekTo(chapter:) without a player is a no-op")
+    func seekChapterWithoutPlayer() {
+        let model = AppModel(skipBootstrap: true)
+        let chapter = Chapter(title: "Intro", start: 12)
+
+        model.seekTo(chapter: chapter)
+
+        #expect(model.player == nil)
+    }
+
+    @Test("maybeSkipSilence does nothing when skipSilences is off")
+    func skipSilenceDisabledByPreference() {
+        let model = AppModel(skipBootstrap: true)
+        model.skipSilences = false
+        model.transcript = Self.makeTranscript([(0, 0, 1), (1, 5, 6)])
+        model.installPlayer(for: Self.makeURL())
+        let startTime = model.currentTimeSeconds
+
+        model.maybeSkipSilence(currentTime: 0.5)
+
+        #expect(model.currentTimeSeconds == startTime)
+    }
+
+    @Test("maybeSkipSilence bails out without a transcript")
+    func skipSilenceNoTranscript() {
+        let model = AppModel(skipBootstrap: true)
+        model.skipSilences = true
+        model.transcript = nil
+        model.installPlayer(for: Self.makeURL())
+
+        model.maybeSkipSilence(currentTime: 0)
+
+        #expect(model.player != nil)
+    }
+
+    @Test("maybeSkipSilence bails out without a player")
+    func skipSilenceNoPlayer() {
+        let model = AppModel(skipBootstrap: true)
+        model.skipSilences = true
+        model.transcript = Self.makeTranscript([(0, 0, 1), (1, 5, 6)])
+
+        model.maybeSkipSilence(currentTime: 0.5)
+
+        #expect(model.player == nil)
+    }
+
+    @Test("handleAppResignedActive does nothing when pause-on-hide is off")
+    func handleResignedDisabled() {
+        let model = AppModel(skipBootstrap: true)
+        model.pausePlayerOnAppHidden = false
+        model.installPlayer(for: Self.makeURL())
+
+        model.handleAppResignedActive()
+
+        #expect(model.player != nil)
+    }
+
+    @Test("handleAppResignedActive does nothing when there is no player")
+    func handleResignedNoPlayer() {
+        let model = AppModel(skipBootstrap: true)
+        model.pausePlayerOnAppHidden = true
+
+        model.handleAppResignedActive()
+
+        #expect(model.player == nil)
+    }
+}
