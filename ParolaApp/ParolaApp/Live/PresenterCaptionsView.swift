@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PresenterCaptionsView: View {
-    @ObservedObject var controller: LiveCaptionsController
+    @Bindable var controller: LiveCaptionsController
     let onClose: () -> Void
 
     @AppStorage("presenter.fontSize") private var fontSize: Double = 96

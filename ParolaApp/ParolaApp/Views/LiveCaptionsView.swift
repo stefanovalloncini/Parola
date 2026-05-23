@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct LiveCaptionsView: View {
-    @ObservedObject var controller: LiveCaptionsController
+    @Bindable var controller: LiveCaptionsController
     @AppStorage("liveCaptions.opacity") private var opacity: Double = 1.0
     @AppStorage("liveCaptions.fontSize") private var fontSize: Double = 22
 

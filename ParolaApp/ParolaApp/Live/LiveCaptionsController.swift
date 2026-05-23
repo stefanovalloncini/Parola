@@ -4,11 +4,12 @@ import ParolaCore
 import SwiftUI
 
 @MainActor
-final class LiveCaptionsController: ObservableObject {
-    private static let timestampFormatter = ISO8601DateFormatter()
+@Observable
+final class LiveCaptionsController {
+    @ObservationIgnored private static let timestampFormatter = ISO8601DateFormatter()
 
-    @Published var state: LiveCaptionsState = LiveCaptionsState()
-    @Published var translateToEnglish: Bool = false
+    var state: LiveCaptionsState = LiveCaptionsState()
+    var translateToEnglish: Bool = false
 
     private var panel: NSPanel?
     private var presenterWindow: NSWindow?

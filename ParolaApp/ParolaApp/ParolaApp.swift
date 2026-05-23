@@ -60,7 +60,7 @@ private func handleOpen(_ url: URL, model: AppModel) {
 @main
 struct ParolaApp: App {
     @StateObject private var model = AppModel()
-    @StateObject private var liveCaptions = LiveCaptionsController()
+    @State private var liveCaptions = LiveCaptionsController()
     @State private var scratchpad = ScratchpadController()
     @State private var shortcutSheetOpen = false
     @State private var aboutSheetOpen = false
@@ -71,7 +71,7 @@ struct ParolaApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(model)
-                .environmentObject(liveCaptions)
+                .environment(liveCaptions)
                 .frame(minWidth: 920, minHeight: 600)
                 .preferredColorScheme(model.preferredColorScheme)
                 .onAppear {
@@ -245,7 +245,7 @@ struct ParolaApp: App {
         Settings {
             SettingsView()
                 .environmentObject(model)
-                .environmentObject(liveCaptions)
+                .environment(liveCaptions)
                 .frame(minWidth: 880, idealWidth: 900, maxWidth: .infinity, minHeight: 600, idealHeight: 640, maxHeight: .infinity)
         }
 

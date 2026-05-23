@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct LiveCaptionsPane: View {
-    @EnvironmentObject var liveCaptions: LiveCaptionsController
+    @Environment(LiveCaptionsController.self) private var liveCaptions
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
