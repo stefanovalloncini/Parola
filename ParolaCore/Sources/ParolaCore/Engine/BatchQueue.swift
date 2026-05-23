@@ -58,7 +58,8 @@ public actor BatchQueue {
         jobs: [BatchJob],
         options: TranscriptionOptions
     ) -> AsyncStream<BatchEvent> {
-        AsyncStream { continuation in
+        let session = self.session
+        return AsyncStream { continuation in
             let processingTask = Task {
                 for job in jobs {
                     if Task.isCancelled {
@@ -81,7 +82,10 @@ public actor BatchQueue {
                 continuation.yield(.finished)
                 continuation.finish()
             }
-            continuation.onTermination = { _ in processingTask.cancel() }
+            continuation.onTermination = { _ in
+                processingTask.cancel()
+                Task { await session.cancelInFlight() }
+            }
         }
     }
 }
