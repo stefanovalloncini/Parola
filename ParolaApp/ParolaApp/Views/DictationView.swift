@@ -5,7 +5,7 @@ import ParolaCore
 struct DictationView: View {
     let state: DictationCoordinator.State
     @ObservedObject var model: AppModel
-    @ObservedObject var controller: DictationController
+    @Bindable var controller: DictationController
     var onStop: (() -> Void)?
 
     @State private var startedAt: Date = Date()

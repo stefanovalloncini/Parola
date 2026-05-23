@@ -355,7 +355,6 @@ final class AppModel: ObservableObject {
     ]
 
     let dictationController = DictationController()
-    var dictationCancellables: Set<AnyCancellable> = []
 
     @Published var dictationState: DictationCoordinator.State = .idle
     let recordingAudioLevel = CurrentValueSubject<Float, Never>(0)

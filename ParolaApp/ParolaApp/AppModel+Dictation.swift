@@ -172,10 +172,6 @@ extension AppModel {
     func wireDictationController() {
         dictationController.appModel = self
         dictationController.indicatorStyle = dictationIndicatorStyle
-        dictationController.$state
-            .receive(on: RunLoop.main)
-            .sink { [weak self] state in self?.dictationState = state }
-            .store(in: &dictationCancellables)
     }
 
     func restartDictation() {

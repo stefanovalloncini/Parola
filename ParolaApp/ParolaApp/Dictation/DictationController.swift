@@ -5,10 +5,11 @@ import ParolaCore
 import SwiftUI
 
 @MainActor
-final class DictationController: ObservableObject {
-    @Published private(set) var state: DictationCoordinator.State = .idle
-    let audioLevel = CurrentValueSubject<Float, Never>(0)
-    @Published private(set) var partialText: String = "" {
+@Observable
+final class DictationController {
+    private(set) var state: DictationCoordinator.State = .idle
+    @ObservationIgnored let audioLevel = CurrentValueSubject<Float, Never>(0)
+    private(set) var partialText: String = "" {
         didSet { if oldValue.isEmpty != partialText.isEmpty { resizeHUDForPartial() } }
     }
 
@@ -117,6 +118,7 @@ final class DictationController: ObservableObject {
 
     private func handleStateChange(_ state: DictationCoordinator.State) {
         self.state = state
+        appModel?.dictationState = state
         switch state {
         case .idle:
             hideHUD()
