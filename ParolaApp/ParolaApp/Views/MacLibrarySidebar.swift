@@ -101,16 +101,16 @@ struct MacLibrarySidebar: View {
         HStack(spacing: 6) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
-                    FilterChip(id: "library.filter.all", title: "All", isSelected: model.libraryFilter == nil) {
+                    Chip(title: "All", isSelected: model.libraryFilter == nil, size: .regular, style: .subtle, selectedFill: DS.Color.accent.opacity(0.85), bordered: false, identifier: "library.filter.all") {
                         model.libraryFilter = nil
                     }
-                    FilterChip(id: "library.filter.transcriptions", title: "Transcriptions", isSelected: model.libraryFilter == .transcription) {
+                    Chip(title: "Transcriptions", isSelected: model.libraryFilter == .transcription, size: .regular, style: .subtle, selectedFill: DS.Color.accent.opacity(0.85), bordered: false, identifier: "library.filter.transcriptions") {
                         model.libraryFilter = .transcription
                     }
-                    FilterChip(id: "library.filter.meetings", title: "Meetings", isSelected: model.libraryFilter == .meeting) {
+                    Chip(title: "Meetings", isSelected: model.libraryFilter == .meeting, size: .regular, style: .subtle, selectedFill: DS.Color.accent.opacity(0.85), bordered: false, identifier: "library.filter.meetings") {
                         model.libraryFilter = .meeting
                     }
-                    FilterChip(id: "library.filter.dictations", title: "Dictations", isSelected: model.libraryFilter == .dictation) {
+                    Chip(title: "Dictations", isSelected: model.libraryFilter == .dictation, size: .regular, style: .subtle, selectedFill: DS.Color.accent.opacity(0.85), bordered: false, identifier: "library.filter.dictations") {
                         model.libraryFilter = .dictation
                     }
                 }
@@ -214,38 +214,6 @@ private struct SidebarRow: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .fill(Color.primary.opacity(0.06))
         }
-    }
-}
-
-private struct FilterChip: View {
-    let id: String
-    let title: LocalizedStringKey
-    let isSelected: Bool
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.85))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule(style: .continuous).fill(background)
-                )
-                .contentShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
-        .accessibilityIdentifier(id)
-    }
-
-    private var background: Color {
-        if isSelected { return DS.Color.accent.opacity(0.85) }
-        if isHovering { return DS.Color.surfaceElevated }
-        return Color.primary.opacity(0.06)
     }
 }
 

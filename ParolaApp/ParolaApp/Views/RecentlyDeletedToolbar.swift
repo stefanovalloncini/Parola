@@ -201,56 +201,16 @@ struct RecentlyDeletedFilterBar: View {
                 .tracking(0.6)
                 .foregroundStyle(.secondary)
             ForEach(options) { option in
-                FilterChip(
-                    title: option[keyPath: title],
-                    isSelected: selection.wrappedValue == option
+                Chip(
+                    title: LocalizedStringKey(option[keyPath: title]),
+                    isSelected: selection.wrappedValue == option,
+                    size: .compact,
+                    weight: .semibold
                 ) {
                     selection.wrappedValue = option
                 }
             }
         }
-    }
-}
-
-private struct FilterChip: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    @State private var hovered = false
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(foreground)
-                .padding(.horizontal, 10)
-                .frame(height: 22)
-                .background(
-                    Capsule(style: .continuous).fill(background)
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .stroke(border, lineWidth: 0.5)
-                )
-                .contentShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .onHover { hovered = $0 }
-    }
-
-    private var foreground: Color {
-        isSelected ? .white : .primary.opacity(0.85)
-    }
-
-    private var background: Color {
-        if isSelected { return DS.Color.accent }
-        if hovered { return DS.Color.surfaceElevated }
-        return DS.Color.surfaceElevated.opacity(0.6)
-    }
-
-    private var border: Color {
-        isSelected ? DS.Color.accent : DS.Color.separator.opacity(0.4)
     }
 }
 

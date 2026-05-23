@@ -102,7 +102,7 @@ struct FindReplacePane: View {
     private var filterRow: some View {
         HStack(spacing: 8) {
             ForEach(StatusFilter.allCases, id: \.self) { option in
-                FilterChip(title: option.label, isSelected: statusFilter == option) {
+                Chip(title: option.label, isSelected: statusFilter == option, size: .regular, style: .subtle, selectedFill: DS.Color.accent, bordered: false) {
                     statusFilter = option
                 }
             }
@@ -154,27 +154,6 @@ struct FindReplacePane: View {
             case .enabledFirst: return "Enabled first"
             }
         }
-    }
-}
-
-private struct FilterChip: View {
-    let title: LocalizedStringKey
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(isSelected ? Color.white : .primary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(isSelected ? DS.Color.accent : Color.primary.opacity(0.08))
-                )
-        }
-        .buttonStyle(.plain)
     }
 }
 
