@@ -4,6 +4,13 @@ public struct OllamaLanguageModel: LanguageModel {
     public static let defaultEndpoint = URL(string: "http://localhost:11434")!
     public static let defaultModel = "llama3"
 
+    private static let streamingSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 60
+        config.timeoutIntervalForResource = 300
+        return URLSession(configuration: config)
+    }()
+
     private let model: String
     private let endpoint: URL
     private let instructions: String
@@ -13,12 +20,12 @@ public struct OllamaLanguageModel: LanguageModel {
         model: String = OllamaLanguageModel.defaultModel,
         endpoint: URL = OllamaLanguageModel.defaultEndpoint,
         instructions: String = "You're a helpful assistant.",
-        session: URLSession = .shared
+        session: URLSession? = nil
     ) {
         self.model = model
         self.endpoint = endpoint
         self.instructions = instructions
-        self.session = session
+        self.session = session ?? Self.streamingSession
     }
 
     public func respond(history: [ChatTurn]) async throws -> String {

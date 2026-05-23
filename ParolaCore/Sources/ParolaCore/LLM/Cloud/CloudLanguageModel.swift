@@ -1,6 +1,13 @@
 import Foundation
 
 public struct CloudLanguageModel: LanguageModel {
+    private static let streamingSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 60
+        config.timeoutIntervalForResource = 300
+        return URLSession(configuration: config)
+    }()
+
     private let provider: CloudLLMProviderID
     private let model: String
     private let apiKey: String
@@ -12,13 +19,13 @@ public struct CloudLanguageModel: LanguageModel {
         model: String? = nil,
         apiKey: String,
         instructions: String = "You're a helpful assistant.",
-        session: URLSession = .shared
+        session: URLSession? = nil
     ) {
         self.provider = provider
         self.model = model ?? CloudLLMProviderInfo.info(for: provider)?.defaultModel ?? ""
         self.apiKey = apiKey
         self.instructions = instructions
-        self.session = session
+        self.session = session ?? Self.streamingSession
     }
 
     public static func isSupported(_ provider: CloudLLMProviderID) -> Bool {
