@@ -3,7 +3,7 @@ import ParolaCore
 
 struct TranscriptHeaderBar: View {
     @EnvironmentObject var model: AppModel
-    @StateObject private var speaker = TranscriptSpeaker()
+    @State private var speaker = TranscriptSpeaker()
     let title: String
     let onAdvance: () -> Void
     let onOpenSummary: () -> Void

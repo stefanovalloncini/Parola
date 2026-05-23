@@ -3,9 +3,10 @@ import Foundation
 import SwiftUI
 
 @MainActor
-final class TranscriptSpeaker: NSObject, ObservableObject {
-    @Published private(set) var isSpeaking: Bool = false
-    @Published private(set) var isPaused: Bool = false
+@Observable
+final class TranscriptSpeaker: NSObject {
+    private(set) var isSpeaking: Bool = false
+    private(set) var isPaused: Bool = false
 
     private let synthesizer = AVSpeechSynthesizer()
 
