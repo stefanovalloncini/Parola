@@ -248,6 +248,6 @@ private struct FindReplaceRuleRow: View {
             .padding(.vertical, 10)
         }
         .onAppear { cachedRegexError = Self.compile(rule.find) }
-        .onChange(of: rule.find) { cachedRegexError = Self.compile(rule.find) }
+        .onChange(of: rule.find) { _, newValue in cachedRegexError = Self.compile(newValue) }
     }
 }
