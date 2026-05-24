@@ -17,6 +17,7 @@ let package = Package(
         .package(url: "https://github.com/argmaxinc/WhisperKit.git", exact: "1.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.12.4"),
+        .package(url: "https://github.com/pointfreeco/swift-clocks.git", from: "1.0.0"),
     ],
     targets: [
         .target(
@@ -25,12 +26,16 @@ let package = Package(
                 .product(name: "WhisperKit", package: "WhisperKit"),
                 .product(name: "SpeakerKit", package: "WhisperKit"),
                 .product(name: "FluidAudio", package: "FluidAudio"),
+                .product(name: "Clocks", package: "swift-clocks"),
             ],
             resources: [.process("Resources")]
         ),
         .target(
             name: "ParolaDictation",
-            dependencies: ["ParolaCore"]
+            dependencies: [
+                "ParolaCore",
+                .product(name: "Clocks", package: "swift-clocks"),
+            ]
         ),
         .target(
             name: "ParolaMCP",

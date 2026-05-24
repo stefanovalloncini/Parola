@@ -1,6 +1,6 @@
 import Foundation
 
-struct AppBootstrap: Sendable {
+struct AppBootstrap: @unchecked Sendable {
     enum Mode: Sendable { case normal, test }
 
     let mode: Mode
@@ -13,6 +13,7 @@ struct AppBootstrap: Sendable {
     let bridgeToken: String?
     let sideEffects: Set<BootstrapSideEffect>
     let filePicker: FilePicker
+    let clock: any Clock<Duration>  // `any Clock<Duration>` isn't Sendable-marked, but the clocks we hand out (ContinuousClock, TestClock, ImmediateClock) are all immutable, safe-to-share instances.
 
     init(
         mode: Mode,
@@ -24,7 +25,8 @@ struct AppBootstrap: Sendable {
         bridgePort: UInt16? = nil,
         bridgeToken: String? = nil,
         sideEffects: Set<BootstrapSideEffect>,
-        filePicker: FilePicker
+        filePicker: FilePicker,
+        clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.mode = mode
         self.library = library
@@ -36,6 +38,7 @@ struct AppBootstrap: Sendable {
         self.bridgeToken = bridgeToken
         self.sideEffects = sideEffects
         self.filePicker = filePicker
+        self.clock = clock
     }
 
     static let normal: AppBootstrap = AppBootstrap(
@@ -57,7 +60,8 @@ struct AppBootstrap: Sendable {
             bridgePort: map["--bridge-port"].flatMap { UInt16($0) },
             bridgeToken: map["--bridge-token"],
             sideEffects: BootstrapSideEffect.testing,
-            filePicker: SystemFilePicker()
+            filePicker: SystemFilePicker(),
+            clock: ContinuousClock()
         )
     }
 

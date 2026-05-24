@@ -35,7 +35,7 @@ public enum AppLauncher {
                     "portFile": portFile.path,
                 ] as [String: Any])
             }
-            try await Task.sleep(for: .milliseconds(200))
+            try await Task.sleep(for: .milliseconds(200), clock: ContinuousClock())
         }
         return BridgeJSON.string([
             "launched": true,

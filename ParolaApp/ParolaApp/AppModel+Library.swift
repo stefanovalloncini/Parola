@@ -275,8 +275,9 @@ extension AppModel {
             searchResults = nil
             return
         }
+        let clock = clock
         searchTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(200))
+            try? await Task.sleep(for: .milliseconds(200), clock: clock)
             guard !Task.isCancelled, let self else { return }
             let matches = await library.search(q)
             guard !Task.isCancelled else { return }

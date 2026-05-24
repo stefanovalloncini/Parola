@@ -11,6 +11,7 @@ public actor TranscriptionSession {
 
     private let registry: EngineRegistry
     private let diarizer = DiarizationService()
+    private let clock: any Clock<Duration>
     private var transcriber: (any Transcriber)?
     private var transcriberEngineID: EngineID?
     private var idleTask: Task<Void, Never>?
@@ -19,11 +20,13 @@ public actor TranscriptionSession {
     public init(
         modelStore: ModelStore = .shared,
         registry: EngineRegistry = .shared,
-        idleTimeout: TimeInterval = 60
+        idleTimeout: TimeInterval = 60,
+        clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.modelStore = modelStore
         self.registry = registry
         self.idleTimeout = idleTimeout
+        self.clock = clock
     }
 
     /// Transcribes from an AudioSource. Downloads the requested model on demand.
@@ -161,10 +164,11 @@ public actor TranscriptionSession {
     private func scheduleIdleUnload() {
         cancelIdleTimer()
         let timeout = idleTimeout
+        let clock = clock
         idleEpoch &+= 1
         let myEpoch = idleEpoch
         idleTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(timeout))
+            try? await Task.sleep(for: .seconds(timeout), clock: clock)
             if Task.isCancelled { return }
             await self?.unloadIfIdle(epoch: myEpoch)
         }

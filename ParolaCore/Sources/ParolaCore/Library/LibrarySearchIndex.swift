@@ -41,11 +41,17 @@ public actor LibrarySearchIndex {
     private var inverted: [String: Set<String>]
     private let indexURL: URL
     private let saveDebounce: Duration
+    private let clock: any Clock<Duration>
     private var pendingSaveTask: Task<Void, Never>?
 
-    public init(indexURL: URL, saveDebounce: Duration = .milliseconds(250)) {
+    public init(
+        indexURL: URL,
+        saveDebounce: Duration = .milliseconds(250),
+        clock: any Clock<Duration> = ContinuousClock()
+    ) {
         self.indexURL = indexURL
         self.saveDebounce = saveDebounce
+        self.clock = clock
         if let data = try? Data(contentsOf: indexURL),
            let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) {
             self.entries = snapshot.entries
@@ -186,8 +192,9 @@ public actor LibrarySearchIndex {
     private func scheduleSave() {
         if pendingSaveTask != nil { return }
         let debounce = saveDebounce
+        let clock = clock
         pendingSaveTask = Task { [weak self] in
-            try? await Task.sleep(for: debounce)
+            try? await Task.sleep(for: debounce, clock: clock)
             if Task.isCancelled { return }
             await self?.persistAfterDebounce()
         }

@@ -559,6 +559,7 @@ final class AppModel {
     @ObservationIgnored let defaults: UserDefaults
     @ObservationIgnored let filePicker: FilePicker
     @ObservationIgnored let mode: AppBootstrap.Mode
+    @ObservationIgnored let clock: any Clock<Duration>
 
     // MARK: - Bootstrap
 
@@ -567,6 +568,7 @@ final class AppModel {
         self.defaults = defaults
         self.filePicker = bootstrap.filePicker
         self.mode = bootstrap.mode
+        self.clock = bootstrap.clock
         self.dictationEnabled = defaults.bool(forKey: "dictationEnabled")
         self.dictationModeRaw = defaults.string(forKey: "dictationModeRaw") ?? DictationMode.pushToTalk.rawValue
         self.dictationKeyCode = defaults.object(forKey: "dictationKeyCode") == nil ? 96 : defaults.integer(forKey: "dictationKeyCode")
@@ -1056,11 +1058,12 @@ final class AppModel {
     private func beginCountIn(seconds: Int, then: @escaping () -> Void) {
         countdownTask?.cancel()
         recordingCountdown = seconds
+        let clock = clock
         countdownTask = Task { @MainActor [weak self] in
             for value in stride(from: seconds, to: 0, by: -1) {
                 guard !Task.isCancelled else { return }
                 self?.recordingCountdown = value
-                try? await Task.sleep(for: .seconds(1))
+                try? await Task.sleep(for: .seconds(1), clock: clock)
             }
             guard !Task.isCancelled else { return }
             self?.recordingCountdown = nil
@@ -1108,8 +1111,9 @@ final class AppModel {
         recordingAutoStopTask?.cancel()
         let limit = recordingMaxMinutes
         guard limit > 0 else { return }
+        let clock = clock
         recordingAutoStopTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(limit * 60))
+            try? await Task.sleep(for: .seconds(limit * 60), clock: clock)
             guard !Task.isCancelled, let self else { return }
             guard case .recording = self.phase else { return }
             self.stopRecordingAndTranscribe()
@@ -1157,9 +1161,10 @@ final class AppModel {
         stopSilenceWatch()
         silenceDetector.reset()
         recordingIsSilent = false
+        let clock = clock
         silenceWatchTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 750_000_000)
+                try? await Task.sleep(for: .milliseconds(750), clock: clock)
                 if Task.isCancelled { return }
                 self?.updateSilenceFlag()
             }

@@ -2,13 +2,17 @@
 import Foundation
 
 enum YouTubeProcess {
-    static func waitWithTimeout(_ process: Process, seconds: Int) async throws {
+    static func waitWithTimeout(
+        _ process: Process,
+        seconds: Int,
+        clock: any Clock<Duration> = ContinuousClock()
+    ) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
                 await waitForExit(process)
             }
             group.addTask {
-                try await Task.sleep(for: .seconds(seconds))
+                try await Task.sleep(for: .seconds(seconds), clock: clock)
                 if process.isRunning { process.terminate() }
                 throw ParolaError.captureUnavailable("yt-dlp exceeded \(seconds)s timeout")
             }

@@ -6,8 +6,9 @@ extension AppModel {
 
     func scheduleRecomputeMatches() {
         matchesDebounce?.cancel()
+        let clock = clock
         matchesDebounce = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(150))
+            try? await Task.sleep(for: .milliseconds(150), clock: clock)
             guard !Task.isCancelled else { return }
             self?.recomputeMatches()
         }

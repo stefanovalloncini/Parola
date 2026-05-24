@@ -53,7 +53,7 @@ func awaitStop(seconds: Double?) async {
     let stop = AsyncSignalStream(signal: SIGINT)
     let timer: Task<Void, Never>? = seconds.map { secs in
         Task {
-            try? await Task.sleep(nanoseconds: UInt64(secs * 1_000_000_000))
+            try? await Task.sleep(for: .seconds(secs), clock: ContinuousClock())
             stop.fire()
         }
     }

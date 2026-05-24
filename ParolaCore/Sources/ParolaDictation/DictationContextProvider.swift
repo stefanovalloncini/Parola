@@ -71,9 +71,14 @@ public actor DictationContextProvider {
     public static let screenCap = 3000
 
     private let source: any DictationContextSource
+    private let clock: any Clock<Duration>
 
-    public init(source: (any DictationContextSource)? = nil) {
+    public init(
+        source: (any DictationContextSource)? = nil,
+        clock: any Clock<Duration> = ContinuousClock()
+    ) {
         self.source = source ?? EmptyDictationContextSource()
+        self.clock = clock
     }
 
     public func gather(_ config: DictationContextConfig) async -> DictationContext {
@@ -91,10 +96,11 @@ public actor DictationContextProvider {
 
     public func gather(_ config: DictationContextConfig, timeout: Duration) async -> DictationContext {
         guard !config.isAllDisabled else { return .empty }
+        let clock = clock
         return await withTaskGroup(of: DictationContext?.self) { group in
             group.addTask { await self.gather(config) }
             group.addTask {
-                try? await Task.sleep(for: timeout)
+                try? await Task.sleep(for: timeout, clock: clock)
                 return DictationContext.empty
             }
             let first = await group.next() ?? nil
