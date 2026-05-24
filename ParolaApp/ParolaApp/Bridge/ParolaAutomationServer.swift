@@ -17,6 +17,8 @@ final class ParolaAutomationServer {
     private let portFileURL: URL
     private let tokenFileURL: URL
     private let authToken: String
+    private let discovery: BridgeDiscovery
+    private let startedAt: Date
     private var connections: [ObjectIdentifier: NWConnection] = [:]
     private var connectionTasks: [ObjectIdentifier: Task<Void, Never>] = [:]
     private var onPortReady: (@MainActor (UInt16) -> Void)?
@@ -42,6 +44,8 @@ final class ParolaAutomationServer {
         self.portFileURL = dir.appendingPathComponent("bridge.port")
         self.tokenFileURL = dir.appendingPathComponent("bridge.token")
         self.authToken = Self.generateToken()
+        self.discovery = BridgeDiscovery(cacheDir: dir)
+        self.startedAt = Date()
 
         self.commands = Self.buildCatalog(server: self)
     }
@@ -101,6 +105,13 @@ final class ParolaAutomationServer {
                         [.posixPermissions: 0o600],
                         ofItemAtPath: self.tokenFileURL.path
                     )
+                    try? self.discovery.write(
+                        port: port.rawValue,
+                        token: self.authToken,
+                        pid: Int(ProcessInfo.processInfo.processIdentifier),
+                        startedAt: self.startedAt,
+                        serverVersion: Self.serverVersion
+                    )
                     FileHandle.standardError.write(
                         Data("[ParolaAutomationServer] listening on 127.0.0.1:\(portString)\n".utf8)
                     )
@@ -125,6 +136,7 @@ final class ParolaAutomationServer {
         if let written = try? String(contentsOf: tokenFileURL, encoding: .utf8), written == authToken {
             try? FileManager.default.removeItem(at: portFileURL)
             try? FileManager.default.removeItem(at: tokenFileURL)
+            discovery.remove()
         }
     }
 
