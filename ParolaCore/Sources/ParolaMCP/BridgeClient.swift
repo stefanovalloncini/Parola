@@ -21,7 +21,7 @@ public struct BridgeClient: BridgeProtocol {
     private let timeout: TimeInterval
 
     /// Bumped when the wire format breaks. The bridge echoes its own version so the client can detect skew.
-    public static let clientVersion: Int = 1
+    public static let clientVersion: Int = 2
 
     public init(timeout: TimeInterval = 30) {
         self.portFileURL = AppLauncher.portFileURL()
@@ -144,8 +144,18 @@ public struct BridgeClient: BridgeProtocol {
         if let ok = dict["ok"] as? Bool, ok {
             return BridgeJSON.string(dict["result"] ?? NSNull())
         }
-        let message = (dict["error"] as? String) ?? "unknown bridge error"
+        let message = Self.errorMessage(from: dict)
         throw BridgeFailure(message: message)
+    }
+
+    private static func errorMessage(from dict: [String: Any]) -> String {
+        if let err = dict["error"] as? [String: Any] {
+            let code = err["code"] as? String ?? "INTERNAL"
+            let msg = err["message"] as? String ?? "unknown bridge error"
+            return "[\(code)] \(msg)"
+        }
+        if let msg = dict["error"] as? String { return msg }
+        return "unknown bridge error"
     }
 }
 

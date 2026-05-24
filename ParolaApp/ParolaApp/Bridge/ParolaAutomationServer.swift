@@ -6,11 +6,11 @@ import Security
 import ParolaCore
 
 /// TCP-loopback IPC server for external tooling (e.g. parola-mcp). Line-delimited JSON,
-/// `{id, cmd, args, auth}` → `{id, ok, result|error}`. Writes the port to
+/// `{id, cmd, args, auth}` → `AutomationResponse`. Writes the port to
 /// `~/Library/Caches/Parola/bridge.port` and the auth token to `bridge.token` on start.
 @MainActor
 final class ParolaAutomationServer {
-    static let serverVersion: Int = 1
+    static let serverVersion: Int = 2
 
     private let listener: NWListener
     private weak var model: AppModel?
@@ -21,8 +21,13 @@ final class ParolaAutomationServer {
     private var connectionTasks: [ObjectIdentifier: Task<Void, Never>] = [:]
     private var onPortReady: (@MainActor (UInt16) -> Void)?
 
-    init(model: AppModel) throws {
+    private var commands: [String: AutomationCommand] = [:]
+    private var revision: Int = 0
+    private let auditLog: AutomationAuditLog?
+
+    init(model: AppModel, auditLog: AutomationAuditLog? = nil) throws {
         self.model = model
+        self.auditLog = auditLog
 
         let params = NWParameters.tcp
         params.acceptLocalOnly = true
@@ -37,7 +42,42 @@ final class ParolaAutomationServer {
         self.portFileURL = dir.appendingPathComponent("bridge.port")
         self.tokenFileURL = dir.appendingPathComponent("bridge.token")
         self.authToken = Self.generateToken()
+
+        self.commands = Self.buildCatalog(server: self)
     }
+
+    private static func buildCatalog(server: ParolaAutomationServer) -> [String: AutomationCommand] {
+        let lists: [[AutomationCommand]] = [
+            server.coreCommands(),
+            server.modelCommands(),
+            server.transcriptCommands(),
+            server.libraryCommands(),
+            server.batchCommands(),
+            server.recordingCommands(),
+            server.dictationCommands(),
+            server.promptCommands(),
+            server.settingsCommands(),
+            server.windowCommands(),
+            server.waitCommands(),
+        ]
+        var out: [String: AutomationCommand] = [:]
+        for list in lists {
+            for cmd in list { out[cmd.name] = cmd }
+        }
+        return out
+    }
+
+    func commandNames() -> [String] { commands.keys.sorted() }
+
+    func capabilities() -> [String] {
+        [
+            "envelope.v2",
+            "errorCodes",
+            "perInstanceCatalog",
+        ]
+    }
+
+    func currentRevision() -> Int { revision }
 
     private static func generateToken() -> String {
         var bytes = [UInt8](repeating: 0, count: 32)
@@ -173,53 +213,103 @@ final class ParolaAutomationServer {
     }
 
     private func handle(line: Data) async -> Data {
+        let start = ContinuousClock.now
+
         let id: String
         let cmd: String
-        let args: [String: Any]
+        let rawArgs: [String: Any]
         let auth: String
 
         do {
             let obj = try JSONSerialization.jsonObject(with: line) as? [String: Any] ?? [:]
             id = obj["id"] as? String ?? ""
             cmd = obj["cmd"] as? String ?? ""
-            args = obj["args"] as? [String: Any] ?? [:]
+            rawArgs = obj["args"] as? [String: Any] ?? [:]
             auth = obj["auth"] as? String ?? ""
         } catch {
-            return Self.encode([
-                "id": "",
-                "ok": false,
-                "serverVersion": Self.serverVersion,
-                "error": "invalid JSON: \(error.localizedDescription)",
-            ])
+            return AutomationResponseEncoder.encode(.failure(
+                id: "",
+                command: "",
+                error: .internal("invalid JSON: \(error.localizedDescription)"),
+                serverVersion: Self.serverVersion,
+                elapsedMs: Self.elapsedMs(since: start)
+            ))
         }
 
         guard authenticate(auth) else {
-            return Self.encode(["id": id, "ok": false, "error": "auth required"])
+            return AutomationResponseEncoder.encode(.failure(
+                id: id,
+                command: cmd,
+                error: .permission("auth required"),
+                serverVersion: Self.serverVersion,
+                elapsedMs: Self.elapsedMs(since: start)
+            ))
         }
 
-        do {
-            let result = try await dispatch(cmd: cmd, args: args)
-            return Self.encode([
-                "id": id,
-                "ok": true,
-                "serverVersion": Self.serverVersion,
-                "result": result,
-            ])
-        } catch let bridgeError as BridgeError {
-            return Self.encode([
-                "id": id,
-                "ok": false,
-                "serverVersion": Self.serverVersion,
-                "error": bridgeError.message,
-            ])
-        } catch {
-            return Self.encode([
-                "id": id,
-                "ok": false,
-                "serverVersion": Self.serverVersion,
-                "error": "\(error)",
-            ])
+        guard let model else {
+            return AutomationResponseEncoder.encode(.failure(
+                id: id,
+                command: cmd,
+                error: .appDead("AppModel released"),
+                serverVersion: Self.serverVersion,
+                elapsedMs: Self.elapsedMs(since: start)
+            ))
         }
+
+        guard let command = commands[cmd] else {
+            let response = AutomationResponse.failure(
+                id: id, command: cmd,
+                error: .unknownCommand(cmd),
+                serverVersion: Self.serverVersion,
+                elapsedMs: Self.elapsedMs(since: start)
+            )
+            await auditLog?.record(id: id, command: cmd, args: AutomationArgs(jsonObject: rawArgs), ok: false, elapsedMs: response.elapsedMs, errorCode: response.error?.code)
+            return AutomationResponseEncoder.encode(response)
+        }
+
+        let parsedArgs = AutomationArgs(jsonObject: rawArgs)
+        let context = AutomationContext(model: model, server: self)
+
+        do {
+            let validatedArgs = try command.validate(parsedArgs)
+            let result = try await command.handler(validatedArgs, context)
+            if command.kind == .mutating {
+                revision &+= 1
+            }
+            let response = AutomationResponse.success(
+                id: id, command: cmd,
+                result: result,
+                serverVersion: Self.serverVersion,
+                elapsedMs: Self.elapsedMs(since: start)
+            )
+            await auditLog?.record(id: id, command: cmd, args: validatedArgs, ok: true, elapsedMs: response.elapsedMs)
+            return AutomationResponseEncoder.encode(response)
+        } catch let err as AutomationError {
+            let response = AutomationResponse.failure(
+                id: id, command: cmd,
+                error: err,
+                serverVersion: Self.serverVersion,
+                elapsedMs: Self.elapsedMs(since: start)
+            )
+            await auditLog?.record(id: id, command: cmd, args: parsedArgs, ok: false, elapsedMs: response.elapsedMs, errorCode: err.code)
+            return AutomationResponseEncoder.encode(response)
+        } catch {
+            let mapped: AutomationError = .internal("\(error)")
+            let response = AutomationResponse.failure(
+                id: id, command: cmd,
+                error: mapped,
+                serverVersion: Self.serverVersion,
+                elapsedMs: Self.elapsedMs(since: start)
+            )
+            await auditLog?.record(id: id, command: cmd, args: parsedArgs, ok: false, elapsedMs: response.elapsedMs, errorCode: mapped.code)
+            return AutomationResponseEncoder.encode(response)
+        }
+    }
+
+    private static func elapsedMs(since start: ContinuousClock.Instant) -> Int {
+        let dur = ContinuousClock.now - start
+        let components = dur.components
+        return Int(components.seconds * 1000 + components.attoseconds / 1_000_000_000_000_000)
     }
 
     private func authenticate(_ candidate: String) -> Bool {
@@ -229,386 +319,6 @@ final class ParolaAutomationServer {
         var diff: UInt8 = 0
         for i in 0..<lhs.count { diff |= lhs[i] ^ rhs[i] }
         return diff == 0
-    }
-
-    private func dispatch(cmd: String, args: [String: Any]) async throws -> Any {
-        guard let model else { throw BridgeError("AppModel released") }
-
-        switch cmd {
-        case "ping":
-            return ["pong": true]
-
-        case "_handshake":
-            return [
-                "serverVersion": Self.serverVersion,
-                "appVersion": Parola.version,
-                "commands": Self.knownCommands,
-            ] as [String: Any]
-
-        case "getState":
-            return state(of: model)
-
-        case "selectModel":
-            let name = try requireString(args, "name")
-            model.selectedModel = name
-            return ["selectedModel": name]
-
-        case "setLanguage":
-            let code = (args["code"] as? String) ?? ""
-            model.selectedLanguage = code.isEmpty ? nil : code
-            return ["language": code]
-
-        case "setTheme":
-            let theme = try requireString(args, "theme")
-            guard ["light", "dark", "system"].contains(theme) else {
-                throw BridgeError("'theme' must be one of: light, dark, system")
-            }
-            model.appTheme = theme
-            return ["appTheme": theme]
-
-        case "setRoute":
-            let raw = try requireString(args, "route")
-            guard let route = AppModel.Route(rawValue: raw) else {
-                throw BridgeError("unknown route: \(raw)")
-            }
-            model.route = route
-            return ["route": route.rawValue]
-
-        case "setLibraryFilter":
-            let raw = (args["category"] as? String) ?? ""
-            if raw.isEmpty {
-                model.libraryFilter = nil
-            } else if let cat = EntryCategory(rawValue: raw) {
-                model.libraryFilter = cat
-            } else {
-                throw BridgeError("unknown category: \(raw)")
-            }
-            return ["libraryFilter": raw]
-
-        case "transcribeYouTube":
-            let url = try requireString(args, "url")
-            model.transcribeYouTube(urlString: url)
-            return ["started": true]
-
-        case "startRecording":
-            let source = (args["source"] as? String) ?? "microphone"
-            let recordSource: AppModel.RecordSource = (source == "systemAudio") ? .systemAudio : .microphone
-            let category = EntryCategory(rawValue: (args["category"] as? String) ?? "") ?? .transcription
-            model.pendingRecordingCategory = category
-            model.startRecording(source: recordSource)
-            return ["started": true, "source": source, "category": category.rawValue]
-
-        case "stopRecording":
-            model.stopRecordingAndTranscribe()
-            return ["stopped": true]
-
-        case "startDictation":
-            model.startDictationFromIntent()
-            return ["started": true]
-
-        case "stopDictation":
-            model.stopDictationFromIntent()
-            return ["stopped": true]
-
-        case "setTranslate":
-            let on = try requireBool(args, "on")
-            model.translate = on
-            return ["translate": on]
-
-        case "setUseStreaming":
-            let on = try requireBool(args, "on")
-            model.useStreaming = on
-            return ["useStreaming": on]
-
-        case "toggleLiveCaptions":
-            let before = model.liveCaptions?.isActive ?? false
-            model.toggleLiveCaptions()
-            // toggleLiveCaptions kicks off an async Task; wait briefly so callers see the flip.
-            let deadline = Date().addingTimeInterval(1.0)
-            while (model.liveCaptions?.isActive ?? false) == before, Date() < deadline {
-                try? await Task.sleep(for: .milliseconds(50))
-            }
-            return ["liveCaptionsActive": model.liveCaptions?.isActive ?? false]
-
-        case "openYouTubeSheet":
-            model.youtubeSheetOpen = true
-            return ["open": true]
-
-        case "closeYouTubeSheet":
-            model.youtubeSheetOpen = false
-            return ["open": false]
-
-        case "fetchYouTubeSubs":
-            let url = try requireString(args, "url")
-            model.fetchYouTubeSubs(urlString: url)
-            return ["started": true]
-
-        case "dismissError":
-            model.dismissError()
-            return ["dismissed": true]
-
-        case "cancel":
-            let wasCancellable = model.canCancel
-            model.cancelCurrentWork()
-            return ["cancelled": wasCancellable]
-
-        case "clearTranscript":
-            model.transcript = nil
-            if case .ready = model.phase { model.phase = .idle }
-            return ["cleared": true]
-
-        case "listEntries":
-            let limit = (args["limit"] as? Int) ?? 50
-            let category = args["category"] as? String
-            let entries = model.libraryEntries.filter { entry in
-                guard let category, !category.isEmpty else { return true }
-                return entry.category.rawValue == category
-            }.prefix(limit)
-            return entries.map { entry in
-                [
-                    "id": entry.id,
-                    "title": entry.title,
-                    "category": entry.category.rawValue,
-                    "createdAt": entry.createdAt.timeIntervalSince1970,
-                ] as [String: Any]
-            }
-
-        case "loadEntry":
-            let id = try requireString(args, "id")
-            model.loadEntry(id)
-            return ["loaded": id]
-
-        case "deleteEntry":
-            let id = try requireString(args, "id")
-            model.deleteEntry(id)
-            return ["deleted": id]
-
-        case "downloadModel":
-            let name = try requireString(args, "name")
-            model.downloadModel(name)
-            return ["started": true, "name": name]
-
-        case "deleteModel":
-            let name = try requireString(args, "name")
-            model.deleteModel(name)
-            return ["deleted": name]
-
-        case "exportTranscript":
-            guard model.transcript != nil else { throw BridgeError("no transcript loaded") }
-            let raw = try requireString(args, "format")
-            guard let format = ExportFormat(rawValue: raw) else {
-                throw BridgeError("invalid format: \(raw)")
-            }
-            model.performExport(format)
-            return ["queued": true, "format": raw]
-
-        case "screenshot":
-            let requested = (args["path"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-            let target = try resolveScreenshotPath(requested)
-            return try await captureMainWindow(path: target.path)
-
-        case "listPrompts":
-            let prompts = await model.promptLibrary.allPrompts
-            return prompts.map { p in
-                [
-                    "id": p.id.uuidString,
-                    "name": p.name,
-                    "isBuiltIn": p.isBuiltIn,
-                    "instructions": p.instructions,
-                ] as [String: Any]
-            }
-
-        case "runPrompt":
-            guard let identifier = (args["name"] as? String) ?? (args["id"] as? String) else {
-                throw BridgeError("missing 'name' or 'id'")
-            }
-            let prompts = await model.promptLibrary.allPrompts
-            guard let prompt = prompts.first(where: { $0.name == identifier || $0.id.uuidString == identifier }) else {
-                throw BridgeError("prompt not found: \(identifier)")
-            }
-            guard model.transcript != nil else { throw BridgeError("no transcript loaded to run prompt on") }
-            model.runPrompt(prompt)
-            return ["started": true, "prompt": prompt.name]
-
-        case "getPromptOutput":
-            guard let out = model.promptOutput else { return NSNull() }
-            return ["promptName": out.promptName, "text": out.text]
-
-        case "transcribeFile":
-            let path = try requireString(args, "path")
-            let url = URL(fileURLWithPath: path)
-            guard FileManager.default.fileExists(atPath: url.path) else {
-                throw BridgeError("file not found: \(path)")
-            }
-            model.transcribe(fileURL: url, translateOverride: args["translate"] as? Bool)
-            return ["started": true, "file": url.path]
-
-        case "startBatch":
-            let urls = try resolveExistingPaths(args)
-            model.startBatch(urls: urls)
-            return ["started": true, "count": urls.count]
-
-        case "addBatchFiles":
-            let urls = try resolveExistingPaths(args)
-            model.addBatchFiles(urls)
-            return ["added": urls.count]
-
-        case "clearBatch":
-            model.clearBatch()
-            return ["cleared": true]
-
-        case "selectBatchJob":
-            let idStr = try requireString(args, "id")
-            guard let id = UUID(uuidString: idStr) else { throw BridgeError("invalid 'id'") }
-            model.selectBatchJob(id)
-            return ["selected": idStr]
-
-        case "summarizeLatestEntry":
-            model.summarizeLatestEntry()
-            return ["started": true]
-
-        case "revealCacheDirectory":
-            model.revealCacheDirectory()
-            return ["revealed": true]
-
-        case "getBatchJobs":
-            return model.batchJobs.map { job in
-                [
-                    "id": job.id.uuidString,
-                    "url": job.url.path,
-                    "status": job.status.rawValue,
-                    "progress": job.progress,
-                    "error": job.error ?? "",
-                    "hasTranscript": job.transcript != nil,
-                ] as [String: Any]
-            }
-
-        case "getSettings":
-            let d = UserDefaults.standard
-            let keys = [
-                "useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt",
-                "diarize", "batchExportFormats", "batchExportToSourceFolder",
-                "batchExportIncludeTimestamps", "selectedModel", "selectedLanguageRaw",
-                "translate", "dictationEnabled", "appTheme", "monospacedTimestamps",
-                "sidebarDensity", "dictationCleanupPromptID", "dictationPerAppOverridesJSON",
-                "meetingDetectorEnabled",
-            ]
-            var out: [String: Any] = [:]
-            for key in keys {
-                out[key] = d.object(forKey: key) ?? NSNull()
-            }
-            return out
-
-        case "setSetting":
-            let key = try requireString(args, "key")
-            let value = args["value"]
-            guard Self.writableSettingKeys.contains(key) else {
-                throw BridgeError("setting '\(key)' is not writable through the bridge")
-            }
-            UserDefaults.standard.set(value, forKey: key)
-            return ["key": key, "value": value ?? NSNull()]
-
-        case "openSettings":
-            let visibleCountBefore = NSApp.windows.filter { $0.isVisible }.count
-            if #available(macOS 14.0, *) {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            } else {
-                NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-            }
-            try? await Task.sleep(for: .milliseconds(300))
-            let visibleAfter = NSApp.windows.filter { $0.isVisible }
-            // Settings window sits in the 400–1300pt band; main window is wider.
-            let settingsWin = visibleAfter.first(where: { $0.frame.width < 1300 && $0.frame.width > 400 })
-            return [
-                "opened": visibleAfter.count > visibleCountBefore || settingsWin != nil,
-                "visibleCount": visibleAfter.count,
-                "settingsSize": ["w": Int(settingsWin?.frame.width ?? 0), "h": Int(settingsWin?.frame.height ?? 0)],
-            ]
-
-        case "closeSettings":
-            var closed = false
-            let mainContent = NSApp.windows.first(where: { $0.frame.width > 1300 && $0.title == "" && !$0.isSheet })
-            for win in NSApp.windows where win.isVisible && win !== mainContent && !win.isSheet {
-                if win.frame.width < 1300 || win.title.contains("Settings") || win.title.contains("Preferences") {
-                    win.close()
-                    closed = true
-                }
-            }
-            return ["closed": closed]
-
-        case "listDeletedEntries":
-            let limit = (args["limit"] as? Int) ?? 50
-            return model.deletedEntries.prefix(limit).map { e in
-                [
-                    "id": e.id,
-                    "title": e.title,
-                    "category": e.category.rawValue,
-                    "createdAt": e.createdAt.timeIntervalSince1970,
-                    "deletedAt": e.deletedAt?.timeIntervalSince1970 ?? 0,
-                ] as [String: Any]
-            }
-
-        case "restoreEntry":
-            let id = try requireString(args, "id")
-            model.restoreEntry(id)
-            return ["restored": id]
-
-        case "purgeEntry":
-            let id = try requireString(args, "id")
-            model.purgeEntry(id)
-            return ["purged": id]
-
-        case "search":
-            let query = try requireString(args, "query")
-            model.searchResults = nil
-            model.search(query)
-            // AppModel.search debounces 200ms before running async; poll until results land.
-            let deadline = Date().addingTimeInterval(2.0)
-            while model.searchResults == nil, Date() < deadline {
-                try? await Task.sleep(for: .milliseconds(50))
-            }
-            let results = model.searchResults ?? []
-            let limit = (args["limit"] as? Int) ?? 20
-            return results.prefix(limit).map { e in
-                ["id": e.id, "title": e.title, "category": e.category.rawValue] as [String: Any]
-            }
-
-        case "listWindows":
-            return NSApp.windows.compactMap { win -> [String: Any]? in
-                guard win.isVisible else { return nil }
-                return [
-                    "title": win.title,
-                    "frame": ["w": Int(win.frame.size.width), "h": Int(win.frame.size.height)],
-                    "isKey": win.isKeyWindow,
-                    "isMain": win.isMainWindow,
-                ]
-            }
-
-        case "waitForPhase":
-            let expected = try requireString(args, "phase")
-            let timeoutMs = (args["timeoutMs"] as? Int) ?? 10_000
-            let deadline = Date().addingTimeInterval(Double(timeoutMs) / 1000.0)
-            while Date() < deadline {
-                if Self.phaseName(model.phase) == expected {
-                    return ["matched": true, "state": state(of: model)]
-                }
-                try? await Task.sleep(for: .milliseconds(100))
-            }
-            return ["matched": false, "state": state(of: model)]
-
-        case "getTranscript":
-            guard let t = model.transcript else { return NSNull() }
-            return [
-                "text": t.segments.map(\.text).joined(separator: "\n"),
-                "language": t.language,
-                "modelName": t.modelName,
-                "segmentCount": t.segments.count,
-                "durationSeconds": t.durationSeconds ?? 0,
-            ]
-
-        default:
-            throw BridgeError("unknown command: \(cmd)")
-        }
     }
 
     static let writableSettingKeys: Set<String> = [
@@ -622,6 +332,11 @@ final class ParolaAutomationServer {
         "transcriptDisplayMode",
     ]
 
+    func runScreenshot(requestedFileName: String?) async throws -> AutomationValue {
+        let target = try resolveScreenshotPath(requestedFileName)
+        return try await captureMainWindow(path: target.path)
+    }
+
     private func resolveScreenshotPath(_ requested: String?) throws -> URL {
         let caches = try FileManager.default.url(
             for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true
@@ -634,14 +349,14 @@ final class ParolaAutomationServer {
         }
         let bare = (requested as NSString).lastPathComponent
         guard !bare.isEmpty, !bare.contains("/"), !bare.contains("..") else {
-            throw BridgeError("screenshot 'path' must be a bare filename")
+            throw AutomationError.invalidArgs(field: "path", reason: "must be a bare filename")
         }
         return dir.appendingPathComponent(bare)
     }
 
-    private func captureMainWindow(path: String) async throws -> [String: Any] {
+    private func captureMainWindow(path: String) async throws -> AutomationValue {
         guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil && !$0.isMiniaturized && $0.frame.size.width > 200 }) else {
-            throw BridgeError("no visible main window to capture")
+            throw AutomationError.precondition("no visible main window to capture")
         }
         let windowID = CGWindowID(window.windowNumber)
         let windowTitle = window.title
@@ -649,7 +364,7 @@ final class ParolaAutomationServer {
 
         let content = try await SCShareableContent.current
         guard let scWindow = content.windows.first(where: { $0.windowID == windowID }) else {
-            throw BridgeError("window \(windowID) not visible to ScreenCaptureKit — Screen Recording permission may be missing")
+            throw AutomationError.permission("window \(windowID) not visible to ScreenCaptureKit — Screen Recording permission may be missing")
         }
 
         let filter = SCContentFilter(desktopIndependentWindow: scWindow)
@@ -664,20 +379,20 @@ final class ParolaAutomationServer {
         let rep = NSBitmapImageRep(cgImage: cgImage)
         rep.size = NSSize(width: pixelWidth, height: pixelHeight)
         guard let pngData = rep.representation(using: .png, properties: [:]) else {
-            throw BridgeError("failed to encode PNG")
+            throw AutomationError.internal("failed to encode PNG")
         }
         try pngData.write(to: URL(fileURLWithPath: path))
-        return [
-            "path": path,
-            "width": pixelWidth,
-            "height": pixelHeight,
-            "bytes": pngData.count,
-            "windowTitle": windowTitle,
-        ]
+        return .object([
+            "path": .string(path),
+            "width": .int(pixelWidth),
+            "height": .int(pixelHeight),
+            "bytes": .int(pngData.count),
+            "windowTitle": .string(windowTitle),
+        ])
     }
 
-    private func state(of model: AppModel) -> [String: Any] {
-        // @AppStorage doesn't always reflect cross-context UserDefaults writes synchronously.
+    func snapshotState() -> AutomationValue {
+        guard let model else { return .null }
         let defaults = UserDefaults.standard
         let selectedModel = defaults.string(forKey: "selectedModel") ?? "openai_whisper-tiny"
         let language = defaults.string(forKey: "selectedLanguageRaw") ?? ""
@@ -685,50 +400,28 @@ final class ParolaAutomationServer {
         let useStreaming = (defaults.object(forKey: "useStreaming") as? Bool) ?? true
         let translate = defaults.bool(forKey: "translate")
 
-        return [
-            "phase": Self.phaseName(model.phase),
+        return .object([
+            "phase": .string(Self.phaseName(model.phase)),
             "phaseDetail": Self.phaseDetail(model.phase),
-            "route": model.route.rawValue,
-            "libraryFilter": model.libraryFilter?.rawValue ?? "",
-            "selectedModel": selectedModel,
-            "language": language,
-            "translate": translate,
-            "useStreaming": useStreaming,
-            "ytDlpAvailable": model.ytDlpAvailable,
-            "appTheme": appTheme,
-            "hasTranscript": model.transcript != nil,
-            "transcriptSegments": model.transcript?.segments.count ?? 0,
-            "availableModels": model.availableModels.map(\.name),
-            "isRunningPrompt": model.isRunningPrompt,
-            "youtubeSheetOpen": model.youtubeSheetOpen,
-            "liveCaptionsActive": model.liveCaptions?.isActive ?? false,
-            "batchJobCount": model.batchJobs.count,
-        ]
+            "route": .string(model.route.rawValue),
+            "libraryFilter": .string(model.libraryFilter?.rawValue ?? ""),
+            "selectedModel": .string(selectedModel),
+            "language": .string(language),
+            "translate": .bool(translate),
+            "useStreaming": .bool(useStreaming),
+            "ytDlpAvailable": .bool(model.ytDlpAvailable),
+            "appTheme": .string(appTheme),
+            "hasTranscript": .bool(model.transcript != nil),
+            "transcriptSegments": .int(model.transcript?.segments.count ?? 0),
+            "availableModels": .array(model.availableModels.map { .string($0.name) }),
+            "isRunningPrompt": .bool(model.isRunningPrompt),
+            "youtubeSheetOpen": .bool(model.youtubeSheetOpen),
+            "liveCaptionsActive": .bool(model.liveCaptions?.isActive ?? false),
+            "batchJobCount": .int(model.batchJobs.count),
+        ])
     }
 
-    private func requireString(_ args: [String: Any], _ key: String) throws -> String {
-        guard let v = args[key] as? String, !v.isEmpty else { throw BridgeError("missing '\(key)'") }
-        return v
-    }
-
-    private func requireBool(_ args: [String: Any], _ key: String) throws -> Bool {
-        guard let v = args[key] as? Bool else { throw BridgeError("missing '\(key)'") }
-        return v
-    }
-
-    private func resolveExistingPaths(_ args: [String: Any]) throws -> [URL] {
-        guard let paths = args["paths"] as? [String], !paths.isEmpty else {
-            throw BridgeError("missing 'paths' (array of file paths)")
-        }
-        let urls = paths.map { URL(fileURLWithPath: $0) }
-        let missing = urls.filter { !FileManager.default.fileExists(atPath: $0.path) }
-        guard missing.isEmpty else {
-            throw BridgeError("missing files: \(missing.map(\.path).joined(separator: ", "))")
-        }
-        return urls
-    }
-
-    private static func phaseName(_ phase: AppModel.Phase) -> String {
+    static func phaseName(_ phase: AppModel.Phase) -> String {
         switch phase {
         case .idle: return "idle"
         case .downloadingModel: return "downloadingModel"
@@ -740,48 +433,20 @@ final class ParolaAutomationServer {
         }
     }
 
-    private static func phaseDetail(_ phase: AppModel.Phase) -> [String: Any] {
+    static func phaseDetail(_ phase: AppModel.Phase) -> AutomationValue {
         switch phase {
         case .idle, .ready:
-            return [:]
+            return .object([:])
         case .downloadingModel(let name, let progress):
-            return ["name": name, "progress": progress]
+            return .object(["name": .string(name), "progress": .double(progress)])
         case .loadingModel(let name):
-            return ["name": name]
+            return .object(["name": .string(name)])
         case .transcribing(let file):
-            return ["file": file.path]
+            return .object(["file": .string(file.path)])
         case .recording(let source):
-            return ["source": source.rawValue]
+            return .object(["source": .string(source.rawValue)])
         case .failed(let message):
-            return ["message": message]
+            return .object(["message": .string(message)])
         }
     }
-
-    private static func encode(_ payload: [String: Any]) -> Data {
-        (try? JSONSerialization.data(withJSONObject: payload)) ?? Data("{}".utf8)
-    }
-
-    static let knownCommands: [String] = [
-        "_handshake", "ping", "getState",
-        "selectModel", "setLanguage", "setTheme", "setRoute", "setLibraryFilter",
-        "transcribeYouTube", "fetchYouTubeSubs",
-        "startRecording", "stopRecording", "startDictation", "stopDictation",
-        "setTranslate", "setUseStreaming", "toggleLiveCaptions",
-        "openYouTubeSheet", "closeYouTubeSheet",
-        "dismissError", "cancel", "clearTranscript",
-        "listEntries", "loadEntry", "deleteEntry",
-        "downloadModel", "deleteModel", "exportTranscript",
-        "screenshot", "listPrompts", "runPrompt", "getPromptOutput",
-        "transcribeFile",
-        "startBatch", "addBatchFiles", "clearBatch", "selectBatchJob", "getBatchJobs",
-        "summarizeLatestEntry", "revealCacheDirectory",
-        "getSettings", "setSetting", "openSettings", "closeSettings",
-        "listDeletedEntries", "restoreEntry", "purgeEntry", "search",
-        "listWindows", "waitForPhase", "getTranscript",
-    ]
-}
-
-private struct BridgeError: Error {
-    let message: String
-    init(_ message: String) { self.message = message }
 }

@@ -1,0 +1,101 @@
+import Foundation
+import ParolaCore
+
+extension ParolaAutomationServer {
+    func recordingCommands() -> [AutomationCommand] {
+        [
+            AutomationCommand(
+                name: "startRecording",
+                area: .recording,
+                summary: "Starts recording from microphone or system audio.",
+                kind: .mutating,
+                args: [
+                    .init(
+                        name: "source",
+                        kind: .string(enum: ["microphone", "systemAudio"]),
+                        required: false,
+                        summary: "Audio source",
+                        defaultValue: .string("microphone")
+                    ),
+                    .init(
+                        name: "category",
+                        kind: .string(),
+                        required: false,
+                        summary: "EntryCategory rawValue for the resulting library entry",
+                        defaultValue: .string(EntryCategory.transcription.rawValue)
+                    ),
+                ],
+                handler: { args, ctx in
+                    let source = (try args.optionalString("source")) ?? "microphone"
+                    let recordSource: AppModel.RecordSource = (source == "systemAudio") ? .systemAudio : .microphone
+                    let categoryRaw = (try args.optionalString("category")) ?? ""
+                    let category = EntryCategory(rawValue: categoryRaw) ?? .transcription
+                    ctx.model.pendingRecordingCategory = category
+                    ctx.model.startRecording(source: recordSource)
+                    return .object([
+                        "started": .bool(true),
+                        "source": .string(source),
+                        "category": .string(category.rawValue),
+                    ])
+                }
+            ),
+
+            AutomationCommand(
+                name: "stopRecording",
+                area: .recording,
+                summary: "Stops recording and starts transcription.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    ctx.model.stopRecordingAndTranscribe()
+                    return .object(["stopped": .bool(true)])
+                }
+            ),
+
+            AutomationCommand(
+                name: "toggleLiveCaptions",
+                area: .recording,
+                summary: "Toggles live captions; waits up to 1s for the flip.",
+                kind: .async,
+                handler: { _, ctx in
+                    let before = ctx.model.liveCaptions?.isActive ?? false
+                    ctx.model.toggleLiveCaptions()
+                    let deadline = Date().addingTimeInterval(1.0)
+                    while (ctx.model.liveCaptions?.isActive ?? false) == before, Date() < deadline {
+                        try? await Task.sleep(for: .milliseconds(50))
+                    }
+                    return .object(["liveCaptionsActive": .bool(ctx.model.liveCaptions?.isActive ?? false)])
+                }
+            ),
+
+            AutomationCommand(
+                name: "setUseStreaming",
+                area: .recording,
+                summary: "Enables or disables streaming decoding.",
+                kind: .mutating,
+                args: [
+                    .init(name: "on", kind: .boolean, required: true, summary: "true to enable streaming"),
+                ],
+                handler: { args, ctx in
+                    let on = try args.bool("on")
+                    ctx.model.useStreaming = on
+                    return .object(["useStreaming": .bool(on)])
+                }
+            ),
+
+            AutomationCommand(
+                name: "setTranslate",
+                area: .recording,
+                summary: "Enables or disables translate-to-English mode.",
+                kind: .mutating,
+                args: [
+                    .init(name: "on", kind: .boolean, required: true, summary: "true to enable translate"),
+                ],
+                handler: { args, ctx in
+                    let on = try args.bool("on")
+                    ctx.model.translate = on
+                    return .object(["translate": .bool(on)])
+                }
+            ),
+        ]
+    }
+}
