@@ -55,7 +55,11 @@ let package = Package(
         ),
         .testTarget(
             name: "ParolaCoreTests",
-            dependencies: ["ParolaCore", "ParolaDictation"],
+            dependencies: [
+                "ParolaCore",
+                "ParolaDictation",
+                .product(name: "Clocks", package: "swift-clocks"),
+            ],
             resources: [
                 .process("Resources/sample.srt"),
                 .process("Resources/sample.vtt"),

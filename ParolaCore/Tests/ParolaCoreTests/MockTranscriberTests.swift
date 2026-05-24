@@ -1,0 +1,112 @@
+import Foundation
+import Testing
+import Clocks
+@testable import ParolaCore
+
+@Suite("MockTranscriber + MockTranscriberRegistry")
+struct MockTranscriberTests {
+
+    @Test("transcribe returns the materialised transcript and fires every partial")
+    func transcribeYieldsSegmentsAndPartials() async throws {
+        let response = MockTranscriberResponse(
+            segments: [
+                TranscriptSegmentSeed(start: 0, end: 1, text: "hello"),
+                TranscriptSegmentSeed(start: 1, end: 2, text: "world"),
+            ],
+            partials: ["hello", "hello world"],
+            language: "en",
+            durationSeconds: 2,
+            modelName: "mock-tiny"
+        )
+        let mock = MockTranscriber.make(response: response, clock: ImmediateClock())
+
+        let received = LockedBox<[String]>(value: [])
+        let url = URL(fileURLWithPath: "/tmp/mock-input.wav")
+        let transcript = try await mock.transcribe(
+            url: url,
+            options: .default,
+            partialHandler: { text in received.mutate { $0.append(text) } }
+        )
+
+        #expect(transcript.segments.count == 2)
+        #expect(transcript.segments.map(\.text) == ["hello", "world"])
+        #expect(transcript.language == "en")
+        #expect(transcript.modelName == "mock-tiny")
+        #expect(transcript.sourceURL == url)
+        #expect(received.value == ["hello", "hello world"])
+    }
+
+    @Test("transcribe throws the failure error when one is installed")
+    func transcribeFailureThrows() async {
+        let response = MockTranscriberResponse(
+            failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
+        )
+        let mock = MockTranscriber.make(response: response, clock: ImmediateClock())
+
+        do {
+            _ = try await mock.transcribe(
+                url: URL(fileURLWithPath: "/tmp/x.wav"),
+                options: .default
+            )
+            Issue.record("expected transcribe to throw")
+        } catch let error as ParolaError {
+            guard case .transcriptionFailed(let message) = error else {
+                Issue.record("unexpected ParolaError: \(error)")
+                return
+            }
+            #expect(message == "boom")
+        } catch {
+            Issue.record("unexpected error type: \(error)")
+        }
+    }
+
+    @Test("registry install + resolve only matches the engine the mock was installed for")
+    func registryResolvesPerEngine() async {
+        let registry = MockTranscriberRegistry()
+        let response = MockTranscriberResponse(
+            segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "hi")],
+            language: "en",
+            modelName: "mock"
+        )
+        await registry.install(engineID: .whisperKit, response: response)
+
+        let whisper = await registry.resolve(for: .whisperKit)
+        let parakeet = await registry.resolve(for: .parakeet)
+
+        #expect(whisper?.segments.first?.text == "hi")
+        #expect(parakeet == nil)
+    }
+
+    @Test("clear() removes every installed mock")
+    func clearWipesRegistry() async {
+        let registry = MockTranscriberRegistry()
+        await registry.install(
+            engineID: .whisperKit,
+            response: MockTranscriberResponse(modelName: "a")
+        )
+        await registry.install(
+            engineID: nil,
+            response: MockTranscriberResponse(modelName: "global")
+        )
+
+        await registry.clear()
+
+        #expect(await registry.resolve(for: .whisperKit) == nil)
+        #expect(await registry.resolve(for: .parakeet) == nil)
+        #expect(await registry.list().isEmpty)
+    }
+}
+
+private final class LockedBox<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _value: T
+    init(value: T) { self._value = value }
+    var value: T {
+        lock.lock(); defer { lock.unlock() }
+        return _value
+    }
+    func mutate(_ change: (inout T) -> Void) {
+        lock.lock(); defer { lock.unlock() }
+        change(&_value)
+    }
+}
