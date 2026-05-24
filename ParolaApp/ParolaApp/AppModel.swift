@@ -482,6 +482,20 @@ final class AppModel {
         phase = .idle
     }
 
+    func cancelAllTasks() {
+        countdownTask?.cancel(); countdownTask = nil
+        batchTask?.cancel(); batchTask = nil
+        matchesDebounce?.cancel(); matchesDebounce = nil
+        recordingLevelTask?.cancel(); recordingLevelTask = nil
+        silenceWatchTask?.cancel(); silenceWatchTask = nil
+        recordingAutoStopTask?.cancel(); recordingAutoStopTask = nil
+        searchTask?.cancel(); searchTask = nil
+        streamingConsumer?.cancel(); streamingConsumer = nil
+        fileTranscribeTask?.cancel(); fileTranscribeTask = nil
+        youtubeTranscribeTask?.cancel(); youtubeTranscribeTask = nil
+        youtubeSubsTask?.cancel(); youtubeSubsTask = nil
+    }
+
     @ObservationIgnored private var testBridge: ParolaAutomationServer?
     private(set) var automationBridgeRunning: Bool = false
     private(set) var automationBridgePort: UInt16?
@@ -544,6 +558,7 @@ final class AppModel {
 
     @ObservationIgnored let defaults: UserDefaults
     @ObservationIgnored let filePicker: FilePicker
+    @ObservationIgnored let mode: AppBootstrap.Mode
 
     // MARK: - Bootstrap
 
@@ -551,6 +566,7 @@ final class AppModel {
         let defaults = bootstrap.defaults
         self.defaults = defaults
         self.filePicker = bootstrap.filePicker
+        self.mode = bootstrap.mode
         self.dictationEnabled = defaults.bool(forKey: "dictationEnabled")
         self.dictationModeRaw = defaults.string(forKey: "dictationModeRaw") ?? DictationMode.pushToTalk.rawValue
         self.dictationKeyCode = defaults.object(forKey: "dictationKeyCode") == nil ? 96 : defaults.integer(forKey: "dictationKeyCode")

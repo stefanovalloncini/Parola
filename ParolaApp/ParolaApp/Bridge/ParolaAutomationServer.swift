@@ -63,6 +63,7 @@ final class ParolaAutomationServer {
             server.settingsCommands(),
             server.windowCommands(),
             server.waitCommands(),
+            server.lifecycleCommands(),
         ]
         var out: [String: AutomationCommand] = [:]
         for list in lists {
