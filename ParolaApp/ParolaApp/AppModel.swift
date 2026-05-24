@@ -61,37 +61,37 @@ final class AppModel {
     var livePartialText: String = ""
     var liveVoiceActive: Bool = false
     var filePartialText: String = ""
-    @ObservationIgnored @AppStorage("useStreaming") var useStreaming: Bool = true
-    @ObservationIgnored @AppStorage("wordTimestamps") var wordTimestamps: Bool = false
-    @ObservationIgnored @AppStorage("karaokeHighlight") var karaokeHighlight: Bool = true
-    @ObservationIgnored @AppStorage("initialPrompt") var initialPrompt: String = ""
-    @ObservationIgnored @AppStorage("diarize") var diarize: Bool = false
-    @ObservationIgnored @AppStorage("subtitleFPS") var subtitleFPS: Double = 30
-    @ObservationIgnored @AppStorage("subtitleCaptionLength") var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue
-    @ObservationIgnored @AppStorage("transcriptCompact") var transcriptCompact: Bool = false
-    @ObservationIgnored @AppStorage("skipSilences") var skipSilences: Bool = false
-    @ObservationIgnored @AppStorage("pausePlayerOnAppHidden") var pausePlayerOnAppHidden: Bool = false
-    @ObservationIgnored @AppStorage("markdownTimestamps") var markdownTimestamps: Bool = false
-    @ObservationIgnored @AppStorage("htmlExportTheme") var htmlExportThemeRaw: String = HtmlExportTheme.light.rawValue
-    @ObservationIgnored @AppStorage("dictationHudOpacity") var dictationHudOpacity: Double = 1.0
-    @ObservationIgnored @AppStorage("lastFindQuery") var lastFindQuery: String = ""
-    @ObservationIgnored @AppStorage("parola.userPrivacyMode") var userPrivacyMode: Bool = false
-    @ObservationIgnored @AppStorage("pinnedModel") var pinnedModel: String = ""
-    @ObservationIgnored @AppStorage("mainWindowAlwaysOnTop") var mainWindowAlwaysOnTop: Bool = false
-    @ObservationIgnored @AppStorage("recentFiles") var recentFilesRaw: String = "[]"
-    @ObservationIgnored @AppStorage("micHotkeyKeyCode") var micHotkeyKeyCode: Int = 15 // kVK_ANSI_R
-    @ObservationIgnored @AppStorage("micHotkeyModifiers") var micHotkeyModifiers: Int = 786721 // ⌃⌥⌘
-    @ObservationIgnored @AppStorage("micHotkeyEnabled") var micHotkeyEnabled: Bool = false
-    @ObservationIgnored @AppStorage("dictationStripSelfCorrections") var dictationStripSelfCorrections: Bool = false
-    @ObservationIgnored @AppStorage("dictationPasteDelayMs") var dictationPasteDelayMs: Int = 0
-    @ObservationIgnored @AppStorage("dictationContextSelection") var dictationContextSelection: Bool = false
-    @ObservationIgnored @AppStorage("dictationContextClipboard") var dictationContextClipboard: Bool = false
-    @ObservationIgnored @AppStorage("dictationContextScreen") var dictationContextScreen: Bool = false
-    @ObservationIgnored @AppStorage("recordingMaxMinutes") var recordingMaxMinutes: Int = 0
-    @ObservationIgnored @AppStorage("showMenuBarExtra") var showMenuBarExtra: Bool = false
-    @ObservationIgnored @AppStorage("recordingCountInSeconds") var recordingCountInSeconds: Int = 0
-    @ObservationIgnored @AppStorage("autoMuteWhileRecording") var autoMuteWhileRecording: Bool = false
-    @ObservationIgnored @AppStorage("autoPauseMediaWhileRecording") var autoPauseMediaWhileRecording: Bool = false
+    @ObservationIgnored @AppStorage("useStreaming", store: DefaultsStore.current) var useStreaming: Bool = true
+    @ObservationIgnored @AppStorage("wordTimestamps", store: DefaultsStore.current) var wordTimestamps: Bool = false
+    @ObservationIgnored @AppStorage("karaokeHighlight", store: DefaultsStore.current) var karaokeHighlight: Bool = true
+    @ObservationIgnored @AppStorage("initialPrompt", store: DefaultsStore.current) var initialPrompt: String = ""
+    @ObservationIgnored @AppStorage("diarize", store: DefaultsStore.current) var diarize: Bool = false
+    @ObservationIgnored @AppStorage("subtitleFPS", store: DefaultsStore.current) var subtitleFPS: Double = 30
+    @ObservationIgnored @AppStorage("subtitleCaptionLength", store: DefaultsStore.current) var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue
+    @ObservationIgnored @AppStorage("transcriptCompact", store: DefaultsStore.current) var transcriptCompact: Bool = false
+    @ObservationIgnored @AppStorage("skipSilences", store: DefaultsStore.current) var skipSilences: Bool = false
+    @ObservationIgnored @AppStorage("pausePlayerOnAppHidden", store: DefaultsStore.current) var pausePlayerOnAppHidden: Bool = false
+    @ObservationIgnored @AppStorage("markdownTimestamps", store: DefaultsStore.current) var markdownTimestamps: Bool = false
+    @ObservationIgnored @AppStorage("htmlExportTheme", store: DefaultsStore.current) var htmlExportThemeRaw: String = HtmlExportTheme.light.rawValue
+    @ObservationIgnored @AppStorage("dictationHudOpacity", store: DefaultsStore.current) var dictationHudOpacity: Double = 1.0
+    @ObservationIgnored @AppStorage("lastFindQuery", store: DefaultsStore.current) var lastFindQuery: String = ""
+    @ObservationIgnored @AppStorage("parola.userPrivacyMode", store: DefaultsStore.current) var userPrivacyMode: Bool = false
+    @ObservationIgnored @AppStorage("pinnedModel", store: DefaultsStore.current) var pinnedModel: String = ""
+    @ObservationIgnored @AppStorage("mainWindowAlwaysOnTop", store: DefaultsStore.current) var mainWindowAlwaysOnTop: Bool = false
+    @ObservationIgnored @AppStorage("recentFiles", store: DefaultsStore.current) var recentFilesRaw: String = "[]"
+    @ObservationIgnored @AppStorage("micHotkeyKeyCode", store: DefaultsStore.current) var micHotkeyKeyCode: Int = 15 // kVK_ANSI_R
+    @ObservationIgnored @AppStorage("micHotkeyModifiers", store: DefaultsStore.current) var micHotkeyModifiers: Int = 786721 // ⌃⌥⌘
+    @ObservationIgnored @AppStorage("micHotkeyEnabled", store: DefaultsStore.current) var micHotkeyEnabled: Bool = false
+    @ObservationIgnored @AppStorage("dictationStripSelfCorrections", store: DefaultsStore.current) var dictationStripSelfCorrections: Bool = false
+    @ObservationIgnored @AppStorage("dictationPasteDelayMs", store: DefaultsStore.current) var dictationPasteDelayMs: Int = 0
+    @ObservationIgnored @AppStorage("dictationContextSelection", store: DefaultsStore.current) var dictationContextSelection: Bool = false
+    @ObservationIgnored @AppStorage("dictationContextClipboard", store: DefaultsStore.current) var dictationContextClipboard: Bool = false
+    @ObservationIgnored @AppStorage("dictationContextScreen", store: DefaultsStore.current) var dictationContextScreen: Bool = false
+    @ObservationIgnored @AppStorage("recordingMaxMinutes", store: DefaultsStore.current) var recordingMaxMinutes: Int = 0
+    @ObservationIgnored @AppStorage("showMenuBarExtra", store: DefaultsStore.current) var showMenuBarExtra: Bool = false
+    @ObservationIgnored @AppStorage("recordingCountInSeconds", store: DefaultsStore.current) var recordingCountInSeconds: Int = 0
+    @ObservationIgnored @AppStorage("autoMuteWhileRecording", store: DefaultsStore.current) var autoMuteWhileRecording: Bool = false
+    @ObservationIgnored @AppStorage("autoPauseMediaWhileRecording", store: DefaultsStore.current) var autoPauseMediaWhileRecording: Bool = false
     var recordingCountdown: Int? = nil
     @ObservationIgnored private var countdownTask: Task<Void, Never>?
 
@@ -139,10 +139,10 @@ final class AppModel {
     var selectedBatchJobID: BatchJob.ID?
     @ObservationIgnored var batchTask: Task<Void, Never>?
 
-    @ObservationIgnored @AppStorage("batchExportFormats") var batchExportFormatsRaw: String = "txt,srt"
-    @ObservationIgnored @AppStorage("batchExportToSourceFolder") var batchExportToSourceFolder: Bool = true
-    @ObservationIgnored @AppStorage("batchExportIncludeTimestamps") var batchExportIncludeTimestamps: Bool = false
-    @ObservationIgnored @AppStorage("batchExportFormatOptions") var batchExportFormatOptionsJSON: String = "{}"
+    @ObservationIgnored @AppStorage("batchExportFormats", store: DefaultsStore.current) var batchExportFormatsRaw: String = "txt,srt"
+    @ObservationIgnored @AppStorage("batchExportToSourceFolder", store: DefaultsStore.current) var batchExportToSourceFolder: Bool = true
+    @ObservationIgnored @AppStorage("batchExportIncludeTimestamps", store: DefaultsStore.current) var batchExportIncludeTimestamps: Bool = false
+    @ObservationIgnored @AppStorage("batchExportFormatOptions", store: DefaultsStore.current) var batchExportFormatOptionsJSON: String = "{}"
 
     var findIsOpen: Bool = false
     var findQuery: String = "" {
@@ -158,15 +158,15 @@ final class AppModel {
     var currentMatchIndex: Int = 0
     @ObservationIgnored var matchesDebounce: Task<Void, Never>?
 
-    @ObservationIgnored @AppStorage("inputDeviceUID") var inputDeviceUID: String = ""
+    @ObservationIgnored @AppStorage("inputDeviceUID", store: DefaultsStore.current) var inputDeviceUID: String = ""
 
     var preferredInputDeviceUID: String? {
         inputDeviceUID.isEmpty ? nil : inputDeviceUID
     }
 
-    @ObservationIgnored @AppStorage("selectedModel") var selectedModel: String = "openai_whisper-tiny"
-    @ObservationIgnored @AppStorage("selectedLanguageRaw") private var selectedLanguageRaw: String = ""
-    @ObservationIgnored @AppStorage("translate") var translate: Bool = false
+    @ObservationIgnored @AppStorage("selectedModel", store: DefaultsStore.current) var selectedModel: String = "openai_whisper-tiny"
+    @ObservationIgnored @AppStorage("selectedLanguageRaw", store: DefaultsStore.current) private var selectedLanguageRaw: String = ""
+    @ObservationIgnored @AppStorage("translate", store: DefaultsStore.current) var translate: Bool = false
 
     @ObservationIgnored private var cachedSelectedModel: String = ""
     @ObservationIgnored private var cachedCapabilities: EngineCapabilities = .whisperKitDefaults
@@ -313,10 +313,10 @@ final class AppModel {
 
     // MARK: - Customization
 
-    @ObservationIgnored @AppStorage("appTheme") var appTheme: String = "system"  // "system" | "light" | "dark"
-    @ObservationIgnored @AppStorage("monospacedTimestamps") var monospacedTimestamps: Bool = true
-    @ObservationIgnored @AppStorage("sidebarDensity") var sidebarDensity: String = "comfortable"  // "comfortable" | "compact"
-    @ObservationIgnored @AppStorage(AppAccent.storageKey) var appAccentRaw: String = AppAccent.terracotta.rawValue
+    @ObservationIgnored @AppStorage("appTheme", store: DefaultsStore.current) var appTheme: String = "system"  // "system" | "light" | "dark"
+    @ObservationIgnored @AppStorage("monospacedTimestamps", store: DefaultsStore.current) var monospacedTimestamps: Bool = true
+    @ObservationIgnored @AppStorage("sidebarDensity", store: DefaultsStore.current) var sidebarDensity: String = "comfortable"  // "comfortable" | "compact"
+    @ObservationIgnored @AppStorage(AppAccent.storageKey, store: DefaultsStore.current) var appAccentRaw: String = AppAccent.terracotta.rawValue
 
     var appAccent: AppAccent {
         get { AppAccent(rawValue: appAccentRaw) ?? .terracotta }
@@ -486,7 +486,7 @@ final class AppModel {
     private(set) var automationBridgeRunning: Bool = false
     private(set) var automationBridgePort: UInt16?
 
-    @ObservationIgnored @AppStorage("automationBridgeEnabled") var automationBridgeEnabled: Bool = AppModel.defaultBridgeEnabled
+    @ObservationIgnored @AppStorage("automationBridgeEnabled", store: DefaultsStore.current) var automationBridgeEnabled: Bool = AppModel.defaultBridgeEnabled
 
     static var defaultBridgeEnabled: Bool {
         #if DEBUG
@@ -498,11 +498,11 @@ final class AppModel {
 
     // MARK: - Sparkle
 
-    @ObservationIgnored @AppStorage("sparkleChannel") var sparkleChannelRaw: String = SparkleChannel.stable.rawValue {
+    @ObservationIgnored @AppStorage("sparkleChannel", store: DefaultsStore.current) var sparkleChannelRaw: String = SparkleChannel.stable.rawValue {
         didSet { applySparkleChannelChange() }
     }
 
-    @ObservationIgnored @AppStorage("sparkleAutomatic") var sparkleAutomatic: Bool = true {
+    @ObservationIgnored @AppStorage("sparkleAutomatic", store: DefaultsStore.current) var sparkleAutomatic: Bool = true {
         didSet { SparkleUpdater.shared.automaticallyChecks = sparkleAutomatic }
     }
 
@@ -516,7 +516,7 @@ final class AppModel {
 
     // MARK: - Live captions translation
 
-    @ObservationIgnored @AppStorage("liveCaptionsTranslate") var liveCaptionsTranslate: Bool = false {
+    @ObservationIgnored @AppStorage("liveCaptionsTranslate", store: DefaultsStore.current) var liveCaptionsTranslate: Bool = false {
         didSet { applyLiveCaptionsTranslateChange() }
     }
 

@@ -43,10 +43,10 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "getSettings",
                 area: .core,
-                summary: "Returns the bridge-readable subset of UserDefaults.",
+                summary: "Returns the bridge-readable subset of the app's UserDefaults suite.",
                 kind: .sync,
-                handler: { _, _ in
-                    let d = UserDefaults.standard
+                handler: { _, ctx in
+                    let d = ctx.model.defaults
                     let keys = [
                         "useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt",
                         "diarize", "batchExportFormats", "batchExportToSourceFolder",

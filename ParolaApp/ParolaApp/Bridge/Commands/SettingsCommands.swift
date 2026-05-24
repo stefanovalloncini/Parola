@@ -58,13 +58,13 @@ extension ParolaAutomationServer {
                     .init(name: "key", kind: .string(), required: true, summary: "UserDefaults key"),
                     .init(name: "value", kind: .any, required: false, summary: "JSON value to store"),
                 ],
-                handler: { args, _ in
+                handler: { args, ctx in
                     let key = try args.string("key")
                     guard ParolaAutomationServer.writableSettingKeys.contains(key) else {
                         throw AutomationError.invalidArgs(field: "key", reason: "setting '\(key)' is not writable through the bridge")
                     }
                     let value = args.rawValue("value") ?? .null
-                    UserDefaults.standard.set(value.jsonObject, forKey: key)
+                    ctx.model.defaults.set(value.jsonObject, forKey: key)
                     return .object(["key": .string(key), "value": value])
                 }
             ),
