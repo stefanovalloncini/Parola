@@ -59,13 +59,19 @@ private func handleOpen(_ url: URL, model: AppModel) {
 
 @main
 struct ParolaApp: App {
-    @State private var model = AppModel()
+    @State private var model: AppModel
     @State private var liveCaptions = LiveCaptionsController()
     @State private var scratchpad = ScratchpadController()
     @State private var shortcutSheetOpen = false
     @State private var aboutSheetOpen = false
     @State private var micHotkey = MicHotkeyController()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
+    init() {
+        let bootstrap = AppBootstrap.test(from: CommandLine.arguments) ?? .normal
+        DefaultsStore.current = bootstrap.defaults
+        _model = State(initialValue: AppModel(bootstrap: bootstrap))
+    }
 
     var body: some Scene {
         WindowGroup {

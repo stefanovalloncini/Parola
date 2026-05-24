@@ -545,13 +545,12 @@ final class AppModel {
     @ObservationIgnored let defaults: UserDefaults
     @ObservationIgnored let filePicker: FilePicker
 
-    init(
-        skipBootstrap: Bool = false,
-        defaults: UserDefaults = .standard,
-        filePicker: FilePicker = SystemFilePicker()
-    ) {
+    // MARK: - Bootstrap
+
+    init(bootstrap: AppBootstrap) {
+        let defaults = bootstrap.defaults
         self.defaults = defaults
-        self.filePicker = filePicker
+        self.filePicker = bootstrap.filePicker
         self.dictationEnabled = defaults.bool(forKey: "dictationEnabled")
         self.dictationModeRaw = defaults.string(forKey: "dictationModeRaw") ?? DictationMode.pushToTalk.rawValue
         self.dictationKeyCode = defaults.object(forKey: "dictationKeyCode") == nil ? 96 : defaults.integer(forKey: "dictationKeyCode")
@@ -565,27 +564,57 @@ final class AppModel {
         loadSnippets()
         loadCorrectionRules()
         refreshModelList()
-        refreshYtDlpAvailability()
         refreshLibrary()
-        _ = watchedFolders
-        _ = meetingDetector
         wireDictationController()
-        if skipBootstrap { return }
-        if dictationEnabled { startDictation() }
-        SparkleUpdater.shared.channel = sparkleChannel
-        SparkleUpdater.shared.automaticallyChecks = sparkleAutomatic
-        let initialTranslate = liveCaptionsTranslate
-        Task { [weak self] in await self?.liveCaptions?.setTranslate(initialTranslate) }
-        if automationBridgeEnabled {
+
+        let sideEffects = bootstrap.sideEffects
+        if sideEffects.contains(.refreshYtDlp) {
+            refreshYtDlpAvailability()
+        }
+        if sideEffects.contains(.watchedFolders) {
+            _ = watchedFolders
+        }
+        if sideEffects.contains(.meetingDetector) {
+            _ = meetingDetector
+        }
+        if sideEffects.contains(.dictationHotkey), dictationEnabled {
+            startDictation()
+        }
+        if sideEffects.contains(.sparkle) {
+            SparkleUpdater.shared.channel = sparkleChannel
+            SparkleUpdater.shared.automaticallyChecks = sparkleAutomatic
+        }
+        if sideEffects.contains(.liveCaptionsTranslateRestore) {
+            let initialTranslate = liveCaptionsTranslate
+            Task { [weak self] in await self?.liveCaptions?.setTranslate(initialTranslate) }
+        }
+        if sideEffects.contains(.automationBridge), automationBridgeEnabled {
             startAutomationBridge()
         }
-        Task { [weak self, library] in
-            await library.purgeDeletedOlderThan(days: AppModel.trashRetentionDays, now: Date())
-            self?.refreshLibrary()
+        if sideEffects.contains(.libraryPurgeOnLaunch) {
+            Task { [weak self, library] in
+                await library.purgeDeletedOlderThan(days: AppModel.trashRetentionDays, now: Date())
+                self?.refreshLibrary()
+            }
         }
         Task { [weak self] in
             await self?.refreshDictationTriggerPrompts()
         }
+    }
+
+    convenience init(
+        skipBootstrap: Bool = false,
+        defaults: UserDefaults = .standard,
+        filePicker: FilePicker = SystemFilePicker()
+    ) {
+        let sideEffects: Set<BootstrapSideEffect> = skipBootstrap ? [] : BootstrapSideEffect.all
+        let bootstrap = AppBootstrap(
+            mode: .normal,
+            defaultsOverride: defaults,
+            sideEffects: sideEffects,
+            filePicker: filePicker
+        )
+        self.init(bootstrap: bootstrap)
     }
 
     deinit {
