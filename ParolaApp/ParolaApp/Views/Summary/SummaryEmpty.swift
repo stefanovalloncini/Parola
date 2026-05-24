@@ -47,6 +47,7 @@ struct SummaryEmpty: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.top, DS.Spacing.small)
+                .axLeaf("Summary.Button.Generate")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -38,6 +38,7 @@ struct WorkflowRow: View {
                             Image(systemName: "trash")
                         }
                         .buttonStyle(.borderless)
+                        .axLeaf("Workflow.Button.RemoveOverride")
                     }
                 }
                 if isBrowser {
@@ -53,6 +54,7 @@ struct WorkflowRow: View {
                         }
                         .buttonStyle(.borderless)
                         .foregroundStyle(.secondary)
+                        .axLeaf("Workflow.Button.AddURLRule")
                         Spacer()
                     }
                 }
@@ -70,6 +72,7 @@ struct WorkflowRow: View {
         .labelsHidden()
         .pickerStyle(.menu)
         .frame(width: 170)
+        .axLeaf("Workflow.Picker.Prompt")
     }
 
     private var languagePicker: some View {
@@ -82,6 +85,7 @@ struct WorkflowRow: View {
         .labelsHidden()
         .pickerStyle(.menu)
         .frame(width: 130)
+        .axLeaf("Workflow.Picker.Language")
     }
 
     private var insertionPicker: some View {
@@ -92,6 +96,7 @@ struct WorkflowRow: View {
         .labelsHidden()
         .pickerStyle(.menu)
         .frame(width: 120)
+        .axLeaf("Workflow.Picker.Insertion")
     }
 
     private var promptBinding: Binding<String> {

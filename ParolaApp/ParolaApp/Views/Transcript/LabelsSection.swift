@@ -44,6 +44,7 @@ struct LabelsSection: View {
                     .font(.system(size: 9, weight: .bold))
             }
             .buttonStyle(.plain)
+            .axLeaf("Labels.Button.RemoveChip")
         }
         .foregroundStyle(DS.Color.accent)
         .padding(.horizontal, 8)
@@ -59,6 +60,7 @@ struct LabelsSection: View {
                 .textFieldStyle(.roundedBorder)
                 .controlSize(.small)
                 .onSubmit(addDraft)
+                .axLeaf("Labels.TextField.AddLabel")
             if !model.allKnownLabels.isEmpty {
                 Menu {
                     ForEach(model.allKnownLabels, id: \.self) { suggestion in
@@ -72,6 +74,7 @@ struct LabelsSection: View {
                 }
                 .menuStyle(.borderlessButton)
                 .frame(width: 24, height: 22)
+                .axLeaf("Labels.Menu.Suggestions")
             }
         }
     }

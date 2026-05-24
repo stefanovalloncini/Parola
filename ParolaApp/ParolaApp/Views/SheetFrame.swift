@@ -84,6 +84,7 @@ struct SheetFrame<Content: View, Footer: View>: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.cancelAction)
             .accessibilityLabel("Close")
+            .axLeaf("Sheet.Button.Close")
         }
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, 12)

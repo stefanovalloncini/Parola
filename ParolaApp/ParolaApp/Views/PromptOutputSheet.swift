@@ -38,6 +38,7 @@ struct PromptOutputSheet: View {
             Button("Close") { dismiss() }
                 .sheetSecondaryAction()
                 .keyboardShortcut(.cancelAction)
+                .axLeaf("PromptOutput.Button.Close")
 
             Spacer()
 
@@ -47,6 +48,7 @@ struct PromptOutputSheet: View {
             }
             .sheetPrimaryAction()
             .keyboardShortcut(.defaultAction)
+            .axLeaf("PromptOutput.Button.Copy")
         }
     }
 

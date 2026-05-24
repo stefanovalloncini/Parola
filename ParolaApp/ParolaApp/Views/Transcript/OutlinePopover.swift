@@ -41,6 +41,7 @@ struct OutlinePopover: View {
                 Button("Generate chapters") { model.extractSmartChapters() }
                     .controlSize(.small)
                     .disabled(model.isExtractingChapters)
+                    .axLeaf("Outline.Button.GenerateChapters")
             }
         }
         .padding(.horizontal, 12)
@@ -99,5 +100,6 @@ private struct OutlineRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .axLeaf("Outline.Button.Jump")
     }
 }

@@ -70,6 +70,7 @@ struct BatchJobRow: View {
         }
         .buttonStyle(.plain)
         .help(job.status == .transcribing ? "Cancel" : "Remove")
+        .axLeaf("Row.Button.Cancel")
     }
 }
 

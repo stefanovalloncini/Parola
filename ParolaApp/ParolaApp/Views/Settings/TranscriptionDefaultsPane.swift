@@ -19,6 +19,7 @@ struct TranscriptionDefaultsPane: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(minWidth: 220)
+                    .axLeaf("TranscriptionDefaults.Picker.Model")
                 }
                 SettingRow("Default language",
                            description: "Auto picks the language from the audio. Override when the audio is in a known language.") {
@@ -31,14 +32,17 @@ struct TranscriptionDefaultsPane: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(minWidth: 220)
+                    .axLeaf("TranscriptionDefaults.Picker.Language")
                 }
                 SettingRow("Word timestamps",
                            description: "Captures the start and end time of each word. Required for karaoke highlight.") {
                     Toggle("", isOn: $model.wordTimestamps).labelsHidden()
+                        .axLeaf("TranscriptionDefaults.Toggle.WordTimestamps")
                 }
                 SettingRow("Diarize speakers",
                            description: "Identify multiple speakers in the audio (slower).") {
                     Toggle("", isOn: $model.diarize).labelsHidden()
+                        .axLeaf("TranscriptionDefaults.Toggle.Diarize")
                 }
             }
             SettingHelper(text: "The main-window toolbar overrides these per transcript.")
@@ -48,6 +52,7 @@ struct TranscriptionDefaultsPane: View {
                            description: "Pauses the player when you switch to another app.",
                            isFirst: true) {
                     Toggle("", isOn: $model.pausePlayerOnAppHidden).labelsHidden()
+                        .axLeaf("Playback.Toggle.PauseOnHidden")
                 }
             }
 
@@ -56,6 +61,7 @@ struct TranscriptionDefaultsPane: View {
                            description: "Disable all cloud LLM calls. Local models stay available.",
                            isFirst: true) {
                     Toggle("", isOn: $model.userPrivacyMode).labelsHidden()
+                        .axLeaf("Privacy.Toggle.PrivacyMode")
                 }
             }
 

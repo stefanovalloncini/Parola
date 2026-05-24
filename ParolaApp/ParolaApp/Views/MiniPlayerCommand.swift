@@ -8,5 +8,6 @@ struct MiniPlayerCommand: View {
             openWindow(id: "mini-player")
         }
         .keyboardShortcut("m", modifiers: [.command, .option])
+        .axLeaf("Menu.Button.ShowMiniPlayer")
     }
 }

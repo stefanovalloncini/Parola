@@ -17,6 +17,7 @@ struct CustomizationPane: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(width: 160)
+                    .axLeaf("Customization.Picker.Appearance")
                 }
                 SettingRow("Accent color",
                            description: "Used for the active sidebar item, primary buttons, and other highlights.") {
@@ -25,6 +26,7 @@ struct CustomizationPane: View {
                 SettingRow("Monospaced timestamps",
                            description: "Use a fixed-width font for timestamps in the transcript.") {
                     Toggle("", isOn: $model.monospacedTimestamps).labelsHidden()
+                        .axLeaf("Customization.Toggle.MonospacedTimestamps")
                 }
                 SettingRow("Sidebar density",
                            description: "Spacing in the library sidebar.") {
@@ -35,6 +37,7 @@ struct CustomizationPane: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(width: 160)
+                    .axLeaf("Customization.Picker.SidebarDensity")
                 }
             }
             ResetPaneButton(scope: .customization)
@@ -65,6 +68,7 @@ private struct AccentColorRow: View {
                 }
                 .buttonStyle(.plain)
                 .help(accent.label)
+                .axLeaf("Customization.Button.Accent.\(accent.rawValue)")
             }
         }
     }

@@ -40,6 +40,7 @@ struct CorrectionsPane: View {
             } label: {
                 Label("Add correction", systemImage: "plus.circle")
             }
+            .axLeaf("Corrections.Button.AddCorrection")
 
             help
             ResetPaneButton(scope: .corrections)
@@ -92,20 +93,25 @@ private struct CorrectionRow: View {
                 Toggle("", isOn: enabledBinding)
                     .labelsHidden()
                     .disabled(!canEnable)
+                    .axLeaf("Corrections.Toggle.RuleEnabled")
                 TextField("heard", text: $rule.from)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 180)
+                    .axLeaf("Corrections.TextField.From")
                 Text("→").foregroundStyle(.secondary)
                 TextField("write", text: $rule.to)
                     .textFieldStyle(.roundedBorder)
+                    .axLeaf("Corrections.TextField.To")
                 Toggle("Aa", isOn: $rule.caseSensitive)
                     .toggleStyle(.button)
                     .controlSize(.small)
                     .help("Case-sensitive match")
+                    .axLeaf("Corrections.Toggle.CaseSensitive")
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.borderless)
+                .axLeaf("Corrections.Button.Delete")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)

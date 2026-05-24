@@ -27,6 +27,7 @@ struct ShortcutsPane: View {
                            description: "Start or stop mic recording from anywhere. Off by default.") {
                     HStack(spacing: 8) {
                         Toggle("", isOn: $model.micHotkeyEnabled).labelsHidden()
+                            .axLeaf("Shortcuts.Toggle.MicHotkeyEnabled")
                         HotkeyRecorder(
                             keyCode: $model.micHotkeyKeyCode,
                             modifierRawValue: $model.micHotkeyModifiers

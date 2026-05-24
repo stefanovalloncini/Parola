@@ -8,7 +8,7 @@ import ScreenCaptureKit
 /// Requires the host process to have Screen Recording permission. The very first call
 /// will trigger the standard TCC prompt.
 @available(macOS 13.0, *)
-public actor SystemAudioSource: AudioSource {
+public actor SystemAudioSource: LiveAudioSource {
     private var stream: SCStream?
     private var handler: SampleHandler?
     private let outputURL: URL

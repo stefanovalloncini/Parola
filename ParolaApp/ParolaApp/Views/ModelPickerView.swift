@@ -89,6 +89,7 @@ struct ModelPickerView: View {
             TextField("Search models", text: $searchText)
                 .textFieldStyle(.plain)
                 .font(.subheadline)
+                .axLeaf("ModelPicker.TextField.Search")
             if !searchText.isEmpty {
                 Button {
                     searchText = ""
@@ -98,6 +99,7 @@ struct ModelPickerView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .axLeaf("ModelPicker.Button.ClearSearch")
             }
         }
         .padding(.horizontal, 8)
@@ -116,6 +118,7 @@ struct ModelPickerView: View {
         .toggleStyle(.switch)
         .controlSize(.mini)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .axLeaf("ModelPicker.Toggle.InstalledOnly")
     }
 
     private var filteredGroups: [(ModelCategory, [ModelVariant])] {

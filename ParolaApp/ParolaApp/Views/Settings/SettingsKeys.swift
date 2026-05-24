@@ -174,6 +174,7 @@ struct ResetPaneButton: View {
                 .controlSize(.small)
                 .buttonStyle(.borderless)
                 .foregroundStyle(.secondary)
+                .axLeaf("Pane.Button.ResetToDefaults.\(scope.rawValue)")
             }
             .confirmationDialog(
                 String(localized: "Reset \(scope.localizedLabel) to defaults?"),
@@ -231,6 +232,7 @@ struct ResetAllSettingsButton: View {
             .controlSize(.small)
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
+            .axLeaf("Settings.Button.ResetAll")
         }
         .confirmationDialog(
             "Reset every Parola setting?",

@@ -24,6 +24,7 @@ struct MediaBar: View {
             .help(model.isPlaying ? "Pause" : "Play")
             .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
             .accessibilityIdentifier("transcript.player.playPause")
+            .axLeaf("MediaBar.Button.PlayPause")
 
             ScrubberTrack(
                 progress: progress,
@@ -55,6 +56,7 @@ struct MediaBar: View {
             }
             .buttonStyle(.plain)
             .help(model.skipSilences ? "Skip silences (on)" : "Skip silences")
+            .axLeaf("MediaBar.Button.SkipSilences")
 
             Menu {
                 ForEach(speeds, id: \.self) { s in
@@ -88,6 +90,7 @@ struct MediaBar: View {
             .fixedSize()
             .help("Playback speed")
             .accessibilityIdentifier("transcript.player.speed")
+            .axLeaf("MediaBar.Menu.Speed")
         }
         .padding(.horizontal, DS.Spacing.regular)
         .frame(height: 52)

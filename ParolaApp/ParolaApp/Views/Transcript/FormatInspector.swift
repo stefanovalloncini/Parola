@@ -19,6 +19,7 @@ struct FormatInspector: View {
                 TextField("Add a speaker…", text: $newSpeaker)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { commitSpeaker() }
+                    .axLeaf("Inspector.TextField.AddSpeaker")
             }
         }
     }
@@ -42,6 +43,7 @@ struct FormatInspector: View {
         }
         .buttonStyle(.plain)
         .disabled(model.transcript == nil)
+        .axLeaf("Inspector.Button.CopyTranscript")
     }
 
     private var displayModesCard: some View {
@@ -107,5 +109,6 @@ struct DisplayModeCard: View {
             .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular))
         }
         .buttonStyle(.plain)
+        .axLeaf("Inspector.Button.DisplayMode.\(icon.replacingOccurrences(of: ".", with: ""))")
     }
 }

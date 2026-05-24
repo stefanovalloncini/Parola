@@ -71,6 +71,7 @@ struct BatchFormatCard: View {
                     .help("Remove this format")
                     .accessibilityLabel("Remove \(format.fileExtension.uppercased())")
                     .accessibilityIdentifier("batch.format.\(format.fileExtension).delete")
+                    .axLeaf("Export.Button.Remove.\(format.fileExtension)")
                 }
                 .contentShape(Rectangle())
             }
@@ -90,6 +91,7 @@ struct BatchFormatCard: View {
                             .controlSize(.small)
                             .tint(DS.Color.accent)
                             .accessibilityIdentifier("batch.format.\(format.fileExtension).toggle")
+                            .axLeaf("Export.Toggle.WriteToSourceFolder.\(format.fileExtension)")
                     }
                     if format == .md || format == .html {
                         BatchSettingRow(
@@ -101,6 +103,7 @@ struct BatchFormatCard: View {
                                 .toggleStyle(.switch)
                                 .controlSize(.small)
                                 .tint(DS.Color.accent)
+                                .axLeaf("Export.Toggle.IncludeTimestamps.\(format.fileExtension)")
                         }
                     }
                 }

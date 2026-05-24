@@ -17,6 +17,7 @@ struct ContentView: View {
                 CountInOverlay(count: count) { model.cancelRecordingCountdown() }
             }
         }
+        .axBranch("App")
     }
 }
 
@@ -37,6 +38,7 @@ private struct CountInOverlay: View {
                     .keyboardShortcut(.escape, modifiers: [])
                     .controlSize(.large)
                     .tint(.white)
+                    .axLeaf("CountIn.Button.Cancel")
             }
         }
         .transition(.opacity)

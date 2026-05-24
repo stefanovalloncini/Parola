@@ -56,9 +56,11 @@ struct RecentlyDeletedRow: View {
             Button { onRestore() } label: {
                 Label("Restore", systemImage: "arrow.uturn.backward")
             }
+            .axLeaf("Row.ContextMenuItem.Restore")
             Button(role: .destructive) { onPurge() } label: {
                 Label("Delete permanently", systemImage: "trash")
             }
+            .axLeaf("Row.ContextMenuItem.Purge")
         }
         .animation(.easeInOut(duration: 0.12), value: hovered)
     }
@@ -147,5 +149,6 @@ struct RecentlyDeletedCardIconButton: View {
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
         .help(help)
+        .axLeaf("Row.Button.\(systemName.replacingOccurrences(of: ".", with: ""))")
     }
 }

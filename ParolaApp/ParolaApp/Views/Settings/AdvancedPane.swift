@@ -15,6 +15,7 @@ struct AdvancedPane: View {
                         .truncationMode(.head)
                         .foregroundStyle(.secondary)
                     Button("Reveal in Finder") { model.revealCacheDirectory() }
+                        .axLeaf("Advanced.Button.RevealCache")
                 }
                 .padding(16)
             }
@@ -28,9 +29,11 @@ struct AdvancedPane: View {
                         Button("Export settings…") {
                             SettingsExportService.presentExportPanel()
                         }
+                        .axLeaf("Advanced.Button.ExportSettings")
                         Button("Import settings…") {
                             SettingsExportService.presentImportPanel()
                         }
+                        .axLeaf("Advanced.Button.ImportSettings")
                     }
                 }
                 .padding(16)
@@ -46,6 +49,7 @@ struct AdvancedPane: View {
                     } label: {
                         Text("Reset all settings…")
                     }
+                    .axLeaf("Advanced.Button.ResetAll")
                 }
                 .padding(16)
             }

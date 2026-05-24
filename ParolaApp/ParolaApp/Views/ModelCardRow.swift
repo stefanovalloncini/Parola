@@ -48,6 +48,7 @@ struct ModelCardRow: View {
                 Button(role: .destructive, action: deleteAction) {
                     Label("Delete from disk", systemImage: "trash")
                 }
+                .axLeaf("Card.ContextMenuItem.Delete")
             }
         }
     }
@@ -98,12 +99,14 @@ struct ModelCardRow: View {
                         .help("Delete this model from disk")
                         .accessibilityLabel("Delete \(variant.displayName)")
                         .accessibilityIdentifier("model.\(variant.id).delete")
+                        .axLeaf("Card.Button.Delete")
                     }
                     Button(action: primaryAction) {
                         Text("Activate")
                     }
                     .buttonStyle(ModelPillButtonStyle())
                     .accessibilityIdentifier("model.\(variant.id).activate")
+                    .axLeaf("Card.Button.Activate")
                 }
             case .available:
                 Button(action: primaryAction) {
@@ -114,6 +117,7 @@ struct ModelCardRow: View {
                 }
                 .buttonStyle(ModelPillButtonStyle())
                 .accessibilityIdentifier("model.\(variant.id).download")
+                .axLeaf("Card.Button.Download")
             case .downloading(let progress):
                 HStack(spacing: 8) {
                     ProgressView(value: progress)

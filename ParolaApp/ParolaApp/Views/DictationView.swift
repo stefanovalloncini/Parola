@@ -24,6 +24,7 @@ struct DictationView: View {
         .onChange(of: state) { _, newValue in
             if case .listening = newValue { startedAt = Date() }
         }
+        .axBranch("Dictation")
     }
 
     private var hasPartial: Bool {
@@ -171,6 +172,7 @@ struct DictationView: View {
             }
             .buttonStyle(.plain)
             .help("Stop dictation")
+            .axLeaf("HUD.Button.Stop")
         }
     }
 

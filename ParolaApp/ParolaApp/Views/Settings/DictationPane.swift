@@ -30,6 +30,7 @@ struct DictationPane: View {
                            descriptionVerbatim: modeDescription,
                            isFirst: true) {
                     Toggle("", isOn: $model.dictationEnabled).labelsHidden()
+                        .axLeaf("Dictation.Toggle.Enabled")
                 }
                 SettingRow("Mode") {
                     Picker("", selection: $model.dictationModeRaw) {
@@ -40,6 +41,7 @@ struct DictationPane: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(width: 200)
+                    .axLeaf("Dictation.Picker.Mode")
                 }
                 SettingRow("Activation key",
                            description: "Click to record any key combination.") {
@@ -58,12 +60,14 @@ struct DictationPane: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(width: 200)
+                    .axLeaf("Dictation.Picker.IndicatorStyle")
                 }
                 SettingRow("HUD opacity",
                            description: "Make the dictation HUD translucent.") {
                     HStack(spacing: 8) {
                         Slider(value: $model.dictationHudOpacity, in: 0.4...1.0)
                             .frame(width: 160)
+                            .axLeaf("Dictation.Slider.HudOpacity")
                         Text("\(Int(model.dictationHudOpacity * 100))%")
                             .font(.system(.caption, design: .monospaced))
                             .foregroundStyle(.secondary)
@@ -88,16 +92,19 @@ struct DictationPane: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(width: 200)
+                    .axLeaf("Dictation.Picker.CleanupMode")
                 }
                 SettingRow("Strip self-corrections",
                            description: "Drops \"scratch that\", \"wait, no\", and collapses \", I mean,\" hedges.") {
                     Toggle("", isOn: $model.dictationStripSelfCorrections).labelsHidden()
+                        .axLeaf("Dictation.Toggle.StripSelfCorrections")
                 }
                 SettingRow("Paste delay",
                            description: "Wait this long after dictation ends before pasting. Useful when the target app needs a beat to refocus.") {
                     HStack(spacing: 6) {
                         Slider(value: pasteDelayBinding, in: 0...1000, step: 50)
                             .frame(width: 160)
+                            .axLeaf("Dictation.Slider.PasteDelay")
                         Text("\(model.dictationPasteDelayMs) ms")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(.secondary)
@@ -112,14 +119,17 @@ struct DictationPane: View {
                            description: "Sends the highlighted text in the frontmost app to the cleanup model so proper nouns spell right. Requires Accessibility permission.",
                            isFirst: true) {
                     Toggle("", isOn: $model.dictationContextSelection).labelsHidden()
+                        .axLeaf("Dictation.Toggle.ContextSelection")
                 }
                 SettingRow("Include clipboard",
                            description: "Adds the current clipboard string. Disable when the clipboard might hold sensitive data.") {
                     Toggle("", isOn: $model.dictationContextClipboard).labelsHidden()
+                        .axLeaf("Dictation.Toggle.ContextClipboard")
                 }
                 SettingRow("Include screen content (OCR)",
                            description: "Reads on-screen text in the frontmost window via OCR. Slower, requires Screen Recording permission, and the window content is sent to the cleanup model.") {
                     Toggle("", isOn: $model.dictationContextScreen).labelsHidden()
+                        .axLeaf("Dictation.Toggle.ContextScreen")
                 }
             }
             SettingHelper(text: "Context is used only for proper nouns and technical terms — the model never echoes or responds to it. All three are off by default.")
@@ -140,6 +150,7 @@ struct DictationPane: View {
                 } label: {
                     Label("Add app…", systemImage: "plus.circle")
                 }
+                .axLeaf("Dictation.Button.AddApp")
                 Spacer()
             }
             SettingHelper(text: "When the frontmost app matches, dictation uses these overrides. Prompt cleans up the text after transcription; language hints the engine before it. URL rules take precedence over the bundle default for supported browsers.")

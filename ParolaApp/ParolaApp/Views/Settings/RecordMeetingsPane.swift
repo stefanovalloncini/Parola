@@ -12,6 +12,7 @@ struct RecordMeetingsPane: View {
                            description: "Offer to record system audio when Zoom, Teams, Webex, or Meet launches.",
                            isFirst: true) {
                     Toggle("", isOn: $detector.isEnabled).labelsHidden()
+                        .axLeaf("RecordMeetings.Toggle.Enabled")
                 }
             }
             SettingHelper(text: "Parola watches running applications; nothing leaves your Mac.")

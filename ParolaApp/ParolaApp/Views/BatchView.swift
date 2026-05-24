@@ -20,6 +20,7 @@ struct BatchView: View {
                 }
             }
         }
+        .axBranch("Batch")
     }
 
     private var header: some View {
@@ -33,6 +34,7 @@ struct BatchView: View {
             }
             .buttonStyle(.borderless)
             .help("Back")
+            .axLeaf("Header.Button.Back")
 
             Text("Batch")
                 .font(DS.Font.title)
@@ -56,6 +58,7 @@ struct BatchView: View {
                             Text(format.fileExtension.uppercased())
                         }
                     }
+                    .axLeaf("Header.MenuItem.Format.\(format.fileExtension)")
                 }
             } label: {
                 Label("Add Format", systemImage: "plus")
@@ -67,6 +70,7 @@ struct BatchView: View {
             .controlSize(.regular)
             .help("Choose which formats to write next to each transcribed file.")
             .accessibilityIdentifier("batch.addFormat")
+            .axLeaf("Header.Menu.AddFormat")
 
             Button {
                 exportPaneVisible.toggle()
@@ -78,6 +82,7 @@ struct BatchView: View {
             }
             .buttonStyle(.borderless)
             .help(exportPaneVisible ? "Hide export options" : "Show export options")
+            .axLeaf("Header.Button.ToggleExportPane")
         }
         .padding(.horizontal, DS.Spacing.large)
         .padding(.vertical, DS.Spacing.regular)

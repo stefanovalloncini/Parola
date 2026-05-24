@@ -49,7 +49,7 @@ struct PromptDictationProcessor: TextPostProcessor {
         let context = await gatheredContext()
         do {
             let situated = contextualizing(prompt, with: frontmost.name, context: context)
-            let model = try LanguageModelFactory.makeOnDevice(instructions: situated.instructions)
+            let model = try await LanguageModelFactory.makeOnDevice(instructions: situated.instructions)
             let result = try await PromptRunner.run(situated, on: input, model: model)
             let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? input : trimmed

@@ -12,6 +12,7 @@ struct TranslationPane: View {
                            description: "Apply translation to every new transcription unless overridden.",
                            isFirst: true) {
                     Toggle("", isOn: $model.translate).labelsHidden()
+                        .axLeaf("Translation.Toggle.TranslateByDefault")
                 }
             }
             SettingHelper(text: "Whisper translates from the detected source language into English.")

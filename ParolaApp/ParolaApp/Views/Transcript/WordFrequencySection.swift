@@ -73,5 +73,6 @@ private struct WordFrequencyBar: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help("Find “\(word)” in transcript")
+        .axLeaf("WordFrequency.Button.FindWord")
     }
 }

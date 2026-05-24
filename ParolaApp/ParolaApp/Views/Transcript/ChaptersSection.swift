@@ -38,15 +38,18 @@ struct ChaptersSection: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
             .accessibilityIdentifier("transcript.inspector.chapters")
+            .axLeaf("Chapters.Button.Generate")
     }
 
     private var actionsRow: some View {
         HStack(spacing: DS.Spacing.small) {
             Button("Regenerate") { model.extractSmartChapters() }
                 .controlSize(.small)
+                .axLeaf("Chapters.Button.Regenerate")
             Spacer()
             Button("Clear") { model.clearSmartChapters() }
                 .controlSize(.small)
+                .axLeaf("Chapters.Button.Clear")
         }
     }
 }
@@ -71,5 +74,6 @@ private struct ChapterRow: View {
         }
         .buttonStyle(.plain)
         .help("Jump to \(Timecode.format(chapter.start))")
+        .axLeaf("Chapters.Button.Jump")
     }
 }

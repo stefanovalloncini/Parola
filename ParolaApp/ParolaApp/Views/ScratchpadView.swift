@@ -32,15 +32,18 @@ struct ScratchpadView: View {
             HStack {
                 Button("Copy") { controller.copyToPasteboard() }
                     .disabled(controller.text.isEmpty)
+                    .axLeaf("Scratchpad.Button.Copy")
                 Spacer()
                 Button(role: .destructive) { controller.clear() } label: {
                     Text("Clear")
                 }
                 .disabled(controller.text.isEmpty)
+                .axLeaf("Scratchpad.Button.Clear")
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 10)
         }
         .frame(minWidth: 320, minHeight: 220)
+        .axBranch("Scratchpad")
     }
 }

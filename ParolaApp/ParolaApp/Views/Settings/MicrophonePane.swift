@@ -29,6 +29,7 @@ struct MicrophonePane: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(minWidth: 220)
+                    .axLeaf("Microphone.Picker.InputDevice")
                 }
                 SettingRow("Live preview") {
                     VUMeter(level: level)
@@ -48,6 +49,7 @@ struct MicrophonePane: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .frame(width: 120)
+                        .axLeaf("Microphone.Picker.AutoStop")
                     }
                 }
                 SettingRow("Count-in",
@@ -61,6 +63,7 @@ struct MicrophonePane: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(width: 140)
+                    .axLeaf("Microphone.Picker.CountIn")
                 }
             }
             if let startError {
@@ -73,10 +76,12 @@ struct MicrophonePane: View {
                            description: "Mutes the default output device while recording from the microphone, so playback doesn't leak into your transcript. Restores the previous mute state when recording stops.",
                            isFirst: true) {
                     Toggle("", isOn: $model.autoMuteWhileRecording).labelsHidden()
+                        .axLeaf("Microphone.Toggle.AutoMute")
                 }
                 SettingRow("Pause Music, Spotify, YouTube",
                            description: "Sends a pause command to whatever app is playing media when recording starts, and resumes when it stops.") {
                     Toggle("", isOn: $model.autoPauseMediaWhileRecording).labelsHidden()
+                        .axLeaf("Microphone.Toggle.AutoPauseMedia")
                 }
             }
             SettingHelper(text: "Both apply to dictation too. Mute is skipped when the recording source is system audio.")
@@ -176,6 +181,7 @@ private struct MicErrorBanner: View {
                     }
                 }
                 .controlSize(.small)
+                .axLeaf("Microphone.Button.OpenSystemSettings")
             }
         }
         .padding(12)

@@ -67,6 +67,7 @@ struct AutomationPane: View {
                                     model.stopAutomationBridge()
                                 }
                             }
+                            .axLeaf("Automation.Toggle.BridgeEnabled")
                     }
                 }
 
@@ -91,7 +92,9 @@ struct AutomationPane: View {
                                 .foregroundStyle(.secondary)
                             HStack(spacing: 8) {
                                 Button("Reveal in Finder") { reveal(path: path) }
+                                    .axLeaf("Automation.Button.RevealMcpBinary")
                                 Button("Copy path") { copy(path, label: String(localized: "Path copied")) }
+                                    .axLeaf("Automation.Button.CopyMcpPath")
                             }
                         } else {
                             HStack(spacing: 6) {
@@ -127,6 +130,7 @@ struct AutomationPane: View {
                                     .fill(Color.primary.opacity(0.05))
                             )
                             Button("Copy snippet") { copy(snippet, label: String(localized: "Snippet copied")) }
+                                .axLeaf("Automation.Button.CopySnippet")
                         }
                         .padding(16)
                     }

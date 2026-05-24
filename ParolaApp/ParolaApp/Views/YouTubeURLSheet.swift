@@ -40,6 +40,7 @@ struct YouTubeURLSheet: View {
                     .textFieldStyle(.roundedBorder)
                     .focused($fieldFocused)
                     .onSubmit { submit(prefersExistingSubs: false) }
+                    .axLeaf("YouTube.TextField.URL")
 
                 if !model.ytDlpAvailable {
                     YtDlpBanner()
@@ -54,17 +55,20 @@ struct YouTubeURLSheet: View {
             Button("Cancel") { dismiss() }
                 .sheetSecondaryAction()
                 .keyboardShortcut(.cancelAction)
+                .axLeaf("YouTube.Button.Cancel")
 
             Spacer()
 
             Button("Use captions") { submit(prefersExistingSubs: true) }
                 .sheetSecondaryAction()
                 .disabled(disabled || !model.ytDlpAvailable)
+                .axLeaf("YouTube.Button.UseCaptions")
 
             Button("Transcribe") { submit(prefersExistingSubs: false) }
                 .sheetPrimaryAction()
                 .keyboardShortcut(.defaultAction)
                 .disabled(disabled || !model.ytDlpAvailable)
+                .axLeaf("YouTube.Button.Transcribe")
         }
     }
 
@@ -125,12 +129,14 @@ private struct YtDlpBanner: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.ytDlpInstalling)
+                .axLeaf("YouTube.Button.InstallYtDlp")
 
                 Button("Copy command") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString("brew install yt-dlp", forType: .string)
                 }
                 .disabled(model.ytDlpInstalling)
+                .axLeaf("YouTube.Button.CopyBrewCommand")
             }
         }
         .padding(DS.Spacing.regular)

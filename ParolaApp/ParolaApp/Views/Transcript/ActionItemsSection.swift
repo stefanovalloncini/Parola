@@ -38,17 +38,21 @@ struct ActionItemsSection: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
             .accessibilityIdentifier("transcript.inspector.actionItems")
+            .axLeaf("ActionItems.Button.Find")
     }
 
     private var actionsRow: some View {
         HStack(spacing: DS.Spacing.small) {
             Button("Re-extract") { model.extractActionItems() }
                 .controlSize(.small)
+                .axLeaf("ActionItems.Button.Reextract")
             Button("Copy") { copyToClipboard() }
                 .controlSize(.small)
+                .axLeaf("ActionItems.Button.Copy")
             Spacer()
             Button("Clear") { model.clearActionItems() }
                 .controlSize(.small)
+                .axLeaf("ActionItems.Button.Clear")
         }
     }
 

@@ -32,10 +32,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        if CommandLine.arguments.contains("--headless") {
+            NSApp.setActivationPolicy(.accessory)
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.servicesProvider = provider
         NSUpdateDynamicServices()
-        SparkleUpdater.shared.start()
+        if CommandLine.arguments.contains("--headless") {
+            for window in NSApp.windows { window.orderOut(nil) }
+        } else {
+            SparkleUpdater.shared.start()
+        }
     }
 
     func applicationDidResignActive(_ notification: Notification) {

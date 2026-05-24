@@ -51,6 +51,7 @@ struct AutoExportPane: View {
             } label: {
                 Label("Add rule", systemImage: "plus.circle")
             }
+            .axLeaf("AutoExport.Button.AddRule")
 
             SettingHelper(text: "Auto-export writes additional files next to the source when transcription completes.")
 
@@ -66,10 +67,12 @@ struct AutoExportPane: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(width: 200)
+                    .axLeaf("AutoExport.Picker.SubtitleLength")
                 }
                 SettingRow("Markdown timestamps",
                            description: "Prefix each Markdown paragraph with its start time.") {
                     Toggle("", isOn: $model.markdownTimestamps).labelsHidden()
+                        .axLeaf("AutoExport.Toggle.MarkdownTimestamps")
                 }
                 SettingRow("HTML theme",
                            description: "Color scheme used by the HTML export.") {
@@ -81,6 +84,7 @@ struct AutoExportPane: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(width: 160)
+                    .axLeaf("AutoExport.Picker.HtmlTheme")
                 }
             }
 
@@ -145,6 +149,7 @@ struct AutoExportPane: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort")
+        .axLeaf("AutoExport.Menu.Sort")
     }
 }
 
@@ -178,17 +183,20 @@ private struct AutoExportRuleRow: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Toggle("", isOn: $rule.enabled).labelsHidden()
+                        .axLeaf("AutoExport.Toggle.RuleEnabled")
                     Text(summary).font(.body.weight(.medium))
                     Spacer()
                     Button(role: .destructive, action: onDelete) {
                         Image(systemName: "trash")
                     }
                     .buttonStyle(.borderless)
+                    .axLeaf("AutoExport.Button.DeleteRule")
                 }
                 HStack {
                     Text("When source is").font(.caption).foregroundStyle(.secondary)
                     TextField("mp4, mov", text: $extensionsText)
                         .textFieldStyle(.roundedBorder)
+                        .axLeaf("AutoExport.TextField.Extensions")
                         .onChange(of: extensionsText) { _, new in
                             rule.sourceExtensions = Set(
                                 new.split(separator: ",")
@@ -233,6 +241,7 @@ private struct AutoExportFormatChips: View {
                 .buttonStyle(.bordered)
                 .tint(isOn ? .accentColor : .secondary)
                 .controlSize(.small)
+                .axLeaf("AutoExport.Button.Format.\(format.fileExtension)")
             }
         }
     }

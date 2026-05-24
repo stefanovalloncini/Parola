@@ -18,6 +18,7 @@ struct LiveCaptionsView: View {
             }
             .opacity(opacity)
             .contextMenu { settingsMenu }
+            .axBranch("LiveCaptions")
     }
 
     @ViewBuilder
@@ -86,21 +87,35 @@ struct LiveCaptionsView: View {
     private var settingsMenu: some View {
         Menu("Style") {
             Button("Cinema") { apply(.cinema) }
+                .axLeaf("ContextMenu.MenuItem.StyleCinema")
             Button("Compact") { apply(.compact) }
+                .axLeaf("ContextMenu.MenuItem.StyleCompact")
             Button("Subtle") { apply(.subtle) }
+                .axLeaf("ContextMenu.MenuItem.StyleSubtle")
         }
+        .axLeaf("ContextMenu.Menu.Style")
         Menu("Opacity") {
             Button("100%") { opacity = 1.0 }
+                .axLeaf("ContextMenu.MenuItem.Opacity100")
             Button("85%") { opacity = 0.85 }
+                .axLeaf("ContextMenu.MenuItem.Opacity85")
             Button("70%") { opacity = 0.7 }
+                .axLeaf("ContextMenu.MenuItem.Opacity70")
             Button("50%") { opacity = 0.5 }
+                .axLeaf("ContextMenu.MenuItem.Opacity50")
         }
+        .axLeaf("ContextMenu.Menu.Opacity")
         Menu("Caption size") {
             Button("Small") { fontSize = 18 }
+                .axLeaf("ContextMenu.MenuItem.SizeSmall")
             Button("Medium") { fontSize = 22 }
+                .axLeaf("ContextMenu.MenuItem.SizeMedium")
             Button("Large") { fontSize = 28 }
+                .axLeaf("ContextMenu.MenuItem.SizeLarge")
             Button("Huge") { fontSize = 36 }
+                .axLeaf("ContextMenu.MenuItem.SizeHuge")
         }
+        .axLeaf("ContextMenu.Menu.CaptionSize")
     }
 
     private func apply(_ preset: LiveCaptionStylePreset) {

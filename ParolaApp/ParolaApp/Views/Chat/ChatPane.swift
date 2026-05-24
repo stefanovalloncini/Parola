@@ -52,6 +52,7 @@ struct ChatPane: View {
         .onAppear { isSearching = isSearchingPersisted }
         .onChange(of: isSearching) { _, value in isSearchingPersisted = value }
         .focusedSceneValue(\.focusChatComposer, FocusChatComposerAction { composerFocused = true })
+        .axBranch("Chat")
     }
 
     private var header: some View {
@@ -67,6 +68,7 @@ struct ChatPane: View {
             .buttonStyle(.plain)
             .help("Search chat (⌘F)")
             .keyboardShortcut("f", modifiers: [.command])
+            .axLeaf("Header.Button.ToggleSearch")
 
             Button(role: .destructive, action: resetConversation) {
                 Image(systemName: "arrow.counterclockwise")
@@ -76,6 +78,7 @@ struct ChatPane: View {
             .foregroundStyle(DS.Color.secondaryText)
             .help("Clear conversation")
             .disabled(displayedHistory.isEmpty || isSending)
+            .axLeaf("Header.Button.Reset")
         }
         .padding(.horizontal, DS.Spacing.medium)
         .padding(.vertical, DS.Spacing.regular)
@@ -90,6 +93,7 @@ struct ChatPane: View {
                 TextField("Filter messages", text: $searchQuery)
                     .textFieldStyle(.plain)
                     .focused($searchFocused)
+                    .axLeaf("Search.TextField.Query")
                 if !searchQuery.isEmpty {
                     Button {
                         searchQuery = ""
@@ -114,6 +118,7 @@ struct ChatPane: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.escape, modifiers: [])
             .help("Close search")
+            .axLeaf("Search.Button.Close")
         }
         .padding(.horizontal, DS.Spacing.medium)
         .padding(.vertical, DS.Spacing.small)
@@ -143,6 +148,7 @@ struct ChatPane: View {
                 .lineLimit(1...5)
                 .textFieldStyle(.plain)
                 .focused($composerFocused)
+                .axLeaf("Composer.TextField.Input")
                 .padding(.horizontal, DS.Spacing.regular)
                 .padding(.vertical, 8)
                 .background(
@@ -172,6 +178,7 @@ struct ChatPane: View {
             .disabled(isSendDisabled)
             .keyboardShortcut(.return, modifiers: [.command])
             .help("Send (⌘↩)")
+            .axLeaf("Composer.Button.Send")
         }
         .padding(.horizontal, DS.Spacing.medium)
         .padding(.bottom, DS.Spacing.medium)

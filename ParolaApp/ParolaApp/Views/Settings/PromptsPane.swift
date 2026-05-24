@@ -39,6 +39,7 @@ struct PromptsPane: View {
                 } label: {
                     Label("Add prompt", systemImage: "plus.circle")
                 }
+                .axLeaf("Prompts.Button.AddPrompt")
                 Spacer()
             }
 
@@ -107,6 +108,7 @@ struct PromptsPane: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .help("Sort prompts")
+            .axLeaf("Prompts.Menu.Sort")
         }
     }
 
@@ -186,6 +188,7 @@ private struct PromptRow: View {
                     }
                     .buttonStyle(.borderless)
                     .help("Edit prompt")
+                    .axLeaf("Prompts.Button.Edit")
                     Button(role: .destructive) {
                         onDelete()
                     } label: {
@@ -193,6 +196,7 @@ private struct PromptRow: View {
                     }
                     .buttonStyle(.borderless)
                     .help("Delete prompt")
+                    .axLeaf("Prompts.Button.Delete")
                 }
             }
         }
@@ -242,6 +246,7 @@ private struct PromptEditor: View {
                 Text("Name").font(.caption).foregroundStyle(.secondary)
                 TextField("Name", text: $draft.name)
                     .textFieldStyle(.roundedBorder)
+                    .axLeaf("PromptEditor.TextField.Name")
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -260,6 +265,7 @@ private struct PromptEditor: View {
                 Text("Trigger words").font(.caption).foregroundStyle(.secondary)
                 TextField("summary, recap", text: $draft.triggerWordsText)
                     .textFieldStyle(.roundedBorder)
+                    .axLeaf("PromptEditor.TextField.TriggerWords")
                 Text("Words that switch to this prompt for one dictation. Separate with commas.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -267,6 +273,7 @@ private struct PromptEditor: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Toggle("Assistant mode", isOn: $draft.assistantMode)
+                    .axLeaf("PromptEditor.Toggle.AssistantMode")
                 Text("When on, the LLM answers your dictation instead of cleaning it up. Use this for voice Q&A.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -275,9 +282,11 @@ private struct PromptEditor: View {
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel, action: onCancel)
+                    .axLeaf("PromptEditor.Button.Cancel")
                 Button("Save") { onCommit(draft) }
                     .keyboardShortcut(.defaultAction)
                     .disabled(draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .axLeaf("PromptEditor.Button.Save")
             }
         }
         .padding(20)

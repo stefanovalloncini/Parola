@@ -24,6 +24,7 @@ struct SegmentTimingPopover: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .frame(width: 96)
+                .axLeaf("Timing.Picker.Fps")
             }
             Divider()
             timingRow(label: "Start", value: current?.start ?? segment.start) { delta in
@@ -64,6 +65,7 @@ struct SegmentTimingPopover: View {
         }
         .buttonStyle(.plain)
         .help(help)
+        .axLeaf("Timing.Button.Nudge.\(systemName)")
     }
 
     private static let fpsOptions: [Double] = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60]

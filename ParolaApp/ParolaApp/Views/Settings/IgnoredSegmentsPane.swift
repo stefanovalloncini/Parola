@@ -49,6 +49,7 @@ struct IgnoredSegmentsPane: View {
             } label: {
                 Label("Add pattern", systemImage: "plus.circle")
             }
+            .axLeaf("IgnoredSegments.Button.AddPattern")
 
             SettingHelper(text: "Segments matching a pattern (case-insensitive, trimmed) are removed before saving.")
             ResetPaneButton(scope: .ignoredSegments)
@@ -110,6 +111,7 @@ struct IgnoredSegmentsPane: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort")
+        .axLeaf("IgnoredSegments.Menu.Sort")
     }
 }
 
@@ -154,12 +156,15 @@ private struct IgnoredRuleRow: View {
                 Toggle("", isOn: enabledBinding)
                     .labelsHidden()
                     .disabled(!canEnable)
+                    .axLeaf("IgnoredSegments.Toggle.RuleEnabled")
                 TextField("e.g. uh, um, hmm", text: $rule.pattern)
                     .textFieldStyle(.roundedBorder)
+                    .axLeaf("IgnoredSegments.TextField.Pattern")
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.borderless)
+                .axLeaf("IgnoredSegments.Button.Delete")
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)

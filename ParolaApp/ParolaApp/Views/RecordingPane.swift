@@ -127,6 +127,7 @@ struct RecordingCard: View {
             }
             .buttonStyle(.plain)
             .keyboardShortcut(.return)
+            .axLeaf("Recording.Button.Stop")
         }
         .padding(32)
         .frame(width: 360)

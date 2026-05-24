@@ -24,10 +24,12 @@ struct GeneralPane: View {
                                 launchAtLoginError = error.localizedDescription
                             }
                         }
+                        .axLeaf("General.Toggle.LaunchAtLogin")
                 }
                 SettingRow("Show menu bar icon",
                            description: "Adds a Parola item to the system menu bar with quick actions and recent transcripts.") {
                     Toggle("", isOn: $model.showMenuBarExtra).labelsHidden()
+                        .axLeaf("General.Toggle.MenuBarExtra")
                 }
             }
 
@@ -40,20 +42,24 @@ struct GeneralPane: View {
                         .onChange(of: model.karaokeHighlight) { _, isOn in
                             if !isOn { model.wordTimestamps = false }
                         }
+                        .axLeaf("General.Toggle.KaraokeHighlight")
                 }
                 SettingRow("Use precise word timings",
                            description: "Asks Whisper for word-level timestamps. More accurate karaoke, but slower.") {
                     Toggle("", isOn: $model.wordTimestamps)
                         .labelsHidden()
                         .disabled(!model.karaokeHighlight)
+                        .axLeaf("General.Toggle.WordTimestamps")
                 }
                 SettingRow("Stream microphone in real time",
                            description: "Transcript appears as you speak. Off records the whole take first, then transcribes.") {
                     Toggle("", isOn: $model.useStreaming).labelsHidden()
+                        .axLeaf("General.Toggle.UseStreaming")
                 }
                 SettingRow("Identify speakers",
                            description: "Tags each segment with Speaker 1, Speaker 2, etc. Loads a second model on first use.") {
                     Toggle("", isOn: $model.diarize).labelsHidden()
+                        .axLeaf("General.Toggle.Diarize")
                 }
             }
 
@@ -63,6 +69,7 @@ struct GeneralPane: View {
                               text: $model.initialPrompt, axis: .vertical)
                         .lineLimit(2...6)
                         .textFieldStyle(.roundedBorder)
+                        .axLeaf("General.TextField.InitialPrompt")
                     Text("A short list of names or jargon helps Whisper get unusual words right.")
                         .font(.caption)
                         .foregroundStyle(.secondary)

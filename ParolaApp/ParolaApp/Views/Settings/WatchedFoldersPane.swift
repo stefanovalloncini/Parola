@@ -43,6 +43,7 @@ private struct WatchedFoldersPaneBody: View {
                     Button("Dismiss") { store.dismissError() }
                         .buttonStyle(.borderless)
                         .controlSize(.small)
+                        .axLeaf("WatchedFolders.Button.DismissError")
                 }
                 .padding(12)
                 .background(
@@ -56,6 +57,7 @@ private struct WatchedFoldersPaneBody: View {
             } label: {
                 Label("Add Folder…", systemImage: "plus.circle")
             }
+            .axLeaf("WatchedFolders.Button.AddFolder")
 
             SettingHelper(text: "New files dropped into a watched folder are transcribed automatically. Existing files are ignored.")
             ResetPaneButton(scope: .watchedFolders)
@@ -82,6 +84,7 @@ private struct WatchedFolderRow: View {
                         store.reattach(folder.id)
                     }
                     .controlSize(.small)
+                    .axLeaf("WatchedFolders.Button.Readd")
                 }
                 Button {
                     store.removeFolder(folder.id)
@@ -89,6 +92,7 @@ private struct WatchedFolderRow: View {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.borderless)
+                .axLeaf("WatchedFolders.Button.Remove")
             }
         }
     }

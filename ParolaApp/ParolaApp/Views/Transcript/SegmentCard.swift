@@ -183,10 +183,13 @@ struct SegmentCard: View {
     private var actionStrip: some View {
         HStack(spacing: 2) {
             cardButton(systemName: "pencil", help: "Edit") { beginEditing() }
+                .axLeaf("Card.Button.Edit")
             cardButton(systemName: "note.text", help: "Add note") { beginEditingNote() }
+                .axLeaf("Card.Button.Note")
             cardButton(systemName: "play.fill", help: "Play from here") {
                 model.seek(to: segment)
             }
+            .axLeaf("Card.Button.Play")
             cardButton(systemName: "clock", help: "Nudge timing") {
                 timingPopoverOpen = true
             }
@@ -194,16 +197,20 @@ struct SegmentCard: View {
                 SegmentTimingPopover(segment: segment)
                     .environment(model)
             }
+            .axLeaf("Card.Button.Timing")
             cardButton(systemName: "doc.on.doc", help: "Copy segment with timestamp") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(draggablePayload, forType: .string)
             }
+            .axLeaf("Card.Button.Copy")
             cardButton(systemName: "link", help: "Copy parola:// link to this segment") {
                 copyDeeplink()
             }
+            .axLeaf("Card.Button.CopyLink")
             cardButton(systemName: "trash", help: "Delete segment") {
                 model.deleteSegment(id: segment.id)
             }
+            .axLeaf("Card.Button.Delete")
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)

@@ -26,10 +26,12 @@ final class ParolaAutomationServer {
     private var commands: [String: AutomationCommand] = [:]
     private var revision: Int = 0
     private let auditLog: AutomationAuditLog?
+    let revisionLog: RevisionLog
 
-    init(model: AppModel, auditLog: AutomationAuditLog? = nil) throws {
+    init(model: AppModel, auditLog: AutomationAuditLog? = nil, revisionLog: RevisionLog? = nil) throws {
         self.model = model
         self.auditLog = auditLog
+        self.revisionLog = revisionLog ?? RevisionLog()
 
         let params = NWParameters.tcp
         params.acceptLocalOnly = true
@@ -64,6 +66,10 @@ final class ParolaAutomationServer {
             server.windowCommands(),
             server.waitCommands(),
             server.lifecycleCommands(),
+            server.revisionLogCommands(),
+            server.simulationCommands(),
+            server.mockCommands(),
+            server.accessibilityCommands(),
         ]
         var out: [String: AutomationCommand] = [:]
         for list in lists {
@@ -288,6 +294,14 @@ final class ParolaAutomationServer {
             let result = try await command.handler(validatedArgs, context)
             if command.kind == .mutating {
                 revision &+= 1
+                let stateSnapshot = snapshotState()
+                let entry = RevisionEntry(
+                    revision: revision,
+                    timestamp: Date(),
+                    cause: cmd,
+                    snapshotHash: RevisionLog.hash(stateSnapshot)
+                )
+                await revisionLog.append(entry)
             }
             let response = AutomationResponse.success(
                 id: id, command: cmd,

@@ -48,13 +48,17 @@ struct QueueRow: View {
             switch job.status {
             case .pending, .transcribing:
                 Button("Cancel batch") { model.cancelAllInFlightBatchJobs() }
+                    .axLeaf("Row.ContextMenuItem.CancelBatch")
             case .failed, .cancelled:
                 Button("Retry") { model.retryBatchJob(job.id) }
+                    .axLeaf("Row.ContextMenuItem.Retry")
             case .done:
                 Button("Open") { model.openBatchJobTranscript(job.id) }
+                    .axLeaf("Row.ContextMenuItem.Open")
                 Button("Reveal in Finder") {
                     NSWorkspace.shared.activateFileViewerSelecting([job.url])
                 }
+                .axLeaf("Row.ContextMenuItem.RevealInFinder")
             }
         }
         .onDrag {
@@ -139,5 +143,6 @@ struct QueueRow: View {
         }
         .buttonStyle(.plain)
         .help(help)
+        .axLeaf("Row.Button.\(help.replacingOccurrences(of: " ", with: ""))")
     }
 }

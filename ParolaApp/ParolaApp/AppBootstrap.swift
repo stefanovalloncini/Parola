@@ -14,6 +14,7 @@ struct AppBootstrap: @unchecked Sendable {
     let sideEffects: Set<BootstrapSideEffect>
     let filePicker: FilePicker
     let clock: any Clock<Duration>  // `any Clock<Duration>` isn't Sendable-marked, but the clocks we hand out (ContinuousClock, TestClock, ImmediateClock) are all immutable, safe-to-share instances.
+    let headless: Bool
 
     init(
         mode: Mode,
@@ -26,7 +27,8 @@ struct AppBootstrap: @unchecked Sendable {
         bridgeToken: String? = nil,
         sideEffects: Set<BootstrapSideEffect>,
         filePicker: FilePicker,
-        clock: any Clock<Duration> = ContinuousClock()
+        clock: any Clock<Duration> = ContinuousClock(),
+        headless: Bool = false
     ) {
         self.mode = mode
         self.library = library
@@ -39,6 +41,7 @@ struct AppBootstrap: @unchecked Sendable {
         self.sideEffects = sideEffects
         self.filePicker = filePicker
         self.clock = clock
+        self.headless = headless
     }
 
     static let normal: AppBootstrap = AppBootstrap(
@@ -61,7 +64,8 @@ struct AppBootstrap: @unchecked Sendable {
             bridgeToken: map["--bridge-token"],
             sideEffects: BootstrapSideEffect.testing,
             filePicker: SystemFilePicker(),
-            clock: ContinuousClock()
+            clock: ContinuousClock(),
+            headless: args.contains("--headless")
         )
     }
 

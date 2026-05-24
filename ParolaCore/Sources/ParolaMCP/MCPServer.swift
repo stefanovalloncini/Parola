@@ -12,6 +12,9 @@ public actor MCPServer {
     private let bridge: any BridgeProtocol
     private(set) var shouldExit: Bool = false
 
+    private var cachedToolList: [MCPTool] = ToolRegistry.allTools()
+    private var cachedBridgeVersion: Int?
+
     public func requestExit() {
         shouldExit = true
     }
@@ -35,7 +38,8 @@ public actor MCPServer {
         case "notifications/initialized":
             return nil
         case "tools/list":
-            return JSONRPCResponse.success(id: request.id, result: MCPListToolsResult(tools: ToolRegistry.allTools()))
+            await refreshToolListIfNeeded()
+            return JSONRPCResponse.success(id: request.id, result: MCPListToolsResult(tools: cachedToolList))
         case "tools/call":
             return try await callTool(request)
         case "shutdown":
@@ -76,6 +80,10 @@ public actor MCPServer {
             let result: MCPToolCallResult
             if let engineTool = EngineTool(rawValue: name) {
                 result = try await invoke(engineTool, args: args)
+            } else if let typedTool = TypedToolRegistry.byName[name] {
+                result = try await typedTool.invoke(args: args, bridge: bridge)
+            } else if name == TypedToolRegistry.appDispatch.name {
+                result = try await dispatchAppCommand(args: args)
             } else if let appTool = AppTools.byName[name] {
                 result = try await appTool.invoke(args: args, bridge: bridge)
             } else {
@@ -193,7 +201,7 @@ public actor MCPServer {
             source: source,
             options: TranscriptionOptions()
         )
-        let model = try LanguageModelFactory.makeOnDevice(
+        let model = try await LanguageModelFactory.makeOnDevice(
             instructions: "Summarise the transcript in 3 short bullet points."
         )
         let summary = try await model.respond(to: transcript.text)
@@ -205,6 +213,33 @@ public actor MCPServer {
         let bundleID = args["bundleID"] as? String ?? "com.parola.Parola"
         let report = try await AppLauncher.launch(bundleID: bundleID, timeoutMs: timeoutMs)
         return MCPToolCallResult(text: report)
+    }
+
+    private func dispatchAppCommand(args: [String: Any]) async throws -> MCPToolCallResult {
+        guard let command = args["command"] as? String, !command.isEmpty else {
+            throw MCPToolError("parola_app_dispatch requires 'command'")
+        }
+        let inner = (args["args"] as? [String: Any]) ?? [:]
+        let argsData = (try? JSONSerialization.data(withJSONObject: inner)) ?? Data("{}".utf8)
+        let text = try await bridge.call(command, argsJSON: argsData)
+        return MCPToolCallResult(text: text)
+    }
+
+    private func refreshToolListIfNeeded() async {
+        let version = await fetchHandshakeVersion()
+        guard version != cachedBridgeVersion else { return }
+        cachedBridgeVersion = version
+        cachedToolList = ToolRegistry.allTools()
+    }
+
+    private func fetchHandshakeVersion() async -> Int? {
+        let raw = try? await bridge.call("_handshake", argsJSON: Data("{}".utf8))
+        guard let raw,
+              let data = raw.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        return object["serverVersion"] as? Int
     }
 }
 

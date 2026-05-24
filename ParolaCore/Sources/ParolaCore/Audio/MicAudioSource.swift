@@ -9,7 +9,7 @@ import CoreAudio
 ///
 /// Lifecycle: `start()` to begin, `prepare()` to stop and return the file URL,
 /// or `cancel()` to stop and discard.
-public actor MicAudioSource: AudioSource {
+public actor MicAudioSource: LiveAudioSource {
     private let engine = AVAudioEngine()
     private let preferredDeviceUID: String?
     private var session: Session?

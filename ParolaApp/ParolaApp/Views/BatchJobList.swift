@@ -24,6 +24,7 @@ struct BatchJobList: View {
                     .buttonStyle(.borderless)
                     .controlSize(.small)
                     .disabled(model.batchJobs.allSatisfy { $0.status == .transcribing })
+                    .axLeaf("Queue.Button.Clear")
             }
             .padding(.horizontal, DS.Spacing.large)
             .padding(.top, DS.Spacing.regular)
@@ -49,6 +50,7 @@ struct BatchJobList: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
+                .axLeaf("Queue.Button.AddFiles")
             }
             .padding(.horizontal, DS.Spacing.large)
             .padding(.bottom, DS.Spacing.regular)
@@ -100,13 +102,16 @@ struct BatchJobList: View {
             .contextMenu {
                 if isPending {
                     Button("Move to top") { model.moveBatchJobToTop(job.id) }
+                        .axLeaf("Row.ContextMenuItem.MoveToTop")
                 }
                 if job.status == .done {
                     Button("Open transcript") { model.openBatchJobTranscript(job.id) }
+                        .axLeaf("Row.ContextMenuItem.OpenTranscript")
                 }
                 Button(job.status == .transcribing ? "Cancel" : "Remove", role: .destructive) {
                     model.cancelBatchJob(job.id)
                 }
+                .axLeaf("Row.ContextMenuItem.CancelOrRemove")
             }
     }
 
@@ -131,6 +136,7 @@ struct BatchJobList: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort: \(sortOrder.localizedTitle)")
+        .axLeaf("Queue.Menu.Sort")
     }
 
     private var filteredJobs: [BatchJob] {

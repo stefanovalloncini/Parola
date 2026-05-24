@@ -17,8 +17,11 @@ public actor EngineRegistry {
     }
 
     private var entries: [EngineID: Entry] = [:]
+    private let clock: any Clock<Duration>
 
-    public init() {}
+    public init(clock: any Clock<Duration> = ContinuousClock()) {
+        self.clock = clock
+    }
 
     public func register(
         engineID: EngineID,
@@ -39,7 +42,10 @@ public actor EngineRegistry {
         entries.removeAll()
     }
 
-    public func transcriber(for engineID: EngineID, store: ModelStore) throws -> any Transcriber {
+    public func transcriber(for engineID: EngineID, store: ModelStore) async throws -> any Transcriber {
+        if let mock = await MockTranscriberRegistry.shared.resolve(for: engineID) {
+            return MockTranscriber.make(response: mock, clock: clock)
+        }
         guard let entry = entries[engineID] else {
             throw ParolaError.engineNotRegistered(engineID.rawValue)
         }

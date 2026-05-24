@@ -41,7 +41,7 @@ public actor SummaryService {
     }
 
     private func summariseText(_ transcript: Transcript) async throws -> Summary {
-        let model = try LanguageModelFactory.makeOnDevice(instructions: SummaryService.textInstructions)
+        let model = try await LanguageModelFactory.makeOnDevice(instructions: SummaryService.textInstructions)
         return try await summarise(transcript, model: model)
     }
 

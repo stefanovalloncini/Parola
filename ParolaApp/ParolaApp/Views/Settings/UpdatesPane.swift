@@ -12,6 +12,7 @@ struct UpdatesPane: View {
                            description: "Looks for updates in the background once a day.",
                            isFirst: true) {
                     Toggle("", isOn: $model.sparkleAutomatic).labelsHidden()
+                        .axLeaf("Updates.Toggle.Automatic")
                 }
                 SettingRow("Channel", description: model.sparkleChannel.description) {
                     Picker("", selection: $model.sparkleChannelRaw) {
@@ -22,12 +23,14 @@ struct UpdatesPane: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(width: 200)
+                    .axLeaf("Updates.Picker.Channel")
                 }
                 SettingRow("Check now") {
                     Button("Check for updates…") {
                         SparkleUpdater.shared.checkForUpdates()
                     }
                     .disabled(!feedConfigured)
+                    .axLeaf("Updates.Button.CheckNow")
                 }
             }
 

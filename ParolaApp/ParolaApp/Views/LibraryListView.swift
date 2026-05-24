@@ -128,6 +128,7 @@ struct LibraryListView: View {
             }
             .accessibilityIdentifier("alert.rename.confirm")
         }
+        .axBranch("Library")
     }
 
     private var header: some View {
@@ -144,25 +145,35 @@ struct LibraryListView: View {
             if !selection.isEmpty {
                 Menu {
                     Button("Plain Text (.txt)") { model.bulkExportEntries(ids: selection, format: .txt) }
+                        .axLeaf("Header.MenuItem.ExportTxt")
                     Button("Markdown (.md)") { model.bulkExportEntries(ids: selection, format: .md) }
+                        .axLeaf("Header.MenuItem.ExportMd")
                     Button("Subtitles (.srt)") { model.bulkExportEntries(ids: selection, format: .srt) }
+                        .axLeaf("Header.MenuItem.ExportSrt")
                     Button("WebVTT (.vtt)") { model.bulkExportEntries(ids: selection, format: .vtt) }
+                        .axLeaf("Header.MenuItem.ExportVtt")
                     Button("CSV (.csv)") { model.bulkExportEntries(ids: selection, format: .csv) }
+                        .axLeaf("Header.MenuItem.ExportCsv")
                     Button("JSON (.json)") { model.bulkExportEntries(ids: selection, format: .json) }
+                        .axLeaf("Header.MenuItem.ExportJson")
                     Button("JSON Lines (.jsonl)") { model.bulkExportEntries(ids: selection, format: .jsonl) }
+                        .axLeaf("Header.MenuItem.ExportJsonl")
                     Button("HTML (.html)") { model.bulkExportEntries(ids: selection, format: .html) }
+                        .axLeaf("Header.MenuItem.ExportHtml")
                 } label: {
                     Label("Export \(selection.count)", systemImage: "square.and.arrow.up")
                 }
                 .menuStyle(.borderlessButton)
                 .controlSize(.small)
                 .fixedSize()
+                .axLeaf("Header.Menu.BulkExport")
                 Button(role: .destructive) {
                     pendingBulkDelete = true
                 } label: {
                     Label("Delete \(selection.count)", systemImage: "trash")
                 }
                 .controlSize(.small)
+                .axLeaf("Header.Button.BulkDelete")
             }
             Text(totalsLabel)
                 .font(DS.Font.captionMono)
@@ -213,12 +224,14 @@ struct LibraryListView: View {
                     Label("Open file…", systemImage: "doc.badge.plus")
                 }
                 .buttonStyle(.borderedProminent)
+                .axLeaf("Empty.Button.OpenFile")
                 Button {
                     model.startRecording(source: .microphone)
                 } label: {
                     Label("Record", systemImage: "mic.fill")
                 }
                 .buttonStyle(.bordered)
+                .axLeaf("Empty.Button.Record")
             }
             .padding(.top, 4)
         }

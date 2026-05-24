@@ -12,9 +12,10 @@ actor MicDictationRecorder: DictationRecorder {
     private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
     private var partialContinuations: [UUID: AsyncStream<String>.Continuation] = [:]
 
-    private var fallbackSource: MicAudioSource?
+    private var fallbackSource: (any LiveAudioSource)?
     private let fallbackSession = TranscriptionSession()
     private var fallbackForwardingTask: Task<Void, Never>?
+    private let clock: any Clock<Duration>
 
     private var streamingSession: StreamingTranscriptionSession?
     private var streamingConsumer: Task<Void, Never>?
@@ -27,7 +28,8 @@ actor MicDictationRecorder: DictationRecorder {
         language: String?,
         deviceUID: String? = nil,
         streamingEnabled: Bool = true,
-        workflowResolver: (@Sendable () async -> DictationWorkflow?)? = nil
+        workflowResolver: (@Sendable () async -> DictationWorkflow?)? = nil,
+        clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.model = model
         self.defaultLanguage = language
@@ -35,6 +37,7 @@ actor MicDictationRecorder: DictationRecorder {
         self.deviceUID = deviceUID
         self.streamingEnabled = streamingEnabled
         self.workflowResolver = workflowResolver
+        self.clock = clock
     }
 
     private func resolveLanguageOverride() async {
@@ -158,7 +161,7 @@ actor MicDictationRecorder: DictationRecorder {
 
     private func startFallback() async throws {
         guard fallbackSource == nil else { return }
-        let mic = MicAudioSource(deviceUID: deviceUID)
+        let mic = await LiveAudioSourceFactory.makeMicrophone(deviceUID: deviceUID, clock: clock)
         try await mic.start()
         fallbackSource = mic
         fallbackForwardingTask?.cancel()

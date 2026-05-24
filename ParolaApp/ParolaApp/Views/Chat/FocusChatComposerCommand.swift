@@ -9,5 +9,6 @@ struct FocusChatComposerCommand: View {
         }
         .keyboardShortcut("l", modifiers: [.command])
         .disabled(focus == nil)
+        .axLeaf("Menu.Button.FocusChatComposer")
     }
 }

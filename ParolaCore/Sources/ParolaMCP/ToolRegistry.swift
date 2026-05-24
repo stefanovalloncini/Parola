@@ -2,10 +2,12 @@ import Foundation
 
 public enum ToolRegistry {
     public static func allTools() -> [MCPTool] {
-        EngineTool.allCases.map(\.mcpTool) + AppTools.all.map(\.mcpTool)
+        let engineNames = Set(EngineTool.allCases.map(\.rawValue))
+        return EngineTool.allCases.map(\.mcpTool)
+            + TypedToolRegistry.emittedTools(skipping: engineNames)
     }
 
     public static func allToolNames() -> [String] {
-        EngineTool.allCases.map(\.rawValue) + AppTools.all.map(\.name)
+        allTools().map(\.name)
     }
 }

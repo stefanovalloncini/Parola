@@ -44,6 +44,7 @@ struct TranscriptHeaderBar: View {
                 }
                 .environment(model)
             }
+            .axLeaf("HeaderBar.Button.Outline")
 
             Button { jumpOpen.toggle() } label: {
                 Image(systemName: "clock.arrow.circlepath")
@@ -53,30 +54,35 @@ struct TranscriptHeaderBar: View {
             .popover(isPresented: $jumpOpen, arrowEdge: .bottom) {
                 jumpPopover
             }
+            .axLeaf("HeaderBar.Button.JumpToTime")
 
             Button { toggleSpeak() } label: {
                 Image(systemName: speaker.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
             }
             .buttonStyle(.borderless)
             .modifier(SpeakHelpModifier(isSpeaking: speaker.isSpeaking))
+            .axLeaf("HeaderBar.Button.Speak")
 
             Button { model.transcriptCompact.toggle() } label: {
                 Image(systemName: model.transcriptCompact ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
             }
             .buttonStyle(.borderless)
             .modifier(CompactHelpModifier(isCompact: model.transcriptCompact))
+            .axLeaf("HeaderBar.Button.ToggleCompact")
 
             Button(action: onOpenSummary) {
                 Image(systemName: "sparkles")
             }
             .buttonStyle(.borderless)
             .help("Summary")
+            .axLeaf("HeaderBar.Button.OpenSummary")
 
             Button(action: onOpenChat) {
                 Image(systemName: "bubble.left.and.text.bubble.right")
             }
             .buttonStyle(.borderless)
             .help("Chat with this transcript")
+            .axLeaf("HeaderBar.Button.OpenChat")
 
             Button(action: onAdvance) {
                 Image(systemName: "chevron.right.2")
@@ -89,6 +95,7 @@ struct TranscriptHeaderBar: View {
             }
             .buttonStyle(.plain)
             .help("Jump to next segment")
+            .axLeaf("HeaderBar.Button.Advance")
         }
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.small)
@@ -115,9 +122,11 @@ struct TranscriptHeaderBar: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 100)
                     .onSubmit { commitJump() }
+                    .axLeaf("HeaderBar.TextField.JumpTime")
                 Button("Go", action: commitJump)
                     .buttonStyle(.borderedProminent)
                     .disabled(Timecode.parse(jumpDraft) == nil)
+                    .axLeaf("HeaderBar.Button.JumpGo")
             }
         }
         .padding(12)

@@ -16,6 +16,7 @@ struct URLRuleRow: View {
             TextField(String(localized: "Example: gmail.com"), text: urlPatternBinding)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 160)
+                .axLeaf("URLRule.TextField.Pattern")
 
             Picker("", selection: promptBinding) {
                 Text("Default prompt").tag("")
@@ -26,6 +27,7 @@ struct URLRuleRow: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .frame(width: 140)
+            .axLeaf("URLRule.Picker.Prompt")
 
             Picker("", selection: languageBinding) {
                 Text("Default language").tag("")
@@ -36,6 +38,7 @@ struct URLRuleRow: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .frame(width: 110)
+            .axLeaf("URLRule.Picker.Language")
 
             Picker("", selection: insertionBinding) {
                 Text("Paste").tag(DictationInsertionMode.paste)
@@ -44,6 +47,7 @@ struct URLRuleRow: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .frame(width: 110)
+            .axLeaf("URLRule.Picker.Insertion")
 
             Button(role: .destructive) {
                 model.removeDictationURLRule(for: app.bundleID, at: index)
@@ -52,6 +56,7 @@ struct URLRuleRow: View {
             }
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
+            .axLeaf("URLRule.Button.Remove")
         }
         .padding(.leading, 6)
     }

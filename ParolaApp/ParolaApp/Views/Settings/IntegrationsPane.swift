@@ -57,6 +57,7 @@ private struct ToolStatusRow: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(installing)
+                        .axLeaf("Integrations.Button.Install.\(name)")
                     }
                 }
                 Text(description)

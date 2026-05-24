@@ -36,6 +36,7 @@ struct FindBar: View {
                     .focused($queryFocused)
                     .onSubmit { model.goToNextMatch() }
                     .accessibilityIdentifier("find.query")
+                    .axLeaf("FindBar.TextField.Query")
                 if !model.findQuery.isEmpty {
                     Text(matchSummary)
                         .font(DS.Font.captionMono)
@@ -90,6 +91,7 @@ struct FindBar: View {
             .help("Close find")
             .accessibilityLabel("Close find")
             .accessibilityIdentifier("find.close")
+            .axLeaf("FindBar.Button.Close")
         }
     }
 
@@ -104,6 +106,7 @@ struct FindBar: View {
                     .textFieldStyle(.plain)
                     .focused($replaceFocused)
                     .accessibilityIdentifier("find.replacement")
+                    .axLeaf("FindBar.TextField.Replace")
             }
 
             Button("Replace") { model.replaceCurrentMatch() }
@@ -112,6 +115,7 @@ struct FindBar: View {
                 .keyboardShortcut("=", modifiers: [.command])
                 .disabled(model.matches.isEmpty)
                 .accessibilityIdentifier("find.replace")
+                .axLeaf("FindBar.Button.Replace")
 
             Button("Replace All") { model.replaceAllMatches() }
                 .buttonStyle(.borderedProminent)
@@ -120,6 +124,7 @@ struct FindBar: View {
                 .keyboardShortcut("e", modifiers: [.command, .option])
                 .disabled(model.matches.isEmpty)
                 .accessibilityIdentifier("find.replaceAll")
+                .axLeaf("FindBar.Button.ReplaceAll")
         }
         .padding(.leading, 2)
     }

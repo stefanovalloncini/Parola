@@ -14,6 +14,7 @@ struct MiniPlayerWindow: View {
         .padding(.vertical, 10)
         .frame(minWidth: 320, idealWidth: 360, maxWidth: 520)
         .background(MiniPlayerWindowConfigurator())
+        .axBranch("MiniPlayer")
     }
 
     private var currentSegmentText: some View {
@@ -41,6 +42,7 @@ struct MiniPlayerWindow: View {
             }
             .buttonStyle(.borderless)
             .disabled(model.transcript == nil)
+            .axLeaf("MiniPlayer.Button.Previous")
 
             Button(action: togglePlayPause) {
                 Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
@@ -51,12 +53,14 @@ struct MiniPlayerWindow: View {
             }
             .buttonStyle(.plain)
             .disabled(model.player == nil)
+            .axLeaf("MiniPlayer.Button.PlayPause")
 
             Button(action: next) {
                 Image(systemName: "forward.fill")
             }
             .buttonStyle(.borderless)
             .disabled(model.transcript == nil)
+            .axLeaf("MiniPlayer.Button.Next")
 
             Spacer()
 

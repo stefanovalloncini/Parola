@@ -41,18 +41,21 @@ struct SnippetsPane: View {
                 } label: {
                     Label("Add snippet", systemImage: "plus.circle")
                 }
+                .axLeaf("Snippets.Button.AddSnippet")
                 Spacer()
                 Button {
                     model.importSnippetsFromFile()
                 } label: {
                     Label("Import…", systemImage: "square.and.arrow.down")
                 }
+                .axLeaf("Snippets.Button.Import")
                 Button {
                     model.exportSnippetsToFile()
                 } label: {
                     Label("Export…", systemImage: "square.and.arrow.up")
                 }
                 .disabled(model.snippets.isEmpty)
+                .axLeaf("Snippets.Button.Export")
             }
 
             placeholderHelp
@@ -112,16 +115,20 @@ private struct SnippetRow: View {
                     Toggle("", isOn: enabledBinding)
                         .labelsHidden()
                         .disabled(!canEnable)
+                        .axLeaf("Snippets.Toggle.SnippetEnabled")
                     TextField("trigger phrase", text: $snippet.trigger)
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: 200)
+                        .axLeaf("Snippets.TextField.Trigger")
                     Text("→").foregroundStyle(.secondary)
                     TextField("replacement", text: $snippet.replacement)
                         .textFieldStyle(.roundedBorder)
+                        .axLeaf("Snippets.TextField.Replacement")
                     Button(role: .destructive, action: onDelete) {
                         Image(systemName: "trash")
                     }
                     .buttonStyle(.borderless)
+                    .axLeaf("Snippets.Button.Delete")
                 }
             }
             .padding(.horizontal, 16)

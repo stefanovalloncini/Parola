@@ -47,6 +47,7 @@ struct PillPickerButton<MenuContent: View>: View {
                 .padding(.vertical, 6)
                 .frame(minWidth: 240)
         }
+        .axLeaf("Pill.Button.\(caption)")
     }
 }
 
@@ -87,6 +88,7 @@ struct PillToggleButton: View {
         .onHover { hovering = $0 }
         .accessibilityLabel(label)
         .accessibilityValue(isOn ? "on" : "off")
+        .axLeaf("Pill.Toggle.\(label)")
     }
 
     private var fillColor: Color {
@@ -159,6 +161,7 @@ struct PillPopoverRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .axLeaf("Pill.PopoverRow.\(title)")
     }
 }
 

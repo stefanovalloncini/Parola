@@ -26,6 +26,7 @@ struct QueueView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)
+        .axBranch("Queue")
     }
 
     private var toolbar: some View {
@@ -52,6 +53,7 @@ struct QueueView: View {
             .buttonStyle(.plain)
             .disabled(!hasFinishedJobs)
             .opacity(hasFinishedJobs ? 1 : 0.5)
+            .axLeaf("Toolbar.Button.ClearFinished")
         }
         .padding(.horizontal, DS.Spacing.large)
         .padding(.vertical, DS.Spacing.regular)
@@ -78,6 +80,7 @@ struct QueueView: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort jobs")
+        .axLeaf("Toolbar.Menu.Sort")
     }
 
     @ViewBuilder

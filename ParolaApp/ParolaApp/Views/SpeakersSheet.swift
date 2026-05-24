@@ -78,6 +78,7 @@ struct SpeakersSheet: View {
             Button("Cancel") { dismiss() }
                 .sheetSecondaryAction()
                 .keyboardShortcut(.cancelAction)
+                .axLeaf("Speakers.Button.Cancel")
 
             Spacer()
 
@@ -87,6 +88,7 @@ struct SpeakersSheet: View {
             }
             .sheetPrimaryAction()
             .keyboardShortcut(.defaultAction)
+            .axLeaf("Speakers.Button.Done")
         }
     }
 
@@ -99,6 +101,7 @@ struct SpeakersSheet: View {
             TextField("Rename", text: renameBinding(for: speaker))
                 .textFieldStyle(.roundedBorder)
                 .focused($focusedSpeaker, equals: speaker)
+                .axLeaf("Speakers.TextField.Rename")
         }
     }
 
@@ -138,6 +141,7 @@ private struct FlowChips: View {
                 Button(item) { onTap(item) }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .axLeaf("Speakers.Button.Suggestion")
             }
         }
     }

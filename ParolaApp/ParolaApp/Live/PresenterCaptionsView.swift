@@ -28,6 +28,7 @@ struct PresenterCaptionsView: View {
         .background(KeyEventCatcher(onEscape: onClose))
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.18), value: hovering)
+        .axBranch("Presenter")
     }
 
     @ViewBuilder

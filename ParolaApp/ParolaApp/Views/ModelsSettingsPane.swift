@@ -140,6 +140,7 @@ struct ModelsSettingsPane: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort: \(sortOption.label)")
+        .axLeaf("ModelsSettings.Menu.Sort")
     }
 
     private var chipsRow: some View {

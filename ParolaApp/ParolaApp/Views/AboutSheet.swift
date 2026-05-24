@@ -50,10 +50,12 @@ struct AboutSheet: View {
                 Spacer()
                 Button("Close") { dismiss() }
                     .keyboardShortcut(.cancelAction)
+                    .axLeaf("About.Button.Close")
             }
         }
         .padding(20)
         .frame(width: 380, height: 360)
+        .axBranch("About")
     }
 
     private static var versionString: String {

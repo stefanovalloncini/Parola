@@ -16,6 +16,7 @@ struct SettingsView: View {
         }
         .frame(minWidth: 880, idealWidth: 900, maxWidth: .infinity,
                minHeight: 600, idealHeight: 640, maxHeight: .infinity)
+        .axBranch("Settings")
     }
 }
 
@@ -251,6 +252,7 @@ private struct SidebarRow: View {
             )
             .contentShape(Rectangle())
         }
+        .axLeaf("Sidebar.Button.\(route.rawValue)")
         .buttonStyle(.plain)
         .padding(.horizontal, 8)
         .onHover { hovering = $0 }

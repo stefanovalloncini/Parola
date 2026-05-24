@@ -10,17 +10,21 @@ struct PromptsMenu: View {
             ForEach(Prompt.builtIns) { prompt in
                 Button(prompt.name) { model.runPrompt(prompt) }
                     .accessibilityIdentifier("prompts.\(Self.identifierSlug(prompt.name))")
+                    .axLeaf("Toolbar.MenuItem.BuiltinPrompt.\(Self.identifierSlug(prompt.name))")
             }
             Divider()
             Button("YouTube Chapters") { model.generateYouTubeChapters() }
                 .accessibilityIdentifier("prompts.youtube_chapters")
+                .axLeaf("Toolbar.MenuItem.YouTubeChapters")
             Button("Speakers…") { model.showingSpeakersSheet = true }
                 .accessibilityIdentifier("prompts.speakers")
+                .axLeaf("Toolbar.MenuItem.Speakers")
             if !userPrompts.isEmpty {
                 Divider()
                 ForEach(userPrompts) { prompt in
                     Button(prompt.name) { model.runPrompt(prompt) }
                         .accessibilityIdentifier("prompts.\(Self.identifierSlug(prompt.name))")
+                        .axLeaf("Toolbar.MenuItem.UserPrompt.\(Self.identifierSlug(prompt.name))")
                 }
             }
         } label: {
@@ -33,6 +37,7 @@ struct PromptsMenu: View {
         .menuIndicator(.hidden)
         .modifier(PromptsMenuHelp(isRunning: model.isRunningPrompt))
         .accessibilityIdentifier("toolbar.prompts")
+        .axLeaf("Toolbar.Menu.Prompts")
         .task {
             userPrompts = await model.promptLibrary.userPrompts
         }

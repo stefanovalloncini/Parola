@@ -17,9 +17,11 @@ struct SummarySheet: View {
                         Label("Copy", systemImage: "doc.on.doc")
                     }
                     .keyboardShortcut("c", modifiers: [.command, .shift])
+                    .axLeaf("SummarySheet.Button.Copy")
                 }
                 Button("Done") { dismiss() }
                     .keyboardShortcut(.escape, modifiers: [])
+                    .axLeaf("SummarySheet.Button.Done")
             }
             .padding(DS.Spacing.regular)
             Divider()
@@ -44,6 +46,7 @@ struct ChatSheet: View {
                 Spacer()
                 Button("Done") { dismiss() }
                     .keyboardShortcut(.escape, modifiers: [])
+                    .axLeaf("ChatSheet.Button.Done")
             }
             .padding(DS.Spacing.regular)
             Divider()

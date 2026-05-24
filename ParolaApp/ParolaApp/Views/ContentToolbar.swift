@@ -21,6 +21,7 @@ struct ContentToolbar: ToolbarContent {
                 .toggleStyle(.button)
                 .help("Translate to English instead of transcribing in the source language.")
                 .accessibilityIdentifier("toolbar.translate")
+                .axLeaf("Toolbar.Toggle.Translate")
             }
             Toggle(isOn: $model.diarize) {
                 HStack(spacing: 4) {
@@ -31,6 +32,7 @@ struct ContentToolbar: ToolbarContent {
             .toggleStyle(.button)
             .help("Identify multiple speakers in the audio (slower).")
             .accessibilityIdentifier("toolbar.diarize")
+            .axLeaf("Toolbar.Toggle.Diarize")
         }
         ToolbarItemGroup(placement: .primaryAction) {
             if model.route != .batch {
@@ -41,6 +43,7 @@ struct ContentToolbar: ToolbarContent {
                 }
                 .help("Open the batch transcription page.")
                 .accessibilityIdentifier("toolbar.batch")
+                .axLeaf("Toolbar.Button.Batch")
             }
             if !model.deletedEntries.isEmpty {
                 Button { model.showingTrash = true } label: {
@@ -48,6 +51,7 @@ struct ContentToolbar: ToolbarContent {
                 }
                 .help("Show Recently Deleted")
                 .accessibilityIdentifier("toolbar.recentlyDeleted")
+                .axLeaf("Toolbar.Button.RecentlyDeleted")
             }
             Button {
                 model.youtubeSheetOpen = true
@@ -57,18 +61,22 @@ struct ContentToolbar: ToolbarContent {
             .disabled(isBusy)
             .help("Transcribe from a YouTube URL.")
             .accessibilityIdentifier("toolbar.youtube")
+            .axLeaf("Toolbar.Button.YouTube")
 
             Menu {
                 Button("Microphone") { model.startRecording(source: .microphone) }
                     .accessibilityIdentifier("toolbar.record.microphone")
+                    .axLeaf("Toolbar.MenuItem.RecordMicrophone")
                 Button("System audio") { model.startRecording(source: .systemAudio) }
                     .accessibilityIdentifier("toolbar.record.system")
+                    .axLeaf("Toolbar.MenuItem.RecordSystem")
             } label: {
                 Label("Record", systemImage: "mic.fill")
             }
             .disabled(isBusy)
             .help("Record from the microphone or system audio.")
             .accessibilityIdentifier("toolbar.record")
+            .axLeaf("Toolbar.Menu.Record")
 
             PromptsMenu()
                 .disabled(model.transcript == nil || model.isRunningPrompt)
@@ -81,6 +89,7 @@ struct ContentToolbar: ToolbarContent {
             .disabled(isBusy)
             .help("Open an audio or video file.")
             .accessibilityIdentifier("toolbar.openFile")
+            .axLeaf("Toolbar.Button.OpenFile")
         }
     }
 

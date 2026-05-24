@@ -43,17 +43,22 @@ struct FindReplacePane: View {
                 } label: {
                     Label("Add rule", systemImage: "plus.circle")
                 }
+                .axLeaf("FindReplace.Button.AddRule")
                 Spacer()
                 Menu {
                     Button("Tech terms (English)") { model.importBundledTermPack(named: "tech-terms-en") }
+                        .axLeaf("FindReplace.MenuItem.PackTechTermsEn")
                     Button("Termini tecnici (Italiano)") { model.importBundledTermPack(named: "tech-terms-it") }
+                        .axLeaf("FindReplace.MenuItem.PackTechTermsIt")
                     Divider()
                     Button("Import from file…") { model.presentTermPackImporter() }
+                        .axLeaf("FindReplace.MenuItem.ImportFromFile")
                 } label: {
                     Label("Import pack", systemImage: "tray.and.arrow.down")
                 }
                 .menuStyle(.borderlessButton)
                 .fixedSize()
+                .axLeaf("FindReplace.Menu.ImportPack")
 
                 Button {
                     model.presentTermPackExporter()
@@ -61,6 +66,7 @@ struct FindReplacePane: View {
                     Label("Export pack", systemImage: "tray.and.arrow.up")
                 }
                 .disabled(model.findReplaceRules.isEmpty)
+                .axLeaf("FindReplace.Button.ExportPack")
             }
 
             SettingHelper(text: "Substitutions applied to every new transcript before it's saved. Term packs add curated rules in one click.")
@@ -129,6 +135,7 @@ struct FindReplacePane: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .help("Sort rules")
+            .axLeaf("FindReplace.Menu.Sort")
         }
     }
 
@@ -200,22 +207,28 @@ private struct FindReplaceRuleRow: View {
                     Toggle("", isOn: enabledBinding)
                         .labelsHidden()
                         .disabled(!canEnable)
+                        .axLeaf("FindReplace.Toggle.RuleEnabled")
                     TextField("find", text: $rule.find)
                         .textFieldStyle(.roundedBorder)
                         .overlay(
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .strokeBorder(regexError == nil ? Color.clear : Color.red.opacity(0.8), lineWidth: 1)
                         )
+                        .axLeaf("FindReplace.TextField.Find")
                     Text("→").foregroundStyle(.secondary)
                     TextField("replace with", text: $rule.replace).textFieldStyle(.roundedBorder)
+                        .axLeaf("FindReplace.TextField.Replace")
                     Button(role: .destructive, action: onDelete) {
                         Image(systemName: "trash")
                     }
                     .buttonStyle(.borderless)
+                    .axLeaf("FindReplace.Button.DeleteRule")
                 }
                 HStack(spacing: 16) {
                     Toggle("Case-sensitive", isOn: $rule.caseSensitive).toggleStyle(.checkbox)
+                        .axLeaf("FindReplace.Toggle.CaseSensitive")
                     Toggle("Regex", isOn: $rule.regex).toggleStyle(.checkbox)
+                        .axLeaf("FindReplace.Toggle.Regex")
                 }
                 .font(.caption)
                 if let regexError {

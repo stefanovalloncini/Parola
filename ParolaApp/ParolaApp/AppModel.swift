@@ -1089,12 +1089,15 @@ final class AppModel {
                 phase = .recording(source: source)
                 switch source {
                 case .microphone:
-                    let mic = MicAudioSource(deviceUID: preferredInputDeviceUID)
+                    let mic = await LiveAudioSourceFactory.makeMicrophone(
+                        deviceUID: preferredInputDeviceUID,
+                        clock: clock
+                    )
                     try await mic.start()
                     liveSource = mic
                     observeRecordingLevels(from: mic)
                 case .systemAudio:
-                    let sys = SystemAudioSource()
+                    let sys = await LiveAudioSourceFactory.makeSystem(clock: clock)
                     try await sys.start()
                     liveSource = sys
                     observeRecordingLevels(from: sys)
@@ -1120,24 +1123,11 @@ final class AppModel {
         }
     }
 
-    private func observeRecordingLevels(from mic: MicAudioSource) {
+    private func observeRecordingLevels(from source: any LiveAudioSource) {
         recordingLevelTask?.cancel()
         let subject = recordingAudioLevel
         recordingLevelTask = Task { @MainActor in
-            let stream = await mic.levels()
-            for await value in stream {
-                if abs(subject.value - value) > 0.05 {
-                    subject.send(value)
-                }
-            }
-        }
-    }
-
-    private func observeRecordingLevels(from system: SystemAudioSource) {
-        recordingLevelTask?.cancel()
-        let subject = recordingAudioLevel
-        recordingLevelTask = Task { @MainActor in
-            let stream = await system.levels()
+            let stream = await source.levels()
             for await value in stream {
                 if abs(subject.value - value) > 0.05 {
                     subject.send(value)

@@ -33,10 +33,12 @@ struct AboutPane: View {
                         NSWorkspace.shared.open(url)
                     }
                 }
+                .axLeaf("About.Button.OpenRepository")
                 Button("Copy version") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(versionLine, forType: .string)
                 }
+                .axLeaf("About.Button.CopyVersion")
             }
             .controlSize(.small)
 

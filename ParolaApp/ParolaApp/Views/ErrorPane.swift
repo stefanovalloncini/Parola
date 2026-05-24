@@ -11,6 +11,7 @@ struct ErrorPane: View {
         } actions: {
             Button("Try again") { model.dismissError() }
                 .buttonStyle(.bordered)
+                .axLeaf("Error.Button.TryAgain")
         }
     }
 }

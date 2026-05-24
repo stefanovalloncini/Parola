@@ -19,6 +19,7 @@ struct SummaryPane: View {
             content
         }
         .background(DS.Color.surface)
+        .axBranch("Summary")
     }
 
     private var header: some View {
@@ -40,6 +41,7 @@ struct SummaryPane: View {
             .foregroundStyle(DS.Color.secondaryText)
             .disabled(model.transcript == nil || model.isSummarising)
             .help(model.transcript?.summary == nil ? "Generate summary" : "Regenerate summary")
+            .axLeaf("Summary.Button.Regenerate")
         }
     }
 

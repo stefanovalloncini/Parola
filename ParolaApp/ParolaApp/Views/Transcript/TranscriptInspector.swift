@@ -60,6 +60,7 @@ struct InspectorModeIcon: View {
                 .foregroundStyle(isOn ? DS.Color.accent : DS.Color.primaryText)
         }
         .buttonStyle(.plain)
+        .axLeaf("Inspector.Button.\(systemName.replacingOccurrences(of: ".", with: ""))")
     }
 }
 
@@ -106,6 +107,7 @@ struct InspectorDisclosureRow<Content: View>: View {
                 }
             }
             .buttonStyle(.plain)
+            .axLeaf("Inspector.Button.DisclosureRow")
 
             if isExpanded {
                 content

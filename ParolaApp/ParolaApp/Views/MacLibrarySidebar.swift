@@ -38,6 +38,7 @@ struct MacLibrarySidebar: View {
                         model.libraryFilter = nil
                         model.route = .transcript
                     }
+                    .axLeaf("Sidebar.Button.Home")
 
                     SidebarRow(
                         id: "library.queue",
@@ -49,6 +50,7 @@ struct MacLibrarySidebar: View {
                         model.libraryFilter = nil
                         model.route = .queue
                     }
+                    .axLeaf("Sidebar.Button.Queue")
 
                     SidebarRow(
                         id: "library.recentlyDeleted",
@@ -58,6 +60,7 @@ struct MacLibrarySidebar: View {
                     ) {
                         model.showingTrash = true
                     }
+                    .axLeaf("Sidebar.Button.RecentlyDeleted")
 
                     SectionLabel("People").padding(.top, 14)
 
@@ -72,6 +75,7 @@ struct MacLibrarySidebar: View {
                         }
                     }
                     .disabled(model.transcript == nil)
+                    .axLeaf("Sidebar.Button.AddPeople")
                 }
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
@@ -141,6 +145,7 @@ struct MacLibrarySidebar: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort")
+        .axLeaf("Sidebar.Menu.Sort")
     }
 
     private var bottomPills: some View {
@@ -149,6 +154,7 @@ struct MacLibrarySidebar: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("library.settings")
+        .axLeaf("Sidebar.Button.Settings")
     }
 }
 

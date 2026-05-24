@@ -78,6 +78,7 @@ struct RecentlyDeletedToolbar: View {
             emptyTrashButton
             Button("Done", action: onDone)
                 .keyboardShortcut(.defaultAction)
+                .axLeaf("Toolbar.Button.Done")
         }
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.small)
@@ -91,6 +92,7 @@ struct RecentlyDeletedToolbar: View {
             TextField("Search", text: $searchText)
                 .textFieldStyle(.plain)
                 .frame(minWidth: 140, maxWidth: 200)
+                .axLeaf("Toolbar.TextField.Search")
             if !searchText.isEmpty {
                 Button { searchText = "" } label: {
                     Image(systemName: "xmark.circle.fill")
@@ -98,6 +100,7 @@ struct RecentlyDeletedToolbar: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .axLeaf("Toolbar.Button.ClearSearch")
             }
         }
         .padding(.horizontal, 10)
@@ -124,6 +127,7 @@ struct RecentlyDeletedToolbar: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort")
+        .axLeaf("Toolbar.Menu.Sort")
     }
 
     var actionMenu: some View {
@@ -132,11 +136,13 @@ struct RecentlyDeletedToolbar: View {
                 for entry in model.deletedEntries { model.restoreEntry(entry.id) }
             }
             .disabled(model.deletedEntries.isEmpty)
+            .axLeaf("Toolbar.MenuItem.RestoreAll")
             Divider()
             Button("Empty Recently Deleted", role: .destructive) {
                 confirmingEmpty = true
             }
             .disabled(model.deletedEntries.isEmpty)
+            .axLeaf("Toolbar.MenuItem.EmptyTrash")
         } label: {
             Image(systemName: "ellipsis")
                 .font(.system(size: 13, weight: .semibold))
@@ -147,6 +153,7 @@ struct RecentlyDeletedToolbar: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("More actions")
+        .axLeaf("Toolbar.Menu.Actions")
     }
 
     var emptyTrashButton: some View {
@@ -160,6 +167,7 @@ struct RecentlyDeletedToolbar: View {
         .buttonStyle(.plain)
         .disabled(model.deletedEntries.isEmpty)
         .help("Empty Recently Deleted")
+        .axLeaf("Toolbar.Button.EmptyTrash")
     }
 }
 

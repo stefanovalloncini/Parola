@@ -34,9 +34,11 @@ struct LibraryFilterBar: View {
             if !labelOptions.isEmpty {
                 Menu {
                     Button("All labels") { labelFilter = nil }
+                        .axLeaf("Filter.MenuItem.AllLabels")
                     Divider()
                     ForEach(labelOptions, id: \.self) { label in
                         Button(label) { labelFilter = label }
+                            .axLeaf("Filter.MenuItem.Label.\(label)")
                     }
                 } label: {
                     HStack(spacing: 4) {
@@ -49,10 +51,12 @@ struct LibraryFilterBar: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
+                .axLeaf("Filter.Menu.Label")
             }
             Menu {
                 ForEach(LibraryDateRangeFilter.allCases) { option in
                     Button(option.label) { dateRangeFilter = option }
+                        .axLeaf("Filter.MenuItem.Date.\(option.rawValue)")
                 }
             } label: {
                 HStack(spacing: 4) {
@@ -65,6 +69,7 @@ struct LibraryFilterBar: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
+            .axLeaf("Filter.Menu.Date")
         }
     }
 }

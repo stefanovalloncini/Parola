@@ -12,6 +12,7 @@ struct LiveCaptionsPane: View {
                            isFirst: true) {
                     Toggle("", isOn: translateBinding)
                         .labelsHidden()
+                        .axLeaf("LiveCaptions.Toggle.Translate")
                 }
                 SettingRow("Status") {
                     Text(liveCaptions.isActive ? "Running" : "Stopped")

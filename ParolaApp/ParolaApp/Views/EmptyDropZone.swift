@@ -19,42 +19,50 @@ struct EmptyDropZone: View {
                         systemImage: "folder.fill.badge.plus",
                         action: { model.presentOpenPanel() }
                     )
+                    .axLeaf("Empty.Button.OpenFile")
                     ActionCard(
                         title: "Record Mic",
                         systemImage: "mic.fill",
                         action: { model.startRecording(source: .microphone) }
                     )
+                    .axLeaf("Empty.Button.RecordMic")
                     ActionCard(
                         title: "Record System Audio",
                         systemImage: "waveform.circle.fill",
                         action: { model.startRecording(source: .systemAudio) }
                     )
+                    .axLeaf("Empty.Button.RecordSystemAudio")
                     ActionCard(
                         title: "Live Captions",
                         systemImage: "captions.bubble.fill",
                         action: { model.toggleLiveCaptions() }
                     )
+                    .axLeaf("Empty.Button.LiveCaptions")
                     ActionCard(
                         title: "Dictation",
                         systemImage: "text.cursor",
                         action: { model.startDictationFromIntent() }
                     )
+                    .axLeaf("Empty.Button.Dictation")
                     ActionCard(
                         title: "Manage Models",
                         systemImage: "cpu.fill",
                         action: { openSettings() }
                     )
+                    .axLeaf("Empty.Button.ManageModels")
                     ActionCard(
                         title: "YouTube URL",
                         systemImage: "play.rectangle.fill",
                         action: { model.youtubeSheetOpen = true }
                     )
+                    .axLeaf("Empty.Button.YouTube")
                     ActionCard(
                         title: "Recently Deleted",
                         systemImage: "trash.fill",
                         isEnabled: !model.deletedEntries.isEmpty,
                         action: { model.showingTrash = true }
                     )
+                    .axLeaf("Empty.Button.RecentlyDeleted")
                 }
 
                 if model.libraryEntries.isEmpty {

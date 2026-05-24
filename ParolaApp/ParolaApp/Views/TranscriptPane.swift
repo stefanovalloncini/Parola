@@ -78,6 +78,7 @@ struct TranscriptPane: View {
         .sheet(isPresented: $chatSheetOpen) {
             ChatSheet().environment(model)
         }
+        .axBranch("Transcript")
     }
 
     private var headerTitle: String {

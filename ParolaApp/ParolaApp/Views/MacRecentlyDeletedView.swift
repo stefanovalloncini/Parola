@@ -81,6 +81,7 @@ struct MacRecentlyDeletedView: View {
         } message: {
             Text("All \(model.deletedEntries.count) items will be deleted for good.")
         }
+        .axBranch("RecentlyDeleted")
     }
 
     private var selectionBar: some View {
@@ -95,15 +96,18 @@ struct MacRecentlyDeletedView: View {
                 Label("Restore", systemImage: "arrow.uturn.backward")
             }
             .buttonStyle(.bordered)
+            .axLeaf("Selection.Button.Restore")
             Button(role: .destructive) {
                 confirmingPurgeBulk = selection
             } label: {
                 Label("Delete permanently", systemImage: "trash")
             }
             .buttonStyle(.bordered)
+            .axLeaf("Selection.Button.DeletePermanently")
             Button("Clear selection") { selection = [] }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
+                .axLeaf("Selection.Button.ClearSelection")
         }
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.small)
