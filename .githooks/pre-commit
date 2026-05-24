@@ -37,4 +37,7 @@ if ! swift test --skip MemoryFootprintTests --parallel; then
     exit 1
 fi
 
+cd "$REPO"
+bash scripts/check-feature-coverage.sh --soft || true
+
 echo "✓ Pre-commit: tests green."
