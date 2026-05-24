@@ -527,7 +527,7 @@ final class AppModel {
 
     func startAutomationBridge() {
         guard testBridge == nil else { return }
-        guard let bridge = try? ParolaAutomationServer(model: self) else { return }
+        guard let bridge = try? ParolaAutomationServer(model: self, auditLog: AutomationAuditLog()) else { return }
         bridge.start { [weak self] port in
             self?.automationBridgePort = port
         }
