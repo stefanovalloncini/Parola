@@ -543,9 +543,15 @@ final class AppModel {
     }
 
     @ObservationIgnored let defaults: UserDefaults
+    @ObservationIgnored let filePicker: FilePicker
 
-    init(skipBootstrap: Bool = false, defaults: UserDefaults = .standard) {
+    init(
+        skipBootstrap: Bool = false,
+        defaults: UserDefaults = .standard,
+        filePicker: FilePicker = SystemFilePicker()
+    ) {
         self.defaults = defaults
+        self.filePicker = filePicker
         self.dictationEnabled = defaults.bool(forKey: "dictationEnabled")
         self.dictationModeRaw = defaults.string(forKey: "dictationModeRaw") ?? DictationMode.pushToTalk.rawValue
         self.dictationKeyCode = defaults.object(forKey: "dictationKeyCode") == nil ? 96 : defaults.integer(forKey: "dictationKeyCode")
@@ -698,14 +704,15 @@ final class AppModel {
     // MARK: - File transcription
 
     func presentOpenPanel() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.audio, .movie]
-        panel.allowsMultipleSelection = true
-        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
-        if panel.urls.count == 1 {
-            transcribe(fileURL: panel.urls[0])
-        } else {
-            startBatch(urls: panel.urls)
+        Task { [weak self] in
+            guard let self else { return }
+            let urls = await self.filePicker.chooseInputFiles(allowedTypes: [.audio, .movie], allowsMultiple: true)
+            guard !urls.isEmpty else { return }
+            if urls.count == 1 {
+                self.transcribe(fileURL: urls[0])
+            } else {
+                self.startBatch(urls: urls)
+            }
         }
     }
 
@@ -1285,13 +1292,15 @@ final class AppModel {
 
     func saveProjectDocument() {
         guard let transcript, let sourceFileURL else { return }
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = sourceFileURL.deletingPathExtension().lastPathComponent + ".parola"
-        guard panel.runModal() == .OK, let dest = panel.url else { return }
-        do {
-            _ = try ParolaDocument.write(transcript: transcript, audioURL: sourceFileURL, to: dest)
-        } catch {
-            phase = .failed(message: "Save failed: \(error.localizedDescription)")
+        let suggested = sourceFileURL.deletingPathExtension().lastPathComponent + ".parola"
+        Task { [weak self] in
+            guard let self else { return }
+            guard let dest = await self.filePicker.chooseSaveDestination(suggestedName: suggested, allowedTypes: []) else { return }
+            do {
+                _ = try ParolaDocument.write(transcript: transcript, audioURL: sourceFileURL, to: dest)
+            } catch {
+                self.phase = .failed(message: "Save failed: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -1327,26 +1336,27 @@ final class AppModel {
 
     func burnSubtitlesIntoVideo() {
         guard let transcript else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            let inputURLs = await self.filePicker.chooseInputFiles(
+                allowedTypes: [.movie, .mpeg4Movie, .quickTimeMovie],
+                allowsMultiple: false,
+                message: "Pick the video to burn subtitles into."
+            )
+            guard let videoURL = inputURLs.first else { return }
+            let suggested = videoURL.deletingPathExtension().lastPathComponent + " (captioned).mp4"
+            guard let outputURL = await self.filePicker.chooseSaveDestination(
+                suggestedName: suggested,
+                allowedTypes: [.mpeg4Movie]
+            ) else { return }
 
-        let open = NSOpenPanel()
-        open.allowedContentTypes = [.movie, .mpeg4Movie, .quickTimeMovie]
-        open.allowsMultipleSelection = false
-        open.message = "Pick the video to burn subtitles into."
-        guard open.runModal() == .OK, let videoURL = open.url else { return }
-
-        let save = NSSavePanel()
-        save.allowedContentTypes = [.mpeg4Movie]
-        save.nameFieldStringValue = videoURL.deletingPathExtension().lastPathComponent + " (captioned).mp4"
-        guard save.runModal() == .OK, let outputURL = save.url else { return }
-
-        let snapshot = transcript
-        phase = .transcribing(file: outputURL)
-        Task {
+            let snapshot = transcript
+            self.phase = .transcribing(file: outputURL)
             do {
                 try await SubtitleBurner.burn(transcript: snapshot, video: videoURL, to: outputURL)
-                phase = .ready
+                self.phase = .ready
             } catch {
-                phase = .failed(message: "Burn failed: \(error.localizedDescription)")
+                self.phase = .failed(message: "Burn failed: \(error.localizedDescription)")
             }
         }
     }
@@ -1365,12 +1375,16 @@ final class AppModel {
             return
         }
         let notes = entry.segmentNotes
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.plainText]
-        panel.nameFieldStringValue = "\(entry.title)-notes.md"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        let body = NotesMarkdownRenderer.render(transcript: transcript, notes: notes, title: entry.title)
-        try? body.data(using: .utf8)?.write(to: url, options: .atomic)
+        let title = entry.title
+        Task { [weak self] in
+            guard let self else { return }
+            guard let url = await self.filePicker.chooseSaveDestination(
+                suggestedName: "\(title)-notes.md",
+                allowedTypes: [.plainText]
+            ) else { return }
+            let body = NotesMarkdownRenderer.render(transcript: transcript, notes: notes, title: title)
+            try? body.data(using: .utf8)?.write(to: url, options: .atomic)
+        }
     }
 
     func jumpToNextSpeaker() {
@@ -1492,15 +1506,18 @@ final class AppModel {
 
     func performExport(_ format: ExportFormat) {
         guard let transcript else { return }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.plainText]
-        panel.nameFieldStringValue = "transcript.\(format.fileExtension)"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let data = try makeExporter(for: format).render(transcript)
-            try data.write(to: url, options: .atomic)
-        } catch {
-            phase = .failed(message: "Export failed: \(error.localizedDescription)")
+        Task { [weak self] in
+            guard let self else { return }
+            guard let url = await self.filePicker.chooseSaveDestination(
+                suggestedName: "transcript.\(format.fileExtension)",
+                allowedTypes: [.plainText]
+            ) else { return }
+            do {
+                let data = try self.makeExporter(for: format).render(transcript)
+                try data.write(to: url, options: .atomic)
+            } catch {
+                self.phase = .failed(message: "Export failed: \(error.localizedDescription)")
+            }
         }
     }
 
