@@ -4,12 +4,13 @@ import ParolaCore
 import ParolaDictation
 
 struct DictationView: View {
-    let state: DictationCoordinator.State
     let model: AppModel
     @Bindable var controller: DictationController
     var onStop: (() -> Void)?
 
     @State private var startedAt: Date = Date()
+
+    private var state: DictationCoordinator.State { controller.state }
 
     var body: some View {
         Group {
@@ -58,7 +59,6 @@ struct DictationView: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .transition(.opacity)
             }
         }
         .padding(.horizontal, 18)
@@ -72,7 +72,6 @@ struct DictationView: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(.white.opacity(0.08), lineWidth: 1)
         )
-        .animation(.easeOut(duration: 0.18), value: hasPartial)
     }
 
     private var notchBody: some View {
@@ -100,7 +99,6 @@ struct DictationView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(.white.opacity(0.05), lineWidth: 1)
         )
-        .animation(.easeOut(duration: 0.18), value: hasPartial)
     }
 
     private var minimalBody: some View {

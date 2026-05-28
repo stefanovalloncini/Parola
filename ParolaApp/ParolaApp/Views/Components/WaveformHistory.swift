@@ -24,18 +24,45 @@ struct WaveformHistory: View {
     var idleHeight: CGFloat = 2
     var fill: Color = .white
 
-    @State private var history = LevelHistory(capacity: 32)
+    @State private var history: LevelHistory
+
+    init(
+        level: Float,
+        capacity: Int = 32,
+        barWidth: CGFloat = 2,
+        spacing: CGFloat = 1.5,
+        maxHeight: CGFloat = 18,
+        idleHeight: CGFloat = 2,
+        fill: Color = .white
+    ) {
+        self.level = level
+        self.capacity = capacity
+        self.barWidth = barWidth
+        self.spacing = spacing
+        self.maxHeight = maxHeight
+        self.idleHeight = idleHeight
+        self.fill = fill
+        _history = State(initialValue: LevelHistory(capacity: capacity))
+    }
+
+    private var contentWidth: CGFloat {
+        CGFloat(capacity) * barWidth + CGFloat(max(0, capacity - 1)) * spacing
+    }
 
     var body: some View {
-        HStack(alignment: .center, spacing: spacing) {
-            ForEach(0..<history.samples.count, id: \.self) { index in
-                Capsule(style: .continuous)
-                    .fill(fill)
-                    .frame(width: barWidth, height: barHeight(history.samples[index]))
+        Canvas(opaque: false) { context, size in
+            let samples = history.samples
+            for (index, sample) in samples.enumerated() {
+                let height = barHeight(sample)
+                let x = CGFloat(index) * (barWidth + spacing)
+                let rect = CGRect(x: x, y: (size.height - height) / 2, width: barWidth, height: height)
+                context.fill(
+                    Path(roundedRect: rect, cornerRadius: barWidth / 2, style: .continuous),
+                    with: .color(fill)
+                )
             }
         }
-        .frame(height: maxHeight)
-        .onAppear { history = LevelHistory(capacity: capacity) }
+        .frame(width: contentWidth, height: maxHeight)
         .onChange(of: level) { _, newValue in
             history.append(newValue)
         }

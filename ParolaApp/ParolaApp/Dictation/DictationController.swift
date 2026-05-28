@@ -124,14 +124,14 @@ final class DictationController {
         case .idle:
             hideHUD()
         case .listening:
-            showHUD(state: state)
+            showHUD()
             startLevelStream()
             startPartialStream()
         case .transcribing:
-            showHUD(state: state)
+            showHUD()
             stopLevelStream()
         case .failed:
-            showHUD(state: state)
+            showHUD()
             stopLevelStream()
             stopPartialStream()
             Task { [weak self] in
@@ -183,20 +183,14 @@ final class DictationController {
         partialText = ""
     }
 
-    private func showHUD(state: DictationCoordinator.State) {
+    private func showHUD() {
         guard let model = appModel else { return }
         if hud == nil {
-            hud = DictationHUD.make { [weak self] in
-                guard let self else {
-                    return DictationView(state: .idle, model: model, controller: DictationController())
-                }
-                return DictationView(state: self.state, model: model, controller: self)
+            hud = DictationHUD.make { [self] in
+                DictationView(model: model, controller: self)
             }
         }
         guard let panel = hud else { return }
-        if let host = panel.contentView as? NSHostingView<DictationView> {
-            host.rootView = DictationView(state: state, model: model, controller: self)
-        }
         panel.setFrame(preferredHUDFrame(), display: true, animate: false)
         panel.orderFrontRegardless()
     }
@@ -205,7 +199,7 @@ final class DictationController {
         guard let panel = hud else { return }
         let target = preferredHUDFrame()
         guard panel.frame != target else { return }
-        panel.setFrame(target, display: true, animate: true)
+        panel.setFrame(target, display: true, animate: false)
     }
 
     private func preferredHUDFrame() -> NSRect {

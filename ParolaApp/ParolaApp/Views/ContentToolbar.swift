@@ -63,20 +63,32 @@ struct ContentToolbar: ToolbarContent {
             .accessibilityIdentifier("toolbar.youtube")
             .axLeaf("Toolbar.Button.YouTube")
 
-            Menu {
-                Button("Microphone") { model.startRecording(source: .microphone) }
-                    .accessibilityIdentifier("toolbar.record.microphone")
-                    .axLeaf("Toolbar.MenuItem.RecordMicrophone")
-                Button("System audio") { model.startRecording(source: .systemAudio) }
-                    .accessibilityIdentifier("toolbar.record.system")
-                    .axLeaf("Toolbar.MenuItem.RecordSystem")
-            } label: {
-                Label("Record", systemImage: "mic.fill")
+            if isRecording {
+                Button {
+                    model.stopRecordingAndTranscribe()
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
+                }
+                .tint(.red)
+                .help("Stop recording and transcribe.")
+                .accessibilityIdentifier("toolbar.stopRecording")
+                .axLeaf("Toolbar.Button.StopRecording")
+            } else {
+                Menu {
+                    Button("Microphone") { model.startRecording(source: .microphone) }
+                        .accessibilityIdentifier("toolbar.record.microphone")
+                        .axLeaf("Toolbar.MenuItem.RecordMicrophone")
+                    Button("System audio") { model.startRecording(source: .systemAudio) }
+                        .accessibilityIdentifier("toolbar.record.system")
+                        .axLeaf("Toolbar.MenuItem.RecordSystem")
+                } label: {
+                    Label("Record", systemImage: "mic.fill")
+                }
+                .disabled(isBusy)
+                .help("Record from the microphone or system audio.")
+                .accessibilityIdentifier("toolbar.record")
+                .axLeaf("Toolbar.Menu.Record")
             }
-            .disabled(isBusy)
-            .help("Record from the microphone or system audio.")
-            .accessibilityIdentifier("toolbar.record")
-            .axLeaf("Toolbar.Menu.Record")
 
             PromptsMenu()
                 .disabled(model.transcript == nil || model.isRunningPrompt)
@@ -105,6 +117,11 @@ struct ContentToolbar: ToolbarContent {
         case .idle, .ready, .failed: return false
         default: return true
         }
+    }
+
+    private var isRecording: Bool {
+        if case .recording = model.phase { return true }
+        return false
     }
 }
 
