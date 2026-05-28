@@ -100,7 +100,7 @@ actor MicDictationRecorder: DictationRecorder {
     }
 
     private func startStreaming() async throws {
-        let session = await StreamingTranscriberFactory.make(clock: clock)
+        let session = StreamingTranscriberFactory.make(clock: clock)
         streamingSegments = []
         streamingPartial = ""
         streamingFinished = false

@@ -54,7 +54,7 @@ final class LiveCaptionsController {
         state.isActive = true
         state.isLoading = true
 
-        let s = await StreamingTranscriberFactory.make()
+        let s = StreamingTranscriberFactory.make()
         session = s
         showWindow()
 

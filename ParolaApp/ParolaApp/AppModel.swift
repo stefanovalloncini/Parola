@@ -1170,6 +1170,8 @@ final class AppModel {
 
     private func startStreamingMic() {
         streamingConsumer?.cancel()
+        let s = StreamingTranscriberFactory.make(clock: clock)
+        streamingSession = s
         liveSegments = []
         livePartialText = ""
         liveVoiceActive = false
@@ -1183,8 +1185,6 @@ final class AppModel {
 
         streamingConsumer = Task { @MainActor in
             await mediaSession.enterRecording(config: config)
-            let s = await StreamingTranscriberFactory.make(clock: clock)
-            streamingSession = s
             do {
                 let events = try await s.start(options: opts, speakerLabeler: nil, downloadProgress: progress)
                 phase = .recording(source: .microphone)

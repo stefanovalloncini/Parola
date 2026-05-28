@@ -4,12 +4,12 @@ import Testing
 @Suite("Mock streaming registry")
 struct MockStreamingTranscriberRegistryTests {
     @Test("install then resolve, clear removes it")
-    func installResolveClear() async {
+    func installResolveClear() {
         let reg = MockStreamingTranscriberRegistry()
-        #expect(await reg.resolve() == nil)
-        await reg.install(MockTranscriberResponse(partials: ["x"]))
-        #expect(await reg.resolve() != nil)
-        await reg.clear()
-        #expect(await reg.resolve() == nil)
+        #expect(reg.resolve() == nil)
+        reg.install(MockTranscriberResponse(partials: ["x"]))
+        #expect(reg.resolve() != nil)
+        reg.clear()
+        #expect(reg.resolve() == nil)
     }
 }

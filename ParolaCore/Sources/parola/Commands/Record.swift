@@ -97,7 +97,7 @@ struct Record: AsyncParsableCommand {
     }
 
     private func runStreaming() async throws {
-        let session = await StreamingTranscriberFactory.make()
+        let session = StreamingTranscriberFactory.make()
         let opts = TranscriptionOptions(
             model: model,
             language: language,
