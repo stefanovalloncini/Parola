@@ -2,14 +2,13 @@ import Foundation
 
 public actor MockStreamingTranscriber: StreamingTranscriber {
     private let response: MockTranscriberResponse
-    private let sleeper: @Sendable (Int) async throws -> Void
+    private let sleeper: @Sendable (Int) async -> Void
     private var continuation: AsyncStream<StreamingEvent>.Continuation?
+    private var emitTask: Task<Void, Never>?
 
     public init<C: Clock>(response: MockTranscriberResponse, clock: C) where C.Duration == Duration {
         self.response = response
-        self.sleeper = { ms in
-            try await Task.sleep(for: .milliseconds(ms), clock: clock)
-        }
+        self.sleeper = { ms in try? await Task.sleep(for: .milliseconds(ms), clock: clock) }
     }
 
     public func start(
@@ -17,52 +16,35 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
         speakerLabeler: (any StreamingSpeakerLabeler)?,
         downloadProgress: (@Sendable (Double) -> Void)?
     ) async throws -> AsyncStream<StreamingEvent> {
+        if let fraction = response.downloadFractions.first { downloadProgress?(fraction) }
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(256))
         continuation = cont
-
-        let partials = response.partials
-        let segments = response.segments
-        let fractions = response.downloadFractions
-        let delayMs = response.delayMs
+        let response = self.response
         let sleeper = self.sleeper
-
-        Task {
-            if let first = fractions.first {
-                downloadProgress?(first)
+        emitTask = Task {
+            let perStep = response.partials.isEmpty ? 0 : response.delayMs / response.partials.count
+            for partial in response.partials {
+                if Task.isCancelled { return }
+                cont.yield(.partial(text: partial))
+                if perStep > 0 { await sleeper(perStep) }
             }
-
-            let perStepMs = partials.count > 0 ? max(0, delayMs / partials.count) : 0
-            for text in partials {
-                cont.yield(.partial(text: text))
-                if perStepMs > 0 {
-                    try? await sleeper(perStepMs)
-                }
-            }
-
-            for (index, seed) in segments.enumerated() {
-                let segment = TranscriptSegment(
-                    id: index,
-                    start: seed.start,
-                    end: seed.end,
-                    text: seed.text,
-                    speaker: seed.speaker
-                )
-                cont.yield(.confirmed(segment))
+            var nextID = 0
+            for seed in response.segments {
+                if Task.isCancelled { return }
+                cont.yield(.confirmed(TranscriptSegment(id: nextID, start: seed.start, end: seed.end, text: seed.text, speaker: seed.speaker)))
+                nextID += 1
             }
         }
-
         return stream
     }
 
     public func stop() async {
-        guard let cont = continuation else { return }
-        let transcript = response.materialise(sourceURL: nil)
-        cont.yield(.finished(transcript))
-        cont.finish()
+        await emitTask?.value
+        emitTask = nil
+        continuation?.yield(.finished(response.materialise(sourceURL: nil)))
+        continuation?.finish()
         continuation = nil
     }
 
-    public func currentModel() async -> String? {
-        response.modelName
-    }
+    public func currentModel() async -> String? { response.modelName }
 }

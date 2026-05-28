@@ -17,9 +17,6 @@ struct MockStreamingTranscriberTests {
         let mock = MockStreamingTranscriber(response: response, clock: ContinuousClock())
         let stream = try await mock.start(options: TranscriptionOptions(model: "mock"),
                                           speakerLabeler: nil, downloadProgress: nil)
-        var partials: [String] = []
-        var confirmed: [String] = []
-        var finished: Transcript?
         let collector = Task { () -> ([String], [String], Transcript?) in
             var p: [String] = []; var c: [String] = []; var f: Transcript?
             for await event in stream {
@@ -32,9 +29,8 @@ struct MockStreamingTranscriberTests {
             }
             return (p, c, f)
         }
-        try await Task.sleep(for: .milliseconds(50))
         await mock.stop()
-        (partials, confirmed, finished) = await collector.value
+        let (partials, confirmed, finished) = await collector.value
         #expect(partials == ["hel", "hello", "hello world"])
         #expect(confirmed == ["hello world"])
         #expect(finished?.segments.first?.text == "hello world")
