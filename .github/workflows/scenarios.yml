@@ -1,0 +1,56 @@
+name: Scenarios
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scenarios:
+    name: scenarios --mock
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: derived-scenarios-${{ runner.os }}-${{ hashFiles('ParolaApp/project.yml', 'ParolaCore/Package.resolved') }}
+          restore-keys: |
+            derived-scenarios-${{ runner.os }}-
+
+      - name: Cache SwiftPM build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ParolaCore/.build
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-${{ runner.os }}-${{ hashFiles('ParolaCore/Package.resolved', 'ParolaCore/Package.swift') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Generate Xcode project
+        working-directory: ParolaApp
+        run: xcodegen generate
+
+      # --mock uses the streaming mock transcriber (canned events); no
+      # microphone, no network, no Whisper model download required.
+      - name: Run mock scenarios
+        run: ./scripts/scenarios.sh --mock
