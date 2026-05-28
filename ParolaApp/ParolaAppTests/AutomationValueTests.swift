@@ -132,4 +132,22 @@ struct AutomationValueTests {
         let value = AutomationValue(NSNumber(value: 42))
         #expect(value == .int(42))
     }
+
+    @Test("NSNumber 0 and 1 decode as int, not bool")
+    func nsNumberIntZeroOneNotBool() {
+        #expect(AutomationValue(NSNumber(value: 0)) == .int(0))
+        #expect(AutomationValue(NSNumber(value: 1)) == .int(1))
+        #expect(AutomationValue(NSNumber(value: true)) == .bool(true))
+        #expect(AutomationValue(NSNumber(value: false)) == .bool(false))
+    }
+
+    @Test("JSONSerialization wire values keep int / bool / double distinct")
+    func wireRoundTripIntBoolDouble() throws {
+        let data = Data(#"{"i":0,"j":1,"b":true,"d":2.0}"#.utf8)
+        let obj = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        #expect(AutomationValue(obj["i"]) == .int(0))
+        #expect(AutomationValue(obj["j"]) == .int(1))
+        #expect(AutomationValue(obj["b"]) == .bool(true))
+        #expect(AutomationValue(obj["d"]) == .double(2.0))
+    }
 }
