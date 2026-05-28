@@ -26,7 +26,7 @@ public protocol StreamingSpeakerLabeler: Sendable {
 /// ```
 ///
 /// One session = one mic capture. Construct a new one to record again.
-public actor StreamingTranscriptionSession {
+public actor StreamingTranscriptionSession: StreamingTranscriber {
     public let modelStore: ModelStore
 
     private var whisperKit: WhisperKit?

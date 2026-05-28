@@ -442,7 +442,7 @@ final class AppModel {
     }
 
     @ObservationIgnored private var liveSource: AudioSource?
-    @ObservationIgnored private var streamingSession: StreamingTranscriptionSession?
+    @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
     @ObservationIgnored private var streamingConsumer: Task<Void, Never>?
     @ObservationIgnored private var fileTranscribeTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>?
@@ -1170,8 +1170,6 @@ final class AppModel {
 
     private func startStreamingMic() {
         streamingConsumer?.cancel()
-        let s = StreamingTranscriptionSession()
-        streamingSession = s
         liveSegments = []
         livePartialText = ""
         liveVoiceActive = false
@@ -1185,8 +1183,10 @@ final class AppModel {
 
         streamingConsumer = Task { @MainActor in
             await mediaSession.enterRecording(config: config)
+            let s = await StreamingTranscriberFactory.make(clock: clock)
+            streamingSession = s
             do {
-                let events = try await s.start(options: opts, downloadProgress: progress)
+                let events = try await s.start(options: opts, speakerLabeler: nil, downloadProgress: progress)
                 phase = .recording(source: .microphone)
                 for await event in events {
                     handleStreamingEvent(event)
