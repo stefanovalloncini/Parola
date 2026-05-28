@@ -28,6 +28,22 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "installMockStreamingTranscriber",
+                area: .test,
+                summary: "Installs a canned streaming-transcriber response (segments, partials, delayMs). Test-mode only.",
+                kind: .mutating,
+                args: [
+                    .init(name: "response", kind: .object, required: false, summary: "Canned transcript JSON"),
+                ],
+                handler: { args, ctx in
+                    try requireTestMode(ctx)
+                    let response = try buildTranscriberResponse(args: args)
+                    MockStreamingTranscriberRegistry.shared.install(response)
+                    return .object(["installed": .bool(true)])
+                }
+            ),
+
+            AutomationCommand(
                 name: "installMockLanguageModel",
                 area: .test,
                 summary: "Installs a canned language model response. Test-mode only.",
@@ -90,6 +106,7 @@ extension ParolaAutomationServer {
                     let scope = (try args.optionalString("scope")) ?? "all"
                     if scope == "transcriber" || scope == "all" {
                         await MockTranscriberRegistry.shared.clear()
+                        MockStreamingTranscriberRegistry.shared.clear()
                     }
                     if scope == "llm" || scope == "all" {
                         await MockLanguageModelStore.shared.clear()
@@ -118,6 +135,7 @@ extension ParolaAutomationServer {
                     for (k, v) in audioMap { audioObject[k] = .string(v) }
                     return .object([
                         "transcriber": .array(transcribers.map { .string($0) }),
+                        "streamingTranscriber": .bool(MockStreamingTranscriberRegistry.shared.resolve() != nil),
                         "llm": .array(languageModels.map { .string($0) }),
                         "audio": .object(audioObject),
                     ])
