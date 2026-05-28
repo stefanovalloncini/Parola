@@ -113,14 +113,14 @@ actor WhisperKitTranscriber: Transcriber {
             decoding.usePrefillPrompt = true
         }
 
-        let pieces = OSAllocatedUnfairLock<[String]>(initialState: [])
+        let builder = OSAllocatedUnfairLock(initialState: StreamingPartialBuilder())
         if let handler = partialHandler {
             kit.segmentDiscoveryCallback = { @Sendable segments in
-                let text = pieces.withLock { state -> String in
+                let text = builder.withLock { state -> String in
                     for segment in segments {
-                        state.append(segment.text.trimmingCharacters(in: .whitespaces))
+                        state.add(seek: segment.seek, text: segment.text)
                     }
-                    return state.joined(separator: " ")
+                    return state.text
                 }
                 handler(text)
             }
