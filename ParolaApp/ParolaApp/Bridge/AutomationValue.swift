@@ -16,6 +16,8 @@ extension AutomationValue {
         switch jsonObject {
         case is NSNull:
             self = .null
+        case let value as NSNumber:
+            self = AutomationValue.fromNSNumber(value)
         case let value as Bool:
             self = .bool(value)
         case let value as Int:
@@ -28,8 +30,6 @@ extension AutomationValue {
             self = .double(value)
         case let value as Float:
             self = .double(Double(value))
-        case let value as NSNumber:
-            self = AutomationValue.fromNSNumber(value)
         case let value as String:
             self = .string(value)
         case let value as [Any]:
