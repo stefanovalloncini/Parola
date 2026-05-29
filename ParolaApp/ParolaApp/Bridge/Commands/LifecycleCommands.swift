@@ -43,6 +43,10 @@ extension ParolaAutomationServer {
                         model.defaults.removeObject(forKey: key)
                     }
                     model.refreshLibrary()
+                    await MockTranscriberRegistry.shared.clear()
+                    MockStreamingTranscriberRegistry.shared.clear()
+                    await MockLanguageModelStore.shared.clear()
+                    await MockAudioSourceRegistry.shared.clear()
                     CapturedInsertionStore.shared.clear()
                     MockMediaFetcherRegistry.shared.clear()
                     return .object(["reset": .bool(true)])
