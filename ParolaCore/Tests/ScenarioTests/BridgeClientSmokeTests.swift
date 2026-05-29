@@ -1,7 +1,8 @@
+import Foundation
 import Testing
 import ScenarioKit
 
-@Suite("Bridge client smoke", .serialized)
+@Suite("Bridge client smoke", .serialized, .enabled(if: ProcessInfo.processInfo.environment["PAROLA_RUN_SCENARIOS"] == "1"))
 struct BridgeClientSmokeTests {
     @Test("ping reaches a running app")
     func ping() async throws {

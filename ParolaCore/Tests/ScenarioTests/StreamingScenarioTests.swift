@@ -1,7 +1,8 @@
+import Foundation
 import Testing
 import ScenarioKit
 
-@Suite("Streaming scenarios", .serialized)
+@Suite("Streaming scenarios", .serialized, .enabled(if: ProcessInfo.processInfo.environment["PAROLA_RUN_SCENARIOS"] == "1"))
 struct StreamingScenarioTests {
     @Test("mic streaming renders scripted partials then finishes")
     func micStreaming() async throws {

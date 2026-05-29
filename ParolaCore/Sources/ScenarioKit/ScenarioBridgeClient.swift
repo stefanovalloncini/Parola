@@ -81,7 +81,7 @@ public actor ScenarioBridgeClient {
         self.connection = NWConnection(host: "127.0.0.1", port: port, using: .tcp)
     }
 
-    public func connect() async throws {
+    public func connect(timeout: Duration = .seconds(5)) async throws {
         let resumed = ResumeGuard()
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             connection.stateUpdateHandler = { state in
@@ -96,6 +96,14 @@ public actor ScenarioBridgeClient {
                 }
             }
             connection.start(queue: .global())
+            let conn = connection
+            Task {
+                try? await Task.sleep(for: timeout)
+                if resumed.claim() {
+                    conn.cancel()
+                    cont.resume(throwing: ScenarioError.connection("connect timed out"))
+                }
+            }
         }
         connection.stateUpdateHandler = nil
     }

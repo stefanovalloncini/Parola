@@ -34,4 +34,4 @@ for _ in $(seq 1 60); do [ -f "$PORT_FILE" ] && break; sleep 0.5; done
 [ -f "$PORT_FILE" ] || { echo "bridge never came up"; exit 1; }
 
 echo "Running scenarios…"
-(cd ParolaCore && swift test --filter ScenarioTests)
+(cd ParolaCore && PAROLA_RUN_SCENARIOS=1 swift test --filter ScenarioTests)
