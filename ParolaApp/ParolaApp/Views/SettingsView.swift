@@ -256,7 +256,6 @@ private struct SidebarRow: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 8)
         .onHover { hovering = $0 }
-        .accessibilityIdentifier("settings.\(route.rawValue)")
         .accessibilityLabel(route.label)
     }
 

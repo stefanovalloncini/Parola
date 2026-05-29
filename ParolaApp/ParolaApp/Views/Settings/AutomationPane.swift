@@ -5,6 +5,7 @@ import ParolaCore
 struct AutomationPane: View {
     @Environment(AppModel.self) private var model
     @State private var copyConfirmation: String?
+    @State private var confirmationTask: Task<Void, Never>?
 
     private var bundledBinaryPath: String? {
         guard let bundled = Bundle.main.executableURL?
@@ -191,8 +192,10 @@ struct AutomationPane: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         withAnimation { copyConfirmation = label }
-        Task {
+        confirmationTask?.cancel()
+        confirmationTask = Task {
             try? await Task.sleep(for: .seconds(2))
+            if Task.isCancelled { return }
             withAnimation { copyConfirmation = nil }
         }
     }

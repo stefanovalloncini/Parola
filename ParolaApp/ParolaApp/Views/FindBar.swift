@@ -53,6 +53,7 @@ struct FindBar: View {
                 ) { model.goToPreviousMatch() }
                     .keyboardShortcut("g", modifiers: [.command, .shift])
                     .accessibilityIdentifier("find.prev")
+                    .accessibilityLabel("Previous match")
                 FindIconButton(
                     systemName: "chevron.down",
                     help: "Next match",
@@ -60,6 +61,7 @@ struct FindBar: View {
                 ) { model.goToNextMatch() }
                     .keyboardShortcut("g", modifiers: [.command])
                     .accessibilityIdentifier("find.next")
+                    .accessibilityLabel("Next match")
             }
 
             FindToggleButton(
@@ -77,6 +79,7 @@ struct FindBar: View {
                 showReplace.toggle()
                 if showReplace { replaceFocused = true } else { queryFocused = true }
             }
+            .accessibilityLabel(showReplace ? "Hide replace" : "Show replace")
 
             Button {
                 model.toggleFind()

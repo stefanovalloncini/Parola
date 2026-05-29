@@ -14,7 +14,7 @@ extension ParolaAutomationServer {
                 handler: { args, ctx in
                     let count = (try? args.int("count")) ?? 50
                     let entries = await ctx.server.revisionLog.recent(count: count)
-                    return .array(entries.map(\.jsonObject))
+                    return .array(entries.map(\.automationValue))
                 }
             ),
 
@@ -29,7 +29,7 @@ extension ParolaAutomationServer {
                 handler: { args, ctx in
                     let revision = try args.int("revision")
                     let entries = await ctx.server.revisionLog.since(revision)
-                    return .array(entries.map(\.jsonObject))
+                    return .array(entries.map(\.automationValue))
                 }
             ),
         ]

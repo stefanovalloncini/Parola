@@ -58,7 +58,11 @@ struct SnippetsPane: View {
                 .axLeaf("Snippets.Button.Export")
             }
 
-            placeholderHelp
+            SettingHelper(text: "Triggers fire on dictated text only; matching is case-insensitive and word-bounded.")
+            Text("Placeholders: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
             ResetPaneButton(scope: .snippets)
         }
     }
@@ -75,19 +79,6 @@ struct SnippetsPane: View {
         guard let idx = model.snippets.firstIndex(where: { $0.id == id }) else { return nil }
         @Bindable var model = model
         return $model.snippets[idx]
-    }
-
-    private var placeholderHelp: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Triggers fire on dictated text only; matching is case-insensitive and word-bounded.")
-                .font(.caption)
-                .italic()
-                .foregroundStyle(.secondary)
-            Text("Placeholders: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}")
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 4)
     }
 }
 

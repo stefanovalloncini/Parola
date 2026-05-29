@@ -151,9 +151,13 @@ private final class MicPreviewController {
 private struct MicErrorBanner: View {
     let message: String
 
+    private var looksLikePermissionError: Bool {
+        let l = message.lowercased()
+        return l.contains("permission") || l.contains("denied") || l.contains("authoriz")
+    }
+
     private var hint: String {
-        let lower = message.lowercased()
-        if lower.contains("permission") || lower.contains("denied") || lower.contains("authoriz") {
+        if looksLikePermissionError {
             return String(localized: "Open System Settings → Privacy & Security → Microphone and grant Parola access.")
         }
         return String(localized: "Pick a different device or reconnect the current one.")
@@ -174,7 +178,7 @@ private struct MicErrorBanner: View {
             Text(hint)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if message.lowercased().contains("permission") || message.lowercased().contains("denied") || message.lowercased().contains("authoriz") {
+            if looksLikePermissionError {
                 Button("Open System Settings…") {
                     if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
                         NSWorkspace.shared.open(url)

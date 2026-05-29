@@ -6,7 +6,6 @@ enum AutomationError: Error {
     case precondition(String)
     case permission(String)
     case notFound(kind: String, id: String)
-    case timeout(observed: [String: AutomationValue])
     case `internal`(String)
     case appDead(String)
 }
@@ -19,7 +18,6 @@ extension AutomationError {
         case .precondition: return "PRECONDITION"
         case .permission: return "PERMISSION"
         case .notFound: return "NOT_FOUND"
-        case .timeout: return "TIMEOUT"
         case .internal: return "INTERNAL"
         case .appDead: return "APP_DEAD"
         }
@@ -37,8 +35,6 @@ extension AutomationError {
             return reason
         case .notFound(let kind, let id):
             return "\(kind) not found: \(id)"
-        case .timeout:
-            return "Operation timed out."
         case .internal(let reason):
             return reason
         case .appDead(let reason):
@@ -56,8 +52,6 @@ extension AutomationError {
             return [:]
         case .notFound(let kind, let id):
             return ["kind": .string(kind), "id": .string(id)]
-        case .timeout(let observed):
-            return observed
         }
     }
 

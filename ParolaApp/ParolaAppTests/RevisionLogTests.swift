@@ -68,10 +68,10 @@ struct RevisionLogTests {
         #expect(all.map(\.revision) == [3, 4, 5])
     }
 
-    @Test("RevisionEntry.jsonObject carries the four expected keys")
+    @Test("RevisionEntry.automationValue carries the four expected keys")
     func entryJsonHasFourKeys() {
         let entry = makeEntry(7, cause: "loadEntry")
-        guard case .object(let dict) = entry.jsonObject else {
+        guard case .object(let dict) = entry.automationValue else {
             Issue.record("expected .object")
             return
         }

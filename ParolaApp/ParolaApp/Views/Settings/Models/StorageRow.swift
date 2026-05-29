@@ -1,5 +1,6 @@
 import SwiftUI
 import ParolaCore
+import AppKit
 
 struct StorageRow: View {
     var body: some View {

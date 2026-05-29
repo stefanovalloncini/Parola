@@ -171,7 +171,13 @@ struct BatchFormatChip: View {
 struct BatchSettingRow<Control: View>: View {
     let title: String
     let description: String
-    @ViewBuilder let control: () -> Control
+    @ViewBuilder var control: Control
+
+    init(title: String, description: String, @ViewBuilder control: () -> Control) {
+        self.title = title
+        self.description = description
+        self.control = control()
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: DS.Spacing.regular) {
@@ -185,7 +191,7 @@ struct BatchSettingRow<Control: View>: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: DS.Spacing.small)
-            control()
+            control
         }
     }
 }

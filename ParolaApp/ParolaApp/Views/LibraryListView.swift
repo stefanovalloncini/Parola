@@ -309,7 +309,7 @@ private struct LibraryRow: View {
                         .font(DS.Font.body)
                         .foregroundStyle(DS.Color.primaryText)
                         .lineLimit(1)
-                    if entry.segmentNotes.count > 0 {
+                    if !entry.segmentNotes.isEmpty {
                         HStack(spacing: 2) {
                             Image(systemName: "note.text")
                                 .font(.system(size: 9))

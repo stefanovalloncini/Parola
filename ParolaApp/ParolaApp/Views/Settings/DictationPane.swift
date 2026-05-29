@@ -74,8 +74,8 @@ struct DictationPane: View {
                             .frame(width: 40, alignment: .trailing)
                     }
                 }
-                SettingRow("Mode",
-                           description: "Quick context: how the dictated text should land.") {
+                SettingRow("Cleanup style",
+                           description: "How the dictated text should land.") {
                     DictationModeRow(selectedID: $model.dictationCleanupPromptID)
                 }
                 SettingRow("Rewrite preset",

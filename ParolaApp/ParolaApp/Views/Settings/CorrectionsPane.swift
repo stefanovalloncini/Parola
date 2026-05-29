@@ -42,7 +42,7 @@ struct CorrectionsPane: View {
             }
             .axLeaf("Corrections.Button.AddCorrection")
 
-            help
+            SettingHelper(text: "Word-bounded replacements applied after every dictation. Use this for mis-transcribed jargon like \"q three\" → \"Q3\".")
             ResetPaneButton(scope: .corrections)
         }
     }
@@ -59,14 +59,6 @@ struct CorrectionsPane: View {
         guard let idx = model.correctionRules.firstIndex(where: { $0.id == id }) else { return nil }
         @Bindable var model = model
         return $model.correctionRules[idx]
-    }
-
-    private var help: some View {
-        Text("Word-bounded replacements applied after every dictation. Use this for mis-transcribed jargon like \"q three\" → \"Q3\".")
-            .font(.caption)
-            .italic()
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 4)
     }
 }
 
