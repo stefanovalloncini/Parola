@@ -50,7 +50,7 @@ actor AppleSpeechTranscriber: Transcriber {
         let myEpoch = inFlightEpoch
         inFlightCancel = { [weak cancellation] in await cancellation?.cancel() }
         if let priorCancel {
-            Task { await priorCancel() }
+            await priorCancel()
         }
         defer {
             if inFlightEpoch == myEpoch {

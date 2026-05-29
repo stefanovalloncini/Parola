@@ -12,10 +12,6 @@ public struct ActionItem: Equatable, Sendable, Identifiable {
         self.task = task
         self.dueDate = dueDate
     }
-
-    public static func == (lhs: ActionItem, rhs: ActionItem) -> Bool {
-        lhs.assignee == rhs.assignee && lhs.task == rhs.task && lhs.dueDate == rhs.dueDate
-    }
 }
 
 public enum ActionItemParser {

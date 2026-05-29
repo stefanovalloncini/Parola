@@ -23,7 +23,6 @@ public actor DictationCoordinator {
     private var eventContinuation: AsyncStream<HotkeyEvent>.Continuation?
 
     private var pressStartedAt: Date?
-    private var pendingHybridTimer: Task<Void, Never>?
     private var hybridLocked: Bool = false
     private static let hybridHoldThreshold: TimeInterval = 0.3
 
@@ -82,8 +81,6 @@ public actor DictationCoordinator {
 
     public func setMode(_ newMode: DictationMode) {
         mode = newMode
-        pendingHybridTimer?.cancel()
-        pendingHybridTimer = nil
         hybridLocked = false
     }
 

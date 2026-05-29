@@ -30,4 +30,9 @@ struct ChapterIDTests {
         let chapter = Chapter(id: "custom", title: "Same", start: 0)
         #expect(chapter.id == "custom")
     }
+
+    @Test("derived id is a fixed, cross-process-stable value")
+    func deterministicLiteral() {
+        #expect(Chapter(title: "Intro", start: 0).id == "ch-0-ba77daf5b55d0cd1")
+    }
 }

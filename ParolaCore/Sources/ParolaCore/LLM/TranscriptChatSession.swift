@@ -32,6 +32,16 @@ public actor TranscriptChatSession {
     }
 
     public func ask(_ message: String) async throws -> ChatMessage {
+        let prior = inFlight
+        let work = Task { () async throws -> ChatMessage in
+            await prior?.value
+            return try await self.performAsk(message)
+        }
+        inFlight = Task { _ = try? await work.value }
+        return try await work.value
+    }
+
+    private func performAsk(_ message: String) async throws -> ChatMessage {
         let user = ChatMessage(role: .user, text: message)
         let turns = (history + [user]).map(ChatTurn.init)
         let raw: String

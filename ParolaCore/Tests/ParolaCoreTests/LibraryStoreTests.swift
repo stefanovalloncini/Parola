@@ -234,6 +234,25 @@ struct LibraryStoreTests {
         #expect(refreshed.updatedAt == when)
     }
 
+    @Test("updateTranscript re-indexes so search reflects the edit")
+    func updateTranscriptReindexesSearch() async throws {
+        let (store, _) = try makeTempLibrary()
+        let original = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "quarterly budget review")],
+            language: "en",
+            modelName: "tiny"
+        )
+        let entry = try await store.add(transcript: original, audioSource: nil)
+        #expect(await store.search("quarterly").contains(where: { $0.entryID == entry.id }))
+
+        var edited = original
+        edited.segments[0].text = "annual roadmap workshop"
+        try await store.updateTranscript(edited, for: entry.id)
+
+        #expect(await store.search("roadmap").contains(where: { $0.entryID == entry.id }))
+        #expect(await store.search("quarterly").contains(where: { $0.entryID == entry.id }) == false)
+    }
+
     @Test("search returns active entries and filters soft-deleted")
     func searchFiltersSoftDeleted() async throws {
         let (store, _) = try makeTempLibrary()

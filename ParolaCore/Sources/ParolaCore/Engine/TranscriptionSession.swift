@@ -85,7 +85,6 @@ public actor TranscriptionSession {
             try await active.load(model: modelName)
             scheduleIdleUnload()
         } catch {
-            // Prewarm failures are non-fatal.
         }
     }
 

@@ -145,8 +145,9 @@ public actor LibraryStore {
         await extraIndexer.deindex(id: id)
     }
 
-    /// Overwrites the transcript.json inside an existing bundle. Bumps the manifest `updatedAt`.
-    public func updateTranscript(_ transcript: Transcript, for id: LibraryEntry.ID, at now: Date = Date()) throws {
+    /// Overwrites the transcript.json inside an existing bundle, bumps the manifest `updatedAt`,
+    /// and re-indexes the entry so search and Spotlight reflect the edited text.
+    public func updateTranscript(_ transcript: Transcript, for id: LibraryEntry.ID, at now: Date = Date()) async throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
@@ -162,6 +163,8 @@ public actor LibraryStore {
         }
         invalidateListCaches()
         if cachedLoaded?.id == id { cachedLoaded = nil }
+        let entry = try makeEntry(bundleURL: bundleURL)
+        await indexEntry(entry, transcriptText: transcript.text)
     }
 
     /// Changes the category of an entry.
@@ -190,8 +193,9 @@ public actor LibraryStore {
         if cachedLoaded?.id == id { cachedLoaded = nil }
     }
 
-    /// Renames an entry's display title by updating the manifest's `originalAudioName`.
-    public func renameEntry(_ id: LibraryEntry.ID, to newName: String) throws {
+    /// Renames an entry's display title by updating the manifest's `originalAudioName`,
+    /// then re-indexes so search matches the new title.
+    public func renameEntry(_ id: LibraryEntry.ID, to newName: String) async throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
@@ -208,6 +212,10 @@ public actor LibraryStore {
         }
         invalidateListCaches()
         if cachedLoaded?.id == id { cachedLoaded = nil }
+        let entry = try makeEntry(bundleURL: bundleURL)
+        if let doc = try? ParolaDocument.read(at: bundleURL) {
+            await indexEntry(entry, transcriptText: doc.transcript.text)
+        }
     }
 
     /// Sets a note for a segment within an entry. Pass `nil` or empty to clear it.

@@ -42,7 +42,6 @@ public actor FolderWatcher {
     private struct PendingFile {
         var modificationDate: Date
         var size: Int64
-        var firstSeen: Date
     }
 
     public init(
@@ -59,12 +58,12 @@ public actor FolderWatcher {
         self.init(folderURL: folderURL, options: Options(), onNewMediaFile: onNewMediaFile)
     }
 
-    public func start() {
+    public func start() async {
         guard source == nil else { return }
         let fd = folderURL.path.withCString { open($0, O_EVTONLY) }
         guard fd >= 0 else { return }
         fileDescriptor = fd
-        knownFiles = scanFolder()
+        knownFiles = await scanFolderOffActor()
 
         let (stream, continuation) = AsyncStream.makeStream(of: Void.self)
         scanContinuation = continuation
@@ -104,7 +103,7 @@ public actor FolderWatcher {
     }
 
     internal func checkForNewFiles() async {
-        let current = scanFolder()
+        let current = await scanFolderOffActor()
         let added = current.subtracting(knownFiles)
         knownFiles.formUnion(current)
 
@@ -115,7 +114,7 @@ public actor FolderWatcher {
             let attrs = try? FileManager.default.attributesOfItem(atPath: path)
             let mtime = attrs?[.modificationDate] as? Date ?? now
             let size = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
-            pendingFiles[path] = PendingFile(modificationDate: mtime, size: size, firstSeen: now)
+            pendingFiles[path] = PendingFile(modificationDate: mtime, size: size)
         }
 
         if !pendingFiles.isEmpty {
@@ -148,11 +147,7 @@ public actor FolderWatcher {
             if mtime <= cutoff && size == info.size && size > 0 {
                 onNewMediaFile(URL(fileURLWithPath: path))
             } else {
-                stillPending[path] = PendingFile(
-                    modificationDate: mtime,
-                    size: size,
-                    firstSeen: info.firstSeen
-                )
+                stillPending[path] = PendingFile(modificationDate: mtime, size: size)
             }
         }
         pendingFiles = stillPending
@@ -166,7 +161,11 @@ public actor FolderWatcher {
         return Double(comp.seconds) + Double(comp.attoseconds) / 1e18
     }
 
-    private func scanFolder() -> Set<String> {
+    private func scanFolderOffActor() async -> Set<String> {
+        await Task.detached(priority: .userInitiated) { [self] in scanFolder() }.value
+    }
+
+    private nonisolated func scanFolder() -> Set<String> {
         let fm = FileManager.default
         guard options.recursive else {
             guard let contents = try? fm.contentsOfDirectory(atPath: folderURL.path) else { return [] }
