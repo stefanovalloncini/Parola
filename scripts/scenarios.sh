@@ -18,7 +18,10 @@ SPEECH="Hello, my name is Parola. I transcribe audio using the Whisper model on 
 
 PLAYER_PID=""
 cleanup() {
-  [ -n "$PLAYER_PID" ] && kill "$PLAYER_PID" 2>/dev/null || true
+  if [ -n "$PLAYER_PID" ]; then
+    kill "$PLAYER_PID" 2>/dev/null || true
+    pkill -f parola-scenario-fixture 2>/dev/null || true
+  fi
   pkill -f 'Parola.app/Contents/MacOS/Parola' 2>/dev/null || true
 }
 trap cleanup EXIT
