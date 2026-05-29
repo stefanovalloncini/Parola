@@ -38,8 +38,8 @@ extension ScenarioSuite {
                 _ = try await client.send("queueSaveDestination", ["path": out.path])
                 _ = try await client.send("exportTranscript", ["format": format])
 
-                // performExport writes the file in a detached, atomic Task with no
-                // completion signal — poll the filesystem until the write lands.
+                // performExport writes the file in a background Task with no completion
+                // signal — poll the filesystem until the atomic write lands.
                 var wrote = false
                 for _ in 0..<30 {
                     if FileManager.default.fileExists(atPath: out.path) { wrote = true; break }
