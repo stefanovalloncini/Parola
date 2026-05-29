@@ -10,7 +10,7 @@ extension AppModel {
         Task { [weak self] in
             guard let self else { return }
             do {
-                let model = try LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
+                let model = try await LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
                 let result = try await PromptRunner.run(prompt, on: transcript.text, model: model)
                 promptOutput = PromptOutput(promptName: prompt.name, text: result)
             } catch {
@@ -27,7 +27,7 @@ extension AppModel {
         Task { [weak self] in
             guard let self else { return }
             do {
-                let model = try LanguageModelFactory.makeOnDevice()
+                let model = try await LanguageModelFactory.makeOnDevice()
                 let result = try await YouTubeChapters.generate(for: transcript, model: model)
                 promptOutput = PromptOutput(promptName: "YouTube Chapters", text: result)
             } catch {
