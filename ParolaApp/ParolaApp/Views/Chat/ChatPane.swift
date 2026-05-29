@@ -255,18 +255,39 @@ struct ChatPane: View {
         isSending = true
         let entryID = model.selectedEntryID
         sendTask?.cancel()
+        displayedHistory.append(ChatMessage(role: .user, text: text))
         sendTask = Task {
             defer {
                 if !Task.isCancelled, entryID == model.selectedEntryID {
                     isSending = false
                 }
             }
+            let liveID = UUID()
+            var collected = ""
+            var started = false
             do {
-                _ = try await session.ask(text)
-                guard !Task.isCancelled, entryID == model.selectedEntryID else { return }
-                let updated = await session.history
-                displayedHistory = updated
-                model.recordChat(history: updated, for: entryID)
+                for try await event in session.stream(text) {
+                    guard !Task.isCancelled, entryID == model.selectedEntryID else { return }
+                    switch event {
+                    case .delta(let delta):
+                        collected += delta
+                        if started {
+                            displayedHistory[displayedHistory.count - 1] = ChatMessage(
+                                id: liveID,
+                                role: .assistant,
+                                text: collected
+                            )
+                        } else {
+                            started = true
+                            isSending = false
+                            displayedHistory.append(ChatMessage(id: liveID, role: .assistant, text: collected))
+                        }
+                    case .completed:
+                        let updated = await session.history
+                        displayedHistory = updated
+                        model.recordChat(history: updated, for: entryID)
+                    }
+                }
             } catch {
                 guard !Task.isCancelled, entryID == model.selectedEntryID else { return }
                 sessionError = error.localizedDescription

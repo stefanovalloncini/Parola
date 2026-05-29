@@ -1,4 +1,5 @@
 import Foundation
+import os
 @preconcurrency import WhisperKit
 
 /// Labels a confirmed live-caption segment with a speaker.
@@ -239,15 +240,15 @@ public actor StreamingTranscriptionSession {
 // MARK: - State → event translator
 
 /// Adapts AudioStreamTranscriber's coarse state-diff callback into our finer-grained events.
-///
-/// Unchecked Sendable: WhisperKit's `AudioStreamTranscriber` delivers `stateChangeCallback`
-/// invocations serially from its own internal queue, so `lastPartial` and `lastVoiceActive` are
-/// only mutated from that single producer. `onConfirmed` is a `let` set at init.
-final class EventSink: @unchecked Sendable {
+final class EventSink: Sendable {
+    private struct State {
+        var lastPartial = ""
+        var lastVoiceActive: Bool?
+    }
+
     let continuation: AsyncStream<StreamingEvent>.Continuation
     let onConfirmed: @Sendable ([TranscriptionSegment]) -> Void
-    private var lastPartial: String = ""
-    private var lastVoiceActive: Bool? = nil
+    private let state = OSAllocatedUnfairLock(initialState: State())
 
     init(
         continuation: AsyncStream<StreamingEvent>.Continuation,
@@ -271,18 +272,24 @@ final class EventSink: @unchecked Sendable {
     }
 
     func handlePartial(text: String) {
-        guard text != lastPartial else { return }
-        lastPartial = text
-        if !text.isEmpty {
-            continuation.yield(.partial(text: text))
+        let changed = state.withLock { state -> Bool in
+            guard text != state.lastPartial else { return false }
+            state.lastPartial = text
+            return true
         }
+        guard changed, !text.isEmpty else { return }
+        continuation.yield(.partial(text: text))
     }
 
     func handleEnergy(last: Float?) {
         guard let last else { return }
         let voice = last > 0.05
-        guard lastVoiceActive != voice else { return }
-        lastVoiceActive = voice
+        let changed = state.withLock { state -> Bool in
+            guard state.lastVoiceActive != voice else { return false }
+            state.lastVoiceActive = voice
+            return true
+        }
+        guard changed else { return }
         continuation.yield(.voiceActivity(active: voice))
     }
 

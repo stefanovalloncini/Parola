@@ -34,121 +34,45 @@ private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
-    var label: String {
-        switch self {
-        case .general: return "General"
-        case .customization: return "Customization"
-        case .watchedFolders: return "Watched Folders"
-        case .recordMeetings: return "Record Meetings"
-        case .shortcuts: return "Shortcuts"
-        case .microphone: return "Microphone"
-        case .liveCaptions: return "Live Captions"
-        case .dictation: return "Dictation"
-        case .snippets: return "Snippets"
-        case .corrections: return "Corrections"
-        case .localModels: return "Local Models"
-        case .transcriptionDefaults: return "Transcription Defaults"
-        case .translation: return "Translation"
-        case .ignoredSegments: return "Ignored Segments"
-        case .findReplace: return "Find & Replace"
-        case .exportFormats: return "Export Formats"
-        case .batchExport: return "Batch Export"
-        case .autoExport: return "Auto-Export"
-        case .integrations: return "Integrations"
-        case .prompts: return "Prompts"
-        case .automation: return "MCP & Automation"
-        case .updates: return "Updates"
-        case .advanced: return "Advanced"
-        case .about: return "About"
-        }
-    }
+    private var meta: SettingsRouteMeta { SettingsRouteMeta.table[self]! }
 
-    var localizedLabelKey: LocalizedStringKey {
-        switch self {
-        case .general: return "General"
-        case .customization: return "Customization"
-        case .watchedFolders: return "Watched Folders"
-        case .recordMeetings: return "Record Meetings"
-        case .shortcuts: return "Shortcuts"
-        case .microphone: return "Microphone"
-        case .liveCaptions: return "Live Captions"
-        case .dictation: return "Dictation"
-        case .snippets: return "Snippets"
-        case .corrections: return "Corrections"
-        case .localModels: return "Local Models"
-        case .transcriptionDefaults: return "Transcription Defaults"
-        case .translation: return "Translation"
-        case .ignoredSegments: return "Ignored Segments"
-        case .findReplace: return "Find & Replace"
-        case .exportFormats: return "Export Formats"
-        case .batchExport: return "Batch Export"
-        case .autoExport: return "Auto-Export"
-        case .integrations: return "Integrations"
-        case .prompts: return "Prompts"
-        case .automation: return "MCP & Automation"
-        case .updates: return "Updates"
-        case .advanced: return "Advanced"
-        case .about: return "About"
-        }
-    }
+    var label: String { String(localized: String.LocalizationValue(meta.titleKey)) }
+    var localizedLabelKey: LocalizedStringKey { LocalizedStringKey(meta.titleKey) }
+    var symbol: String { meta.symbol }
+    var paneScope: SettingsPaneScope? { meta.scope }
+}
 
-    var symbol: String {
-        switch self {
-        case .general: return "gearshape"
-        case .customization: return "paintbrush"
-        case .watchedFolders: return "folder.badge.gearshape"
-        case .recordMeetings: return "video.bubble"
-        case .shortcuts: return "command"
-        case .microphone: return "mic"
-        case .liveCaptions: return "captions.bubble"
-        case .dictation: return "text.bubble"
-        case .snippets: return "text.append"
-        case .corrections: return "wand.and.rays"
-        case .localModels: return "cpu"
-        case .transcriptionDefaults: return "slider.horizontal.3"
-        case .translation: return "character.book.closed"
-        case .ignoredSegments: return "line.3.horizontal.decrease.circle"
-        case .findReplace: return "arrow.triangle.2.circlepath"
-        case .exportFormats: return "square.and.arrow.up"
-        case .batchExport: return "rectangle.stack.badge.play"
-        case .autoExport: return "arrow.up.doc"
-        case .integrations: return "puzzlepiece.extension"
-        case .prompts: return "text.cursor"
-        case .automation: return "bolt.horizontal.circle"
-        case .updates: return "arrow.down.circle"
-        case .advanced: return "wrench.and.screwdriver"
-        case .about: return "info.circle"
-        }
-    }
+private struct SettingsRouteMeta {
+    let titleKey: String
+    let symbol: String
+    let scope: SettingsPaneScope?
 
-    var paneScope: SettingsPaneScope? {
-        switch self {
-        case .general: return .general
-        case .customization: return .customization
-        case .watchedFolders: return .watchedFolders
-        case .recordMeetings: return .recordMeetings
-        case .shortcuts: return nil
-        case .microphone: return .microphone
-        case .liveCaptions: return .liveCaptions
-        case .dictation: return .dictation
-        case .snippets: return .snippets
-        case .corrections: return .corrections
-        case .localModels: return nil
-        case .transcriptionDefaults: return .transcriptionDefaults
-        case .translation: return .translation
-        case .ignoredSegments: return .ignoredSegments
-        case .findReplace: return .findReplace
-        case .exportFormats: return .exportFormats
-        case .batchExport: return .batchExport
-        case .autoExport: return .autoExport
-        case .integrations: return .integrations
-        case .prompts: return .prompts
-        case .automation: return .automation
-        case .updates: return .updates
-        case .advanced: return .advanced
-        case .about: return nil
-        }
-    }
+    static let table: [SettingsRoute: SettingsRouteMeta] = [
+        .general: SettingsRouteMeta(titleKey: "General", symbol: "gearshape", scope: .general),
+        .customization: SettingsRouteMeta(titleKey: "Customization", symbol: "paintbrush", scope: .customization),
+        .watchedFolders: SettingsRouteMeta(titleKey: "Watched Folders", symbol: "folder.badge.gearshape", scope: .watchedFolders),
+        .recordMeetings: SettingsRouteMeta(titleKey: "Record Meetings", symbol: "video.bubble", scope: .recordMeetings),
+        .shortcuts: SettingsRouteMeta(titleKey: "Shortcuts", symbol: "command", scope: nil),
+        .microphone: SettingsRouteMeta(titleKey: "Microphone", symbol: "mic", scope: .microphone),
+        .liveCaptions: SettingsRouteMeta(titleKey: "Live Captions", symbol: "captions.bubble", scope: .liveCaptions),
+        .dictation: SettingsRouteMeta(titleKey: "Dictation", symbol: "text.bubble", scope: .dictation),
+        .snippets: SettingsRouteMeta(titleKey: "Snippets", symbol: "text.append", scope: .snippets),
+        .corrections: SettingsRouteMeta(titleKey: "Corrections", symbol: "wand.and.rays", scope: .corrections),
+        .localModels: SettingsRouteMeta(titleKey: "Local Models", symbol: "cpu", scope: nil),
+        .transcriptionDefaults: SettingsRouteMeta(titleKey: "Transcription Defaults", symbol: "slider.horizontal.3", scope: .transcriptionDefaults),
+        .translation: SettingsRouteMeta(titleKey: "Translation", symbol: "character.book.closed", scope: .translation),
+        .ignoredSegments: SettingsRouteMeta(titleKey: "Ignored Segments", symbol: "line.3.horizontal.decrease.circle", scope: .ignoredSegments),
+        .findReplace: SettingsRouteMeta(titleKey: "Find & Replace", symbol: "arrow.triangle.2.circlepath", scope: .findReplace),
+        .exportFormats: SettingsRouteMeta(titleKey: "Export Formats", symbol: "square.and.arrow.up", scope: .exportFormats),
+        .batchExport: SettingsRouteMeta(titleKey: "Batch Export", symbol: "rectangle.stack.badge.play", scope: .batchExport),
+        .autoExport: SettingsRouteMeta(titleKey: "Auto-Export", symbol: "arrow.up.doc", scope: .autoExport),
+        .integrations: SettingsRouteMeta(titleKey: "Integrations", symbol: "puzzlepiece.extension", scope: .integrations),
+        .prompts: SettingsRouteMeta(titleKey: "Prompts", symbol: "text.cursor", scope: .prompts),
+        .automation: SettingsRouteMeta(titleKey: "MCP & Automation", symbol: "bolt.horizontal.circle", scope: .automation),
+        .updates: SettingsRouteMeta(titleKey: "Updates", symbol: "arrow.down.circle", scope: .updates),
+        .advanced: SettingsRouteMeta(titleKey: "Advanced", symbol: "wrench.and.screwdriver", scope: .advanced),
+        .about: SettingsRouteMeta(titleKey: "About", symbol: "info.circle", scope: nil)
+    ]
 }
 
 private struct SidebarGroup: Identifiable {

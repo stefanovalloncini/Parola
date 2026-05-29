@@ -38,7 +38,6 @@ struct AboutSheet: View {
             VStack(alignment: .leading, spacing: 8) {
                 creditRow(title: "Transcription", value: "WhisperKit · FluidAudio Parakeet · Apple Speech")
                 creditRow(title: "Local LLM", value: "Apple Foundation Models")
-                creditRow(title: "Cloud LLM", value: "OpenAI · Anthropic · Groq · Cerebras · Ollama")
                 creditRow(title: "Auto-update", value: "Sparkle")
                 creditRow(title: "Models on disk", value: modelsOnDiskLabel)
             }
