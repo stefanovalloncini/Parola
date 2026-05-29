@@ -70,7 +70,11 @@ struct ParolaApp: App {
     init() {
         let bootstrap = AppBootstrap.test(from: CommandLine.arguments) ?? .normal
         DefaultsStore.current = bootstrap.defaults
-        _model = State(initialValue: AppModel(bootstrap: bootstrap))
+        let m = AppModel(bootstrap: bootstrap)
+        let lc = LiveCaptionsController()
+        m.liveCaptions = lc
+        _model = State(initialValue: m)
+        _liveCaptions = State(initialValue: lc)
     }
 
     var body: some Scene {
