@@ -496,6 +496,10 @@ final class AppModel {
         youtubeSubsTask?.cancel(); youtubeSubsTask = nil
     }
 
+    func unloadTranscriptionSession() async {
+        await session.unloadModel()
+    }
+
     @ObservationIgnored private var testBridge: ParolaAutomationServer?
     private(set) var automationBridgeRunning: Bool = false
     private(set) var automationBridgePort: UInt16?

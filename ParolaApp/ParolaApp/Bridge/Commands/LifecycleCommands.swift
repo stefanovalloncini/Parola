@@ -33,6 +33,7 @@ extension ParolaAutomationServer {
                     }
                     let model = ctx.model
                     model.cancelAllTasks()
+                    await model.unloadTranscriptionSession()
                     model.batchJobs = []
                     model.transcript = nil
                     model.libraryEntries = []
