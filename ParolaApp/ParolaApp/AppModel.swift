@@ -851,19 +851,19 @@ final class AppModel {
     var ytDlpInstallError: String?
 
     func refreshYtDlpAvailability() {
-        ytDlpAvailable = Self.findYtDlp() != nil
+        ytDlpAvailable = YtDlpInstaller.locate() != nil
     }
 
     func installYtDlpViaBrew() {
         guard !ytDlpInstalling else { return }
-        guard let brew = Self.findBrew() else {
+        guard let brew = YtDlpInstaller.locateBrew() else {
             ytDlpInstallError = "Homebrew isn't installed. Install it from https://brew.sh, then try again."
             return
         }
         ytDlpInstalling = true
         ytDlpInstallError = nil
         Task { [weak self] in
-            let outcome = await Self.runBrewInstall(brewPath: brew, formula: "yt-dlp")
+            let outcome = await YtDlpInstaller.install(formula: "yt-dlp", brewPath: brew)
             guard let self else { return }
             self.ytDlpInstalling = false
             switch outcome {
@@ -876,85 +876,6 @@ final class AppModel {
                 self.ytDlpInstallError = message
             }
         }
-    }
-
-    private enum BrewOutcome {
-        case success
-        case failure(String)
-    }
-
-    private static func runBrewInstall(brewPath: String, formula: String) async -> BrewOutcome {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: brewPath)
-        proc.arguments = ["install", formula]
-        var env = ProcessInfo.processInfo.environment
-        env["HOMEBREW_NO_AUTO_UPDATE"] = "1"
-        env["HOMEBREW_NO_ANALYTICS"] = "1"
-        proc.environment = env
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        proc.standardError = pipe
-
-        let (chunkStream, chunkContinuation) = AsyncStream.makeStream(of: Data.self)
-        pipe.fileHandleForReading.readabilityHandler = { fh in
-            let chunk = fh.availableData
-            if chunk.isEmpty {
-                fh.readabilityHandler = nil
-                chunkContinuation.finish()
-            } else {
-                chunkContinuation.yield(chunk)
-            }
-        }
-
-        let bufferTask = Task<String, Never> {
-            var data = Data()
-            for await chunk in chunkStream {
-                data.append(chunk)
-            }
-            return String(decoding: data, as: UTF8.self)
-        }
-
-        do {
-            try proc.run()
-        } catch {
-            pipe.fileHandleForReading.readabilityHandler = nil
-            chunkContinuation.finish()
-            return .failure("Could not launch brew: \(error.localizedDescription)")
-        }
-        return await withCheckedContinuation { cont in
-            proc.terminationHandler = { p in
-                pipe.fileHandleForReading.readabilityHandler = nil
-                chunkContinuation.finish()
-                Task {
-                    let output = await bufferTask.value
-                    if p.terminationStatus == 0 {
-                        cont.resume(returning: .success)
-                    } else {
-                        let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                        cont.resume(returning: .failure(detail.isEmpty ? "brew exited with status \(p.terminationStatus)." : detail))
-                    }
-                }
-            }
-        }
-    }
-
-    private static func findYtDlp() -> String? {
-        for path in ["/opt/homebrew/bin/yt-dlp", "/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"] {
-            if FileManager.default.isExecutableFile(atPath: path) { return path }
-        }
-        let env = ProcessInfo.processInfo.environment["PATH"] ?? ""
-        for dir in env.split(separator: ":") {
-            let candidate = "\(dir)/yt-dlp"
-            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
-        }
-        return nil
-    }
-
-    private static func findBrew() -> String? {
-        for path in ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"] {
-            if FileManager.default.isExecutableFile(atPath: path) { return path }
-        }
-        return nil
     }
 
     func transcribeYouTube(urlString: String) {
