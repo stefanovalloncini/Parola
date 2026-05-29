@@ -3,7 +3,7 @@ import Testing
 import ScenarioKit
 
 extension ScenarioSuite {
-    @Suite("Live captions scenarios")
+    @Suite("Live captions scenarios", .enabled(if: ScenarioSuite.backend == "mock"))
     struct LiveCaptions {
         @Test("live captions render scripted partials then a confirmed line")
         func rendersCaptions() async throws {

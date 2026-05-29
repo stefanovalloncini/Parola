@@ -3,7 +3,7 @@ import Testing
 import ScenarioKit
 
 extension ScenarioSuite {
-    @Suite("Export scenarios")
+    @Suite("Export scenarios", .enabled(if: ScenarioSuite.backend == "mock"))
     struct Export {
         @Test("export writes each format to the queued destination")
         func exportsTranscriptFiles() async throws {

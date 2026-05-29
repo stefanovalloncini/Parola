@@ -3,7 +3,7 @@ import Testing
 import ScenarioKit
 
 extension ScenarioSuite {
-    @Suite("YouTube scenarios")
+    @Suite("YouTube scenarios", .enabled(if: ScenarioSuite.backend == "mock"))
     struct YouTube {
         @Test("transcribes a YouTube URL without network")
         func transcribesWithoutNetwork() async throws {
