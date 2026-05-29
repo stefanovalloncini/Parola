@@ -966,8 +966,8 @@ final class AppModel {
             guard let self else { return }
             do {
                 phase = .downloadingModel(name: "youtube", progress: 0)
-                let source = try YouTubeAudioSource(url: url)
-                let audioURL = try await source.prepare()
+                let fetcher = MediaFetcherFactory.make()
+                let audioURL = try await fetcher.prepare(url: url)
                 try Task.checkCancellation()
                 sourceFileURL = audioURL
                 installPlayer(for: audioURL)
