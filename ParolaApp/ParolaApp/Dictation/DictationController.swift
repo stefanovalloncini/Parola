@@ -41,10 +41,12 @@ final class DictationController {
     private var hud: NSPanel?
     private var levelTask: Task<Void, Never>?
     private var partialTask: Task<Void, Never>?
+    private var failedHideTask: Task<Void, Never>?
 
     isolated deinit {
         levelTask?.cancel()
         partialTask?.cancel()
+        failedHideTask?.cancel()
     }
 
     func start(configuration: Configuration) {
@@ -87,6 +89,8 @@ final class DictationController {
             return
         }
         coordinator = nil
+        failedHideTask?.cancel()
+        failedHideTask = nil
         Task { await coord.stopMonitoring() }
         stopPartialStream()
         hideHUD()
@@ -120,6 +124,8 @@ final class DictationController {
     private func handleStateChange(_ state: DictationCoordinator.State) {
         self.state = state
         appModel?.dictationState = state
+        failedHideTask?.cancel()
+        failedHideTask = nil
         switch state {
         case .idle:
             hideHUD()
@@ -134,9 +140,9 @@ final class DictationController {
             showHUD()
             stopLevelStream()
             stopPartialStream()
-            Task { [weak self] in
+            failedHideTask = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(3))
-                guard let self else { return }
+                guard let self, !Task.isCancelled else { return }
                 if case .failed = self.state { self.hideHUD() }
             }
         }

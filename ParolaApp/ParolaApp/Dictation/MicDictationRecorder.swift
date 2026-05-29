@@ -21,7 +21,6 @@ actor MicDictationRecorder: DictationRecorder {
     private var streamingConsumer: Task<Void, Never>?
     private var streamingSegments: [TranscriptSegment] = []
     private var streamingPartial: String = ""
-    private var streamingFinished: Bool = false
 
     init(
         model: String?,
@@ -103,7 +102,6 @@ actor MicDictationRecorder: DictationRecorder {
         let session = StreamingTranscriptionSession()
         streamingSegments = []
         streamingPartial = ""
-        streamingFinished = false
 
         let options = TranscriptionOptions(
             model: model,
@@ -127,9 +125,7 @@ actor MicDictationRecorder: DictationRecorder {
         streamingConsumer = nil
         streamingSession = nil
         broadcastLevel(0)
-        let combined = streamingSegments.map(\.text).joined(separator: " ")
-            + (streamingPartial.isEmpty ? "" : " \(streamingPartial)")
-        return combined.trimmingCharacters(in: .whitespacesAndNewlines)
+        return combinedText().trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func handleStreaming(_ event: StreamingEvent) async {
@@ -143,12 +139,8 @@ actor MicDictationRecorder: DictationRecorder {
             broadcastPartial(combinedText())
         case .voiceActivity(let active):
             broadcastLevel(active ? 0.5 : 0.0)
-        case .warning:
+        case .warning, .failed, .finished:
             break
-        case .failed:
-            break
-        case .finished:
-            streamingFinished = true
         }
     }
 

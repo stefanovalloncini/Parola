@@ -60,9 +60,7 @@ struct AdvancedPane: View {
             titleVisibility: .visible
         ) {
             Button("Reset", role: .destructive) {
-                for scope in SettingsPaneScope.allCases {
-                    SettingsResetService.reset(scope: scope)
-                }
+                SettingsResetService.resetAll()
             }
             Button("Cancel", role: .cancel) {}
         } message: {

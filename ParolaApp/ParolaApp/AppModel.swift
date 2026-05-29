@@ -447,8 +447,6 @@ final class AppModel {
     @ObservationIgnored private var fileTranscribeTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeSubsTask: Task<Void, Never>?
-    @ObservationIgnored private var lastDownloadPercent: Int = -1
-
     var canCancel: Bool {
         if batchTask != nil { return true }
         if streamingConsumer != nil { return true }
@@ -458,15 +456,7 @@ final class AppModel {
         return false
     }
 
-    func cancelCurrentWork() {
-        batchTask?.cancel()
-        batchTask = nil
-        fileTranscribeTask?.cancel()
-        fileTranscribeTask = nil
-        youtubeTranscribeTask?.cancel()
-        youtubeTranscribeTask = nil
-        youtubeSubsTask?.cancel()
-        youtubeSubsTask = nil
+    private func teardownActiveCapture() {
         streamingConsumer?.cancel()
         streamingConsumer = nil
         if let s = streamingSession {
@@ -479,6 +469,18 @@ final class AppModel {
         }
         Task { await mediaSession.exitRecording() }
         pendingRecordingCategory = .transcription
+    }
+
+    func cancelCurrentWork() {
+        batchTask?.cancel()
+        batchTask = nil
+        fileTranscribeTask?.cancel()
+        fileTranscribeTask = nil
+        youtubeTranscribeTask?.cancel()
+        youtubeTranscribeTask = nil
+        youtubeSubsTask?.cancel()
+        youtubeSubsTask = nil
+        teardownActiveCapture()
         phase = .idle
     }
 
@@ -490,10 +492,10 @@ final class AppModel {
         silenceWatchTask?.cancel(); silenceWatchTask = nil
         recordingAutoStopTask?.cancel(); recordingAutoStopTask = nil
         searchTask?.cancel(); searchTask = nil
-        streamingConsumer?.cancel(); streamingConsumer = nil
         fileTranscribeTask?.cancel(); fileTranscribeTask = nil
         youtubeTranscribeTask?.cancel(); youtubeTranscribeTask = nil
         youtubeSubsTask?.cancel(); youtubeSubsTask = nil
+        teardownActiveCapture()
     }
 
     @ObservationIgnored private var testBridge: ParolaAutomationServer?
@@ -730,16 +732,11 @@ final class AppModel {
     }
 
     func downloadModel(_ name: String) {
+        let progress = makeDownloadProgressHandler(for: name)
         Task {
             do {
                 phase = .downloadingModel(name: name, progress: 0)
-                _ = try await store.download(variant: name, progress: { [weak self] frac in
-                    Task { @MainActor [weak self] in
-                        if case .downloadingModel(let n, _) = self?.phase, n == name {
-                            self?.phase = .downloadingModel(name: name, progress: frac)
-                        }
-                    }
-                })
+                _ = try await store.download(variant: name, progress: progress)
                 phase = .idle
                 refreshModelList()
             } catch {
@@ -788,7 +785,7 @@ final class AppModel {
                 let result = try await session.transcribe(
                     source: FileAudioSource(url: fileURL),
                     options: makeOptions(task: task),
-                    downloadProgress: makeDownloadProgressHandler(),
+                    downloadProgress: makeDownloadProgressHandler(for: selectedModel),
                     partialHandler: makeFilePartialHandler()
                 )
                 try Task.checkCancellation()
@@ -830,15 +827,17 @@ final class AppModel {
         )
     }
 
-    private func makeDownloadProgressHandler() -> @Sendable (Double) -> Void {
-        let modelName = selectedModel
-        lastDownloadPercent = -1
+    @MainActor private final class DownloadProgressThrottle {
+        var lastPercent = -1
+    }
+
+    private func makeDownloadProgressHandler(for modelName: String) -> @Sendable (Double) -> Void {
+        let throttle = DownloadProgressThrottle()
         return { [weak self] frac in
             let percent = Int(frac * 100)
             Task { @MainActor [weak self] in
-                guard let self else { return }
-                guard percent != self.lastDownloadPercent else { return }
-                self.lastDownloadPercent = percent
+                guard let self, percent != throttle.lastPercent else { return }
+                throttle.lastPercent = percent
                 self.phase = .downloadingModel(name: modelName, progress: frac)
             }
         }
@@ -976,7 +975,7 @@ final class AppModel {
                 let result = try await session.transcribe(
                     source: FileAudioSource(url: audioURL),
                     options: currentOptions,
-                    downloadProgress: makeDownloadProgressHandler()
+                    downloadProgress: makeDownloadProgressHandler(for: selectedModel)
                 )
                 try Task.checkCancellation()
                 let processed = postProcess(result)
@@ -1180,7 +1179,7 @@ final class AppModel {
         scheduleRecordingAutoStop()
 
         let opts = currentOptions
-        let progress = makeDownloadProgressHandler()
+        let progress = makeDownloadProgressHandler(for: selectedModel)
         let config = mediaSessionConfig(allowMute: true)
 
         streamingConsumer = Task { @MainActor in

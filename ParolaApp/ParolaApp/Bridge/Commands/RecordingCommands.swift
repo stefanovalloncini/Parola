@@ -59,9 +59,11 @@ extension ParolaAutomationServer {
                 handler: { _, ctx in
                     let before = ctx.model.liveCaptions?.isActive ?? false
                     ctx.model.toggleLiveCaptions()
-                    let deadline = Date().addingTimeInterval(1.0)
-                    while (ctx.model.liveCaptions?.isActive ?? false) == before, Date() < deadline {
-                        try? await Task.sleep(for: .milliseconds(50))
+                    let clock = ctx.model.clock
+                    var waitedMs = 0
+                    while (ctx.model.liveCaptions?.isActive ?? false) == before, waitedMs < 1000 {
+                        try? await Task.sleep(for: .milliseconds(50), clock: clock)
+                        waitedMs += 50
                     }
                     return .object(["liveCaptionsActive": .bool(ctx.model.liveCaptions?.isActive ?? false)])
                 }

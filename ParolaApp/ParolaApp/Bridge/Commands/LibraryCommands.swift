@@ -75,9 +75,11 @@ extension ParolaAutomationServer {
                     let query = try args.string("query")
                     ctx.model.searchResults = nil
                     ctx.model.search(query)
-                    let deadline = Date().addingTimeInterval(2.0)
-                    while ctx.model.searchResults == nil, Date() < deadline {
-                        try? await Task.sleep(for: .milliseconds(50))
+                    let clock = ctx.model.clock
+                    var waitedMs = 0
+                    while ctx.model.searchResults == nil, waitedMs < 2000 {
+                        try? await Task.sleep(for: .milliseconds(50), clock: clock)
+                        waitedMs += 50
                     }
                     let results = ctx.model.searchResults ?? []
                     let limit = (try args.optionalInt("limit")) ?? 20

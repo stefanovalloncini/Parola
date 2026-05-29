@@ -173,11 +173,11 @@ final class ParolaAutomationServer {
                 let (data, isComplete) = try await receive(from: conn)
                 if let data { buffer.append(data) }
                 let lines = Self.consumeLines(buffer: &buffer)
-                for lineData in lines {
+                for (index, lineData) in lines.enumerated() {
                     let response = await handle(line: lineData)
                     var out = response
                     out.append(0x0A)
-                    await send(out, on: conn, ending: isComplete && lines.last == lineData)
+                    await send(out, on: conn, ending: isComplete && index == lines.count - 1)
                 }
                 if isComplete {
                     if lines.isEmpty { conn.cancel() }

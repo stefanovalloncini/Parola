@@ -47,16 +47,8 @@ extension ParolaAutomationServer {
                 kind: .sync,
                 handler: { _, ctx in
                     let d = ctx.model.defaults
-                    let keys = [
-                        "useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt",
-                        "diarize", "batchExportFormats", "batchExportToSourceFolder",
-                        "batchExportIncludeTimestamps", "selectedModel", "selectedLanguageRaw",
-                        "translate", "dictationEnabled", "appTheme", "monospacedTimestamps",
-                        "sidebarDensity", "dictationCleanupPromptID", "dictationPerAppOverridesJSON",
-                        "meetingDetectorEnabled",
-                    ]
                     var out: [String: AutomationValue] = [:]
-                    for key in keys {
+                    for key in ParolaAutomationServer.writableSettingKeys.sorted() {
                         out[key] = AutomationValue(d.object(forKey: key))
                     }
                     return .object(out)

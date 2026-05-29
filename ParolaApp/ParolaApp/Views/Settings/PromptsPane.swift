@@ -132,13 +132,12 @@ struct PromptsPane: View {
             )
             await model.promptLibrary.updateUserPrompt(updated)
         } else {
-            let created = await model.promptLibrary.addUserPrompt(name: trimmed, instructions: draft.instructions)
-            if !draft.parsedTriggerWords.isEmpty || draft.assistantMode {
-                var updated = created
-                updated.triggerWords = draft.parsedTriggerWords
-                updated.useSystemInstructions = !draft.assistantMode
-                await model.promptLibrary.updateUserPrompt(updated)
-            }
+            _ = await model.promptLibrary.addUserPrompt(
+                name: trimmed,
+                instructions: draft.instructions,
+                triggerWords: draft.parsedTriggerWords,
+                useSystemInstructions: !draft.assistantMode
+            )
         }
         await reload()
         await model.refreshDictationTriggerPrompts()
