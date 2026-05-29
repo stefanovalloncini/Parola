@@ -45,6 +45,22 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "installMockMediaFetcher",
+                area: .test,
+                summary: "Installs a local fixture as the media-fetch result, skipping yt-dlp. Test-mode only.",
+                kind: .mutating,
+                args: [
+                    .init(name: "fixturePath", kind: .string(), required: true, summary: "Absolute path to a local audio file"),
+                ],
+                handler: { args, ctx in
+                    try requireTestMode(ctx)
+                    let path = try args.string("fixturePath")
+                    MockMediaFetcherRegistry.shared.install(URL(fileURLWithPath: path))
+                    return .object(["installed": .bool(true)])
+                }
+            ),
+
+            AutomationCommand(
                 name: "installMockLanguageModel",
                 area: .test,
                 summary: "Installs a canned language model response. Test-mode only.",
@@ -100,7 +116,7 @@ extension ParolaAutomationServer {
                 summary: "Clears installed mocks. Test-mode only.",
                 kind: .mutating,
                 args: [
-                    .init(name: "scope", kind: .string(enum: ["transcriber", "llm", "audio", "all"]), required: false, summary: "Scope to clear", defaultValue: .string("all")),
+                    .init(name: "scope", kind: .string(enum: ["transcriber", "llm", "audio", "media", "all"]), required: false, summary: "Scope to clear", defaultValue: .string("all")),
                 ],
                 handler: { args, ctx in
                     try requireTestMode(ctx)
@@ -115,6 +131,9 @@ extension ParolaAutomationServer {
                     }
                     if scope == "audio" || scope == "all" {
                         await MockAudioSourceRegistry.shared.clear()
+                    }
+                    if scope == "media" || scope == "all" {
+                        MockMediaFetcherRegistry.shared.clear()
                     }
                     return .object([
                         "cleared": .bool(true),
@@ -141,6 +160,7 @@ extension ParolaAutomationServer {
                         "llm": .array(languageModels.map { .string($0) }),
                         "audio": .object(audioObject),
                         "capturedInsertions": .int(CapturedInsertionStore.shared.all().count),
+                        "mediaFetcher": .bool(MockMediaFetcherRegistry.shared.resolve() != nil),
                     ])
                 }
             ),

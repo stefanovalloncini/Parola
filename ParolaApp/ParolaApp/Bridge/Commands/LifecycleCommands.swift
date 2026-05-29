@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import ParolaCore
 import ParolaDictation
 
 extension ParolaAutomationServer {
@@ -42,6 +43,7 @@ extension ParolaAutomationServer {
                     }
                     model.refreshLibrary()
                     CapturedInsertionStore.shared.clear()
+                    MockMediaFetcherRegistry.shared.clear()
                     return .object(["reset": .bool(true)])
                 }
             ),
