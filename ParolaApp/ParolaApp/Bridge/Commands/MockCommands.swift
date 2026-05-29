@@ -160,6 +160,25 @@ extension ParolaAutomationServer {
                     ])
                 }
             ),
+
+            AutomationCommand(
+                name: "queueSaveDestination",
+                area: .test,
+                summary: "Queues a save-panel response for the next export. Test-mode only.",
+                kind: .mutating,
+                args: [
+                    .init(name: "path", kind: .string(), required: true, summary: "Absolute path to return as the save destination"),
+                ],
+                handler: { args, ctx in
+                    try requireTestMode(ctx)
+                    guard let picker = ctx.model.filePicker as? TestFilePicker else {
+                        throw AutomationError.precondition("file picker is not a TestFilePicker")
+                    }
+                    let path = try args.string("path")
+                    await picker.queueSaveResponse(URL(fileURLWithPath: path))
+                    return .object(["queued": .bool(true)])
+                }
+            ),
         ]
     }
 }
