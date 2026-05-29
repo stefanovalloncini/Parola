@@ -17,12 +17,12 @@ struct MeetingDetectorTests {
     }
 
     private func make(clock: Clock, recorder: Recorder) -> MeetingDetector {
-        let storage = UserDefaults.standard
-        storage.set(true, forKey: "meetingDetectorEnabled")
-        return MeetingDetector(
+        let detector = MeetingDetector(
             onDetected: { name in recorder.calls.append(name) },
             clock: { clock.now }
         )
+        detector.isEnabled = true
+        return detector
     }
 
     @Test("two fires for the same app within 5s only call the closure once")
