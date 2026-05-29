@@ -1,5 +1,6 @@
 import Foundation
 import ParolaCore
+import ParolaDictation
 
 extension ParolaAutomationServer {
     func mockCommands() -> [AutomationCommand] {
@@ -107,6 +108,7 @@ extension ParolaAutomationServer {
                     if scope == "transcriber" || scope == "all" {
                         await MockTranscriberRegistry.shared.clear()
                         MockStreamingTranscriberRegistry.shared.clear()
+                        CapturedInsertionStore.shared.clear()
                     }
                     if scope == "llm" || scope == "all" {
                         await MockLanguageModelStore.shared.clear()
@@ -138,6 +140,23 @@ extension ParolaAutomationServer {
                         "streamingTranscriber": .bool(MockStreamingTranscriberRegistry.shared.resolve() != nil),
                         "llm": .array(languageModels.map { .string($0) }),
                         "audio": .object(audioObject),
+                        "capturedInsertions": .int(CapturedInsertionStore.shared.all().count),
+                    ])
+                }
+            ),
+
+            AutomationCommand(
+                name: "getLastInsertedText",
+                area: .test,
+                summary: "Returns the captured-insertion buffer. Test-mode only.",
+                kind: .sync,
+                handler: { _, ctx in
+                    try requireTestMode(ctx)
+                    let last = CapturedInsertionStore.shared.last()
+                    let log = CapturedInsertionStore.shared.all()
+                    return .object([
+                        "lastText": last.map { .string($0) } ?? .null,
+                        "log": .array(log.map { .string($0) }),
                     ])
                 }
             ),

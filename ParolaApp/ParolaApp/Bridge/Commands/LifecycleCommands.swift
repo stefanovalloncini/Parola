@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import ParolaDictation
 
 extension ParolaAutomationServer {
     func lifecycleCommands() -> [AutomationCommand] {
@@ -40,6 +41,7 @@ extension ParolaAutomationServer {
                         model.defaults.removeObject(forKey: key)
                     }
                     model.refreshLibrary()
+                    CapturedInsertionStore.shared.clear()
                     return .object(["reset": .bool(true)])
                 }
             ),
