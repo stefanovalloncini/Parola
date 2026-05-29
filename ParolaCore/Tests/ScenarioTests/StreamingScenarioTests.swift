@@ -2,8 +2,9 @@ import Foundation
 import Testing
 import ScenarioKit
 
-@Suite("Streaming scenarios", .serialized, .enabled(if: ProcessInfo.processInfo.environment["PAROLA_RUN_SCENARIOS"] == "1"))
-struct StreamingScenarioTests {
+extension ScenarioSuite {
+    @Suite("Streaming scenarios")
+    struct Streaming {
     @Test("mic streaming renders scripted partials then finishes")
     func micStreaming() async throws {
         let client = try ScenarioBridgeClient()
@@ -30,5 +31,6 @@ struct StreamingScenarioTests {
         #expect(transcript["text"]?.stringValue?.contains("one two three") == true)
 
         _ = try await client.send("clearMocks", ["scope": "all"])
+    }
     }
 }
