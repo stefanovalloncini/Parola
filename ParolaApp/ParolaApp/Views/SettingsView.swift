@@ -3,15 +3,21 @@ import ParolaCore
 
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
-    @State private var route: SettingsRoute = .general
     @State private var search: String = ""
+
+    private var route: Binding<SettingsRoute> {
+        Binding(
+            get: { SettingsRoute(rawValue: model.settingsPane) ?? .general },
+            set: { model.settingsPane = $0.rawValue }
+        )
+    }
 
     var body: some View {
         HStack(spacing: 0) {
-            SettingsSidebar(route: $route, search: $search)
+            SettingsSidebar(route: route, search: $search)
                 .frame(width: 220)
             Divider()
-            SettingsDetail(route: route)
+            SettingsDetail(route: route.wrappedValue)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(minWidth: 880, idealWidth: 900, maxWidth: .infinity,

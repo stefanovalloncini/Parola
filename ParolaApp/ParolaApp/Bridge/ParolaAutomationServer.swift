@@ -431,6 +431,7 @@ final class ParolaAutomationServer {
             "phase": .string(Self.phaseName(model.phase)),
             "phaseDetail": Self.phaseDetail(model.phase),
             "route": .string(model.route.rawValue),
+            "settingsPane": .string(model.settingsPane),
             "libraryFilter": .string(model.libraryFilter?.rawValue ?? ""),
             "selectedModel": .string(selectedModel),
             "language": .string(language),

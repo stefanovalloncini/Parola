@@ -8,9 +8,15 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "openSettings",
                 area: .settings,
-                summary: "Opens the Settings window and waits ~300ms for it to appear.",
+                summary: "Opens the Settings window, optionally focusing a pane, and waits ~300ms for it to appear.",
                 kind: .async,
-                handler: { _, _ in
+                args: [
+                    .init(name: "pane", kind: .string(), required: false, summary: "Settings pane identifier (e.g. 'general', 'dictation', 'localModels')"),
+                ],
+                handler: { args, ctx in
+                    if let pane = try args.optionalString("pane"), !pane.isEmpty {
+                        ctx.model.settingsPane = pane
+                    }
                     let visibleCountBefore = NSApp.windows.filter { $0.isVisible }.count
                     if #available(macOS 14.0, *) {
                         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)

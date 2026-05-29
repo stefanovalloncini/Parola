@@ -42,6 +42,7 @@ final class AppModel {
     }
 
     var route: Route = .transcript
+    var settingsPane: String = "general"
     var phase: Phase = .idle
     var transcript: Transcript? {
         didSet {

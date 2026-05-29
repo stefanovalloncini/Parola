@@ -416,8 +416,8 @@ public enum AppTools {
         AppTool(
             name: "parola_app_open_settings",
             bridgeCmd: "openSettings",
-            description: "Open the Settings window. Returns whether a Settings window was found after opening.",
-            properties: [],
+            description: "Open the Settings window, optionally focusing a pane. Pass 'pane' as one of: general, customization, watchedFolders, recordMeetings, shortcuts, microphone, liveCaptions, dictation, snippets, corrections, localModels, transcriptionDefaults, translation, ignoredSegments, findReplace, exportFormats, batchExport, autoExport, integrations, prompts, automation, updates, advanced, about. Returns whether a Settings window was found after opening.",
+            properties: [.string("pane")],
             required: []
         ),
         AppTool(

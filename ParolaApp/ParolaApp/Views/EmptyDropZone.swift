@@ -47,7 +47,10 @@ struct EmptyDropZone: View {
                     ActionCard(
                         title: "Manage Models",
                         systemImage: "cpu.fill",
-                        action: { openSettings() }
+                        action: {
+                            model.settingsPane = "localModels"
+                            openSettings()
+                        }
                     )
                     .axLeaf("Empty.Button.ManageModels")
                     ActionCard(
