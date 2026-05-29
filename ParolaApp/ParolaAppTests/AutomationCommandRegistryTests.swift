@@ -145,14 +145,6 @@ struct AutomationCommandRegistryTests {
         #expect(error.details["id"] == .string("abc123"))
     }
 
-    @Test("timeout maps to TIMEOUT and exposes the observed dictionary as details")
-    func timeoutWire() {
-        let observed: [String: AutomationValue] = ["phase": .string("transcribing")]
-        let error = AutomationError.timeout(observed: observed)
-        #expect(error.code == "TIMEOUT")
-        #expect(error.details == observed)
-    }
-
     @Test("internal maps to INTERNAL with empty details")
     func internalWire() {
         let error = AutomationError.internal("boom")

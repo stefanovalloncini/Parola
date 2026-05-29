@@ -5,6 +5,16 @@ import Foundation
 final class BrowserURLResolver {
     static let shared = BrowserURLResolver()
 
+    static let supportedBundleIDs: Set<String> = [
+        "com.apple.Safari",
+        "com.google.Chrome",
+        "com.google.Chrome.canary",
+        "com.brave.Browser",
+        "com.microsoft.edgemac",
+        "company.thebrowser.Browser",
+        "org.mozilla.firefox",
+    ]
+
     private struct CacheEntry {
         let url: URL?
         let expires: Date

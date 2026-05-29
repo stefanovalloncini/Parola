@@ -72,22 +72,4 @@ public struct CorrectionRuleSet: TextPostProcessor, Sendable {
         return out
     }
 
-    static func replaceWordBounded(
-        pattern: String,
-        in text: String,
-        with replacement: String,
-        caseSensitive: Bool
-    ) -> String {
-        let escaped = NSRegularExpression.escapedPattern(for: pattern)
-        guard !escaped.isEmpty else { return text }
-        let bounded = "(?<![\\p{L}\\p{N}])\(escaped)(?![\\p{L}\\p{N}])"
-        var options: NSRegularExpression.Options = []
-        if !caseSensitive { options.insert(.caseInsensitive) }
-        guard let regex = try? NSRegularExpression(pattern: bounded, options: options) else {
-            return text
-        }
-        let range = NSRange(text.startIndex..., in: text)
-        let template = NSRegularExpression.escapedTemplate(for: replacement)
-        return regex.stringByReplacingMatches(in: text, range: range, withTemplate: template)
-    }
 }

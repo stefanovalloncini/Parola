@@ -36,9 +36,10 @@ final class LiveCaptionsController {
     func setTranslate(_ enabled: Bool) async {
         guard translateToEnglish != enabled else { return }
         translateToEnglish = enabled
-        guard let last = lastOptions, state.isActive else { return }
+        guard state.isActive else { return }
         await stop()
-        await start(options: optionsWithTranslate(last))
+        guard !state.isActive, let current = lastOptions else { return }
+        await start(options: optionsWithTranslate(current))
     }
 
     private func optionsWithTranslate(_ options: TranscriptionOptions) -> TranscriptionOptions {
@@ -65,6 +66,8 @@ final class LiveCaptionsController {
                 for await event in events {
                     self?.handle(event)
                 }
+            } catch is CancellationError {
+                return
             } catch {
                 self?.handleError(error.localizedDescription)
             }

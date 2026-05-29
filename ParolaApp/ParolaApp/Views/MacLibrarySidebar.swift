@@ -105,17 +105,10 @@ struct MacLibrarySidebar: View {
         HStack(spacing: 6) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
-                    Chip(title: "All", isSelected: model.libraryFilter == nil, size: .regular, style: .subtle, selectedFill: DS.Color.accent.opacity(0.85), bordered: false, identifier: "library.filter.all") {
-                        model.libraryFilter = nil
-                    }
-                    Chip(title: "Transcriptions", isSelected: model.libraryFilter == .transcription, size: .regular, style: .subtle, selectedFill: DS.Color.accent.opacity(0.85), bordered: false, identifier: "library.filter.transcriptions") {
-                        model.libraryFilter = .transcription
-                    }
-                    Chip(title: "Meetings", isSelected: model.libraryFilter == .meeting, size: .regular, style: .subtle, selectedFill: DS.Color.accent.opacity(0.85), bordered: false, identifier: "library.filter.meetings") {
-                        model.libraryFilter = .meeting
-                    }
-                    Chip(title: "Dictations", isSelected: model.libraryFilter == .dictation, size: .regular, style: .subtle, selectedFill: DS.Color.accent.opacity(0.85), bordered: false, identifier: "library.filter.dictations") {
-                        model.libraryFilter = .dictation
+                    ForEach([(title: "All", filter: EntryCategory?.none), ("Transcriptions", .transcription), ("Meetings", .meeting), ("Dictations", .dictation)], id: \.title) { item in
+                        Chip(title: LocalizedStringKey(item.title), isSelected: model.libraryFilter == item.filter, size: .regular, style: .subtle, selectedFill: DS.Color.accent.opacity(0.85), bordered: false, identifier: "library.filter.\(item.title.lowercased())") {
+                            model.libraryFilter = item.filter
+                        }
                     }
                 }
             }
@@ -258,14 +251,11 @@ private struct PillRowContent: View {
         .padding(.horizontal, 10)
         .frame(height: 30)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
+        .background {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .stroke(Color.primary.opacity(0.12), lineWidth: 1)
-                .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(isHovering ? Color.primary.opacity(0.06) : Color.clear)
-                )
-        )
+                .fill(isHovering ? Color.primary.opacity(0.06) : Color.clear)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+        }
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
     }

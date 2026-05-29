@@ -58,9 +58,9 @@ struct ModelCategorySection: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(Array(categories.enumerated()), id: \.element.id) { index, category in
+            ForEach(categories) { category in
                 ModelCategoryRow(category: category)
-                if index < categories.count - 1 {
+                if category.id != categories.last?.id {
                     Divider().padding(.leading, 56)
                 }
             }

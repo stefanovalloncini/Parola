@@ -8,17 +8,7 @@ struct WorkflowRow: View {
     let isRemovable: Bool
     @Environment(AppModel.self) private var model
 
-    private static let browserBundleIDs: Set<String> = [
-        "com.apple.Safari",
-        "com.google.Chrome",
-        "com.google.Chrome.canary",
-        "company.thebrowser.Browser",
-        "org.mozilla.firefox",
-        "com.brave.Browser",
-        "com.microsoft.edgemac"
-    ]
-
-    private var isBrowser: Bool { Self.browserBundleIDs.contains(app.bundleID) }
+    private var isBrowser: Bool { BrowserURLResolver.supportedBundleIDs.contains(app.bundleID) }
 
     private var urlRules: [DictationWorkflow] {
         model.urlDictationRules(for: app.bundleID)

@@ -1,5 +1,5 @@
 import Foundation
-@preconcurrency import AVFoundation
+import AVFoundation
 
 #if canImport(CoreAudio)
 import CoreAudio

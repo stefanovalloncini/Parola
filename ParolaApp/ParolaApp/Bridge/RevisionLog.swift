@@ -7,10 +7,10 @@ struct RevisionEntry: Sendable {
     let cause: String
     let snapshotHash: String
 
-    var jsonObject: AutomationValue {
+    var automationValue: AutomationValue {
         .object([
             "revision": .int(revision),
-            "timestamp": .string(ISO8601DateFormatter().string(from: timestamp)),
+            "timestamp": .string(timestamp.ISO8601Format()),
             "cause": .string(cause),
             "snapshotHash": .string(snapshotHash),
         ])

@@ -447,8 +447,6 @@ final class AppModel {
     @ObservationIgnored private var fileTranscribeTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeSubsTask: Task<Void, Never>?
-    @ObservationIgnored private var lastDownloadPercent: Int = -1
-
     var canCancel: Bool {
         if batchTask != nil { return true }
         if streamingConsumer != nil { return true }
@@ -458,15 +456,7 @@ final class AppModel {
         return false
     }
 
-    func cancelCurrentWork() {
-        batchTask?.cancel()
-        batchTask = nil
-        fileTranscribeTask?.cancel()
-        fileTranscribeTask = nil
-        youtubeTranscribeTask?.cancel()
-        youtubeTranscribeTask = nil
-        youtubeSubsTask?.cancel()
-        youtubeSubsTask = nil
+    private func teardownActiveCapture() {
         streamingConsumer?.cancel()
         streamingConsumer = nil
         if let s = streamingSession {
@@ -479,6 +469,18 @@ final class AppModel {
         }
         Task { await mediaSession.exitRecording() }
         pendingRecordingCategory = .transcription
+    }
+
+    func cancelCurrentWork() {
+        batchTask?.cancel()
+        batchTask = nil
+        fileTranscribeTask?.cancel()
+        fileTranscribeTask = nil
+        youtubeTranscribeTask?.cancel()
+        youtubeTranscribeTask = nil
+        youtubeSubsTask?.cancel()
+        youtubeSubsTask = nil
+        teardownActiveCapture()
         phase = .idle
     }
 
@@ -490,10 +492,10 @@ final class AppModel {
         silenceWatchTask?.cancel(); silenceWatchTask = nil
         recordingAutoStopTask?.cancel(); recordingAutoStopTask = nil
         searchTask?.cancel(); searchTask = nil
-        streamingConsumer?.cancel(); streamingConsumer = nil
         fileTranscribeTask?.cancel(); fileTranscribeTask = nil
         youtubeTranscribeTask?.cancel(); youtubeTranscribeTask = nil
         youtubeSubsTask?.cancel(); youtubeSubsTask = nil
+        teardownActiveCapture()
     }
 
     @ObservationIgnored private var testBridge: ParolaAutomationServer?
@@ -730,16 +732,11 @@ final class AppModel {
     }
 
     func downloadModel(_ name: String) {
+        let progress = makeDownloadProgressHandler(for: name)
         Task {
             do {
                 phase = .downloadingModel(name: name, progress: 0)
-                _ = try await store.download(variant: name, progress: { [weak self] frac in
-                    Task { @MainActor [weak self] in
-                        if case .downloadingModel(let n, _) = self?.phase, n == name {
-                            self?.phase = .downloadingModel(name: name, progress: frac)
-                        }
-                    }
-                })
+                _ = try await store.download(variant: name, progress: progress)
                 phase = .idle
                 refreshModelList()
             } catch {
@@ -788,7 +785,7 @@ final class AppModel {
                 let result = try await session.transcribe(
                     source: FileAudioSource(url: fileURL),
                     options: makeOptions(task: task),
-                    downloadProgress: makeDownloadProgressHandler(),
+                    downloadProgress: makeDownloadProgressHandler(for: selectedModel),
                     partialHandler: makeFilePartialHandler()
                 )
                 try Task.checkCancellation()
@@ -830,15 +827,17 @@ final class AppModel {
         )
     }
 
-    private func makeDownloadProgressHandler() -> @Sendable (Double) -> Void {
-        let modelName = selectedModel
-        lastDownloadPercent = -1
+    @MainActor private final class DownloadProgressThrottle {
+        var lastPercent = -1
+    }
+
+    private func makeDownloadProgressHandler(for modelName: String) -> @Sendable (Double) -> Void {
+        let throttle = DownloadProgressThrottle()
         return { [weak self] frac in
             let percent = Int(frac * 100)
             Task { @MainActor [weak self] in
-                guard let self else { return }
-                guard percent != self.lastDownloadPercent else { return }
-                self.lastDownloadPercent = percent
+                guard let self, percent != throttle.lastPercent else { return }
+                throttle.lastPercent = percent
                 self.phase = .downloadingModel(name: modelName, progress: frac)
             }
         }
@@ -852,19 +851,19 @@ final class AppModel {
     var ytDlpInstallError: String?
 
     func refreshYtDlpAvailability() {
-        ytDlpAvailable = Self.findYtDlp() != nil
+        ytDlpAvailable = YtDlpInstaller.locate() != nil
     }
 
     func installYtDlpViaBrew() {
         guard !ytDlpInstalling else { return }
-        guard let brew = Self.findBrew() else {
+        guard let brew = YtDlpInstaller.locateBrew() else {
             ytDlpInstallError = "Homebrew isn't installed. Install it from https://brew.sh, then try again."
             return
         }
         ytDlpInstalling = true
         ytDlpInstallError = nil
         Task { [weak self] in
-            let outcome = await Self.runBrewInstall(brewPath: brew, formula: "yt-dlp")
+            let outcome = await YtDlpInstaller.install(formula: "yt-dlp", brewPath: brew)
             guard let self else { return }
             self.ytDlpInstalling = false
             switch outcome {
@@ -877,85 +876,6 @@ final class AppModel {
                 self.ytDlpInstallError = message
             }
         }
-    }
-
-    private enum BrewOutcome {
-        case success
-        case failure(String)
-    }
-
-    private static func runBrewInstall(brewPath: String, formula: String) async -> BrewOutcome {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: brewPath)
-        proc.arguments = ["install", formula]
-        var env = ProcessInfo.processInfo.environment
-        env["HOMEBREW_NO_AUTO_UPDATE"] = "1"
-        env["HOMEBREW_NO_ANALYTICS"] = "1"
-        proc.environment = env
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        proc.standardError = pipe
-
-        let (chunkStream, chunkContinuation) = AsyncStream.makeStream(of: Data.self)
-        pipe.fileHandleForReading.readabilityHandler = { fh in
-            let chunk = fh.availableData
-            if chunk.isEmpty {
-                fh.readabilityHandler = nil
-                chunkContinuation.finish()
-            } else {
-                chunkContinuation.yield(chunk)
-            }
-        }
-
-        let bufferTask = Task<String, Never> {
-            var data = Data()
-            for await chunk in chunkStream {
-                data.append(chunk)
-            }
-            return String(decoding: data, as: UTF8.self)
-        }
-
-        do {
-            try proc.run()
-        } catch {
-            pipe.fileHandleForReading.readabilityHandler = nil
-            chunkContinuation.finish()
-            return .failure("Could not launch brew: \(error.localizedDescription)")
-        }
-        return await withCheckedContinuation { cont in
-            proc.terminationHandler = { p in
-                pipe.fileHandleForReading.readabilityHandler = nil
-                chunkContinuation.finish()
-                Task {
-                    let output = await bufferTask.value
-                    if p.terminationStatus == 0 {
-                        cont.resume(returning: .success)
-                    } else {
-                        let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                        cont.resume(returning: .failure(detail.isEmpty ? "brew exited with status \(p.terminationStatus)." : detail))
-                    }
-                }
-            }
-        }
-    }
-
-    private static func findYtDlp() -> String? {
-        for path in ["/opt/homebrew/bin/yt-dlp", "/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"] {
-            if FileManager.default.isExecutableFile(atPath: path) { return path }
-        }
-        let env = ProcessInfo.processInfo.environment["PATH"] ?? ""
-        for dir in env.split(separator: ":") {
-            let candidate = "\(dir)/yt-dlp"
-            if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
-        }
-        return nil
-    }
-
-    private static func findBrew() -> String? {
-        for path in ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"] {
-            if FileManager.default.isExecutableFile(atPath: path) { return path }
-        }
-        return nil
     }
 
     func transcribeYouTube(urlString: String) {
@@ -976,7 +896,7 @@ final class AppModel {
                 let result = try await session.transcribe(
                     source: FileAudioSource(url: audioURL),
                     options: currentOptions,
-                    downloadProgress: makeDownloadProgressHandler()
+                    downloadProgress: makeDownloadProgressHandler(for: selectedModel)
                 )
                 try Task.checkCancellation()
                 let processed = postProcess(result)
@@ -1180,7 +1100,7 @@ final class AppModel {
         scheduleRecordingAutoStop()
 
         let opts = currentOptions
-        let progress = makeDownloadProgressHandler()
+        let progress = makeDownloadProgressHandler(for: selectedModel)
         let config = mediaSessionConfig(allowMute: true)
 
         streamingConsumer = Task { @MainActor in

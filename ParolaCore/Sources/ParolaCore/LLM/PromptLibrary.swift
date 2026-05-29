@@ -46,8 +46,19 @@ public actor PromptLibrary {
 
     public var allPrompts: [Prompt] { Prompt.builtIns + userPrompts }
 
-    public func addUserPrompt(name: String, instructions: String) -> Prompt {
-        let prompt = Prompt(name: name, instructions: instructions, isBuiltIn: false)
+    public func addUserPrompt(
+        name: String,
+        instructions: String,
+        triggerWords: [String] = [],
+        useSystemInstructions: Bool = true
+    ) -> Prompt {
+        let prompt = Prompt(
+            name: name,
+            instructions: instructions,
+            isBuiltIn: false,
+            triggerWords: triggerWords,
+            useSystemInstructions: useSystemInstructions
+        )
         userPrompts.append(prompt)
         save()
         return prompt

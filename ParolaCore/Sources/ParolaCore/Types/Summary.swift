@@ -18,7 +18,12 @@ public struct Chapter: Codable, Hashable, Sendable, Identifiable {
     }
 
     static func stableID(title: String, start: Double) -> String {
-        "ch-\(Int(start.rounded()))-\(title.hashValue)"
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in title.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+        return "ch-\(Int(start.rounded()))-\(String(hash, radix: 16))"
     }
 }
 

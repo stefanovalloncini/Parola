@@ -7,6 +7,10 @@ import ParolaDictation
 struct ClipboardPasteInserter: TextInserter {
     var preDelayMs: Int = 0
 
+    /// Leaves the dictated text on the pasteboard this long before restoring the prior contents;
+    /// must outlast the target app's read of the pasteboard or the insertion is lost.
+    private static let restoreDelayMs = 300
+
     func insert(_ text: String) async {
         if preDelayMs > 0 {
             try? await Task.sleep(for: .milliseconds(preDelayMs))
@@ -19,7 +23,7 @@ struct ClipboardPasteInserter: TextInserter {
             let changeCountAfterWrite = pasteboard.changeCount
             postCmdV()
             Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(300))
+                try? await Task.sleep(for: .milliseconds(Self.restoreDelayMs))
                 guard let priorContents else { return }
                 guard pasteboard.changeCount == changeCountAfterWrite else { return }
                 pasteboard.clearContents()

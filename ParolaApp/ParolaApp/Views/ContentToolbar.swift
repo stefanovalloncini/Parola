@@ -128,10 +128,6 @@ struct ContentToolbar: ToolbarContent {
 private struct EnglishOnlyHelpModifier: ViewModifier {
     let isEnglishOnly: Bool
     func body(content: Content) -> some View {
-        if isEnglishOnly {
-            content.help("This model is English-only.")
-        } else {
-            content
-        }
+        content.help(isEnglishOnly ? "This model is English-only." : "")
     }
 }

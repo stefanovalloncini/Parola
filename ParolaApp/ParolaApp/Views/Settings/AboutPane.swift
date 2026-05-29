@@ -1,5 +1,6 @@
 import SwiftUI
 import ParolaCore
+import AppKit
 
 struct AboutPane: View {
     var body: some View {

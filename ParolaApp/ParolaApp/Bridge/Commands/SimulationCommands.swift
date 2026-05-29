@@ -39,7 +39,12 @@ extension ParolaAutomationServer {
                         } else {
                             ctx.model.startDictationFromIntent()
                         }
-                    case "mic.start", "mic.toggle":
+                    case "mic.start":
+                        guard case .recording(.microphone) = ctx.model.phase else {
+                            ctx.model.toggleMicRecording()
+                            break
+                        }
+                    case "mic.toggle":
                         ctx.model.toggleMicRecording()
                     case "mic.stop":
                         if case .recording(.microphone) = ctx.model.phase {

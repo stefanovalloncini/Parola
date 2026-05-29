@@ -1,6 +1,6 @@
 #if os(macOS)
 import Foundation
-@preconcurrency import AVFoundation
+import AVFoundation
 import ScreenCaptureKit
 
 /// Captures system audio output via ScreenCaptureKit and writes 16 kHz mono Float32 WAV.

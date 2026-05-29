@@ -15,7 +15,7 @@ private func applyAppAppearance(_ theme: String) {
 
 @MainActor
 private func applyAlwaysOnTop(_ on: Bool) {
-    for window in NSApp.windows where window.title == "Parola" || window.styleMask.contains(.titled) && window.isVisible {
+    for window in NSApp.windows where window.canBecomeMain && !window.title.contains("Mini") {
         window.level = on ? .floating : .normal
     }
 }

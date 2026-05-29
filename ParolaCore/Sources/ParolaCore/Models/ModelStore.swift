@@ -13,6 +13,18 @@ public final class ModelStore: Sendable {
 
     public static let storageOverrideKey = "parola.modelsStoragePath"
 
+    private static let orphanScanRootRelativePaths = [
+        "models/argmaxinc/whisperkit-coreml",
+        "models/FluidInference",
+        "models/openai",
+    ]
+
+    private var orphanScanRoots: [URL] {
+        Self.orphanScanRootRelativePaths.map {
+            modelsDirectory.appendingPathComponent($0, isDirectory: true)
+        }
+    }
+
     public init(modelsDirectory: URL? = nil) {
         if let modelsDirectory {
             self.modelsDirectory = modelsDirectory
@@ -85,12 +97,7 @@ public final class ModelStore: Sendable {
             installedURL(for: $0.downloadSource).standardizedFileURL.path
         })
 
-        let scanRoots: [URL] = [
-            modelsDirectory.appendingPathComponent("models/argmaxinc/whisperkit-coreml", isDirectory: true),
-            modelsDirectory.appendingPathComponent("models/FluidInference", isDirectory: true),
-        ]
-
-        for root in scanRoots {
+        for root in orphanScanRoots {
             guard fm.fileExists(atPath: root.path) else { continue }
             let entries = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
             for url in entries {
@@ -123,12 +130,7 @@ public final class ModelStore: Sendable {
             try delete(variant: name)
             return
         }
-        let scanRoots: [URL] = [
-            modelsDirectory.appendingPathComponent("models/argmaxinc/whisperkit-coreml", isDirectory: true),
-            modelsDirectory.appendingPathComponent("models/FluidInference", isDirectory: true),
-            modelsDirectory.appendingPathComponent("models/openai", isDirectory: true),
-        ]
-        for root in scanRoots {
+        for root in orphanScanRoots {
             let candidate = root.appendingPathComponent(name, isDirectory: true)
             if FileManager.default.fileExists(atPath: candidate.path) {
                 do {

@@ -117,8 +117,8 @@ struct MacRecentlyDeletedView: View {
     private var list: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: DS.Spacing.large, pinnedViews: []) {
-                ForEach(sections, id: \.0) { group in
-                    section(title: group.0, entries: group.1)
+                ForEach(sections, id: \.0.id) { group in
+                    section(bucket: group.0, entries: group.1)
                 }
                 footer
             }
@@ -128,10 +128,11 @@ struct MacRecentlyDeletedView: View {
         }
     }
 
-    private func section(title: String, entries: [LibraryEntry]) -> some View {
+    private func section(bucket: Bucket, entries: [LibraryEntry]) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            if !title.isEmpty {
-                Text(title.uppercased())
+            if let header = bucket.header {
+                header
+                    .textCase(.uppercase)
                     .font(.system(.caption, design: .default, weight: .semibold))
                     .tracking(0.8)
                     .foregroundStyle(.secondary)
@@ -204,34 +205,62 @@ struct MacRecentlyDeletedView: View {
         }
     }
 
-    private var sections: [(String, [LibraryEntry])] {
-        guard sortOption.groupsByDate else { return [("", sorted)] }
+    private var sections: [(Bucket, [LibraryEntry])] {
+        guard sortOption.groupsByDate else { return [(.none, sorted)] }
         var seen = Set<String>()
-        var order: [String] = []
+        var order: [Bucket] = []
         var bucketed: [String: [LibraryEntry]] = [:]
         for entry in sorted {
             let key = bucket(for: entry.deletedAt)
-            if seen.insert(key).inserted { order.append(key) }
-            bucketed[key, default: []].append(entry)
+            if seen.insert(key.id).inserted { order.append(key) }
+            bucketed[key.id, default: []].append(entry)
         }
-        return order.map { ($0, bucketed[$0] ?? []) }
+        return order.map { ($0, bucketed[$0.id] ?? []) }
     }
 
-    private static let monthYearFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "MMMM yyyy"
-        return f
-    }()
+    private enum Bucket {
+        case none
+        case today
+        case yesterday
+        case earlierThisWeek
+        case earlierThisMonth
+        case month(String)
+        case unknown
 
-    private func bucket(for date: Date?) -> String {
-        guard let date else { return "Unknown" }
+        var id: String {
+            switch self {
+            case .none: return ""
+            case .today: return "today"
+            case .yesterday: return "yesterday"
+            case .earlierThisWeek: return "earlierThisWeek"
+            case .earlierThisMonth: return "earlierThisMonth"
+            case .month(let label): return label
+            case .unknown: return "unknown"
+            }
+        }
+
+        var header: Text? {
+            switch self {
+            case .none: return nil
+            case .today: return Text("Today")
+            case .yesterday: return Text("Yesterday")
+            case .earlierThisWeek: return Text("Earlier This Week")
+            case .earlierThisMonth: return Text("Earlier This Month")
+            case .month(let label): return Text(verbatim: label)
+            case .unknown: return Text("Unknown")
+            }
+        }
+    }
+
+    private func bucket(for date: Date?) -> Bucket {
+        guard let date else { return .unknown }
         let cal = Calendar.current
-        if cal.isDateInToday(date) { return "Today" }
-        if cal.isDateInYesterday(date) { return "Yesterday" }
+        if cal.isDateInToday(date) { return .today }
+        if cal.isDateInYesterday(date) { return .yesterday }
         let days = cal.dateComponents([.day], from: cal.startOfDay(for: date), to: cal.startOfDay(for: Date())).day ?? 0
-        if days < 7 { return "Earlier This Week" }
-        if days < 30 { return "Earlier This Month" }
-        return Self.monthYearFormatter.string(from: date)
+        if days < 7 { return .earlierThisWeek }
+        if days < 30 { return .earlierThisMonth }
+        return .month(date.formatted(.dateTime.month(.wide).year()))
     }
 
     private func handleTap(entry: LibraryEntry, modifiers: NSEvent.ModifierFlags) {

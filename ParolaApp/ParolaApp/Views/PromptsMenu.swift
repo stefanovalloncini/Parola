@@ -54,10 +54,6 @@ struct PromptsMenu: View {
 private struct PromptsMenuHelp: ViewModifier {
     let isRunning: Bool
     func body(content: Content) -> some View {
-        if isRunning {
-            content.help("Running prompt…")
-        } else {
-            content.help("Run a prompt against the transcript")
-        }
+        content.help(isRunning ? "Running prompt…" : "Run a prompt against the transcript")
     }
 }

@@ -220,9 +220,8 @@ private func waitForCondition(
 ) async -> AutomationValue {
     let clock = ctx.model.clock
     let pollIntervalMs = 50
-    let start = Date()
-    let deadline = start.addingTimeInterval(Double(timeoutMs) / 1000.0)
-    while Date() < deadline {
+    var elapsedMs = 0
+    while elapsedMs < timeoutMs {
         if predicate() {
             var result: [String: AutomationValue] = [
                 "matched": .bool(true),
@@ -232,6 +231,7 @@ private func waitForCondition(
             return .object(result)
         }
         try? await Task.sleep(for: .milliseconds(pollIntervalMs), clock: clock)
+        elapsedMs += pollIntervalMs
     }
     return .object([
         "matched": .bool(false),

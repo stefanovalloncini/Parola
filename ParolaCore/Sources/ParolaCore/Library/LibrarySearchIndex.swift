@@ -102,10 +102,6 @@ public actor LibrarySearchIndex {
             }
     }
 
-    public func entryIDs() -> Set<String> {
-        Set(entries.keys)
-    }
-
     /// Writes any pending debounced snapshot to disk. Call before app termination.
     public func flush() async {
         let task = pendingSaveTask

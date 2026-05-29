@@ -1,14 +1,7 @@
 import SwiftUI
 
-private struct AccessibilityIdentifierPathKey: EnvironmentKey {
-    static let defaultValue: [String] = []
-}
-
 extension EnvironmentValues {
-    var accessibilityIdentifierPath: [String] {
-        get { self[AccessibilityIdentifierPathKey.self] }
-        set { self[AccessibilityIdentifierPathKey.self] = newValue }
-    }
+    @Entry var accessibilityIdentifierPath: [String] = []
 }
 
 struct AccessibilityIdentifierBranch: ViewModifier {

@@ -19,10 +19,6 @@ public struct FileAudioSource: AudioSource {
 
     public func cancel() async {}
 
-    public func duration() async -> Double? {
-        await estimatedDuration()
-    }
-
     public func estimatedDuration() async -> Double? {
         let asset = AVURLAsset(url: url)
         do {

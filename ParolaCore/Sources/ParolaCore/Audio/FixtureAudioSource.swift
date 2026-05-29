@@ -1,5 +1,5 @@
 import Foundation
-@preconcurrency import AVFoundation
+import AVFoundation
 
 /// AudioSource backed by an on-disk WAV fixture. Used by the agent platform to
 /// drive recording flows in test mode without real microphone or screen capture.
@@ -92,6 +92,7 @@ public actor FixtureAudioSource: LiveAudioSource {
         paceTask?.cancel()
         paceTask = nil
         finishLevels()
+        started = false
         return fixtureURL
     }
 
