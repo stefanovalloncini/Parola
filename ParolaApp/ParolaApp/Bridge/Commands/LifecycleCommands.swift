@@ -42,6 +42,7 @@ extension ParolaAutomationServer {
                     for key in model.defaults.dictionaryRepresentation().keys {
                         model.defaults.removeObject(forKey: key)
                     }
+                    model.dictationCleanupPromptID = ""
                     model.refreshLibrary()
                     await MockTranscriberRegistry.shared.clear()
                     MockStreamingTranscriberRegistry.shared.clear()
