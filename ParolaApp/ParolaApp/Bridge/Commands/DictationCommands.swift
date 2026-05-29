@@ -28,13 +28,13 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "setDictationCleanupPromptID",
                 area: .dictation,
-                summary: "Selects the dictation cleanup prompt by id (empty string disables cleanup).",
+                summary: "Selects the dictation cleanup prompt by id; omit or pass an empty id to disable cleanup.",
                 kind: .mutating,
                 args: [
-                    .init(name: "id", kind: .string(), required: true, summary: "Prompt UUID, or empty to disable"),
+                    .init(name: "id", kind: .string(), required: false, summary: "Prompt UUID; omit or empty to disable"),
                 ],
                 handler: { args, ctx in
-                    let id = try args.string("id")
+                    let id = try args.optionalString("id") ?? ""
                     ctx.model.dictationCleanupPromptID = id
                     return .object(["promptID": .string(id)])
                 }
