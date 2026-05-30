@@ -4,11 +4,12 @@ struct LanguagePickScreen: View {
     var isActive: Bool = true
     let onContinue: () -> Void
 
-    @EnvironmentObject private var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var showingFullList = false
 
     var body: some View {
-        OnboardingScreen(
+        @Bindable var settings = model.settings
+        return OnboardingScreen(
             headline: "onboarding.language.headline",
             body: ["onboarding.language.subhead"],
             primaryTitle: "onboarding.cta.continue",
@@ -22,7 +23,7 @@ struct LanguagePickScreen: View {
                         Image(systemName: "globe")
                             .font(.body.weight(.medium))
                             .foregroundStyle(Color.accentColor)
-                        Text(LanguageCatalog.label(for: model.settings.language))
+                        Text(LanguageCatalog.label(for: settings.language))
                             .font(.body.weight(.semibold))
                             .foregroundStyle(.primary)
                         Spacer()
@@ -47,7 +48,7 @@ struct LanguagePickScreen: View {
         )
         .sheet(isPresented: $showingFullList) {
             NavigationStack {
-                LanguagePicker(selection: $model.settings.language, compact: false)
+                LanguagePicker(selection: $settings.language, compact: false)
                     .navigationTitle(Text("language.choose"))
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {

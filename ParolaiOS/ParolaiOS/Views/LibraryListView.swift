@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct LibraryListView: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @Binding var selection: LibraryEntry.ID?
     @State private var category: EntryCategory?
     @State private var sortOrder: SortOrder = .newestFirst

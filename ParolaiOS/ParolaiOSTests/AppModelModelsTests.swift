@@ -6,14 +6,12 @@ import ParolaCore
 @Suite("AppModel model list")
 @MainActor
 struct AppModelModelsTests {
-    private static let modelKey = "selectedModel"
-
     private func makeModel() throws -> AppModel {
-        UserDefaults.standard.removeObject(forKey: Self.modelKey)
+        let defaults = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-appmodel-models-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        return AppModel(libraryURL: tmp)
+        return AppModel(libraryURL: tmp, defaults: defaults)
     }
 
     @Test("refreshModelList mirrors the curated catalog")
@@ -22,7 +20,6 @@ struct AppModelModelsTests {
         model.refreshModelList()
         #expect(model.availableModels.isEmpty == false)
         #expect(model.availableModels == ModelStore.shared.catalog())
-        UserDefaults.standard.removeObject(forKey: Self.modelKey)
     }
 
     @Test("an unknown selected model is coerced to a catalog entry")
@@ -32,7 +29,6 @@ struct AppModelModelsTests {
         model.refreshModelList()
         #expect(model.availableModels.contains { $0.name == model.settings.modelName })
         #expect(model.settings.modelName == model.availableModels.first?.name)
-        UserDefaults.standard.removeObject(forKey: Self.modelKey)
     }
 
     @Test("a selected model that exists in the catalog is left unchanged")
@@ -42,6 +38,5 @@ struct AppModelModelsTests {
         model.settings.modelName = known
         model.refreshModelList()
         #expect(model.settings.modelName == known)
-        UserDefaults.standard.removeObject(forKey: Self.modelKey)
     }
 }

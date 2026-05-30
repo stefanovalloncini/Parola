@@ -11,7 +11,7 @@ struct TranscriptionCoordinatorTests {
             .appendingPathComponent("parola-coord-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         let library = LibraryStore(libraryURL: tmp)
-        let settings = UserSettings()
+        let settings = UserSettings(defaults: UserDefaults(suiteName: "test-\(UUID().uuidString)")!)
         return (TranscriptionCoordinator(library: library, settings: settings), library)
     }
 

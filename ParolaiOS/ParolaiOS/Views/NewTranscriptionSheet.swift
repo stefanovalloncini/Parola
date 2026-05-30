@@ -3,7 +3,7 @@ import ParolaCore
 
 struct NewTranscriptionSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var pickingFile = false
     @State private var becameBusy = false
 
@@ -86,7 +86,7 @@ struct NewTranscriptionSheet: View {
 }
 
 private struct LiveRecordingPane: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
 
     private func scrollToTail(_ proxy: ScrollViewProxy) {
         if !model.coordinator.livePartialText.isEmpty {

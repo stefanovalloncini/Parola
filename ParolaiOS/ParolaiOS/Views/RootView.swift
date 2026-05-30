@@ -3,7 +3,7 @@ import ParolaCore
 import Combine
 
 struct RootView: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @Environment(\.horizontalSizeClass) private var hSize
     @State private var selectedEntry: LibraryEntry.ID?
     @State private var showingSettings = false
@@ -30,7 +30,7 @@ struct RootView: View {
             RecentlyDeletedView()
         }
         .sheet(isPresented: $showingLiveCaptions) {
-            LiveCaptionsSheet().environmentObject(model)
+            LiveCaptionsSheet().environment(model)
         }
         .alert(
             "Something went wrong",
@@ -103,7 +103,7 @@ struct RootView: View {
     @ToolbarContentBuilder
     private var toolbarItems: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            Button { showingSettings = true } label: { Image(systemName: "gearshape") }
+            Button("Settings", systemImage: "gearshape") { showingSettings = true }
         }
         if !model.deletedEntries.isEmpty {
             ToolbarItem(placement: .topBarLeading) {
@@ -116,7 +116,7 @@ struct RootView: View {
                 .accessibilityLabel(Text("Live Captions"))
         }
         ToolbarItem(placement: .topBarTrailing) {
-            Button { showingNew = true } label: { Image(systemName: "plus") }
+            Button("New", systemImage: "plus") { showingNew = true }
         }
     }
 }

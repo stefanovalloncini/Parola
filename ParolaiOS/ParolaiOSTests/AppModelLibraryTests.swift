@@ -10,7 +10,7 @@ struct AppModelLibraryTests {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-appmodel-lib-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        return (AppModel(libraryURL: tmp), tmp)
+        return (AppModel(libraryURL: tmp, defaults: UserDefaults(suiteName: "test-\(UUID().uuidString)")!), tmp)
     }
 
     private func transcript(_ text: String) -> Transcript {

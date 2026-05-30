@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct ModelManagerView: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var query = ""
     @State private var filter: ModelFilter = .all
 

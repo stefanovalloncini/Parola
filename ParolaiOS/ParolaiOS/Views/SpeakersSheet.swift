@@ -5,7 +5,7 @@ struct SpeakersSheet: View {
     let entryID: LibraryEntry.ID
     let transcript: Transcript
     let onApply: (Transcript) -> Void
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var renames: [String: String] = [:]
     @State private var suggestions: [Person] = []

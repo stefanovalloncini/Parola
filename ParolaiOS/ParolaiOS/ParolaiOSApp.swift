@@ -4,12 +4,12 @@ import ParolaCore
 
 @main
 struct ParolaiOSApp: App {
-    @StateObject private var model = AppModel()
+    @State private var model = AppModel()
 
     var body: some Scene {
         WindowGroup {
             AppRoot()
-                .environmentObject(model)
+                .environment(model)
                 .environment(model.playback)
         }
     }
@@ -42,8 +42,7 @@ struct ParolaShortcuts: AppShortcutsProvider {
 }
 
 private struct AppRoot: View {
-    @EnvironmentObject private var model: AppModel
-    @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
+    @Environment(AppModel.self) private var model
     @State private var deferOnboarding = false
 
     var body: some View {
@@ -58,17 +57,17 @@ private struct AppRoot: View {
         }
         .animation(.smooth(duration: 0.35), value: shouldShowOnboarding)
         .onOpenURL { url in
-            if !onboardingComplete {
+            if !model.settings.onboardingComplete {
                 deferOnboarding = true
             }
             Task { await model.handleIncoming(url: url) }
         }
-        .onChange(of: onboardingComplete) { _, completed in
+        .onChange(of: model.settings.onboardingComplete) { _, completed in
             if !completed { deferOnboarding = false }
         }
     }
 
     private var shouldShowOnboarding: Bool {
-        !onboardingComplete && !deferOnboarding
+        !model.settings.onboardingComplete && !deferOnboarding
     }
 }

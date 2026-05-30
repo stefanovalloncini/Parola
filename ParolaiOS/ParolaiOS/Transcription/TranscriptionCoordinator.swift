@@ -4,7 +4,8 @@ import AVFoundation
 import ParolaCore
 
 @MainActor
-final class TranscriptionCoordinator: ObservableObject {
+@Observable
+final class TranscriptionCoordinator {
     enum Phase: Equatable {
         case idle
         case downloadingModel(name: String, progress: Double)
@@ -14,22 +15,22 @@ final class TranscriptionCoordinator: ObservableObject {
         case failed(message: String)
     }
 
-    @Published private(set) var phase: Phase = .idle
-    @Published private(set) var liveSegments: [TranscriptSegment] = []
-    @Published private(set) var livePartialText: String = ""
+    private(set) var phase: Phase = .idle
+    private(set) var liveSegments: [TranscriptSegment] = []
+    private(set) var livePartialText: String = ""
 
-    var onComplete: (@MainActor (LibraryEntry) -> Void)?
-    var postProcessor: (@MainActor (Transcript) -> Transcript)?
+    @ObservationIgnored var onComplete: (@MainActor (LibraryEntry) -> Void)?
+    @ObservationIgnored var postProcessor: (@MainActor (Transcript) -> Transcript)?
 
-    private let library: LibraryStore
-    private let settings: UserSettings
-    private let session = TranscriptionSession()
-    private var streamingSession: StreamingTranscriptionSession?
-    private var streamingTask: Task<Void, Never>?
-    private var transcribeTask: Task<Void, Never>?
-    private var recordingGeneration: Int = 0
-    private var cancelledGeneration: Int = -1
-    private var lastProgressPercent: Int = -1
+    @ObservationIgnored private let library: LibraryStore
+    @ObservationIgnored private let settings: UserSettings
+    @ObservationIgnored private let session = TranscriptionSession()
+    @ObservationIgnored private var streamingSession: StreamingTranscriptionSession?
+    @ObservationIgnored private var streamingTask: Task<Void, Never>?
+    @ObservationIgnored private var transcribeTask: Task<Void, Never>?
+    @ObservationIgnored private var recordingGeneration: Int = 0
+    @ObservationIgnored private var cancelledGeneration: Int = -1
+    @ObservationIgnored private var lastProgressPercent: Int = -1
 
     init(library: LibraryStore, settings: UserSettings) {
         self.library = library

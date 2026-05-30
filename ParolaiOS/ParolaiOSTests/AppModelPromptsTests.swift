@@ -10,7 +10,7 @@ struct AppModelPromptsTests {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-appmodel-prompts-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        return AppModel(libraryURL: tmp)
+        return AppModel(libraryURL: tmp, defaults: UserDefaults(suiteName: "test-\(UUID().uuidString)")!)
     }
 
     private func transcript() -> Transcript {

@@ -2,12 +2,13 @@ import SwiftUI
 import ParolaCore
 
 struct IgnoredSegmentsSettings: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var query = ""
     @State private var filter: RuleFilter = .all
 
     var body: some View {
-        Form {
+        @Bindable var model = model
+        return Form {
             Section {
                 Picker("Filter", selection: $filter) {
                     ForEach(RuleFilter.allCases) { option in

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct OnboardingFlow: View {
     let onFinish: () -> Void
-    @EnvironmentObject private var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var step: OnboardingStep = .initialStep
     @State private var finishToken = 0
 

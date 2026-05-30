@@ -3,7 +3,7 @@ import ParolaCore
 
 struct TranscriptDetailView: View {
     let entryID: LibraryEntry.ID
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @Environment(PlaybackController.self) private var playback
     @State private var loaded: LoadedEntry?
     @State private var loadError: String?
@@ -14,7 +14,8 @@ struct TranscriptDetailView: View {
     @State private var selectedSpeaker: String?
 
     var body: some View {
-        Group {
+        @Bindable var model = model
+        return Group {
             if let loaded {
                 let speakers = loaded.document.transcript.uniqueSpeakers
                 let filtered = filteredSegments(in: loaded.document.transcript)
@@ -86,7 +87,7 @@ struct TranscriptDetailView: View {
                 .onChange(of: selectedSpeaker) { _, _ in currentMatchIndex = 0 }
                 .sheet(isPresented: $showingChat) {
                     ChatSheet(entry: loaded.entry, transcript: loaded.document.transcript)
-                        .environmentObject(model)
+                        .environment(model)
                 }
                 .sheet(item: $model.promptOutput) { output in
                     PromptOutputSheet(output: output)
@@ -98,7 +99,7 @@ struct TranscriptDetailView: View {
                     ) { updated in
                         self.loaded = LoadedEntry(entry: loaded.entry, document: ParolaDocument(transcript: updated, audioURL: loaded.document.audioURL, manifest: loaded.document.manifest))
                     }
-                    .environmentObject(model)
+                    .environment(model)
                 }
             } else if let loadError {
                 Text(loadError).foregroundStyle(.red)

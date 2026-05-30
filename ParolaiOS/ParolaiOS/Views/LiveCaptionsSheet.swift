@@ -3,7 +3,7 @@ import SwiftUI
 import ParolaCore
 
 struct LiveCaptionsSheet: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var state = LiveCaptionsState()
     @State private var session: StreamingTranscriptionSession?
