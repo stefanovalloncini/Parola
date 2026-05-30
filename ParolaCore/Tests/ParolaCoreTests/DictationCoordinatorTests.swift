@@ -310,4 +310,58 @@ struct DictationCoordinatorTests {
         let inserted = await inserter.inserted
         #expect(inserted.isEmpty)
     }
+
+    /// A recorder whose `start()` parks until the test opens the gate, so a teardown can be
+    /// injected while `beginListening` is mid-startup.
+    private actor GatedRecorder: DictationRecorder {
+        private(set) var startCalls = 0
+        private(set) var stopCalls = 0
+        private(set) var running = false
+        private(set) var gateArmed = false
+        private var gate: CheckedContinuation<Void, Never>?
+
+        func start() async throws {
+            startCalls += 1
+            await withCheckedContinuation { gate = $0; gateArmed = true }
+            running = true
+        }
+
+        func openGate() {
+            gateArmed = false
+            gate?.resume()
+            gate = nil
+        }
+
+        func stopAndTranscribe() async throws -> String {
+            stopCalls += 1
+            running = false
+            return ""
+        }
+    }
+
+    @Test("aborting while a press is mid-startup never leaves the recorder running")
+    func abortDuringStartupDoesNotOrphanRecorder() async throws {
+        let hotkey = MockHotkey()
+        let recorder = GatedRecorder()
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(hotkey: hotkey, recorder: recorder, inserter: inserter)
+        await coord.startMonitoring()
+
+        let press = Task { await coord.simulatePress() }
+
+        var spins = 0
+        while await recorder.gateArmed == false {
+            await Task.yield()
+            spins += 1
+            if spins > 100_000 { break }
+        }
+
+        await coord.abortMonitoring()
+        await recorder.openGate()
+        await press.value
+
+        await #expect(coord.state == .idle)
+        let running = await recorder.running
+        #expect(running == false, "recorder must be stopped, not orphaned, after abort races startup")
+    }
 }

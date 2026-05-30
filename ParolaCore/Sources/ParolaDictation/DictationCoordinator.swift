@@ -26,6 +26,11 @@ public actor DictationCoordinator {
     private var hybridLocked: Bool = false
     private static let hybridHoldThreshold: TimeInterval = 0.3
 
+    /// Bumped by every transition that leaves (or gives up) the listening state. `beginListening`
+    /// captures it before its awaits and rolls back its own setup if a teardown raced it — the
+    /// actor is reentrant, so a stop/abort can run while `recorder.start()` is still suspended.
+    private var generation: UInt64 = 0
+
     public init(
         hotkey: any HotkeyMonitor,
         recorder: any DictationRecorder,
@@ -104,6 +109,7 @@ public actor DictationCoordinator {
     /// so the user's last utterance isn't dropped. Use ``abortMonitoring()`` for "give up"
     /// semantics that discard pending audio.
     public func stopMonitoring() async {
+        generation &+= 1
         await teardownMonitor()
         if case .listening = state {
             await finishListening()
@@ -114,6 +120,7 @@ public actor DictationCoordinator {
 
     /// Stops listening and discards any in-flight recording without inserting text.
     public func abortMonitoring() async {
+        generation &+= 1
         await teardownMonitor()
         if case .listening = state {
             await mediaSession?.exitRecording()
@@ -199,22 +206,32 @@ public actor DictationCoordinator {
 
     private func beginListening() async {
         guard state == .idle else { return }
+        generation &+= 1
+        let myGeneration = generation
+        await setState(.listening)
         if let session = mediaSession {
             let config = await mediaConfigProvider?() ?? .none
             await session.enterRecording(config: config)
         }
         do {
             try await recorder.start()
-            await setState(.listening)
         } catch {
+            guard myGeneration == generation else { return }
             await mediaSession?.exitRecording()
             await setState(.failed(error.localizedDescription))
             await setState(.idle)
+            return
+        }
+        guard myGeneration == generation else {
+            await mediaSession?.exitRecording()
+            _ = try? await recorder.stopAndTranscribe()
+            return
         }
     }
 
     private func finishListening() async {
         guard state == .listening else { return }
+        generation &+= 1
         hybridLocked = false
         await setState(.transcribing)
         await mediaSession?.exitRecording()
