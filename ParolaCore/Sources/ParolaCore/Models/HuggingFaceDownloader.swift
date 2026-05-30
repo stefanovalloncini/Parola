@@ -75,8 +75,7 @@ enum HuggingFaceDownloader {
                     underlying: "HTTP \(httpStatus ?? -1) for \(entry.path)"
                 )
             }
-            try? FileManager.default.removeItem(at: localURL)
-            try FileManager.default.moveItem(at: tmp, to: localURL)
+            try Self.install(from: tmp, to: localURL)
 
             if let expected = entry.expectedSHA256 {
                 let actual = try sha256Hex(of: localURL)
@@ -198,6 +197,19 @@ enum HuggingFaceDownloader {
             throw ParolaError.modelDownloadFailed(repo, underlying: "Bad URL for \(path)")
         }
         return url
+    }
+
+    /// Lands a freshly downloaded temp file at its destination, overwriting any prior copy.
+    /// Falls back to copy+delete when `moveItem` can't rename across volumes (EXDEV), which
+    /// happens when the model store is on a different volume than the system temp dir.
+    static func install(from tmp: URL, to localURL: URL) throws {
+        try? FileManager.default.removeItem(at: localURL)
+        do {
+            try FileManager.default.moveItem(at: tmp, to: localURL)
+        } catch {
+            try FileManager.default.copyItem(at: tmp, to: localURL)
+            try? FileManager.default.removeItem(at: tmp)
+        }
     }
 
     private static func sha256Hex(of url: URL) throws -> String {

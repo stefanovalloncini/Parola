@@ -229,4 +229,32 @@ struct DownloadSidecarTests {
         )
         #expect(sidecarExists == false, "successful snapshot removes the sidecar on completion")
     }
+
+    @Test("install lands the temp file at the destination and consumes the temp")
+    func installLandsFile() throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let tmp = dir.appendingPathComponent("download.tmp")
+        let dest = dir.appendingPathComponent("model.bin")
+        try Data("model-bytes".utf8).write(to: tmp)
+
+        try HuggingFaceDownloader.install(from: tmp, to: dest)
+
+        #expect(try String(contentsOf: dest, encoding: .utf8) == "model-bytes")
+        #expect(FileManager.default.fileExists(atPath: tmp.path) == false)
+    }
+
+    @Test("install overwrites an existing destination")
+    func installOverwrites() throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let tmp = dir.appendingPathComponent("download.tmp")
+        let dest = dir.appendingPathComponent("model.bin")
+        try Data("stale".utf8).write(to: dest)
+        try Data("fresh".utf8).write(to: tmp)
+
+        try HuggingFaceDownloader.install(from: tmp, to: dest)
+
+        #expect(try String(contentsOf: dest, encoding: .utf8) == "fresh")
+    }
 }
