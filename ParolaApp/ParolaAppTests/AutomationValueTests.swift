@@ -132,4 +132,20 @@ struct AutomationValueTests {
         let value = AutomationValue(NSNumber(value: 42))
         #expect(value == .int(42))
     }
+
+    @Test("JSON numbers 0 and 1 decode as int, not bool")
+    func jsonZeroAndOneAreInts() throws {
+        let data = Data(#"{"start":0,"end":1,"two":2,"flag":true,"off":false,"frac":1.0}"#.utf8)
+        let value = AutomationValue(try JSONSerialization.jsonObject(with: data))
+        guard case .object(let dict) = value else {
+            Issue.record("expected .object, got \(value)")
+            return
+        }
+        #expect(dict["start"] == .int(0))
+        #expect(dict["end"] == .int(1))
+        #expect(dict["two"] == .int(2))
+        #expect(dict["flag"] == .bool(true))
+        #expect(dict["off"] == .bool(false))
+        #expect(dict["frac"] == .double(1.0))
+    }
 }

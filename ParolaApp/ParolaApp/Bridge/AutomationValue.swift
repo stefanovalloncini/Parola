@@ -16,18 +16,9 @@ extension AutomationValue {
         switch jsonObject {
         case is NSNull:
             self = .null
-        case let value as Bool:
-            self = .bool(value)
-        case let value as Int:
-            self = .int(value)
-        case let value as Int64:
-            self = .int(Int(value))
-        case let value as UInt:
-            self = .int(Int(value))
-        case let value as Double:
-            self = .double(value)
-        case let value as Float:
-            self = .double(Double(value))
+        // JSONSerialization returns every JSON number and boolean as NSNumber, and an
+        // NSNumber of 0/1 also bridges `as? Bool` — so a Bool arm here would misdecode
+        // numeric 0/1 as false/true. Classify via CFNumberGetType in fromNSNumber instead.
         case let value as NSNumber:
             self = AutomationValue.fromNSNumber(value)
         case let value as String:
