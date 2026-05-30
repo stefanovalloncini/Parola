@@ -405,13 +405,17 @@ public actor LibraryStore {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let manifest = try decoder.decode(ParolaDocument.Manifest.self, from: data)
+        guard manifest.version <= ParolaDocument.Manifest.currentVersion else {
+            throw ParolaError.ioError("Parola document version \(manifest.version) is newer than this app understands.")
+        }
         let id = (bundleURL.lastPathComponent as NSString).deletingPathExtension
         return LibraryEntry(id: id, bundleURL: bundleURL, manifest: manifest)
     }
 
     private func uniqueEntryName(at date: Date) -> String {
+        // Full UUID (122 bits), not a truncated prefix — a collision would overwrite an existing bundle.
         let prefix = isoBasic(date)
-        let short = String(UUID().uuidString.prefix(8)).lowercased()
+        let short = UUID().uuidString.lowercased()
         return "\(prefix)-\(short)"
     }
 

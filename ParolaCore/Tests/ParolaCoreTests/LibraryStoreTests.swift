@@ -78,6 +78,23 @@ struct LibraryStoreTests {
         #expect(hits.isEmpty == false)
     }
 
+    @Test("a bundle whose manifest version is newer than the app is dropped from the list")
+    func futureVersionBundleDropped() async throws {
+        let (store, url) = try makeTempLibrary()
+        let audio = try makeFakeAudio()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: audio)
+
+        let manifestURL = entry.bundleURL.appendingPathComponent("manifest.json")
+        var json = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as? [String: Any])
+        json["version"] = ParolaDocument.Manifest.currentVersion + 1
+        try JSONSerialization.data(withJSONObject: json).write(to: manifestURL)
+
+        // A fresh store re-scans from disk; the future-version bundle must not appear (it can't open).
+        let reopened = LibraryStore(libraryURL: url, extraIndexer: nil)
+        let entries = await reopened.list()
+        #expect(entries.isEmpty)
+    }
+
     @Test("load round-trips transcript and audio URL")
     func loadRoundTrip() async throws {
         let (store, _) = try makeTempLibrary()
