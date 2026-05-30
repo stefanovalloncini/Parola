@@ -67,13 +67,17 @@ public struct BridgeClient: BridgeProtocol {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    private func encodeRequest(cmd: String, argsJSON: Data, token: String) -> Data {
-        let argsBytes = argsJSON.isEmpty ? Data("{}".utf8) : argsJSON
-        let id = UUID().uuidString
-        var out = Data()
-        out.append(Data("{\"id\":\"\(id)\",\"version\":\(BridgeClient.clientVersion),\"cmd\":\"\(cmd)\",\"auth\":\"\(token)\",\"args\":".utf8))
-        out.append(argsBytes)
-        out.append(Data("}\n".utf8))
+    func encodeRequest(cmd: String, argsJSON: Data, token: String) -> Data {
+        let argsObject = (try? JSONSerialization.jsonObject(with: argsJSON.isEmpty ? Data("{}".utf8) : argsJSON)) ?? [String: Any]()
+        let envelope: [String: Any] = [
+            "id": UUID().uuidString,
+            "version": BridgeClient.clientVersion,
+            "cmd": cmd,
+            "auth": token,
+            "args": argsObject,
+        ]
+        guard var out = try? JSONSerialization.data(withJSONObject: envelope) else { return Data() }
+        out.append(0x0A)
         return out
     }
 

@@ -107,6 +107,21 @@ struct ToolRegistryTests {
     func bridgeClientVersionPinned() {
         #expect(BridgeClient.clientVersion >= 1)
     }
+
+    @Test("BridgeClient encodes valid JSON even with quotes and backslashes in cmd, token, args")
+    func bridgeClientEscapesRequestJSON() throws {
+        let client = BridgeClient()
+        let data = client.encodeRequest(
+            cmd: #"weird"cmd\name"#,
+            argsJSON: Data(#"{"k":"v\"x"}"#.utf8),
+            token: #"tok"en"#
+        )
+        let line = Data(data.prefix(while: { $0 != 0x0A }))
+        let obj = try #require(try JSONSerialization.jsonObject(with: line) as? [String: Any])
+        #expect(obj["cmd"] as? String == #"weird"cmd\name"#)
+        #expect(obj["auth"] as? String == #"tok"en"#)
+        #expect((obj["args"] as? [String: Any])?["k"] as? String == #"v"x"#)
+    }
 }
 
 private actor RecordingBridge: BridgeProtocol {
