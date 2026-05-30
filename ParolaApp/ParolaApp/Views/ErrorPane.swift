@@ -9,9 +9,9 @@ struct ErrorPane: View {
         } description: {
             Text(message)
         } actions: {
-            Button("Try again") { model.dismissError() }
+            Button("Dismiss") { model.dismissError() }
                 .buttonStyle(.bordered)
-                .axLeaf("Error.Button.TryAgain")
+                .axLeaf("Error.Button.Dismiss")
         }
     }
 }
