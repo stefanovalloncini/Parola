@@ -209,7 +209,7 @@ private struct SidebarRow: View {
     private var rowBackground: some View {
         if isSelected {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.accentColor.opacity(0.85))
+                .fill(DS.Color.accent.opacity(0.85))
         } else if isHovering {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .fill(Color.primary.opacity(0.06))

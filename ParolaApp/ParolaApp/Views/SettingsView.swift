@@ -190,7 +190,7 @@ private struct SidebarRow: View {
     }
 
     private var background: Color {
-        if selected { return .accentColor }
+        if selected { return DS.Color.accent }
         if hovering { return .secondary.opacity(0.12) }
         return .clear
     }

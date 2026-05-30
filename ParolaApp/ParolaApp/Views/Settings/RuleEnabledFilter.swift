@@ -37,7 +37,7 @@ struct RuleEnabledFilterChips: View {
                         .padding(.vertical, 3)
                         .foregroundStyle(filter == option ? Color.white : Color.primary.opacity(0.85))
                         .background(
-                            Capsule().fill(filter == option ? Color.accentColor : Color.secondary.opacity(0.15))
+                            Capsule().fill(filter == option ? DS.Color.accent : Color.secondary.opacity(0.15))
                         )
                 }
                 .buttonStyle(.plain)

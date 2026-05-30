@@ -239,7 +239,7 @@ private struct AutoExportFormatChips: View {
                     if isOn { selected.remove(format) } else { selected.insert(format) }
                 }
                 .buttonStyle(.bordered)
-                .tint(isOn ? .accentColor : .secondary)
+                .tint(isOn ? DS.Color.accent : .secondary)
                 .controlSize(.small)
                 .axLeaf("AutoExport.Button.Format.\(format.fileExtension)")
             }

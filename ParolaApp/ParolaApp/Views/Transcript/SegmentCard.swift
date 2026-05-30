@@ -265,7 +265,7 @@ struct SegmentCard: View {
             acc += token.count
             var piece = AttributedString(token + (i == tokens.count - 1 ? "" : " "))
             if !marked && (acc >= target || i == tokens.count - 1) {
-                piece.foregroundColor = .accentColor
+                piece.foregroundColor = DS.Color.accent
                 piece.font = .body.bold()
                 marked = true
             }
@@ -286,7 +286,7 @@ struct SegmentCard: View {
                 let attrHi = AttributedString.Index(stringHi, within: attr)
             else { continue }
             let isCurrent = m.id == currentMatchID
-            attr[attrLo..<attrHi].backgroundColor = isCurrent ? Color.accentColor : Color.yellow
+            attr[attrLo..<attrHi].backgroundColor = isCurrent ? DS.Color.accent : Color.yellow
             attr[attrLo..<attrHi].foregroundColor = Color.black
         }
         return Text(attr)
@@ -298,7 +298,7 @@ struct SegmentCard: View {
         for word in words {
             var piece = AttributedString(word.word + " ")
             if word.id == activeID {
-                piece.foregroundColor = .accentColor
+                piece.foregroundColor = DS.Color.accent
                 piece.font = .body.bold()
             }
             attr.append(piece)
