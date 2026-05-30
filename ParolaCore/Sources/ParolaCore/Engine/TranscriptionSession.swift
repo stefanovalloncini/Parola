@@ -181,5 +181,8 @@ public actor TranscriptionSession {
     private func cancelIdleTimer() {
         idleTask?.cancel()
         idleTask = nil
+        // Invalidate any timer that already slipped past its isCancelled check, so it can't
+        // unload mid-transcribe (cancel() alone doesn't bump the epoch its guard compares).
+        idleEpoch &+= 1
     }
 }

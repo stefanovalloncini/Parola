@@ -149,15 +149,25 @@ actor DiarizationService {
         start: Double,
         end: Double
     ) -> SpeakerSegment? {
-        var best: SpeakerSegment?
+        let intervals = segments.map { (start: Double($0.startTime), end: Double($0.endTime)) }
+        return bestMatchIndex(start: start, end: end, intervals: intervals).map { segments[$0] }
+    }
+
+    /// Index of the interval that best matches `[start, end]` by overlap. A zero-duration query
+    /// (start == end, e.g. a punctuation token) has no overlap to measure, so it falls back to the
+    /// first interval that contains the point — otherwise such a word stays unlabeled and fragments
+    /// a single-speaker segment into a nil island.
+    static func bestMatchIndex(start: Double, end: Double, intervals: [(start: Double, end: Double)]) -> Int? {
+        if end <= start {
+            return intervals.firstIndex { $0.start <= start && start <= $0.end }
+        }
+        var best: Int?
         var bestOverlap: Double = 0
-        for s in segments {
-            let lo = max(Double(s.startTime), start)
-            let hi = min(Double(s.endTime), end)
-            let overlap = max(0, hi - lo)
+        for (i, iv) in intervals.enumerated() {
+            let overlap = max(0, min(iv.end, end) - max(iv.start, start))
             if overlap > bestOverlap {
                 bestOverlap = overlap
-                best = s
+                best = i
             }
         }
         return bestOverlap > 0 ? best : nil
