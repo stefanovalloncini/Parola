@@ -6,6 +6,8 @@ struct LibraryListView: View {
     @Binding var selection: LibraryEntry.ID?
     @State private var category: EntryCategory?
     @State private var sortOrder: SortOrder = .newestFirst
+    @State private var displayed: [LibraryEntry] = []
+    @State private var grouped: [EntryCategory: [LibraryEntry]] = [:]
 
     enum SortOrder: String, CaseIterable, Identifiable {
         case newestFirst
@@ -25,10 +27,12 @@ struct LibraryListView: View {
         }
     }
 
-    private var displayed: [LibraryEntry] {
+    private func recompute() {
         let base = model.searchResults ?? model.libraryEntries
         let filtered = category.map { c in base.filter { $0.category == c } } ?? base
-        return sort(filtered)
+        let sorted = sort(filtered)
+        displayed = sorted
+        grouped = Dictionary(grouping: sorted, by: \.category)
     }
 
     private func sort(_ entries: [LibraryEntry]) -> [LibraryEntry] {
@@ -52,6 +56,11 @@ struct LibraryListView: View {
             content
         }
         .toolbar { sortMenu }
+        .onAppear { recompute() }
+        .onChange(of: model.libraryEntries) { _, _ in recompute() }
+        .onChange(of: model.searchResults) { _, _ in recompute() }
+        .onChange(of: category) { _, _ in recompute() }
+        .onChange(of: sortOrder) { _, _ in recompute() }
     }
 
     @ViewBuilder
@@ -71,8 +80,7 @@ struct LibraryListView: View {
         } else {
             List(selection: $selection) {
                 ForEach(EntryCategory.allCases, id: \.self) { category in
-                    let entries = displayed.filter { $0.category == category }
-                    if !entries.isEmpty {
+                    if let entries = grouped[category], !entries.isEmpty {
                         Section(Self.label(for: category)) {
                             ForEach(entries) { entry in
                                 row(entry).tag(entry.id)

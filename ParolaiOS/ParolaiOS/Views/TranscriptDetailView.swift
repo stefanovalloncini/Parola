@@ -12,14 +12,14 @@ struct TranscriptDetailView: View {
     @State private var query: String = ""
     @State private var currentMatchIndex: Int = 0
     @State private var selectedSpeaker: String?
+    @State private var speakers: [String] = []
+    @State private var filtered: [TranscriptSegment] = []
+    @State private var matchIDs: [TranscriptSegment.ID] = []
 
     var body: some View {
         @Bindable var model = model
         return Group {
             if let loaded {
-                let speakers = loaded.document.transcript.uniqueSpeakers
-                let filtered = filteredSegments(in: loaded.document.transcript)
-                let matchIDs = matchingSegmentIDs(in: filtered)
                 VStack(spacing: 0) {
                     if speakers.count >= 2 {
                         SpeakerChipRow(
@@ -83,8 +83,14 @@ struct TranscriptDetailView: View {
                     }
                 }
                 .searchable(text: $query, prompt: "Search transcript")
-                .onChange(of: query) { _, _ in currentMatchIndex = 0 }
-                .onChange(of: selectedSpeaker) { _, _ in currentMatchIndex = 0 }
+                .onChange(of: query) { _, _ in
+                    currentMatchIndex = 0
+                    recomputeMatches()
+                }
+                .onChange(of: selectedSpeaker) { _, _ in
+                    currentMatchIndex = 0
+                    recomputeFiltered()
+                }
                 .sheet(isPresented: $showingChat) {
                     ChatSheet(entry: loaded.entry, transcript: loaded.document.transcript)
                         .environment(model)
@@ -98,6 +104,7 @@ struct TranscriptDetailView: View {
                         transcript: loaded.document.transcript
                     ) { updated in
                         self.loaded = LoadedEntry(entry: loaded.entry, document: ParolaDocument(transcript: updated, audioURL: loaded.document.audioURL, manifest: loaded.document.manifest))
+                        recomputeFiltered()
                     }
                     .environment(model)
                 }
@@ -111,6 +118,7 @@ struct TranscriptDetailView: View {
             do {
                 let result = try await model.library.load(entryID)
                 loaded = result
+                recomputeFiltered()
                 playback.load(
                     audioURL: result.document.audioURL,
                     transcript: result.document.transcript
@@ -122,21 +130,35 @@ struct TranscriptDetailView: View {
         .onDisappear { playback.pause() }
     }
 
-    private var trimmedQuery: String {
-        query.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func recomputeFiltered() {
+        guard let transcript = loaded?.document.transcript else {
+            speakers = []
+            filtered = []
+            matchIDs = []
+            return
+        }
+        speakers = transcript.uniqueSpeakers
+        if let speaker = selectedSpeaker {
+            filtered = transcript.segments.filter { $0.speaker == speaker }
+        } else {
+            filtered = transcript.segments
+        }
+        recomputeMatches()
     }
 
-    private func filteredSegments(in transcript: Transcript) -> [TranscriptSegment] {
-        guard let speaker = selectedSpeaker else { return transcript.segments }
-        return transcript.segments.filter { $0.speaker == speaker }
-    }
-
-    private func matchingSegmentIDs(in segments: [TranscriptSegment]) -> [TranscriptSegment.ID] {
+    private func recomputeMatches() {
         let q = trimmedQuery
-        guard !q.isEmpty else { return [] }
-        return segments
+        guard !q.isEmpty else {
+            matchIDs = []
+            return
+        }
+        matchIDs = filtered
             .filter { $0.text.range(of: q, options: .caseInsensitive) != nil }
             .map(\.id)
+    }
+
+    private var trimmedQuery: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func targetMatchID(in matches: [TranscriptSegment.ID]) -> TranscriptSegment.ID? {
