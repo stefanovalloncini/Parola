@@ -14,9 +14,10 @@ struct LibraryListView: View {
     @State private var entries: [LibraryEntry] = []
     @State private var labelOptions: [String] = []
 
-    private func recomputeEntries() {
+    @discardableResult
+    private func recomputeEntries() -> [LibraryEntry] {
         let inCategory = model.libraryEntries.filter { $0.category == category }
-        entries = inCategory
+        let computed = inCategory
             .filter { entry in
                 guard let labelFilter else { return true }
                 return entry.labels.contains { $0.localizedCaseInsensitiveCompare(labelFilter) == .orderedSame }
@@ -29,6 +30,8 @@ struct LibraryListView: View {
                 if lhs.pinned != rhs.pinned { return lhs.pinned }
                 return lhs.createdAt > rhs.createdAt
             }
+        entries = computed
+        return computed
     }
 
     private func recomputeLabelOptions() {
@@ -100,9 +103,9 @@ struct LibraryListView: View {
             recomputeLabelOptions()
         }
         .onChange(of: model.libraryVersion) { _, _ in
-            recomputeEntries()
+            let newEntries = recomputeEntries()
             recomputeLabelOptions()
-            selection = selection.intersection(Set(entries.map(\.id)))
+            selection = selection.intersection(Set(newEntries.map(\.id)))
         }
         .onChange(of: labelFilter) { _, _ in recomputeEntries() }
         .onChange(of: dateRangeFilter) { _, _ in recomputeEntries() }
