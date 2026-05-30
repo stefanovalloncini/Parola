@@ -31,10 +31,15 @@ struct EmptyAppContextReader: AppContextReader {
     func frontmostAppName() -> String? { nil }
 }
 
-/// Sentinel inserted in place of `{{CURSOR}}` during expansion. The inserter splits the
-/// final string on this marker and positions the cursor between the two halves.
+/// Sentinel inserted in place of `{{CURSOR}}` during expansion. No inserter repositions the
+/// caret yet, so the insert path strips it via ``stripped(_:)``; keeping the sentinel reserves
+/// the spot for a future split-and-reposition inserter.
 enum SnippetMarker {
     static let cursor = "\u{E000}__PAROLA_CURSOR__\u{E001}"
+
+    static func stripped(_ text: String) -> String {
+        text.replacingOccurrences(of: cursor, with: "")
+    }
 }
 
 public struct SnippetExpander: TextPostProcessor {

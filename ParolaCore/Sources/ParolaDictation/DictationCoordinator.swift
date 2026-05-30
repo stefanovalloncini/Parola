@@ -240,7 +240,7 @@ public actor DictationCoordinator {
             let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty {
                 let processed = await postProcessor.process(trimmed)
-                let final = processed.trimmingCharacters(in: .whitespacesAndNewlines)
+                let final = SnippetMarker.stripped(processed).trimmingCharacters(in: .whitespacesAndNewlines)
                 if !final.isEmpty {
                     await inserter.insert(final)
                 }

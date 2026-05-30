@@ -160,6 +160,31 @@ struct DictationCoordinatorTests {
         func process(_ text: String) async -> String { "" }
     }
 
+    private struct CursorMarkerPostProcessor: TextPostProcessor {
+        func process(_ text: String) async -> String { "\(text) \(SnippetMarker.cursor) tail" }
+    }
+
+    @Test("the {{CURSOR}} sentinel is stripped before insertion")
+    func cursorMarkerStrippedBeforeInsert() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .text("hello"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(
+            hotkey: hotkey,
+            recorder: recorder,
+            inserter: inserter,
+            postProcessor: CursorMarkerPostProcessor()
+        )
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await coord.handle(.release)
+        let inserted = await inserter.inserted
+        #expect(inserted.count == 1)
+        #expect(inserted.first?.contains(SnippetMarker.cursor) == false)
+        #expect(inserted.first?.contains("__PAROLA_CURSOR__") == false)
+        #expect(inserted.first?.contains("hello") == true)
+    }
+
     @Test("post-processor transforms text before inserting")
     func postProcessorTransforms() async throws {
         let hotkey = MockHotkey()
