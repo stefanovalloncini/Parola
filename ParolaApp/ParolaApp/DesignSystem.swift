@@ -69,8 +69,12 @@ enum DS {
     ]
 
     static func speakerColor(for label: String) -> SwiftUI.Color {
-        let digits = label.compactMap(\.wholeNumberValue)
-        let idx = (digits.first ?? 0) % speakerPalette.count
+        let key = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        var hash: UInt64 = 0xcbf29ce484222325
+        for scalar in key.unicodeScalars {
+            hash = (hash ^ UInt64(scalar.value)) &* 0x100000001b3
+        }
+        let idx = Int(hash % UInt64(speakerPalette.count))
         return speakerPalette[idx]
     }
 
