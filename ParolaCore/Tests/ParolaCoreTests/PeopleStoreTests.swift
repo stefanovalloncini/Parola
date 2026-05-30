@@ -119,7 +119,7 @@ struct PeopleStoreTests {
         let base = Date(timeIntervalSince1970: 1_700_000_000)
         _ = await store.recordUsage(name: "Stefano", at: base)
         _ = await store.recordUsage(name: "Stefano", at: base.addingTimeInterval(60))
-        let original = await store.people.first!
+        let original = try #require(await store.people.first)
         let renamed = try #require(await store.rename(original.id, to: "Steve"))
         #expect(renamed.name == "Steve")
         #expect(renamed.usageCount == 2)

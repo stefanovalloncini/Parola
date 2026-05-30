@@ -91,7 +91,9 @@ struct LibrarySearchIndexTests {
         let matches = await index.search("sprint planning")
         // Both match; e2's text has both tokens, e1's title has both. Either way matches must come back ranked.
         #expect(matches.count == 2)
-        #expect(matches.first!.score >= matches.last!.score)
+        let first = try #require(matches.first)
+        let last = try #require(matches.last)
+        #expect(first.score >= last.score)
     }
 
     @Test("match snippet includes highlight ranges around each hit")

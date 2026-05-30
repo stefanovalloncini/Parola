@@ -48,7 +48,7 @@ struct PromptLibraryTests {
     @Test("updating a built-in prompt is rejected")
     func cannotUpdateBuiltIn() async throws {
         let lib = PromptLibrary(storageURL: makeTempStorage())
-        var builtIn = Prompt.builtIns.first!
+        var builtIn = try #require(Prompt.builtIns.first)
         builtIn.name = "Hacked"
         let ok = await lib.updateUserPrompt(builtIn)
         #expect(ok == false)
