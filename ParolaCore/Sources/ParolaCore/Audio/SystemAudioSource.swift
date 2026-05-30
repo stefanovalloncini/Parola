@@ -82,9 +82,14 @@ public actor SystemAudioSource: LiveAudioSource {
             onLevel: levelSink
         )
         let stream = SCStream(filter: filter, configuration: config, delegate: handler)
-        try stream.addStreamOutput(handler, type: .audio, sampleHandlerQueue: callbackQueue)
-
-        try await stream.startCapture()
+        do {
+            try stream.addStreamOutput(handler, type: .audio, sampleHandlerQueue: callbackQueue)
+            try await stream.startCapture()
+        } catch {
+            try? await stream.stopCapture()
+            try? FileManager.default.removeItem(at: outputURL)
+            throw error
+        }
         self.stream = stream
         self.handler = handler
     }
