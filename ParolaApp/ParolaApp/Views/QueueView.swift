@@ -163,6 +163,7 @@ struct QueueView: View {
                     ForEach(matching) { job in
                         QueueRow(job: job, isFocused: focusedJob == job.id)
                             .focusable(true)
+                            .focusEffectDisabled()
                             .focused($focusedJob, equals: job.id)
                             .onKeyPress(.return) {
                                 handleReturn(job: job); return .handled

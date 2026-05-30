@@ -94,6 +94,7 @@ struct BatchJobList: View {
         let isPending = job.status == .pending
         return BatchJobRow(job: job)
             .focusable(true)
+            .focusEffectDisabled()
             .focused($focusedJob, equals: job.id)
             .onTapGesture { model.selectBatchJob(job.id) }
             .onKeyPress(.return) { model.selectBatchJob(job.id); return .handled }
