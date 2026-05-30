@@ -221,16 +221,18 @@ struct CloudLanguageModel: LanguageModel {
         let payload = String(trimmed.dropFirst("data:".count)).trimmingCharacters(in: .whitespaces)
         if payload == "[DONE]" || payload.isEmpty { return .ignore }
         guard let data = payload.data(using: .utf8) else { return .ignore }
-        if let message = decodeStreamErrorMessage(data) { return .streamError(message) }
         struct Chunk: Decodable {
             struct Choice: Decodable {
                 struct Delta: Decodable { let content: String? }
                 let delta: Delta
             }
-            let choices: [Choice]
+            struct ErrorInfo: Decodable { let message: String? }
+            let choices: [Choice]?
+            let error: ErrorInfo?
         }
-        guard let chunk = try? JSONDecoder().decode(Chunk.self, from: data),
-              let content = chunk.choices.first?.delta.content else { return .ignore }
+        guard let chunk = try? JSONDecoder().decode(Chunk.self, from: data) else { return .ignore }
+        if let error = chunk.error { return .streamError(error.message ?? "stream error") }
+        guard let content = chunk.choices?.first?.delta.content else { return .ignore }
         return .text(content)
     }
 
@@ -255,15 +257,5 @@ struct CloudLanguageModel: LanguageModel {
             return .text(text)
         }
         return .ignore
-    }
-
-    private static func decodeStreamErrorMessage(_ data: Data) -> String? {
-        struct Envelope: Decodable {
-            struct ErrorInfo: Decodable { let message: String? }
-            let error: ErrorInfo?
-        }
-        guard let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
-              let error = envelope.error else { return nil }
-        return error.message ?? "stream error"
     }
 }

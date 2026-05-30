@@ -102,6 +102,8 @@ actor AppleSpeechTranscriber: Transcriber {
             if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
                 try await request.downloadAndInstall()
             }
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw ParolaError.unsupportedForEngine(
                 "Apple Speech has no model for \(locale.identifier): \(error.localizedDescription)"

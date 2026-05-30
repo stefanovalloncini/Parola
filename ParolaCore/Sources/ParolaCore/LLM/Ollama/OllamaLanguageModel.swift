@@ -61,8 +61,13 @@ struct OllamaLanguageModel: LanguageModel {
                     }
                     for try await line in bytes.lines {
                         try Task.checkCancellation()
-                        if let chunk = Self.parseStreamLine(line), !chunk.isEmpty {
-                            continuation.yield(chunk)
+                        switch Self.parseStreamLine(line) {
+                        case .text(let chunk):
+                            if !chunk.isEmpty { continuation.yield(chunk) }
+                        case .streamError(let message):
+                            throw OllamaError.streamError(message: message)
+                        case .ignore:
+                            break
                         }
                     }
                     continuation.finish()
@@ -107,23 +112,33 @@ struct OllamaLanguageModel: LanguageModel {
         })
     }
 
-    static func parseStreamLine(_ line: String) -> String? {
+    static func parseStreamLine(_ line: String) -> OllamaStreamLine {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty, let data = trimmed.data(using: .utf8) else { return nil }
+        guard !trimmed.isEmpty, let data = trimmed.data(using: .utf8) else { return .ignore }
         struct Chunk: Decodable {
             struct Message: Decodable { let content: String? }
             let message: Message?
             let done: Bool?
+            let error: String?
         }
-        guard let chunk = try? JSONDecoder().decode(Chunk.self, from: data) else { return nil }
-        if chunk.done == true { return nil }
-        return chunk.message?.content
+        guard let chunk = try? JSONDecoder().decode(Chunk.self, from: data) else { return .ignore }
+        if let error = chunk.error { return .streamError(error) }
+        if chunk.done == true { return .ignore }
+        if let content = chunk.message?.content { return .text(content) }
+        return .ignore
     }
+}
+
+enum OllamaStreamLine: Equatable, Sendable {
+    case text(String)
+    case streamError(String)
+    case ignore
 }
 
 enum OllamaError: Error, LocalizedError, Sendable {
     case malformedResponse
     case requestFailed(status: Int, body: String)
+    case streamError(message: String)
 
     var errorDescription: String? {
         switch self {
@@ -131,6 +146,8 @@ enum OllamaError: Error, LocalizedError, Sendable {
             return "Ollama responded with an unexpected payload."
         case .requestFailed(let status, _):
             return "Ollama request failed with HTTP \(status). Make sure Ollama is running locally."
+        case .streamError(let message):
+            return "Ollama failed mid-response: \(message). The model may have crashed or run out of memory."
         }
     }
 }

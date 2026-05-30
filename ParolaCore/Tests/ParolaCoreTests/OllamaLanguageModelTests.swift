@@ -66,15 +66,20 @@ struct OllamaLanguageModelTests {
     @Test("stream line parser extracts the chunked content delta")
     func streamLine() {
         let line = "{\"message\": {\"role\": \"assistant\", \"content\": \"frag\"}, \"done\": false}"
-        let chunk = OllamaLanguageModel.parseStreamLine(line)
-        #expect(chunk == "frag")
+        #expect(OllamaLanguageModel.parseStreamLine(line) == .text("frag"))
     }
 
-    @Test("stream line parser returns nil for done envelopes and blanks")
+    @Test("stream line parser ignores done envelopes and blanks")
     func streamLineSkips() {
-        #expect(OllamaLanguageModel.parseStreamLine("") == nil)
+        #expect(OllamaLanguageModel.parseStreamLine("") == .ignore)
         let done = "{\"done\": true, \"total_duration\": 100}"
-        #expect(OllamaLanguageModel.parseStreamLine(done) == nil)
+        #expect(OllamaLanguageModel.parseStreamLine(done) == .ignore)
+    }
+
+    @Test("stream line parser surfaces a mid-stream error frame")
+    func streamLineError() {
+        let line = "{\"error\": \"model runner has unexpectedly stopped\"}"
+        #expect(OllamaLanguageModel.parseStreamLine(line) == .streamError("model runner has unexpectedly stopped"))
     }
 
     @Test("custom endpoint without trailing slash is honored")
