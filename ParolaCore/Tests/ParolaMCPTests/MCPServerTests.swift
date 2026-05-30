@@ -116,6 +116,19 @@ struct MCPServerTests {
         #expect(error["code"] as? Int == RPCErrorCode.methodNotFound)
     }
 
+    @Test("unknown notification (no id) gets no response, per JSON-RPC")
+    func unknownNotificationHasNoResponse() async throws {
+        let server = makeServer()
+        let request = JSONRPCRequest(
+            jsonrpc: "2.0",
+            id: nil,
+            method: "notifications/cancelled",
+            params: nil
+        )
+        let response = try await server.handle(request)
+        #expect(response == nil)
+    }
+
     @Test("tools/call with missing name returns invalidParams")
     func toolsCallMissingNameReturnsInvalidParams() async throws {
         let server = makeServer()

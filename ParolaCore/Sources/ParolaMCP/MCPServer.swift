@@ -12,9 +12,6 @@ public actor MCPServer {
     private let bridge: any BridgeProtocol
     private(set) var shouldExit: Bool = false
 
-    private var cachedToolList: [MCPTool] = ToolRegistry.allTools()
-    private var cachedBridgeVersion: Int?
-
     public func requestExit() {
         shouldExit = true
     }
@@ -38,14 +35,15 @@ public actor MCPServer {
         case "notifications/initialized":
             return nil
         case "tools/list":
-            await refreshToolListIfNeeded()
-            return JSONRPCResponse.success(id: request.id, result: MCPListToolsResult(tools: cachedToolList))
+            return JSONRPCResponse.success(id: request.id, result: MCPListToolsResult(tools: ToolRegistry.allTools()))
         case "tools/call":
             return try await callTool(request)
         case "shutdown":
             shouldExit = true
             return JSONRPCResponse.success(id: request.id, result: AnyEncodable([String: String]()))
         default:
+            // JSON-RPC notifications carry no id; the server must not reply to them.
+            if request.id == nil { return nil }
             return JSONRPCResponse.failure(
                 id: request.id,
                 code: RPCErrorCode.methodNotFound,
@@ -225,22 +223,6 @@ public actor MCPServer {
         return MCPToolCallResult(text: text)
     }
 
-    private func refreshToolListIfNeeded() async {
-        let version = await fetchHandshakeVersion()
-        guard version != cachedBridgeVersion else { return }
-        cachedBridgeVersion = version
-        cachedToolList = ToolRegistry.allTools()
-    }
-
-    private func fetchHandshakeVersion() async -> Int? {
-        let raw = try? await bridge.call("_handshake", argsJSON: Data("{}".utf8))
-        guard let raw,
-              let data = raw.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
-        }
-        return object["serverVersion"] as? Int
-    }
 }
 
 public struct MCPToolError: LocalizedError {
