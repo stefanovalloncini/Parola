@@ -39,7 +39,7 @@ enum AppAccent: String, CaseIterable, Identifiable {
     static let storageKey = "appAccentColor"
 
     static var current: AppAccent {
-        guard let raw = UserDefaults.standard.string(forKey: storageKey),
+        guard let raw = DefaultsStore.current.string(forKey: storageKey),
               let value = AppAccent(rawValue: raw) else {
             return .terracotta
         }
