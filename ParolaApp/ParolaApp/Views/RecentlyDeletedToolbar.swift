@@ -87,7 +87,7 @@ struct RecentlyDeletedToolbar: View {
     var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 12))
+                .font(DS.Font.callout)
                 .foregroundStyle(.secondary)
             TextField("Search", text: $searchText)
                 .textFieldStyle(.plain)
@@ -96,7 +96,7 @@ struct RecentlyDeletedToolbar: View {
             if !searchText.isEmpty {
                 Button { searchText = "" } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
+                        .font(DS.Font.callout)
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
@@ -118,7 +118,7 @@ struct RecentlyDeletedToolbar: View {
             .pickerStyle(.inline)
         } label: {
             Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 11, weight: .semibold))
+                .font(DS.Font.subheadlineEmphasized)
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 26)
                 .background(RecentlyDeletedPillChrome())
@@ -145,7 +145,7 @@ struct RecentlyDeletedToolbar: View {
             .axLeaf("Toolbar.MenuItem.EmptyTrash")
         } label: {
             Image(systemName: "ellipsis")
-                .font(.system(size: 13, weight: .semibold))
+                .font(DS.Font.heading)
                 .frame(width: 28, height: 26)
                 .background(RecentlyDeletedPillChrome())
         }
@@ -159,7 +159,7 @@ struct RecentlyDeletedToolbar: View {
     var emptyTrashButton: some View {
         Button { confirmingEmpty = true } label: {
             Image(systemName: "trash")
-                .font(.system(size: 12, weight: .semibold))
+                .font(DS.Font.calloutEmphasized)
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 26)
                 .background(RecentlyDeletedPillChrome())

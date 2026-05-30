@@ -125,7 +125,7 @@ struct BatchJobList: View {
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: 12, weight: .medium))
+                .font(DS.Font.calloutMedium)
                 .foregroundStyle(.secondary)
                 .frame(width: 26, height: 26)
                 .background(

@@ -54,7 +54,7 @@ struct RecordingPane: View {
             Image(systemName: "speaker.slash.fill")
                 .foregroundStyle(.white)
             Text("No voice detected — check your microphone.")
-                .font(.system(size: 12, weight: .medium))
+                .font(DS.Font.calloutMedium)
                 .foregroundStyle(.white)
             Spacer()
         }
@@ -78,6 +78,7 @@ struct RecordingCard: View {
     var levelSubject: CurrentValueSubject<Float, Never>? = nil
     var showsWaveform: Bool = false
     let onStop: () -> Void
+    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 64
 
     var body: some View {
         VStack(spacing: DS.Spacing.large) {
@@ -86,7 +87,7 @@ struct RecordingCard: View {
                     .fill(DS.Color.accent.opacity(0.12))
                     .frame(width: 120, height: 120)
                 Image(systemName: "mic.fill")
-                    .font(.system(size: 64, weight: .regular))
+                    .font(.system(size: iconSize, weight: .regular))
                     .foregroundStyle(DS.Color.accent)
             }
 

@@ -60,7 +60,7 @@ struct SnippetsPane: View {
 
             SettingHelper(text: "Triggers fire on dictated text only; matching is case-insensitive and word-bounded.")
             Text("Placeholders: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}")
-                .font(.system(size: 11, design: .monospaced))
+                .font(DS.Font.subheadlineMono)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)
             ResetPaneButton(scope: .snippets)

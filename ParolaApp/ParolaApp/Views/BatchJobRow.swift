@@ -53,7 +53,7 @@ struct BatchJobRow: View {
             .frame(width: 32, height: 32)
             .overlay {
                 Image(systemName: iconSymbol)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(DS.Font.bodyEmphasized)
                     .foregroundStyle(.white)
             }
     }
@@ -63,7 +63,7 @@ struct BatchJobRow: View {
             model.cancelBatchJob(job.id)
         } label: {
             Image(systemName: "xmark")
-                .font(.system(size: 11, weight: .semibold))
+                .font(DS.Font.subheadlineEmphasized)
                 .foregroundStyle(DS.Color.secondaryText)
                 .frame(width: 22, height: 22)
                 .background(

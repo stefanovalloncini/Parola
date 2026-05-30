@@ -13,7 +13,7 @@ struct LongPauseDivider: View {
             line
             HStack(spacing: 4) {
                 Image(systemName: "moon.zzz")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(DS.Font.caption2Emphasized)
                 Text(label)
                     .font(DS.Font.captionMono)
             }

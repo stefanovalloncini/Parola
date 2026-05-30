@@ -22,7 +22,7 @@ struct TranscriptHeaderBar: View {
 
             if let label = languageLabel {
                 Text(label)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(DS.Font.caption2Emphasized)
                     .foregroundStyle(DS.Color.accent)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -90,7 +90,7 @@ struct TranscriptHeaderBar: View {
 
             Button(action: onAdvance) {
                 Image(systemName: "chevron.right.2")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(DS.Font.heading)
                     .frame(width: 28, height: 22)
                     .background(
                         Capsule(style: .continuous)

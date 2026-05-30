@@ -10,7 +10,7 @@ struct ScratchpadView: View {
                 Image(systemName: "note.text")
                     .foregroundStyle(DS.Color.accent)
                 Text("Focus the text below, then trigger dictation to capture here.")
-                    .font(.system(size: 11))
+                    .font(DS.Font.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             }
@@ -18,7 +18,7 @@ struct ScratchpadView: View {
             .padding(.top, 8)
 
             TextEditor(text: $controller.text)
-                .font(.system(size: 13))
+                .font(DS.Font.body)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .background(

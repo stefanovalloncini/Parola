@@ -28,10 +28,12 @@ struct ContinuousParagraph: View {
     @State private var attributedCache: AttributedString = AttributedString()
     @State private var segmentRuns: [TranscriptSegment.ID: SegmentRun] = [:]
     @State private var highlightedSegmentID: TranscriptSegment.ID?
+    @ScaledMetric(relativeTo: .body) private var compactSize: CGFloat = 14
+    @ScaledMetric(relativeTo: .body) private var comfortableSize: CGFloat = 18
 
     var body: some View {
         Text(attributedCache)
-            .font(.system(size: model.transcriptCompact ? 14 : 18, weight: .regular))
+            .font(.system(size: model.transcriptCompact ? compactSize : comfortableSize, weight: .regular))
             .lineSpacing(model.transcriptCompact ? 3 : 6)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)

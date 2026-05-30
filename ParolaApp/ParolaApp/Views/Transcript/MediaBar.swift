@@ -15,7 +15,7 @@ struct MediaBar: View {
         HStack(spacing: DS.Spacing.regular) {
             Button(action: togglePlayPause) {
                 Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(DS.Font.bodyEmphasized)
                     .foregroundStyle(DS.Color.onAccent)
                     .frame(width: 36, height: 36)
                     .background(Circle().fill(DS.Color.accent))
@@ -39,14 +39,14 @@ struct MediaBar: View {
             .accessibilityIdentifier("transcript.player.scrub")
 
             Text(timeLabel(current: progress, total: duration))
-                .font(.system(size: 12, design: .monospaced))
+                .font(DS.Font.calloutMono)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .frame(minWidth: 96, alignment: .trailing)
 
             Button { model.skipSilences.toggle() } label: {
                 Image(systemName: model.skipSilences ? "forward.end.fill" : "forward.end")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(DS.Font.subheadlineEmphasized)
                     .foregroundStyle(model.skipSilences ? DS.Color.accent : .secondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
@@ -73,7 +73,7 @@ struct MediaBar: View {
                 }
             } label: {
                 Text(speedLabel(playbackRate))
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .font(DS.Font.calloutMonoEmphasized)
                     .monospacedDigit()
                     .foregroundStyle(DS.Color.accent)
                     .padding(.horizontal, 10)

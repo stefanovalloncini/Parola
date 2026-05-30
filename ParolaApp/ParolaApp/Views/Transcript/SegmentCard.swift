@@ -113,7 +113,7 @@ struct SegmentCard: View {
     private func noteRow(text: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "note.text")
-                .font(.system(size: 10))
+                .font(DS.Font.caption2)
                 .foregroundStyle(DS.Color.accent)
             Text(text)
                 .font(DS.Font.caption)
@@ -224,7 +224,7 @@ struct SegmentCard: View {
     private func cardButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 11, weight: .semibold))
+                .font(DS.Font.subheadlineEmphasized)
                 .frame(width: 22, height: 22)
                 .contentShape(Rectangle())
         }

@@ -84,7 +84,7 @@ struct ModelPickerView: View {
     private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
+                .font(DS.Font.calloutMedium)
                 .foregroundStyle(.secondary)
             TextField("Search models", text: $searchText)
                 .textFieldStyle(.plain)
@@ -95,7 +95,7 @@ struct ModelPickerView: View {
                     searchText = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
+                        .font(DS.Font.callout)
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)

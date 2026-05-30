@@ -40,7 +40,7 @@ struct DictationView: View {
                     .foregroundStyle(.white)
                 if let modeName = currentModeName {
                     Text(modeName)
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(DS.Font.caption2Emphasized)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -73,7 +73,7 @@ struct DictationView: View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
                 Text(controller.recentDictation)
-                    .font(.system(size: 13))
+                    .font(DS.Font.body)
                     .foregroundStyle(.white.opacity(0.9))
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -95,12 +95,12 @@ struct DictationView: View {
             indicator
                 .frame(width: 22, height: 16)
             Text(notchLabel)
-                .font(.system(size: 11, weight: .medium))
+                .font(DS.Font.subheadlineMedium)
                 .foregroundStyle(.white.opacity(0.9))
                 .lineLimit(1)
             Spacer(minLength: 0)
             timer
-                .font(.system(size: 11, design: .monospaced))
+                .font(DS.Font.subheadlineMono)
                 .foregroundStyle(.white.opacity(0.65))
             stopButton
         }
@@ -151,7 +151,7 @@ struct DictationView: View {
             SpinningRing().frame(width: 14, height: 14)
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 16))
+                .font(DS.Font.title3Regular)
                 .foregroundStyle(.orange)
         }
     }
@@ -182,7 +182,7 @@ struct DictationView: View {
                 ZStack {
                     Circle().fill(Color.white.opacity(0.14))
                     Image(systemName: "stop.fill")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(DS.Font.caption2Bold)
                         .foregroundStyle(.white)
                 }
                 .frame(width: 22, height: 22)

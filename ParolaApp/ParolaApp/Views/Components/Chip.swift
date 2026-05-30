@@ -59,9 +59,9 @@ struct Chip: View {
 
     private var font: Font {
         switch size {
-        case .compact: return .system(size: 11, weight: weight)
-        case .regular: return .caption.weight(weight)
-        case .prominent: return .system(size: 12.5, weight: weight)
+        case .compact: return DS.Font.subheadline.weight(weight)
+        case .regular: return DS.Font.caption.weight(weight)
+        case .prominent: return DS.Font.callout.weight(weight)
         }
     }
 

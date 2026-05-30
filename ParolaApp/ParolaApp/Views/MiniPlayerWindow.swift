@@ -28,7 +28,7 @@ struct MiniPlayerWindow: View {
             return seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
         }()
         return Text(text)
-            .font(.system(size: 13, weight: .regular))
+            .font(DS.Font.body)
             .foregroundStyle(.primary)
             .lineLimit(2)
             .multilineTextAlignment(.leading)
@@ -48,7 +48,7 @@ struct MiniPlayerWindow: View {
 
             Button(action: togglePlayPause) {
                 Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(DS.Font.title3Bold)
                     .foregroundStyle(DS.Color.onAccent)
                     .frame(width: 32, height: 32)
                     .background(Circle().fill(DS.Color.accent))
@@ -71,7 +71,7 @@ struct MiniPlayerWindow: View {
             Spacer()
 
             Text(timeLabel)
-                .font(.system(size: 11, design: .monospaced))
+                .font(DS.Font.subheadlineMono)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
         }

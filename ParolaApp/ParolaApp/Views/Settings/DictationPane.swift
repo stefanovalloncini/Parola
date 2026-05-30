@@ -106,7 +106,7 @@ struct DictationPane: View {
                             .frame(width: 160)
                             .axLeaf("Dictation.Slider.PasteDelay")
                         Text("\(model.dictationPasteDelayMs) ms")
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(DS.Font.subheadlineMono)
                             .foregroundStyle(.secondary)
                             .frame(width: 56, alignment: .trailing)
                     }

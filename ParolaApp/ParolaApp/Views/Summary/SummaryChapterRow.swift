@@ -20,7 +20,7 @@ struct SummaryChapterRow: View {
                     .foregroundStyle(DS.Color.primaryText)
                 Spacer()
                 Image(systemName: "play.fill")
-                    .font(.system(size: 10))
+                    .font(DS.Font.caption2)
                     .foregroundStyle(DS.Color.accent)
                     .opacity(hovering ? 1 : 0)
             }

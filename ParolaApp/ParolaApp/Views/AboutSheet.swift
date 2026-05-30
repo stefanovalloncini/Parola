@@ -4,23 +4,24 @@ import ParolaCore
 struct AboutSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 44
 
     var body: some View {
         VStack(spacing: 18) {
             HStack(spacing: 14) {
                 Image(systemName: "waveform")
-                    .font(.system(size: 44, weight: .regular))
+                    .font(.system(size: iconSize, weight: .regular))
                     .foregroundStyle(DS.Color.accent)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Parola")
-                        .font(.system(size: 22, weight: .semibold))
+                        .font(DS.Font.title)
                     HStack(spacing: 6) {
                         Text("Version \(Self.versionString)")
-                            .font(.system(size: 12))
+                            .font(DS.Font.callout)
                             .foregroundStyle(.secondary)
                         if let channel = Self.channelLabel {
                             Text(channel)
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(DS.Font.caption2Emphasized)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 1)
                                 .background(
@@ -86,11 +87,11 @@ struct AboutSheet: View {
     private func creditRow(title: LocalizedStringKey, value: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(title)
-                .font(.system(size: 11, weight: .semibold))
+                .font(DS.Font.subheadlineEmphasized)
                 .foregroundStyle(.secondary)
                 .frame(width: 90, alignment: .leading)
             Text(verbatim: value)
-                .font(.system(size: 12))
+                .font(DS.Font.callout)
                 .foregroundStyle(.primary)
         }
     }

@@ -14,7 +14,7 @@ struct SegmentTimingPopover: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("Timing")
-                    .font(.system(size: 12.5, weight: .semibold))
+                    .font(DS.Font.calloutEmphasized)
                 Spacer()
                 Picker("", selection: $model.subtitleFPS) {
                     ForEach(Self.fpsOptions, id: \.self) { fps in
@@ -41,12 +41,12 @@ struct SegmentTimingPopover: View {
     private func timingRow(label: String, value: Double, nudge: @escaping (Int) -> Void) -> some View {
         HStack(spacing: 8) {
             Text(label)
-                .font(.system(size: 11.5, weight: .medium))
+                .font(DS.Font.subheadlineMedium)
                 .foregroundStyle(DS.Color.secondaryText)
                 .frame(width: 36, alignment: .leading)
             nudgeButton(systemName: "minus", help: "−1 frame") { nudge(-1) }
             Text(Self.format(value))
-                .font(.system(size: 12, design: .monospaced).monospacedDigit())
+                .font(DS.Font.calloutMono.monospacedDigit())
                 .frame(maxWidth: .infinity)
             nudgeButton(systemName: "plus", help: "+1 frame") { nudge(1) }
         }
@@ -55,7 +55,7 @@ struct SegmentTimingPopover: View {
     private func nudgeButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 11, weight: .semibold))
+                .font(DS.Font.subheadlineEmphasized)
                 .frame(width: 26, height: 22)
                 .background(
                     RoundedRectangle(cornerRadius: 4)

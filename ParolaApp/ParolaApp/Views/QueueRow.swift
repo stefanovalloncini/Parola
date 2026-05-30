@@ -76,7 +76,7 @@ struct QueueRow: View {
             RoundedRectangle(cornerRadius: DS.Radius.small)
                 .fill(iconTint.opacity(0.22))
             Image(systemName: iconName)
-                .font(.system(size: 15, weight: .medium))
+                .font(DS.Font.title3Medium)
                 .foregroundStyle(iconTint)
         }
         .frame(width: 32, height: 32)
@@ -138,7 +138,7 @@ struct QueueRow: View {
     private func actionButton(_ help: String, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 16))
+                .font(DS.Font.title3Regular)
                 .foregroundStyle(DS.Color.secondaryText)
         }
         .buttonStyle(.plain)

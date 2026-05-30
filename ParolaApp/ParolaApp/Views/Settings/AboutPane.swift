@@ -3,13 +3,15 @@ import ParolaCore
 import AppKit
 
 struct AboutPane: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 48
+
     var body: some View {
         VStack(alignment: .center, spacing: 14) {
             Image(systemName: "waveform")
-                .font(.system(size: 48, weight: .light))
+                .font(.system(size: iconSize, weight: .light))
                 .foregroundStyle(.tint)
                 .padding(.top, 32)
-            Text("Parola").font(.system(size: 22, weight: .semibold))
+            Text("Parola").font(DS.Font.title)
             Text(versionLine)
                 .font(.caption)
                 .foregroundStyle(.secondary)

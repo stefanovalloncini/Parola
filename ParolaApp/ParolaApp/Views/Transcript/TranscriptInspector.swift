@@ -51,7 +51,7 @@ struct InspectorModeIcon: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 14, weight: .regular))
+                .font(DS.Font.body)
                 .frame(width: 32, height: 26)
                 .background(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -102,7 +102,7 @@ struct InspectorDisclosureRow<Content: View>: View {
                     Text(title)
                     Spacer()
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 11, weight: .regular))
+                        .font(DS.Font.subheadline)
                         .foregroundStyle(DS.Color.secondaryText)
                 }
             }

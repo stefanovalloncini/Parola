@@ -38,10 +38,10 @@ struct LabelsSection: View {
     private func chip(_ label: String) -> some View {
         HStack(spacing: 4) {
             Text(label)
-                .font(.system(size: 11.5, weight: .medium))
+                .font(DS.Font.subheadlineMedium)
             Button { remove(label) } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(DS.Font.caption2Bold)
             }
             .buttonStyle(.plain)
             .axLeaf("Labels.Button.RemoveChip")
@@ -70,7 +70,7 @@ struct LabelsSection: View {
                     }
                 } label: {
                     Image(systemName: "tag")
-                        .font(.system(size: 11))
+                        .font(DS.Font.subheadline)
                 }
                 .menuStyle(.borderlessButton)
                 .frame(width: 24, height: 22)

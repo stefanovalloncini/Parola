@@ -77,7 +77,7 @@ private struct ActionItemRow: View {
             HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.tight) {
                 Image(systemName: "checkmark.circle")
                     .foregroundStyle(DS.Color.accent)
-                    .font(.system(size: 12))
+                    .font(DS.Font.callout)
                 if let assignee = item.assignee {
                     Text(assignee)
                         .font(DS.Font.body.weight(.semibold))

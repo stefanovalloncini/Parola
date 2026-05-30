@@ -3,11 +3,12 @@ import SwiftUI
 struct BatchEmptyState: View {
     @Environment(AppModel.self) private var model
     let isDropping: Bool
+    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 48
 
     var body: some View {
         VStack(spacing: DS.Spacing.medium) {
             Image(systemName: "square.stack.3d.up")
-                .font(.system(size: 48, weight: .light))
+                .font(.system(size: iconSize, weight: .light))
                 .foregroundStyle(DS.Color.secondaryText.opacity(0.55))
                 .padding(.bottom, DS.Spacing.small)
 

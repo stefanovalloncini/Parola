@@ -96,7 +96,7 @@ struct DisplayModeCard: View {
         Button(action: action) {
             VStack(spacing: DS.Spacing.small) {
                 Image(systemName: icon)
-                    .font(.system(size: 22, weight: .regular))
+                    .font(DS.Font.titleRegular)
                 Text(title).font(DS.Font.caption)
             }
             .frame(maxWidth: .infinity)

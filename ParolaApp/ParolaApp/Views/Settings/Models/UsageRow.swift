@@ -10,10 +10,10 @@ struct UsageRow: View {
             Image(systemName: icon)
                 .foregroundStyle(.secondary)
             Text(label)
-                .font(.system(size: 12, weight: .medium))
+                .font(DS.Font.calloutMedium)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.system(size: 12, design: .monospaced))
+                .font(DS.Font.calloutMono)
                 .foregroundStyle(.primary)
             Spacer()
         }

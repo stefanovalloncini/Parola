@@ -61,7 +61,7 @@ struct SheetFrame<Content: View, Footer: View>: View {
     private var header: some View {
         HStack(spacing: DS.Spacing.regular) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
+                .font(DS.Font.bodyEmphasized)
                 .foregroundStyle(iconTint)
                 .frame(width: 28, height: 28)
                 .background(iconTint.opacity(0.16))
@@ -75,7 +75,7 @@ struct SheetFrame<Content: View, Footer: View>: View {
 
             Button(action: onClose) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(DS.Font.subheadlineBold)
                     .foregroundStyle(DS.Color.secondaryText)
                     .frame(width: 22, height: 22)
                     .background(DS.Color.surfaceElevated)

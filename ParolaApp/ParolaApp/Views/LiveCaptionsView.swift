@@ -4,6 +4,7 @@ import ParolaCore
 struct LiveCaptionsView: View {
     @Bindable var controller: LiveCaptionsController
     @AppStorage("liveCaptions.opacity") private var opacity: Double = 1.0
+    // Fixed pt by design: the caption overlay has its own user size control (context menu → Caption size).
     @AppStorage("liveCaptions.fontSize") private var fontSize: Double = 22
 
     var body: some View {
@@ -68,9 +69,9 @@ struct LiveCaptionsView: View {
         let translating = controller.translateToEnglish
         HStack(spacing: 6) {
             Image(systemName: translating ? "character.bubble" : "mic.fill")
-                .font(.system(size: 9, weight: .bold))
+                .font(DS.Font.caption2Bold)
             Text(translating ? "Translate" : "Mic")
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .font(DS.Font.caption2MonoEmphasized)
                 .textCase(.uppercase)
         }
         .foregroundStyle(translating ? Color.white : Color.white.opacity(0.7))

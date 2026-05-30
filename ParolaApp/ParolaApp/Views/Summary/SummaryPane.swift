@@ -34,7 +34,7 @@ struct SummaryPane: View {
                         .frame(width: 18, height: 18)
                 } else {
                     Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(DS.Font.bodyMedium)
                 }
             }
             .buttonStyle(.plain)

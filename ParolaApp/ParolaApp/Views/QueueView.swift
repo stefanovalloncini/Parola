@@ -68,7 +68,7 @@ struct QueueView: View {
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: 12, weight: .semibold))
+                .font(DS.Font.calloutEmphasized)
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 26)
                 .background(

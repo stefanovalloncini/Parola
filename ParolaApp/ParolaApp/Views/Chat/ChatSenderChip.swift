@@ -23,7 +23,7 @@ struct ChatSenderChip: View {
                 Text(selection.label)
                     .font(DS.Font.caption)
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(DS.Font.caption2Emphasized)
             }
             .padding(.horizontal, 10)
             .frame(height: 28)
