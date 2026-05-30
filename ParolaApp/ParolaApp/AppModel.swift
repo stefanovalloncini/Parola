@@ -1113,10 +1113,23 @@ final class AppModel {
                     handleStreamingEvent(event)
                 }
             } catch {
+                teardownStreaming()
                 phase = .failed(message: error.localizedDescription)
             }
             await mediaSession.exitRecording()
         }
+    }
+
+    /// Stops and clears the live streaming session, its consumer, and the silence watch.
+    /// Without this a failed stream left the audio engine and observers running.
+    private func teardownStreaming() {
+        streamingConsumer?.cancel()
+        streamingConsumer = nil
+        if let session = streamingSession {
+            streamingSession = nil
+            Task { await session.stop() }
+        }
+        stopSilenceWatch()
     }
 
     private func handleStreamingEvent(_ event: StreamingEvent) {
@@ -1133,6 +1146,7 @@ final class AppModel {
         case .warning:
             break
         case .failed(let msg):
+            teardownStreaming()
             phase = .failed(message: msg)
         case .finished(let transcript):
             let processed = postProcess(transcript)
@@ -1179,6 +1193,8 @@ final class AppModel {
                 refreshModelList()
                 persistToLibrary(processed, audioSource: url)
             } catch {
+                liveSource = nil
+                stopRecordingLevelObserver()
                 phase = .failed(message: error.localizedDescription)
             }
         }
@@ -1278,16 +1294,15 @@ final class AppModel {
         summaryGeneration &+= 1
         let generation = summaryGeneration
         let snapshot = transcript
-        Task {
+        Task { [weak self] in
             do {
                 let summary = try await SummaryService().summarise(snapshot)
-                guard generation == summaryGeneration else { return }
+                guard let self, generation == summaryGeneration else { return }
                 self.transcript?.summary = summary
+                isSummarising = false
             } catch {
-                guard generation == summaryGeneration else { return }
+                guard let self, generation == summaryGeneration else { return }
                 summaryError = error.localizedDescription
-            }
-            if generation == summaryGeneration {
                 isSummarising = false
             }
         }
