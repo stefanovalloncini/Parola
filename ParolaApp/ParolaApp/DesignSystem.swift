@@ -21,14 +21,60 @@ enum DS {
         static let idealWidth: CGFloat = 320
     }
 
+    /// Text-style-based scale so every label tracks the user's text-size / "Larger Text"
+    /// accessibility setting. Pick the token whose default macOS point size is nearest the
+    /// design value (largeTitle 26, title 22, title2 17, title3 15, headline/body 13,
+    /// callout 12, subheadline 11, footnote/caption/caption2 10). Weight and design are baked
+    /// into the token; the style still scales.
     enum Font {
-        static let title = SwiftUI.Font.system(.title2, design: .default, weight: .semibold)
+        static let largeTitle = SwiftUI.Font.system(.largeTitle, design: .default)
+        static let largeTitleRounded = SwiftUI.Font.system(.largeTitle, design: .rounded)
+
+        static let title = SwiftUI.Font.system(.title, design: .default, weight: .semibold)
+        static let titleRegular = SwiftUI.Font.system(.title, design: .default)
+        static let titleRounded = SwiftUI.Font.system(.title, design: .rounded, weight: .semibold)
+
+        static let title2 = SwiftUI.Font.system(.title2, design: .default, weight: .semibold)
+        static let title2Regular = SwiftUI.Font.system(.title2, design: .default)
+
+        static let title3 = SwiftUI.Font.system(.title3, design: .default, weight: .semibold)
+        static let title3Regular = SwiftUI.Font.system(.title3, design: .default)
+        static let title3Medium = SwiftUI.Font.system(.title3, design: .default, weight: .medium)
+        static let title3Bold = SwiftUI.Font.system(.title3, design: .default, weight: .bold)
+
         static let heading = SwiftUI.Font.system(.headline, design: .default, weight: .semibold)
+
         static let body = SwiftUI.Font.system(.body, design: .default)
+        static let bodyEmphasized = SwiftUI.Font.system(.body, design: .default, weight: .semibold)
+        static let bodyMedium = SwiftUI.Font.system(.body, design: .default, weight: .medium)
         static let transcript = SwiftUI.Font.system(.body, design: .default).weight(.regular)
+
+        static let callout = SwiftUI.Font.system(.callout, design: .default)
+        static let calloutEmphasized = SwiftUI.Font.system(.callout, design: .default, weight: .semibold)
+        static let calloutMedium = SwiftUI.Font.system(.callout, design: .default, weight: .medium)
+        static let calloutMono = SwiftUI.Font.system(.callout, design: .monospaced)
+        static let calloutMonoEmphasized = SwiftUI.Font.system(.callout, design: .monospaced, weight: .semibold)
+
+        static let subheadline = SwiftUI.Font.system(.subheadline, design: .default)
+        static let subheadlineEmphasized = SwiftUI.Font.system(.subheadline, design: .default, weight: .semibold)
+        static let subheadlineMedium = SwiftUI.Font.system(.subheadline, design: .default, weight: .medium)
+        static let subheadlineBold = SwiftUI.Font.system(.subheadline, design: .default, weight: .bold)
+        static let subheadlineMono = SwiftUI.Font.system(.subheadline, design: .monospaced)
+
         static let caption = SwiftUI.Font.system(.caption, design: .default)
+        static let captionEmphasized = SwiftUI.Font.system(.caption, design: .default, weight: .semibold)
+        static let captionMedium = SwiftUI.Font.system(.caption, design: .default, weight: .medium)
         static let captionMono = SwiftUI.Font.system(.caption, design: .monospaced)
-        static let timer = SwiftUI.Font.system(size: 28, weight: .light, design: .monospaced)
+        static let captionMonoEmphasized = SwiftUI.Font.system(.caption, design: .monospaced, weight: .semibold)
+
+        static let caption2 = SwiftUI.Font.system(.caption2, design: .default)
+        static let caption2Emphasized = SwiftUI.Font.system(.caption2, design: .default, weight: .semibold)
+        static let caption2Medium = SwiftUI.Font.system(.caption2, design: .default, weight: .medium)
+        static let caption2Bold = SwiftUI.Font.system(.caption2, design: .default, weight: .bold)
+        static let caption2Mono = SwiftUI.Font.system(.caption2, design: .monospaced)
+        static let caption2MonoEmphasized = SwiftUI.Font.system(.caption2, design: .monospaced, weight: .semibold)
+
+        static let timer = SwiftUI.Font.system(.title, design: .monospaced).weight(.light)
     }
 
     /// The active palette every element color funnels through. AppModel.applyTheme() sets it on
