@@ -50,22 +50,26 @@ struct WaveformHistory: View {
     }
 
     var body: some View {
-        Canvas(opaque: false) { context, size in
-            let samples = history.samples
-            for (index, sample) in samples.enumerated() {
-                let height = barHeight(sample)
-                let x = CGFloat(index) * (barWidth + spacing)
-                let rect = CGRect(x: x, y: (size.height - height) / 2, width: barWidth, height: height)
-                context.fill(
-                    Path(roundedRect: rect, cornerRadius: barWidth / 2, style: .continuous),
-                    with: .color(fill)
-                )
+        // Audio levels arrive in irregular bursts; sampling the latest level on a steady ~30fps
+        // display clock makes the scroll cadence even (smooth) instead of stuttering with the input.
+        TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { timeline in
+            Canvas(opaque: false) { context, size in
+                let samples = history.samples
+                for (index, sample) in samples.enumerated() {
+                    let height = barHeight(sample)
+                    let x = CGFloat(index) * (barWidth + spacing)
+                    let rect = CGRect(x: x, y: (size.height - height) / 2, width: barWidth, height: height)
+                    context.fill(
+                        Path(roundedRect: rect, cornerRadius: barWidth / 2, style: .continuous),
+                        with: .color(fill)
+                    )
+                }
+            }
+            .onChange(of: timeline.date) { _, _ in
+                history.append(level)
             }
         }
         .frame(width: contentWidth, height: maxHeight)
-        .onChange(of: level) { _, newValue in
-            history.append(newValue)
-        }
     }
 
     private func barHeight(_ value: Float) -> CGFloat {

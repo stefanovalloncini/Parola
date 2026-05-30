@@ -19,6 +19,7 @@ struct WaveformBars: View {
             }
         }
         .frame(height: Self.maxHeight)
+        .animation(.easeOut(duration: 0.12), value: level)
     }
 
     private func barHeight(at index: Int) -> CGFloat {

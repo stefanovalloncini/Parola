@@ -214,12 +214,15 @@ struct DictationView: View {
     }
 }
 
+// Audio levels arrive far faster than a display needs; throttle to ~22 fps so the live waveform
+// stays smooth instead of flooding the main thread with redraws during speech.
+
 private struct LiveWaveformBars: View {
     let levelSubject: CurrentValueSubject<Float, Never>
     @State private var level: Float = 0
     var body: some View {
         WaveformBars(level: level)
-            .onReceive(levelSubject) { level = $0 }
+            .onReceive(levelSubject.throttle(for: .milliseconds(45), scheduler: DispatchQueue.main, latest: true)) { level = $0 }
     }
 }
 
@@ -230,7 +233,7 @@ private struct LiveWaveformHistory: View {
     @State private var level: Float = 0
     var body: some View {
         WaveformHistory(level: level, capacity: capacity, maxHeight: maxHeight)
-            .onReceive(levelSubject) { level = $0 }
+            .onReceive(levelSubject.throttle(for: .milliseconds(45), scheduler: DispatchQueue.main, latest: true)) { level = $0 }
     }
 }
 
