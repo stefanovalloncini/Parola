@@ -27,7 +27,7 @@ struct ModelsCategory: Identifiable {
             title: "WhisperKit",
             description: "OpenAI Whisper compiled to Core ML.",
             symbol: "waveform",
-            tint: DS.Color.accent
+            tint: .teal
         ),
         .init(
             id: "whisper-cpp",
