@@ -104,17 +104,59 @@ struct CloudLanguageModelTests {
     @Test("OpenAI stream line parser extracts delta content")
     func openAIStreamParser() {
         let line = #"data: {"choices":[{"delta":{"content":"Hello"}}]}"#
-        #expect(CloudLanguageModel.parseOpenAIStreamLine(line) == "Hello")
-        #expect(CloudLanguageModel.parseOpenAIStreamLine("data: [DONE]") == nil)
-        #expect(CloudLanguageModel.parseOpenAIStreamLine("") == nil)
+        #expect(CloudLanguageModel.parseOpenAIStreamLine(line) == .text("Hello"))
+        #expect(CloudLanguageModel.parseOpenAIStreamLine("data: [DONE]") == .ignore)
+        #expect(CloudLanguageModel.parseOpenAIStreamLine("") == .ignore)
+    }
+
+    @Test("OpenAI stream line parser surfaces a mid-stream error frame")
+    func openAIStreamParserError() {
+        let line = #"data: {"error":{"message":"rate limit reached","type":"rate_limit_error"}}"#
+        #expect(CloudLanguageModel.parseOpenAIStreamLine(line) == .streamError("rate limit reached"))
     }
 
     @Test("Anthropic stream line parser extracts content_block_delta text")
     func anthropicStreamParser() {
         let line = #"data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi"}}"#
-        #expect(CloudLanguageModel.parseAnthropicStreamLine(line) == "Hi")
+        #expect(CloudLanguageModel.parseAnthropicStreamLine(line) == .text("Hi"))
         let ping = #"data: {"type":"ping"}"#
-        #expect(CloudLanguageModel.parseAnthropicStreamLine(ping) == nil)
+        #expect(CloudLanguageModel.parseAnthropicStreamLine(ping) == .ignore)
+    }
+
+    @Test("Anthropic stream line parser surfaces an SSE error event")
+    func anthropicStreamParserError() {
+        let line = #"data: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#
+        #expect(CloudLanguageModel.parseAnthropicStreamLine(line) == .streamError("Overloaded"))
+    }
+
+    @Test("stream throws streamError when the provider emits an error frame after a 200")
+    func streamSurfacesMidStreamError() async throws {
+        let sse = [
+            #"data: {"choices":[{"delta":{"content":"partial"}}]}"#,
+            #"data: {"error":{"message":"overloaded"}}"#,
+        ].joined(separator: "\n\n") + "\n\n"
+        let handler = MockTransport.Handler { _ in .ok(body: sse) }
+        let session = MockTransport.makeSession(handler: handler)
+        let model = CloudLanguageModel(provider: .openAI, apiKey: "k", session: session)
+
+        var chunks: [String] = []
+        var captured: CloudLLMError?
+        do {
+            for try await chunk in model.stream(history: [ChatTurn(role: .user, text: "hi")]) {
+                chunks.append(chunk)
+            }
+            Issue.record("expected stream to throw on the error frame")
+        } catch let error as CloudLLMError {
+            captured = error
+        }
+        #expect(chunks == ["partial"])
+        switch captured {
+        case let .streamError(provider, message)?:
+            #expect(provider == .openAI)
+            #expect(message.contains("overloaded"))
+        default:
+            Issue.record("expected .streamError, got \(String(describing: captured))")
+        }
     }
 
     @Test("APIKeyStore (in-memory) round-trips and clears values")

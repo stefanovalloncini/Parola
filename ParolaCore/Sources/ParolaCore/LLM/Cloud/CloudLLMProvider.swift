@@ -69,6 +69,7 @@ public struct CloudLLMProviderInfo: Sendable, Hashable {
 public enum CloudLLMError: LocalizedError, Sendable {
     case missingAPIKey(CloudLLMProviderID)
     case requestFailed(provider: CloudLLMProviderID, status: Int, body: String)
+    case streamError(provider: CloudLLMProviderID, message: String)
     case malformedResponse(provider: CloudLLMProviderID)
     case unsupportedProvider(CloudLLMProviderID)
     case disabledByPolicy
@@ -80,6 +81,8 @@ public enum CloudLLMError: LocalizedError, Sendable {
             return "No API key configured for \(id)."
         case .requestFailed(let id, let status, _):
             return "\(id) request failed (HTTP \(status))."
+        case .streamError(let id, let message):
+            return "\(id) failed mid-response: \(message)"
         case .malformedResponse(let id):
             return "\(id) returned a malformed response."
         case .unsupportedProvider(let id):

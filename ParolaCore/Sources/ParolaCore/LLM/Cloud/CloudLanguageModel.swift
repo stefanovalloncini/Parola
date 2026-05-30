@@ -1,5 +1,11 @@
 import Foundation
 
+enum CloudStreamLine: Equatable, Sendable {
+    case text(String)
+    case streamError(String)
+    case ignore
+}
+
 struct CloudLanguageModel: LanguageModel {
     private static let streamingSession: URLSession = {
         let config = URLSessionConfiguration.default
@@ -66,8 +72,13 @@ struct CloudLanguageModel: LanguageModel {
                     }
                     for try await line in bytes.lines {
                         try Task.checkCancellation()
-                        if let chunk = parseLine(line), !chunk.isEmpty {
-                            continuation.yield(chunk)
+                        switch parseLine(line) {
+                        case .text(let chunk):
+                            if !chunk.isEmpty { continuation.yield(chunk) }
+                        case .streamError(let message):
+                            throw CloudLLMError.streamError(provider: provider, message: message)
+                        case .ignore:
+                            break
                         }
                     }
                     continuation.finish()
@@ -115,8 +126,8 @@ struct CloudLanguageModel: LanguageModel {
 
     func buildStreamingRequest(
         history: [ChatTurn]
-    ) throws -> (URLRequest, @Sendable (String) -> String?) {
-        let parser: @Sendable (String) -> String?
+    ) throws -> (URLRequest, @Sendable (String) -> CloudStreamLine) {
+        let parser: @Sendable (String) -> CloudStreamLine
         switch provider {
         case .openAI, .groq, .cerebras: parser = Self.parseOpenAIStreamLine
         case .anthropic: parser = Self.parseAnthropicStreamLine
@@ -200,12 +211,13 @@ struct CloudLanguageModel: LanguageModel {
         })
     }
 
-    static func parseOpenAIStreamLine(_ line: String) -> String? {
+    static func parseOpenAIStreamLine(_ line: String) -> CloudStreamLine {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
-        guard trimmed.hasPrefix("data:") else { return nil }
+        guard trimmed.hasPrefix("data:") else { return .ignore }
         let payload = String(trimmed.dropFirst("data:".count)).trimmingCharacters(in: .whitespaces)
-        if payload == "[DONE]" || payload.isEmpty { return nil }
-        guard let data = payload.data(using: .utf8) else { return nil }
+        if payload == "[DONE]" || payload.isEmpty { return .ignore }
+        guard let data = payload.data(using: .utf8) else { return .ignore }
+        if let message = decodeStreamErrorMessage(data) { return .streamError(message) }
         struct Chunk: Decodable {
             struct Choice: Decodable {
                 struct Delta: Decodable { let content: String? }
@@ -213,25 +225,41 @@ struct CloudLanguageModel: LanguageModel {
             }
             let choices: [Choice]
         }
-        guard let chunk = try? JSONDecoder().decode(Chunk.self, from: data) else { return nil }
-        return chunk.choices.first?.delta.content
+        guard let chunk = try? JSONDecoder().decode(Chunk.self, from: data),
+              let content = chunk.choices.first?.delta.content else { return .ignore }
+        return .text(content)
     }
 
-    static func parseAnthropicStreamLine(_ line: String) -> String? {
+    static func parseAnthropicStreamLine(_ line: String) -> CloudStreamLine {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
-        guard trimmed.hasPrefix("data:") else { return nil }
+        guard trimmed.hasPrefix("data:") else { return .ignore }
         let payload = String(trimmed.dropFirst("data:".count)).trimmingCharacters(in: .whitespaces)
-        guard !payload.isEmpty, payload != "[DONE]" else { return nil }
-        guard let data = payload.data(using: .utf8) else { return nil }
+        guard !payload.isEmpty, payload != "[DONE]" else { return .ignore }
+        guard let data = payload.data(using: .utf8) else { return .ignore }
         struct Event: Decodable {
             struct Delta: Decodable { let type: String?; let text: String? }
+            struct ErrorInfo: Decodable { let message: String? }
             let type: String
             let delta: Delta?
+            let error: ErrorInfo?
         }
-        guard let event = try? JSONDecoder().decode(Event.self, from: data) else { return nil }
+        guard let event = try? JSONDecoder().decode(Event.self, from: data) else { return .ignore }
+        if event.type == "error" {
+            return .streamError(event.error?.message ?? "stream error")
+        }
         if event.type == "content_block_delta", let text = event.delta?.text {
-            return text
+            return .text(text)
         }
-        return nil
+        return .ignore
+    }
+
+    private static func decodeStreamErrorMessage(_ data: Data) -> String? {
+        struct Envelope: Decodable {
+            struct ErrorInfo: Decodable { let message: String? }
+            let error: ErrorInfo?
+        }
+        guard let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
+              let error = envelope.error else { return nil }
+        return error.message ?? "stream error"
     }
 }
