@@ -33,17 +33,19 @@ struct BatchJobRow: View {
         .padding(.vertical, DS.Spacing.regular)
         .background {
             RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                .fill(DS.Color.surfaceElevated)
+                .fill(isSelected ? DS.Color.accent.opacity(0.12) : DS.Color.surfaceElevated)
                 .overlay(
                     RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
                         .strokeBorder(
-                            model.selectedBatchJobID == job.id ? DS.Color.accent.opacity(0.5) : DS.Color.separator.opacity(0.4),
-                            lineWidth: model.selectedBatchJobID == job.id ? 1.5 : 0.5
+                            isSelected ? DS.Color.accent.opacity(0.7) : DS.Color.separator.opacity(0.4),
+                            lineWidth: isSelected ? 1.5 : 0.5
                         )
                 )
         }
         .contentShape(Rectangle())
     }
+
+    private var isSelected: Bool { model.selectedBatchJobID == job.id }
 
     private var iconSquare: some View {
         RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
