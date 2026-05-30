@@ -154,6 +154,7 @@ struct LibraryListView: View {
 
 private struct EmptyLibraryView: View {
     @State private var pulse = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 24) {
@@ -175,6 +176,6 @@ private struct EmptyLibraryView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
-        .onAppear { pulse = true }
+        .onAppear { if !reduceMotion { pulse = true } }
     }
 }

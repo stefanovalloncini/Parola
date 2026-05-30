@@ -3,13 +3,16 @@ import SwiftUI
 struct MicRippleView: View {
     var isActive: Bool = true
     @State private var pulse = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive || reduceMotion)) { context in
+            let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
             ZStack {
-                Canvas { canvas, size in
-                    drawRipples(canvas: canvas, size: size, time: t)
+                if !reduceMotion {
+                    Canvas { canvas, size in
+                        drawRipples(canvas: canvas, size: size, time: t)
+                    }
                 }
 
                 Circle()
@@ -23,7 +26,7 @@ struct MicRippleView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .onAppear { pulse = true }
+        .onAppear { if !reduceMotion { pulse = true } }
     }
 
     private func drawRipples(canvas: GraphicsContext, size: CGSize, time: TimeInterval) {

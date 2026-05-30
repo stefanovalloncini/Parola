@@ -44,21 +44,26 @@ private struct ConfettiPiece: Identifiable {
 private struct ConfettiDot: View {
     let piece: ConfettiPiece
     @State private var animate = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Circle()
-            .fill(color)
-            .frame(width: piece.size, height: piece.size)
-            .scaleEffect(animate ? 1 : 0)
-            .offset(x: animate ? piece.dx : 0, y: animate ? piece.dy : 0)
-            .opacity(animate ? 0 : 1)
-            .animation(
-                .spring(response: 0.9, dampingFraction: 0.6).delay(piece.delay),
-                value: animate
-            )
-            .onAppear {
-                animate = true
-            }
+        if reduceMotion {
+            EmptyView()
+        } else {
+            Circle()
+                .fill(color)
+                .frame(width: piece.size, height: piece.size)
+                .scaleEffect(animate ? 1 : 0)
+                .offset(x: animate ? piece.dx : 0, y: animate ? piece.dy : 0)
+                .opacity(animate ? 0 : 1)
+                .animation(
+                    .spring(response: 0.9, dampingFraction: 0.6).delay(piece.delay),
+                    value: animate
+                )
+                .onAppear {
+                    animate = true
+                }
+        }
     }
 
     private var color: Color {

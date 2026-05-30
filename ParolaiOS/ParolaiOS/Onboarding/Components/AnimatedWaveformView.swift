@@ -4,11 +4,12 @@ struct AnimatedWaveformView: View {
     var isActive: Bool = true
     private let barCount = 28
     @State private var seeds: [Double] = (0..<28).map { _ in .random(in: 0...1) }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { proxy in
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive)) { context in
-                let t = context.date.timeIntervalSinceReferenceDate
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive || reduceMotion)) { context in
+                let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
                 Canvas { canvas, size in
                     draw(into: canvas, size: size, time: t)
                 }
