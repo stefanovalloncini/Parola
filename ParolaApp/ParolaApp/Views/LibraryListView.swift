@@ -91,6 +91,7 @@ struct LibraryListView: View {
                         .accessibilityIdentifier("library.row.\(entry.id)")
                 }
                 .listStyle(.inset)
+                .tint(DS.Color.accent)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
