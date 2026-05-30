@@ -8,6 +8,9 @@ public struct ParolaDocument: Sendable {
         public var version: Int
         public var createdAt: Date
         public var originalAudioName: String
+        /// A user-authored display title. When nil, the title is derived from `originalAudioName`
+        /// (with the audio extension stripped). Kept separate so titles with dots survive.
+        public var title: String?
         public var modelName: String
         public var language: String
         public var category: EntryCategory
@@ -23,6 +26,7 @@ public struct ParolaDocument: Sendable {
             version: Int = Manifest.currentVersion,
             createdAt: Date = Date(),
             originalAudioName: String,
+            title: String? = nil,
             modelName: String,
             language: String,
             category: EntryCategory = .transcription,
@@ -37,6 +41,7 @@ public struct ParolaDocument: Sendable {
             self.version = version
             self.createdAt = createdAt
             self.originalAudioName = originalAudioName
+            self.title = title
             self.modelName = modelName
             self.language = language
             self.category = category
@@ -53,6 +58,7 @@ public struct ParolaDocument: Sendable {
             case version
             case createdAt
             case originalAudioName
+            case title
             case modelName
             case language
             case category
@@ -70,6 +76,7 @@ public struct ParolaDocument: Sendable {
             version = try c.decode(Int.self, forKey: .version)
             createdAt = try c.decode(Date.self, forKey: .createdAt)
             originalAudioName = try c.decode(String.self, forKey: .originalAudioName)
+            title = try c.decodeIfPresent(String.self, forKey: .title)
             modelName = try c.decode(String.self, forKey: .modelName)
             language = try c.decode(String.self, forKey: .language)
             category = try c.decodeIfPresent(EntryCategory.self, forKey: .category) ?? .transcription
@@ -87,6 +94,7 @@ public struct ParolaDocument: Sendable {
             try c.encode(version, forKey: .version)
             try c.encode(createdAt, forKey: .createdAt)
             try c.encode(originalAudioName, forKey: .originalAudioName)
+            try c.encodeIfPresent(title, forKey: .title)
             try c.encode(modelName, forKey: .modelName)
             try c.encode(language, forKey: .language)
             try c.encode(category, forKey: .category)
@@ -148,12 +156,11 @@ public struct ParolaDocument: Sendable {
                 originalAudioName = source.lastPathComponent
                 audioFilename = audioName
             }
-            if let titleOverride, !titleOverride.isEmpty {
-                originalAudioName = titleOverride
-            }
+            let title = titleOverride.flatMap { $0.isEmpty ? nil : $0 }
 
             let manifest = Manifest(
                 originalAudioName: originalAudioName,
+                title: title,
                 modelName: transcript.modelName,
                 language: transcript.language,
                 category: category,

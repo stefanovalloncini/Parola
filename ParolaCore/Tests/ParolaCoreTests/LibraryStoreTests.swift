@@ -46,6 +46,21 @@ struct LibraryStoreTests {
         #expect(entries.first?.id == entry.id)
     }
 
+    @Test("renaming an entry to a title with a dot keeps the whole title")
+    func renamePreservesDottedTitle() async throws {
+        let (store, _) = try makeTempLibrary()
+        let audio = try makeFakeAudio()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: audio)
+
+        try await store.renameEntry(entry.id, to: "Report v2.0")
+        let afterDotted = await store.list()
+        #expect(afterDotted.first?.title == "Report v2.0")
+
+        try await store.renameEntry(entry.id, to: "Standup")
+        let afterPlain = await store.list()
+        #expect(afterPlain.first?.title == "Standup")
+    }
+
     @Test("load round-trips transcript and audio URL")
     func loadRoundTrip() async throws {
         let (store, _) = try makeTempLibrary()

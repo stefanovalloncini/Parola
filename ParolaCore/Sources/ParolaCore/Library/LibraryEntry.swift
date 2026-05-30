@@ -12,6 +12,7 @@ public struct LibraryEntry: Identifiable, Hashable, Sendable {
     }
 
     public var title: String {
+        if let title = manifest.title, !title.isEmpty { return title }
         let name = manifest.originalAudioName
         guard !name.isEmpty else { return "Untitled" }
         return (name as NSString).deletingPathExtension

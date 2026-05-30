@@ -193,7 +193,7 @@ public actor LibraryStore {
         if cachedLoaded?.id == id { cachedLoaded = nil }
     }
 
-    /// Renames an entry's display title by updating the manifest's `originalAudioName`,
+    /// Renames an entry's display title by storing it in the manifest's `title` field,
     /// then re-indexes so search matches the new title.
     public func renameEntry(_ id: LibraryEntry.ID, to newName: String) async throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
@@ -203,12 +203,7 @@ public actor LibraryStore {
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
-            let existingExtension = (manifest.originalAudioName as NSString).pathExtension
-            if existingExtension.isEmpty || trimmed.contains(".") {
-                manifest.originalAudioName = trimmed
-            } else {
-                manifest.originalAudioName = "\(trimmed).\(existingExtension)"
-            }
+            manifest.title = trimmed
         }
         invalidateListCaches()
         if cachedLoaded?.id == id { cachedLoaded = nil }
