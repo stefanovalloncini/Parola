@@ -163,6 +163,22 @@ struct AppModelBatchTests {
         model.batchTask = nil
     }
 
+    @Test("retrying a failed job while another is transcribing does not tear down the live batch")
+    func retryDuringLiveBatchKeepsQueue() {
+        let model = makeModel()
+        let running = Self.makeJob("running", status: .transcribing)
+        let failed = Self.makeJob("a", status: .failed)
+        model.batchJobs = [running, failed]
+
+        model.retryBatchJob(failed.id)
+
+        #expect(model.batchJobs[0].status == .transcribing)  // live job untouched
+        #expect(model.batchJobs[1].status == .pending)        // reset; the running batch's resume picks it up
+        #expect(model.batchTask == nil)                       // no new queue spawned -> live batch not cancelled
+        model.batchTask?.cancel()
+        model.batchTask = nil
+    }
+
     @Test("cancelBatchJob removes a non-running job from the list")
     func cancelRemovesFinishedJob() {
         let model = makeModel()

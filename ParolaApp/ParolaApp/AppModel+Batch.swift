@@ -221,7 +221,11 @@ extension AppModel {
         batchJobs[idx].error = nil
         batchJobs[idx].progress = 0
         batchJobs[idx].transcript = nil
-        runBatchTask(jobs: [batchJobs[idx]])
+        // Don't tear down a live batch to retry one file — runBatchTask cancels the running queue and
+        // strands the in-flight job. Reset to .pending; the running batch's .finished resume picks it up.
+        if !batchIsRunning {
+            runBatchTask(jobs: [batchJobs[idx]])
+        }
     }
 
     func clearFinishedBatchJobs() {
