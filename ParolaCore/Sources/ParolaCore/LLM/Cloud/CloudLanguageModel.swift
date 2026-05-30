@@ -67,7 +67,11 @@ struct CloudLanguageModel: LanguageModel {
                     }
                     guard (200..<300).contains(http.statusCode) else {
                         var body = ""
-                        for try await line in bytes.lines { body += line + "\n" }
+                        for try await line in bytes.lines {
+                            try Task.checkCancellation()
+                            body += line + "\n"
+                            if body.utf8.count > 8 * 1024 { break }
+                        }
                         throw CloudLLMError.requestFailed(provider: provider, status: http.statusCode, body: body)
                     }
                     for try await line in bytes.lines {

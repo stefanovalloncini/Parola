@@ -326,6 +326,27 @@ struct CloudLanguageModelTests {
         }
     }
 
+    @Test("stream caps the harvested error body instead of accumulating it unbounded")
+    func streamCapsErrorBody() async throws {
+        let huge = Array(repeating: "errorline", count: 5000).joined(separator: "\n")  // ~50KB across many lines
+        let handler = MockTransport.Handler { _ in .status(500, body: huge) }
+        let session = MockTransport.makeSession(handler: handler)
+        let model = CloudLanguageModel(provider: .openAI, apiKey: "k", session: session)
+
+        var captured: CloudLLMError?
+        do {
+            for try await _ in model.stream(history: [ChatTurn(role: .user, text: "hi")]) {}
+        } catch let error as CloudLLMError {
+            captured = error
+        }
+        guard case let .requestFailed(_, status, body)? = captured else {
+            Issue.record("expected requestFailed, got \(String(describing: captured))")
+            return
+        }
+        #expect(status == 500)
+        #expect(body.utf8.count <= 9 * 1024, "error body should be capped near 8KB, was \(body.utf8.count)")
+    }
+
     @Test("respond throws tokenBudgetExceeded before any network call when history exceeds context")
     func respondRejectsOverBudget() async throws {
         let handler = MockTransport.Handler { _ in .ok(body: "{}") }
