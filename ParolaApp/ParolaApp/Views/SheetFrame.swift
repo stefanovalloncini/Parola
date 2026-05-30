@@ -148,7 +148,7 @@ struct SheetActionPill: ButtonStyle {
 
     private var foreground: Color {
         switch kind {
-        case .primary: return .white
+        case .primary: return DS.Color.onAccent
         case .secondary: return DS.Color.primaryText
         }
     }

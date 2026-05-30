@@ -44,6 +44,10 @@ enum DS {
         static var surfaceElevated: SwiftUI.Color { DS.theme.surfaceElevated.color }
         static var separator: SwiftUI.Color { DS.theme.divider.color }
         static var danger: SwiftUI.Color { DS.theme.danger.color }
+
+        /// A legible foreground for text/glyphs drawn on top of `accent`: near-black on light
+        /// accents (Amber, Mint, custom), white on dark ones. Resolves per appearance.
+        static var onAccent: SwiftUI.Color { DS.theme.accent.legibleForeground }
     }
 
     enum Palette {

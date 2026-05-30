@@ -21,6 +21,20 @@ enum ThemeColor: Sendable, Codable, Equatable {
             })
         }
     }
+
+    /// White or near-black, chosen per appearance for legibility on top of this color.
+    var legibleForeground: Color {
+        Color(nsColor: NSColor(name: nil) { [self] appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            let base: RGBA = switch self {
+            case .dynamic(let light, let dark): isDark ? dark : light
+            case .system(let semantic): RGBA(semantic.color)
+            }
+            return base.relativeLuminance > 0.55
+                ? NSColor(srgbRed: 0.08, green: 0.08, blue: 0.08, alpha: 1)
+                : .white
+        })
+    }
 }
 
 struct RGBA: Sendable, Codable, Equatable {
@@ -34,6 +48,14 @@ struct RGBA: Sendable, Codable, Equatable {
     }
 
     var nsColor: NSColor { NSColor(srgbRed: r, green: g, blue: b, alpha: a) }
+
+    /// WCAG relative luminance in [0, 1]; used to pick a legible foreground on a colored fill.
+    var relativeLuminance: Double {
+        func linear(_ c: Double) -> Double {
+            c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
+    }
 
     /// Parses `#RRGGBB` / `#RRGGBBAA` (with or without the leading `#`). Returns nil on malformed input.
     init?(hex: String) {

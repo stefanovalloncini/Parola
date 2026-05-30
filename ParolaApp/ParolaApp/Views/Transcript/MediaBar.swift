@@ -16,7 +16,7 @@ struct MediaBar: View {
             Button(action: togglePlayPause) {
                 Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.onAccent)
                     .frame(width: 36, height: 36)
                     .background(Circle().fill(DS.Color.accent))
             }
