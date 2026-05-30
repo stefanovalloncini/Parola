@@ -191,6 +191,48 @@ struct DownloadSidecarTests {
         }
     }
 
+    @Test("snapshot rejects a non-LFS file shorter than the tree-declared size")
+    func snapshotRejectsTruncatedFile() async throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let dest = dir.appendingPathComponent("model-truncated")
+
+        let handler = MockTransport.Handler { request in
+            let path = request.url?.path ?? ""
+            if path.contains("/api/models/") {
+                return .ok(body: #"[{"type":"file","path":"weights.bin","size":10}]"#)
+            }
+            return .ok(body: "abcd")  // 4 bytes; the tree declares 10
+        }
+        let session = MockTransport.makeSession(handler: handler)
+
+        var captured: Error?
+        do {
+            try await HuggingFaceDownloader.snapshot(
+                repo: "fake/truncated",
+                subpath: nil,
+                destination: dest,
+                urlSession: session,
+                progress: nil
+            )
+        } catch {
+            captured = error
+        }
+        guard case ParolaError.modelDownloadFailed(let repo, let reason)? = captured else {
+            Issue.record("expected modelDownloadFailed, got \(String(describing: captured))")
+            return
+        }
+        #expect(repo == "fake/truncated")
+        #expect(reason.contains("Short"))
+
+        // The short file is removed and the sidecar kept, so isInstalled stays false and it re-fetches.
+        #expect(FileManager.default.fileExists(atPath: dest.appendingPathComponent("weights.bin").path) == false)
+        let sidecarExists = FileManager.default.fileExists(
+            atPath: dest.appendingPathComponent(HuggingFaceDownloader.sidecarFilename).path
+        )
+        #expect(sidecarExists)
+    }
+
     @Test("snapshot writes a sidecar that records each completed file by name")
     func snapshotPersistsSidecarBetweenSteps() async throws {
         let dir = tempDir()

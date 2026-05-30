@@ -89,6 +89,19 @@ enum HuggingFaceDownloader {
                         got: actual
                     )
                 }
+            } else if let expected = entry.size {
+                // Non-LFS files carry no checksum, so a truncated download would otherwise be
+                // recorded complete. Reject a short file and keep the sidecar so it re-fetches.
+                let actual = (try? FileManager.default.attributesOfItem(atPath: localURL.path)[.size] as? Int64) ?? -1
+                if actual != expected {
+                    try? FileManager.default.removeItem(at: localURL)
+                    sidecar.files[entry.relativeName] = nil
+                    try? sidecar.write(to: sidecarURL)
+                    throw ParolaError.modelDownloadFailed(
+                        repo,
+                        underlying: "Short file \(entry.relativeName): \(actual)/\(expected) bytes"
+                    )
+                }
             }
 
             let size = entry.size
