@@ -98,8 +98,14 @@ actor AppleSpeechTranscriber: Transcriber {
             attributeOptions: [.audioTimeRange]
         )
 
-        if let request = try? await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-            try await request.downloadAndInstall()
+        do {
+            if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+                try await request.downloadAndInstall()
+            }
+        } catch {
+            throw ParolaError.unsupportedForEngine(
+                "Apple Speech has no model for \(locale.identifier): \(error.localizedDescription)"
+            )
         }
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
@@ -177,7 +183,11 @@ actor AppleSpeechTranscriber: Transcriber {
         if language.contains("-") || language.contains("_") {
             return Locale(identifier: language)
         }
-        let region = regionDefaults[language.lowercased()] ?? "US"
+        // For a language without a known region default, use the bare-language locale rather than
+        // fabricating "<lang>_US" — Speech has no "sv_US" model, but resolves "sv" to its best match.
+        guard let region = regionDefaults[language.lowercased()] else {
+            return Locale(identifier: language)
+        }
         return Locale(identifier: "\(language)_\(region)")
     }
 }

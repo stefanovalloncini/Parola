@@ -16,6 +16,17 @@ struct AppleSpeechTranscriberTests {
         #expect(locale.identifier.isEmpty == false)
     }
 
+    @Test("pickLocale uses a bare-language locale when no region default exists")
+    func pickLocaleNoRegionDefault() {
+        // Swedish has no entry in regionDefaults; it must not fabricate an invalid "sv_US".
+        let sv = AppleSpeechTranscriber.pickLocale(language: "sv")
+        #expect(sv.identifier == "sv")
+        #expect(sv.identifier.contains("US") == false)
+        // Languages with a known region default still get it.
+        #expect(AppleSpeechTranscriber.pickLocale(language: "en").identifier == "en_US")
+        #expect(AppleSpeechTranscriber.pickLocale(language: "it").identifier == "it_IT")
+    }
+
     @Test("synthetic model id is stable")
     func syntheticIDStable() {
         #expect(AppleSpeechTranscriber.syntheticModelID == "apple-speech-analyzer")
