@@ -45,6 +45,14 @@ public enum Format {
         escapeHTML(s)
     }
 
+    /// WebVTT cue text only decodes `&amp;`, `&lt;`, `&gt;` (and a few named entities), not numeric
+    /// references — so escaping quotes/apostrophes the HTML way would surface literal `&#39;` in players.
+    public static func escapeWebVTT(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+    }
+
     /// Builds a CTFont with a language-aware fallback cascade so non-Latin scripts don't render as `.notdef`.
     public static func cascadingFont(name: String, size: CGFloat, language: String) -> CTFont {
         let base = CTFontCreateWithName(name as CFString, size, nil)

@@ -60,9 +60,9 @@ public struct VttExporter: TranscriptExporter {
         var out = "WEBVTT\n\n"
         for seg in transcript.segments {
             out += "\(Self.vttTimestamp(seg.start)) --> \(Self.vttTimestamp(seg.end))\n"
-            let body = CaptionWrapper.wrap(seg.text, length: options.captionLength)
+            let body = Format.escapeWebVTT(CaptionWrapper.wrap(seg.text, length: options.captionLength))
             if options.includeSpeakers, let speaker = seg.speaker, !speaker.isEmpty {
-                out += "<v \(speaker)>\(body)</v>\n\n"
+                out += "<v \(Format.escapeWebVTT(speaker))>\(body)</v>\n\n"
             } else {
                 out += body + "\n\n"
             }

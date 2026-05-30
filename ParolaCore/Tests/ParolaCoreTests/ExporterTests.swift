@@ -317,6 +317,27 @@ struct ExporterTests {
         #expect(out.contains("<v") == false)
     }
 
+    @Test("vtt escapes markup in body and speaker but keeps apostrophes literal")
+    func vttEscapesMarkupNotApostrophes() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1.5, text: "a < b & c > d, don't <i>x</i>", speaker: "Ann <Boss> & Co"),
+            ],
+            language: "en",
+            modelName: "m",
+            sourceURL: URL(fileURLWithPath: "/tmp/x.wav"),
+            durationSeconds: 1.5
+        )
+        let out = try VttExporter(options: SubtitleOptions(includeSpeakers: true)).renderText(transcript)
+        #expect(out.contains("a &lt; b &amp; c &gt; d"))
+        #expect(out.contains("&lt;i&gt;x&lt;/i&gt;"))
+        #expect(out.contains("<v Ann &lt;Boss&gt; &amp; Co>"))
+        // WebVTT players do not decode numeric refs, so apostrophes/quotes must stay literal.
+        #expect(out.contains("don't"))
+        #expect(out.contains("&#39;") == false)
+        #expect(out.contains("&quot;") == false)
+    }
+
     @Test("tsv emits header and tab-separated rows")
     func tsvHeader() throws {
         let out = try TsvExporter().renderText(sample())
