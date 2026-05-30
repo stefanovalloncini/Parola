@@ -111,9 +111,14 @@ public struct SnippetExpander: TextPostProcessor {
     }
 
     private static func wordBoundedPattern(for trigger: String) -> String? {
+        guard let first = trigger.first, let last = trigger.last else { return nil }
         let escaped = NSRegularExpression.escapedPattern(for: trigger)
-        guard !escaped.isEmpty else { return nil }
-        return "\\b\(escaped)\\b"
+        let isWord: (Character) -> Bool = { $0.isLetter || $0.isNumber || $0 == "_" }
+        // \b only matches at a word/non-word transition, so a trigger whose edge is punctuation
+        // (e.g. "brb!", ":)") could never satisfy it. Anchor each edge only when it's a word char.
+        let lead = isWord(first) ? "(?<![\\p{L}\\p{N}_])" : ""
+        let trail = isWord(last) ? "(?![\\p{L}\\p{N}_])" : ""
+        return "\(lead)\(escaped)\(trail)"
     }
 
     static func expand(

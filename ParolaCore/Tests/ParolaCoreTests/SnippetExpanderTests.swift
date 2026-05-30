@@ -38,6 +38,24 @@ struct SnippetExpanderTests {
         #expect(out == "a catalog of cats and one 🐈")
     }
 
+    @Test("expands a trigger that ends with punctuation")
+    func punctuationEndedTrigger() async {
+        let expander = SnippetExpander(snippets: [
+            Snippet(trigger: "brb!", replacement: "be right back!")
+        ])
+        let out = await expander.process("ok brb! now")
+        #expect(out == "ok be right back! now")
+    }
+
+    @Test("expands a symbol-only trigger")
+    func symbolTrigger() async {
+        let expander = SnippetExpander(snippets: [
+            Snippet(trigger: ":)", replacement: "🙂")
+        ])
+        let out = await expander.process("hi :) there")
+        #expect(out == "hi 🙂 there")
+    }
+
     @Test("is case-insensitive")
     func caseInsensitive() async {
         let expander = SnippetExpander(snippets: [
