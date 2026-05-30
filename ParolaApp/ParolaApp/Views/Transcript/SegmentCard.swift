@@ -231,6 +231,7 @@ struct SegmentCard: View {
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
         .help(help)
+        .accessibilityLabel(help)
     }
 
     private func beginEditing() {

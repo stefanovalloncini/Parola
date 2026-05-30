@@ -37,6 +37,7 @@ struct TranscriptHeaderBar: View {
             }
             .buttonStyle(.borderless)
             .help("Outline")
+            .accessibilityLabel("Outline")
             .popover(isPresented: $outlineOpen, arrowEdge: .bottom) {
                 OutlinePopover { seconds in
                     model.seekTo(seconds: seconds)
@@ -51,6 +52,7 @@ struct TranscriptHeaderBar: View {
             }
             .buttonStyle(.borderless)
             .help("Jump to time")
+            .accessibilityLabel("Jump to time")
             .popover(isPresented: $jumpOpen, arrowEdge: .bottom) {
                 jumpPopover
             }
@@ -75,6 +77,7 @@ struct TranscriptHeaderBar: View {
             }
             .buttonStyle(.borderless)
             .help("Summary")
+            .accessibilityLabel("Summary")
             .axLeaf("HeaderBar.Button.OpenSummary")
 
             Button(action: onOpenChat) {
@@ -82,6 +85,7 @@ struct TranscriptHeaderBar: View {
             }
             .buttonStyle(.borderless)
             .help("Chat with this transcript")
+            .accessibilityLabel("Chat with this transcript")
             .axLeaf("HeaderBar.Button.OpenChat")
 
             Button(action: onAdvance) {
@@ -95,6 +99,7 @@ struct TranscriptHeaderBar: View {
             }
             .buttonStyle(.plain)
             .help("Jump to next segment")
+            .accessibilityLabel("Jump to next segment")
             .axLeaf("HeaderBar.Button.Advance")
         }
         .padding(.horizontal, DS.Spacing.regular)
@@ -143,21 +148,15 @@ struct TranscriptHeaderBar: View {
 private struct SpeakHelpModifier: ViewModifier {
     let isSpeaking: Bool
     func body(content: Content) -> some View {
-        if isSpeaking {
-            content.help("Stop reading")
-        } else {
-            content.help("Read aloud")
-        }
+        let text = isSpeaking ? "Stop reading" : "Read aloud"
+        content.help(text).accessibilityLabel(text)
     }
 }
 
 private struct CompactHelpModifier: ViewModifier {
     let isCompact: Bool
     func body(content: Content) -> some View {
-        if isCompact {
-            content.help("Expanded view")
-        } else {
-            content.help("Compact view")
-        }
+        let text = isCompact ? "Expanded view" : "Compact view"
+        content.help(text).accessibilityLabel(text)
     }
 }
