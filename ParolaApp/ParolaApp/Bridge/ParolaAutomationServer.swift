@@ -356,7 +356,7 @@ final class ParolaAutomationServer {
         "sidebarDensity", "dictationCleanupPromptID", "dictationPerAppOverridesJSON",
         "meetingDetectorEnabled", "dictationModeRaw", "dictationKeyCode",
         "dictationIndicatorStyleRaw", "automationBridgeEnabled",
-        "transcriptDisplayMode",
+        "transcriptDisplayMode", "autoTitleEntries",
     ]
 
     func runScreenshot(requestedFileName: String?) async throws -> AutomationValue {
