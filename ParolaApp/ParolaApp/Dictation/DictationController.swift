@@ -193,7 +193,7 @@ final class DictationController {
         guard let model = appModel else { return }
         if hud == nil {
             hud = DictationHUD.make { [self] in
-                DictationView(model: model, controller: self)
+                DictationView(model: model, controller: self, onStop: { model.stopDictationFromIntent() })
             }
         }
         guard let panel = hud else { return }
