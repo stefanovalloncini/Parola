@@ -229,19 +229,21 @@ private func waitForCondition(
 ) async -> AutomationValue {
     let clock = ctx.model.clock
     let pollIntervalMs = 50
+    func matchedResult() -> AutomationValue {
+        var result: [String: AutomationValue] = [
+            "matched": .bool(true),
+            "observed": .object(observed()),
+        ]
+        for (k, v) in successFields() { result[k] = v }
+        return .object(result)
+    }
     var elapsedMs = 0
     while elapsedMs < timeoutMs {
-        if predicate() {
-            var result: [String: AutomationValue] = [
-                "matched": .bool(true),
-                "observed": .object(observed()),
-            ]
-            for (k, v) in successFields() { result[k] = v }
-            return .object(result)
-        }
+        if predicate() { return matchedResult() }
         try? await Task.sleep(for: .milliseconds(pollIntervalMs), clock: clock)
         elapsedMs += pollIntervalMs
     }
+    if predicate() { return matchedResult() }
     return .object([
         "matched": .bool(false),
         "timedOut": .bool(true),

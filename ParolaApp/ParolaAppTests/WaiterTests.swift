@@ -120,6 +120,23 @@ struct WaiterTests {
         #expect(matched(result) == true)
     }
 
+    @Test("a waiter evaluates the predicate at least once even with a non-positive timeout")
+    func waiterChecksPredicateOnZeroTimeout() async throws {
+        let (_, server, context, commands) = try makeRig()
+        let command = try #require(commands["waitForLibraryCount"])
+        // Library is empty, so count == 0 already holds; with timeoutMs 0 the old
+        // loop body never ran and reported a spurious timeout.
+        let args = try command.validate(AutomationArgs([
+            "op": .string("=="),
+            "count": .int(0),
+            "timeoutMs": .int(0),
+        ]))
+        let result = try await command.handler(args, context)
+        withExtendedLifetime(server) {}
+
+        #expect(matched(result) == true)
+    }
+
     @Test("waitForDictationState(listening) times out while the coordinator is idle")
     func waitForDictationStateIdleTimesOut() async throws {
         let (model, server, context, commands) = try makeRig()
