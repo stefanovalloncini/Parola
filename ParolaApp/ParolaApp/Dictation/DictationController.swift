@@ -11,7 +11,22 @@ final class DictationController {
     private(set) var state: DictationCoordinator.State = .idle
     @ObservationIgnored let audioLevel = CurrentValueSubject<Float, Never>(0)
     private(set) var partialText: String = "" {
-        didSet { if oldValue.isEmpty != partialText.isEmpty { resizeHUDForPartial() } }
+        didSet {
+            recentDictation = Self.capped(partialText)
+            if oldValue.isEmpty != partialText.isEmpty { resizeHUDForPartial() }
+        }
+    }
+    private(set) var recentDictation: String = ""
+
+    private static let recentDictationCharLimit = 600
+
+    private static func capped(_ text: String) -> String {
+        guard text.count > recentDictationCharLimit else { return text }
+        let tail = text.suffix(recentDictationCharLimit)
+        guard let wordStart = tail.firstIndex(where: { $0 == " " || $0 == "\n" }) else {
+            return String(tail)
+        }
+        return "…" + tail[tail.index(after: wordStart)...]
     }
 
     var indicatorStyle: DictationIndicatorStyle = .overlay {
@@ -172,6 +187,7 @@ final class DictationController {
         guard let coord = coordinator else { return }
         partialTask?.cancel()
         partialText = ""
+        recentDictation = ""
         partialTask = Task { @MainActor [weak self] in
             let stream = await coord.partials()
             for await text in stream {
@@ -187,6 +203,7 @@ final class DictationController {
         partialTask?.cancel()
         partialTask = nil
         partialText = ""
+        recentDictation = ""
     }
 
     private func showHUD() {
@@ -214,7 +231,7 @@ final class DictationController {
         let size: NSSize
         switch style {
         case .overlay:
-            size = NSSize(width: hasPartial ? 332 : 268, height: hasPartial ? 78 : 64)
+            size = NSSize(width: hasPartial ? 380 : 268, height: hasPartial ? 156 : 64)
         case .notch:
             size = NSSize(width: hasPartial ? 372 : 252, height: 36)
         case .minimal:
