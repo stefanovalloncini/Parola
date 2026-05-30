@@ -45,4 +45,27 @@ struct UserSettingsTests {
         let settings = UserSettings(defaults: defaults)
         #expect(settings.language == "fr")
     }
+
+    @Test("a programmatic write notifies observers")
+    func writeIsObservable() async {
+        let settings = UserSettings(defaults: freshDefaults())
+        await confirmation("observation fires on write") { fired in
+            withObservationTracking {
+                _ = settings.translate
+            } onChange: {
+                fired()
+            }
+            settings.translate = true
+        }
+    }
+
+    @Test("a programmatic write persists to the injected store")
+    func writePersistsToStore() {
+        let defaults = freshDefaults()
+        let settings = UserSettings(defaults: defaults)
+        settings.translate = true
+        settings.modelName = "openai_whisper-large-v3"
+        #expect(defaults.bool(forKey: "translate"))
+        #expect(defaults.string(forKey: "selectedModel") == "openai_whisper-large-v3")
+    }
 }
