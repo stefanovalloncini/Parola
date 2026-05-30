@@ -15,6 +15,9 @@ extension ParolaAutomationServer {
                 ],
                 handler: { args, ctx in
                     if let pane = try args.optionalString("pane"), !pane.isEmpty {
+                        guard SettingsRoute(rawValue: pane) != nil else {
+                            throw AutomationError.invalidArgs(field: "pane", reason: "unknown settings pane: \(pane)")
+                        }
                         ctx.model.settingsPane = pane
                     }
                     let visibleCountBefore = NSApp.windows.filter { $0.isVisible }.count

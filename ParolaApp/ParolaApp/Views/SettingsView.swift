@@ -28,7 +28,7 @@ struct SettingsView: View {
 
 // MARK: - Routes
 
-private enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
+enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     case general, customization, watchedFolders, recordMeetings, shortcuts
     case microphone, liveCaptions, dictation, snippets, corrections
     case localModels, transcriptionDefaults, translation, ignoredSegments, findReplace

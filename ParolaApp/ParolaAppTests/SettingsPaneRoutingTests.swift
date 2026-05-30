@@ -28,6 +28,19 @@ struct SettingsPaneRoutingTests {
         #expect(model.settingsPane == "localModels")
     }
 
+    @Test("openSettings rejects an unknown pane instead of diverging model state from the UI")
+    func openSettingsRejectsUnknownPane() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let command = try #require(commands["openSettings"])
+        let args = try command.validate(AutomationArgs(["pane": .string("nonsense-pane")]))
+
+        await #expect(throws: AutomationError.self) {
+            _ = try await command.handler(args, context)
+        }
+        withExtendedLifetime(server) {}
+        #expect(model.settingsPane == "general")
+    }
+
     @Test("openSettings without a pane leaves the current pane untouched")
     func openSettingsKeepsPaneWhenAbsent() async throws {
         let (model, server, context, commands) = try makeRig()
