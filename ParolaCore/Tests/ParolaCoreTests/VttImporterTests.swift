@@ -104,4 +104,12 @@ struct VttImporterTests {
         #expect(t.segments.count == 1)
         #expect(t.segments.first?.text == "Hello.")
     }
+
+    @Test("parses the first cue when no blank line follows the WEBVTT header")
+    func parsesCueWithoutHeaderBlankLine() {
+        let vtt = "WEBVTT\n00:00:01.000 --> 00:00:02.000\nHello"
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.count == 1)
+        #expect(t.segments.first?.text == "Hello")
+    }
 }

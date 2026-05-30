@@ -92,4 +92,20 @@ struct SrtImporterTests {
         #expect(t.segments.first?.start == 0.0)
         #expect(t.segments.first?.end == 1.5)
     }
+
+    @Test("skips a cue whose text is empty and keeps ids sequential")
+    func skipsEmptyTextCue() {
+        let srt = """
+        1
+        00:00:00,000 --> 00:00:01,000
+
+        2
+        00:00:01,000 --> 00:00:02,000
+        Real text.
+        """
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.count == 1)
+        #expect(t.segments.first?.text == "Real text.")
+        #expect(t.segments.first?.id == 0)
+    }
 }

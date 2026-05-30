@@ -13,7 +13,9 @@ enum VttImporter {
         var i = 0
         var nextID = 0
 
-        while i < lines.count, !lines[i].trimmingCharacters(in: .whitespaces).isEmpty {
+        while i < lines.count,
+              !lines[i].trimmingCharacters(in: .whitespaces).isEmpty,
+              !lines[i].contains("-->") {
             i += 1
         }
 

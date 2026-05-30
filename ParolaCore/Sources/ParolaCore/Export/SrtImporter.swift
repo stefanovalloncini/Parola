@@ -32,13 +32,16 @@ public enum SrtImporter {
                 i += 1
             }
 
-            segments.append(TranscriptSegment(
-                id: nextID,
-                start: times.start,
-                end: times.end,
-                text: textLines.joined(separator: " ")
-            ))
-            nextID += 1
+            let text = textLines.joined(separator: " ")
+            if !text.isEmpty {
+                segments.append(TranscriptSegment(
+                    id: nextID,
+                    start: times.start,
+                    end: times.end,
+                    text: text
+                ))
+                nextID += 1
+            }
         }
 
         return Transcript(
