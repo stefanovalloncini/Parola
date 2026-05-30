@@ -53,17 +53,12 @@ struct DictationView: View {
             }
             .frame(height: 32)
             if hasPartial {
-                Text(controller.partialText)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                runningTranscript
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-        .frame(width: hasPartial ? 320 : 256, alignment: .leading)
+        .padding(.horizontal, DS.Spacing.medium)
+        .padding(.vertical, DS.Spacing.regular)
+        .frame(width: hasPartial ? 344 : 256, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(Color.black.opacity(0.85))
@@ -73,6 +68,27 @@ struct DictationView: View {
                 .stroke(.white.opacity(0.08), lineWidth: 1)
         )
     }
+
+    private var runningTranscript: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.vertical, showsIndicators: false) {
+                Text(controller.recentDictation)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .id(transcriptTailAnchor)
+            }
+            .frame(height: 84)
+            .onChange(of: controller.recentDictation) {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    proxy.scrollTo(transcriptTailAnchor, anchor: .bottom)
+                }
+            }
+        }
+    }
+
+    private let transcriptTailAnchor = "dictation.transcript.tail"
 
     private var notchBody: some View {
         HStack(spacing: 10) {
@@ -117,8 +133,11 @@ struct DictationView: View {
     }
 
     private var notchLabel: String {
-        if hasPartial { return controller.partialText }
-        return label
+        guard hasPartial else { return label }
+        let lastLine = controller.recentDictation
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .last
+        return lastLine.map(String.init) ?? controller.recentDictation
     }
 
     @ViewBuilder
