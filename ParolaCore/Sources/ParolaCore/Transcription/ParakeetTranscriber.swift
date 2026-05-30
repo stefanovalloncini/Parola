@@ -141,15 +141,12 @@ actor ParakeetTranscriber: Transcriber {
                 return
             }
             let words: [WordTiming]? = includeWords
-                ? currentTokens.enumerated().map { idx, t in
-                    WordTiming(
-                        id: "\(nextID)-\(idx)",
-                        word: t.token.trimmingCharacters(in: .whitespaces),
-                        start: t.startTime,
-                        end: t.endTime,
-                        probability: Double(t.confidence)
-                    )
-                }
+                ? mergeWords(
+                    currentTokens.map {
+                        WordPiece(token: $0.token, start: $0.startTime, end: $0.endTime, confidence: Double($0.confidence))
+                    },
+                    segmentID: nextID
+                )
                 : nil
             segments.append(TranscriptSegment(
                 id: nextID,
@@ -178,5 +175,43 @@ actor ParakeetTranscriber: Transcriber {
             return [TranscriptSegment(id: 0, start: 0, end: result.duration, text: trimmedText, words: nil)]
         }
         return segments
+    }
+
+    struct WordPiece: Sendable {
+        let token: String
+        let start: Double
+        let end: Double
+        let confidence: Double
+    }
+
+    /// Merges SentencePiece sub-word tokens into whole words. FluidAudio marks a word start with a
+    /// leading space (the normalized `▁`); continuation pieces have none. Emitting one WordTiming per
+    /// raw token splits words ("transcri" + "ption"), breaking karaoke highlight and word diarization.
+    static func mergeWords(_ pieces: [WordPiece], segmentID: Int) -> [WordTiming] {
+        var words: [WordTiming] = []
+        var group: [WordPiece] = []
+
+        func emit() {
+            defer { group.removeAll() }
+            guard let first = group.first, let last = group.last else { return }
+            let text = group.map(\.token).joined().trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else { return }
+            let confidence = group.reduce(0.0) { $0 + $1.confidence } / Double(group.count)
+            words.append(WordTiming(
+                id: "\(segmentID)-\(words.count)",
+                word: text,
+                start: first.start,
+                end: last.end,
+                probability: confidence
+            ))
+        }
+
+        for piece in pieces {
+            let startsWord = piece.token.first.map { $0 == " " || $0 == "\n" || $0 == "\t" } ?? false
+            if startsWord, !group.isEmpty { emit() }
+            group.append(piece)
+        }
+        emit()
+        return words
     }
 }
