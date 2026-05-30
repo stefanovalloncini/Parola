@@ -125,7 +125,7 @@ struct CsvExporter: TranscriptExporter {
         for seg in transcript.segments {
             let speaker = seg.speaker ?? ""
             let text = seg.text.trimmingCharacters(in: .whitespaces)
-            out += "\(seg.start),\(seg.end),\(Self.quote(speaker)),\(Self.quote(text))\n"
+            out += "\(Format.decimalSeconds(seg.start)),\(Format.decimalSeconds(seg.end)),\(Self.quote(speaker)),\(Self.quote(text))\n"
         }
         return utf8(out)
     }

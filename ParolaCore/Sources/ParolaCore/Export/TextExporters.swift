@@ -55,7 +55,7 @@ struct TsvExporter: TranscriptExporter {
         for seg in transcript.segments {
             let speaker = Self.escape(seg.speaker ?? "")
             let text = Self.escape(seg.text.trimmingCharacters(in: .whitespaces))
-            out += "\(seg.start)\t\(seg.end)\t\(speaker)\t\(text)\n"
+            out += "\(Format.decimalSeconds(seg.start))\t\(Format.decimalSeconds(seg.end))\t\(speaker)\t\(text)\n"
         }
         return utf8(out)
     }

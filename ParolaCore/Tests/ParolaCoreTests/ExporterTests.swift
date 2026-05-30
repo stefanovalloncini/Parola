@@ -338,6 +338,28 @@ struct ExporterTests {
         #expect(out.contains("&quot;") == false)
     }
 
+    @Test("decimalSeconds avoids scientific notation and trims trailing zeros")
+    func decimalSecondsFormatting() {
+        #expect(Format.decimalSeconds(0.00001) == "0.00001")
+        #expect(Format.decimalSeconds(1.5) == "1.5")
+        #expect(Format.decimalSeconds(0.0) == "0.0")
+        #expect(Format.decimalSeconds(4.0) == "4.0")
+        #expect(Format.decimalSeconds(7.25) == "7.25")
+        #expect(Format.decimalSeconds(0.00001).contains("e") == false)
+    }
+
+    @Test("csv renders a sub-millisecond start without an exponent")
+    func csvSmallTimestampNoExponent() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0.00001, end: 1.5, text: "hi")],
+            language: "en",
+            modelName: "tiny"
+        )
+        let csv = try CsvExporter().renderText(transcript)
+        #expect(csv.contains("0.00001,1.5,"))
+        #expect(csv.contains("1e-05") == false)
+    }
+
     @Test("tsv emits header and tab-separated rows")
     func tsvHeader() throws {
         let out = try TsvExporter().renderText(sample())

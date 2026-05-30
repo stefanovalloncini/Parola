@@ -20,6 +20,15 @@ public enum Format {
         return String(format: "%02d:%02d:%02d\(msSeparator)%03d", h, m, s, ms)
     }
 
+    /// Renders a seconds value for CSV/TSV numeric columns. `%f` is locale-independent and never
+    /// uses scientific notation (unlike a bare Double interpolation, which prints e.g. "1e-05").
+    public static func decimalSeconds(_ v: Double) -> String {
+        var s = String(format: "%.6f", v)
+        while s.hasSuffix("0") { s.removeLast() }
+        if s.hasSuffix(".") { s += "0" }
+        return s
+    }
+
     /// Parses `HH:MM:SS.mmm` or `MM:SS.mmm` style timestamps. Treats `,` as equivalent to `.`.
     public static func parseClockTimestamp(_ s: String) -> Double? {
         let trimmed = s.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
