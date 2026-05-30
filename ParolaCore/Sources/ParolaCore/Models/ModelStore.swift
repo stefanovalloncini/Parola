@@ -25,10 +25,10 @@ public final class ModelStore: Sendable {
         }
     }
 
-    public init(modelsDirectory: URL? = nil) {
+    public init(modelsDirectory: URL? = nil, defaults: UserDefaults = .standard) {
         if let modelsDirectory {
             self.modelsDirectory = modelsDirectory
-        } else if let raw = UserDefaults.standard.string(forKey: Self.storageOverrideKey),
+        } else if let raw = defaults.string(forKey: Self.storageOverrideKey),
                   !raw.trimmingCharacters(in: .whitespaces).isEmpty {
             self.modelsDirectory = URL(fileURLWithPath: (raw as NSString).expandingTildeInPath, isDirectory: true)
         } else {

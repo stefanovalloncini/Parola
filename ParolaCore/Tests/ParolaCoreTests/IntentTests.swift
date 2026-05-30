@@ -1,6 +1,37 @@
 import Testing
 import Foundation
+import os
 @testable import ParolaCore
+
+/// A one-shot async latch: `wait()` suspends until `fulfill()` is called from any thread.
+private final class SignalGate: Sendable {
+    private struct State {
+        var fulfilled = false
+        var continuation: CheckedContinuation<Void, Never>?
+    }
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    func fulfill() {
+        let resume = state.withLock { state -> CheckedContinuation<Void, Never>? in
+            guard !state.fulfilled else { return nil }
+            state.fulfilled = true
+            defer { state.continuation = nil }
+            return state.continuation
+        }
+        resume?.resume()
+    }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let alreadyFulfilled = state.withLock { state -> Bool in
+                if state.fulfilled { return true }
+                state.continuation = continuation
+                return false
+            }
+            if alreadyFulfilled { continuation.resume() }
+        }
+    }
+}
 
 @Suite("App Intents")
 struct IntentTests {
@@ -60,14 +91,17 @@ struct IntentTests {
     }
 
     @Test("Darwin dictation signal delivers across the start/stop names")
-    func dictationSignalRoundTrip() async throws {
-        try await confirmation("received start") { received in
-            let subscription = DictationSignal.subscribe { name in
-                if name == DictationSignal.startName { received() }
-            }
+    func dictationSignalRoundTrip() async {
+        let delivered = SignalGate()
+        let subscription = DictationSignal.subscribe { name in
+            if name == DictationSignal.startName { delivered.fulfill() }
+        }
+        defer { subscription.cancel() }
+
+        await confirmation("received start") { received in
             DictationSignal.start()
-            try await Task.sleep(for: .milliseconds(120))
-            subscription.cancel()
+            await delivered.wait()
+            received()
         }
     }
 }

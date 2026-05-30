@@ -7,19 +7,20 @@ final class LiveCounter: Sendable {
     private let lock = OSAllocatedUnfairLock(initialState: 0)
     func increment() { lock.withLock { $0 += 1 } }
     func decrement() { lock.withLock { $0 -= 1 } }
-    func reset() { lock.withLock { $0 = 0 } }
     var count: Int { lock.withLock { $0 } }
 }
 
-@Suite("Engine memory footprint", .serialized, .tags(.slow))
+@Suite("Engine memory footprint", .tags(.slow))
 struct MemoryFootprintTests {
-    static let counter = LiveCounter()
-
     actor TrackedTranscriber: Transcriber {
         static let engineID = EngineID("tracked")
         static let capabilities = EngineCapabilities.whisperKitDefaults
-        init() { MemoryFootprintTests.counter.increment() }
-        deinit { MemoryFootprintTests.counter.decrement() }
+        let counter: LiveCounter
+        init(counter: LiveCounter) {
+            self.counter = counter
+            counter.increment()
+        }
+        deinit { counter.decrement() }
         func load(model: String) async throws {}
         func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
             Transcript(segments: [], language: "en", modelName: "tracked", sourceURL: url)
@@ -30,12 +31,12 @@ struct MemoryFootprintTests {
 
     @Test("registry resolution does not retain transcribers across cycles")
     func registryNoRetain() async throws {
-        Self.counter.reset()
+        let counter = LiveCounter()
         let registry = EngineRegistry()
         await registry.register(
             engineID: TrackedTranscriber.engineID,
             capabilities: TrackedTranscriber.capabilities
-        ) { _ in TrackedTranscriber() }
+        ) { _ in TrackedTranscriber(counter: counter) }
 
         let store = ModelStore(modelsDirectory: FileManager.default.temporaryDirectory.appendingPathComponent("mem-\(UUID().uuidString)"))
 
@@ -48,32 +49,32 @@ struct MemoryFootprintTests {
         }
 
         for _ in 0..<20 {
-            if Self.counter.count == 0 { break }
+            if counter.count == 0 { break }
             try? await Task.sleep(nanoseconds: 50_000_000)
         }
-        #expect(Self.counter.count == 0, "transcribers leaked across registry resolution: \(Self.counter.count) still alive")
+        #expect(counter.count == 0, "transcribers leaked across registry resolution: \(counter.count) still alive")
     }
 
     @Test("resident memory of TranscriptionSession is bounded after idle-unload",
           .timeLimit(.minutes(1)))
     func idleUnloadReleases() async throws {
+        let counter = LiveCounter()
         let store = ModelStore(modelsDirectory: FileManager.default.temporaryDirectory.appendingPathComponent("mem-\(UUID().uuidString)"))
         let registry = EngineRegistry()
         await registry.register(
             engineID: .whisperKit,
             capabilities: .whisperKitDefaults
-        ) { _ in TrackedTranscriber() }
+        ) { _ in TrackedTranscriber(counter: counter) }
         await registry.register(
             engineID: .parakeet,
             capabilities: .parakeetDefaults
-        ) { _ in TrackedTranscriber() }
+        ) { _ in TrackedTranscriber(counter: counter) }
         let session = TranscriptionSession(modelStore: store, registry: registry, idleTimeout: 0.25)
 
-        Self.counter.reset()
         for _ in 0..<3 {
             await session.unloadModel()
         }
-        #expect(Self.counter.count == 0)
+        #expect(counter.count == 0)
     }
 
     @Test("resident size from mach_task_basic_info is reportable",

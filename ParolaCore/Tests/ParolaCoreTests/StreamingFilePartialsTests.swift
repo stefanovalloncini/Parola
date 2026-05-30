@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Testing
 @testable import ParolaCore
 
@@ -60,14 +61,10 @@ struct StreamingFilePartialsTests {
         let transcript = try await stub.transcribe(
             url: url,
             options: TranscriptionOptions(model: "partials-stub"),
-            partialHandler: { text in
-                Task { await collected.append(text) }
-            }
+            partialHandler: { text in collected.append(text) }
         )
 
-        try await Task.sleep(for: .milliseconds(50))
-        let values = await collected.values
-        #expect(values == ["hello", "hello world", "hello world!"])
+        #expect(collected.values == ["hello", "hello world", "hello world!"])
         #expect(transcript.segments.first?.text == "hello world!")
     }
 
@@ -82,8 +79,9 @@ struct StreamingFilePartialsTests {
         #expect(transcript.segments.first?.text == "ab")
     }
 
-    actor Collected {
-        private(set) var values: [String] = []
-        func append(_ value: String) { values.append(value) }
+    final class Collected: Sendable {
+        private let storage = OSAllocatedUnfairLock(initialState: [String]())
+        var values: [String] { storage.withLock { $0 } }
+        func append(_ value: String) { storage.withLock { $0.append(value) } }
     }
 }
