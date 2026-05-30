@@ -114,7 +114,7 @@ struct DictationCoordinatorTests {
         func record(_ s: DictationCoordinator.State) { captured.append(s) }
     }
 
-    @Test("transcriber failure returns to idle with failed state observed")
+    @Test("transcriber failure rests in an observable failed state")
     func transcribeFailure() async throws {
         let hotkey = MockHotkey()
         let recorder = MockRecorder(outcome: .failure("mic error"))
@@ -130,13 +130,30 @@ struct DictationCoordinatorTests {
         await coord.startMonitoring()
         await coord.handle(.press)
         await coord.handle(.release)
-        await #expect(coord.state == .idle)
+        await #expect(coord.state == .failed("mic error"))
         let inserted = await inserter.inserted
         #expect(inserted.isEmpty)
         let captured = await stateRecorder.captured
         #expect(captured.contains(where: {
             if case .failed = $0 { return true } else { return false }
         }))
+    }
+
+    @Test("a press after a failure recovers and starts listening again")
+    func recoversFromFailedState() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .failure("mic error"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(hotkey: hotkey, recorder: recorder, inserter: inserter)
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await coord.handle(.release)
+        await #expect(coord.state == .failed("mic error"))
+
+        await coord.handle(.press)
+        await #expect(coord.state == .listening)
+        let starts = await recorder.startCalls
+        #expect(starts == 2)
     }
 
     @Test("empty transcript text is not inserted")

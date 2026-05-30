@@ -171,11 +171,11 @@ public actor DictationCoordinator {
     private func handleToggle(_ event: HotkeyEvent) async {
         guard case .press = event else { return }
         switch state {
-        case .idle:
+        case .idle, .failed:
             await beginListening()
         case .listening:
             await finishListening()
-        case .transcribing, .failed:
+        case .transcribing:
             break
         }
     }
@@ -205,7 +205,11 @@ public actor DictationCoordinator {
     }
 
     private func beginListening() async {
-        guard state == .idle else { return }
+        // .failed is a resting state too: a new press recovers from a prior error.
+        switch state {
+        case .idle, .failed: break
+        default: return
+        }
         generation &+= 1
         let myGeneration = generation
         await setState(.listening)
@@ -219,7 +223,6 @@ public actor DictationCoordinator {
             guard myGeneration == generation else { return }
             await mediaSession?.exitRecording()
             await setState(.failed(error.localizedDescription))
-            await setState(.idle)
             return
         }
         guard myGeneration == generation else {
@@ -248,7 +251,6 @@ public actor DictationCoordinator {
             await setState(.idle)
         } catch {
             await setState(.failed(error.localizedDescription))
-            await setState(.idle)
         }
     }
 
