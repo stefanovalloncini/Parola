@@ -12,7 +12,9 @@ extension ParolaAutomationServer {
                 handler: { _, ctx in
                     ctx.model.cancelAllTasks()
                     ctx.server.stop()
+                    let library = ctx.model.library
                     Task { @MainActor in
+                        await library.flush()
                         try? await Task.sleep(for: .milliseconds(50))
                         NSApp.terminate(nil)
                     }

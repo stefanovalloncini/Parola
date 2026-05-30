@@ -54,6 +54,12 @@ public actor LibraryStore {
         return matches.filter { activeIDs.contains($0.entryID) }
     }
 
+    /// Writes any pending debounced search-index snapshot to disk. The index is loaded from this
+    /// snapshot (never rebuilt from bundles), so call this before the app terminates.
+    public func flush() async {
+        await searchIndex.flush()
+    }
+
     private func primeCaches() async {
         let url = libraryURL
         let entries = await Task.detached(priority: .userInitiated) { [self] in

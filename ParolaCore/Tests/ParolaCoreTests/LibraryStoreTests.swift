@@ -61,6 +61,23 @@ struct LibraryStoreTests {
         #expect(afterPlain.first?.title == "Standup")
     }
 
+    @Test("flush persists the search index so a freshly opened store finds the entry")
+    func flushPersistsSearchIndex() async throws {
+        let (store, url) = try makeTempLibrary()
+        let audio = try makeFakeAudio()
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "kangaroo invoice quarterly")],
+            language: "en",
+            modelName: "tiny"
+        )
+        _ = try await store.add(transcript: transcript, audioSource: audio)
+        await store.flush()
+
+        let reopened = LibraryStore(libraryURL: url, extraIndexer: nil)
+        let hits = await reopened.search("kangaroo")
+        #expect(hits.isEmpty == false)
+    }
+
     @Test("load round-trips transcript and audio URL")
     func loadRoundTrip() async throws {
         let (store, _) = try makeTempLibrary()
