@@ -49,4 +49,42 @@ struct OnboardingStepTests {
     func showsDots(for step: OnboardingStep, expected: Bool) {
         #expect(step.showsDots == expected)
     }
+
+    @Test(
+        "showsSkip tracks the intermediate steps",
+        arguments: [
+            (OnboardingStep.welcome, false),
+            (.model, true),
+            (.language, true),
+            (.microphone, true),
+            (.done, false),
+        ]
+    )
+    func showsSkip(for step: OnboardingStep, expected: Bool) {
+        #expect(step.showsSkip == expected)
+    }
+
+    @Test(
+        "previous returns the preceding step",
+        arguments: [
+            (OnboardingStep.model, OnboardingStep.welcome),
+            (.language, .model),
+            (.microphone, .language),
+            (.done, .microphone),
+        ]
+    )
+    func previous(from step: OnboardingStep, expected: OnboardingStep) {
+        #expect(step.previous == expected)
+    }
+
+    @Test("welcome is the first step")
+    func welcomeHasNoPrevious() {
+        #expect(OnboardingStep.welcome.previous == nil)
+    }
+
+    @Test("initialStep is welcome when no override is set")
+    func initialStepFallsBackToWelcome() {
+        #expect(ProcessInfo.processInfo.environment["PAROLA_ONBOARDING_STEP"] == nil)
+        #expect(OnboardingStep.initialStep == .welcome)
+    }
 }
