@@ -115,6 +115,50 @@ struct FolderWatcherTests {
         #expect(final.contains(where: { $0.lastPathComponent == "growing.mp3" }))
     }
 
+    @Test("a deleted-then-recreated file with the same name is detected again")
+    func recreatedFileIsRedetected() async throws {
+        let tempDir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let inserted = CollectedURLs()
+        let scheduler = ManualScheduler()
+        let clock = FixedClock(start: Date())
+        let options = FolderWatcher.Options(
+            recursive: false,
+            settledInterval: .milliseconds(50),
+            clock: clock,
+            scheduler: scheduler
+        )
+        let watcher = FolderWatcher(folderURL: tempDir, options: options) { url in
+            inserted.append(url)
+        }
+        await watcher.start()
+
+        let file = tempDir.appendingPathComponent("clip.wav")
+        func writeSettled() throws {
+            try Data(count: 1024).write(to: file)
+            try FileManager.default.setAttributes(
+                [.modificationDate: clock.start.addingTimeInterval(-10)],
+                ofItemAtPath: file.path
+            )
+        }
+
+        try writeSettled()
+        await watcher.checkForNewFiles()
+        try await scheduler.advanceAndWait()
+        #expect(inserted.snapshot().count == 1)
+
+        try FileManager.default.removeItem(at: file)
+        await watcher.checkForNewFiles()  // the path is forgotten
+
+        try writeSettled()  // recreate with the same name
+        await watcher.checkForNewFiles()
+        try await scheduler.advanceAndWait()
+        await watcher.stop()
+
+        #expect(inserted.snapshot().count == 2, "recreated same-name file must be detected again")
+    }
+
     private func makeTempDir() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-folderwatch-\(UUID().uuidString)")

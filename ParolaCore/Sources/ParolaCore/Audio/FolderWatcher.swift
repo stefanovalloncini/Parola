@@ -64,6 +64,9 @@ public actor FolderWatcher {
         guard fd >= 0 else { return }
         fileDescriptor = fd
         knownFiles = await scanFolderOffActor()
+        // stop() can run on this actor during the await above; if it did, it cleared fileDescriptor
+        // and closed our fd — don't resurrect a source on a closed descriptor.
+        guard fileDescriptor == fd else { return }
 
         let (stream, continuation) = AsyncStream.makeStream(of: Void.self)
         scanContinuation = continuation
@@ -90,7 +93,13 @@ public actor FolderWatcher {
     }
 
     public func stop() {
-        source?.cancel()
+        // The source's cancel handler owns the fd. If start() opened the fd but hasn't created the
+        // source yet (it's parked in the initial scan await), close the fd here so it can't leak.
+        if let source {
+            source.cancel()
+        } else if fileDescriptor >= 0 {
+            close(fileDescriptor)
+        }
         source = nil
         fileDescriptor = -1
         scanContinuation?.finish()
@@ -105,7 +114,9 @@ public actor FolderWatcher {
     internal func checkForNewFiles() async {
         let current = await scanFolderOffActor()
         let added = current.subtracting(knownFiles)
-        knownFiles.formUnion(current)
+        // Replace, don't union: a vanished path must be forgotten so a same-name file recreated later
+        // is re-detected, and so the set stays bounded to the folder's current contents.
+        knownFiles = current
 
         let now = options.clock.now()
         for path in added {
