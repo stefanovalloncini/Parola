@@ -1,5 +1,6 @@
 import Foundation
 import ParolaCore
+import ParolaDictation
 
 extension ParolaAutomationServer {
     func waitCommands() -> [AutomationCommand] {
@@ -134,7 +135,7 @@ extension ParolaAutomationServer {
                 summary: "Resolves when the dictation controller reports the named state.",
                 kind: .waiter,
                 args: [
-                    .init(name: "state", kind: .string(enum: ["idle", "listening", "stopped"]), required: true, summary: "Target dictation state"),
+                    .init(name: "state", kind: .string(enum: ["idle", "listening", "transcribing", "stopped"]), required: true, summary: "Target dictation state"),
                     .init(name: "timeoutMs", kind: .integer, required: false, summary: "Timeout in ms", defaultValue: .int(10_000)),
                 ],
                 handler: { args, ctx in
@@ -143,11 +144,19 @@ extension ParolaAutomationServer {
                     return await waitForCondition(
                         ctx: ctx,
                         timeoutMs: timeoutMs,
-                        observed: { ["dictationActive": .bool(ctx.model.dictationEnabled)] },
+                        observed: {
+                            [
+                                "state": .string("\(ctx.model.dictationState)"),
+                                "running": .bool(ctx.model.dictationController.isRunning),
+                                "dictationEnabled": .bool(ctx.model.dictationEnabled),
+                            ]
+                        },
                         predicate: {
                             switch target {
-                            case "listening": return ctx.model.dictationEnabled
-                            case "idle", "stopped": return !ctx.model.dictationEnabled
+                            case "listening": return ctx.model.dictationState == .listening
+                            case "transcribing": return ctx.model.dictationState == .transcribing
+                            case "idle": return ctx.model.dictationState == .idle
+                            case "stopped": return !ctx.model.dictationController.isRunning
                             default: return false
                             }
                         }

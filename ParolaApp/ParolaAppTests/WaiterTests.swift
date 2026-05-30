@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Parola
 import ParolaCore
+import ParolaDictation
 
 @MainActor
 @Suite("Bridge waiter commands")
@@ -99,5 +100,40 @@ struct WaiterTests {
         withExtendedLifetime(server) {}
 
         #expect(matched(result) == true)
+    }
+
+    @Test("waitForDictationState resolves on the live coordinator state, not the settings toggle")
+    func waitForDictationStateTracksLiveState() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let command = try #require(commands["waitForDictationState"])
+
+        // The live mirror is .listening while the settings toggle stays off — the old code
+        // read the toggle and would never resolve here.
+        model.dictationState = .listening
+        let args = try command.validate(AutomationArgs([
+            "state": .string("listening"),
+            "timeoutMs": .int(400),
+        ]))
+        let result = try await command.handler(args, context)
+        withExtendedLifetime(server) {}
+
+        #expect(matched(result) == true)
+    }
+
+    @Test("waitForDictationState(listening) times out while the coordinator is idle")
+    func waitForDictationStateIdleTimesOut() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let command = try #require(commands["waitForDictationState"])
+
+        model.dictationState = .idle
+        let args = try command.validate(AutomationArgs([
+            "state": .string("listening"),
+            "timeoutMs": .int(120),
+        ]))
+        let result = try await command.handler(args, context)
+        withExtendedLifetime(server) {}
+
+        #expect(matched(result) == false)
+        #expect(timedOut(result) == true)
     }
 }
