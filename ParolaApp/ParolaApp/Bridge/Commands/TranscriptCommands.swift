@@ -98,17 +98,53 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "setTheme",
                 area: .transcript,
-                summary: "Sets the app theme.",
+                summary: "Sets the appearance (light/dark/system) and/or the color preset.",
                 kind: .mutating,
                 args: [
-                    .init(name: "theme", kind: .string(enum: ["light", "dark", "system"]), required: true, summary: "light, dark, or system"),
+                    .init(name: "theme", kind: .string(enum: ["light", "dark", "system"]), required: false, summary: "Appearance: light, dark, or system"),
+                    .init(name: "preset", kind: .string(enum: ThemePreset.allCases.map(\.rawValue)), required: false, summary: "Color preset"),
+                    .init(name: "palette", kind: .object, required: false, summary: "Custom palette: hex strings for accent/canvas/surface/surfaceElevated/divider/textPrimary/textSecondary"),
                 ],
                 handler: { args, ctx in
-                    let theme = try args.string("theme")
-                    ctx.model.appTheme = theme
-                    return .object(["appTheme": .string(theme)])
+                    if let theme = try args.optionalString("theme") {
+                        ctx.model.appTheme = theme
+                    }
+                    if let preset = try args.optionalString("preset") {
+                        guard ThemePreset(rawValue: preset) != nil else {
+                            throw AutomationError.invalidArgs(field: "preset", reason: "unknown preset '\(preset)'")
+                        }
+                        ctx.model.selectThemePreset(preset)
+                    }
+                    if let raw = args.rawValue("palette"), case .object(let obj) = raw {
+                        ctx.model.applyCustomPalette(buildCustomPalette(obj))
+                    }
+                    return .object([
+                        "appTheme": .string(ctx.model.appTheme),
+                        "themePreset": .string(ctx.model.appAccentRaw),
+                        "themeIsCustom": .bool(ctx.model.themeIsCustom),
+                    ])
                 }
             ),
         ]
     }
+}
+
+private func buildCustomPalette(_ obj: [String: AutomationValue]) -> ThemePalette {
+    let base = ThemePreset.terracotta.palette
+    func token(_ key: String, _ fallback: ThemeColor) -> ThemeColor {
+        if case .string(let hex)? = obj[key], let rgba = RGBA(hex: hex) { return .uniform(rgba) }
+        return fallback
+    }
+    return ThemePalette(
+        accent: token("accent", base.accent),
+        canvas: token("canvas", base.canvas),
+        surface: token("surface", base.surface),
+        surfaceElevated: token("surfaceElevated", base.surfaceElevated),
+        divider: token("divider", base.divider),
+        textPrimary: token("textPrimary", base.textPrimary),
+        textSecondary: token("textSecondary", base.textSecondary),
+        success: base.success,
+        warning: base.warning,
+        danger: base.danger
+    )
 }

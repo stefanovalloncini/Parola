@@ -31,26 +31,31 @@ enum DS {
         static let timer = SwiftUI.Font.system(size: 28, weight: .light, design: .monospaced)
     }
 
+    /// The active palette every element color funnels through. AppModel.applyTheme() sets it on
+    /// the main actor; view bodies read it on the main actor. nonisolated(unsafe) is safe because
+    /// ThemePalette is a Sendable value and access is main-actor in practice.
+    nonisolated(unsafe) static var theme: ThemePalette = ThemePreset.terracotta.palette
+
     enum Color {
-        static var accent: SwiftUI.Color { AppAccent.current.color }
-        static let primaryText = SwiftUI.Color.primary
-        static let secondaryText = SwiftUI.Color.secondary
-        static let surface = SwiftUI.Color(nsColor: .windowBackgroundColor)
-        static let surfaceElevated = SwiftUI.Color(nsColor: .controlBackgroundColor)
-        static let separator = SwiftUI.Color(nsColor: .separatorColor)
-        static let danger = SwiftUI.Color.red
+        static var accent: SwiftUI.Color { DS.theme.accent.color }
+        static var primaryText: SwiftUI.Color { DS.theme.textPrimary.color }
+        static var secondaryText: SwiftUI.Color { DS.theme.textSecondary.color }
+        static var surface: SwiftUI.Color { DS.theme.surface.color }
+        static var surfaceElevated: SwiftUI.Color { DS.theme.surfaceElevated.color }
+        static var separator: SwiftUI.Color { DS.theme.divider.color }
+        static var danger: SwiftUI.Color { DS.theme.danger.color }
     }
 
     enum Palette {
-        static let canvas = SwiftUI.Color("CanvasColor")
-        static let surface = SwiftUI.Color("SurfaceColor")
-        static let surfaceElevated = SwiftUI.Color("SurfaceElevatedColor")
-        static let surfaceHover = SwiftUI.Color.primary.opacity(0.06)
-        static let divider = SwiftUI.Color("DividerColor")
-        static let pillFill = SwiftUI.Color.primary.opacity(0.08)
-        static let pillFillHover = SwiftUI.Color.primary.opacity(0.14)
-        static let success = SwiftUI.Color(red: 0.32, green: 0.74, blue: 0.42)
-        static let warning = SwiftUI.Color(red: 0.95, green: 0.66, blue: 0.20)
+        static var canvas: SwiftUI.Color { DS.theme.canvas.color }
+        static var surface: SwiftUI.Color { DS.theme.surface.color }
+        static var surfaceElevated: SwiftUI.Color { DS.theme.surfaceElevated.color }
+        static var surfaceHover: SwiftUI.Color { SwiftUI.Color.primary.opacity(0.06) }
+        static var divider: SwiftUI.Color { DS.theme.divider.color }
+        static var pillFill: SwiftUI.Color { SwiftUI.Color.primary.opacity(0.08) }
+        static var pillFillHover: SwiftUI.Color { SwiftUI.Color.primary.opacity(0.14) }
+        static var success: SwiftUI.Color { DS.theme.success.color }
+        static var warning: SwiftUI.Color { DS.theme.warning.color }
     }
 
     static let speakerPalette: [SwiftUI.Color] = [

@@ -324,6 +324,65 @@ final class AppModel {
         set { appAccentRaw = newValue.rawValue }
     }
 
+    @ObservationIgnored @AppStorage("themeIsCustom", store: DefaultsStore.current) var themeIsCustom: Bool = false
+    @ObservationIgnored @AppStorage("themeCustomPaletteJSON", store: DefaultsStore.current) var themeCustomPaletteJSON: String = ""
+
+    /// Bumped on every theme change. The window root keys `.id` off it so the whole tree repaints —
+    /// most leaf views read DS.Color.* statically and would not otherwise re-render on a palette swap.
+    private(set) var themeRevision: Int = 0
+
+    var themeSelection: ThemeSelection {
+        if themeIsCustom, let palette = decodedCustomPalette() {
+            return .custom(palette)
+        }
+        return .preset(ThemePreset(rawValue: appAccentRaw) ?? .terracotta)
+    }
+
+    @discardableResult
+    func applyTheme() -> ThemePalette {
+        let palette = themeSelection.palette
+        DS.theme = palette
+        return palette
+    }
+
+    func selectThemePreset(_ raw: String) {
+        appAccentRaw = raw
+        themeIsCustom = false
+        applyTheme()
+        themeRevision &+= 1
+    }
+
+    func applyCustomPalette(_ palette: ThemePalette) {
+        guard let data = try? JSONEncoder().encode(palette),
+              let json = String(data: data, encoding: .utf8) else { return }
+        themeCustomPaletteJSON = json
+        themeIsCustom = true
+        applyTheme()
+        themeRevision &+= 1
+    }
+
+    func resetToPresetTheme() {
+        themeIsCustom = false
+        applyTheme()
+        themeRevision &+= 1
+    }
+
+    /// Live edit of the custom palette from the color editor. Updates DS.theme and persists, but
+    /// does NOT bump themeRevision — a full `.id` rebuild would dismiss the open color picker. The
+    /// rest of the app repaints with the new palette on its next render (e.g. when Settings closes).
+    func previewCustomPalette(_ palette: ThemePalette) {
+        guard let data = try? JSONEncoder().encode(palette),
+              let json = String(data: data, encoding: .utf8) else { return }
+        themeCustomPaletteJSON = json
+        themeIsCustom = true
+        DS.theme = palette
+    }
+
+    private func decodedCustomPalette() -> ThemePalette? {
+        guard let data = themeCustomPaletteJSON.data(using: .utf8), !data.isEmpty else { return nil }
+        return try? JSONDecoder().decode(ThemePalette.self, from: data)
+    }
+
     var preferredColorScheme: ColorScheme? {
         switch appTheme {
         case "light": return .light
@@ -579,6 +638,7 @@ final class AppModel {
         self.dictationIndicatorStyleRaw = defaults.string(forKey: "dictationIndicatorStyleRaw") ?? DictationIndicatorStyle.overlay.rawValue
         self.dictationCleanupPromptID = defaults.string(forKey: "dictationCleanupPromptID") ?? ""
         self.dictationPerAppOverridesJSON = defaults.string(forKey: "dictationPerAppOverridesJSON") ?? "{}"
+        applyTheme()
         loadAutoExportRules()
         loadIgnoredSegmentRules()
         loadFindReplaceRules()

@@ -19,12 +19,29 @@ struct CustomizationPane: View {
                     .frame(width: 160)
                     .axLeaf("Customization.Picker.Appearance")
                 }
-                SettingRow("Accent color",
-                           description: "Used for the active sidebar item, primary buttons, and other highlights.") {
-                    AccentColorRow(selection: $model.appAccentRaw)
+                SettingRow("Theme",
+                           description: "Recolors the accent and surfaces across the whole app.") {
+                    ThemePresetGallery()
                 }
+                SettingRow("Custom colors",
+                           description: "Pick your own palette instead of a preset.") {
+                    Toggle("", isOn: Binding(
+                        get: { model.themeIsCustom },
+                        set: { on in on ? beginCustom() : model.resetToPresetTheme() }
+                    ))
+                    .labelsHidden()
+                    .axLeaf("Customization.Toggle.CustomColors")
+                }
+            }
+
+            if model.themeIsCustom {
+                SettingsSection { CustomThemeEditor() }
+            }
+
+            SettingsSection {
                 SettingRow("Monospaced timestamps",
-                           description: "Use a fixed-width font for timestamps in the transcript.") {
+                           description: "Use a fixed-width font for timestamps in the transcript.",
+                           isFirst: true) {
                     Toggle("", isOn: $model.monospacedTimestamps).labelsHidden()
                         .axLeaf("Customization.Toggle.MonospacedTimestamps")
                 }
@@ -43,22 +60,36 @@ struct CustomizationPane: View {
             ResetPaneButton(scope: .customization)
         }
     }
+
+    private func beginCustom() {
+        let p = DS.theme
+        model.applyCustomPalette(.custom(
+            accent: p.accent.editableColor,
+            canvas: p.canvas.editableColor,
+            surface: p.surface.editableColor,
+            surfaceElevated: p.surfaceElevated.editableColor,
+            divider: p.divider.editableColor,
+            textPrimary: p.textPrimary.editableColor,
+            textSecondary: p.textSecondary.editableColor
+        ))
+    }
 }
 
-private struct AccentColorRow: View {
-    @Binding var selection: String
+private struct ThemePresetGallery: View {
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         HStack(spacing: 8) {
-            ForEach(AppAccent.allCases) { accent in
+            ForEach(ThemePreset.allCases) { preset in
+                let isActive = !model.themeIsCustom && model.appAccentRaw == preset.rawValue
                 Button {
-                    selection = accent.rawValue
+                    model.selectThemePreset(preset.rawValue)
                 } label: {
                     ZStack {
                         Circle()
-                            .fill(accent.color)
+                            .fill(preset.accent.color)
                             .frame(width: 22, height: 22)
-                        if accent.rawValue == selection {
+                        if isActive {
                             Circle()
                                 .strokeBorder(Color.primary.opacity(0.6), lineWidth: 2)
                                 .frame(width: 26, height: 26)
@@ -67,9 +98,44 @@ private struct AccentColorRow: View {
                     .padding(2)
                 }
                 .buttonStyle(.plain)
-                .help(accent.label)
-                .axLeaf("Customization.Button.Accent.\(accent.rawValue)")
+                .help(preset.label)
+                .axLeaf("Customization.Button.Theme.\(preset.rawValue)")
             }
         }
+    }
+}
+
+private struct CustomThemeEditor: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        VStack(spacing: 0) {
+            colorRow("Accent", \.accent, isFirst: true)
+            colorRow("Background", \.canvas)
+            colorRow("Surface", \.surface)
+            colorRow("Elevated surface", \.surfaceElevated)
+            colorRow("Divider", \.divider)
+            colorRow("Primary text", \.textPrimary)
+            colorRow("Secondary text", \.textSecondary)
+        }
+    }
+
+    private func colorRow(_ label: String, _ keyPath: WritableKeyPath<ThemePalette, ThemeColor>, isFirst: Bool = false) -> some View {
+        SettingRow(LocalizedStringKey(label), isFirst: isFirst) {
+            ColorPicker("", selection: binding(keyPath), supportsOpacity: false)
+                .labelsHidden()
+                .axLeaf("Customization.ColorPicker.\(label.replacingOccurrences(of: " ", with: ""))")
+        }
+    }
+
+    private func binding(_ keyPath: WritableKeyPath<ThemePalette, ThemeColor>) -> Binding<Color> {
+        Binding(
+            get: { DS.theme[keyPath: keyPath].editableColor },
+            set: { newColor in
+                var palette = DS.theme
+                palette[keyPath: keyPath] = .uniform(RGBA(newColor))
+                model.previewCustomPalette(palette)
+            }
+        )
     }
 }

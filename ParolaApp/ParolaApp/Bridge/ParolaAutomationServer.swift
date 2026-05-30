@@ -442,6 +442,8 @@ final class ParolaAutomationServer {
         let selectedModel = defaults.string(forKey: "selectedModel") ?? "openai_whisper-tiny"
         let language = defaults.string(forKey: "selectedLanguageRaw") ?? ""
         let appTheme = defaults.string(forKey: "appTheme") ?? "system"
+        let themePreset = defaults.string(forKey: "appAccentColor") ?? "terracotta"
+        let themeIsCustom = defaults.bool(forKey: "themeIsCustom")
         let useStreaming = (defaults.object(forKey: "useStreaming") as? Bool) ?? true
         let translate = defaults.bool(forKey: "translate")
 
@@ -457,6 +459,8 @@ final class ParolaAutomationServer {
             "useStreaming": .bool(useStreaming),
             "ytDlpAvailable": .bool(model.ytDlpAvailable),
             "appTheme": .string(appTheme),
+            "themePreset": .string(themePreset),
+            "themeIsCustom": .bool(themeIsCustom),
             "hasTranscript": .bool(model.transcript != nil),
             "transcriptSegments": .int(model.transcript?.segments.count ?? 0),
             "availableModels": .array(model.availableModels.map { .string($0.name) }),

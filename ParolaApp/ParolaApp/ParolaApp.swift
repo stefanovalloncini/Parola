@@ -76,6 +76,8 @@ struct ParolaApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .id(model.themeRevision)
+                .tint(DS.Color.accent)
                 .environment(model)
                 .environment(liveCaptions)
                 .frame(minWidth: 920, minHeight: 600)
