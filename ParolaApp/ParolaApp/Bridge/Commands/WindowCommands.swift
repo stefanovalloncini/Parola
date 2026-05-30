@@ -14,6 +14,7 @@ extension ParolaAutomationServer {
                         guard win.isVisible else { return nil }
                         return .object([
                             "title": .string(win.title),
+                            "windowNumber": .int(win.windowNumber),
                             "frame": .object([
                                 "w": .int(Int(win.frame.size.width)),
                                 "h": .int(Int(win.frame.size.height)),
@@ -65,7 +66,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "screenshot",
                 area: .window,
-                summary: "Captures the main window via ScreenCaptureKit and writes a PNG.",
+                summary: "Captures the main window via ScreenCaptureKit and writes a PNG. Needs Screen Recording; if denied it errors with the windowNumber so a granted process can `screencapture -l<n>`.",
                 kind: .async,
                 args: [
                     .init(name: "path", kind: .string(), required: false, summary: "Bare filename inside the cache; default is timestamped"),

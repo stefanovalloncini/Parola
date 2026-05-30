@@ -385,6 +385,22 @@ final class ParolaAutomationServer {
         guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil && !$0.isMiniaturized && $0.frame.size.width > 200 }) else {
             throw AutomationError.precondition("no visible main window to capture")
         }
+        do {
+            return try await captureViaScreenCaptureKit(window: window, path: path)
+        } catch {
+            // SwiftUI content is GPU/IOSurface-backed, so an in-app CALayer/cacheDisplay
+            // render comes back blank — the only faithful capture goes through the window
+            // server, which needs Screen Recording. Surface the window number so a process
+            // that already holds the grant can capture it instead of failing opaquely.
+            throw AutomationError.permission(
+                "screenshot needs Screen Recording permission (\(error.localizedDescription)). "
+                + "Capture window \(window.windowNumber) from a permitted process — "
+                + "`screencapture -o -x -l\(window.windowNumber) <path>` — or grant Parola Screen Recording in System Settings."
+            )
+        }
+    }
+
+    private func captureViaScreenCaptureKit(window: NSWindow, path: String) async throws -> AutomationValue {
         let windowID = CGWindowID(window.windowNumber)
         let windowTitle = window.title
         let scale = window.backingScaleFactor
@@ -415,6 +431,8 @@ final class ParolaAutomationServer {
             "height": .int(pixelHeight),
             "bytes": .int(pngData.count),
             "windowTitle": .string(windowTitle),
+            "windowNumber": .int(window.windowNumber),
+            "method": .string("screenCaptureKit"),
         ])
     }
 
