@@ -53,10 +53,26 @@ struct AccessibilityTreeWalker {
         maxDepth: Int = 12,
         maxElements: Int = 500
     ) -> WalkResult {
-        var state = WalkState(filter: filter, maxDepth: maxDepth, maxElements: maxElements)
-        let root = makeNode(for: rootWindow, depth: 0, state: &state)
+        walk(rootElement: rootWindow, filter: filter, maxDepth: maxDepth, maxElements: maxElements)
+    }
+
+    func walk(
+        rootElement: Any,
+        filter: Filter = .actionable,
+        maxDepth: Int = 12,
+        maxElements: Int = 500
+    ) -> WalkResult {
+        var state = WalkState(
+            filter: filter,
+            maxDepth: max(0, min(maxDepth, Self.hardDepthCap)),
+            maxElements: max(1, min(maxElements, Self.hardElementCap))
+        )
+        let root = makeNode(for: rootElement, depth: 0, state: &state)
         return WalkResult(truncated: state.truncated, elementCount: state.elementCount, tree: root)
     }
+
+    private static let hardDepthCap = 40
+    private static let hardElementCap = 5000
 
     func toAutomationValue(_ node: AXNode) -> AutomationValue {
         var dict: [String: AutomationValue] = [
@@ -86,20 +102,35 @@ struct AccessibilityTreeWalker {
         var truncated: Bool = false
     }
 
+    private struct Attributes {
+        var identifier: String?
+        var role: String = ""
+        var label: String?
+        var value: String?
+        var frame: CGRect = .zero
+        var enabled: Bool = false
+        var selected: Bool?
+        var focused: Bool?
+    }
+
     private func makeNode(for element: Any, depth: Int, state: inout WalkState) -> AXNode {
         state.elementCount += 1
-        let role = readRole(from: element)
-        let identifier = readIdentifier(from: element)
-        let label = readLabel(from: element)
-        let value = readValue(from: element)
-        let frame = readFrame(from: element)
-        let enabled = readEnabled(from: element)
-        let selected = readSelected(from: element, role: role)
-        let focused = readFocused(from: element)
+
+        var attrs = Attributes()
+        _ = ParolaCatchingNSException {
+            attrs.role = self.readRole(from: element)
+            attrs.identifier = self.readIdentifier(from: element)
+            attrs.label = self.readLabel(from: element)
+            attrs.value = self.readValue(from: element)
+            attrs.frame = self.readFrame(from: element)
+            attrs.enabled = self.readEnabled(from: element)
+            attrs.selected = self.readSelected(from: element, role: attrs.role)
+            attrs.focused = self.readFocused(from: element)
+        }
 
         var children: [AXNode] = []
         if depth < state.maxDepth, !state.truncated {
-            for child in readChildren(from: element) {
+            for child in safeChildren(of: element) {
                 if state.elementCount >= state.maxElements {
                     state.truncated = true
                     break
@@ -114,16 +145,22 @@ struct AccessibilityTreeWalker {
         }
 
         return AXNode(
-            identifier: identifier,
-            role: role,
-            label: label,
-            value: value,
-            frame: frame,
-            enabled: enabled,
-            selected: selected,
-            focused: focused,
+            identifier: attrs.identifier,
+            role: attrs.role,
+            label: attrs.label,
+            value: attrs.value,
+            frame: attrs.frame,
+            enabled: attrs.enabled,
+            selected: attrs.selected,
+            focused: attrs.focused,
             children: children
         )
+    }
+
+    private func safeChildren(of element: Any) -> [Any] {
+        var result: [Any] = []
+        _ = ParolaCatchingNSException { result = self.readChildren(from: element) }
+        return result
     }
 
     private func shouldKeep(_ node: AXNode, filter: Filter) -> Bool {
@@ -135,33 +172,34 @@ struct AccessibilityTreeWalker {
         }
     }
 
+    // Typed NSAccessibilityProtocol accessors, not KVC `value(forKey:)`. SwiftUI's AX proxy objects
+    // are not reliably KVC-compliant for these keys, and a raised NSUnknownKeyException from KVC is an
+    // Objective-C exception Swift can't catch — it crashes the process. The protocol methods are safe.
     private func readChildren(from element: Any) -> [Any] {
-        guard let obj = element as? NSObject else { return [] }
-        let val = obj.value(forKey: "accessibilityChildren") as? [Any]
-        return val ?? []
+        guard let ax = element as? any NSAccessibilityProtocol else { return [] }
+        return ax.accessibilityChildren() ?? []
     }
 
     private func readIdentifier(from element: Any) -> String? {
-        guard let obj = element as? NSObject else { return nil }
-        let id = obj.value(forKey: "accessibilityIdentifier") as? String
+        guard let ax = element as? any NSAccessibilityProtocol else { return nil }
+        let id = ax.accessibilityIdentifier()
         return (id?.isEmpty == false) ? id : nil
     }
 
     private func readRole(from element: Any) -> String {
-        guard let obj = element as? NSObject else { return "" }
-        return obj.value(forKey: "accessibilityRole") as? String ?? ""
+        guard let ax = element as? any NSAccessibilityProtocol else { return "" }
+        return ax.accessibilityRole()?.rawValue ?? ""
     }
 
     private func readLabel(from element: Any) -> String? {
-        guard let obj = element as? NSObject else { return nil }
-        let label = obj.value(forKey: "accessibilityLabel") as? String
+        guard let ax = element as? any NSAccessibilityProtocol else { return nil }
+        let label = ax.accessibilityLabel()
         return (label?.isEmpty == false) ? label : nil
     }
 
     private func readValue(from element: Any) -> String? {
-        guard let obj = element as? NSObject else { return nil }
-        let raw = obj.value(forKey: "accessibilityValue")
-        switch raw {
+        guard let ax = element as? any NSAccessibilityProtocol else { return nil }
+        switch ax.accessibilityValue() {
         case let s as String:
             return s.isEmpty ? nil : s
         case let n as NSNumber:
@@ -174,23 +212,23 @@ struct AccessibilityTreeWalker {
     }
 
     private func readFrame(from element: Any) -> CGRect {
-        guard let obj = element as? NSObject else { return .zero }
-        return (obj.value(forKey: "accessibilityFrame") as? NSValue)?.rectValue ?? .zero
+        guard let ax = element as? any NSAccessibilityProtocol else { return .zero }
+        return ax.accessibilityFrame()
     }
 
     private func readEnabled(from element: Any) -> Bool {
-        guard let obj = element as? NSObject else { return false }
-        return (obj.value(forKey: "isAccessibilityEnabled") as? Bool) ?? false
+        guard let ax = element as? any NSAccessibilityProtocol else { return false }
+        return ax.isAccessibilityEnabled()
     }
 
     private func readSelected(from element: Any, role: String) -> Bool? {
         guard Self.selectableRoles.contains(role) else { return nil }
-        guard let obj = element as? NSObject else { return nil }
-        return obj.value(forKey: "isAccessibilitySelected") as? Bool
+        guard let ax = element as? any NSAccessibilityProtocol else { return nil }
+        return ax.isAccessibilitySelected()
     }
 
     private func readFocused(from element: Any) -> Bool? {
-        guard let obj = element as? NSObject else { return nil }
-        return obj.value(forKey: "isAccessibilityFocused") as? Bool
+        guard let ax = element as? any NSAccessibilityProtocol else { return nil }
+        return ax.isAccessibilityFocused()
     }
 }
