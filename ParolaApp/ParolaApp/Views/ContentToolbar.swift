@@ -6,11 +6,15 @@ struct ContentToolbar: ToolbarContent {
 
     var body: some ToolbarContent {
         @Bindable var model = model
+        ToolbarItem(placement: .navigation) {
+            HStack(spacing: DS.Spacing.small) {
+                ModelPickerView()
+                LanguagePickerView()
+                    .disabled(selectedModelIsEnglishOnly)
+                    .modifier(EnglishOnlyHelpModifier(isEnglishOnly: selectedModelIsEnglishOnly))
+            }
+        }
         ToolbarItemGroup(placement: .navigation) {
-            ModelPickerView()
-            LanguagePickerView()
-                .disabled(selectedModelIsEnglishOnly)
-                .modifier(EnglishOnlyHelpModifier(isEnglishOnly: selectedModelIsEnglishOnly))
             if selectedModelSupportsTranslate {
                 Toggle(isOn: $model.translate) {
                     HStack(spacing: 4) {
