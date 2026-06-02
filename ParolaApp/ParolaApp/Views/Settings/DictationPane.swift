@@ -78,22 +78,6 @@ struct DictationPane: View {
                            description: "How the dictated text should land.") {
                     DictationModeRow(selectedID: $model.dictationCleanupPromptID)
                 }
-                SettingRow("Rewrite preset",
-                           description: "Fine-tune the cleanup tone.") {
-                    RewritePresetRow(selectedID: $model.dictationCleanupPromptID)
-                }
-                SettingRow("Cleanup mode") {
-                    Picker("", selection: $model.dictationCleanupPromptID) {
-                        Text("Raw (no cleanup)").tag("")
-                        ForEach(Prompt.builtIns) { prompt in
-                            Text(prompt.name).tag(prompt.id.uuidString)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 200)
-                    .axLeaf("Dictation.Picker.CleanupMode")
-                }
                 SettingRow("Strip self-corrections",
                            description: "Drops \"scratch that\", \"wait, no\", and collapses \", I mean,\" hedges.") {
                     Toggle("", isOn: $model.dictationStripSelfCorrections).labelsHidden()

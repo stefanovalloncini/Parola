@@ -62,38 +62,38 @@ final class AppModel {
     var livePartialText: String = ""
     var liveVoiceActive: Bool = false
     var filePartialText: String = ""
-    @ObservationIgnored @AppStorage("useStreaming", store: DefaultsStore.current) var useStreaming: Bool = true
-    @ObservationIgnored @AppStorage("wordTimestamps", store: DefaultsStore.current) var wordTimestamps: Bool = false
-    @ObservationIgnored @AppStorage("karaokeHighlight", store: DefaultsStore.current) var karaokeHighlight: Bool = true
-    @ObservationIgnored @AppStorage("initialPrompt", store: DefaultsStore.current) var initialPrompt: String = ""
-    @ObservationIgnored @AppStorage("diarize", store: DefaultsStore.current) var diarize: Bool = false
-    @ObservationIgnored @AppStorage("autoTitleEntries", store: DefaultsStore.current) var autoTitleEntries: Bool = false
-    @ObservationIgnored @AppStorage("subtitleFPS", store: DefaultsStore.current) var subtitleFPS: Double = 30
-    @ObservationIgnored @AppStorage("subtitleCaptionLength", store: DefaultsStore.current) var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue
-    @ObservationIgnored @AppStorage("transcriptCompact", store: DefaultsStore.current) var transcriptCompact: Bool = false
-    @ObservationIgnored @AppStorage("skipSilences", store: DefaultsStore.current) var skipSilences: Bool = false
-    @ObservationIgnored @AppStorage("pausePlayerOnAppHidden", store: DefaultsStore.current) var pausePlayerOnAppHidden: Bool = false
-    @ObservationIgnored @AppStorage("markdownTimestamps", store: DefaultsStore.current) var markdownTimestamps: Bool = false
-    @ObservationIgnored @AppStorage("htmlExportTheme", store: DefaultsStore.current) var htmlExportThemeRaw: String = HtmlExportTheme.light.rawValue
-    @ObservationIgnored @AppStorage("dictationHudOpacity", store: DefaultsStore.current) var dictationHudOpacity: Double = 1.0
-    @ObservationIgnored @AppStorage("lastFindQuery", store: DefaultsStore.current) var lastFindQuery: String = ""
-    @ObservationIgnored @AppStorage("parola.userPrivacyMode", store: DefaultsStore.current) var userPrivacyMode: Bool = false
-    @ObservationIgnored @AppStorage("pinnedModel", store: DefaultsStore.current) var pinnedModel: String = ""
-    @ObservationIgnored @AppStorage("mainWindowAlwaysOnTop", store: DefaultsStore.current) var mainWindowAlwaysOnTop: Bool = false
-    @ObservationIgnored @AppStorage("recentFiles", store: DefaultsStore.current) var recentFilesRaw: String = "[]"
-    @ObservationIgnored @AppStorage("micHotkeyKeyCode", store: DefaultsStore.current) var micHotkeyKeyCode: Int = 15 // kVK_ANSI_R
-    @ObservationIgnored @AppStorage("micHotkeyModifiers", store: DefaultsStore.current) var micHotkeyModifiers: Int = 786721 // ⌃⌥⌘
-    @ObservationIgnored @AppStorage("micHotkeyEnabled", store: DefaultsStore.current) var micHotkeyEnabled: Bool = false
-    @ObservationIgnored @AppStorage("dictationStripSelfCorrections", store: DefaultsStore.current) var dictationStripSelfCorrections: Bool = false
-    @ObservationIgnored @AppStorage("dictationPasteDelayMs", store: DefaultsStore.current) var dictationPasteDelayMs: Int = 0
-    @ObservationIgnored @AppStorage("dictationContextSelection", store: DefaultsStore.current) var dictationContextSelection: Bool = false
-    @ObservationIgnored @AppStorage("dictationContextClipboard", store: DefaultsStore.current) var dictationContextClipboard: Bool = false
-    @ObservationIgnored @AppStorage("dictationContextScreen", store: DefaultsStore.current) var dictationContextScreen: Bool = false
-    @ObservationIgnored @AppStorage("recordingMaxMinutes", store: DefaultsStore.current) var recordingMaxMinutes: Int = 0
-    @ObservationIgnored @AppStorage("showMenuBarExtra", store: DefaultsStore.current) var showMenuBarExtra: Bool = false
-    @ObservationIgnored @AppStorage("recordingCountInSeconds", store: DefaultsStore.current) var recordingCountInSeconds: Int = 0
-    @ObservationIgnored @AppStorage("autoMuteWhileRecording", store: DefaultsStore.current) var autoMuteWhileRecording: Bool = false
-    @ObservationIgnored @AppStorage("autoPauseMediaWhileRecording", store: DefaultsStore.current) var autoPauseMediaWhileRecording: Bool = false
+    var useStreaming: Bool = true { didSet { defaults.set(useStreaming, forKey: "useStreaming") } }
+    var wordTimestamps: Bool = false { didSet { defaults.set(wordTimestamps, forKey: "wordTimestamps") } }
+    var karaokeHighlight: Bool = true { didSet { defaults.set(karaokeHighlight, forKey: "karaokeHighlight") } }
+    var initialPrompt: String = "" { didSet { defaults.set(initialPrompt, forKey: "initialPrompt") } }
+    var diarize: Bool = false { didSet { defaults.set(diarize, forKey: "diarize") } }
+    var autoTitleEntries: Bool = false { didSet { defaults.set(autoTitleEntries, forKey: "autoTitleEntries") } }
+    var subtitleFPS: Double = 30 { didSet { defaults.set(subtitleFPS, forKey: "subtitleFPS") } }
+    var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue { didSet { defaults.set(subtitleCaptionLengthRaw, forKey: "subtitleCaptionLength") } }
+    var transcriptCompact: Bool = false { didSet { defaults.set(transcriptCompact, forKey: "transcriptCompact") } }
+    var skipSilences: Bool = false { didSet { defaults.set(skipSilences, forKey: "skipSilences") } }
+    var pausePlayerOnAppHidden: Bool = false { didSet { defaults.set(pausePlayerOnAppHidden, forKey: "pausePlayerOnAppHidden") } }
+    var markdownTimestamps: Bool = false { didSet { defaults.set(markdownTimestamps, forKey: "markdownTimestamps") } }
+    var htmlExportThemeRaw: String = HtmlExportTheme.light.rawValue { didSet { defaults.set(htmlExportThemeRaw, forKey: "htmlExportTheme") } }
+    var dictationHudOpacity: Double = 1.0 { didSet { defaults.set(dictationHudOpacity, forKey: "dictationHudOpacity") } }
+    var lastFindQuery: String = "" { didSet { defaults.set(lastFindQuery, forKey: "lastFindQuery") } }
+    var userPrivacyMode: Bool = false { didSet { defaults.set(userPrivacyMode, forKey: "parola.userPrivacyMode") } }
+    var pinnedModel: String = "" { didSet { defaults.set(pinnedModel, forKey: "pinnedModel") } }
+    var mainWindowAlwaysOnTop: Bool = false { didSet { defaults.set(mainWindowAlwaysOnTop, forKey: "mainWindowAlwaysOnTop") } }
+    var recentFilesRaw: String = "[]" { didSet { defaults.set(recentFilesRaw, forKey: "recentFiles") } }
+    var micHotkeyKeyCode: Int = 15 { didSet { defaults.set(micHotkeyKeyCode, forKey: "micHotkeyKeyCode") } } // kVK_ANSI_R
+    var micHotkeyModifiers: Int = 786721 { didSet { defaults.set(micHotkeyModifiers, forKey: "micHotkeyModifiers") } } // ⌃⌥⌘
+    var micHotkeyEnabled: Bool = false { didSet { defaults.set(micHotkeyEnabled, forKey: "micHotkeyEnabled") } }
+    var dictationStripSelfCorrections: Bool = false { didSet { defaults.set(dictationStripSelfCorrections, forKey: "dictationStripSelfCorrections") } }
+    var dictationPasteDelayMs: Int = 0 { didSet { defaults.set(dictationPasteDelayMs, forKey: "dictationPasteDelayMs") } }
+    var dictationContextSelection: Bool = false { didSet { defaults.set(dictationContextSelection, forKey: "dictationContextSelection") } }
+    var dictationContextClipboard: Bool = false { didSet { defaults.set(dictationContextClipboard, forKey: "dictationContextClipboard") } }
+    var dictationContextScreen: Bool = false { didSet { defaults.set(dictationContextScreen, forKey: "dictationContextScreen") } }
+    var recordingMaxMinutes: Int = 0 { didSet { defaults.set(recordingMaxMinutes, forKey: "recordingMaxMinutes") } }
+    var showMenuBarExtra: Bool = false { didSet { defaults.set(showMenuBarExtra, forKey: "showMenuBarExtra") } }
+    var recordingCountInSeconds: Int = 0 { didSet { defaults.set(recordingCountInSeconds, forKey: "recordingCountInSeconds") } }
+    var autoMuteWhileRecording: Bool = false { didSet { defaults.set(autoMuteWhileRecording, forKey: "autoMuteWhileRecording") } }
+    var autoPauseMediaWhileRecording: Bool = false { didSet { defaults.set(autoPauseMediaWhileRecording, forKey: "autoPauseMediaWhileRecording") } }
     var recordingCountdown: Int? = nil
     @ObservationIgnored private var countdownTask: Task<Void, Never>?
 
@@ -141,10 +141,10 @@ final class AppModel {
     var selectedBatchJobID: BatchJob.ID?
     @ObservationIgnored var batchTask: Task<Void, Never>?
 
-    @ObservationIgnored @AppStorage("batchExportFormats", store: DefaultsStore.current) var batchExportFormatsRaw: String = "txt,srt"
-    @ObservationIgnored @AppStorage("batchExportToSourceFolder", store: DefaultsStore.current) var batchExportToSourceFolder: Bool = true
-    @ObservationIgnored @AppStorage("batchExportIncludeTimestamps", store: DefaultsStore.current) var batchExportIncludeTimestamps: Bool = false
-    @ObservationIgnored @AppStorage("batchExportFormatOptions", store: DefaultsStore.current) var batchExportFormatOptionsJSON: String = "{}"
+    var batchExportFormatsRaw: String = "txt,srt" { didSet { defaults.set(batchExportFormatsRaw, forKey: "batchExportFormats") } }
+    var batchExportToSourceFolder: Bool = true { didSet { defaults.set(batchExportToSourceFolder, forKey: "batchExportToSourceFolder") } }
+    var batchExportIncludeTimestamps: Bool = false { didSet { defaults.set(batchExportIncludeTimestamps, forKey: "batchExportIncludeTimestamps") } }
+    var batchExportFormatOptionsJSON: String = "{}" { didSet { defaults.set(batchExportFormatOptionsJSON, forKey: "batchExportFormatOptions") } }
 
     var findIsOpen: Bool = false
     var findQuery: String = "" {
@@ -160,15 +160,15 @@ final class AppModel {
     var currentMatchIndex: Int = 0
     @ObservationIgnored var matchesDebounce: Task<Void, Never>?
 
-    @ObservationIgnored @AppStorage("inputDeviceUID", store: DefaultsStore.current) var inputDeviceUID: String = ""
+    var inputDeviceUID: String = "" { didSet { defaults.set(inputDeviceUID, forKey: "inputDeviceUID") } }
 
     var preferredInputDeviceUID: String? {
         inputDeviceUID.isEmpty ? nil : inputDeviceUID
     }
 
-    @ObservationIgnored @AppStorage("selectedModel", store: DefaultsStore.current) var selectedModel: String = "openai_whisper-tiny"
-    @ObservationIgnored @AppStorage("selectedLanguageRaw", store: DefaultsStore.current) private var selectedLanguageRaw: String = ""
-    @ObservationIgnored @AppStorage("translate", store: DefaultsStore.current) var translate: Bool = false
+    var selectedModel: String = "openai_whisper-tiny" { didSet { defaults.set(selectedModel, forKey: "selectedModel") } }
+    private var selectedLanguageRaw: String = "" { didSet { defaults.set(selectedLanguageRaw, forKey: "selectedLanguageRaw") } }
+    var translate: Bool = false { didSet { defaults.set(translate, forKey: "translate") } }
 
     @ObservationIgnored private var cachedSelectedModel: String = ""
     @ObservationIgnored private var cachedCapabilities: EngineCapabilities = .whisperKitDefaults
@@ -315,9 +315,9 @@ final class AppModel {
 
     // MARK: - Customization
 
-    @ObservationIgnored @AppStorage("appTheme", store: DefaultsStore.current) var appTheme: String = "system"  // "system" | "light" | "dark"
-    @ObservationIgnored @AppStorage("monospacedTimestamps", store: DefaultsStore.current) var monospacedTimestamps: Bool = true
-    @ObservationIgnored @AppStorage("sidebarDensity", store: DefaultsStore.current) var sidebarDensity: String = "comfortable"  // "comfortable" | "compact"
+    var appTheme: String = "system" { didSet { defaults.set(appTheme, forKey: "appTheme") } }  // "system" | "light" | "dark"
+    var monospacedTimestamps: Bool = true { didSet { defaults.set(monospacedTimestamps, forKey: "monospacedTimestamps") } }
+    var sidebarDensity: String = "comfortable" { didSet { defaults.set(sidebarDensity, forKey: "sidebarDensity") } }  // "comfortable" | "compact"
 
     var transcriptDisplayModeRaw: String = TranscriptDisplayMode.transcript.rawValue {
         didSet { defaults.set(transcriptDisplayModeRaw, forKey: "transcriptDisplayMode") }
@@ -339,15 +339,15 @@ final class AppModel {
             break
         }
     }
-    @ObservationIgnored @AppStorage(AppAccent.storageKey, store: DefaultsStore.current) var appAccentRaw: String = AppAccent.terracotta.rawValue
+    var appAccentRaw: String = AppAccent.terracotta.rawValue { didSet { defaults.set(appAccentRaw, forKey: AppAccent.storageKey) } }
 
     var appAccent: AppAccent {
         get { AppAccent(rawValue: appAccentRaw) ?? .terracotta }
         set { appAccentRaw = newValue.rawValue }
     }
 
-    @ObservationIgnored @AppStorage("themeIsCustom", store: DefaultsStore.current) var themeIsCustom: Bool = false
-    @ObservationIgnored @AppStorage("themeCustomPaletteJSON", store: DefaultsStore.current) var themeCustomPaletteJSON: String = ""
+    var themeIsCustom: Bool = false { didSet { defaults.set(themeIsCustom, forKey: "themeIsCustom") } }
+    var themeCustomPaletteJSON: String = "" { didSet { defaults.set(themeCustomPaletteJSON, forKey: "themeCustomPaletteJSON") } }
 
     /// Bumped on every theme change. The window root keys `.id` off it so the whole tree repaints —
     /// most leaf views read DS.Color.* statically and would not otherwise re-render on a palette swap.
@@ -456,6 +456,16 @@ final class AppModel {
     private func readInt(_ key: String, default fallback: Int) -> Int {
         if defaults.object(forKey: key) == nil { return fallback }
         return defaults.integer(forKey: key)
+    }
+
+    private func readBool(_ key: String, default fallback: Bool) -> Bool {
+        if defaults.object(forKey: key) == nil { return fallback }
+        return defaults.bool(forKey: key)
+    }
+
+    private func readDouble(_ key: String, default fallback: Double) -> Double {
+        if defaults.object(forKey: key) == nil { return fallback }
+        return defaults.double(forKey: key)
     }
 
     private static let sharedJSONDecoder = JSONDecoder()
@@ -588,7 +598,7 @@ final class AppModel {
     private(set) var automationBridgeRunning: Bool = false
     private(set) var automationBridgePort: UInt16?
 
-    @ObservationIgnored @AppStorage("automationBridgeEnabled", store: DefaultsStore.current) var automationBridgeEnabled: Bool = AppModel.defaultBridgeEnabled
+    var automationBridgeEnabled: Bool = AppModel.defaultBridgeEnabled { didSet { defaults.set(automationBridgeEnabled, forKey: "automationBridgeEnabled") } }
 
     static var defaultBridgeEnabled: Bool {
         #if DEBUG
@@ -600,12 +610,12 @@ final class AppModel {
 
     // MARK: - Sparkle
 
-    @ObservationIgnored @AppStorage("sparkleChannel", store: DefaultsStore.current) var sparkleChannelRaw: String = SparkleChannel.stable.rawValue {
-        didSet { applySparkleChannelChange() }
+    var sparkleChannelRaw: String = SparkleChannel.stable.rawValue {
+        didSet { applySparkleChannelChange(); defaults.set(sparkleChannelRaw, forKey: "sparkleChannel") }
     }
 
-    @ObservationIgnored @AppStorage("sparkleAutomatic", store: DefaultsStore.current) var sparkleAutomatic: Bool = true {
-        didSet { SparkleUpdater.shared.automaticallyChecks = sparkleAutomatic }
+    var sparkleAutomatic: Bool = true {
+        didSet { SparkleUpdater.shared.automaticallyChecks = sparkleAutomatic; defaults.set(sparkleAutomatic, forKey: "sparkleAutomatic") }
     }
 
     var sparkleChannel: SparkleChannel {
@@ -618,8 +628,8 @@ final class AppModel {
 
     // MARK: - Live captions translation
 
-    @ObservationIgnored @AppStorage("liveCaptionsTranslate", store: DefaultsStore.current) var liveCaptionsTranslate: Bool = false {
-        didSet { applyLiveCaptionsTranslateChange() }
+    var liveCaptionsTranslate: Bool = false {
+        didSet { applyLiveCaptionsTranslateChange(); defaults.set(liveCaptionsTranslate, forKey: "liveCaptionsTranslate") }
     }
 
     private func applyLiveCaptionsTranslateChange() {
@@ -665,6 +675,56 @@ final class AppModel {
         self.dictationCleanupPromptID = defaults.string(forKey: "dictationCleanupPromptID") ?? ""
         self.dictationPerAppOverridesJSON = defaults.string(forKey: "dictationPerAppOverridesJSON") ?? "{}"
         self.transcriptDisplayModeRaw = defaults.string(forKey: "transcriptDisplayMode") ?? TranscriptDisplayMode.transcript.rawValue
+        self.useStreaming = readBool("useStreaming", default: true)
+        self.wordTimestamps = defaults.bool(forKey: "wordTimestamps")
+        self.karaokeHighlight = readBool("karaokeHighlight", default: true)
+        self.initialPrompt = defaults.string(forKey: "initialPrompt") ?? ""
+        self.diarize = defaults.bool(forKey: "diarize")
+        self.autoTitleEntries = defaults.bool(forKey: "autoTitleEntries")
+        self.subtitleFPS = readDouble("subtitleFPS", default: 30)
+        self.subtitleCaptionLengthRaw = defaults.string(forKey: "subtitleCaptionLength") ?? CaptionLength.none.rawValue
+        self.transcriptCompact = defaults.bool(forKey: "transcriptCompact")
+        self.skipSilences = defaults.bool(forKey: "skipSilences")
+        self.pausePlayerOnAppHidden = defaults.bool(forKey: "pausePlayerOnAppHidden")
+        self.markdownTimestamps = defaults.bool(forKey: "markdownTimestamps")
+        self.htmlExportThemeRaw = defaults.string(forKey: "htmlExportTheme") ?? HtmlExportTheme.light.rawValue
+        self.dictationHudOpacity = readDouble("dictationHudOpacity", default: 1.0)
+        self.lastFindQuery = defaults.string(forKey: "lastFindQuery") ?? ""
+        self.userPrivacyMode = defaults.bool(forKey: "parola.userPrivacyMode")
+        self.pinnedModel = defaults.string(forKey: "pinnedModel") ?? ""
+        self.mainWindowAlwaysOnTop = defaults.bool(forKey: "mainWindowAlwaysOnTop")
+        self.recentFilesRaw = defaults.string(forKey: "recentFiles") ?? "[]"
+        self.micHotkeyKeyCode = readInt("micHotkeyKeyCode", default: 15)
+        self.micHotkeyModifiers = readInt("micHotkeyModifiers", default: 786721)
+        self.micHotkeyEnabled = defaults.bool(forKey: "micHotkeyEnabled")
+        self.dictationStripSelfCorrections = defaults.bool(forKey: "dictationStripSelfCorrections")
+        self.dictationPasteDelayMs = defaults.integer(forKey: "dictationPasteDelayMs")
+        self.dictationContextSelection = defaults.bool(forKey: "dictationContextSelection")
+        self.dictationContextClipboard = defaults.bool(forKey: "dictationContextClipboard")
+        self.dictationContextScreen = defaults.bool(forKey: "dictationContextScreen")
+        self.recordingMaxMinutes = defaults.integer(forKey: "recordingMaxMinutes")
+        self.showMenuBarExtra = defaults.bool(forKey: "showMenuBarExtra")
+        self.recordingCountInSeconds = defaults.integer(forKey: "recordingCountInSeconds")
+        self.autoMuteWhileRecording = defaults.bool(forKey: "autoMuteWhileRecording")
+        self.autoPauseMediaWhileRecording = defaults.bool(forKey: "autoPauseMediaWhileRecording")
+        self.batchExportFormatsRaw = defaults.string(forKey: "batchExportFormats") ?? "txt,srt"
+        self.batchExportToSourceFolder = readBool("batchExportToSourceFolder", default: true)
+        self.batchExportIncludeTimestamps = defaults.bool(forKey: "batchExportIncludeTimestamps")
+        self.batchExportFormatOptionsJSON = defaults.string(forKey: "batchExportFormatOptions") ?? "{}"
+        self.inputDeviceUID = defaults.string(forKey: "inputDeviceUID") ?? ""
+        self.selectedModel = defaults.string(forKey: "selectedModel") ?? "openai_whisper-tiny"
+        self.selectedLanguageRaw = defaults.string(forKey: "selectedLanguageRaw") ?? ""
+        self.translate = defaults.bool(forKey: "translate")
+        self.appTheme = defaults.string(forKey: "appTheme") ?? "system"
+        self.monospacedTimestamps = readBool("monospacedTimestamps", default: true)
+        self.sidebarDensity = defaults.string(forKey: "sidebarDensity") ?? "comfortable"
+        self.appAccentRaw = defaults.string(forKey: AppAccent.storageKey) ?? AppAccent.terracotta.rawValue
+        self.themeIsCustom = defaults.bool(forKey: "themeIsCustom")
+        self.themeCustomPaletteJSON = defaults.string(forKey: "themeCustomPaletteJSON") ?? ""
+        self.automationBridgeEnabled = readBool("automationBridgeEnabled", default: AppModel.defaultBridgeEnabled)
+        self.sparkleChannelRaw = defaults.string(forKey: "sparkleChannel") ?? SparkleChannel.stable.rawValue
+        self.sparkleAutomatic = readBool("sparkleAutomatic", default: true)
+        self.liveCaptionsTranslate = defaults.bool(forKey: "liveCaptionsTranslate")
         applyTheme()
         loadAutoExportRules()
         loadIgnoredSegmentRules()

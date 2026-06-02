@@ -257,6 +257,7 @@ struct ParolaApp: App {
                 .environment(model)
                 .environment(liveCaptions)
                 .frame(minWidth: 880, idealWidth: 900, maxWidth: .infinity, minHeight: 600, idealHeight: 640, maxHeight: .infinity)
+                .preferredColorScheme(model.preferredColorScheme)
         }
 
         Window("Mini Player", id: "mini-player") {
