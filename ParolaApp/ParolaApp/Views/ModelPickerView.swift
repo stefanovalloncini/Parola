@@ -99,6 +99,7 @@ struct ModelPickerView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
                 .axLeaf("ModelPicker.Button.ClearSearch")
             }
         }

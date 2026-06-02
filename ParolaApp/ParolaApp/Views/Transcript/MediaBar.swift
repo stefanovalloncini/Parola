@@ -56,6 +56,8 @@ struct MediaBar: View {
             }
             .buttonStyle(.plain)
             .help(model.skipSilences ? "Skip silences (on)" : "Skip silences")
+            .accessibilityLabel("Skip silences")
+            .accessibilityValue(model.skipSilences ? "On" : "Off")
             .axLeaf("MediaBar.Button.SkipSilences")
 
             Menu {
@@ -89,6 +91,8 @@ struct MediaBar: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .help("Playback speed")
+            .accessibilityLabel("Playback speed")
+            .accessibilityValue(speedLabel(playbackRate))
             .accessibilityIdentifier("transcript.player.speed")
             .axLeaf("MediaBar.Menu.Speed")
         }

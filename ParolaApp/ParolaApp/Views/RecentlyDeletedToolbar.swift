@@ -100,6 +100,7 @@ struct RecentlyDeletedToolbar: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
                 .axLeaf("Toolbar.Button.ClearSearch")
             }
         }
@@ -127,6 +128,7 @@ struct RecentlyDeletedToolbar: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort")
+        .accessibilityLabel("Sort")
         .axLeaf("Toolbar.Menu.Sort")
     }
 
@@ -153,6 +155,7 @@ struct RecentlyDeletedToolbar: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("More actions")
+        .accessibilityLabel("More actions")
         .axLeaf("Toolbar.Menu.Actions")
     }
 
@@ -167,6 +170,7 @@ struct RecentlyDeletedToolbar: View {
         .buttonStyle(.plain)
         .disabled(model.deletedEntries.isEmpty)
         .help("Empty Recently Deleted")
+        .accessibilityLabel("Empty Recently Deleted")
         .axLeaf("Toolbar.Button.EmptyTrash")
     }
 }
