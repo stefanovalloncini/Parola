@@ -4,6 +4,7 @@ build/
 DerivedData/
 *.xcuserstate
 xcuserdata/
+.vscode/
 
 # xcodegen output — regenerate with `xcodegen generate`
 ParolaApp/ParolaApp.xcodeproj/
