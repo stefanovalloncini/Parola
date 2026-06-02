@@ -28,6 +28,7 @@ struct RootView: View {
         }
         .sheet(isPresented: $showingTrash) {
             RecentlyDeletedView()
+                .presentationDetents([.large])
         }
         .sheet(isPresented: $showingLiveCaptions) {
             LiveCaptionsSheet().environment(model)

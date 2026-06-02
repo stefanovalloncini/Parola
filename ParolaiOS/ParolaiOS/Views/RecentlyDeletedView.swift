@@ -45,6 +45,7 @@ struct RecentlyDeletedView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .listStyle(.plain)
                 }
             }
             .navigationTitle("Recently Deleted")
@@ -93,7 +94,11 @@ struct RecentlyDeletedView: View {
             filtered = model.deletedEntries
         } else {
             let needle = trimmed.lowercased()
-            filtered = model.deletedEntries.filter { $0.title.lowercased().contains(needle) }
+            filtered = model.deletedEntries.filter {
+                $0.title.lowercased().contains(needle)
+                    || Self.kindLabel(for: $0.category).lowercased().contains(needle)
+                    || $0.manifest.modelName.lowercased().contains(needle)
+            }
         }
         switch sortOrder {
         case .recentlyDeleted:
@@ -108,32 +113,44 @@ struct RecentlyDeletedView: View {
     }
 
     private func row(_ entry: LibraryEntry) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(entry.title).font(.body.weight(.medium))
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(entry.title)
+                .font(.body.weight(.medium))
+            HStack(spacing: 6) {
                 if let deletedAt = entry.deletedAt {
-                    Text(deletedAt, style: .relative).foregroundStyle(.secondary)
+                    Text(deletedAt, style: .relative)
+                    Text("·")
                 }
-                Spacer()
-                Button {
-                    model.restoreEntry(entry.id)
-                } label: {
-                    Label("Restore", systemImage: "arrow.uturn.backward.circle")
-                }
-                .buttonStyle(.borderless)
-                .controlSize(.small)
-                Button(role: .destructive) {
-                    confirmingPurge = entry.id
-                } label: {
-                    Label("Delete permanently", systemImage: "trash")
-                        .labelStyle(.iconOnly)
-                }
-                .buttonStyle(.borderless)
-                .controlSize(.small)
+                Text(Self.kindLabel(for: entry.category))
             }
-            .font(.caption)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button {
+                model.restoreEntry(entry.id)
+            } label: {
+                Label("Restore", systemImage: "arrow.uturn.backward")
+            }
+            .tint(.blue)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                confirmingPurge = entry.id
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    private static func kindLabel(for category: EntryCategory) -> String {
+        switch category {
+        case .transcription: return "Transcription"
+        case .meeting: return "Meeting"
+        case .dictation: return "Dictation"
+        }
     }
 
     private var empty: some View {
