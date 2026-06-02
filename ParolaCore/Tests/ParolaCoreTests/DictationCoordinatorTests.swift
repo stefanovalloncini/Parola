@@ -361,6 +361,9 @@ struct DictationCoordinatorTests {
         private(set) var running = false
         private(set) var gateArmed = false
         private var gate: CheckedContinuation<Void, Never>?
+        private let text: String
+
+        init(text: String = "") { self.text = text }
 
         func start() async throws {
             startCalls += 1
@@ -377,7 +380,7 @@ struct DictationCoordinatorTests {
         func stopAndTranscribe() async throws -> String {
             stopCalls += 1
             running = false
-            return ""
+            return text
         }
     }
 
@@ -405,5 +408,37 @@ struct DictationCoordinatorTests {
         await #expect(coord.state == .idle)
         let running = await recorder.running
         #expect(running == false, "recorder must be stopped, not orphaned, after abort races startup")
+    }
+
+    @Test("a release that races recorder startup is deferred, then transcribes once it is up")
+    func releaseDuringStartupIsDeferredNotDropped() async throws {
+        let hotkey = MockHotkey()
+        let recorder = GatedRecorder(text: "deferred")
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(hotkey: hotkey, recorder: recorder, inserter: inserter)
+        await coord.startMonitoring()
+
+        let press = Task { await coord.simulatePress() }
+
+        var spins = 0
+        while await recorder.gateArmed == false {
+            await Task.yield()
+            spins += 1
+            if spins > 100_000 { break }
+        }
+
+        // Release arrives while the recorder is still starting: `.listening` must not be reported
+        // yet, and nothing is inserted until the recorder is actually up.
+        await coord.simulateRelease()
+        await #expect(coord.state != .listening)
+        let insertedDuringStart = await inserter.inserted
+        #expect(insertedDuringStart.isEmpty)
+
+        await recorder.openGate()
+        await press.value
+
+        await #expect(coord.state == .idle)
+        let inserted = await inserter.inserted
+        #expect(inserted == ["deferred"], "the deferred release must transcribe-and-insert once the recorder finishes starting")
     }
 }

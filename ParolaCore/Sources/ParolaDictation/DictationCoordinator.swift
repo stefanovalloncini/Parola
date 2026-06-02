@@ -31,6 +31,12 @@ public actor DictationCoordinator {
     /// actor is reentrant, so a stop/abort can run while `recorder.start()` is still suspended.
     private var generation: UInt64 = 0
 
+    /// True while `beginListening` is awaiting `recorder.start()`. The actor is reentrant, so a
+    /// release can land before the recorder is up; we defer it and replay it once `.listening` is
+    /// real, so `.listening` never reports a session that can't yet be stopped-and-transcribed.
+    private var startInFlight = false
+    private var releaseDuringStart = false
+
     public init(
         hotkey: any HotkeyMonitor,
         recorder: any DictationRecorder,
@@ -149,6 +155,10 @@ public actor DictationCoordinator {
     }
 
     func handle(_ event: HotkeyEvent) async {
+        if startInFlight, case .release = event {
+            releaseDuringStart = true
+            return
+        }
         switch mode {
         case .pushToTalk:
             await handlePushToTalk(event)
@@ -212,7 +222,8 @@ public actor DictationCoordinator {
         }
         generation &+= 1
         let myGeneration = generation
-        await setState(.listening)
+        startInFlight = true
+        releaseDuringStart = false
         if let session = mediaSession {
             let config = await mediaConfigProvider?() ?? .none
             await session.enterRecording(config: config)
@@ -220,15 +231,22 @@ public actor DictationCoordinator {
         do {
             try await recorder.start()
         } catch {
+            startInFlight = false
             guard myGeneration == generation else { return }
             await mediaSession?.exitRecording()
             await setState(.failed(error.localizedDescription))
             return
         }
+        startInFlight = false
         guard myGeneration == generation else {
             await mediaSession?.exitRecording()
             _ = try? await recorder.stopAndTranscribe()
             return
+        }
+        await setState(.listening)
+        if releaseDuringStart {
+            releaseDuringStart = false
+            await handle(.release)
         }
     }
 
