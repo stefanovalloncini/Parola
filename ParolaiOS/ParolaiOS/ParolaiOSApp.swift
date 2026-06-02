@@ -56,6 +56,7 @@ private struct AppRoot: View {
             }
         }
         .animation(.smooth(duration: 0.35), value: shouldShowOnboarding)
+        .preferredColorScheme(model.settings.appearance.colorScheme)
         .onOpenURL { url in
             if !model.settings.onboardingComplete {
                 deferOnboarding = true

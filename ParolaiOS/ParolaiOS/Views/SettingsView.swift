@@ -44,6 +44,9 @@ struct SettingsSheet: View {
             if visibleSections.contains(.activeModel) {
                 activeModelSection
             }
+            if visibleSections.contains(.appearance) {
+                appearanceSection
+            }
             if visibleSections.contains(.vocabulary), supportsInitialPrompt {
                 vocabularySection
             }
@@ -109,6 +112,20 @@ struct SettingsSheet: View {
             } else {
                 Text("settings.wordTimestamps.footer")
             }
+        }
+    }
+
+    private var appearanceSection: some View {
+        @Bindable var settings = model.settings
+        return Section {
+            Picker("Appearance", selection: $settings.appearance) {
+                ForEach(AppTheme.allCases) { theme in
+                    Text(theme.label).tag(theme)
+                }
+            }
+            .pickerStyle(.segmented)
+        } header: {
+            Text("Appearance")
         }
     }
 
@@ -203,10 +220,46 @@ struct SettingsSheet: View {
 
     private var aboutSection: some View {
         Section {
-            Text("settings.about")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 14) {
+                Image(systemName: "waveform.circle.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Parola")
+                        .font(.headline)
+                    Text("settings.about")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 4)
+
+            LabeledContent("Version", value: appVersion)
+            LabeledContent("Engine", value: activeModelLabel)
+            LabeledContent("Models on device", value: modelsSummary)
+        } header: {
+            Text("About")
         }
+    }
+
+    private var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = info?["CFBundleVersion"] as? String ?? "—"
+        return "\(short) (\(build))"
+    }
+
+    private var activeModelLabel: String {
+        model.availableModels.first { $0.name == model.settings.modelName }?.label
+            ?? model.settings.modelName
+    }
+
+    private var modelsSummary: String {
+        let installed = model.availableModels.filter(\.isInstalled)
+        let bytes = installed.reduce(0) { $0 + ($1.approximateSizeBytes ?? 0) }
+        let size = ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+        return "\(installed.count) · \(size)"
     }
 
     private var capabilities: EngineCapabilities {
@@ -234,6 +287,7 @@ struct SettingsSheet: View {
 
 private enum SettingsSection: CaseIterable {
     case activeModel
+    case appearance
     case vocabulary
     case modelsOnDevice
     case workflows
@@ -244,6 +298,8 @@ private enum SettingsSection: CaseIterable {
         switch self {
         case .activeModel:
             return ["active model", "model", "language", "translate", "word timestamps"]
+        case .appearance:
+            return ["appearance", "theme", "dark", "light", "color", "automatic"]
         case .vocabulary:
             return ["vocabulary", "prompt"]
         case .modelsOnDevice:
