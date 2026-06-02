@@ -35,6 +35,7 @@ struct PlayerBar: View {
                     Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                         .font(.title)
                 }
+                .accessibilityLabel(playback.isPlaying ? Text("Pause") : Text("Play"))
                 Spacer()
                 Text(format(playback.duration))
                     .font(.caption.monospacedDigit())

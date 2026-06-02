@@ -38,6 +38,7 @@ struct IgnoredSegmentsSettings: View {
                                 } label: {
                                     Image(systemName: "trash")
                                 }
+                                .accessibilityLabel(Text("Delete rule"))
                             }
                         }
                     }

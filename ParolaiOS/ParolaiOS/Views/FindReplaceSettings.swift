@@ -112,6 +112,7 @@ struct FindReplaceSettings: View {
                 } label: {
                     Image(systemName: "trash")
                 }
+                .accessibilityLabel(Text("Delete rule"))
             }
             HStack(spacing: 16) {
                 Toggle("Case-sensitive", isOn: rule.caseSensitive)

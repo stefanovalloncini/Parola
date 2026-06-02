@@ -83,6 +83,7 @@ private struct AutoExportRuleEditor: View {
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash")
                 }
+                .accessibilityLabel(Text("Delete rule"))
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("When source is").font(.caption).foregroundStyle(.secondary)

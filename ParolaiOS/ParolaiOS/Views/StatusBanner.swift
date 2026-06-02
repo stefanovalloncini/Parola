@@ -36,6 +36,7 @@ struct StatusBanner: View {
                 Text(text).font(.subheadline)
                 Spacer()
             }
+            .accessibilityElement(children: .combine)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(.thinMaterial)
