@@ -27,7 +27,13 @@ Sparkle is wired up. The hooks live in `ParolaApp/project.yml` (`SUFeedURL`, `SU
    ```
    It writes the private key to your Keychain and prints the public key. Paste that public key into `ParolaApp/project.yml` under `SUPublicEDKey`.
 
-4. **Appcast hosting**. Pick an HTTPS URL you control (GitHub Pages, Cloudflare Pages, your own host). Set `SUFeedURL` in `project.yml` to match.
+4. **Appcast hosting on GitHub Releases**. Set `SUFeedURL` in `project.yml` to the latest-release asset URL so Sparkle always reads the newest appcast:
+
+   ```
+   https://github.com/stefanovalloncini/Parola/releases/latest/download/appcast.xml
+   ```
+
+   This requires the repo (or at least its Releases) to be **public**. Each release carries two assets: the notarized DMG and a cumulative `appcast.xml` listing every shipped `<item>`. Sparkle reads `appcast.xml` from the most recent release; each `<enclosure url>` points at that version's DMG (`…/releases/download/vX.Y.Z/Parola-X.Y.Z.dmg`).
 
 After steps 1–4: `(cd ParolaApp && xcodegen generate)` and commit the updated `project.yml` (without the team ID if this is a public repo — use an overlay locally).
 
@@ -49,14 +55,14 @@ xcrun stapler staple dist/Parola-X.Y.Z.dmg
 ./scripts/sign-update.sh dist/Parola-X.Y.Z.dmg
 ```
 
-Upload the DMG (GitHub Releases or your CDN), then append an `<item>` to `appcast.xml`:
+Tag the release `vX.Y.Z`, then append an `<item>` to `appcast.xml` (keep the full version history in the file):
 
 ```xml
 <item>
     <title>Version X.Y.Z</title>
     <pubDate>...</pubDate>
     <enclosure
-        url="https://parola.app/releases/Parola-X.Y.Z.dmg"
+        url="https://github.com/stefanovalloncini/Parola/releases/download/vX.Y.Z/Parola-X.Y.Z.dmg"
         sparkle:version="X.Y.Z"
         sparkle:edSignature="..."
         length="..."
@@ -64,7 +70,13 @@ Upload the DMG (GitHub Releases or your CDN), then append an `<item>` to `appcas
 </item>
 ```
 
-Push the updated `appcast.xml` to its host. Existing installs pick up the new version on the next Sparkle check.
+Publish both the DMG and the updated `appcast.xml` as assets on the release:
+
+```sh
+gh release create vX.Y.Z dist/Parola-X.Y.Z.dmg appcast.xml --title "X.Y.Z" --notes "…"
+```
+
+Because `SUFeedURL` points at `releases/latest/download/appcast.xml`, existing installs pick up the new version on their next Sparkle check.
 
 ## Smoke test before announcing
 
