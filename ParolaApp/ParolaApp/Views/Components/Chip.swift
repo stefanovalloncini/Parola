@@ -84,9 +84,9 @@ struct Chip: View {
     private var foreground: Color {
         switch style {
         case .elevated:
-            return isSelected ? .white : .primary.opacity(0.85)
+            return isSelected ? DS.Color.onAccent : .primary.opacity(0.85)
         case .subtle:
-            return isSelected ? .white : .primary
+            return isSelected ? DS.Color.onAccent : .primary
         }
     }
 

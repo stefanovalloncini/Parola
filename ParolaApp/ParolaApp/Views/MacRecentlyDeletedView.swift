@@ -43,8 +43,12 @@ struct MacRecentlyDeletedView: View {
             let live = Set(entries.map(\.id))
             previews = previews.filter { live.contains($0.key) }
         }
-        .frame(minWidth: 620, minHeight: 460)
+        .task {
+            for entry in model.deletedEntries { await loadPreview(for: entry) }
+        }
+        .frame(minWidth: 640, idealWidth: 820, minHeight: 520, idealHeight: 680)
         .background(DS.Color.surface)
+        .ignoresSafeArea(.container, edges: .top)
         .confirmationDialog(
             "Delete permanently?",
             isPresented: isPurgingSingle
@@ -173,8 +177,17 @@ struct MacRecentlyDeletedView: View {
         )
     }
 
+    @ViewBuilder
     private var noMatches: some View {
-        ContentUnavailableView.search(text: searchText)
+        if searchText.isEmpty {
+            ContentUnavailableView(
+                "No items match these filters",
+                systemImage: "line.3.horizontal.decrease.circle",
+                description: Text("Try a different When or Kind filter.")
+            )
+        } else {
+            ContentUnavailableView.search(text: searchText)
+        }
     }
 
     private var filtered: [LibraryEntry] {

@@ -23,7 +23,7 @@ struct RecentlyDeletedRow: View {
                         .lineLimit(1)
                     Spacer(minLength: DS.Spacing.small)
                     if let deletedAt = entry.deletedAt {
-                        Text(deletedAt, format: .dateTime.hour().minute())
+                        Text(deletedAt, format: .dateTime.month(.abbreviated).day().hour().minute())
                             .font(DS.Font.captionMono)
                             .foregroundStyle(.secondary)
                     }
