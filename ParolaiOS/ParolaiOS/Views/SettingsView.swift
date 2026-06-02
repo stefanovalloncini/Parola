@@ -3,7 +3,7 @@ import ParolaCore
 
 struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @State private var confirmingReset = false
     @State private var query = ""
 
@@ -63,15 +63,16 @@ struct SettingsSheet: View {
     }
 
     private var activeModelSection: some View {
-        Section {
-            Picker("settings.model", selection: $model.settings.modelName) {
+        @Bindable var settings = model.settings
+        return Section {
+            Picker("settings.model", selection: $settings.modelName) {
                 ForEach(model.availableModels) { entry in
                     Text(entry.label).tag(entry.name)
                 }
             }
-            .onChange(of: model.settings.modelName) {
-                if isEnglishOnlyModel { model.settings.language = "en" }
-                if !supportsTranslate { model.settings.translate = false }
+            .onChange(of: settings.modelName) {
+                if isEnglishOnlyModel { settings.language = "en" }
+                if !supportsTranslate { settings.translate = false }
             }
             if isEnglishOnlyModel {
                 HStack {
@@ -84,22 +85,22 @@ struct SettingsSheet: View {
                 }
             } else {
                 NavigationLink {
-                    LanguagePicker(selection: $model.settings.language, compact: false)
+                    LanguagePicker(selection: $settings.language, compact: false)
                         .navigationTitle(Text("language.choose"))
                         .navigationBarTitleDisplayMode(.inline)
                 } label: {
                     HStack {
                         Text("settings.language")
                         Spacer()
-                        Text(LanguageCatalog.label(for: model.settings.language))
+                        Text(LanguageCatalog.label(for: settings.language))
                             .foregroundStyle(.secondary)
                     }
                 }
             }
             if supportsTranslate {
-                Toggle("settings.translate", isOn: $model.settings.translate)
+                Toggle("settings.translate", isOn: $settings.translate)
             }
-            Toggle("settings.wordTimestamps", isOn: $model.settings.wordTimestamps)
+            Toggle("settings.wordTimestamps", isOn: $settings.wordTimestamps)
         } header: {
             Text("settings.section.activeModel")
         } footer: {
@@ -112,10 +113,11 @@ struct SettingsSheet: View {
     }
 
     private var vocabularySection: some View {
-        Section("settings.vocabulary.title") {
+        @Bindable var settings = model.settings
+        return Section("settings.vocabulary.title") {
             TextField(
                 "settings.vocabulary.placeholder",
-                text: $model.settings.initialPrompt,
+                text: $settings.initialPrompt,
                 axis: .vertical
             )
             .lineLimit(2...5)
@@ -126,7 +128,7 @@ struct SettingsSheet: View {
         Section {
             NavigationLink {
                 ModelManagerView()
-                    .environmentObject(model)
+                    .environment(model)
             } label: {
                 HStack {
                     Image(systemName: "internaldrive")
@@ -143,7 +145,7 @@ struct SettingsSheet: View {
         Section {
             NavigationLink {
                 AutoExportSettings()
-                    .environmentObject(model)
+                    .environment(model)
                     .navigationTitle("Auto-Export")
                     .navigationBarTitleDisplayMode(.inline)
             } label: {
@@ -157,7 +159,7 @@ struct SettingsSheet: View {
             }
             NavigationLink {
                 IgnoredSegmentsSettings()
-                    .environmentObject(model)
+                    .environment(model)
                     .navigationTitle("Filters")
                     .navigationBarTitleDisplayMode(.inline)
             } label: {
@@ -171,7 +173,7 @@ struct SettingsSheet: View {
             }
             NavigationLink {
                 FindReplaceSettings()
-                    .environmentObject(model)
+                    .environment(model)
                     .navigationTitle("Find & Replace")
                     .navigationBarTitleDisplayMode(.inline)
             } label: {

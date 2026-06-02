@@ -2,7 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct RecentlyDeletedView: View {
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var confirmingPurge: LibraryEntry.ID?
     @State private var searchText = ""

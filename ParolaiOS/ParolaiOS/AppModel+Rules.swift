@@ -4,38 +4,38 @@ import ParolaCore
 
 extension AppModel {
     func loadAutoExportRules() {
-        guard let data = UserDefaults.standard.data(forKey: "autoExportRules"),
+        guard let data = defaults.data(forKey: "autoExportRules"),
               let rules = try? JSONDecoder().decode([AutoExportRule].self, from: data) else { return }
         autoExportRules = rules
     }
 
     func saveAutoExportRules() {
         if let data = try? JSONEncoder().encode(autoExportRules) {
-            UserDefaults.standard.set(data, forKey: "autoExportRules")
+            defaults.set(data, forKey: "autoExportRules")
         }
     }
 
     func loadIgnoredSegmentRules() {
-        guard let data = UserDefaults.standard.data(forKey: "ignoredSegmentRules"),
+        guard let data = defaults.data(forKey: "ignoredSegmentRules"),
               let rules = try? JSONDecoder().decode([IgnoredSegmentRule].self, from: data) else { return }
         ignoredSegmentRules = rules
     }
 
     func saveIgnoredSegmentRules() {
         if let data = try? JSONEncoder().encode(ignoredSegmentRules) {
-            UserDefaults.standard.set(data, forKey: "ignoredSegmentRules")
+            defaults.set(data, forKey: "ignoredSegmentRules")
         }
     }
 
     func loadFindReplaceRules() {
-        guard let data = UserDefaults.standard.data(forKey: "findReplaceRules"),
+        guard let data = defaults.data(forKey: "findReplaceRules"),
               let rules = try? JSONDecoder().decode([FindReplaceRule].self, from: data) else { return }
         findReplaceRules = rules
     }
 
     func saveFindReplaceRules() {
         if let data = try? JSONEncoder().encode(findReplaceRules) {
-            UserDefaults.standard.set(data, forKey: "findReplaceRules")
+            defaults.set(data, forKey: "findReplaceRules")
         }
     }
 

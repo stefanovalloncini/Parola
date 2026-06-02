@@ -6,67 +6,70 @@ import ParolaCore
 @Suite("AppModel rule persistence")
 @MainActor
 struct AppModelRulesTests {
-    private static let keys = ["autoExportRules", "ignoredSegmentRules", "findReplaceRules"]
+    private func freshDefaults() -> UserDefaults {
+        UserDefaults(suiteName: "test-\(UUID().uuidString)")!
+    }
 
-    private func makeModel() throws -> AppModel {
-        for key in Self.keys { UserDefaults.standard.removeObject(forKey: key) }
+    private func makeModel(defaults: UserDefaults) throws -> AppModel {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-appmodel-rules-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        return AppModel(libraryURL: tmp)
+        return AppModel(libraryURL: tmp, defaults: defaults)
+    }
+
+    private func makeReader(defaults: UserDefaults) -> AppModel {
+        AppModel(
+            libraryURL: FileManager.default.temporaryDirectory
+                .appendingPathComponent("parola-rules-reader-\(UUID().uuidString)", isDirectory: true),
+            defaults: defaults
+        )
     }
 
     @Test("auto-export rules survive a save and reload")
     func autoExportRoundTrip() throws {
-        let writer = try makeModel()
+        let defaults = freshDefaults()
+        let writer = try makeModel(defaults: defaults)
         let rules = [
             AutoExportRule(sourceExtensions: ["m4a", "wav"], outputFormats: [.srt, .txt]),
             AutoExportRule(sourceExtensions: ["mp3"], outputFormats: [.json], enabled: false),
         ]
         writer.autoExportRules = rules
 
-        let reader = AppModel(libraryURL: FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-rules-reader-\(UUID().uuidString)", isDirectory: true))
+        let reader = makeReader(defaults: defaults)
         #expect(reader.autoExportRules == rules)
-
-        for key in Self.keys { UserDefaults.standard.removeObject(forKey: key) }
     }
 
     @Test("ignored-segment rules survive a save and reload")
     func ignoredSegmentRoundTrip() throws {
-        let writer = try makeModel()
+        let defaults = freshDefaults()
+        let writer = try makeModel(defaults: defaults)
         let rules = [
             IgnoredSegmentRule(pattern: "uh"),
             IgnoredSegmentRule(pattern: "[music]", enabled: false),
         ]
         writer.ignoredSegmentRules = rules
 
-        let reader = AppModel(libraryURL: FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-rules-reader-\(UUID().uuidString)", isDirectory: true))
+        let reader = makeReader(defaults: defaults)
         #expect(reader.ignoredSegmentRules == rules)
-
-        for key in Self.keys { UserDefaults.standard.removeObject(forKey: key) }
     }
 
     @Test("find-replace rules survive a save and reload")
     func findReplaceRoundTrip() throws {
-        let writer = try makeModel()
+        let defaults = freshDefaults()
+        let writer = try makeModel(defaults: defaults)
         let rules = [
             FindReplaceRule(find: "teh", replace: "the"),
             FindReplaceRule(find: "\\bok\\b", replace: "OK", caseSensitive: true, regex: true, enabled: false),
         ]
         writer.findReplaceRules = rules
 
-        let reader = AppModel(libraryURL: FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-rules-reader-\(UUID().uuidString)", isDirectory: true))
+        let reader = makeReader(defaults: defaults)
         #expect(reader.findReplaceRules == rules)
-
-        for key in Self.keys { UserDefaults.standard.removeObject(forKey: key) }
     }
 
     @Test("a fresh model with no stored rules starts empty")
     func defaultsAreEmpty() throws {
-        let model = try makeModel()
+        let model = try makeModel(defaults: freshDefaults())
         #expect(model.autoExportRules.isEmpty)
         #expect(model.ignoredSegmentRules.isEmpty)
         #expect(model.findReplaceRules.isEmpty)
@@ -89,7 +92,7 @@ struct AppModelRulesTests {
 
     @Test("runAutoExports writes the planned formats for a matching rule")
     func runAutoExportsWritesFiles() async throws {
-        let model = try makeModel()
+        let model = try makeModel(defaults: freshDefaults())
         model.autoExportRules = [
             AutoExportRule(sourceExtensions: ["m4a"], outputFormats: [.srt, .txt]),
         ]
@@ -112,13 +115,11 @@ struct AppModelRulesTests {
 
         let txtContents = try String(contentsOf: txt, encoding: .utf8)
         #expect(txtContents.contains("hello there"))
-
-        for key in Self.keys { UserDefaults.standard.removeObject(forKey: key) }
     }
 
     @Test("runAutoExports writes nothing when no rule matches the source extension")
     func runAutoExportsSkipsUnmatched() async throws {
-        let model = try makeModel()
+        let model = try makeModel(defaults: freshDefaults())
         model.autoExportRules = [
             AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.srt]),
         ]
@@ -130,13 +131,11 @@ struct AppModelRulesTests {
         try await Task.sleep(for: .milliseconds(200))
         let exportsDir = model.library.libraryURL.appendingPathComponent("Exports", isDirectory: true)
         #expect(FileManager.default.fileExists(atPath: exportsDir.path) == false)
-
-        for key in Self.keys { UserDefaults.standard.removeObject(forKey: key) }
     }
 
     @Test("runAutoExports ignores a disabled rule")
     func runAutoExportsIgnoresDisabled() async throws {
-        let model = try makeModel()
+        let model = try makeModel(defaults: freshDefaults())
         model.autoExportRules = [
             AutoExportRule(sourceExtensions: ["m4a"], outputFormats: [.srt], enabled: false),
         ]
@@ -148,8 +147,6 @@ struct AppModelRulesTests {
         try await Task.sleep(for: .milliseconds(200))
         let exportsDir = model.library.libraryURL.appendingPathComponent("Exports", isDirectory: true)
         #expect(FileManager.default.fileExists(atPath: exportsDir.path) == false)
-
-        for key in Self.keys { UserDefaults.standard.removeObject(forKey: key) }
     }
 
     private func pollUntil(_ condition: () -> Bool) async throws {

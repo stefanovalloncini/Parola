@@ -23,7 +23,7 @@ struct ChatSheet: View {
 
     let entry: LibraryEntry
     let transcript: Transcript
-    @EnvironmentObject var model: AppModel
+    @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var session: TranscriptChatSession?
     @State private var sessionError: String?

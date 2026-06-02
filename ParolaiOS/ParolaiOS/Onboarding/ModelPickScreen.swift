@@ -4,7 +4,7 @@ import ParolaCore
 struct ModelPickScreen: View {
     let onContinue: () -> Void
 
-    @EnvironmentObject private var model: AppModel
+    @Environment(AppModel.self) private var model
 
     private let groups: [(ModelCategory, [ModelVariant])] = ModelCatalog.groupedForPicker()
 

@@ -1,36 +1,37 @@
 import Foundation
-import SwiftUI
 import ParolaCore
 
 @MainActor
-final class AppModel: ObservableObject {
-    let library: LibraryStore
-    @Published var settings: UserSettings
-    let coordinator: TranscriptionCoordinator
+@Observable
+final class AppModel {
+    @ObservationIgnored let defaults: UserDefaults
+    @ObservationIgnored let library: LibraryStore
+    let settings: UserSettings
+    @ObservationIgnored let coordinator: TranscriptionCoordinator
     let playback = PlaybackController()
 
-    @Published var availableModels: [ModelInfo] = []
-    @Published var libraryEntries: [LibraryEntry] = []
-    @Published var deletedEntries: [LibraryEntry] = []
-    @Published var searchResults: [LibraryEntry]?
-    @Published var autoExportRules: [AutoExportRule] = [] {
+    var availableModels: [ModelInfo] = []
+    var libraryEntries: [LibraryEntry] = []
+    var deletedEntries: [LibraryEntry] = []
+    var searchResults: [LibraryEntry]?
+    var autoExportRules: [AutoExportRule] = [] {
         didSet { saveAutoExportRules() }
     }
-    @Published var ignoredSegmentRules: [IgnoredSegmentRule] = [] {
+    var ignoredSegmentRules: [IgnoredSegmentRule] = [] {
         didSet { saveIgnoredSegmentRules() }
     }
-    @Published var findReplaceRules: [FindReplaceRule] = [] {
+    var findReplaceRules: [FindReplaceRule] = [] {
         didSet { saveFindReplaceRules() }
     }
-    @Published var lastError: String?
-    @Published var promptOutput: PromptOutput?
-    @Published var isRunningPrompt: Bool = false
+    var lastError: String?
+    var promptOutput: PromptOutput?
+    var isRunningPrompt: Bool = false
 
-    let promptLibrary = PromptLibrary()
-    let peopleStore = PeopleStore()
+    @ObservationIgnored let promptLibrary = PromptLibrary()
+    @ObservationIgnored let peopleStore = PeopleStore()
 
-    var searchTask: Task<Void, Never>?
-    var refreshTask: Task<Void, Never>?
+    @ObservationIgnored var searchTask: Task<Void, Never>?
+    @ObservationIgnored var refreshTask: Task<Void, Never>?
 
     static let trashRetentionDays = 30
 
@@ -40,10 +41,11 @@ final class AppModel: ObservableObject {
         let text: String
     }
 
-    init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
+    init(libraryURL: URL = LibraryStore.defaultLibraryURL, defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         let store = LibraryStore(libraryURL: libraryURL)
         self.library = store
-        let userSettings = UserSettings()
+        let userSettings = UserSettings(defaults: defaults)
         self.settings = userSettings
         self.coordinator = TranscriptionCoordinator(library: store, settings: userSettings)
         coordinator.onComplete = { [weak self] entry in

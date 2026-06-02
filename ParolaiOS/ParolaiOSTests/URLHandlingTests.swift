@@ -10,7 +10,7 @@ struct URLHandlingTests {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-url-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        let model = AppModel(libraryURL: tmp)
+        let model = AppModel(libraryURL: tmp, defaults: UserDefaults(suiteName: "test-\(UUID().uuidString)")!)
         return (model, tmp)
     }
 

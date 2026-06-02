@@ -18,10 +18,11 @@ struct DoneScreen: View {
 private struct DoneHero: View {
     let isActive: Bool
     @State private var bounced = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
-            if isActive {
+            if isActive && !reduceMotion {
                 ConfettiBurstView()
             }
             Image(systemName: "checkmark.circle.fill")
@@ -31,7 +32,7 @@ private struct DoneHero: View {
                 .shadow(color: Color.accentColor.opacity(0.3), radius: 24, x: 0, y: 8)
         }
         .onChange(of: isActive) { _, active in
-            if active { bounced.toggle() }
+            if active && !reduceMotion { bounced.toggle() }
         }
     }
 }
