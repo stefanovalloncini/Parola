@@ -1,9 +1,32 @@
 import SwiftUI
 import ParolaCore
 
-struct AboutSheet: View {
+/// Version and channel strings shared by every About surface so they can't drift apart.
+enum AboutInfo {
+    static var versionString: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(short) (\(build))"
+    }
+
+    static var channelLabel: String? {
+        #if DEBUG
+        return "DEBUG"
+        #else
+        guard let receiptURL = Bundle.main.appStoreReceiptURL else { return nil }
+        let path = receiptURL.path
+        if path.contains("sandboxReceipt") { return "TESTFLIGHT" }
+        if FileManager.default.fileExists(atPath: path) { return "APP STORE" }
+        return nil
+        #endif
+    }
+}
+
+/// Icon, version, channel badge, and credits — the single About body shared by the menu-bar About
+/// sheet and the Settings About pane, so the two never present conflicting information.
+struct AboutInfoView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
     @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 44
 
     var body: some View {
@@ -12,21 +35,20 @@ struct AboutSheet: View {
                 Image(systemName: "waveform")
                     .font(.system(size: iconSize, weight: .regular))
                     .foregroundStyle(DS.Color.accent)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Parola")
                         .font(DS.Font.title)
                     HStack(spacing: 6) {
-                        Text("Version \(Self.versionString)")
+                        Text("Version \(AboutInfo.versionString)")
                             .font(DS.Font.callout)
                             .foregroundStyle(.secondary)
-                        if let channel = Self.channelLabel {
+                        if let channel = AboutInfo.channelLabel {
                             Text(channel)
                                 .font(DS.Font.caption2Emphasized)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 1)
-                                .background(
-                                    Capsule().fill(DS.Color.accent.opacity(0.18))
-                                )
+                                .background(Capsule().fill(DS.Color.accent.opacity(0.18)))
                                 .foregroundStyle(DS.Color.accent)
                         }
                     }
@@ -43,38 +65,7 @@ struct AboutSheet: View {
                 creditRow(title: "Models on disk", value: modelsOnDiskLabel)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-
-            Spacer(minLength: 0)
-
-            HStack {
-                Spacer()
-                Button("Close") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                    .axLeaf("About.Button.Close")
-            }
         }
-        .padding(20)
-        .frame(width: 380, height: 360)
-        .axBranch("About")
-    }
-
-    private static var versionString: String {
-        let info = Bundle.main.infoDictionary
-        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
-        let build = info?["CFBundleVersion"] as? String ?? "?"
-        return "\(short) (\(build))"
-    }
-
-    private static var channelLabel: String? {
-        #if DEBUG
-        return "DEBUG"
-        #else
-        guard let receiptURL = Bundle.main.appStoreReceiptURL else { return nil }
-        let path = receiptURL.path
-        if path.contains("sandboxReceipt") { return "TESTFLIGHT" }
-        if FileManager.default.fileExists(atPath: path) { return "APP STORE" }
-        return nil
-        #endif
     }
 
     private var modelsOnDiskLabel: String {
@@ -94,5 +85,25 @@ struct AboutSheet: View {
                 .font(DS.Font.callout)
                 .foregroundStyle(.primary)
         }
+    }
+}
+
+struct AboutSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 18) {
+            AboutInfoView()
+            Spacer(minLength: 0)
+            HStack {
+                Spacer()
+                Button("Close") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                    .axLeaf("About.Button.Close")
+            }
+        }
+        .padding(20)
+        .frame(width: 380, height: 360)
+        .axBranch("About")
     }
 }
