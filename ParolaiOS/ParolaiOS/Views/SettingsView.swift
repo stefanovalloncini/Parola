@@ -228,7 +228,7 @@ struct SettingsSheet: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Parola")
                         .font(.headline)
-                    Text("settings.about")
+                    Text("On-device speech to text")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
