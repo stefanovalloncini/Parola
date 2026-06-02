@@ -1,5 +1,7 @@
 import Foundation
 import AppKit
+import ParolaCore
+import ParolaDictation
 
 extension ParolaAutomationServer {
     func lifecycleCommands() -> [AutomationCommand] {
@@ -33,6 +35,7 @@ extension ParolaAutomationServer {
                     }
                     let model = ctx.model
                     model.cancelAllTasks()
+                    await model.unloadTranscriptionSession()
                     model.batchJobs = []
                     model.transcript = nil
                     model.libraryEntries = []
@@ -41,7 +44,14 @@ extension ParolaAutomationServer {
                     for key in model.defaults.dictionaryRepresentation().keys {
                         model.defaults.removeObject(forKey: key)
                     }
+                    model.dictationCleanupPromptID = ""
                     model.refreshLibrary()
+                    await MockTranscriberRegistry.shared.clear()
+                    MockStreamingTranscriberRegistry.shared.clear()
+                    await MockLanguageModelStore.shared.clear()
+                    await MockAudioSourceRegistry.shared.clear()
+                    CapturedInsertionStore.shared.clear()
+                    MockMediaFetcherRegistry.shared.clear()
                     return .object(["reset": .bool(true)])
                 }
             ),

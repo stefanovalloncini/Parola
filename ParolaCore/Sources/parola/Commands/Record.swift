@@ -97,7 +97,7 @@ struct Record: AsyncParsableCommand {
     }
 
     private func runStreaming() async throws {
-        let session = StreamingTranscriptionSession()
+        let session = StreamingTranscriberFactory.make()
         let opts = TranscriptionOptions(
             model: model,
             language: language,
@@ -111,6 +111,7 @@ struct Record: AsyncParsableCommand {
         let progress = ProgressReporter(label: "downloading \(model)")
         let events = try await session.start(
             options: opts,
+            speakerLabeler: nil,
             downloadProgress: { p in progress.update(p) }
         )
         progress.finish()

@@ -17,7 +17,7 @@ actor MicDictationRecorder: DictationRecorder {
     private var fallbackForwardingTask: Task<Void, Never>?
     private let clock: any Clock<Duration>
 
-    private var streamingSession: StreamingTranscriptionSession?
+    private var streamingSession: (any StreamingTranscriber)?
     private var streamingConsumer: Task<Void, Never>?
     private var streamingSegments: [TranscriptSegment] = []
     private var streamingPartial: String = ""
@@ -99,7 +99,7 @@ actor MicDictationRecorder: DictationRecorder {
     }
 
     private func startStreaming() async throws {
-        let session = StreamingTranscriptionSession()
+        let session = StreamingTranscriberFactory.make(clock: clock)
         streamingSegments = []
         streamingPartial = ""
 
@@ -108,7 +108,7 @@ actor MicDictationRecorder: DictationRecorder {
             language: effectiveLanguage,
             task: .transcribe
         )
-        let events = try await session.start(options: options)
+        let events = try await session.start(options: options, speakerLabeler: nil, downloadProgress: nil)
         streamingSession = session
 
         streamingConsumer = Task { [weak self] in

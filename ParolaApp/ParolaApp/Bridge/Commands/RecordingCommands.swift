@@ -70,6 +70,24 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "getLiveCaptionsState",
+                area: .recording,
+                summary: "Returns the live-captions state (active, partial, confirmed lines).",
+                kind: .sync,
+                handler: { _, ctx in
+                    let s = ctx.model.liveCaptions?.state ?? LiveCaptionsState()
+                    return .object([
+                        "isActive": .bool(s.isActive),
+                        "isLoading": .bool(s.isLoading),
+                        "partial": .string(s.partial),
+                        "confirmedLines": .array(s.confirmedLines.map { .string($0) }),
+                        "displayedText": .string(s.displayedText),
+                        "error": s.error.map { .string($0) } ?? .null,
+                    ])
+                }
+            ),
+
+            AutomationCommand(
                 name: "setUseStreaming",
                 area: .recording,
                 summary: "Enables or disables streaming decoding.",

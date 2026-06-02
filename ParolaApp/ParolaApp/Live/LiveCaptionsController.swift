@@ -13,7 +13,7 @@ final class LiveCaptionsController {
 
     private var panel: NSPanel?
     private var presenterWindow: NSWindow?
-    private var session: StreamingTranscriptionSession?
+    private var session: (any StreamingTranscriber)?
     private var consumer: Task<Void, Never>?
     private var lastOptions: TranscriptionOptions?
 
@@ -55,13 +55,13 @@ final class LiveCaptionsController {
         state.isActive = true
         state.isLoading = true
 
-        let s = StreamingTranscriptionSession()
+        let s = StreamingTranscriberFactory.make()
         session = s
         showWindow()
 
         consumer = Task { [weak self] in
             do {
-                let events = try await s.start(options: options, downloadProgress: { _ in })
+                let events = try await s.start(options: options, speakerLabeler: nil, downloadProgress: { _ in })
                 self?.state.isLoading = false
                 for await event in events {
                     self?.handle(event)

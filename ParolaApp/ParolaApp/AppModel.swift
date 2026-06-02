@@ -524,7 +524,7 @@ final class AppModel {
     }
 
     @ObservationIgnored private var liveSource: AudioSource?
-    @ObservationIgnored private var streamingSession: StreamingTranscriptionSession?
+    @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
     @ObservationIgnored private var streamingConsumer: Task<Void, Never>?
     @ObservationIgnored private var fileTranscribeTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>?
@@ -578,6 +578,10 @@ final class AppModel {
         youtubeTranscribeTask?.cancel(); youtubeTranscribeTask = nil
         youtubeSubsTask?.cancel(); youtubeSubsTask = nil
         teardownActiveCapture()
+    }
+
+    func unloadTranscriptionSession() async {
+        await session.unloadModel()
     }
 
     @ObservationIgnored private var testBridge: ParolaAutomationServer?
@@ -973,8 +977,8 @@ final class AppModel {
             guard let self else { return }
             do {
                 phase = .downloadingModel(name: "youtube", progress: 0)
-                let source = try YouTubeAudioSource(url: url)
-                let audioURL = try await source.prepare()
+                let fetcher = MediaFetcherFactory.make()
+                let audioURL = try await fetcher.prepare(url: url)
                 try Task.checkCancellation()
                 sourceFileURL = audioURL
                 installPlayer(for: audioURL)
@@ -1185,7 +1189,7 @@ final class AppModel {
 
     private func startStreamingMic() {
         streamingConsumer?.cancel()
-        let s = StreamingTranscriptionSession()
+        let s = StreamingTranscriberFactory.make(clock: clock)
         streamingSession = s
         liveSegments = []
         livePartialText = ""
@@ -1201,7 +1205,7 @@ final class AppModel {
         streamingConsumer = Task { @MainActor in
             await mediaSession.enterRecording(config: config)
             do {
-                let events = try await s.start(options: opts, downloadProgress: progress)
+                let events = try await s.start(options: opts, speakerLabeler: nil, downloadProgress: progress)
                 phase = .recording(source: .microphone)
                 for await event in events {
                     handleStreamingEvent(event)

@@ -63,7 +63,7 @@ struct AppBootstrap: @unchecked Sendable {
             bridgePort: map["--bridge-port"].flatMap { UInt16($0) },
             bridgeToken: map["--bridge-token"],
             sideEffects: BootstrapSideEffect.testing,
-            filePicker: SystemFilePicker(),
+            filePicker: TestFilePicker(),
             clock: ContinuousClock(),
             headless: args.contains("--headless")
         )

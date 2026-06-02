@@ -78,11 +78,16 @@ final class DictationController {
                 await Self.resolveWorkflow(in: workflows)
             }
         )
-        let inserter = PerAppTextInserter(
-            paste: ClipboardPasteInserter(preDelayMs: configuration.pasteDelayMs)
-        ) { @Sendable in
-            let workflow = await Self.resolveWorkflow(in: workflows)
-            return workflow?.insertion ?? .paste
+        let inserter: any TextInserter
+        if appModel?.mode == .test {
+            inserter = CapturingTextInserter()
+        } else {
+            inserter = PerAppTextInserter(
+                paste: ClipboardPasteInserter(preDelayMs: configuration.pasteDelayMs)
+            ) { @Sendable in
+                let workflow = await Self.resolveWorkflow(in: workflows)
+                return workflow?.insertion ?? .paste
+            }
         }
         let coord = DictationCoordinator(
             hotkey: hotkey,
