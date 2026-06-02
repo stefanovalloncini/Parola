@@ -37,12 +37,11 @@ struct TranscriptPane: View {
     @Environment(AppModel.self) private var model
     @AppStorage("inspectorVisible") private var inspectorVisible: Bool = true
     @AppStorage("inspectorMode") private var inspectorModeRaw: String = InspectorMode.format.rawValue
-    @AppStorage("transcriptDisplayMode") private var displayModeRaw: String = TranscriptDisplayMode.transcript.rawValue
     @State private var summarySheetOpen = false
     @State private var chatSheetOpen = false
 
     private var displayMode: TranscriptDisplayMode {
-        TranscriptDisplayMode(rawValue: displayModeRaw) ?? .transcript
+        model.transcriptDisplayMode
     }
 
     var body: some View {

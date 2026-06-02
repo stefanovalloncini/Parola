@@ -317,6 +317,27 @@ final class AppModel {
     @ObservationIgnored @AppStorage("appTheme", store: DefaultsStore.current) var appTheme: String = "system"  // "system" | "light" | "dark"
     @ObservationIgnored @AppStorage("monospacedTimestamps", store: DefaultsStore.current) var monospacedTimestamps: Bool = true
     @ObservationIgnored @AppStorage("sidebarDensity", store: DefaultsStore.current) var sidebarDensity: String = "comfortable"  // "comfortable" | "compact"
+
+    var transcriptDisplayModeRaw: String = TranscriptDisplayMode.transcript.rawValue {
+        didSet { defaults.set(transcriptDisplayModeRaw, forKey: "transcriptDisplayMode") }
+    }
+
+    var transcriptDisplayMode: TranscriptDisplayMode {
+        get { TranscriptDisplayMode(rawValue: transcriptDisplayModeRaw) ?? .transcript }
+        set { transcriptDisplayModeRaw = newValue.rawValue }
+    }
+
+    /// Re-reads an externally written default into its observed property so the bridge `setSetting`
+    /// path drives the live UI the same way the in-app control does.
+    func reloadObservedSetting(key: String) {
+        switch key {
+        case "transcriptDisplayMode":
+            let raw = defaults.string(forKey: key) ?? TranscriptDisplayMode.transcript.rawValue
+            if raw != transcriptDisplayModeRaw { transcriptDisplayModeRaw = raw }
+        default:
+            break
+        }
+    }
     @ObservationIgnored @AppStorage(AppAccent.storageKey, store: DefaultsStore.current) var appAccentRaw: String = AppAccent.terracotta.rawValue
 
     var appAccent: AppAccent {
@@ -638,6 +659,7 @@ final class AppModel {
         self.dictationIndicatorStyleRaw = defaults.string(forKey: "dictationIndicatorStyleRaw") ?? DictationIndicatorStyle.overlay.rawValue
         self.dictationCleanupPromptID = defaults.string(forKey: "dictationCleanupPromptID") ?? ""
         self.dictationPerAppOverridesJSON = defaults.string(forKey: "dictationPerAppOverridesJSON") ?? "{}"
+        self.transcriptDisplayModeRaw = defaults.string(forKey: "transcriptDisplayMode") ?? TranscriptDisplayMode.transcript.rawValue
         applyTheme()
         loadAutoExportRules()
         loadIgnoredSegmentRules()
@@ -1058,13 +1080,21 @@ final class AppModel {
         recordingCountdown = nil
     }
 
+    /// The streaming mic path drives WhisperKit off the live mic and never consults
+    /// MockAudioSourceRegistry. With a mic fixture installed (test-mode) we must avoid it and take the
+    /// file-capture path instead, so the fixture transcribes the same way system audio does.
+    func shouldUseStreamingMic() async -> Bool {
+        guard useStreaming else { return false }
+        return await MockAudioSourceRegistry.shared.resolve(for: .mic) == nil
+    }
+
     private func beginRecordingNow(source: RecordSource) {
-        if source == .microphone && useStreaming {
-            startStreamingMic()
-            return
-        }
         let config = mediaSessionConfig(allowMute: source == .microphone)
         Task {
+            if source == .microphone, await shouldUseStreamingMic() {
+                startStreamingMic()
+                return
+            }
             await mediaSession.enterRecording(config: config)
             do {
                 phase = .recording(source: source)

@@ -2,6 +2,38 @@ import Foundation
 import AppKit
 import ParolaCore
 
+/// True only for the SwiftUI `Settings` scene window. The main `WindowGroup` window has a
+/// `com.apple.SwiftUI.Window`-style identifier and can become the main window; Settings carries a
+/// `com.apple.SwiftUI.Settings` identifier (titled "<App> Settings"). Width is not a reliable
+/// discriminator — the panes can be wider than the default main window — so we never key off it,
+/// and we hard-guard against ever matching the main/key content window.
+@MainActor
+private func isSettingsWindow(_ win: NSWindow) -> Bool {
+    SettingsWindowClassifier.isSettings(
+        identifier: win.identifier?.rawValue,
+        title: win.title,
+        isMainWindow: win.isMainWindow,
+        isTitled: win.styleMask.contains(.titled)
+    )
+}
+
+enum SettingsWindowClassifier {
+    static func isSettings(identifier: String?, title: String, isMainWindow: Bool, isTitled: Bool) -> Bool {
+        if isMainWindow { return false }
+        let identifier = identifier ?? ""
+        if identifier == "mini-player" { return false }
+        if identifier.localizedCaseInsensitiveContains("settings")
+            || identifier.localizedCaseInsensitiveContains("preferences") {
+            return true
+        }
+        // Fallback for OS versions that don't tag the identifier: a titled, non-main window whose
+        // title names Settings/Preferences. The main window uses a hidden title bar (empty title).
+        guard !title.isEmpty, isTitled else { return false }
+        return title.localizedCaseInsensitiveContains("settings")
+            || title.localizedCaseInsensitiveContains("preferences")
+    }
+}
+
 extension ParolaAutomationServer {
     func settingsCommands() -> [AutomationCommand] {
         [
@@ -20,18 +52,24 @@ extension ParolaAutomationServer {
                         }
                         ctx.model.settingsPane = pane
                     }
-                    let visibleCountBefore = NSApp.windows.filter { $0.isVisible }.count
+                    NSApp.activate(ignoringOtherApps: true)
                     if #available(macOS 14.0, *) {
                         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
                     } else {
                         NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
                     }
-                    try? await Task.sleep(for: .milliseconds(300))
-                    let visibleAfter = NSApp.windows.filter { $0.isVisible }
-                    let settingsWin = visibleAfter.first(where: { $0.frame.width < 1300 && $0.frame.width > 400 })
+
+                    var settingsWin = NSApp.windows.first(where: { $0.isVisible && isSettingsWindow($0) })
+                    var waitedMs = 0
+                    while settingsWin == nil, waitedMs < 800 {
+                        try? await Task.sleep(for: .milliseconds(50))
+                        waitedMs += 50
+                        settingsWin = NSApp.windows.first(where: { $0.isVisible && isSettingsWindow($0) })
+                    }
+
                     return .object([
-                        "opened": .bool(visibleAfter.count > visibleCountBefore || settingsWin != nil),
-                        "visibleCount": .int(visibleAfter.count),
+                        "opened": .bool(settingsWin != nil),
+                        "visibleCount": .int(NSApp.windows.filter { $0.isVisible }.count),
                         "settingsSize": .object([
                             "w": .int(Int(settingsWin?.frame.width ?? 0)),
                             "h": .int(Int(settingsWin?.frame.height ?? 0)),
@@ -43,16 +81,13 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "closeSettings",
                 area: .settings,
-                summary: "Closes any visible Settings windows.",
+                summary: "Closes the Settings window only; never the main window.",
                 kind: .mutating,
                 handler: { _, _ in
                     var closed = false
-                    let mainContent = NSApp.windows.first(where: { $0.frame.width > 1300 && $0.title == "" && !$0.isSheet })
-                    for win in NSApp.windows where win.isVisible && win !== mainContent && !win.isSheet {
-                        if win.frame.width < 1300 || win.title.contains("Settings") || win.title.contains("Preferences") {
-                            win.close()
-                            closed = true
-                        }
+                    for win in NSApp.windows where win.isVisible && isSettingsWindow(win) {
+                        win.close()
+                        closed = true
                     }
                     return .object(["closed": .bool(closed)])
                 }
@@ -74,6 +109,7 @@ extension ParolaAutomationServer {
                     }
                     let value = args.rawValue("value") ?? .null
                     ctx.model.defaults.set(value.jsonObject, forKey: key)
+                    ctx.model.reloadObservedSetting(key: key)
                     return .object(["key": .string(key), "value": value])
                 }
             ),
