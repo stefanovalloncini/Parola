@@ -29,7 +29,7 @@ struct BatchView: View {
                 model.route = .transcript
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(DS.Font.bodyEmphasized)
                     .frame(width: 24, height: 24)
             }
             .buttonStyle(.borderless)

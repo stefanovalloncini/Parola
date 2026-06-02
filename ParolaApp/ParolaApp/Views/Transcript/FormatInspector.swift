@@ -2,11 +2,10 @@ import SwiftUI
 
 struct FormatInspector: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("transcriptDisplayMode") private var displayModeRaw: String = TranscriptDisplayMode.transcript.rawValue
     @State private var newSpeaker: String = ""
 
     private var displayMode: TranscriptDisplayMode {
-        TranscriptDisplayMode(rawValue: displayModeRaw) ?? .transcript
+        model.transcriptDisplayMode
     }
 
     var body: some View {
@@ -53,13 +52,13 @@ struct FormatInspector: View {
                     title: "Transcript",
                     icon: "text.alignleft",
                     isSelected: displayMode == .transcript
-                ) { displayModeRaw = TranscriptDisplayMode.transcript.rawValue }
+                ) { model.transcriptDisplayMode = .transcript }
 
                 DisplayModeCard(
                     title: "Segments",
                     icon: "list.bullet.below.rectangle",
                     isSelected: displayMode == .segments
-                ) { displayModeRaw = TranscriptDisplayMode.segments.rawValue }
+                ) { model.transcriptDisplayMode = .segments }
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -96,7 +95,7 @@ struct DisplayModeCard: View {
         Button(action: action) {
             VStack(spacing: DS.Spacing.small) {
                 Image(systemName: icon)
-                    .font(.system(size: 22, weight: .regular))
+                    .font(DS.Font.titleRegular)
                 Text(title).font(DS.Font.caption)
             }
             .frame(maxWidth: .infinity)

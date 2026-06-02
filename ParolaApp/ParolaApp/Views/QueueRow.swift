@@ -36,11 +36,11 @@ struct QueueRow: View {
         .padding(.vertical, DS.Spacing.small)
         .background(
             RoundedRectangle(cornerRadius: DS.Radius.regular)
-                .fill(DS.Color.surfaceElevated)
+                .fill(isFocused ? DS.Color.accent.opacity(0.12) : DS.Color.surfaceElevated)
         )
         .overlay(
             RoundedRectangle(cornerRadius: DS.Radius.regular)
-                .stroke(DS.Color.accent.opacity(isFocused ? 0.55 : 0), lineWidth: 1.5)
+                .strokeBorder(DS.Color.accent.opacity(isFocused ? 0.7 : 0), lineWidth: 1.5)
         )
         .contentShape(Rectangle())
         .onHover { hovered = $0 }
@@ -76,7 +76,7 @@ struct QueueRow: View {
             RoundedRectangle(cornerRadius: DS.Radius.small)
                 .fill(iconTint.opacity(0.22))
             Image(systemName: iconName)
-                .font(.system(size: 15, weight: .medium))
+                .font(DS.Font.title3Medium)
                 .foregroundStyle(iconTint)
         }
         .frame(width: 32, height: 32)
@@ -138,7 +138,7 @@ struct QueueRow: View {
     private func actionButton(_ help: String, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 16))
+                .font(DS.Font.title3Regular)
                 .foregroundStyle(DS.Color.secondaryText)
         }
         .buttonStyle(.plain)

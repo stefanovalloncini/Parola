@@ -13,7 +13,7 @@ struct ChatBubble: View {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(DS.Color.accent)
                     )
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DS.Color.onAccent)
             } else {
                 bubble
                     .background(

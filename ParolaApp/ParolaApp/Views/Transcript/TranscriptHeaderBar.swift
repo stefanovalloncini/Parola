@@ -22,7 +22,7 @@ struct TranscriptHeaderBar: View {
 
             if let label = languageLabel {
                 Text(label)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(DS.Font.caption2Emphasized)
                     .foregroundStyle(DS.Color.accent)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -37,6 +37,7 @@ struct TranscriptHeaderBar: View {
             }
             .buttonStyle(.borderless)
             .help("Outline")
+            .accessibilityLabel("Outline")
             .popover(isPresented: $outlineOpen, arrowEdge: .bottom) {
                 OutlinePopover { seconds in
                     model.seekTo(seconds: seconds)
@@ -51,6 +52,7 @@ struct TranscriptHeaderBar: View {
             }
             .buttonStyle(.borderless)
             .help("Jump to time")
+            .accessibilityLabel("Jump to time")
             .popover(isPresented: $jumpOpen, arrowEdge: .bottom) {
                 jumpPopover
             }
@@ -75,6 +77,7 @@ struct TranscriptHeaderBar: View {
             }
             .buttonStyle(.borderless)
             .help("Summary")
+            .accessibilityLabel("Summary")
             .axLeaf("HeaderBar.Button.OpenSummary")
 
             Button(action: onOpenChat) {
@@ -82,11 +85,12 @@ struct TranscriptHeaderBar: View {
             }
             .buttonStyle(.borderless)
             .help("Chat with this transcript")
+            .accessibilityLabel("Chat with this transcript")
             .axLeaf("HeaderBar.Button.OpenChat")
 
             Button(action: onAdvance) {
                 Image(systemName: "chevron.right.2")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(DS.Font.heading)
                     .frame(width: 28, height: 22)
                     .background(
                         Capsule(style: .continuous)
@@ -95,6 +99,7 @@ struct TranscriptHeaderBar: View {
             }
             .buttonStyle(.plain)
             .help("Jump to next segment")
+            .accessibilityLabel("Jump to next segment")
             .axLeaf("HeaderBar.Button.Advance")
         }
         .padding(.horizontal, DS.Spacing.regular)
@@ -143,21 +148,15 @@ struct TranscriptHeaderBar: View {
 private struct SpeakHelpModifier: ViewModifier {
     let isSpeaking: Bool
     func body(content: Content) -> some View {
-        if isSpeaking {
-            content.help("Stop reading")
-        } else {
-            content.help("Read aloud")
-        }
+        let text = isSpeaking ? "Stop reading" : "Read aloud"
+        content.help(text).accessibilityLabel(text)
     }
 }
 
 private struct CompactHelpModifier: ViewModifier {
     let isCompact: Bool
     func body(content: Content) -> some View {
-        if isCompact {
-            content.help("Expanded view")
-        } else {
-            content.help("Compact view")
-        }
+        let text = isCompact ? "Expanded view" : "Compact view"
+        content.help(text).accessibilityLabel(text)
     }
 }

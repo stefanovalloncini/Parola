@@ -12,11 +12,15 @@ struct ChatMessageList: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 4) {
                     let visible = filteredHistory
+                    let trimmedQuery = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
                     if history.isEmpty {
                         ChatHint()
                             .padding(.top, DS.Spacing.xlarge)
-                    } else if hasActiveFilter && visible.isEmpty {
-                        ContentUnavailableView.search(text: searchQuery)
+                    } else if visible.isEmpty && !trimmedQuery.isEmpty {
+                        ContentUnavailableView.search(text: trimmedQuery)
+                            .padding(.top, DS.Spacing.xlarge)
+                    } else if visible.isEmpty && hasActiveFilter {
+                        ContentUnavailableView("No messages", systemImage: "line.3.horizontal.decrease.circle")
                             .padding(.top, DS.Spacing.xlarge)
                     }
                     ForEach(visible) { msg in

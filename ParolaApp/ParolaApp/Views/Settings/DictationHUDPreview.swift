@@ -8,7 +8,7 @@ struct DictationHUDPreview: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Preview")
-                .font(.system(size: 11, weight: .semibold))
+                .font(DS.Font.subheadlineEmphasized)
                 .foregroundStyle(.secondary)
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
@@ -32,11 +32,11 @@ struct DictationHUDPreview: View {
         HStack(spacing: 10) {
             bars
             Text("Listening")
-                .font(.system(size: 12, weight: .semibold))
+                .font(DS.Font.calloutEmphasized)
                 .foregroundStyle(.white)
             if let modeName {
                 Text(modeName)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(DS.Font.caption2Emphasized)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
@@ -44,7 +44,7 @@ struct DictationHUDPreview: View {
             }
             Spacer(minLength: 0)
             Text("00:03")
-                .font(.system(size: 10, design: .monospaced))
+                .font(DS.Font.caption2Mono)
                 .foregroundStyle(.white.opacity(0.7))
         }
         .padding(.horizontal, 12)
@@ -57,11 +57,11 @@ struct DictationHUDPreview: View {
         HStack(spacing: 6) {
             bars
             Text("Listening")
-                .font(.system(size: 10, weight: .medium))
+                .font(DS.Font.caption2Medium)
                 .foregroundStyle(.white)
             Spacer(minLength: 0)
             Text("00:03")
-                .font(.system(size: 9, design: .monospaced))
+                .font(DS.Font.caption2Mono)
                 .foregroundStyle(.white.opacity(0.6))
         }
         .padding(.horizontal, 10)

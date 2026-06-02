@@ -40,7 +40,7 @@ struct WorkflowRow: View {
                             model.addDictationURLRule(for: app.bundleID)
                         } label: {
                             Label("Add URL rule", systemImage: "plus.circle")
-                                .font(.system(size: 11))
+                                .font(DS.Font.subheadline)
                         }
                         .buttonStyle(.borderless)
                         .foregroundStyle(.secondary)

@@ -126,7 +126,7 @@ struct MacLibrarySidebar: View {
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: 11, weight: .semibold))
+                .font(DS.Font.subheadlineEmphasized)
                 .foregroundStyle(.secondary)
                 .frame(width: 22, height: 22)
                 .background(
@@ -172,7 +172,7 @@ private struct SidebarRow: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(DS.Font.bodyMedium)
                     .frame(width: 18, alignment: .center)
                 Text(title)
                     .font(.subheadline)
@@ -240,7 +240,7 @@ private struct PillRowContent: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: systemImage)
-                .font(.system(size: 13, weight: .medium))
+                .font(DS.Font.bodyMedium)
                 .frame(width: 18, alignment: .center)
                 .foregroundStyle(.secondary)
             Text(title)

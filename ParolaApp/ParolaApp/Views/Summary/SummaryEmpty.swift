@@ -3,11 +3,12 @@ import SwiftUI
 struct SummaryEmpty: View {
     let isWorking: Bool
     let onGenerate: () -> Void
+    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 32
 
     var body: some View {
         VStack(spacing: DS.Spacing.medium) {
             Image(systemName: "sparkles")
-                .font(.system(size: 32, weight: .light))
+                .font(.system(size: iconSize, weight: .light))
                 .foregroundStyle(DS.Color.accent)
                 .opacity(isWorking ? 0.4 : 1)
 
@@ -36,7 +37,7 @@ struct SummaryEmpty: View {
             if !isWorking {
                 Button(action: onGenerate) {
                     Text("Generate")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(DS.Font.heading)
                         .foregroundStyle(.white)
                         .padding(.horizontal, DS.Spacing.large)
                         .padding(.vertical, 8)

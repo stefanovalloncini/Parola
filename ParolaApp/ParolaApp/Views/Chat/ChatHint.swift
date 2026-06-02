@@ -1,10 +1,12 @@
 import SwiftUI
 
 struct ChatHint: View {
+    @ScaledMetric(relativeTo: .title) private var iconSize: CGFloat = 28
+
     var body: some View {
         VStack(spacing: DS.Spacing.small) {
             Image(systemName: "bubble.left.and.text.bubble.right")
-                .font(.system(size: 28, weight: .light))
+                .font(.system(size: iconSize, weight: .light))
                 .foregroundStyle(DS.Color.secondaryText)
             Text("Ask anything about this transcript.")
                 .font(DS.Font.caption)

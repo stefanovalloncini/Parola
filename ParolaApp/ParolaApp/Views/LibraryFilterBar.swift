@@ -45,7 +45,7 @@ struct LibraryFilterBar: View {
                         Image(systemName: "tag")
                         Text(labelFilter ?? "All labels")
                     }
-                    .font(.system(size: 11, weight: .medium))
+                    .font(DS.Font.subheadlineMedium)
                     .foregroundStyle(labelFilter == nil ? .secondary : DS.Color.accent)
                 }
                 .menuStyle(.borderlessButton)
@@ -63,7 +63,7 @@ struct LibraryFilterBar: View {
                     Image(systemName: "calendar")
                     Text(dateRangeFilter.label)
                 }
-                .font(.system(size: 11, weight: .medium))
+                .font(DS.Font.subheadlineMedium)
                 .foregroundStyle(dateRangeFilter == .all ? .secondary : DS.Color.accent)
             }
             .menuStyle(.borderlessButton)

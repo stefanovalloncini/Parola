@@ -94,6 +94,7 @@ struct BatchJobList: View {
         let isPending = job.status == .pending
         return BatchJobRow(job: job)
             .focusable(true)
+            .focusEffectDisabled()
             .focused($focusedJob, equals: job.id)
             .onTapGesture { model.selectBatchJob(job.id) }
             .onKeyPress(.return) { model.selectBatchJob(job.id); return .handled }
@@ -124,7 +125,7 @@ struct BatchJobList: View {
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: 12, weight: .medium))
+                .font(DS.Font.calloutMedium)
                 .foregroundStyle(.secondary)
                 .frame(width: 26, height: 26)
                 .background(

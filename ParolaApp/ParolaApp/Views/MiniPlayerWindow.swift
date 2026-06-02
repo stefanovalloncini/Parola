@@ -28,7 +28,7 @@ struct MiniPlayerWindow: View {
             return seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
         }()
         return Text(text)
-            .font(.system(size: 13, weight: .regular))
+            .font(DS.Font.body)
             .foregroundStyle(.primary)
             .lineLimit(2)
             .multilineTextAlignment(.leading)
@@ -42,17 +42,21 @@ struct MiniPlayerWindow: View {
             }
             .buttonStyle(.borderless)
             .disabled(model.transcript == nil)
+            .help("Previous segment")
+            .accessibilityLabel("Previous segment")
             .axLeaf("MiniPlayer.Button.Previous")
 
             Button(action: togglePlayPause) {
                 Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white)
+                    .font(DS.Font.title3Bold)
+                    .foregroundStyle(DS.Color.onAccent)
                     .frame(width: 32, height: 32)
                     .background(Circle().fill(DS.Color.accent))
             }
             .buttonStyle(.plain)
             .disabled(model.player == nil)
+            .help(model.isPlaying ? "Pause" : "Play")
+            .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
             .axLeaf("MiniPlayer.Button.PlayPause")
 
             Button(action: next) {
@@ -60,12 +64,14 @@ struct MiniPlayerWindow: View {
             }
             .buttonStyle(.borderless)
             .disabled(model.transcript == nil)
+            .help("Next segment")
+            .accessibilityLabel("Next segment")
             .axLeaf("MiniPlayer.Button.Next")
 
             Spacer()
 
             Text(timeLabel)
-                .font(.system(size: 11, design: .monospaced))
+                .font(DS.Font.subheadlineMono)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
         }

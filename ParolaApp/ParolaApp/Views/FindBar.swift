@@ -29,7 +29,7 @@ struct FindBar: View {
         return HStack(spacing: 12) {
             BarPill {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 13, weight: .regular))
+                    .font(DS.Font.body)
                     .foregroundStyle(.secondary)
                 TextField("Find", text: $model.findQuery)
                     .textFieldStyle(.plain)
@@ -85,7 +85,7 @@ struct FindBar: View {
                 model.toggleFind()
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 16, weight: .regular))
+                    .font(DS.Font.title3Regular)
                     .foregroundStyle(.secondary)
                     .contentShape(Rectangle())
             }
@@ -103,7 +103,7 @@ struct FindBar: View {
         return HStack(spacing: 12) {
             BarPill {
                 Image(systemName: "arrow.2.squarepath")
-                    .font(.system(size: 13, weight: .regular))
+                    .font(DS.Font.body)
                     .foregroundStyle(.secondary)
                 TextField("Replace", text: $model.findReplacement)
                     .textFieldStyle(.plain)
@@ -149,7 +149,7 @@ private struct FindIconButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 12, weight: .semibold))
+                .font(DS.Font.calloutEmphasized)
                 .foregroundStyle(disabled ? Color.secondary.opacity(0.4) : Color.primary.opacity(0.85))
                 .frame(width: 22, height: 22)
                 .background(
@@ -176,7 +176,7 @@ private struct FindToggleButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 12, weight: .semibold))
+                .font(DS.Font.calloutEmphasized)
                 .foregroundStyle(isOn ? Color.white : Color.primary.opacity(0.85))
                 .frame(width: 22, height: 22)
                 .background(

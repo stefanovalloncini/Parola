@@ -55,16 +55,16 @@ struct TranscriptWindowView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 8) {
                                 Text(Timecode.format(segment.start))
-                                    .font(.system(size: 11, design: .monospaced))
+                                    .font(DS.Font.subheadlineMono)
                                     .foregroundStyle(.secondary)
                                 if let speaker = segment.speaker {
                                     Text(speaker)
-                                        .font(.system(size: 11, weight: .semibold))
+                                        .font(DS.Font.subheadlineEmphasized)
                                         .foregroundStyle(.secondary)
                                 }
                             }
                             Text(segment.text.trimmingCharacters(in: .whitespaces))
-                                .font(.system(size: 14))
+                                .font(DS.Font.body)
                                 .textSelection(.enabled)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)

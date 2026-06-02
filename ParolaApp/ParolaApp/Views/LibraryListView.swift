@@ -13,10 +13,12 @@ struct LibraryListView: View {
     @State private var dateRangeFilter: LibraryDateRangeFilter = .all
     @State private var entries: [LibraryEntry] = []
     @State private var labelOptions: [String] = []
+    @ScaledMetric(relativeTo: .largeTitle) private var emptyIconSize: CGFloat = 48
 
-    private func recomputeEntries() {
+    @discardableResult
+    private func recomputeEntries() -> [LibraryEntry] {
         let inCategory = model.libraryEntries.filter { $0.category == category }
-        entries = inCategory
+        let computed = inCategory
             .filter { entry in
                 guard let labelFilter else { return true }
                 return entry.labels.contains { $0.localizedCaseInsensitiveCompare(labelFilter) == .orderedSame }
@@ -29,6 +31,8 @@ struct LibraryListView: View {
                 if lhs.pinned != rhs.pinned { return lhs.pinned }
                 return lhs.createdAt > rhs.createdAt
             }
+        entries = computed
+        return computed
     }
 
     private func recomputeLabelOptions() {
@@ -91,6 +95,7 @@ struct LibraryListView: View {
                         .accessibilityIdentifier("library.row.\(entry.id)")
                 }
                 .listStyle(.inset)
+                .tint(DS.Color.accent)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -99,9 +104,9 @@ struct LibraryListView: View {
             recomputeLabelOptions()
         }
         .onChange(of: model.libraryVersion) { _, _ in
-            recomputeEntries()
+            let newEntries = recomputeEntries()
             recomputeLabelOptions()
-            selection = selection.intersection(Set(entries.map(\.id)))
+            selection = selection.intersection(Set(newEntries.map(\.id)))
         }
         .onChange(of: labelFilter) { _, _ in recomputeEntries() }
         .onChange(of: dateRangeFilter) { _, _ in recomputeEntries() }
@@ -212,7 +217,7 @@ struct LibraryListView: View {
     private var emptyState: some View {
         VStack(spacing: DS.Spacing.regular) {
             Image(systemName: emptyIcon)
-                .font(.system(size: 48, weight: .regular))
+                .font(.system(size: emptyIconSize, weight: .regular))
                 .foregroundStyle(DS.Color.secondaryText.opacity(0.55))
             Text(emptyTitle)
                 .font(DS.Font.heading)
@@ -302,7 +307,7 @@ private struct LibraryRow: View {
                 HStack(spacing: 4) {
                     if entry.pinned {
                         Image(systemName: "pin.fill")
-                            .font(.system(size: 9))
+                            .font(DS.Font.caption2)
                             .foregroundStyle(DS.Color.accent)
                     }
                     Text(entry.title)
@@ -312,9 +317,9 @@ private struct LibraryRow: View {
                     if !entry.segmentNotes.isEmpty {
                         HStack(spacing: 2) {
                             Image(systemName: "note.text")
-                                .font(.system(size: 9))
+                                .font(DS.Font.caption2)
                             Text("\(entry.segmentNotes.count)")
-                                .font(.system(size: 10, weight: .medium))
+                                .font(DS.Font.caption2Medium)
                         }
                         .foregroundStyle(DS.Color.accent.opacity(0.8))
                         .padding(.horizontal, 5)

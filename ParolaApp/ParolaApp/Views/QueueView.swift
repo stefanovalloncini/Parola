@@ -68,7 +68,7 @@ struct QueueView: View {
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: 12, weight: .semibold))
+                .font(DS.Font.calloutEmphasized)
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 26)
                 .background(
@@ -163,6 +163,7 @@ struct QueueView: View {
                     ForEach(matching) { job in
                         QueueRow(job: job, isFocused: focusedJob == job.id)
                             .focusable(true)
+                            .focusEffectDisabled()
                             .focused($focusedJob, equals: job.id)
                             .onKeyPress(.return) {
                                 handleReturn(job: job); return .handled

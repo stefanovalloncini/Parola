@@ -1,6 +1,88 @@
 import Foundation
+import AppKit
 import Testing
 @testable import Parola
+
+@MainActor
+@Suite("AccessibilityTreeWalker.walk is crash-safe")
+struct AccessibilityTreeWalkerWalkTests {
+
+    /// A synthetic AX element whose children can form a cycle or hold non-AX junk — the shapes a
+    /// SwiftUI AX proxy tree can present that crashed the bridge.
+    final class FakeAXElement: NSAccessibilityElement {
+        private let role: NSAccessibility.Role
+        private var kids: [Any] = []
+
+        init(role: NSAccessibility.Role = .group) {
+            self.role = role
+            super.init()
+        }
+
+        func setKids(_ kids: [Any]) { self.kids = kids }
+
+        override func accessibilityRole() -> NSAccessibility.Role? { role }
+        override func accessibilityChildren() -> [Any]? { kids }
+        override func accessibilityFrame() -> NSRect { .zero }
+        override func isAccessibilityEnabled() -> Bool { true }
+    }
+
+    @Test("a self-referential element terminates instead of recursing forever")
+    func cycleTerminates() {
+        let node = FakeAXElement()
+        node.setKids([node])
+
+        let result = AccessibilityTreeWalker().walk(rootElement: node, filter: .all, maxDepth: 12, maxElements: 500)
+
+        #expect(result.elementCount <= 500)
+        #expect(result.tree.role == NSAccessibility.Role.group.rawValue)
+    }
+
+    @Test("a two-node cycle is bounded by the depth cap")
+    func mutualCycleBounded() {
+        let a = FakeAXElement(role: .group)
+        let b = FakeAXElement(role: .group)
+        a.setKids([b])
+        b.setKids([a])
+
+        let result = AccessibilityTreeWalker().walk(rootElement: a, filter: .all, maxDepth: 6, maxElements: 1000)
+
+        #expect(result.elementCount <= 1000)
+    }
+
+    @Test("non-accessibility children are skipped without crashing")
+    func nonAXChildrenSkipped() {
+        let root = FakeAXElement(role: .group)
+        root.setKids(["a plain string", 42, NSObject()])
+
+        let result = AccessibilityTreeWalker().walk(rootElement: root, filter: .all, maxDepth: 12, maxElements: 500)
+
+        #expect(result.tree.role == NSAccessibility.Role.group.rawValue)
+        #expect(result.elementCount >= 1)
+    }
+
+    @Test("a deep chain is cut off at the clamped hard depth cap")
+    func depthCapClamped() {
+        var chain: [FakeAXElement] = []
+        for _ in 0..<60 { chain.append(FakeAXElement(role: .group)) }
+        for i in 0..<(chain.count - 1) { chain[i].setKids([chain[i + 1]]) }
+
+        let result = AccessibilityTreeWalker().walk(
+            rootElement: chain[0], filter: .all, maxDepth: 1_000_000, maxElements: 5000
+        )
+
+        func depth(_ node: AccessibilityTreeWalker.AXNode) -> Int {
+            1 + (node.children.map(depth).max() ?? 0)
+        }
+        #expect(depth(result.tree) <= 41)
+    }
+
+    @Test("a non-accessibility root yields an empty node rather than crashing")
+    func nonAXRootIsSafe() {
+        let result = AccessibilityTreeWalker().walk(rootElement: NSObject(), filter: .all)
+        #expect(result.tree.role == "")
+        #expect(result.tree.children.isEmpty)
+    }
+}
 
 @MainActor
 @Suite("AccessibilityTreeWalker.toAutomationValue")

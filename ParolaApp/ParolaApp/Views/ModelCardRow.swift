@@ -65,7 +65,7 @@ struct ModelCardRow: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .fill(iconTint.opacity(0.15))
             Image(systemName: iconName)
-                .font(.system(size: 16, weight: .semibold))
+                .font(DS.Font.title3)
                 .foregroundStyle(iconTint)
         }
         .frame(width: 34, height: 34)

@@ -24,13 +24,14 @@ struct ContentView: View {
 private struct CountInOverlay: View {
     let count: Int
     let onCancel: () -> Void
+    @ScaledMetric(relativeTo: .largeTitle) private var numeralSize: CGFloat = 140
 
     var body: some View {
         ZStack {
             Color.black.opacity(0.55).ignoresSafeArea()
             VStack(spacing: 20) {
                 Text("\(count)")
-                    .font(.system(size: 140, weight: .bold, design: .rounded))
+                    .font(.system(size: numeralSize, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .monospacedDigit()
                     .contentTransition(.numericText(countsDown: true))

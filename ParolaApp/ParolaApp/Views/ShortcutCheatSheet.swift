@@ -48,7 +48,7 @@ struct ShortcutCheatSheet: View {
                 Spacer()
                 Button { dismiss() } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 18))
+                        .font(DS.Font.title2Regular)
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)

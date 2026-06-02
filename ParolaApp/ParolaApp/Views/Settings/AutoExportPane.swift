@@ -143,7 +143,7 @@ struct AutoExportPane: View {
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: 12, weight: .medium))
+                .font(DS.Font.calloutMedium)
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)

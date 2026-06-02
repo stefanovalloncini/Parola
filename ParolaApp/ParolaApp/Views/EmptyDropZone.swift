@@ -4,6 +4,7 @@ import ParolaCore
 struct EmptyDropZone: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openSettings) private var openSettings
+    @ScaledMetric(relativeTo: .largeTitle) private var emptyIconSize: CGFloat = 48
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: DS.Spacing.regular), count: 4)
 
@@ -71,7 +72,7 @@ struct EmptyDropZone: View {
                 if model.libraryEntries.isEmpty {
                     VStack(spacing: DS.Spacing.regular) {
                         Image(systemName: "clock")
-                            .font(.system(size: 48, weight: .regular))
+                            .font(.system(size: emptyIconSize, weight: .regular))
                             .foregroundStyle(DS.Color.secondaryText.opacity(0.55))
                         Text("No Transcriptions Yet")
                             .font(DS.Font.heading)
@@ -118,10 +119,10 @@ private struct LibraryStatsCard: View {
     private func stat(label: LocalizedStringKey, value: Int) -> some View {
         VStack(alignment: .center, spacing: 4) {
             Text("\(value)")
-                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .font(DS.Font.titleRounded)
                 .foregroundStyle(DS.Color.primaryText)
             Text(label)
-                .font(.system(size: 11, weight: .medium))
+                .font(DS.Font.subheadlineMedium)
                 .foregroundStyle(DS.Color.secondaryText)
                 .textCase(.uppercase)
         }
@@ -142,12 +143,13 @@ struct ActionCard: View {
     let action: () -> Void
 
     @State private var isHovering = false
+    @ScaledMetric(relativeTo: .title) private var iconSize: CGFloat = 26
 
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: DS.Spacing.regular) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 26, weight: .regular))
+                    .font(.system(size: iconSize, weight: .regular))
                     .foregroundStyle(DS.Color.accent)
                     .frame(height: 28, alignment: .leading)
                 Spacer(minLength: 0)

@@ -86,7 +86,7 @@ struct RecentlyDeletedRow: View {
             .fill(categoryTint.opacity(0.18))
             .overlay(
                 Image(systemName: categoryIcon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(DS.Font.bodyEmphasized)
                     .foregroundStyle(categoryTint)
             )
             .frame(width: 32, height: 32)
@@ -137,7 +137,7 @@ struct RecentlyDeletedCardIconButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 11, weight: .semibold))
+                .font(DS.Font.subheadlineEmphasized)
                 .foregroundStyle(tint.opacity(hovered ? 1.0 : 0.75))
                 .frame(width: 22, height: 22)
                 .background(

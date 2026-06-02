@@ -34,7 +34,7 @@ struct OutlinePopover: View {
     private var header: some View {
         HStack {
             Text("Outline")
-                .font(.system(size: 12.5, weight: .semibold))
+                .font(DS.Font.calloutEmphasized)
                 .foregroundStyle(DS.Color.secondaryText)
             Spacer()
             if model.smartChapters.isEmpty {
@@ -51,10 +51,10 @@ struct OutlinePopover: View {
     private var emptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: "list.bullet.rectangle.portrait")
-                .font(.system(size: 22))
+                .font(DS.Font.titleRegular)
                 .foregroundStyle(DS.Color.secondaryText)
             Text("No outline available")
-                .font(.system(size: 12))
+                .font(DS.Font.callout)
                 .foregroundStyle(DS.Color.secondaryText)
         }
         .frame(maxWidth: .infinity)
@@ -72,12 +72,12 @@ private struct OutlineRow: View {
         Button(action: onJump) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(Timecode.format(entry.start))
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .font(DS.Font.subheadlineMedium.monospacedDigit())
                     .foregroundStyle(DS.Color.accent)
                     .frame(width: 50, alignment: .leading)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(entry.title)
-                        .font(.system(size: 12.5))
+                        .font(DS.Font.callout)
                         .foregroundStyle(DS.Color.primaryText)
                         .multilineTextAlignment(.leading)
                     if let speaker = entry.speaker {
@@ -86,7 +86,7 @@ private struct OutlineRow: View {
                                 .fill(DS.speakerColor(for: speaker))
                                 .frame(width: 5, height: 5)
                             Text(speaker)
-                                .font(.system(size: 10.5))
+                                .font(DS.Font.caption2)
                                 .foregroundStyle(DS.Color.secondaryText)
                         }
                     }
