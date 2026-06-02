@@ -65,7 +65,11 @@ struct ModelPickScreen: View {
     private func startDownload(for variant: String) {
         guard !ModelStore.shared.isInstalled(variant) else { return }
         Task {
-            _ = try? await ModelStore.shared.download(variant: variant)
+            do {
+                _ = try await ModelStore.shared.download(variant: variant)
+            } catch {
+                model.lastError = error.localizedDescription
+            }
         }
     }
 }

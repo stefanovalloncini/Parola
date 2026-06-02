@@ -12,7 +12,11 @@ extension AppModel {
         for (from, to) in nonEmpty {
             updated = updated.renamingSpeaker(from, to: to)
         }
-        try? await library.updateTranscript(updated, for: entryID)
+        do {
+            try await library.updateTranscript(updated, for: entryID)
+        } catch {
+            lastError = error.localizedDescription
+        }
         for to in nonEmpty.values {
             _ = await peopleStore.recordUsage(name: to)
         }

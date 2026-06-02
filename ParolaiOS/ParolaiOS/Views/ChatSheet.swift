@@ -134,6 +134,7 @@ struct ChatSheet: View {
                     .font(.title2)
                     .foregroundStyle(.tint)
             }
+            .accessibilityLabel(Text("Send"))
             .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty || isSending)
         }
         .padding()
@@ -165,7 +166,11 @@ struct ChatSheet: View {
                 displayedHistory = updated
                 var saved = transcript
                 saved.chatHistory = updated
-                try? await model.library.updateTranscript(saved, for: entry.id)
+                do {
+                    try await model.library.updateTranscript(saved, for: entry.id)
+                } catch {
+                    model.lastError = error.localizedDescription
+                }
                 isSending = false
             } catch {
                 sessionError = error.localizedDescription
