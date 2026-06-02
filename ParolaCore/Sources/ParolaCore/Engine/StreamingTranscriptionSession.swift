@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import os
 @preconcurrency import WhisperKit
 
@@ -41,9 +42,11 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private var loadedModel: String?
     private var optionsForRun: TranscriptionOptions?
     private var speakerLabeler: (any StreamingSpeakerLabeler)?
+    private var persistAudio = false
 
-    public init(modelStore: ModelStore = .shared) {
+    public init(modelStore: ModelStore = .shared, persistAudio: Bool = false) {
         self.modelStore = modelStore
+        self.persistAudio = persistAudio
     }
 
     /// Loads the model, starts the mic stream, and returns an `AsyncStream` of events.
@@ -164,7 +167,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             segments: allConfirmed,
             language: optionsForRun?.language ?? "auto",
             modelName: loadedModel ?? "unknown",
-            sourceURL: nil,
+            sourceURL: persistAudio ? writeCapturedAudio() : nil,
             durationSeconds: allConfirmed.last?.end
         )
         continuation?.yield(.finished(finalTranscript))
@@ -173,6 +176,47 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     }
 
     public func currentModel() -> String? { loadedModel }
+
+    /// Persists the samples WhisperKit accumulated during the live stream to a 16 kHz mono WAV.
+    private func writeCapturedAudio() -> URL? {
+        guard let kit = whisperKit else { return nil }
+        nonisolated(unsafe) let processor = kit.audioProcessor
+        let samples = processor.audioSamples
+        guard !samples.isEmpty,
+              let format = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: Double(WhisperKit.sampleRate),
+                channels: 1,
+                interleaved: false
+              )
+        else { return nil }
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-recording-\(UUID().uuidString).wav")
+        do {
+            let file = try AVAudioFile(
+                forWriting: url,
+                settings: format.settings,
+                commonFormat: .pcmFormatFloat32,
+                interleaved: false
+            )
+            let chunkSize = 16_384
+            var offset = 0
+            while offset < samples.count {
+                let count = min(chunkSize, samples.count - offset)
+                guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(count)) else { break }
+                buffer.frameLength = AVAudioFrameCount(count)
+                samples.withUnsafeBufferPointer { src in
+                    buffer.floatChannelData![0].update(from: src.baseAddress!.advanced(by: offset), count: count)
+                }
+                try file.write(from: buffer)
+                offset += count
+            }
+            return url
+        } catch {
+            return nil
+        }
+    }
 
     private func handleStreamerFailure(_ error: Error) async {
         continuation?.yield(.failed(error.localizedDescription))

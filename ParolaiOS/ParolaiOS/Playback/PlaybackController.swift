@@ -45,6 +45,7 @@ final class PlaybackController {
 
     func play() {
         guard let player else { return }
+        configurePlaybackSession()
         if duration > 0, currentTime >= duration - 0.05 {
             player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
             tick(to: 0)
@@ -70,6 +71,12 @@ final class PlaybackController {
             _ = await player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
             self?.tick(to: time)
         }
+    }
+
+    private func configurePlaybackSession() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback)
+        try? session.setActive(true)
     }
 
     private func tick(to time: TimeInterval) {

@@ -98,16 +98,20 @@ final class TranscriptionCoordinator {
 
     func startRecording() {
         guard streamingSession == nil else { return }
-        configureAudioSession()
         liveSegments = []
         livePartialText = ""
         recordingGeneration &+= 1
         let generation = recordingGeneration
-        let session = StreamingTranscriptionSession()
+        let session = StreamingTranscriptionSession(persistAudio: true)
         streamingSession = session
         phase = .recording
 
         streamingTask = Task {
+            guard await AVAudioApplication.requestRecordPermission() else {
+                streamingSession = nil
+                phase = .failed(message: "Microphone access is off. Turn it on in Settings to record.")
+                return
+            }
             do {
                 let events = try await session.start(
                     options: currentOptions,
@@ -117,6 +121,7 @@ final class TranscriptionCoordinator {
                     handleStreamingEvent(event, generation: generation)
                 }
             } catch {
+                streamingSession = nil
                 phase = .failed(message: error.localizedDescription)
             }
         }
@@ -127,6 +132,7 @@ final class TranscriptionCoordinator {
         streamingSession = nil
         Task {
             await session.stop()
+            deactivateAudioSession()
         }
     }
 
@@ -138,6 +144,7 @@ final class TranscriptionCoordinator {
         streamingTask = nil
         Task {
             await session.stop()
+            deactivateAudioSession()
         }
     }
 
@@ -169,7 +176,7 @@ final class TranscriptionCoordinator {
             let processed = postProcessor?(final) ?? final
             Task { [generation] in
                 do {
-                    let entry = try await library.add(transcript: processed, audioSource: nil)
+                    let entry = try await library.add(transcript: processed, audioSource: final.sourceURL)
                     guard generation != cancelledGeneration else {
                         phase = .idle
                         return
@@ -183,14 +190,8 @@ final class TranscriptionCoordinator {
         }
     }
 
-    private func configureAudioSession() {
-        let audioSession = AVAudioSession.sharedInstance()
-        do {
-            try audioSession.setCategory(.record, mode: .measurement, options: [])
-            try audioSession.setActive(true)
-        } catch {
-            phase = .failed(message: error.localizedDescription)
-        }
+    private func deactivateAudioSession() {
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     private var currentOptions: TranscriptionOptions {
