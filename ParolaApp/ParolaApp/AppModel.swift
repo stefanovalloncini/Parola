@@ -790,6 +790,9 @@ final class AppModel {
         streamingConsumer?.cancel()
     }
 
+    /// A non-fatal warning (e.g. a failed library save) shown without replacing the open transcript.
+    var nonFatalWarning: String?
+
     func persistToLibrary(_ result: Transcript, audioSource: URL?) {
         let category = pendingRecordingCategory
         pendingRecordingCategory = .transcription
@@ -807,7 +810,7 @@ final class AppModel {
                     autoTitleEntry(entry.id, transcript: result)
                 }
             } catch {
-                // best-effort: transcript stays in memory if library save fails
+                nonFatalWarning = "The transcript is still open, but Parola couldn't save it to your library. \(error.localizedDescription)"
             }
             if let audioSource {
                 runAutoExports(transcript: result, sourceURL: audioSource)
@@ -1459,7 +1462,7 @@ final class AppModel {
         Task { [weak self] in
             do {
                 let summary = try await SummaryService().summarise(snapshot)
-                guard let self, generation == summaryGeneration else { return }
+                guard let self, generation == summaryGeneration, self.transcript == snapshot else { return }
                 self.transcript?.summary = summary
                 isSummarising = false
             } catch {

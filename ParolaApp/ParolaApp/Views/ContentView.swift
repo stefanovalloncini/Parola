@@ -17,6 +17,17 @@ struct ContentView: View {
                 CountInOverlay(count: count) { model.cancelRecordingCountdown() }
             }
         }
+        .alert(
+            "Couldn't save to your library",
+            isPresented: Binding(
+                get: { model.nonFatalWarning != nil },
+                set: { if !$0 { model.nonFatalWarning = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { model.nonFatalWarning = nil }
+        } message: {
+            if let warning = model.nonFatalWarning { Text(warning) }
+        }
         .axBranch("App")
     }
 }
