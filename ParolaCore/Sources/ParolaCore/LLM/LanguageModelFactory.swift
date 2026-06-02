@@ -65,12 +65,29 @@ public enum LanguageModelFactory {
             case .available:
                 return FoundationLanguageModel(instructions: instructions)
             case .unavailable(let reason):
-                throw Failure.notAvailable("\(reason)")
+                throw Failure.notAvailable(unavailableMessage(for: reason))
             @unknown default:
-                throw Failure.notAvailable("Unknown availability state.")
+                throw Failure.notAvailable("Apple Intelligence isn't available right now.")
             }
         }
         #endif
-        throw Failure.notAvailable("Foundation Models requires macOS 26 / iOS 26 or newer.")
+        throw Failure.notAvailable("Apple Intelligence needs macOS 26 or iOS 26 or newer.")
     }
+
+    #if canImport(FoundationModels)
+    /// Human, actionable copy for each reason Apple Intelligence can be unavailable.
+    @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
+    public static func unavailableMessage(for reason: SystemLanguageModel.Availability.UnavailableReason) -> String {
+        switch reason {
+        case .deviceNotEligible:
+            return "This device doesn't support Apple Intelligence."
+        case .appleIntelligenceNotEnabled:
+            return "Apple Intelligence is off. Turn it on in Settings to use this feature."
+        case .modelNotReady:
+            return "Apple Intelligence is still preparing its model. Try again in a little while."
+        @unknown default:
+            return "Apple Intelligence isn't available right now."
+        }
+    }
+    #endif
 }

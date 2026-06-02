@@ -72,13 +72,13 @@ public enum TranscriptChat {
             case .available:
                 return FoundationLanguageModel(instructions: instructions)
             case .unavailable(let reason):
-                throw TranscriptChatSession.FailureReason.notAvailable("On-device language model is not available (\(reason)).")
+                throw TranscriptChatSession.FailureReason.notAvailable(LanguageModelFactory.unavailableMessage(for: reason))
             @unknown default:
-                throw TranscriptChatSession.FailureReason.notAvailable("On-device language model availability is unknown.")
+                throw TranscriptChatSession.FailureReason.notAvailable("Apple Intelligence isn't available right now.")
             }
         }
         #endif
-        throw TranscriptChatSession.FailureReason.notAvailable("Foundation Models requires macOS 26 / iOS 26 or newer.")
+        throw TranscriptChatSession.FailureReason.notAvailable("Apple Intelligence needs macOS 26 or iOS 26 or newer.")
     }
 }
 

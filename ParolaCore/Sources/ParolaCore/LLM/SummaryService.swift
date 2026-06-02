@@ -52,9 +52,9 @@ public actor SummaryService {
         case .available:
             break
         case .unavailable(let reason):
-            throw FailureReason.notAvailable("On-device language model is not available (\(reason)).")
+            throw FailureReason.notAvailable(LanguageModelFactory.unavailableMessage(for: reason))
         @unknown default:
-            throw FailureReason.notAvailable("On-device language model availability is unknown.")
+            throw FailureReason.notAvailable("Apple Intelligence isn't available right now.")
         }
 
         let session = LanguageModelSession(instructions: SummaryService.structuredInstructions)
