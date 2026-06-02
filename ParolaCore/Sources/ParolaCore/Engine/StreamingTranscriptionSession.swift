@@ -140,6 +140,8 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         streamerTask = Task { [weak self] in
             do {
                 try await st.startStreamTranscription()
+                guard let self else { cont.finish(); return }
+                await self.handleStreamerEndedWithoutStop()
             } catch {
                 guard let self else {
                     cont.yield(.failed(error.localizedDescription))
@@ -220,6 +222,16 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
     private func handleStreamerFailure(_ error: Error) async {
         continuation?.yield(.failed(error.localizedDescription))
+        segmentContinuation?.finish()
+        await consumerTask?.value
+        continuation?.finish()
+        teardown()
+    }
+
+    // WhisperKit's startStreamTranscription() returns without throwing when it can't capture (e.g. denied mic); if stop() didn't drive that return (streamer still set), surface a failure so the consumer doesn't wait forever.
+    private func handleStreamerEndedWithoutStop() async {
+        guard streamer != nil else { return }
+        continuation?.yield(.failed("Couldn't start the microphone. Check Microphone access in System Settings › Privacy & Security › Microphone."))
         segmentContinuation?.finish()
         await consumerTask?.value
         continuation?.finish()

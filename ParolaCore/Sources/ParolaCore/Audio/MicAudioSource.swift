@@ -57,8 +57,8 @@ public actor MicAudioSource: LiveAudioSource {
         if let uid = preferredDeviceUID, !uid.isEmpty {
             try Self.applyInputDevice(uid: uid, to: inputNode)
         }
-        let inputFormat = inputNode.inputFormat(forBus: 0)
-        guard inputFormat.sampleRate > 0 else {
+        let tapFormat = inputNode.outputFormat(forBus: 0)
+        guard tapFormat.sampleRate > 0 else {
             throw ParolaError.captureUnavailable("microphone not available — input format invalid (mic permission?)")
         }
 
@@ -70,8 +70,8 @@ public actor MicAudioSource: LiveAudioSource {
         ) else {
             throw ParolaError.captureUnavailable("could not create 16 kHz mono Float32 format")
         }
-        guard let conv = AVAudioConverter(from: inputFormat, to: outFormat) else {
-            throw ParolaError.captureUnavailable("could not create audio converter \(inputFormat) → \(outFormat)")
+        guard let conv = AVAudioConverter(from: tapFormat, to: outFormat) else {
+            throw ParolaError.captureUnavailable("could not create audio converter \(tapFormat) → \(outFormat)")
         }
 
         let url = FileManager.default.temporaryDirectory
@@ -98,7 +98,7 @@ public actor MicAudioSource: LiveAudioSource {
             consumerTask: consumer
         )
 
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { buffer, _ in
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { buffer, _ in
             guard let copy = Self.copy(buffer) else { return }
             cont.yield(BufferBox(buffer: copy))
         }

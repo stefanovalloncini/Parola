@@ -1159,6 +1159,10 @@ final class AppModel {
     private func beginRecordingNow(source: RecordSource) {
         let config = mediaSessionConfig(allowMute: source == .microphone)
         Task {
+            if source == .microphone, mode == .normal, await AVCaptureDevice.requestAccess(for: .audio) == false {
+                phase = .failed(message: "Microphone access is off. Turn it on in System Settings › Privacy & Security › Microphone, then start recording again.")
+                return
+            }
             if source == .microphone, await shouldUseStreamingMic() {
                 startStreamingMic()
                 return
