@@ -112,13 +112,19 @@ struct LibraryListView: View {
 
     private func chip(label: String, value: EntryCategory?) -> some View {
         let selected = category == value
-        return Button(label) {
+        return Button {
             category = value
+        } label: {
+            Text(label)
+                .font(.subheadline.weight(selected ? .semibold : .regular))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule().fill(selected ? Color.accentColor : Color(.secondarySystemFill))
+                )
+                .foregroundStyle(selected ? Color.white : Color.primary)
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .buttonBorderShape(.capsule)
-        .tint(selected ? .accentColor : .secondary)
+        .buttonStyle(.plain)
     }
 
     @ToolbarContentBuilder
