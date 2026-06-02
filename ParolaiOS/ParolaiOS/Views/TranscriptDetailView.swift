@@ -256,28 +256,36 @@ private struct TranscriptScrollView: View {
     }
 }
 
-private struct SegmentView: View, Equatable {
+private struct SegmentView: View {
     let segment: TranscriptSegment
     let activeSegmentID: TranscriptSegment.ID?
     let activeWordID: WordTiming.ID?
     let query: String
     let isDimmed: Bool
-
-    nonisolated static func == (lhs: SegmentView, rhs: SegmentView) -> Bool {
-        lhs.segment.id == rhs.segment.id
-            && lhs.activeSegmentID == rhs.activeSegmentID
-            && lhs.activeWordID == rhs.activeWordID
-            && lhs.query == rhs.query
-            && lhs.isDimmed == rhs.isDimmed
-    }
+    @Environment(PlaybackController.self) private var playback
 
     private var isActive: Bool { activeSegmentID == segment.id }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(timestamp(segment.start))
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                Text(timestamp(segment.start))
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                if playback.hasAudio {
+                    Button {
+                        playback.seek(to: segment.start)
+                    } label: {
+                        Image(systemName: "play.circle")
+                            .font(.body)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(isActive ? Color.accentColor : .secondary)
+                    .accessibilityLabel(Text("Play from \(timestamp(segment.start))"))
+                }
+            }
             if let words = segment.words, !words.isEmpty {
                 WordsView(words: words, activeWordID: activeWordID, query: query)
             } else {
@@ -302,11 +310,17 @@ private struct SegmentTextView: View {
     @Environment(PlaybackController.self) private var playback
 
     var body: some View {
-        Text(highlighted(text: text.trimmingCharacters(in: .whitespaces), query: query))
-            .onTapGesture { playback.seek(to: start) }
+        let label = Text(highlighted(text: text.trimmingCharacters(in: .whitespaces), query: query))
             .padding(6)
             .background(isActive ? Color.accentColor.opacity(0.15) : .clear)
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        if playback.hasAudio {
+            label
+                .contentShape(Rectangle())
+                .onTapGesture { playback.seek(to: start) }
+        } else {
+            label
+        }
     }
 }
 
@@ -339,12 +353,18 @@ private struct WordChip: View, Equatable {
     }
 
     var body: some View {
-        Text(word.word)
+        let chip = Text(word.word)
             .fontWeight(isMatch ? .semibold : .regular)
             .padding(.horizontal, 4).padding(.vertical, 2)
             .background(background)
             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-            .onTapGesture { playback.seek(to: word.start) }
+        if playback.hasAudio {
+            chip
+                .contentShape(Rectangle())
+                .onTapGesture { playback.seek(to: word.start) }
+        } else {
+            chip
+        }
     }
 
     private var background: Color {

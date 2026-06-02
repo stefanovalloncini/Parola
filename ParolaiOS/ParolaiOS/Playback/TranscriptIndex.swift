@@ -7,38 +7,34 @@ struct TranscriptIndex: Sendable {
     let hasWordTimestamps: Bool
 
     init(transcript: Transcript) {
-        let segs = transcript.segments
+        let segs = transcript.segments.sorted { $0.start < $1.start }
         self.segments = segs
-        let flat = segs.flatMap { $0.words ?? [] }
-        self.words = flat
-        self.hasWordTimestamps = !flat.isEmpty
+        self.words = segs.flatMap { $0.words ?? [] }.sorted { $0.start < $1.start }
+        self.hasWordTimestamps = !words.isEmpty
     }
 
     func segmentID(at time: Double) -> TranscriptSegment.ID? {
-        binarySearch(segments, time: time, start: \.start, end: \.end)?.id
+        predecessor(in: segments, at: time, start: \.start, end: \.end)?.id
     }
 
     func word(at time: Double) -> WordTiming? {
-        binarySearch(words, time: time, start: \.start, end: \.end)
+        predecessor(in: words, at: time, start: \.start, end: \.end)
     }
 
-    private func binarySearch<T>(
-        _ array: [T],
-        time: Double,
+    private func predecessor<T>(
+        in array: [T],
+        at time: Double,
         start: KeyPath<T, Double>,
         end: KeyPath<T, Double>
     ) -> T? {
         var lo = 0
-        var hi = array.count - 1
-        while lo <= hi {
+        var hi = array.count
+        while lo < hi {
             let mid = (lo + hi) / 2
-            let item = array[mid]
-            let s = item[keyPath: start]
-            let e = item[keyPath: end]
-            if time < s { hi = mid - 1 }
-            else if time > e { lo = mid + 1 }
-            else { return item }
+            if array[mid][keyPath: start] <= time { lo = mid + 1 } else { hi = mid }
         }
-        return nil
+        guard lo > 0 else { return nil }
+        let item = array[lo - 1]
+        return time <= item[keyPath: end] ? item : nil
     }
 }
