@@ -6,21 +6,34 @@ extension AppModel {
 
     func scheduleRecomputeMatches() {
         matchesDebounce?.cancel()
+        guard findIsOpen, let transcript else {
+            applyMatches([])
+            return
+        }
         let clock = clock
+        let query = findQuery
+        let caseSensitive = findCaseSensitive
         matchesDebounce = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(150), clock: clock)
             guard !Task.isCancelled else { return }
-            self?.recomputeMatches()
+            let result = await Task.detached {
+                transcript.findMatches(query, caseSensitive: caseSensitive)
+            }.value
+            guard !Task.isCancelled else { return }
+            self?.applyMatches(result)
         }
     }
 
     func recomputeMatches() {
         guard findIsOpen, let transcript else {
-            matches = []
-            currentMatchIndex = 0
+            applyMatches([])
             return
         }
-        matches = transcript.findMatches(findQuery, caseSensitive: findCaseSensitive)
+        applyMatches(transcript.findMatches(findQuery, caseSensitive: findCaseSensitive))
+    }
+
+    private func applyMatches(_ result: [TranscriptMatch]) {
+        matches = result
         currentMatchIndex = min(currentMatchIndex, max(matches.count - 1, 0))
         snapToCurrentMatch()
     }

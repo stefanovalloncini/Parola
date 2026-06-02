@@ -106,7 +106,7 @@ extension AppModel {
               !segments.isEmpty else {
             return
         }
-        guard let currentSegment = segments.first(where: { currentTime >= $0.start && currentTime <= $0.end }),
+        guard let currentSegment = segments.binarySearchSegment(coveringTime: currentTime),
               let nextSegment = segments.first(where: { $0.start > currentSegment.end + 0.4 }) else {
             return
         }
