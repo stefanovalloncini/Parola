@@ -152,8 +152,9 @@ public actor StreamingTranscriptionSession {
 
     /// Stops the mic stream, flushes a final transcript, and finishes the stream.
     public func stop() async {
-        guard streamer != nil else { return }
-        await streamer?.stopStreamTranscription()
+        guard let streamer else { return }
+        self.streamer = nil
+        await streamer.stopStreamTranscription()
         segmentContinuation?.finish()
         await consumerTask?.value
         streamerTask?.cancel()

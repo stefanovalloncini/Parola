@@ -330,7 +330,7 @@ struct LibraryStoreTests {
             .appendingPathComponent("bogus-\(UUID().uuidString).parola", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
 
-        await #expect(throws: Error.self) {
+        await #expect(throws: ParolaError.self) {
             try await store.adopt(parolaBundle: scratch)
         }
 
