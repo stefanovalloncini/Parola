@@ -65,6 +65,35 @@ extension AppModel {
         smartChapters = []
     }
 
+    /// Replaces a freshly-saved entry's filename-derived title with a short LLM-written one.
+    /// Best-effort: any failure leaves the original title untouched.
+    func autoTitleEntry(_ id: LibraryEntry.ID, transcript: Transcript) {
+        let text = transcript.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.count >= 40 else { return }
+        let excerpt = String(text.prefix(2000))
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let model = try await LanguageModelFactory.makeOnDevice(
+                    instructions: "Write a concise, specific title of 3 to 6 words for this transcript. Reply with only the title — no quotes, no surrounding punctuation, no preamble."
+                )
+                let raw = try await model.respond(to: excerpt)
+                let title = Self.sanitizedTitle(raw)
+                guard !title.isEmpty else { return }
+                renameEntry(id, to: title)
+            } catch {
+                // best-effort: keep the default title
+            }
+        }
+    }
+
+    static func sanitizedTitle(_ raw: String) -> String {
+        var title = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let newline = title.firstIndex(of: "\n") { title = String(title[..<newline]) }
+        title = title.trimmingCharacters(in: CharacterSet(charactersIn: "\"'“”.,;: "))
+        return String(title.prefix(80))
+    }
+
     func generateYouTubeChapters() {
         guard let transcript = self.transcript else { return }
         guard !isRunningPrompt else { return }

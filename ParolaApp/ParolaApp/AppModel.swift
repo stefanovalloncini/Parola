@@ -67,6 +67,7 @@ final class AppModel {
     @ObservationIgnored @AppStorage("karaokeHighlight", store: DefaultsStore.current) var karaokeHighlight: Bool = true
     @ObservationIgnored @AppStorage("initialPrompt", store: DefaultsStore.current) var initialPrompt: String = ""
     @ObservationIgnored @AppStorage("diarize", store: DefaultsStore.current) var diarize: Bool = false
+    @ObservationIgnored @AppStorage("autoTitleEntries", store: DefaultsStore.current) var autoTitleEntries: Bool = false
     @ObservationIgnored @AppStorage("subtitleFPS", store: DefaultsStore.current) var subtitleFPS: Double = 30
     @ObservationIgnored @AppStorage("subtitleCaptionLength", store: DefaultsStore.current) var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue
     @ObservationIgnored @AppStorage("transcriptCompact", store: DefaultsStore.current) var transcriptCompact: Bool = false
@@ -738,6 +739,9 @@ final class AppModel {
                 )
                 refreshLibrary()
                 selectedEntryID = entry.id
+                if autoTitleEntries {
+                    autoTitleEntry(entry.id, transcript: result)
+                }
             } catch {
                 // best-effort: transcript stays in memory if library save fails
             }

@@ -86,7 +86,108 @@ extension ParolaAutomationServer {
                     ])
                 }
             ),
+
+            AutomationCommand(
+                name: "clickElement",
+                area: .window,
+                summary: "Presses the control whose accessibility identifier matches (e.g. Customization.Button.Theme.blue). Needs Accessibility; uses the out-of-process AX server so it can reach SwiftUI controls.",
+                kind: .async,
+                args: [
+                    .init(name: "id", kind: .string(), required: true, summary: "accessibilityIdentifier of the control"),
+                ],
+                handler: { args, _ in
+                    let id = try args.string("id")
+                    try requireAXTrust()
+                    return try await onAXQueue {
+                        guard let element = axFind(in: appAXElement(), identifier: id, depth: 0) else {
+                            throw AutomationError.notFound(kind: "element", id: id)
+                        }
+                        let result = AXUIElementPerformAction(element, kAXPressAction as CFString)
+                        guard result == .success else {
+                            throw AutomationError.precondition("press failed (AXError \(result.rawValue)) for \(id)")
+                        }
+                        return .object(["pressed": .bool(true), "id": .string(id)])
+                    }
+                }
+            ),
+
+            AutomationCommand(
+                name: "listClickable",
+                area: .window,
+                summary: "Lists every control that has an accessibility identifier (id, role, label, enabled), via the out-of-process AX server. Needs Accessibility. Use the ids with clickElement.",
+                kind: .async,
+                handler: { _, _ in
+                    try requireAXTrust()
+                    return try await onAXQueue {
+                        var found: [AutomationValue] = []
+                        axCollectIdentified(appAXElement(), into: &found, depth: 0)
+                        return .array(found)
+                    }
+                }
+            ),
         ]
+    }
+}
+
+@MainActor
+private func requireAXTrust() throws {
+    guard AXIsProcessTrusted() else {
+        throw AutomationError.permission("needs Accessibility. Grant Parola in System Settings > Privacy & Security > Accessibility.")
+    }
+}
+
+/// AX queries against the app's OWN process must not run on the main thread: the AX server calls
+/// back into the main run loop to answer, which deadlocks if main is blocked waiting on the query.
+private func onAXQueue(_ work: @escaping @Sendable () throws -> AutomationValue) async throws -> AutomationValue {
+    try await withCheckedThrowingContinuation { continuation in
+        DispatchQueue.global(qos: .userInitiated).async {
+            do { continuation.resume(returning: try work()) }
+            catch { continuation.resume(throwing: error) }
+        }
+    }
+}
+
+private func appAXElement() -> AXUIElement {
+    AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+}
+
+private func axChildren(_ element: AXUIElement) -> [AXUIElement] {
+    func array(_ attr: String) -> [AXUIElement] {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attr as CFString, &value) == .success else { return [] }
+        return (value as? [AXUIElement]) ?? []
+    }
+    return array(kAXChildrenAttribute as String) + array(kAXWindowsAttribute as String)
+}
+
+private func axString(_ element: AXUIElement, _ attr: String) -> String? {
+    var value: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(element, attr as CFString, &value) == .success else { return nil }
+    let s = value as? String
+    return (s?.isEmpty == false) ? s : nil
+}
+
+private func axFind(in element: AXUIElement, identifier: String, depth: Int) -> AXUIElement? {
+    if depth > 80 { return nil }
+    if axString(element, kAXIdentifierAttribute as String) == identifier { return element }
+    for child in axChildren(element) {
+        if let hit = axFind(in: child, identifier: identifier, depth: depth + 1) { return hit }
+    }
+    return nil
+}
+
+private func axCollectIdentified(_ element: AXUIElement, into found: inout [AutomationValue], depth: Int) {
+    if depth > 80 || found.count >= 600 { return }
+    if let id = axString(element, kAXIdentifierAttribute as String) {
+        var node: [String: AutomationValue] = ["id": .string(id)]
+        if let role = axString(element, kAXRoleAttribute as String) { node["role"] = .string(role) }
+        if let label = axString(element, kAXTitleAttribute as String) ?? axString(element, kAXDescriptionAttribute as String) {
+            node["label"] = .string(label)
+        }
+        found.append(.object(node))
+    }
+    for child in axChildren(element) {
+        axCollectIdentified(child, into: &found, depth: depth + 1)
     }
 }
 

@@ -61,6 +61,11 @@ struct GeneralPane: View {
                     Toggle("", isOn: $model.diarize).labelsHidden()
                         .axLeaf("General.Toggle.Diarize")
                 }
+                SettingRow("Name transcripts automatically",
+                           description: "Generates a short title from the content on device when a transcription finishes.") {
+                    Toggle("", isOn: $model.autoTitleEntries).labelsHidden()
+                        .axLeaf("General.Toggle.AutoTitle")
+                }
             }
 
             SettingsSection("Custom vocabulary") {
