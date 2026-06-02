@@ -181,7 +181,7 @@ struct SegmentCard: View {
     @State private var timingPopoverOpen = false
 
     private var actionStrip: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 4) {
             cardButton(systemName: "pencil", help: "Edit") { beginEditing() }
                 .axLeaf("Card.Button.Edit")
             cardButton(systemName: "note.text", help: "Add note") { beginEditingNote() }
@@ -209,6 +209,7 @@ struct SegmentCard: View {
                 copyDeeplink()
             }
             .axLeaf("Card.Button.CopyLink")
+            Divider().frame(height: 14).padding(.horizontal, 1)
             cardButton(systemName: "trash", help: "Delete segment") {
                 model.deleteSegment(id: segment.id)
             }
