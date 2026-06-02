@@ -1,5 +1,6 @@
 import AVFoundation
 import SwiftUI
+import UIKit
 import ParolaCore
 
 struct LiveCaptionsSheet: View {
@@ -65,7 +66,12 @@ struct LiveCaptionsSheet: View {
 
     private func start() async {
         guard session == nil else { return }
-        configureAudioSession()
+        guard await AVAudioApplication.requestRecordPermission() else {
+            state.error = "Microphone access is off. Turn it on in Settings to use live captions."
+            state.isActive = false
+            state.isLoading = false
+            return
+        }
         state.reset()
         state.isActive = true
         state.isLoading = true
@@ -101,17 +107,14 @@ struct LiveCaptionsSheet: View {
         consumer?.cancel()
         consumer = nil
         if let s = session {
-            Task { await s.stop() }
+            Task {
+                await s.stop()
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            }
         }
         session = nil
         state.isActive = false
         state.isLoading = false
-    }
-
-    private func configureAudioSession() {
-        let audioSession = AVAudioSession.sharedInstance()
-        try? audioSession.setCategory(.record, mode: .measurement, options: [])
-        try? audioSession.setActive(true)
     }
 }
 
@@ -139,17 +142,34 @@ private struct LiveCaptionsErrorCard: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 24)
             }
-            Button(action: onRetry) {
-                Text("Try again")
-                    .font(.body.weight(.medium))
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule().fill(Color.orange.opacity(0.18))
-                    )
-                    .foregroundStyle(.orange)
+            HStack(spacing: 10) {
+                Button(action: onRetry) {
+                    Text("Try again")
+                        .font(.body.weight(.medium))
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule().fill(Color.orange.opacity(0.18))
+                        )
+                        .foregroundStyle(.orange)
+                }
+                .buttonStyle(.plain)
+                if humanError.symbol == "mic.slash" {
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        Text("Open Settings")
+                            .font(.body.weight(.medium))
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 8)
+                            .background(Capsule().fill(Color.orange))
+                            .foregroundStyle(.white)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .buttonStyle(.plain)
             .padding(.top, 4)
         }
         .padding(.vertical, 8)
