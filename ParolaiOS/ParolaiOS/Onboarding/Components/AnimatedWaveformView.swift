@@ -16,6 +16,7 @@ struct AnimatedWaveformView: View {
                 .frame(width: proxy.size.width, height: proxy.size.height)
             }
         }
+        .accessibilityHidden(true)
     }
 
     private func draw(into canvas: GraphicsContext, size: CGSize, time: TimeInterval) {

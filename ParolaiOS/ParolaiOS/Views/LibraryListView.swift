@@ -178,6 +178,7 @@ private struct EmptyLibraryView: View {
                 .foregroundStyle(Color.accentColor)
                 .symbolEffect(.variableColor.iterative.reversing, options: .repeating, value: pulse)
                 .shadow(color: Color.accentColor.opacity(0.18), radius: 18, x: 0, y: 6)
+                .accessibilityHidden(true)
             VStack(spacing: 8) {
                 Text("library.empty.title")
                     .font(.title3.weight(.semibold))

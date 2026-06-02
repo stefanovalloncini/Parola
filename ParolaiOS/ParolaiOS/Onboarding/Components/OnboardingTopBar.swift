@@ -42,17 +42,21 @@ struct OnboardingTopBar: View {
                 Text("Skip")
                     .font(.body.weight(.medium))
                     .foregroundStyle(.secondary)
-                    .frame(height: 44)
+                    .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
+            .accessibilityLabel(Text("Skip"))
         } else {
             Color.clear.frame(width: 44, height: 44)
         }
     }
 
     private var dots: some View {
-        HStack(spacing: 8) {
-            ForEach(OnboardingStep.allCases.filter { $0.showsDots }, id: \.self) { dot in
+        let steps = OnboardingStep.allCases.filter { $0.showsDots }
+        let total = steps.count
+        let currentIndex = steps.firstIndex(of: step) ?? 0
+        return HStack(spacing: 8) {
+            ForEach(steps, id: \.self) { dot in
                 Capsule()
                     .fill(dot == step ? Color.accentColor : Color.secondary.opacity(0.25))
                     .frame(width: dot == step ? 22 : 6, height: 6)
@@ -60,5 +64,7 @@ struct OnboardingTopBar: View {
             }
         }
         .opacity(step.showsDots ? 1 : 0)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Step \(currentIndex + 1) of \(total)"))
     }
 }

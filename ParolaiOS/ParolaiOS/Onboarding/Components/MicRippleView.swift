@@ -26,6 +26,7 @@ struct MicRippleView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .accessibilityHidden(true)
         .onAppear { if !reduceMotion { pulse = true } }
     }
 

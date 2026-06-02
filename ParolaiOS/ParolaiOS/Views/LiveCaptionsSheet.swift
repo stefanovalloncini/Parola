@@ -25,6 +25,7 @@ struct LiveCaptionsSheet: View {
                         .font(.system(size: 48))
                         .foregroundStyle(.tint)
                         .symbolEffect(.variableColor.iterative, options: .repeating)
+                        .accessibilityHidden(true)
                     Text(state.isLoading ? "Loading model…" : "Listening…")
                         .font(.title3)
                         .foregroundStyle(.secondary)

@@ -17,6 +17,7 @@ struct RotatingGlobeView: View {
             let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
             content(time: t)
         }
+        .accessibilityHidden(true)
         .onAppear { if !reduceMotion { animateColor = true } }
     }
 

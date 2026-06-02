@@ -29,6 +29,7 @@ struct ConfettiBurstView: View {
             }
         }
         .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 

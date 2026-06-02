@@ -31,6 +31,7 @@ private struct DoneHero: View {
                 .symbolEffect(.bounce, value: bounced)
                 .shadow(color: Color.accentColor.opacity(0.3), radius: 24, x: 0, y: 8)
         }
+        .accessibilityHidden(true)
         .onChange(of: isActive) { _, active in
             if active && !reduceMotion { bounced.toggle() }
         }
