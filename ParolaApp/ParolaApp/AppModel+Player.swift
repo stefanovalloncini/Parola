@@ -45,8 +45,14 @@ extension AppModel {
         let asset = AVURLAsset(url: url)
         Task { [weak self] in
             let tracks = (try? await asset.loadTracks(withMediaType: .video)) ?? []
+            let assetDuration = (try? await asset.load(.duration)).map(CMTimeGetSeconds)
             guard let self, self.playerInstallToken == token else { return }
             self.hasVideo = !tracks.isEmpty
+            if let assetDuration, assetDuration.isFinite, assetDuration > 0,
+               var t = self.transcript, (t.durationSeconds ?? 0) < assetDuration - 0.05 {
+                t.durationSeconds = assetDuration
+                self.transcript = t
+            }
         }
     }
 

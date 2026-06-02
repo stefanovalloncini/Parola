@@ -79,7 +79,7 @@ struct SegmentCard: View {
             withAnimation(.easeOut(duration: 0.12)) { hovering = hover }
         }
         .onTapGesture {
-            if !isEditing { model.seek(to: segment) }
+            if !isEditing, model.player != nil { model.seek(to: segment) }
         }
         .alert("Rename speaker", isPresented: $renamingSpeaker, presenting: segment.speaker) { current in
             TextField("Name", text: $draftSpeakerName)
@@ -186,10 +186,12 @@ struct SegmentCard: View {
                 .axLeaf("Card.Button.Edit")
             cardButton(systemName: "note.text", help: "Add note") { beginEditingNote() }
                 .axLeaf("Card.Button.Note")
-            cardButton(systemName: "play.fill", help: "Play from here") {
-                model.seek(to: segment)
+            if model.player != nil {
+                cardButton(systemName: "play.fill", help: "Play from here") {
+                    model.seek(to: segment)
+                }
+                .axLeaf("Card.Button.Play")
             }
-            .axLeaf("Card.Button.Play")
             cardButton(systemName: "clock", help: "Nudge timing") {
                 timingPopoverOpen = true
             }
