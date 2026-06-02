@@ -1,6 +1,14 @@
 import SwiftUI
 import AppKit
+import AVFoundation
 import ParolaCore
+
+@MainActor
+func openMicrophonePrivacySettings() {
+    if let url = URL(string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Microphone") {
+        NSWorkspace.shared.open(url)
+    }
+}
 
 struct MicrophonePane: View {
     @Environment(AppModel.self) private var model
@@ -8,10 +16,14 @@ struct MicrophonePane: View {
     @State private var preview: MicPreviewController?
     @State private var level: Float = 0
     @State private var startError: String?
+    @State private var micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
 
     var body: some View {
         @Bindable var model = model
         return VStack(alignment: .leading, spacing: 12) {
+            if micStatus == .denied || micStatus == .restricted {
+                micPermissionBanner
+            }
             SettingsSection {
                 SettingRow("Input device",
                            description: "Used for recording and the dictation fallback path.",
@@ -88,6 +100,7 @@ struct MicrophonePane: View {
             ResetPaneButton(scope: .microphone)
         }
         .onAppear {
+            micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
             devices = AudioDevices.inputDevices()
             startPreview()
         }
@@ -122,6 +135,31 @@ struct MicrophonePane: View {
             Task { await controller.stop() }
         }
         level = 0
+    }
+
+    private var micPermissionBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "mic.slash.fill")
+                .foregroundStyle(DS.Palette.warning)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Microphone access is off")
+                    .font(.callout.weight(.medium))
+                Text("Parola needs the microphone to record and dictate.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Open Settings…") { openMicrophonePrivacySettings() }
+                .controlSize(.small)
+                .axLeaf("Microphone.Button.OpenAccessSettings")
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(DS.Palette.warning.opacity(0.12))
+        )
     }
 }
 
@@ -179,11 +217,7 @@ private struct MicErrorBanner: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if looksLikePermissionError {
-                Button("Open System Settings…") {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
-                        NSWorkspace.shared.open(url)
-                    }
-                }
+                Button("Open System Settings…") { openMicrophonePrivacySettings() }
                 .controlSize(.small)
                 .axLeaf("Microphone.Button.OpenSystemSettings")
             }
