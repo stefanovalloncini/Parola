@@ -163,4 +163,75 @@ struct ChatIntegrationTests {
 
         #expect(model.isSummarising)
     }
+
+    @Test("summariseTranscript attaches the summary after a benign duration bump")
+    func summariseSurvivesDurationBump() async throws {
+        let model = makeModel(entryID: "entry-sum", transcript: makeTranscript())
+        let gate = SummariseGate()
+        model.summariseOperation = { _ in
+            await gate.wait()
+            return Summary(text: "the summary", chapters: [])
+        }
+
+        model.summariseTranscript()
+        #expect(model.isSummarising)
+
+        model.transcript?.durationSeconds = 123
+
+        gate.open()
+        try await waitUntil { !model.isSummarising }
+
+        #expect(model.transcript?.summary?.text == "the summary")
+        #expect(model.isSummarising == false)
+    }
+
+    @Test("summariseTranscript drops the summary when the user switches entries")
+    func summariseDropsOnEntrySwitch() async throws {
+        let model = makeModel(entryID: "entry-A", transcript: makeTranscript())
+        let gate = SummariseGate()
+        model.summariseOperation = { _ in
+            await gate.wait()
+            return Summary(text: "summary for A", chapters: [])
+        }
+
+        model.summariseTranscript()
+        #expect(model.isSummarising)
+
+        model.transcript = makeTranscript()
+        model.selectedEntryID = "entry-B"
+
+        gate.open()
+        try await waitUntil { !model.isSummarising }
+
+        #expect(model.transcript?.summary == nil)
+        #expect(model.isSummarising == false)
+    }
+
+    private func waitUntil(
+        within timeout: Duration = .seconds(2),
+        _ condition: @MainActor () -> Bool
+    ) async throws {
+        let deadline = ContinuousClock().now.advanced(by: timeout)
+        while !condition() {
+            try #require(ContinuousClock().now < deadline, "timed out waiting for condition")
+            try await Task.sleep(for: .milliseconds(5))
+        }
+    }
+}
+
+@MainActor
+private final class SummariseGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var isOpen = false
+
+    func wait() async {
+        if isOpen { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func open() {
+        isOpen = true
+        continuation?.resume()
+        continuation = nil
+    }
 }

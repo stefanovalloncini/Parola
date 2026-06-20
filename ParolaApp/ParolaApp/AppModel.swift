@@ -1451,6 +1451,8 @@ final class AppModel {
     var isSummarising: Bool = false
     var summaryError: String?
     @ObservationIgnored private var summaryGeneration: Int = 0
+    /// Test seam: when set, replaces the on-device SummaryService so summarise timing is deterministic.
+    @ObservationIgnored var summariseOperation: (@Sendable (Transcript) async throws -> Summary)?
 
     func summariseTranscript() {
         guard let transcript, !isSummarising else { return }
@@ -1459,10 +1461,13 @@ final class AppModel {
         summaryGeneration &+= 1
         let generation = summaryGeneration
         let snapshot = transcript
+        let entryID = selectedEntryID
+        let summarise = summariseOperation ?? { try await SummaryService().summarise($0) }
         Task { [weak self] in
             do {
-                let summary = try await SummaryService().summarise(snapshot)
-                guard let self, generation == summaryGeneration, self.transcript == snapshot else { return }
+                let summary = try await summarise(snapshot)
+                guard let self, generation == summaryGeneration else { return }
+                guard self.selectedEntryID == entryID else { isSummarising = false; return }
                 self.transcript?.summary = summary
                 isSummarising = false
             } catch {
