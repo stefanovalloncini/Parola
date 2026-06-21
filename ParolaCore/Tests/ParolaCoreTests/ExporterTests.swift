@@ -331,6 +331,20 @@ struct ExporterTests {
         #expect(text.contains("Goodbye."))
     }
 
+    @Test("pdf omits the speaker label for an empty-string speaker")
+    func pdfEmptySpeaker() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: "")],
+            language: "en",
+            modelName: "x"
+        )
+        let data = try PdfExporter().render(transcript)
+        let doc = try #require(PDFDocument(data: data))
+        let text = (0..<doc.pageCount).compactMap { doc.page(at: $0)?.string }.joined(separator: " ")
+        #expect(text.contains(":") == false)
+        #expect(text.contains("Hello."))
+    }
+
     @Test("pdf paginates long transcripts onto multiple pages")
     func pdfPaginates() throws {
         let lines = (0..<200).map { i in
