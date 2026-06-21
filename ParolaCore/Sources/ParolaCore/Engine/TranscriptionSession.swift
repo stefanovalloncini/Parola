@@ -34,7 +34,8 @@ public actor TranscriptionSession {
         source: any AudioSource,
         options: TranscriptionOptions,
         downloadProgress: (@Sendable (Double) -> Void)? = nil,
-        partialHandler: (@Sendable (String) -> Void)? = nil
+        partialHandler: (@Sendable (String) -> Void)? = nil,
+        progressHandler: (@Sendable (Double) -> Void)? = nil
     ) async throws -> Transcript {
         await ensureBootstrap()
         let modelName = options.model ?? defaultModelName()
@@ -59,7 +60,8 @@ public actor TranscriptionSession {
         var transcript = try await activeTranscriber.transcribe(
             url: audioURL,
             options: options,
-            partialHandler: partialHandler
+            partialHandler: partialHandler,
+            progressHandler: progressHandler
         )
         if options.diarize {
             try Task.checkCancellation()

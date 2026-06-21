@@ -86,6 +86,15 @@ actor WhisperKitTranscriber: Transcriber {
         options: TranscriptionOptions,
         partialHandler: (@Sendable (String) -> Void)?
     ) async throws -> Transcript {
+        try await transcribe(url: url, options: options, partialHandler: partialHandler, progressHandler: nil)
+    }
+
+    func transcribe(
+        url: URL,
+        options: TranscriptionOptions,
+        partialHandler: (@Sendable (String) -> Void)?,
+        progressHandler: (@Sendable (Double) -> Void)?
+    ) async throws -> Transcript {
         if let requested = options.computeUnits, requested != loadedComputeUnits, let current = loadedModel {
             do {
                 try await load(model: current, computeUnits: requested)
@@ -114,15 +123,20 @@ actor WhisperKitTranscriber: Transcriber {
         }
 
         let builder = OSAllocatedUnfairLock(initialState: StreamingPartialBuilder())
-        if let handler = partialHandler {
+        if partialHandler != nil || progressHandler != nil {
             kit.segmentDiscoveryCallback = { @Sendable segments in
-                let text = builder.withLock { state -> String in
-                    for segment in segments {
-                        state.add(seek: segment.seek, text: segment.text)
+                if let partialHandler {
+                    let text = builder.withLock { state -> String in
+                        for segment in segments {
+                            state.add(seek: segment.seek, text: segment.text)
+                        }
+                        return state.text
                     }
-                    return state.text
+                    partialHandler(text)
                 }
-                handler(text)
+                if let progressHandler, let latest = segments.map({ Double($0.end) }).max() {
+                    progressHandler(latest)
+                }
             }
         }
         defer { kit.segmentDiscoveryCallback = nil }

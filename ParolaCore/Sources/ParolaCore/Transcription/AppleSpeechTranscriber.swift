@@ -30,6 +30,15 @@ actor AppleSpeechTranscriber: Transcriber {
     }
 
     func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+        try await transcribe(url: url, options: options, partialHandler: nil, progressHandler: nil)
+    }
+
+    func transcribe(
+        url: URL,
+        options: TranscriptionOptions,
+        partialHandler: (@Sendable (String) -> Void)?,
+        progressHandler: (@Sendable (Double) -> Void)?
+    ) async throws -> Transcript {
         guard let modelName = loadedModel else {
             throw ParolaError.transcriptionFailed("Apple Speech engine not loaded")
         }
@@ -61,7 +70,8 @@ actor AppleSpeechTranscriber: Transcriber {
             url: url,
             options: options,
             modelName: modelName,
-            cancellation: cancellation
+            cancellation: cancellation,
+            progressHandler: progressHandler
         )
         #else
         throw ParolaError.unsupportedForEngine("Apple Speech framework not available in this build.")
@@ -86,7 +96,8 @@ actor AppleSpeechTranscriber: Transcriber {
         url: URL,
         options: TranscriptionOptions,
         modelName: String,
-        cancellation: AnalyzerCancellation
+        cancellation: AnalyzerCancellation,
+        progressHandler: (@Sendable (Double) -> Void)?
     ) async throws -> Transcript {
         #if canImport(Speech)
         let locale = Self.pickLocale(language: options.language)
@@ -124,6 +135,7 @@ actor AppleSpeechTranscriber: Transcriber {
                 guard !text.isEmpty else { continue }
                 let start = result.range.start.seconds
                 let end = result.range.end.seconds
+                progressHandler?(end)
                 segments.append(TranscriptSegment(
                     id: nextID,
                     start: start,

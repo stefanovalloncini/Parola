@@ -14,6 +14,14 @@ public protocol Transcriber: Sendable {
         partialHandler: (@Sendable (String) -> Void)?
     ) async throws -> Transcript
 
+    /// Streaming variant that also reports the latest transcribed second. Default forwards to the partialHandler overload.
+    func transcribe(
+        url: URL,
+        options: TranscriptionOptions,
+        partialHandler: (@Sendable (String) -> Void)?,
+        progressHandler: (@Sendable (Double) -> Void)?
+    ) async throws -> Transcript
+
     func unload() async
     func loadedModelName() async -> String?
 
@@ -32,5 +40,14 @@ public extension Transcriber {
         partialHandler: (@Sendable (String) -> Void)?
     ) async throws -> Transcript {
         try await transcribe(url: url, options: options)
+    }
+
+    func transcribe(
+        url: URL,
+        options: TranscriptionOptions,
+        partialHandler: (@Sendable (String) -> Void)?,
+        progressHandler: (@Sendable (Double) -> Void)?
+    ) async throws -> Transcript {
+        try await transcribe(url: url, options: options, partialHandler: partialHandler)
     }
 }

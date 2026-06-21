@@ -47,7 +47,7 @@ struct ContentRoutes: View {
             case .loadingModel(let name):
                 ProgressPane(title: "Loading \(name)…", progress: nil)
             case .transcribing(let file):
-                TranscribingPane(file: file, partial: model.filePartialText)
+                TranscribingPane(file: file, partial: model.filePartialText, progress: model.fileTranscribeFraction)
             case .recording(let source):
                 RecordingPane(source: source)
             case .ready:

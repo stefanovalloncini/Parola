@@ -65,6 +65,8 @@ final class AppModel {
     var livePartialText: String = ""
     var liveVoiceActive: Bool = false
     var filePartialText: String = ""
+    /// 0–1 fraction of the media transcribed so far, or nil while indeterminate (duration unknown, or the engine reports no progress).
+    var fileTranscribeFraction: Double?
     var useStreaming: Bool = true { didSet { defaults.set(useStreaming, forKey: "useStreaming") } }
     var wordTimestamps: Bool = false { didSet { defaults.set(wordTimestamps, forKey: "wordTimestamps") } }
     var karaokeHighlight: Bool = true { didSet { defaults.set(karaokeHighlight, forKey: "karaokeHighlight") } }
@@ -931,6 +933,7 @@ final class AppModel {
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
         filePartialText = ""
+        fileTranscribeFraction = nil
 
         let task: TranscriptionTask = (translateOverride ?? translate) ? .translate : .transcribe
 
@@ -948,17 +951,20 @@ final class AppModel {
                     source: FileAudioSource(url: fileURL),
                     options: makeOptions(task: task),
                     downloadProgress: makeDownloadProgressHandler(for: selectedModel),
-                    partialHandler: makeFilePartialHandler()
+                    partialHandler: makeFilePartialHandler(),
+                    progressHandler: makeFileProgressHandler()
                 )
                 try Task.checkCancellation()
                 let processed = postProcess(result)
                 transcript = processed
                 filePartialText = ""
+                fileTranscribeFraction = nil
                 phase = .ready
                 refreshModelList()
                 persistToLibrary(processed, audioSource: fileURL)
             } catch {
                 filePartialText = ""
+                fileTranscribeFraction = nil
                 applyTranscriptionError(error)
             }
             self.fileTranscribeTask = nil
@@ -1001,6 +1007,26 @@ final class AppModel {
                 guard let self, percent != throttle.lastPercent else { return }
                 throttle.lastPercent = percent
                 self.phase = .downloadingModel(name: modelName, progress: frac)
+            }
+        }
+    }
+
+    @MainActor private final class FileProgressThrottle {
+        var lastPercent = -1
+        var lastFraction: Double = 0
+    }
+
+    private func makeFileProgressHandler() -> @Sendable (Double) -> Void {
+        let throttle = FileProgressThrottle()
+        return { [weak self] seconds in
+            Task { @MainActor [weak self] in
+                guard let self, let duration = self.pendingMediaDuration, duration > 0 else { return }
+                let fraction = min(1, max(throttle.lastFraction, seconds / duration))
+                let percent = Int(fraction * 100)
+                guard percent != throttle.lastPercent else { return }
+                throttle.lastPercent = percent
+                throttle.lastFraction = fraction
+                self.fileTranscribeFraction = fraction
             }
         }
     }

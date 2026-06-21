@@ -1,8 +1,13 @@
 import SwiftUI
+import ParolaCore
 
 struct TranscribingPane: View {
     let file: URL
     let partial: String
+    let progress: Double?
+
+    @State private var eta = ETACalculator()
+    @State private var etaLabel: String?
 
     private static let tailID = "transcribing.tail"
     private var hasText: Bool { !partial.isEmpty }
@@ -14,18 +19,57 @@ struct TranscribingPane: View {
         }
         .padding(DS.Spacing.large)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onChange(of: progress) { _, newValue in updateETA(for: newValue) }
+        .onAppear { updateETA(for: progress) }
     }
 
     private var header: some View {
-        HStack(spacing: DS.Spacing.small) {
-            ProgressView()
-                .progressViewStyle(.circular)
-                .controlSize(.small)
-                .tint(DS.Color.accent)
-            Text("Transcribing \(file.lastPathComponent)…")
-                .font(DS.Font.heading)
-                .foregroundStyle(DS.Color.primaryText)
-            Spacer()
+        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            HStack(spacing: DS.Spacing.small) {
+                if progress == nil {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .controlSize(.small)
+                        .tint(DS.Color.accent)
+                }
+                Text("Transcribing \(file.lastPathComponent)…")
+                    .font(DS.Font.heading)
+                    .foregroundStyle(DS.Color.primaryText)
+                Spacer()
+                if let progress {
+                    Text("\(Int(progress * 100))%")
+                        .font(DS.Font.captionMono)
+                        .foregroundStyle(DS.Color.secondaryText)
+                    if let etaLabel {
+                        Text(verbatim: "·")
+                            .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
+                        Text("\(etaLabel) left")
+                            .font(DS.Font.captionMono)
+                            .foregroundStyle(DS.Color.secondaryText)
+                    }
+                }
+            }
+            if let progress {
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .tint(DS.Color.accent)
+            }
+        }
+    }
+
+    private func updateETA(for value: Double?) {
+        guard let value else {
+            eta.reset()
+            etaLabel = nil
+            return
+        }
+        eta.observe(progress: value)
+        if let seconds = eta.remainingSeconds(), seconds > 1 {
+            etaLabel = ETACalculator.format(seconds)
+        } else if value >= 1 {
+            etaLabel = "0:00"
+        } else {
+            etaLabel = nil
         }
     }
 
