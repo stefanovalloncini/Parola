@@ -98,6 +98,22 @@ struct ExporterTests {
         #expect(out.contains("**Speaker 2** *[00:00:01]*: This is Parola."))
     }
 
+    @Test("markdown treats an empty-string speaker as no speaker")
+    func markdownEmptySpeaker() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: "")],
+            language: "en",
+            modelName: "x"
+        )
+        let plain = try MarkdownExporter().renderText(transcript)
+        #expect(plain == "Hello.\n")
+        #expect(plain.contains("**:**") == false)
+
+        let timed = try MarkdownExporter(options: MarkdownOptions(showTimestamps: true)).renderText(transcript)
+        #expect(timed == "*[00:00:00]* Hello.\n")
+        #expect(timed.contains("****") == false)
+    }
+
     @Test("md is a recognized ExportFormat with .md extension")
     func mdFormat() {
         #expect(ExportFormat.md.fileExtension == "md")
@@ -136,6 +152,19 @@ struct ExporterTests {
         let out = try HtmlExporter().renderText(sampleWithSpeakers())
         #expect(out.contains("class=\"s\">Speaker 1</span>"))
         #expect(out.contains("class=\"s\">Speaker 2</span>"))
+    }
+
+    @Test("html omits the speaker span for an empty-string speaker")
+    func htmlEmptySpeaker() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: "")],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try HtmlExporter().renderText(transcript)
+        #expect(out.contains("class=\"s\"") == false)
+        #expect(out.contains("</span>:") == false)
+        #expect(out.contains("Hello."))
     }
 
     @Test("html escapes special characters")
@@ -234,6 +263,20 @@ struct ExporterTests {
         let asString = String(decoding: data, as: UTF8.self)
         #expect(asString.contains("<w:rPr><w:b/></w:rPr>"))
         #expect(asString.contains("Speaker 1:"))
+    }
+
+    @Test("docx omits the bold speaker run for an empty-string speaker")
+    func docxEmptySpeaker() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: "")],
+            language: "en",
+            modelName: "x"
+        )
+        let data = try DocxExporter().render(transcript)
+        let asString = String(decoding: data, as: UTF8.self)
+        #expect(asString.contains("<w:rPr><w:b/></w:rPr>") == false)
+        #expect(asString.contains(": </w:t>") == false)
+        #expect(asString.contains("Hello."))
     }
 
     @Test("docx escapes XML-significant characters")

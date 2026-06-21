@@ -32,13 +32,13 @@ public struct MarkdownExporter: TranscriptExporter {
         for seg in transcript.segments {
             let body = seg.text.trimmingCharacters(in: .whitespaces)
             switch (seg.speaker, options.showTimestamps) {
-            case (let speaker?, true):
+            case (let speaker?, true) where !speaker.isEmpty:
                 out += "**\(speaker)** *[\(Format.timestampHHMMSS(seg.start))]*: \(body)\n\n"
-            case (let speaker?, false):
+            case (let speaker?, false) where !speaker.isEmpty:
                 out += "**\(speaker):** \(body)\n\n"
-            case (nil, true):
+            case (_, true):
                 out += "*[\(Format.timestampHHMMSS(seg.start))]* \(body)\n\n"
-            case (nil, false):
+            case (_, false):
                 out += "\(body)\n\n"
             }
         }

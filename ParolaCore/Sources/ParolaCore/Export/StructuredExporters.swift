@@ -103,7 +103,7 @@ public struct HtmlExporter: TranscriptExporter {
             if options.showTimestamps {
                 paragraph += "<a class=\"t\" href=\"#\(anchor)\">[\(Format.timestampHHMMSS(seg.start))]</a> "
             }
-            if let speaker = seg.speaker {
+            if let speaker = seg.speaker, !speaker.isEmpty {
                 paragraph += "<span class=\"s\">\(Format.escapeHTML(speaker))</span>: "
             }
             paragraph += "\(text)</p>\n"
@@ -162,7 +162,7 @@ struct DocxExporter: TranscriptExporter {
         var body = ""
         for seg in transcript.segments {
             let text = Format.escapeXML(seg.text.trimmingCharacters(in: .whitespaces))
-            if let speaker = seg.speaker {
+            if let speaker = seg.speaker, !speaker.isEmpty {
                 let escapedSpeaker = Format.escapeXML(speaker)
                 body += "<w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space=\"preserve\">\(escapedSpeaker): </w:t></w:r><w:r><w:t xml:space=\"preserve\">\(text)</w:t></w:r></w:p>"
             } else {
