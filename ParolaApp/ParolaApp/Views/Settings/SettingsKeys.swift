@@ -184,7 +184,6 @@ struct ResetPaneButton: View {
             ) {
                 Button("Reset", role: .destructive) {
                     SettingsResetService.reset(scope: scope)
-                    SettingsRelaunch.promptToApply("Quit and relaunch Parola for the reset to take effect.")
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
@@ -216,8 +215,8 @@ enum SettingsResetService {
     }
 }
 
-// Settings load into observed AppModel properties once at launch, so changes made
-// straight to UserDefaults (reset, import) only show after a relaunch.
+// Reset/Import apply live via AppModel.reloadSettings(); this narrowed prompt remains only for the few
+// changes that genuinely need a relaunch (re-arming watched folders' security-scoped bookmarks).
 enum SettingsRelaunch {
     @MainActor
     static func promptToApply(_ informativeText: String) {
@@ -261,7 +260,6 @@ struct ResetAllSettingsButton: View {
         ) {
             Button("Reset all", role: .destructive) {
                 SettingsResetService.resetAll()
-                SettingsRelaunch.promptToApply("Quit and relaunch Parola for the reset to take effect.")
             }
             Button("Cancel", role: .cancel) {}
         } message: {
