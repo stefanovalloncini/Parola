@@ -137,7 +137,7 @@ struct CsvExporter: TranscriptExporter {
     }
 
     static func quote(_ s: String) -> String {
-        let needsQuotes = s.contains(",") || s.contains("\"") || s.contains("\n") || s.contains("\r")
+        let needsQuotes = s.contains(",") || s.contains("\"") || s.unicodeScalars.contains("\n") || s.unicodeScalars.contains("\r")
         guard needsQuotes else { return s }
         let escaped = s.replacingOccurrences(of: "\"", with: "\"\"")
         return "\"\(escaped)\""

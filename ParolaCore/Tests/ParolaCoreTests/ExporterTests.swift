@@ -186,6 +186,19 @@ struct ExporterTests {
         #expect(out.contains("\"line1\nline2\""))
     }
 
+    @Test("csv quotes a field containing a fused CRLF")
+    func csvQuotesFusedCRLF() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "line1\r\nline2"),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try CsvExporter().renderText(transcript)
+        #expect(out.contains("\"line1\r\nline2\""))
+    }
+
     @Test("csv emits empty speaker column when nil")
     func csvEmptySpeaker() throws {
         let out = try CsvExporter().renderText(sample())
