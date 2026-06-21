@@ -1372,6 +1372,7 @@ final class AppModel {
         guard let idx = t.segments.firstIndex(where: { $0.id == id }) else { return }
         t.segments[idx].text = newText
         transcript = t
+        persistCurrentTranscriptIfLoaded()
     }
 
     func deleteSegment(id: TranscriptSegment.ID) {
@@ -1380,6 +1381,7 @@ final class AppModel {
         t.segments.removeAll { $0.id == id }
         guard t.segments.count != before else { return }
         transcript = t
+        persistCurrentTranscriptIfLoaded()
     }
 
     func nudgeSegmentStart(id: TranscriptSegment.ID, frames: Int) {
@@ -1388,6 +1390,7 @@ final class AppModel {
             segments: t.segments, id: id, frameDelta: frames, fps: subtitleFPS
         )
         transcript = t
+        persistCurrentTranscriptIfLoaded()
     }
 
     func nudgeSegmentEnd(id: TranscriptSegment.ID, frames: Int) {
@@ -1396,6 +1399,13 @@ final class AppModel {
             segments: t.segments, id: id, frameDelta: frames, fps: subtitleFPS
         )
         transcript = t
+        persistCurrentTranscriptIfLoaded()
+    }
+
+    /// Persists in-place transcript edits to the open library entry, mirroring applySpeakerRenames/recordChat.
+    func persistCurrentTranscriptIfLoaded() {
+        guard let id = selectedEntryID, let transcript else { return }
+        Task { [library] in try? await library.updateTranscript(transcript, for: id) }
     }
 
     // MARK: - Find & replace

@@ -55,12 +55,14 @@ extension AppModel {
         let match = matches[currentMatchIndex]
         self.transcript = transcript.applying(replacement: findReplacement, to: match)
         recomputeMatches()
+        persistCurrentTranscriptIfLoaded()
     }
 
     func replaceAllMatches() {
         guard let transcript, !findQuery.isEmpty else { return }
         self.transcript = transcript.replacingAll(findQuery, with: findReplacement, caseSensitive: findCaseSensitive)
         recomputeMatches()
+        persistCurrentTranscriptIfLoaded()
     }
 
     private func snapToCurrentMatch() {
