@@ -57,6 +57,24 @@ struct AppModelPlayerTests {
         #expect(model.playerInstallToken == before &+ 1)
     }
 
+    @Test("cached media duration is applied to a transcript that arrives after the player")
+    func mediaDurationAppliedToLateTranscript() {
+        let model = makeModel()
+        model.pendingMediaDuration = 6164
+        model.transcript = Self.makeTranscript([(0, 0, 1)])
+        #expect(model.transcript?.durationSeconds == 6164)
+    }
+
+    @Test("cached media duration does not override a longer transcript duration")
+    func mediaDurationDoesNotShrink() {
+        let model = makeModel()
+        model.pendingMediaDuration = 100
+        var transcript = Self.makeTranscript([(0, 0, 1)])
+        transcript.durationSeconds = 200
+        model.transcript = transcript
+        #expect(model.transcript?.durationSeconds == 200)
+    }
+
     @Test("tearDownPlayer clears player and all derived state")
     func tearDownClearsState() {
         let model = makeModel()
