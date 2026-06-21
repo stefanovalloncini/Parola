@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 enum SettingsPaneScope: String, CaseIterable, Identifiable {
     case general
@@ -183,6 +184,7 @@ struct ResetPaneButton: View {
             ) {
                 Button("Reset", role: .destructive) {
                     SettingsResetService.reset(scope: scope)
+                    SettingsRelaunch.promptToApply("Quit and relaunch Parola for the reset to take effect.")
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
@@ -214,6 +216,24 @@ enum SettingsResetService {
     }
 }
 
+// Settings load into observed AppModel properties once at launch, so changes made
+// straight to UserDefaults (reset, import) only show after a relaunch.
+enum SettingsRelaunch {
+    @MainActor
+    static func promptToApply(_ informativeText: String) {
+        DispatchQueue.main.async {
+            let alert = NSAlert()
+            alert.messageText = "Relaunch to apply"
+            alert.informativeText = informativeText
+            alert.addButton(withTitle: "Quit Parola")
+            alert.addButton(withTitle: "Later")
+            if alert.runModal() == .alertFirstButtonReturn {
+                NSApp.terminate(nil)
+            }
+        }
+    }
+}
+
 extension Notification.Name {
     static let parolaSettingsReset = Notification.Name("ParolaSettingsResetNotification")
 }
@@ -241,6 +261,7 @@ struct ResetAllSettingsButton: View {
         ) {
             Button("Reset all", role: .destructive) {
                 SettingsResetService.resetAll()
+                SettingsRelaunch.promptToApply("Quit and relaunch Parola for the reset to take effect.")
             }
             Button("Cancel", role: .cancel) {}
         } message: {

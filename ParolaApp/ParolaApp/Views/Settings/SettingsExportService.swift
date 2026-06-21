@@ -42,6 +42,7 @@ enum SettingsExportService {
                 throw NSError(domain: "ParolaSettings", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not a valid settings file."])
             }
             apply(payload)
+            SettingsRelaunch.promptToApply("Quit and relaunch Parola to apply the imported settings.")
         } catch {
             NSAlert(error: error).runModal()
         }

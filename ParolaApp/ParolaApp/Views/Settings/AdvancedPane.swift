@@ -61,6 +61,7 @@ struct AdvancedPane: View {
         ) {
             Button("Reset", role: .destructive) {
                 SettingsResetService.resetAll()
+                SettingsRelaunch.promptToApply("Quit and relaunch Parola for the reset to take effect.")
             }
             Button("Cancel", role: .cancel) {}
         } message: {
