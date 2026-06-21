@@ -23,7 +23,8 @@ public struct Chapter: Codable, Hashable, Sendable, Identifiable {
             hash ^= UInt64(byte)
             hash &*= 1_099_511_628_211
         }
-        return "ch-\(Int(start.rounded()))-\(String(hash, radix: 16))"
+        let startKey = Int(exactly: max(0, start).rounded()) ?? .max
+        return "ch-\(startKey)-\(String(hash, radix: 16))"
     }
 }
 

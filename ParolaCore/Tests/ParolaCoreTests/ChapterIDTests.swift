@@ -35,4 +35,15 @@ struct ChapterIDTests {
     func deterministicLiteral() {
         #expect(Chapter(title: "Intro", start: 0).id == "ch-0-ba77daf5b55d0cd1")
     }
+
+    @Test(
+        "a non-finite or out-of-range start yields a stable id without trapping",
+        arguments: [Double.infinity, -.infinity, .nan, 1e19, -1e19]
+    )
+    func idTotalOverExtremeStart(start: Double) {
+        let a = Chapter(title: "Edge", start: start)
+        let b = Chapter(title: "Edge", start: start)
+        #expect(!a.id.isEmpty)
+        #expect(a.id == b.id)
+    }
 }
