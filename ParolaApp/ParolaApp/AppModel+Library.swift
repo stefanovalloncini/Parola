@@ -230,12 +230,20 @@ extension AppModel {
         let targets = ids.compactMap { entriesByID[$0] }
         let exporter = makeExporter(for: format)
         Task { [library, weak self] in
+            var usedNames = Set<String>()
             for entry in targets {
                 do {
                     let loaded = try await library.load(entry.id)
                     let data = try exporter.render(loaded.document.transcript)
                     let safe = entry.title.replacingOccurrences(of: "/", with: "-")
-                    let url = folder.appendingPathComponent("\(safe).\(format.fileExtension)")
+                    var name = safe
+                    var suffix = 2
+                    while usedNames.contains(name) {
+                        name = "\(safe) (\(suffix))"
+                        suffix += 1
+                    }
+                    usedNames.insert(name)
+                    let url = folder.appendingPathComponent("\(name).\(format.fileExtension)")
                     try data.write(to: url, options: .atomic)
                 } catch {
                     await MainActor.run { [weak self] in

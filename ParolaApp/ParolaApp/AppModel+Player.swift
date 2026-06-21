@@ -117,8 +117,8 @@ extension AppModel {
     }
 
     func seekTo(seconds: Double) {
-        guard let player else { return }
-        let t = CMTime(seconds: seconds, preferredTimescale: 600)
+        guard let player, seconds.isFinite else { return }
+        let t = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
         player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
         player.play()
     }
