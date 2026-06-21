@@ -117,7 +117,7 @@ struct ParolaApp: App {
                 Button("Keyboard Shortcuts…") { shortcutSheetOpen = true }
                     .keyboardShortcut("/", modifiers: [.command])
                 Button("Send Feedback") {
-                    if let url = URL(string: "mailto:feedback@parola.app?subject=Parola%20feedback") {
+                    if let url = SupportLinks.feedbackMailto {
                         NSWorkspace.shared.open(url)
                     }
                 }

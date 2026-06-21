@@ -10,9 +10,7 @@ struct AboutPane: View {
 
             HStack(spacing: 10) {
                 Button("Open repository") {
-                    if let url = URL(string: "https://github.com/stefanovalloncini/Parola") {
-                        NSWorkspace.shared.open(url)
-                    }
+                    NSWorkspace.shared.open(SupportLinks.repository)
                 }
                 .axLeaf("About.Button.OpenRepository")
                 Button("Copy version") {
