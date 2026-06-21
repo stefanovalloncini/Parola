@@ -39,4 +39,14 @@ struct SentenceCapitalizerTests {
     func empty() {
         #expect(SentenceCapitalizer.applyTo("") == "")
     }
+
+    @Test("uppercases a sentence-initial sharp s without trapping")
+    func sharpSStart() {
+        #expect(SentenceCapitalizer.applyTo("ßlah. ok.") == "SSlah. Ok.")
+    }
+
+    @Test("uppercases a sentence-initial ligature without trapping")
+    func ligatureStart() {
+        #expect(SentenceCapitalizer.applyTo("ﬁle. done.") == "FIle. Done.")
+    }
 }
