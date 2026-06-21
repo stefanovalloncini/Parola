@@ -105,4 +105,15 @@ struct CapabilityGuardTests {
         let caps = EngineCapabilities.whisperKitDefaults
         #expect(caps.supportedLanguages.allows(nil))
     }
+
+    @Test("static catalog capabilities gate language by model id, matching the warning logic")
+    func staticCatalogCapabilitiesGateLanguage() {
+        let parakeet = ModelCatalog.staticCapabilities(forID: "nvidia_parakeet-tdt-0.6b-v2")?.supportedLanguages
+        #expect(parakeet?.allows("it") == false)
+        #expect(parakeet?.allows("en") == true)
+        #expect(parakeet?.allows(nil) == false)
+
+        let whisper = ModelCatalog.staticCapabilities(forID: "openai_whisper-large-v3_turbo")?.supportedLanguages
+        #expect(whisper?.allows("it") == true)
+    }
 }
