@@ -28,14 +28,14 @@ struct TranscriptInspector: View {
 
     private var modeRow: some View {
         HStack(spacing: DS.Spacing.tight) {
-            InspectorModeIcon(systemName: "textformat", isOn: mode == .format) { mode = .format }
+            InspectorModeIcon(systemName: "textformat", label: "Format", isOn: mode == .format) { mode = .format }
                 .help("Format")
-            InspectorModeIcon(systemName: "info.circle", isOn: mode == .info) { mode = .info }
+            InspectorModeIcon(systemName: "info.circle", label: "Info", isOn: mode == .info) { mode = .info }
                 .help("Info")
-            InspectorModeIcon(systemName: "wand.and.stars", isOn: mode == .actions) { mode = .actions }
+            InspectorModeIcon(systemName: "wand.and.stars", label: "Actions", isOn: mode == .actions) { mode = .actions }
                 .help("Actions")
             Spacer()
-            InspectorModeIcon(systemName: "rectangle.righthalf.filled", isOn: false) {
+            InspectorModeIcon(systemName: "rectangle.righthalf.filled", label: "Hide inspector", isOn: false) {
                 inspectorVisible = false
             }
             .help("Hide inspector")
@@ -45,6 +45,7 @@ struct TranscriptInspector: View {
 
 struct InspectorModeIcon: View {
     let systemName: String
+    let label: LocalizedStringKey
     let isOn: Bool
     let action: () -> Void
 
@@ -60,6 +61,8 @@ struct InspectorModeIcon: View {
                 .foregroundStyle(isOn ? DS.Color.accent : DS.Color.primaryText)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
         .axLeaf("Inspector.Button.\(systemName.replacingOccurrences(of: ".", with: ""))")
     }
 }

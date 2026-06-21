@@ -44,6 +44,7 @@ struct LabelsSection: View {
                     .font(DS.Font.caption2Bold)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Remove label \(label)")
             .axLeaf("Labels.Button.RemoveChip")
         }
         .foregroundStyle(DS.Color.accent)
@@ -74,6 +75,7 @@ struct LabelsSection: View {
                 }
                 .menuStyle(.borderlessButton)
                 .frame(width: 24, height: 22)
+                .accessibilityLabel("Add label")
                 .axLeaf("Labels.Menu.Suggestions")
             }
         }

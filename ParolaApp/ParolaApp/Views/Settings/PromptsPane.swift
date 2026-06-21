@@ -187,6 +187,7 @@ private struct PromptRow: View {
                     }
                     .buttonStyle(.borderless)
                     .help("Edit prompt")
+                    .accessibilityLabel("Edit prompt")
                     .axLeaf("Prompts.Button.Edit")
                     Button(role: .destructive) {
                         onDelete()
@@ -195,6 +196,7 @@ private struct PromptRow: View {
                     }
                     .buttonStyle(.borderless)
                     .help("Delete prompt")
+                    .accessibilityLabel("Delete prompt")
                     .axLeaf("Prompts.Button.Delete")
                 }
             }

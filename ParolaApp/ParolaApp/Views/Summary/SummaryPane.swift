@@ -41,6 +41,7 @@ struct SummaryPane: View {
             .foregroundStyle(DS.Color.secondaryText)
             .disabled(model.transcript == nil || model.isSummarising)
             .help(model.transcript?.summary == nil ? "Generate summary" : "Regenerate summary")
+            .accessibilityLabel("Regenerate summary")
             .axLeaf("Summary.Button.Regenerate")
         }
     }

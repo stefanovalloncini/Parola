@@ -34,6 +34,7 @@ struct BatchView: View {
             }
             .buttonStyle(.borderless)
             .help("Back")
+            .accessibilityLabel("Back")
             .axLeaf("Header.Button.Back")
 
             Text("Batch")
@@ -82,6 +83,7 @@ struct BatchView: View {
             }
             .buttonStyle(.borderless)
             .help(exportPaneVisible ? "Hide export options" : "Show export options")
+            .accessibilityLabel(exportPaneVisible ? "Hide export options" : "Show export options")
             .axLeaf("Header.Button.ToggleExportPane")
         }
         .padding(.horizontal, DS.Spacing.large)

@@ -143,6 +143,7 @@ struct QueueRow: View {
         }
         .buttonStyle(.plain)
         .help(help)
+        .accessibilityLabel(help)
         .axLeaf("Row.Button.\(help.replacingOccurrences(of: " ", with: ""))")
     }
 }

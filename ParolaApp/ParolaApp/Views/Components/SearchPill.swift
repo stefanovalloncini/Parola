@@ -33,6 +33,7 @@ struct SearchPill: View {
                 }
                 .buttonStyle(.plain)
                 .help("Clear")
+                .accessibilityLabel("Clear")
             }
         }
         .padding(.horizontal, 8)

@@ -68,6 +68,7 @@ struct ChatPane: View {
             .buttonStyle(.plain)
             .help("Search chat (⌘F)")
             .keyboardShortcut("f", modifiers: [.command])
+            .accessibilityLabel(isSearching ? "Hide search" : "Search messages")
             .axLeaf("Header.Button.ToggleSearch")
 
             Button(role: .destructive, action: resetConversation) {
@@ -78,6 +79,7 @@ struct ChatPane: View {
             .foregroundStyle(DS.Color.secondaryText)
             .help("Clear conversation")
             .disabled(displayedHistory.isEmpty || isSending)
+            .accessibilityLabel("Clear conversation")
             .axLeaf("Header.Button.Reset")
         }
         .padding(.horizontal, DS.Spacing.medium)
@@ -118,6 +120,7 @@ struct ChatPane: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.escape, modifiers: [])
             .help("Close search")
+            .accessibilityLabel("Close search")
             .axLeaf("Search.Button.Close")
         }
         .padding(.horizontal, DS.Spacing.medium)

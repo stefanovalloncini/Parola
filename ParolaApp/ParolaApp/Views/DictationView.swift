@@ -189,6 +189,7 @@ struct DictationView: View {
             }
             .buttonStyle(.plain)
             .help("Stop dictation")
+            .accessibilityLabel("Stop dictation")
             .axLeaf("HUD.Button.Stop")
         }
     }
