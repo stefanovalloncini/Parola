@@ -19,7 +19,7 @@ public enum TranscriptTimestampedText {
     }
 
     private static func format(_ seconds: Double, hours: Bool) -> String {
-        let total = Int(seconds)
+        let total = Int(exactly: max(0, seconds).rounded(.towardZero)) ?? .max
         let h = total / 3600
         let m = (total % 3600) / 60
         let s = total % 60

@@ -48,6 +48,15 @@ struct TranscriptTimestampedTextTests {
         #expect(text.isEmpty)
     }
 
+    @Test("renders a huge segment start without trapping")
+    func hugeStartDoesNotTrap() {
+        let text = TranscriptTimestampedText.render(transcript(
+            [(1, 1e19, 1e19, "Boom", nil)]
+        ))
+        #expect(text.contains("Boom"))
+        #expect(!text.isEmpty)
+    }
+
     @Test("trims whitespace inside each segment body")
     func trimsBody() {
         let text = TranscriptTimestampedText.render(transcript(

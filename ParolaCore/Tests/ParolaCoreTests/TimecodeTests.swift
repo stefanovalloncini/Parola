@@ -19,4 +19,18 @@ struct TimecodeTests {
         let twoHFiveMSeven = 2 * 3600 + 5 * 60 + 7
         #expect(Timecode.format(Double(twoHFiveMSeven)) == "2:05:07")
     }
+
+    @Test("saturates instead of trapping past Int range")
+    func saturatesOnOverflow() {
+        let huge = Timecode.format(1e19)
+        #expect(huge.filter { $0 == ":" }.count == 2)
+        #expect(!huge.isEmpty)
+        #expect(Timecode.format(.infinity).filter { $0 == ":" }.count == 2)
+    }
+
+    @Test("clamps non-finite and negative input to zero")
+    func clampsNonFiniteAndNegative() {
+        #expect(Timecode.format(.nan) == "00:00")
+        #expect(Timecode.format(-5) == "00:00")
+    }
 }
