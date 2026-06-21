@@ -63,6 +63,17 @@ struct SpeechRateSeriesTests {
         #expect(!series.isEmpty)
     }
 
+    @Test("out-of-order segments span the full transcript")
+    func outOfOrderSpansFullTranscript() throws {
+        let segments = [
+            TranscriptSegment(id: 1, start: 60, end: 90, text: String(repeating: "late ", count: 30)),
+            TranscriptSegment(id: 2, start: 0, end: 30, text: String(repeating: "early ", count: 30)),
+        ]
+        let series = SpeechRateSeries.compute(segments: segments, binSeconds: 30)
+        try #require(series.count == 3)
+        #expect(abs(series[2].wordsPerMinute - 60) < 0.5)
+    }
+
     @Test("negative start does not trap")
     func negativeStart() {
         let segments = [

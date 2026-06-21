@@ -19,7 +19,7 @@ public enum SpeechRateSeries {
         binSeconds: Double = 30
     ) -> [SpeechRateBin] {
         guard binSeconds > 0, !segments.isEmpty else { return [] }
-        let total = segments.last?.end ?? 0
+        let total = segments.map(\.end).max() ?? 0
         guard total > 0 else { return [] }
         let binCount = Int(ceil(total / binSeconds))
         guard binCount > 0 else { return [] }
