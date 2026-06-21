@@ -122,6 +122,15 @@ struct ExporterTests {
         #expect(out.contains("id=\"t-2\""))
     }
 
+    @Test("html omits timestamps when showTimestamps is off")
+    func htmlNoTimestamps() throws {
+        let out = try HtmlExporter(options: HtmlOptions(showTimestamps: false)).renderText(sample())
+        #expect(!out.contains("class=\"t\""))
+        #expect(!out.contains("[00:00:00]"))
+        #expect(out.contains("Hello world."))
+        #expect(out.contains("id=\"t-0\""))
+    }
+
     @Test("html includes speaker prefix when present")
     func htmlSpeakers() throws {
         let out = try HtmlExporter().renderText(sampleWithSpeakers())

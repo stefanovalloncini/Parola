@@ -280,6 +280,9 @@ private struct LibraryRow: View {
     let entry: LibraryEntry
     let sizeBytes: Int64?
 
+    @Environment(AppModel.self) private var model
+    private var compact: Bool { model.sidebarDensity == "compact" }
+
     private var languageLabel: String? {
         let code = entry.language.trimmingCharacters(in: .whitespaces).lowercased()
         guard !code.isEmpty else { return nil }
@@ -344,7 +347,7 @@ private struct LibraryRow: View {
                 }
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.secondaryText)
-                if let opened = entry.lastOpenedAt {
+                if !compact, let opened = entry.lastOpenedAt {
                     Text("Last opened: \(opened.formatted(.relative(presentation: .named)))")
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.Color.secondaryText.opacity(0.75))
@@ -352,7 +355,7 @@ private struct LibraryRow: View {
             }
             Spacer()
         }
-        .padding(.vertical, DS.Spacing.tight)
+        .padding(.vertical, compact ? DS.Spacing.tight / 2 : DS.Spacing.tight)
         .help(tooltip)
     }
 }

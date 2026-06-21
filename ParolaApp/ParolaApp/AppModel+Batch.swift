@@ -119,17 +119,22 @@ extension AppModel {
     private func writeBatchExports(transcript: Transcript, sourceURL: URL) {
         let formats = batchExportFormats
         guard !formats.isEmpty else { return }
-        let plans: [(ExportFormat, URL)] = formats.compactMap { format in
+        let plans: [(ExportFormat, URL, Bool)] = formats.compactMap { format in
             let opts = options(for: format)
             guard opts.writeToSourceFolder else { return nil }
             let url = sourceURL.deletingPathExtension().appendingPathExtension(format.fileExtension)
-            return (format, url)
+            return (format, url, opts.includeTimestamps)
         }
         guard !plans.isEmpty else { return }
         Task.detached {
-            for (format, target) in plans {
+            for (format, target, includeTimestamps) in plans {
                 do {
-                    let data = try Exporters.exporter(for: format).render(transcript)
+                    let exporter: any TranscriptExporter = switch format {
+                    case .md:   MarkdownExporter(options: MarkdownOptions(showTimestamps: includeTimestamps))
+                    case .html: HtmlExporter(options: HtmlOptions(showTimestamps: includeTimestamps))
+                    default:    Exporters.exporter(for: format)
+                    }
+                    let data = try exporter.render(transcript)
                     try data.write(to: target, options: .atomic)
                 } catch {
                     // Sidecar write is best-effort; the transcript is already saved.

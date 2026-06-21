@@ -67,18 +67,22 @@ public enum HtmlExportTheme: String, Sendable, Codable, CaseIterable, Identifiab
 
 public struct HtmlOptions: Sendable, Codable, Hashable {
     public var theme: HtmlExportTheme
+    public var showTimestamps: Bool
 
-    public init(theme: HtmlExportTheme = .light) {
+    public init(theme: HtmlExportTheme = .light, showTimestamps: Bool = true) {
         self.theme = theme
+        self.showTimestamps = showTimestamps
     }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         theme = try c.decodeIfPresent(HtmlExportTheme.self, forKey: .theme) ?? .light
+        showTimestamps = try c.decodeIfPresent(Bool.self, forKey: .showTimestamps) ?? true
     }
 
     private enum CodingKeys: String, CodingKey {
         case theme
+        case showTimestamps
     }
 }
 
@@ -94,9 +98,11 @@ public struct HtmlExporter: TranscriptExporter {
         var body = ""
         for seg in transcript.segments {
             let text = Format.escapeHTML(seg.text.trimmingCharacters(in: .whitespaces))
-            let ts = Format.timestampHHMMSS(seg.start)
             let anchor = "t-\(seg.id)"
-            var paragraph = "<p id=\"\(anchor)\"><a class=\"t\" href=\"#\(anchor)\">[\(ts)]</a> "
+            var paragraph = "<p id=\"\(anchor)\">"
+            if options.showTimestamps {
+                paragraph += "<a class=\"t\" href=\"#\(anchor)\">[\(Format.timestampHHMMSS(seg.start))]</a> "
+            }
             if let speaker = seg.speaker {
                 paragraph += "<span class=\"s\">\(Format.escapeHTML(speaker))</span>: "
             }

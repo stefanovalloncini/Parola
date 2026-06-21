@@ -270,10 +270,8 @@ struct ParolaApp: App {
 
     private var translateCaptionsBinding: Binding<Bool> {
         Binding(
-            get: { liveCaptions.translateToEnglish },
-            set: { newValue in
-                Task { await liveCaptions.setTranslate(newValue) }
-            }
+            get: { model.liveCaptionsTranslate },
+            set: { model.liveCaptionsTranslate = $0 }
         )
     }
 }

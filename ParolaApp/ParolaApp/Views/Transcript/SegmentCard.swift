@@ -27,7 +27,7 @@ struct SegmentCard: View {
 
             HStack(spacing: DS.Spacing.small) {
                 Text(timestamp(segment.start))
-                    .font(DS.Font.captionMono)
+                    .font(model.monospacedTimestamps ? DS.Font.captionMono : DS.Font.caption)
                     .foregroundStyle(isCurrent ? DS.Color.accent : DS.Color.secondaryText)
                 if let speaker = segment.speaker {
                     Text(speaker)
