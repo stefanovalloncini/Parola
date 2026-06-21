@@ -11,6 +11,7 @@ struct MacLibrarySidebar: View {
         case .batch: return .batch
         case .transcript:
             if let filter = model.libraryFilter { return .category(filter) }
+            if model.libraryBrowsingAll { return .all }
             return .home
         }
     }
@@ -36,6 +37,7 @@ struct MacLibrarySidebar: View {
                         badge: pinnedBadge
                     ) {
                         model.libraryFilter = nil
+                        model.libraryBrowsingAll = false
                         model.route = .transcript
                     }
                     .axLeaf("Sidebar.Button.Home")
@@ -48,6 +50,7 @@ struct MacLibrarySidebar: View {
                         badge: activeQueueBadge
                     ) {
                         model.libraryFilter = nil
+                        model.libraryBrowsingAll = false
                         model.route = .queue
                     }
                     .axLeaf("Sidebar.Button.Queue")
@@ -105,9 +108,16 @@ struct MacLibrarySidebar: View {
         HStack(spacing: 6) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
-                    ForEach([(title: "All", filter: EntryCategory?.none), ("Transcriptions", .transcription), ("Meetings", .meeting), ("Dictations", .dictation)], id: \.title) { item in
-                        Chip(title: LocalizedStringKey(item.title), isSelected: model.libraryFilter == item.filter, size: .regular, style: .subtle, selectedFill: DS.Color.accent.opacity(0.85), bordered: false, identifier: "library.filter.\(item.title.lowercased())") {
-                            model.libraryFilter = item.filter
+                    Chip(title: "All", isSelected: model.libraryBrowsingAll, size: .regular, style: .subtle, selectedFill: DS.Color.accent.opacity(0.85), bordered: false, identifier: "library.filter.all") {
+                        model.libraryFilter = nil
+                        model.libraryBrowsingAll = true
+                        model.route = .transcript
+                    }
+                    ForEach([(title: "Transcriptions", category: EntryCategory.transcription), ("Meetings", .meeting), ("Dictations", .dictation)], id: \.title) { item in
+                        Chip(title: LocalizedStringKey(item.title), isSelected: model.libraryFilter == item.category, size: .regular, style: .subtle, selectedFill: DS.Color.accent.opacity(0.85), bordered: false, identifier: "library.filter.\(item.title.lowercased())") {
+                            model.libraryFilter = item.category
+                            model.libraryBrowsingAll = false
+                            model.route = .transcript
                         }
                     }
                 }
@@ -153,6 +163,7 @@ struct MacLibrarySidebar: View {
 
 private enum SidebarRoute: Hashable {
     case home
+    case all
     case queue
     case batch
     case category(EntryCategory)

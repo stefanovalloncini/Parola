@@ -262,12 +262,16 @@ extension AppModel {
                 let loaded = try await library.load(id)
                 transcript = loaded.document.transcript
                 sourceFileURL = loaded.document.audioURL
+                selectedEntryID = id
                 if let audioURL = loaded.document.audioURL {
                     installPlayer(for: audioURL)
                 } else {
                     tearDownPlayer()
                 }
                 phase = .ready
+                libraryFilter = nil
+                libraryBrowsingAll = false
+                searchResults = nil
                 try? await library.markOpened(id: id)
                 refreshLibrary()
             } catch {

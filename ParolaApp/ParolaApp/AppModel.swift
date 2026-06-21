@@ -528,6 +528,8 @@ final class AppModel {
         libraryEntriesByID[id]
     }
     var libraryFilter: EntryCategory?
+    /// True when the "All" chip is showing the flat all-categories list. Distinguishes All from Home, which both leave libraryFilter nil.
+    var libraryBrowsingAll: Bool = false
     var librarySortOrder: LibrarySortOrder = .newest {
         didSet { reapplyLibrarySort() }
     }

@@ -58,6 +58,31 @@ struct AppModelLibraryTests {
         #expect(model.library.libraryURL != LibraryStore.defaultLibraryURL)
     }
 
+    @Test("loadEntry sets selectedEntryID so the detail features bind to the opened entry")
+    func loadEntrySetsSelectedID() async throws {
+        let model = makeModel()
+        let seeded = try await model.library.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        model.selectedEntryID = nil
+
+        model.loadEntry(seeded.id)
+        var loaded = false
+        for _ in 0..<200 {
+            if model.selectedEntryID == seeded.id { loaded = true; break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(loaded)
+        #expect(model.transcript?.segments.first?.text == "hello")
+    }
+
     @Test("newest sort orders by createdAt descending")
     func sortNewest() {
         let model = makeModel()

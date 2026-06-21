@@ -3,7 +3,8 @@ import ParolaCore
 
 struct LibraryListView: View {
     @Environment(AppModel.self) private var model
-    let category: EntryCategory
+    let category: EntryCategory?
+    var searchResults: [LibraryEntry]? = nil
 
     @State private var selection: Set<LibraryEntry.ID> = []
     @State private var pendingBulkDelete = false
@@ -17,20 +18,25 @@ struct LibraryListView: View {
 
     @discardableResult
     private func recomputeEntries() -> [LibraryEntry] {
-        let inCategory = model.libraryEntries.filter { $0.category == category }
-        let computed = inCategory
-            .filter { entry in
-                guard let labelFilter else { return true }
-                return entry.labels.contains { $0.localizedCaseInsensitiveCompare(labelFilter) == .orderedSame }
-            }
-            .filter { entry in
-                guard let cutoff = dateRangeFilter.cutoff else { return true }
-                return entry.createdAt >= cutoff
-            }
-            .sorted { lhs, rhs in
-                if lhs.pinned != rhs.pinned { return lhs.pinned }
-                return lhs.createdAt > rhs.createdAt
-            }
+        let computed: [LibraryEntry]
+        if let searchResults {
+            computed = searchResults
+        } else {
+            computed = model.libraryEntries
+                .filter { category == nil || $0.category == category }
+                .filter { entry in
+                    guard let labelFilter else { return true }
+                    return entry.labels.contains { $0.localizedCaseInsensitiveCompare(labelFilter) == .orderedSame }
+                }
+                .filter { entry in
+                    guard let cutoff = dateRangeFilter.cutoff else { return true }
+                    return entry.createdAt >= cutoff
+                }
+                .sorted { lhs, rhs in
+                    if lhs.pinned != rhs.pinned { return lhs.pinned }
+                    return lhs.createdAt > rhs.createdAt
+                }
+        }
         entries = computed
         return computed
     }
@@ -38,7 +44,7 @@ struct LibraryListView: View {
     private func recomputeLabelOptions() {
         var seen = Set<String>()
         var ordered: [String] = []
-        for entry in model.libraryEntries where entry.category == category {
+        for entry in model.libraryEntries where category == nil || entry.category == category {
             for label in entry.labels {
                 if seen.insert(label).inserted { ordered.append(label) }
             }
@@ -59,12 +65,10 @@ struct LibraryListView: View {
                         .draggable(entry.bundleURL)
                         .onTapGesture(count: 2) {
                             model.loadEntry(entry.id)
-                            model.libraryFilter = nil
                         }
                         .contextMenu {
                             Button("Open") {
                                 model.loadEntry(entry.id)
-                                model.libraryFilter = nil
                             }
                             Button(entry.pinned ? "Unpin" : "Pin") {
                                 model.togglePinned(for: entry.id)
@@ -141,11 +145,13 @@ struct LibraryListView: View {
             Text(headerTitle)
                 .font(DS.Font.title)
                 .foregroundStyle(DS.Color.primaryText)
-            LibraryFilterBar(
-                labelFilter: $labelFilter,
-                dateRangeFilter: $dateRangeFilter,
-                labelOptions: labelOptions
-            )
+            if searchResults == nil {
+                LibraryFilterBar(
+                    labelFilter: $labelFilter,
+                    dateRangeFilter: $dateRangeFilter,
+                    labelOptions: labelOptions
+                )
+            }
             Spacer()
             if !selection.isEmpty {
                 Menu {
@@ -244,18 +250,22 @@ struct LibraryListView: View {
     }
 
     private var headerTitle: String {
+        if searchResults != nil { return "Search results" }
         switch category {
         case .transcription: return "Transcriptions"
         case .meeting: return "Meetings"
         case .dictation: return "Dictations"
+        case nil: return "All"
         }
     }
 
     private var emptyTitle: String {
+        if searchResults != nil { return "No matches" }
         switch category {
         case .transcription: return "No transcriptions yet"
         case .meeting: return "No meetings yet"
         case .dictation: return "No dictations yet"
+        case nil: return "No entries yet"
         }
     }
 
@@ -264,6 +274,7 @@ struct LibraryListView: View {
         case .transcription: return "text.alignleft"
         case .meeting: return "person.2"
         case .dictation: return "text.cursor"
+        case nil: return searchResults != nil ? "magnifyingglass" : "tray"
         }
     }
 }

@@ -38,6 +38,8 @@ struct ContentRoutes: View {
                     ProgressPane(title: "Transcribing batch…", progress: nil)
                 }
             }
+        } else if showsLibraryBrowse {
+            libraryBrowseList
         } else {
             switch model.phase {
             case .idle:
@@ -55,6 +57,26 @@ struct ContentRoutes: View {
             case .failed(let message):
                 ErrorPane(message: message)
             }
+        }
+    }
+
+    private var showsLibraryBrowse: Bool {
+        switch model.phase {
+        case .idle, .ready:
+            return model.searchResults != nil || model.libraryFilter != nil || model.libraryBrowsingAll
+        default:
+            return false
+        }
+    }
+
+    @ViewBuilder
+    private var libraryBrowseList: some View {
+        if let results = model.searchResults {
+            LibraryListView(category: nil, searchResults: results)
+        } else if let filter = model.libraryFilter {
+            LibraryListView(category: filter)
+        } else {
+            LibraryListView(category: nil)
         }
     }
 
