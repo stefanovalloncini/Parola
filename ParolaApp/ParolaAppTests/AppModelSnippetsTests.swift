@@ -9,7 +9,7 @@ import ParolaDictation
 struct AppModelSnippetsTests {
 
     private func makeModel(_ defaults: UserDefaults? = nil) -> AppModel {
-        AppModel(skipBootstrap: true, defaults: defaults ?? UserDefaults(suiteName: "test-\(UUID())")!)
+        AppModel(skipBootstrap: true, defaults: defaults ?? UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("snippets"))
     }
 
     @Test("setting snippets persists them under the snippets key")

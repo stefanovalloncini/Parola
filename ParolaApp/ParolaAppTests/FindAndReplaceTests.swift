@@ -9,7 +9,7 @@ struct FindAndReplaceTests {
     let model: AppModel
 
     init() {
-        model = AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!)
+        model = AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("findreplace"))
         model.transcript = Self.makeTranscript()
     }
 

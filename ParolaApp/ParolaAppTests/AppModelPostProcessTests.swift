@@ -8,7 +8,7 @@ import ParolaCore
 struct AppModelPostProcessTests {
 
     private func makeModel(_ defaults: UserDefaults? = nil) -> AppModel {
-        AppModel(skipBootstrap: true, defaults: defaults ?? UserDefaults(suiteName: "test-\(UUID())")!)
+        AppModel(skipBootstrap: true, defaults: defaults ?? UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("postprocess"))
     }
 
     private static func transcript(_ texts: [String]) -> Transcript {

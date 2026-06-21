@@ -26,7 +26,7 @@ struct AppModelPlayerTests {
     }
 
     private func makeModel() -> AppModel {
-        AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults())
+        AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("player"))
     }
 
     @Test("installPlayer creates a player and resets per-install state")

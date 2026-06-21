@@ -3,6 +3,12 @@ import Testing
 @testable import Parola
 import ParolaCore
 
+/// A throwaway library directory under the temp dir so tests never touch the real on-disk library.
+func makeTempLibraryURL(_ label: String = "appmodel") -> URL {
+    FileManager.default.temporaryDirectory
+        .appendingPathComponent("parola-test-\(label)-\(UUID().uuidString)", isDirectory: true)
+}
+
 @MainActor
 @Suite("AppModel library")
 struct AppModelLibraryTests {
@@ -41,7 +47,15 @@ struct AppModelLibraryTests {
     }
 
     private func makeModel() -> AppModel {
-        AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults())
+        AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("library"))
+    }
+
+    @Test("convenience init routes libraryURL to the store instead of the real library")
+    func libraryURLIsIsolated() {
+        let tmp = makeTempLibraryURL("isolated")
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: tmp)
+        #expect(model.library.libraryURL == tmp)
+        #expect(model.library.libraryURL != LibraryStore.defaultLibraryURL)
     }
 
     @Test("newest sort orders by createdAt descending")

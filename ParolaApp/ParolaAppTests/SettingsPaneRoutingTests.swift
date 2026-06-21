@@ -8,7 +8,7 @@ import ParolaCore
 struct SettingsPaneRoutingTests {
 
     private func makeRig() throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
-        let model = AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!)
+        let model = AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("settingsrouting"))
         let server = try ParolaAutomationServer(model: model)
         let context = AutomationContext(model: model, server: server)
         let commands = Dictionary(uniqueKeysWithValues: server.settingsCommands().map { ($0.name, $0) })

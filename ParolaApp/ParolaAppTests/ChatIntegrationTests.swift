@@ -21,7 +21,7 @@ struct ChatIntegrationTests {
     }
 
     private func makeModel(entryID: LibraryEntry.ID, transcript: Transcript) -> AppModel {
-        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults())
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
         model.transcript = transcript
         model.selectedEntryID = entryID
         return model
@@ -83,7 +83,7 @@ struct ChatIntegrationTests {
 
     @Test("recordChat is a no-op when no transcript is loaded")
     func recordChatRequiresTranscript() {
-        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults())
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
         model.selectedEntryID = "entry-4"
         model.transcript = nil
 
@@ -133,7 +133,7 @@ struct ChatIntegrationTests {
 
     @Test("summariseTranscript flips the thinking flag when a transcript is loaded")
     func thinkingFlagStarts() {
-        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults())
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
         model.transcript = makeTranscript()
         #expect(model.isSummarising == false)
 
@@ -144,7 +144,7 @@ struct ChatIntegrationTests {
 
     @Test("summariseTranscript stays idle without a transcript")
     func thinkingFlagStaysOffWithoutTranscript() {
-        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults())
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
         model.transcript = nil
 
         model.summariseTranscript()
@@ -154,7 +154,7 @@ struct ChatIntegrationTests {
 
     @Test("summariseTranscript ignores re-entry while already running")
     func thinkingFlagBlocksReentry() {
-        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults())
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
         model.transcript = makeTranscript()
         model.summariseTranscript()
         #expect(model.isSummarising)

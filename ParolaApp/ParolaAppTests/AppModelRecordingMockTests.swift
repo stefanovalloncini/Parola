@@ -8,7 +8,7 @@ import ParolaCore
 struct AppModelRecordingMockTests {
 
     private func makeModel() -> AppModel {
-        AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!)
+        AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("recording"))
     }
 
     @Test("with no mic mock and streaming on, the mic path uses the streaming session")

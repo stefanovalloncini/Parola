@@ -7,7 +7,7 @@ import Testing
 struct TranscriptDisplayModeTests {
 
     private func makeModel(_ defaults: UserDefaults) -> AppModel {
-        AppModel(skipBootstrap: true, defaults: defaults)
+        AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("displaymode"))
     }
 
     @Test("default display mode is the continuous transcript")

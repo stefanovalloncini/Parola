@@ -13,7 +13,7 @@ struct AppModelDictationTests {
     }
 
     private func makeModel() -> AppModel {
-        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults())
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("dictation"))
         model.dictationPerAppOverridesJSON = "{}"
         return model
     }

@@ -13,7 +13,7 @@ struct WaiterTests {
     }
 
     private func makeRig() throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
-        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults())
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("waiter"))
         let server = try ParolaAutomationServer(model: model)
         let context = AutomationContext(model: model, server: server)
         let commands = Dictionary(uniqueKeysWithValues: server.waitCommands().map { ($0.name, $0) })

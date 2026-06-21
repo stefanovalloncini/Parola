@@ -779,11 +779,13 @@ final class AppModel {
     convenience init(
         skipBootstrap: Bool = false,
         defaults: UserDefaults = .standard,
-        filePicker: FilePicker = SystemFilePicker()
+        filePicker: FilePicker = SystemFilePicker(),
+        libraryURL: URL? = nil
     ) {
         let sideEffects: Set<BootstrapSideEffect> = skipBootstrap ? [] : BootstrapSideEffect.all
         let bootstrap = AppBootstrap(
             mode: .normal,
+            library: libraryURL,
             defaultsOverride: defaults,
             sideEffects: sideEffects,
             filePicker: filePicker

@@ -20,7 +20,7 @@ struct AppModelBatchTests {
     }
 
     private func makeModel() -> AppModel {
-        AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults())
+        AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("batch"))
     }
 
     private static func makeTranscript() -> Transcript {

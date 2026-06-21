@@ -8,7 +8,7 @@ import ParolaCore
 struct AppModelTermPacksTests {
 
     private func makeModel() -> AppModel {
-        AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!)
+        AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("termpacks"))
     }
 
     private func writePack(_ pack: TermPack) throws -> URL {
