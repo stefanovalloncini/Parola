@@ -35,4 +35,10 @@ struct SentenceCounterTests {
         let text = "Pi is 3.14 and version 1.0 ships today."
         #expect(SentenceCounter.count(text) == 1)
     }
+
+    @Test("counts a sentence that ends in a number")
+    func terminatorAfterDigit() {
+        #expect(SentenceCounter.count("The year was 2020. It rained.") == 2)
+        #expect(SentenceCounter.count("I scored 5. You scored 3.") == 2)
+    }
 }

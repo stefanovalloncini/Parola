@@ -6,22 +6,30 @@ public enum SentenceCounter {
         guard !trimmed.isEmpty else { return 0 }
         var sentences = 0
         var insideSentence = false
-        var inDigit = false
-        for char in trimmed {
+        var previousWasDigit = false
+        var index = trimmed.startIndex
+        while index < trimmed.endIndex {
+            let char = trimmed[index]
+            let next = trimmed.index(after: index)
+            index = next
             if char.isWhitespace || char.isNewline {
-                inDigit = false
+                previousWasDigit = false
                 continue
             }
             if char == "." || char == "!" || char == "?" {
-                if char == "." && inDigit { continue }
+                let nextIsDigit = next < trimmed.endIndex && trimmed[next].isNumber
+                if char == "." && previousWasDigit && nextIsDigit {
+                    previousWasDigit = false
+                    continue
+                }
                 if insideSentence {
                     sentences += 1
                     insideSentence = false
                 }
-                inDigit = false
+                previousWasDigit = false
             } else {
                 insideSentence = true
-                inDigit = char.isNumber
+                previousWasDigit = char.isNumber
             }
         }
         if insideSentence { sentences += 1 }
