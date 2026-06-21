@@ -21,7 +21,8 @@ public enum SpeechRateSeries {
         guard binSeconds > 0, !segments.isEmpty else { return [] }
         let total = segments.map(\.end).max() ?? 0
         guard total > 0 else { return [] }
-        let binCount = Int(ceil(total / binSeconds))
+        let rawBinCount = ceil(total / binSeconds)
+        let binCount = rawBinCount >= Double(maxBins) ? maxBins : Int(rawBinCount)
         guard binCount > 0 else { return [] }
         var counts = Array(repeating: 0.0, count: binCount)
 
@@ -30,8 +31,8 @@ public enum SpeechRateSeries {
             guard words > 0, seg.end > seg.start else { continue }
             let duration = seg.end - seg.start
             let wordsPerSecond = Double(words) / duration
-            let firstBin = min(binCount - 1, max(0, Int(seg.start / binSeconds)))
-            let lastBin = max(firstBin, min(binCount - 1, Int((seg.end - 0.000_001) / binSeconds)))
+            let firstBin = binIndex(seg.start / binSeconds, binCount: binCount)
+            let lastBin = max(firstBin, binIndex((seg.end - 0.000_001) / binSeconds, binCount: binCount))
             for bin in firstBin...lastBin {
                 let binStart = Double(bin) * binSeconds
                 let binEnd = binStart + binSeconds
@@ -43,6 +44,13 @@ public enum SpeechRateSeries {
         return counts.enumerated().map { idx, words in
             SpeechRateBin(startSeconds: Double(idx) * binSeconds, wordsPerMinute: (words / binSeconds) * 60)
         }
+    }
+
+    // Ceiling so a malformed import's huge-finite segment end can't blow up the bin array (~35 days at 30s bins).
+    private static let maxBins = 100_000
+
+    private static func binIndex(_ raw: Double, binCount: Int) -> Int {
+        Int(min(Double(binCount - 1), max(0, raw)))
     }
 
     private static func countWords(_ text: String) -> Int {

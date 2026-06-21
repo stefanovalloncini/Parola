@@ -82,4 +82,26 @@ struct SpeechRateSeriesTests {
         let series = SpeechRateSeries.compute(segments: segments, binSeconds: 30)
         #expect(!series.isEmpty)
     }
+
+    @Test("a huge-finite end does not trap or allocate unboundedly")
+    func hugeFiniteEndDoesNotTrap() {
+        let segments = [
+            TranscriptSegment(id: 1, start: 0, end: 1e21, text: "alpha bravo charlie"),
+        ]
+        let series = SpeechRateSeries.compute(segments: segments, binSeconds: 30)
+        #expect(!series.isEmpty)
+        #expect(series.count <= 100_000)
+    }
+
+    @Test("a malformed huge-finite segment among normal ones does not trap")
+    func hugeFiniteSegmentAmongNormalDoesNotTrap() {
+        let segments = [
+            TranscriptSegment(id: 1, start: 0, end: 30, text: String(repeating: "word ", count: 60)),
+            TranscriptSegment(id: 2, start: 1e20, end: 1e21, text: "garbage cue from a malformed import"),
+        ]
+        let series = SpeechRateSeries.compute(segments: segments, binSeconds: 30)
+        #expect(!series.isEmpty)
+        #expect(series.count <= 100_000)
+        #expect(series[0].wordsPerMinute > 0)
+    }
 }
