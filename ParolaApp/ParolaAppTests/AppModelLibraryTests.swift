@@ -61,7 +61,9 @@ struct AppModelLibraryTests {
     @Test("loadEntry sets selectedEntryID so the detail features bind to the opened entry")
     func loadEntrySetsSelectedID() async throws {
         let model = makeModel()
-        let seeded = try await model.library.add(
+        // Seed via a no-Spotlight store sharing the model's library dir; the real CSSearchableIndex call inside add() can hang in the test host.
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
             transcript: Transcript(
                 segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
                 language: "en",
