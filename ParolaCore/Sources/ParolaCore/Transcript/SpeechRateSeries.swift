@@ -31,7 +31,7 @@ public enum SpeechRateSeries {
             let duration = seg.end - seg.start
             let wordsPerSecond = Double(words) / duration
             let firstBin = Int(seg.start / binSeconds)
-            let lastBin = min(binCount - 1, Int((seg.end - 0.000_001) / binSeconds))
+            let lastBin = max(firstBin, min(binCount - 1, Int((seg.end - 0.000_001) / binSeconds)))
             for bin in firstBin...lastBin {
                 let binStart = Double(bin) * binSeconds
                 let binEnd = binStart + binSeconds

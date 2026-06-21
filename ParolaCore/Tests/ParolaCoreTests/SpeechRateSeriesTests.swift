@@ -41,4 +41,15 @@ struct SpeechRateSeriesTests {
             #expect(series[i].startSeconds > series[i - 1].startSeconds)
         }
     }
+
+    @Test("sub-microsecond segment on a bin boundary does not trap")
+    func degenerateSegmentOnBoundary() {
+        let segments = [
+            TranscriptSegment(id: 1, start: 0, end: 30, text: String(repeating: "a ", count: 30)),
+            TranscriptSegment(id: 2, start: 30, end: 30.000_000_5, text: "boundary"),
+        ]
+        let series = SpeechRateSeries.compute(segments: segments, binSeconds: 30)
+        #expect(series.count == 2)
+        #expect(series[1].wordsPerMinute > 0)
+    }
 }
