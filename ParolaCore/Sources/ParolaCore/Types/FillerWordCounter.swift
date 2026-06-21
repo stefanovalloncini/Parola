@@ -21,7 +21,7 @@ public enum FillerWordCounter {
             var range = haystack.startIndex..<haystack.endIndex
             while let hit = haystack.range(of: needle, range: range) {
                 total += 1
-                range = hit.upperBound..<haystack.endIndex
+                range = haystack.index(before: hit.upperBound)..<haystack.endIndex
             }
         }
         return total

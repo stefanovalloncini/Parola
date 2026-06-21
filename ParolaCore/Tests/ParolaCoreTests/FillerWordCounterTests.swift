@@ -21,6 +21,12 @@ struct FillerWordCounterTests {
         #expect(FillerWordCounter.count(in: "umbrella likewise") == 0)
     }
 
+    @Test("counts back-to-back repeats of the same filler")
+    func consecutiveRepeats() {
+        #expect(FillerWordCounter.count(in: "um um um") == 3)
+        #expect(FillerWordCounter.count(in: "you know, you know") == 2)
+    }
+
     @Test("empty input is zero")
     func empty() {
         #expect(FillerWordCounter.count(in: "") == 0)
