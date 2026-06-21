@@ -87,6 +87,20 @@ struct PeopleStoreTests {
         #expect(transcript.uniqueSpeakers == ["SPEAKER_01", "SPEAKER_02"])
     }
 
+    @Test("uniqueSpeakers treats an empty-string speaker as no speaker")
+    func uniqueSpeakersSkipsEmpty() {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "hi", speaker: "SPEAKER_01"),
+                TranscriptSegment(id: 1, start: 1, end: 2, text: "blank", speaker: ""),
+                TranscriptSegment(id: 2, start: 2, end: 3, text: "no speaker"),
+            ],
+            language: "en",
+            modelName: "tiny"
+        )
+        #expect(transcript.uniqueSpeakers == ["SPEAKER_01"])
+    }
+
     @Test("Transcript.renamingSpeaker rewrites every matching segment")
     func renamingSpeaker() {
         let transcript = Transcript(

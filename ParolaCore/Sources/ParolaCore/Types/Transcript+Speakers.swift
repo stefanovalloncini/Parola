@@ -6,7 +6,7 @@ public extension Transcript {
         var seen = Set<String>()
         var ordered: [String] = []
         for seg in segments {
-            if let speaker = seg.speaker, !seen.contains(speaker) {
+            if let speaker = seg.speaker, !speaker.isEmpty, !seen.contains(speaker) {
                 seen.insert(speaker)
                 ordered.append(speaker)
             }
