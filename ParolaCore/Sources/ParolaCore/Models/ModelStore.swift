@@ -96,6 +96,10 @@ public final class ModelStore: Sendable {
         let catalogPaths: Set<String> = Set(ModelCatalog.all.map {
             installedURL(for: $0.downloadSource).standardizedFileURL.path
         })
+        // FluidAudio's cache drops the "-coreml" suffix our catalog repo carries, leaving a de-suffixed twin dir for the same model; match it by name so the twin isn't listed as a stray orphan.
+        let catalogDirNames: Set<String> = Set(ModelCatalog.all.map {
+            installedURL(for: $0.downloadSource).lastPathComponent
+        })
 
         for root in orphanScanRoots {
             guard fm.fileExists(atPath: root.path) else { continue }
@@ -106,6 +110,7 @@ public final class ModelStore: Sendable {
                 else { continue }
                 let standardPath = url.standardizedFileURL.path
                 if catalogPaths.contains(standardPath) { continue }
+                if catalogDirNames.contains(url.lastPathComponent + "-coreml") { continue }
                 let id = url.lastPathComponent
                 if seen[id] != nil { continue }
                 seen[id] = ModelInfo(
