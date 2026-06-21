@@ -52,4 +52,23 @@ struct SpeechRateSeriesTests {
         #expect(series.count == 2)
         #expect(series[1].wordsPerMinute > 0)
     }
+
+    @Test("out-of-order segments do not trap")
+    func outOfOrderSegments() {
+        let segments = [
+            TranscriptSegment(id: 1, start: 60, end: 65, text: "hello world"),
+            TranscriptSegment(id: 2, start: 0, end: 5, text: "foo bar"),
+        ]
+        let series = SpeechRateSeries.compute(segments: segments, binSeconds: 30)
+        #expect(!series.isEmpty)
+    }
+
+    @Test("negative start does not trap")
+    func negativeStart() {
+        let segments = [
+            TranscriptSegment(id: 1, start: -40, end: 10, text: "alpha bravo charlie"),
+        ]
+        let series = SpeechRateSeries.compute(segments: segments, binSeconds: 30)
+        #expect(!series.isEmpty)
+    }
 }
