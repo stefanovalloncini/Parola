@@ -51,6 +51,18 @@ struct SpeakerStatsTests {
         #expect(stats[0].speaker == "Alice")
     }
 
+    @Test("treats an empty-string speaker as unlabeled")
+    func ignoresEmptyStringSpeaker() {
+        let t = transcript([
+            segment(1, start: 0, end: 4, text: "x", speaker: ""),
+            segment(2, start: 4, end: 10, text: "y", speaker: "Alice"),
+        ])
+        let stats = SpeakerStats.compute(for: t)
+        #expect(stats.count == 1)
+        #expect(stats[0].speaker == "Alice")
+        #expect(stats[0].share == 1)
+    }
+
     @Test("share is the fraction of total duration")
     func share() {
         let t = transcript([

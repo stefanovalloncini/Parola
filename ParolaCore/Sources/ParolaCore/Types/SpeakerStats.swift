@@ -20,7 +20,7 @@ public struct SpeakerStats: Equatable, Sendable, Identifiable {
         var order: [String] = []
         var aggregates: [String: (words: Int, characters: Int, duration: Double)] = [:]
         for segment in transcript.segments {
-            guard let speaker = segment.speaker else { continue }
+            guard let speaker = segment.speaker, !speaker.isEmpty else { continue }
             if aggregates[speaker] == nil {
                 order.append(speaker)
                 aggregates[speaker] = (0, 0, 0)
