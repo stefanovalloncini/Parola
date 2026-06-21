@@ -114,6 +114,26 @@ struct SrtImporterTests {
         #expect(t.segments.allSatisfy { $0.start.isFinite && $0.end.isFinite })
     }
 
+    @Test("drops a cue whose timestamp is absurdly large")
+    func dropsOutOfRangeTimestampCue() {
+        let srt = """
+        1
+        00:00:00,000 --> 00:00:01,000
+        hello
+
+        2
+        99999999999:00:00,000 --> 99999999999:00:01,000
+        poison
+
+        3
+        00:00:04,000 --> 00:00:05,000
+        world
+        """
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.count == 2)
+        #expect(t.segments.map(\.text) == ["hello", "world"])
+    }
+
     @Test("skips a cue whose text is empty and keeps ids sequential")
     func skipsEmptyTextCue() {
         let srt = """

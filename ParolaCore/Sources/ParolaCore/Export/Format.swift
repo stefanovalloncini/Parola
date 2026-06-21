@@ -33,14 +33,19 @@ public enum Format {
     public static func parseClockTimestamp(_ s: String) -> Double? {
         let trimmed = s.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
         let parts = trimmed.components(separatedBy: ":")
+        let seconds: Double
         if parts.count == 3, let h = Int(parts[0]), let m = Int(parts[1]), let sec = plainSeconds(parts[2]) {
-            return Double(h) * 3600 + Double(m) * 60 + sec
+            seconds = Double(h) * 3600 + Double(m) * 60 + sec
+        } else if parts.count == 2, let m = Int(parts[0]), let sec = plainSeconds(parts[1]) {
+            seconds = Double(m) * 60 + sec
+        } else {
+            return nil
         }
-        if parts.count == 2, let m = Int(parts[0]), let sec = plainSeconds(parts[1]) {
-            return Double(m) * 60 + sec
-        }
-        return nil
+        // Past this a cue's time is corrupt (e.g. a malformed hours field); no real recording is this long.
+        return (0...maxClockSeconds).contains(seconds) ? seconds : nil
     }
+
+    private static let maxClockSeconds: Double = 1000 * 3600
 
     // Double.init over-accepts nan/inf/scientific/hex/signs; subtitle seconds are always plain SS[.mmm].
     private static func plainSeconds(_ field: String) -> Double? {

@@ -61,6 +61,23 @@ struct FormatTests {
         #expect(Format.parseClockTimestamp(input) == nil)
     }
 
+    @Test("parseClockTimestamp rejects out-of-range timestamps", arguments: [
+        "99999999999:00:00.000",
+        "1000:00:00.001",
+        "00:00:999999999999.000",
+        "-5:00:00.000",
+        "00:-1:00.000",
+    ])
+    func parseRejectsOutOfRange(_ input: String) {
+        #expect(Format.parseClockTimestamp(input) == nil)
+    }
+
+    @Test("parseClockTimestamp keeps long in-range timestamps")
+    func parseKeepsLongInRange() {
+        #expect(Format.parseClockTimestamp("999:00:00.000") == 3_596_400.0)
+        #expect(Format.parseClockTimestamp("1000:00:00.000") == 3_600_000.0)
+    }
+
     @Test("subtitleTimestamp uses the requested millisecond separator")
     func subtitleSeparator() {
         #expect(Format.subtitleTimestamp(1.5, msSeparator: ",") == "00:00:01,500")
