@@ -19,6 +19,7 @@ extension AppModel {
         isPlaying = false
         currentSegmentID = nil
         currentWordID = nil
+        pendingMediaDuration = nil
     }
 
     func installPlayer(for url: URL) {
@@ -48,10 +49,12 @@ extension AppModel {
             let assetDuration = (try? await asset.load(.duration)).map(CMTimeGetSeconds)
             guard let self, self.playerInstallToken == token else { return }
             self.hasVideo = !tracks.isEmpty
-            if let assetDuration, assetDuration.isFinite, assetDuration > 0,
-               var t = self.transcript, (t.durationSeconds ?? 0) < assetDuration - 0.05 {
-                t.durationSeconds = assetDuration
-                self.transcript = t
+            if let assetDuration, assetDuration.isFinite, assetDuration > 0 {
+                self.pendingMediaDuration = assetDuration
+                if var t = self.transcript, (t.durationSeconds ?? 0) < assetDuration - 0.05 {
+                    t.durationSeconds = assetDuration
+                    self.transcript = t
+                }
             }
         }
     }

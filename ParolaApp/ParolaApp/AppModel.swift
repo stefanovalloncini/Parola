@@ -46,6 +46,9 @@ final class AppModel {
     var phase: Phase = .idle
     var transcript: Transcript? {
         didSet {
+            if let d = pendingMediaDuration, transcript != nil, (transcript?.durationSeconds ?? 0) < d - 0.05 {
+                transcript?.durationSeconds = d
+            }
             let speakers = transcript?.uniqueSpeakers ?? []
             if speakers != transcriptSpeakers { transcriptSpeakers = speakers }
             transcriptVersion &+= 1
@@ -196,6 +199,8 @@ final class AppModel {
     @ObservationIgnored var playerTimeObserver: Any?
     @ObservationIgnored var timeControlObserver: NSKeyValueObservation?
     @ObservationIgnored var playerInstallToken: Int = 0
+    /// Duration loaded from the player asset, applied once the transcript arrives — the transcribe path installs the player before the transcript exists.
+    @ObservationIgnored var pendingMediaDuration: Double?
 
     var pendingExport: ExportFormat?
 
