@@ -48,6 +48,25 @@ struct TranscriptOutlineTests {
         #expect(entries[1].speaker == "Bob")
     }
 
+    @Test("an empty-string speaker does not start a new outline entry")
+    func emptyStringSpeakerNoSplit() {
+        let segments = [
+            makeSegment(1, start: 0, text: "Alice opens the meeting", speaker: "Alice"),
+            makeSegment(2, start: 8, text: "the discussion keeps going", speaker: ""),
+        ]
+        let entries = TranscriptOutline.entries(for: makeTranscript(segments: segments), chapters: [])
+        #expect(entries.count == 1)
+        #expect(entries[0].speaker == "Alice")
+    }
+
+    @Test("an empty-string speaker is normalized to nil in the outline")
+    func emptyStringSpeakerNormalized() {
+        let segments = [makeSegment(1, start: 0, text: "hello there everyone", speaker: "")]
+        let entries = TranscriptOutline.entries(for: makeTranscript(segments: segments), chapters: [])
+        #expect(entries.count == 1)
+        #expect(entries[0].speaker == nil)
+    }
+
     @Test("long monologue emits a heading every gap window")
     func gapWindow() {
         let segments = (0..<6).map { idx in

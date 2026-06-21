@@ -31,16 +31,17 @@ public enum TranscriptOutline {
         var lastSpeaker: String?
         var lastStart: Double = -.infinity
         for segment in segments {
-            let speakerChanged = segment.speaker != nil && segment.speaker != lastSpeaker
+            let speaker = segment.speaker.flatMap { $0.isEmpty ? nil : $0 }
+            let speakerChanged = speaker != nil && speaker != lastSpeaker
             let gapElapsed = segment.start - lastStart >= gapSeconds
             if entries.isEmpty || speakerChanged || gapElapsed {
                 entries.append(Entry(
                     id: "seg-\(segment.id)",
                     start: segment.start,
                     title: headingTitle(from: segment.text),
-                    speaker: segment.speaker
+                    speaker: speaker
                 ))
-                lastSpeaker = segment.speaker
+                lastSpeaker = speaker
                 lastStart = segment.start
             }
         }
