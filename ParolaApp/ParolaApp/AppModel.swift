@@ -497,7 +497,7 @@ final class AppModel {
 
     // MARK: - Library
 
-    @ObservationIgnored let library = LibraryStore()
+    @ObservationIgnored let library: LibraryStore
     var libraryEntries: [LibraryEntry] = [] {
         didSet {
             rebuildLibraryIndex()
@@ -672,6 +672,7 @@ final class AppModel {
         self.filePicker = bootstrap.filePicker
         self.mode = bootstrap.mode
         self.clock = bootstrap.clock
+        self.library = LibraryStore(libraryURL: bootstrap.library ?? LibraryStore.defaultLibraryURL)
         self.dictationEnabled = defaults.bool(forKey: "dictationEnabled")
         self.dictationModeRaw = defaults.string(forKey: "dictationModeRaw") ?? DictationMode.pushToTalk.rawValue
         self.dictationKeyCode = defaults.object(forKey: "dictationKeyCode") == nil ? 96 : defaults.integer(forKey: "dictationKeyCode")
