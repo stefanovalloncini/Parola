@@ -30,11 +30,13 @@ public struct ETACalculator: Sendable {
         guard elapsed > 0 else { return nil }
         let rate = (latest.progress - first.progress) / elapsed
         guard rate > 0 else { return nil }
-        return max(0, (1 - latest.progress) / rate)
+        let remaining = (1 - latest.progress) / rate
+        guard remaining.isFinite else { return nil }
+        return max(0, remaining)
     }
 
     public static func format(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds.rounded()))
+        let total = Int(exactly: max(0, seconds).rounded()) ?? .max
         let hours = total / 3600
         let minutes = (total % 3600) / 60
         let secs = total % 60

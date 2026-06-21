@@ -40,10 +40,26 @@ struct ETACalculatorTests {
         #expect(calc.remainingSeconds(at: start.addingTimeInterval(40)) == 0)
     }
 
+    @Test("returns nil when a near-zero rate makes the estimate non-finite")
+    func nonFiniteEstimateIsNil() {
+        var calc = ETACalculator()
+        let start = Date(timeIntervalSince1970: 0)
+        calc.observe(progress: 0.0, at: start)
+        calc.observe(progress: .leastNonzeroMagnitude, at: start.addingTimeInterval(1))
+        #expect(calc.remainingSeconds(at: start.addingTimeInterval(1)) == nil)
+    }
+
     @Test("formatted ETA reads as M:SS for short jobs and H:MM:SS otherwise")
     func formatting() {
         #expect(ETACalculator.format(45) == "0:45")
         #expect(ETACalculator.format(65) == "1:05")
         #expect(ETACalculator.format(3725) == "1:02:05")
+    }
+
+    @Test("formatting saturates on non-finite or out-of-range input instead of trapping")
+    func formatSaturatesDegenerateInput() {
+        #expect(ETACalculator.format(.nan) == "0:00")
+        #expect(ETACalculator.format(-5) == "0:00")
+        #expect(ETACalculator.format(.infinity) == ETACalculator.format(.greatestFiniteMagnitude))
     }
 }
