@@ -19,4 +19,19 @@ public extension Array where Element == TranscriptSegment {
         }
         return nil
     }
+
+    /// Binary-search for the first segment whose `start` is greater than `time`. Assumes segments are sorted by `start`.
+    func firstSegment(startingAfter time: Double) -> TranscriptSegment? {
+        var lo = 0
+        var hi = count
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            if self[mid].start > time {
+                hi = mid
+            } else {
+                lo = mid + 1
+            }
+        }
+        return lo < count ? self[lo] : nil
+    }
 }

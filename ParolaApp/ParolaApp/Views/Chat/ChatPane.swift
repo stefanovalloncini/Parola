@@ -242,13 +242,20 @@ struct ChatPane: View {
     }
 
     private func attachFiles(_ urls: [URL]) {
-        for url in urls where ChatAttachment.isReadableTextFile(url) {
-            let needsScope = url.startAccessingSecurityScopedResource()
-            defer { if needsScope { url.stopAccessingSecurityScopedResource() } }
-            guard let raw = try? String(contentsOf: url, encoding: .utf8) else { continue }
-            input = ChatAttachment.attach(input: input, filename: url.lastPathComponent, content: raw)
+        let readable = urls.filter { ChatAttachment.isReadableTextFile($0) }
+        guard !readable.isEmpty else { return }
+        Task {
+            for url in readable {
+                let raw = await Task.detached { () -> String? in
+                    let needsScope = url.startAccessingSecurityScopedResource()
+                    defer { if needsScope { url.stopAccessingSecurityScopedResource() } }
+                    return try? String(contentsOf: url, encoding: .utf8)
+                }.value
+                guard let raw else { continue }
+                input = ChatAttachment.attach(input: input, filename: url.lastPathComponent, content: raw)
+            }
+            composerFocused = true
         }
-        composerFocused = true
     }
 
     private func send() {

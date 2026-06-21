@@ -1493,7 +1493,7 @@ final class AppModel {
             guard let self else { return }
             guard let dest = await self.filePicker.chooseSaveDestination(suggestedName: suggested, allowedTypes: []) else { return }
             do {
-                _ = try ParolaDocument.write(transcript: transcript, audioURL: sourceFileURL, to: dest)
+                try await Task.detached { _ = try ParolaDocument.write(transcript: transcript, audioURL: sourceFileURL, to: dest) }.value
             } catch {
                 self.phase = .failed(message: "Save failed: \(error.localizedDescription)")
             }
@@ -1712,9 +1712,12 @@ final class AppModel {
                 suggestedName: "transcript.\(format.fileExtension)",
                 allowedTypes: [.plainText]
             ) else { return }
+            let exporter = self.makeExporter(for: format)
             do {
-                let data = try self.makeExporter(for: format).render(transcript)
-                try data.write(to: url, options: .atomic)
+                try await Task.detached {
+                    let data = try exporter.render(transcript)
+                    try data.write(to: url, options: .atomic)
+                }.value
             } catch {
                 self.phase = .failed(message: "Export failed: \(error.localizedDescription)")
             }

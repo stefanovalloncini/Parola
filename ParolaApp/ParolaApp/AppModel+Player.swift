@@ -110,7 +110,7 @@ extension AppModel {
             return
         }
         guard let currentSegment = segments.binarySearchSegment(coveringTime: currentTime),
-              let nextSegment = segments.first(where: { $0.start > currentSegment.end + 0.4 }) else {
+              let nextSegment = segments.firstSegment(startingAfter: currentSegment.end + 0.4) else {
             return
         }
         let gap = nextSegment.start - currentSegment.end
