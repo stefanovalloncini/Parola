@@ -112,4 +112,28 @@ struct VttImporterTests {
         #expect(t.segments.count == 1)
         #expect(t.segments.first?.text == "Hello")
     }
+
+    @Test("decodes HTML entities in cue text")
+    func decodesEntities() {
+        let vtt = """
+        WEBVTT
+
+        00:00:00.000 --> 00:00:02.000
+        welcome to the Q&amp;A about rock &amp; roll
+        """
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.first?.text == "welcome to the Q&A about rock & roll")
+    }
+
+    @Test("keeps escaped angle brackets as literals rather than dropping them as tags")
+    func decodesAngleBrackets() {
+        let vtt = """
+        WEBVTT
+
+        00:00:00.000 --> 00:00:02.000
+        use &lt;b&gt; to make text bold
+        """
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.first?.text == "use <b> to make text bold")
+    }
 }

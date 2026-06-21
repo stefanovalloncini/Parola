@@ -47,7 +47,7 @@ enum VttImporter {
                 i += 1
             }
 
-            let text = textLines.joined(separator: " ")
+            let text = decodeEntities(textLines.joined(separator: " "))
             if !text.isEmpty {
                 segments.append(TranscriptSegment(
                     id: nextID,
@@ -91,6 +91,15 @@ enum VttImporter {
 
     static func parseTimestamp(_ s: String) -> Double? {
         Format.parseClockTimestamp(s)
+    }
+
+    // Must run after tag stripping, else an escaped `&lt;b&gt;` is eaten as a tag; `&amp;` last so `&amp;lt;` stays `&lt;`.
+    static func decodeEntities(_ s: String) -> String {
+        guard s.contains("&") else { return s }
+        return s
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&amp;", with: "&")
     }
 
     static func stripInlineTags(_ line: String) -> String {
