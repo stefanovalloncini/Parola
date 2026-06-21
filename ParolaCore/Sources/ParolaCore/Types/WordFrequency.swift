@@ -11,7 +11,7 @@ public enum WordFrequency {
         "a", "an", "the", "and", "or", "but", "if", "then", "else", "when", "while",
         "of", "at", "by", "for", "with", "about", "against", "between", "into", "through",
         "during", "before", "after", "above", "below", "to", "from", "up", "down", "in",
-        "out", "on", "off", "over", "under", "again", "further", "then", "once",
+        "out", "on", "off", "over", "under", "again", "further", "once",
         "here", "there", "all", "any", "both", "each", "few", "more", "most", "other",
         "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very",
         "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "having",
@@ -19,7 +19,7 @@ public enum WordFrequency {
         "might", "must", "can",
         "this", "that", "these", "those", "i", "me", "my", "we", "our", "you", "your",
         "he", "him", "his", "she", "her", "it", "its", "they", "them", "their", "what",
-        "which", "who", "whom", "as", "just", "really", "very", "also",
+        "which", "who", "whom", "as", "just", "really", "also",
     ]
 
     public static func compute(
