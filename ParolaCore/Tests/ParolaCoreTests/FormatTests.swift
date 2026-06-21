@@ -95,6 +95,23 @@ struct FormatTests {
         #expect(Format.subtitleTimestamp(360_000, msSeparator: ".") == "100:00:00.000")
     }
 
+    @Test("subtitleTimestamp saturates instead of trapping past Int range")
+    func subtitleSaturatesOnOverflow() {
+        let huge = Format.subtitleTimestamp(1e16, msSeparator: ",")
+        #expect(huge.filter { $0 == ":" }.count == 2)
+        let fields = huge.split(separator: ",")
+        #expect(fields.count == 2)
+        #expect(fields[1].count == 3)
+    }
+
+    @Test("timestampHHMMSS saturates instead of trapping past Int range")
+    func timestampSaturatesOnOverflow() {
+        #expect(Format.timestampHHMMSS(3661) == "01:01:01")
+        let huge = Format.timestampHHMMSS(1e19)
+        #expect(huge.filter { $0 == ":" }.count == 2)
+        #expect(!huge.isEmpty)
+    }
+
     @Test("escapeWebVTT escapes ampersand and angle brackets")
     func webvttEscapesMarkup() {
         #expect(Format.escapeWebVTT("a < b & c > d") == "a &lt; b &amp; c &gt; d")

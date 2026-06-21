@@ -3,7 +3,7 @@ import Foundation
 
 public enum Format {
     public static func timestampHHMMSS(_ seconds: Double) -> String {
-        let total = Int(max(0, seconds))
+        let total = Int(exactly: max(0, seconds).rounded(.towardZero)) ?? .max
         let h = total / 3600
         let m = (total / 60) % 60
         let s = total % 60
@@ -12,7 +12,7 @@ public enum Format {
 
     /// Formats seconds as `HH:MM:SS<sep>mmm`. SRT uses `,` as separator, VTT uses `.`.
     public static func subtitleTimestamp(_ seconds: Double, msSeparator: Character) -> String {
-        let total = Int((max(0, seconds) * 1000).rounded())
+        let total = Int(exactly: (max(0, seconds) * 1000).rounded()) ?? .max
         let ms = total % 1000
         let s = (total / 1000) % 60
         let m = (total / 60_000) % 60
