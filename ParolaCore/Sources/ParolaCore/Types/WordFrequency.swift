@@ -29,8 +29,10 @@ public enum WordFrequency {
         stopWords: Set<String> = defaultStopWords
     ) -> [Entry] {
         var counts: [String: Int] = [:]
-        for raw in text.split(whereSeparator: { !$0.isLetter && !$0.isNumber }) {
-            let token = String(raw).lowercased()
+        for raw in text.split(whereSeparator: { !$0.isLetter && !$0.isNumber && !$0.isApostrophe }) {
+            var token = String(raw).lowercased()
+            while token.first?.isApostrophe == true { token.removeFirst() }
+            while token.last?.isApostrophe == true { token.removeLast() }
             guard token.count >= minLength else { continue }
             guard !stopWords.contains(token) else { continue }
             counts[token, default: 0] += 1
@@ -42,4 +44,8 @@ public enum WordFrequency {
         .prefix(limit)
         .map { Entry(word: $0.key, count: $0.value) }
     }
+}
+
+private extension Character {
+    var isApostrophe: Bool { self == "'" || self == "\u{2019}" }
 }

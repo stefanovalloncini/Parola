@@ -54,4 +54,18 @@ struct WordFrequencyTests {
         #expect(WordFrequency.compute(text: "", limit: 5).isEmpty)
         #expect(WordFrequency.compute(text: "the of and", limit: 5).isEmpty)
     }
+
+    @Test("keeps in-word apostrophes so contractions count once")
+    func keepsContractions() {
+        let freq = WordFrequency.compute(text: "Don't go. I don't stay.", limit: 5)
+        let dont = freq.first { $0.word == "don't" }?.count ?? 0
+        #expect(dont == 2)
+    }
+
+    @Test("trims edge apostrophes and keeps curly ones in-word")
+    func trimsEdgeApostrophes() {
+        let freq = WordFrequency.compute(text: "'quoted' it\u{2019}s fine", limit: 5)
+        #expect(freq.first { $0.word == "quoted" }?.count == 1)
+        #expect(freq.first { $0.word == "it\u{2019}s" }?.count == 1)
+    }
 }
