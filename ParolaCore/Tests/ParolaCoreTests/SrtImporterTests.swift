@@ -93,6 +93,27 @@ struct SrtImporterTests {
         #expect(t.segments.first?.end == 1.5)
     }
 
+    @Test("drops a cue whose timestamp is not finite")
+    func dropsNonFiniteTimestampCue() {
+        let srt = """
+        1
+        00:00:00,000 --> 00:00:01,000
+        hello
+
+        2
+        00:00:nan --> 00:00:03,000
+        poison
+
+        3
+        00:00:04,000 --> 00:00:05,000
+        world
+        """
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.count == 2)
+        #expect(t.segments.map(\.text) == ["hello", "world"])
+        #expect(t.segments.allSatisfy { $0.start.isFinite && $0.end.isFinite })
+    }
+
     @Test("skips a cue whose text is empty and keeps ids sequential")
     func skipsEmptyTextCue() {
         let srt = """

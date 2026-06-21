@@ -48,6 +48,19 @@ struct FormatTests {
         #expect(Format.parseClockTimestamp(input) == nil)
     }
 
+    @Test("parseClockTimestamp rejects non-finite and non-decimal seconds", arguments: [
+        "00:00:nan",
+        "00:00:inf",
+        "00:00:1e3",
+        "00:00:0x1p4",
+        "00:00:-5",
+        "00:nan",
+        "00:1e3",
+    ])
+    func parseRejectsNonDecimalSeconds(_ input: String) {
+        #expect(Format.parseClockTimestamp(input) == nil)
+    }
+
     @Test("subtitleTimestamp uses the requested millisecond separator")
     func subtitleSeparator() {
         #expect(Format.subtitleTimestamp(1.5, msSeparator: ",") == "00:00:01,500")

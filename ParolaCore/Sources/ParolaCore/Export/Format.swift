@@ -33,13 +33,22 @@ public enum Format {
     public static func parseClockTimestamp(_ s: String) -> Double? {
         let trimmed = s.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
         let parts = trimmed.components(separatedBy: ":")
-        if parts.count == 3, let h = Int(parts[0]), let m = Int(parts[1]), let sec = Double(parts[2]) {
+        if parts.count == 3, let h = Int(parts[0]), let m = Int(parts[1]), let sec = plainSeconds(parts[2]) {
             return Double(h) * 3600 + Double(m) * 60 + sec
         }
-        if parts.count == 2, let m = Int(parts[0]), let sec = Double(parts[1]) {
+        if parts.count == 2, let m = Int(parts[0]), let sec = plainSeconds(parts[1]) {
             return Double(m) * 60 + sec
         }
         return nil
+    }
+
+    // Double.init over-accepts nan/inf/scientific/hex/signs; subtitle seconds are always plain SS[.mmm].
+    private static func plainSeconds(_ field: String) -> Double? {
+        guard !field.isEmpty,
+              field.allSatisfy({ $0 == "." || ($0.isASCII && $0.isNumber) }),
+              let value = Double(field), value.isFinite
+        else { return nil }
+        return value
     }
 
     public static func escapeHTML(_ s: String) -> String {
