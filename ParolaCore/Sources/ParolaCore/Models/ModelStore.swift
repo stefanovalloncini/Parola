@@ -74,9 +74,17 @@ public final class ModelStore: Sendable {
     public func catalog() -> [ModelInfo] {
         ManagedConfiguration.shared.filterAllowed(ModelCatalog.all).map { variant in
             let url = installedURL(for: variant.downloadSource)
-            let installed = FileManager.default.fileExists(atPath: url.path)
+            let installed = isFullyDownloaded(at: url)
             return modelInfo(for: variant, url: installed ? url : nil, isInstalled: installed)
         }
+    }
+
+    /// A model directory counts as installed only when no download sidecar remains.
+    /// HuggingFaceDownloader leaves that sidecar behind while a fetch is incomplete and removes it on success.
+    private func isFullyDownloaded(at url: URL) -> Bool {
+        guard FileManager.default.fileExists(atPath: url.path) else { return false }
+        let sidecar = url.appendingPathComponent(HuggingFaceDownloader.sidecarFilename)
+        return !FileManager.default.fileExists(atPath: sidecar.path)
     }
 
     /// Returns models present on disk, even if not in the curated catalog. Includes
@@ -88,7 +96,7 @@ public final class ModelStore: Sendable {
 
         for variant in ModelCatalog.all {
             let url = installedURL(for: variant.downloadSource)
-            if fm.fileExists(atPath: url.path) {
+            if isFullyDownloaded(at: url) {
                 seen[variant.id] = modelInfo(for: variant, url: url, isInstalled: true)
             }
         }
@@ -164,10 +172,7 @@ public final class ModelStore: Sendable {
         if let entry = ModelCatalog.variant(id: variant), entry.engineID == .appleSpeech {
             return true
         }
-        let url = installedURL(for: variant)
-        guard FileManager.default.fileExists(atPath: url.path) else { return false }
-        let sidecar = url.appendingPathComponent(HuggingFaceDownloader.sidecarFilename)
-        return !FileManager.default.fileExists(atPath: sidecar.path)
+        return isFullyDownloaded(at: installedURL(for: variant))
     }
 
     /// Downloads a model variant into our cache directory. If already present, returns immediately.

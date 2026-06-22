@@ -26,6 +26,27 @@ struct ModelStoreTests {
         #expect(tiny?.installedURL?.path == installedURL.path)
     }
 
+    @Test("a partial download (leftover sidecar) is reported not-installed by catalog, isInstalled, and installedModels")
+    func partialDownloadNotReportedInstalled() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let url = store.installedURL(for: "openai_whisper-tiny")
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        try Data("partial".utf8).write(to: url.appendingPathComponent("weights.bin"))
+        try Data("{}".utf8).write(to: url.appendingPathComponent(HuggingFaceDownloader.sidecarFilename))
+
+        let tiny = store.catalog().first { $0.name == "openai_whisper-tiny" }
+        #expect(tiny?.isInstalled == false)
+        #expect(tiny?.installedURL == nil)
+        #expect(store.isInstalled("openai_whisper-tiny") == false)
+        let installed = try store.installedModels()
+        #expect(!installed.contains { $0.name == "openai_whisper-tiny" })
+    }
+
     @Test("installedModels picks up directories not in the curated catalog")
     func installedModelsCustom() async throws {
         let tmp = FileManager.default.temporaryDirectory
