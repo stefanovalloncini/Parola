@@ -175,6 +175,19 @@ struct SrtImporterTests {
         #expect(t.durationSeconds == 65.0)
     }
 
+    @Test("ignores SubRip positional coordinates on the time line")
+    func positionalCoordinates() {
+        let srt = """
+        1
+        00:00:00,000 --> 00:00:02,000 X1:100 X2:300 Y1:50 Y2:80
+        Positioned cue.
+        """
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.count == 1)
+        #expect(t.segments.first?.text == "Positioned cue.")
+        #expect(t.segments.first?.end == 2.0)
+    }
+
     @Test("skips a cue whose text is empty and keeps ids sequential")
     func skipsEmptyTextCue() {
         let srt = """

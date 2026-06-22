@@ -54,10 +54,13 @@ public enum SrtImporter {
 
     static func parseTimeLine(_ line: String) -> (start: Double, end: Double)? {
         let parts = line.components(separatedBy: "-->")
-        guard parts.count == 2,
-              let start = parseTimestamp(parts[0]),
-              let end = parseTimestamp(parts[1])
-        else { return nil }
+        guard parts.count == 2 else { return nil }
+        let startSide = parts[0].trimmingCharacters(in: .whitespaces)
+        let endSide = parts[1].trimmingCharacters(in: .whitespaces)
+            .split(whereSeparator: { $0 == " " || $0 == "\t" }).first.map(String.init) ?? parts[1]
+        guard let start = parseTimestamp(startSide), let end = parseTimestamp(endSide) else {
+            return nil
+        }
         return (start, end)
     }
 
