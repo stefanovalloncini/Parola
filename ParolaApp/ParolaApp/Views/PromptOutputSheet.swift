@@ -22,15 +22,30 @@ struct PromptOutputSheet: View {
         }
     }
 
-    private var contentBody: some View {
-        ScrollView {
-            Text(output.text)
-                .font(DS.Font.body)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(DS.Spacing.regular)
+    @ViewBuilder private var contentBody: some View {
+        if shownText.isEmpty {
+            ContentUnavailableView(
+                "No Output",
+                systemImage: "sparkles",
+                description: Text("The model didn't return any text.")
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ScrollView {
+                Text(shownText)
+                    .font(DS.Font.body)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(DS.Spacing.regular)
+            }
         }
+    }
+
+    private var shownText: String { Self.displayText(output.text) }
+
+    static func displayText(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var footerBody: some View {
@@ -48,6 +63,7 @@ struct PromptOutputSheet: View {
             }
             .sheetPrimaryAction()
             .keyboardShortcut(.defaultAction)
+            .disabled(shownText.isEmpty)
             .axLeaf("PromptOutput.Button.Copy")
         }
     }
@@ -64,7 +80,7 @@ struct PromptOutputSheet: View {
     private func copy() {
         let pb = NSPasteboard.general
         pb.clearContents()
-        pb.setString(output.text, forType: .string)
+        pb.setString(shownText, forType: .string)
         copied = true
         resetTask?.cancel()
         resetTask = Task {
