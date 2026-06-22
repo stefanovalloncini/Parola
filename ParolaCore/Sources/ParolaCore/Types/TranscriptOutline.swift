@@ -31,6 +31,7 @@ public enum TranscriptOutline {
         var lastSpeaker: String?
         var lastStart: Double = -.infinity
         for segment in segments {
+            guard !segment.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
             let speaker = segment.speaker.flatMap { $0.isEmpty ? nil : $0 }
             let speakerChanged = speaker != nil && speaker != lastSpeaker
             let gapElapsed = segment.start - lastStart >= gapSeconds

@@ -80,11 +80,36 @@ struct TranscriptOutlineTests {
         }
     }
 
-    @Test("title falls back to a non-empty placeholder")
-    func titleFallback() {
+    @Test("a whitespace-only transcript yields no outline entries")
+    func allEmptyYieldsNothing() {
         let segments = [makeSegment(1, start: 0, text: "   ")]
         let entries = TranscriptOutline.entries(for: makeTranscript(segments: segments), chapters: [])
+        #expect(entries.isEmpty)
+    }
+
+    @Test("a leading empty segment is skipped; the first real segment anchors the first entry")
+    func leadingEmptySkipped() {
+        let segments = [
+            makeSegment(0, start: 0, text: "\n "),
+            makeSegment(1, start: 2, text: "the real opening line"),
+        ]
+        let entries = TranscriptOutline.entries(for: makeTranscript(segments: segments), chapters: [])
         #expect(entries.count == 1)
-        #expect(entries[0].title.isEmpty == false)
+        #expect(entries[0].start == 2)
+        #expect(entries[0].title == "the real opening line")
+    }
+
+    @Test("an empty segment does not steal a heading slot from real content")
+    func emptySegmentDoesNotStealHeading() {
+        let segments = [
+            makeSegment(0, start: 0, text: "first real heading here"),
+            makeSegment(1, start: 130, text: "   "),
+            makeSegment(2, start: 132, text: "second real heading here"),
+        ]
+        let entries = TranscriptOutline.entries(for: makeTranscript(segments: segments), chapters: [], gapSeconds: 120)
+        #expect(entries.count == 2)
+        #expect(entries[0].start == 0)
+        #expect(entries[1].start == 132)
+        #expect(entries.allSatisfy { !$0.title.contains("Section") })
     }
 }
