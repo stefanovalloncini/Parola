@@ -35,4 +35,28 @@ struct BundledTermPacksTests {
     func unknownIsNil() {
         #expect(BundledTermPacks.load("does-not-exist") == nil)
     }
+
+    @Test("Italian pack fixes standalone terms without corrupting substrings")
+    func italianMatchesWholeTermsOnly() throws {
+        let pack = try #require(BundledTermPacks.load("tech-terms-it"))
+        let rules = TermPackIO.merge(pack: pack, into: [])
+        let seg = TranscriptSegment(
+            id: 0, start: 0, end: 1,
+            text: "Il sistema è rapido, devo capire e non urlare; uso la api e la url"
+        )
+        let out = GlobalFindReplace.apply(rules: rules, to: [seg])
+        #expect(out.first?.text == "Il sistema è rapido, devo capire e non urlare; uso la API e la URL")
+    }
+
+    @Test("English pack fixes standalone terms without corrupting substrings")
+    func englishMatchesWholeTermsOnly() throws {
+        let pack = try #require(BundledTermPacks.load("tech-terms-en"))
+        let rules = TermPackIO.merge(pack: pack, into: [])
+        let seg = TranscriptSegment(
+            id: 0, start: 0, end: 1,
+            text: "the therapist visits studios to test the api on ios"
+        )
+        let out = GlobalFindReplace.apply(rules: rules, to: [seg])
+        #expect(out.first?.text == "the therapist visits studios to test the API on iOS")
+    }
 }
