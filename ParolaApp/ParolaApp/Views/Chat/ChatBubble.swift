@@ -26,16 +26,29 @@ struct ChatBubble: View {
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(message.role == .user ? "You" : "Assistant"): \(message.text)")
+        .accessibilityLabel("\(message.role == .user ? "You" : "Assistant"): \(Self.displayText(message.text).isEmpty ? "No response" : message.text)")
     }
 
     private var bubble: some View {
-        Text(message.text)
-            .textSelection(.enabled)
-            .multilineTextAlignment(.leading)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .frame(maxWidth: 480, alignment: .leading)
+        let shown = Self.displayText(message.text)
+        return Group {
+            if shown.isEmpty {
+                Text("No response")
+                    .italic()
+                    .foregroundStyle(DS.Color.secondaryText)
+            } else {
+                Text(shown)
+                    .textSelection(.enabled)
+            }
+        }
+        .multilineTextAlignment(.leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: 480, alignment: .leading)
+    }
+
+    static func displayText(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
