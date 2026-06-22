@@ -68,6 +68,21 @@ struct SmartChaptersTests {
         let result = SmartChapters.parseResponse("00:00 A\n05:00 B\n02:00 C")
         #expect(result.map(\.title) == ["A", "B"])
     }
+
+    @Test("caps chapters at the latest segment end, not array order")
+    func capUsesMaxEndOnOutOfOrderSegments() async throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 540, end: 600, text: "The late topic discussed last."),
+                TranscriptSegment(id: 1, start: 0, end: 60, text: "The early introduction first."),
+            ],
+            language: "en",
+            modelName: "tiny"
+        )
+        let model = MockLanguageModel(scriptedResponses: ["00:00 Intro\n09:00 Late discussion"])
+        let result = try await SmartChapters.generate(for: transcript, model: model)
+        #expect(result.map(\.title) == ["Intro", "Late discussion"])
+    }
 }
 
 @Suite("Timecode parser")

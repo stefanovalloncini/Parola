@@ -26,7 +26,7 @@ public enum SmartChapters {
         \(body)
         """
         let response = try await model.respond(to: envelope)
-        let cap = transcript.segments.last.map { $0.start + $0.duration }
+        let cap = transcript.segments.map(\.end).max()
         return parseResponse(response, maxSeconds: cap)
     }
 
