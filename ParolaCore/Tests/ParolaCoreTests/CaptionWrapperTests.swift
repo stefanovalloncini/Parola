@@ -56,6 +56,33 @@ struct CaptionWrapperTests {
         #expect(CaptionWrapper.wrap("   \n  ", length: .short).isEmpty)
     }
 
+    @Test("none preset drops a blank line that would split a subtitle cue")
+    func noneDropsBlankLine() {
+        #expect(CaptionWrapper.wrap("First part\n\nSecond part", length: .none) == "First part\nSecond part")
+        #expect(CaptionWrapper.wrap("First part\nSecond part", length: .none) == "First part\nSecond part")
+    }
+
+    @Test("srt keeps a segment whose text has a blank line as one cue")
+    func srtBlankLineStaysOneCue() throws {
+        let transcript = Transcript(
+            schemaVersion: 1,
+            segments: [
+                TranscriptSegment(id: 1, start: 0, end: 2, text: "First part\n\nSecond part"),
+                TranscriptSegment(id: 2, start: 2, end: 4, text: "Next cue"),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        let raw = try SrtExporter().render(transcript)
+        let output = String(data: raw, encoding: .utf8) ?? ""
+        let blocks = output
+            .components(separatedBy: "\n\n")
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        #expect(blocks.count == 2)
+        #expect(blocks[0].hasPrefix("1\n"))
+        #expect(blocks[1].hasPrefix("2\n"))
+    }
+
     @Test("SRT exporter applies the preset to each segment body")
     func exporterApplies() throws {
         let transcript = Transcript(

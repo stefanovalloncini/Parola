@@ -30,7 +30,12 @@ public enum CaptionLength: String, Sendable, Codable, Hashable, CaseIterable, Id
 enum CaptionWrapper {
     static func wrap(_ text: String, length: CaptionLength) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let limit = length.maxCharsPerLine else { return trimmed }
+        guard let limit = length.maxCharsPerLine else {
+            return trimmed
+                .split(whereSeparator: \.isNewline)
+                .filter { !$0.allSatisfy(\.isWhitespace) }
+                .joined(separator: "\n")
+        }
         guard !trimmed.isEmpty else { return "" }
         let words = trimmed.split { $0.isWhitespace || $0.isNewline }.map(String.init)
         var lines: [String] = []
