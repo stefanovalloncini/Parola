@@ -65,6 +65,20 @@ struct GlobalFindReplaceTests {
         #expect(out.first?.text == "Hi Verb")
     }
 
+    @Test("a segment emptied by replacement is dropped")
+    func dropsEmptied() {
+        let rule = FindReplaceRule(find: "ok", replace: "")
+        let out = GlobalFindReplace.apply(rules: [rule], to: [seg(0, "ok"), seg(1, "Hello world"), seg(2, "Ok")])
+        #expect(out.map(\.text) == ["Hello world"])
+    }
+
+    @Test("a segment left whitespace-only by replacement is dropped")
+    func dropsWhitespaceOnly() {
+        let rule = FindReplaceRule(find: "uh", replace: "")
+        let out = GlobalFindReplace.apply(rules: [rule], to: [seg(0, " uh "), seg(1, "real")])
+        #expect(out.map(\.text) == ["real"])
+    }
+
     @Test("rule round-trips through JSON")
     func jsonRoundTrip() throws {
         let rule = FindReplaceRule(find: "foo", replace: "bar", caseSensitive: true, regex: true)

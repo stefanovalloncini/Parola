@@ -38,6 +38,8 @@ public enum GlobalFindReplace {
         }
     }
 
+    /// Applies the enabled rules to each segment's text in order. A segment whose text is left
+    /// empty or whitespace-only is dropped, so a deletion rule can't leave a blank cue/line behind.
     public static func apply(
         rules: [FindReplaceRule],
         to segments: [TranscriptSegment]
@@ -46,11 +48,12 @@ public enum GlobalFindReplace {
             .filter { $0.enabled && !$0.find.isEmpty }
             .map { CompiledRule($0) }
         guard !active.isEmpty else { return segments }
-        return segments.map { seg in
+        return segments.compactMap { seg in
             var copy = seg
             copy.text = active.reduce(seg.text) { current, rule in
                 rule.apply(to: current)
             }
+            guard !copy.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
             return copy
         }
     }
