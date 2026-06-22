@@ -27,7 +27,7 @@ struct SpeakersSheet: View {
     private var contentBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.medium) {
-                if !transcript.uniqueSpeakers.isEmpty || !suggestions.isEmpty {
+                if !transcript.uniqueSpeakers.isEmpty {
                     SearchPill(text: $searchText, placeholder: "Search speakers…")
                 }
                 if transcript.uniqueSpeakers.isEmpty {
@@ -44,7 +44,7 @@ struct SpeakersSheet: View {
                 ForEach(filteredSpeakers, id: \.self) { speaker in
                     speakerRow(speaker)
                 }
-                if !filteredSuggestions.isEmpty {
+                if Self.offersSuggestions(hasSpeakers: !transcript.uniqueSpeakers.isEmpty, hasSuggestions: !filteredSuggestions.isEmpty) {
                     Divider().padding(.vertical, 2)
                     Text("Recent")
                         .font(DS.Font.caption)
@@ -124,6 +124,10 @@ struct SpeakersSheet: View {
         guard let target else { return }
         renames[target] = name
         focusedSpeaker = target
+    }
+
+    static func offersSuggestions(hasSpeakers: Bool, hasSuggestions: Bool) -> Bool {
+        hasSpeakers && hasSuggestions
     }
 }
 
