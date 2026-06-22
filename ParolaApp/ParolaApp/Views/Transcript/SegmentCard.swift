@@ -297,17 +297,23 @@ struct SegmentCard: View {
     }
 
     private func karaoke(words: [WordTiming]) -> Text {
+        Text(Self.karaokeText(words: words, activeWordID: model.currentWordID))
+    }
+
+    static func karaokeText(words: [WordTiming], activeWordID: WordTiming.ID?) -> AttributedString {
         var attr = AttributedString()
-        let activeID = model.currentWordID
-        for word in words {
-            var piece = AttributedString(word.word + " ")
-            if word.id == activeID {
+        for (index, word) in words.enumerated() {
+            if index > 0, word.word.first != "'", word.word.first != "\u{2019}" {
+                attr.append(AttributedString(" "))
+            }
+            var piece = AttributedString(word.word)
+            if word.id == activeWordID {
                 piece.foregroundColor = DS.Color.accent
                 piece.font = .body.bold()
             }
             attr.append(piece)
         }
-        return Text(attr)
+        return attr
     }
 
     private func copyDeeplink() {
