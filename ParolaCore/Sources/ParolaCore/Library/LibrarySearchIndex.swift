@@ -138,10 +138,9 @@ public actor LibrarySearchIndex {
 
     private static func makeSnippet(text: String, tokens: [String]) -> (text: String, highlights: [Highlight]) {
         guard !text.isEmpty else { return ("", []) }
-        let lower = text.lowercased()
         var firstHit: Range<String.Index>?
         for token in tokens {
-            if let range = lower.range(of: token) {
+            if let range = text.range(of: token, options: .caseInsensitive) {
                 firstHit = range
                 break
             }
@@ -155,13 +154,12 @@ public actor LibrarySearchIndex {
             snippetRange = text.startIndex..<(text.index(text.startIndex, offsetBy: 80, limitedBy: text.endIndex) ?? text.endIndex)
         }
         let snippet = String(text[snippetRange])
-        let snippetLower = snippet.lowercased()
         var highlights: [Highlight] = []
         for token in Set(tokens) {
-            var cursor = snippetLower.startIndex
-            while let hit = snippetLower.range(of: token, range: cursor..<snippetLower.endIndex) {
-                let start = snippetLower.distance(from: snippetLower.startIndex, to: hit.lowerBound)
-                let length = snippetLower.distance(from: hit.lowerBound, to: hit.upperBound)
+            var cursor = snippet.startIndex
+            while let hit = snippet.range(of: token, options: .caseInsensitive, range: cursor..<snippet.endIndex) {
+                let start = snippet.distance(from: snippet.startIndex, to: hit.lowerBound)
+                let length = snippet.distance(from: hit.lowerBound, to: hit.upperBound)
                 highlights.append(Highlight(start: start, length: length))
                 cursor = hit.upperBound
             }

@@ -111,6 +111,24 @@ struct LibrarySearchIndexTests {
         }
     }
 
+    @Test("snippet surfaces the hit when text changes length when lowercased")
+    func snippetNonASCIICaseFold() async throws {
+        let (index, _) = makeTempIndex()
+        // İ (U+0130) lowercases to "i̇" (i + combining dot), which is longer in UTF-8, so
+        // `text.lowercased()` is longer than `text`. A snippet built from the lowercased copy's
+        // indices then misaligns (or traps) against the original text.
+        let body = String(repeating: "İ", count: 60) + " sprint planning notes"
+        await index.index(id: "e1", title: "Notes", text: body, createdAt: Date())
+        let matches = await index.search("sprint")
+        let match = try #require(matches.first(where: { $0.entryID == "e1" }))
+        #expect(match.snippet.lowercased().contains("sprint"))
+        for highlight in match.highlights {
+            let start = match.snippet.index(match.snippet.startIndex, offsetBy: highlight.start)
+            let end = match.snippet.index(start, offsetBy: highlight.length)
+            #expect(match.snippet[start..<end].lowercased() == "sprint")
+        }
+    }
+
     @Test("flush persists pending debounced writes")
     func flushPersists() async throws {
         let (index1, url) = makeTempIndex()
