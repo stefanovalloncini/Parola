@@ -54,7 +54,7 @@ public enum TermPackIO {
     public static func merge(pack: TermPack, into existing: [FindReplaceRule]) -> [FindReplaceRule] {
         var out = existing
         let key: (FindReplaceRule) -> String = { "\($0.find)|\($0.caseSensitive)|\($0.regex)" }
-        let existingKeys = Set(out.map(key))
+        var seen = Set(out.map(key))
         for rule in pack.rules where !rule.find.isEmpty {
             let candidate = FindReplaceRule(
                 find: rule.find,
@@ -63,9 +63,8 @@ public enum TermPackIO {
                 regex: rule.regex,
                 enabled: true
             )
-            if !existingKeys.contains(key(candidate)) {
-                out.append(candidate)
-            }
+            guard seen.insert(key(candidate)).inserted else { continue }
+            out.append(candidate)
         }
         return out
     }

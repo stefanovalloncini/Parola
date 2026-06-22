@@ -46,6 +46,17 @@ struct TermPackTests {
         #expect(pack.rules[0].caseSensitive == true)
     }
 
+    @Test("merge dedupes rules duplicated within the incoming pack")
+    func mergeDedupesWithinPack() {
+        let pack = TermPack(name: "Tech", locale: "en", rules: [
+            TermPackRule(find: "grpc", replace: "gRPC"),
+            TermPackRule(find: "grpc", replace: "GRPC"),
+        ])
+        let merged = TermPackIO.merge(pack: pack, into: [])
+        #expect(merged.count == 1)
+        #expect(merged.first(where: { $0.find == "grpc" })?.replace == "gRPC")
+    }
+
     @Test("merge drops rules with empty find")
     func mergeDropsEmpty() {
         let pack = TermPack(name: "X", locale: "en", rules: [
