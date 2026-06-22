@@ -175,7 +175,7 @@ public actor MCPServer {
 
     private func searchLibrary(args: [String: Any]) async -> MCPToolCallResult {
         let query = (args["query"] as? String) ?? ""
-        let limit = args["limit"] as? Int ?? 10
+        let limit = max(0, args["limit"] as? Int ?? 10)
         let matches = await libraryStore.search(query)
         let lines = matches.prefix(limit).map { match in
             "- `\(match.entryID)` (score \(match.score)) \(match.snippet)"
@@ -184,7 +184,7 @@ public actor MCPServer {
     }
 
     private func listRecent(args: [String: Any]) async -> MCPToolCallResult {
-        let limit = args["limit"] as? Int ?? 10
+        let limit = max(0, args["limit"] as? Int ?? 10)
         let entries = await libraryStore.list().prefix(limit)
         return MCPToolCallResult(text: entries.map { "- \($0.title)" }.joined(separator: "\n"))
     }

@@ -283,6 +283,32 @@ struct MCPServerTests {
         #expect(text.contains("score"), "search output should include a score label per match")
     }
 
+    @Test("library tools clamp a negative limit instead of trapping")
+    func libraryToolsClampNegativeLimit() async throws {
+        let (store, tmp) = try tempLibrary()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        _ = try await store.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "sprint planning")],
+                language: "en",
+                modelName: "tiny"
+            ),
+            audioSource: nil,
+            title: "Planning notes"
+        )
+        let server = makeServer(libraryStore: store)
+
+        let recent = try await server.handle(
+            toolCall(name: "parola_list_recent", arguments: ["limit": -1], id: 108)
+        )
+        #expect(try textBlock(from: try encode(recent)).isEmpty)
+
+        let search = try await server.handle(
+            toolCall(name: "parola_search_library", arguments: ["query": "sprint", "limit": -1], id: 109)
+        )
+        #expect(try textBlock(from: try encode(search)).isEmpty)
+    }
+
     @Test("parola_app_ping forwards through the bridge and returns its response text")
     func appPingForwardsThroughBridge() async throws {
         let bridge = EchoBridge(reply: "{\"pong\":true}")
