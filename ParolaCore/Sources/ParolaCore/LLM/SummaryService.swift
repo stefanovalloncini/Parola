@@ -106,13 +106,16 @@ public actor SummaryService {
 
         for rawLine in lines {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
-            if line.uppercased().hasPrefix("SUMMARY:") {
+            // Models often wrap the section header in markdown ("**SUMMARY:**", "## CHAPTERS:").
+            let header = line.drop(while: { "#*_ ".contains($0) })
+            if header.uppercased().hasPrefix("SUMMARY:") {
                 section = .summary
-                let remainder = line.dropFirst("SUMMARY:".count).trimmingCharacters(in: .whitespaces)
+                let remainder = header.dropFirst("SUMMARY:".count)
+                    .trimmingCharacters(in: CharacterSet(charactersIn: " *_"))
                 if !remainder.isEmpty { currentParagraph.append(remainder) }
                 continue
             }
-            if line.uppercased().hasPrefix("CHAPTERS:") {
+            if header.uppercased().hasPrefix("CHAPTERS:") {
                 flushParagraph()
                 section = .chapters
                 continue

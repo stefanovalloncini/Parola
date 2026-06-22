@@ -141,6 +141,47 @@ struct SummaryServiceTests {
         #expect(summary.text == "The speaker paused.\n\nThen they continued.")
     }
 
+    @Test("bold markdown section headers are still recognized")
+    func boldMarkdownHeaders() {
+        let response = """
+        **SUMMARY:**
+        The team reviewed the roadmap.
+
+        **CHAPTERS:**
+        00:00 Intro
+        01:30 Roadmap
+        """
+        let summary = SummaryService.parse(response)
+        #expect(summary.text == "The team reviewed the roadmap.")
+        #expect(summary.chapters.map(\.start) == [0, 90])
+    }
+
+    @Test("markdown header (##) section markers are recognized")
+    func atxMarkdownHeaders() {
+        let response = """
+        ## SUMMARY:
+        A short recap.
+
+        ## CHAPTERS:
+        00:00 Start
+        """
+        let summary = SummaryService.parse(response)
+        #expect(summary.text == "A short recap.")
+        #expect(summary.chapters.first?.title == "Start")
+    }
+
+    @Test("inline summary text after a bold header is captured without the markdown")
+    func boldHeaderInlineText() {
+        let response = """
+        **SUMMARY:** It went well.
+
+        CHAPTERS:
+        00:00 Begin
+        """
+        let summary = SummaryService.parse(response)
+        #expect(summary.text == "It went well.")
+    }
+
     @Test("summarise injects an external model so callers can swap providers")
     func summariseWithInjectedModel() async throws {
         let model = MockLanguageModel(scriptedResponses: ["""
