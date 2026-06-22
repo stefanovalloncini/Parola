@@ -30,15 +30,18 @@ public struct SrtExporter: TranscriptExporter {
 
     public func render(_ transcript: Transcript) throws -> Data {
         var out = ""
-        for (i, seg) in transcript.segments.enumerated() {
-            out += "\(i + 1)\n"
-            out += "\(Self.srtTimestamp(seg.start)) --> \(Self.srtTimestamp(seg.end))\n"
+        var cueNumber = 1
+        for seg in transcript.segments {
             let body = CaptionWrapper.wrap(seg.text, length: options.captionLength)
+            guard !body.isEmpty else { continue }
+            out += "\(cueNumber)\n"
+            out += "\(Self.srtTimestamp(seg.start)) --> \(Self.srtTimestamp(seg.end))\n"
             if options.includeSpeakers, let speaker = cueSpeakerLabel(seg.speaker) {
                 out += "\(speaker): \(body)\n\n"
             } else {
                 out += body + "\n\n"
             }
+            cueNumber += 1
         }
         return utf8(out)
     }
@@ -59,8 +62,9 @@ public struct VttExporter: TranscriptExporter {
     public func render(_ transcript: Transcript) throws -> Data {
         var out = "WEBVTT\n\n"
         for seg in transcript.segments {
-            out += "\(Self.vttTimestamp(seg.start)) --> \(Self.vttTimestamp(seg.end))\n"
             let body = Format.escapeWebVTT(CaptionWrapper.wrap(seg.text, length: options.captionLength))
+            guard !body.isEmpty else { continue }
+            out += "\(Self.vttTimestamp(seg.start)) --> \(Self.vttTimestamp(seg.end))\n"
             if options.includeSpeakers, let speaker = cueSpeakerLabel(seg.speaker) {
                 out += "<v \(Format.escapeWebVTT(speaker))>\(body)</v>\n\n"
             } else {

@@ -506,6 +506,48 @@ struct ExporterTests {
         #expect(out.contains("<v Alice Bob>Hello</v>"))
     }
 
+    @Test("srt drops an empty segment and keeps cue numbers contiguous")
+    func srtDropsEmptyCue() throws {
+        let transcript = Transcript(
+            schemaVersion: 1,
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 2, text: "First"),
+                TranscriptSegment(id: 1, start: 2, end: 4, text: "   ", speaker: "Speaker 1"),
+                TranscriptSegment(id: 2, start: 4, end: 6, text: "Third"),
+            ],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try SrtExporter(options: SubtitleOptions(includeSpeakers: true)).renderText(transcript)
+        let blocks = out
+            .components(separatedBy: "\n\n")
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        #expect(blocks.count == 2)
+        #expect(blocks[0].hasPrefix("1\n"))
+        #expect(blocks[1].hasPrefix("2\n"))
+        #expect(blocks[1].contains("Third"))
+        #expect(out.contains("Speaker 1:") == false)
+    }
+
+    @Test("vtt drops an empty segment")
+    func vttDropsEmptyCue() throws {
+        let transcript = Transcript(
+            schemaVersion: 1,
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 2, text: "First"),
+                TranscriptSegment(id: 1, start: 2, end: 4, text: "\n  \n"),
+                TranscriptSegment(id: 2, start: 4, end: 6, text: "Third"),
+            ],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try VttExporter().renderText(transcript)
+        let cueCount = out.components(separatedBy: " --> ").count - 1
+        #expect(cueCount == 2)
+        #expect(out.contains("First"))
+        #expect(out.contains("Third"))
+    }
+
     @Test("decimalSeconds avoids scientific notation and trims trailing zeros")
     func decimalSecondsFormatting() {
         #expect(Format.decimalSeconds(0.00001) == "0.00001")
