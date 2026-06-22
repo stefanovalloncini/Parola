@@ -153,7 +153,7 @@ public actor SummaryService {
         let parts = scanner.split(maxSplits: 1, omittingEmptySubsequences: true, whereSeparator: { $0 == " " || $0 == "\t" })
         guard parts.count == 2 else { return nil }
         let timeToken = String(parts[0])
-        let title = parts[1].trimmingCharacters(in: .whitespaces)
+        let title = ChapterTitle.clean(String(parts[1]))
         guard let seconds = SummaryService.parseClock(timeToken), !title.isEmpty else { return nil }
         return Chapter(title: title, start: seconds)
     }

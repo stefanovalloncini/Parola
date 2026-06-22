@@ -51,6 +51,15 @@ struct SummaryServiceTests {
         #expect(c?.start == 30)
     }
 
+    @Test("chapter title strips surrounding bullets and quotes")
+    func chapterCleansTitle() {
+        let quoted = SummaryService.parseChapter("00:30 - \"Welcome\"")
+        #expect(quoted?.title == "Welcome")
+
+        let dashed = SummaryService.parseChapter("02:00 — Discussion")
+        #expect(dashed?.title == "Discussion")
+    }
+
     @Test("full response parse extracts summary + chapters")
     func fullResponse() {
         let response = """

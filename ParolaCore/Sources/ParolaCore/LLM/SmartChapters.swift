@@ -41,21 +41,10 @@ public enum SmartChapters {
             let timeToken = String(rest[..<space])
             guard let seconds = Timecode.parse(timeToken) else { return nil }
             rest = rest[rest.index(after: space)...]
-            let title = cleanTitle(String(rest))
+            let title = ChapterTitle.clean(String(rest))
             guard !title.isEmpty else { return nil }
             return Chapter(title: title, start: seconds)
         }
         return nil
-    }
-
-    private static func cleanTitle(_ value: String) -> String {
-        var result = value.trimmingCharacters(in: .whitespaces)
-        while let first = result.first, "-—–•\"'".contains(first) {
-            result = String(result.dropFirst()).trimmingCharacters(in: .whitespaces)
-        }
-        while let last = result.last, "\"'".contains(last) {
-            result = String(result.dropLast()).trimmingCharacters(in: .whitespaces)
-        }
-        return result
     }
 }
