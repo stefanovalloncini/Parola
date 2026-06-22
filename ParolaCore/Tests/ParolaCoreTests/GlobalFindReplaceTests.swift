@@ -79,6 +79,23 @@ struct GlobalFindReplaceTests {
         #expect(out.map(\.text) == ["real"])
     }
 
+    @Test("collapses a double space left by a mid-segment deletion")
+    func collapsesInternalWhitespace() {
+        let rule = FindReplaceRule(find: "um", replace: "")
+        let out = GlobalFindReplace.apply(rules: [rule], to: [seg(0, "well um okay")])
+        #expect(out.first?.text == "well okay")
+    }
+
+    @Test("trims edge whitespace left by a deletion")
+    func trimsEdgeWhitespace() {
+        let leadRule = FindReplaceRule(find: "um", replace: "")
+        let leading = GlobalFindReplace.apply(rules: [leadRule], to: [seg(0, "um well okay")])
+        #expect(leading.first?.text == "well okay")
+        let trailRule = FindReplaceRule(find: "okay", replace: "")
+        let trailing = GlobalFindReplace.apply(rules: [trailRule], to: [seg(0, "well okay")])
+        #expect(trailing.first?.text == "well")
+    }
+
     @Test("rule round-trips through JSON")
     func jsonRoundTrip() throws {
         let rule = FindReplaceRule(find: "foo", replace: "bar", caseSensitive: true, regex: true)
