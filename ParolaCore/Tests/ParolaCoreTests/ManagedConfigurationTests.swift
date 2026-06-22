@@ -67,6 +67,14 @@ struct ManagedConfigurationTests {
         #expect(config.isManaged(.disableModelDownloads) == false)
     }
 
+    @Test("disableCloudLLM reads user privacy mode through the injected storage")
+    func privacyModeFromStorage() {
+        let storage = UserDefaults(suiteName: "parola-mdm-privacy-\(UUID().uuidString)")!
+        storage.set(true, forKey: ManagedConfiguration.userPrivacyModeKey)
+        let config = ManagedConfiguration(storage: storage)
+        #expect(config.disableCloudLLM == true)
+    }
+
     @Test("filterAllowed restricts catalog by engine allowlist")
     func filterAllowed() {
         let storage = makeStorage(["allowedEngines": ["whisperkit"]])
