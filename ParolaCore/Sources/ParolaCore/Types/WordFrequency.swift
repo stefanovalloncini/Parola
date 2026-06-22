@@ -22,6 +22,45 @@ public enum WordFrequency {
         "which", "who", "whom", "as", "just", "really", "also",
     ]
 
+    public static let italianStopWords: Set<String> = [
+        "il", "lo", "la", "gli", "le", "un", "uno", "una",
+        "del", "dello", "della", "dei", "degli", "delle",
+        "al", "allo", "alla", "ai", "agli", "alle",
+        "dal", "dallo", "dalla", "dai", "dagli", "dalle",
+        "nel", "nello", "nella", "nei", "negli", "nelle",
+        "sul", "sullo", "sulla", "sui", "sugli", "sulle",
+        "col", "coi",
+        "di", "da", "in", "con", "su", "per", "tra", "fra",
+        "ed", "od", "ma", "se", "che", "come", "perché", "perche",
+        "quando", "mentre", "anche", "oppure", "però", "pero",
+        "quindi", "dunque", "infatti", "cioè", "cioe", "ovvero",
+        "allora", "insomma", "comunque", "ecco",
+        "io", "tu", "lui", "lei", "noi", "voi", "loro",
+        "mi", "ti", "ci", "vi", "si", "ne", "me", "te", "chi", "cui",
+        "mio", "mia", "miei", "mie", "tuo", "tua", "tuoi", "tue",
+        "suo", "sua", "suoi", "sue",
+        "nostro", "nostra", "nostri", "nostre",
+        "vostro", "vostra", "vostri", "vostre",
+        "questo", "questa", "questi", "queste",
+        "quello", "quella", "quelli", "quelle", "quel",
+        "non", "più", "piu", "meno", "molto", "molta", "molti", "molte",
+        "poco", "poca", "pochi", "poche", "tanto", "tanta", "tanti", "tante",
+        "troppo", "tutto", "tutta", "tutti", "tutte",
+        "già", "gia", "ancora", "sempre", "mai",
+        "qui", "qua", "là", "lì", "dove", "quanto", "quanti",
+        "sono", "sei", "siamo", "siete", "era", "ero", "eri", "erano", "eravamo",
+        "sia", "siano", "essere",
+        "ho", "hai", "ha", "abbiamo", "avete", "hanno",
+        "avevo", "aveva", "avevano", "avere", "abbia",
+    ]
+
+    /// Stop words for a transcript's language. Falls back to the English set for languages
+    /// without a dedicated list, so the "Top words" view never surfaces function words.
+    public static func stopWords(for languageCode: String?) -> Set<String> {
+        let code = String((languageCode ?? "").lowercased().prefix(2))
+        return code == "it" ? defaultStopWords.union(italianStopWords) : defaultStopWords
+    }
+
     public static func compute(
         text: String,
         limit: Int = 20,

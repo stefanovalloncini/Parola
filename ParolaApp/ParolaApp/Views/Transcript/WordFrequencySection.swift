@@ -32,7 +32,8 @@ struct WordFrequencySection: View {
 
     private func recompute() {
         guard let text = model.transcript?.text else { entries = []; return }
-        entries = WordFrequency.compute(text: text, limit: 12)
+        let stopWords = WordFrequency.stopWords(for: model.transcript?.language)
+        entries = WordFrequency.compute(text: text, limit: 12, stopWords: stopWords)
     }
 }
 

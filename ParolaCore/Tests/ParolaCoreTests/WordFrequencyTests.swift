@@ -68,4 +68,37 @@ struct WordFrequencyTests {
         #expect(freq.first { $0.word == "quoted" }?.count == 1)
         #expect(freq.first { $0.word == "it\u{2019}s" }?.count == 1)
     }
+
+    @Test("language selector falls back to English for nil and non-Italian codes")
+    func stopWordsFallback() {
+        #expect(WordFrequency.stopWords(for: nil) == WordFrequency.defaultStopWords)
+        #expect(WordFrequency.stopWords(for: "en") == WordFrequency.defaultStopWords)
+        #expect(WordFrequency.stopWords(for: "") == WordFrequency.defaultStopWords)
+    }
+
+    @Test("Italian stop words drop Italian function words from the top words")
+    func italianStopWords() {
+        let text = "Allora parliamo del progetto. La timeline del progetto è importante per il progetto."
+        let freq = WordFrequency.compute(text: text, limit: 10, stopWords: WordFrequency.stopWords(for: "it"))
+        let words = freq.map(\.word)
+        #expect(words.contains("del") == false)
+        #expect(words.contains("la") == false)
+        #expect(words.contains("per") == false)
+        #expect(words.contains("il") == false)
+        #expect(words.contains("progetto"))
+        #expect(freq.first?.word == "progetto")
+    }
+
+    @Test("Italian selector still filters English stop words for code-switched clips")
+    func italianUnionEnglish() {
+        let stop = WordFrequency.stopWords(for: "it")
+        #expect(stop.contains("the"))
+        #expect(stop.contains("di"))
+        #expect(stop.contains("che"))
+    }
+
+    @Test("region-tagged Italian code still selects the Italian list")
+    func italianRegionCode() {
+        #expect(WordFrequency.stopWords(for: "it-IT").contains("di"))
+    }
 }
