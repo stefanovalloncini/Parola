@@ -57,7 +57,7 @@ struct TranscriptWindowView: View {
                                 Text(Timecode.format(segment.start))
                                     .font(DS.Font.subheadlineMono)
                                     .foregroundStyle(.secondary)
-                                if let speaker = segment.speaker {
+                                if let speaker = SegmentCard.speakerLabel(for: segment.speaker) {
                                     Text(speaker)
                                         .font(DS.Font.subheadlineEmphasized)
                                         .foregroundStyle(.secondary)

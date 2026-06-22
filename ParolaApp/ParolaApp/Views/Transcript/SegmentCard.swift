@@ -29,7 +29,7 @@ struct SegmentCard: View {
                 Text(timestamp(segment.start))
                     .font(model.monospacedTimestamps ? DS.Font.captionMono : DS.Font.caption)
                     .foregroundStyle(isCurrent ? DS.Color.accent : DS.Color.secondaryText)
-                if let speaker = segment.speaker {
+                if let speaker = Self.speakerLabel(for: segment.speaker) {
                     Text(speaker)
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.speakerColor(for: speaker))
@@ -180,6 +180,10 @@ struct SegmentCard: View {
 
     static func displayText(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func speakerLabel(for speaker: String?) -> String? {
+        speaker.flatMap { $0.isEmpty ? nil : $0 }
     }
 
     @State private var timingPopoverOpen = false
