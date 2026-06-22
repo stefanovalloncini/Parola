@@ -5,6 +5,7 @@ struct PromptOutputSheet: View {
     let output: AppModel.PromptOutput
     @Environment(\.dismiss) private var dismiss
     @State private var copied: Bool = false
+    @State private var resetTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -18,10 +19,7 @@ struct PromptOutputSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        UIPasteboard.general.string = output.text
-                        copied = true
-                    } label: {
+                    Button(action: copy) {
                         Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
                     }
                 }
@@ -29,6 +27,21 @@ struct PromptOutputSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .onDisappear {
+                resetTask?.cancel()
+                resetTask = nil
+            }
+        }
+    }
+
+    private func copy() {
+        UIPasteboard.general.string = output.text
+        copied = true
+        resetTask?.cancel()
+        resetTask = Task {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            copied = false
         }
     }
 }
