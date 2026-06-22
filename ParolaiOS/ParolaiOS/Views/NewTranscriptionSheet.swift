@@ -53,8 +53,13 @@ struct NewTranscriptionSheet: View {
                 allowedContentTypes: [.audio, .movie],
                 allowsMultipleSelection: false
             ) { result in
-                if case .success(let urls) = result, let url = urls.first {
-                    model.coordinator.startFileTranscription(at: url)
+                switch result {
+                case .success(let urls):
+                    if let url = urls.first {
+                        model.coordinator.startFileTranscription(at: url)
+                    }
+                case .failure(let error):
+                    model.coordinator.reportFileImportFailure(error)
                 }
             }
         }

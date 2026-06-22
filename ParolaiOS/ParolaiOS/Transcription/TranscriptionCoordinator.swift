@@ -63,6 +63,10 @@ final class TranscriptionCoordinator {
         runTranscription(audio: copy)
     }
 
+    func reportFileImportFailure(_ error: Error) {
+        phase = .failed(message: error.localizedDescription)
+    }
+
     private func runTranscription(audio: URL) {
         transcribeTask?.cancel()
         transcribeTask = Task {

@@ -42,6 +42,18 @@ struct TranscriptionCoordinatorTests {
         #expect(coord.phase == .failed(message: "boom"))
     }
 
+    @Test("file-import failure surfaces the error as a failed phase")
+    func fileImportFailureFlipsPhase() throws {
+        let (coord, _) = try makeCoordinator()
+        let error = NSError(
+            domain: "test",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "The file couldn't be opened."]
+        )
+        coord.reportFileImportFailure(error)
+        #expect(coord.phase == .failed(message: "The file couldn't be opened."))
+    }
+
     @Test("reset clears partial, segments, and phase")
     func resetClearsState() throws {
         let (coord, _) = try makeCoordinator()
