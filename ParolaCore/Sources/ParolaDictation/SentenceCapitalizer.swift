@@ -13,7 +13,8 @@ public enum SentenceCapitalizer {
                 result.append(char)
                 if char == "." || char == "?" || char == "!" || char == "\n" {
                     capitalizeNext = true
-                } else if !char.isWhitespace {
+                } else if char.isNumber {
+                    // Only a digit cancels: a leading quote or bracket stays transparent so the first letter after it still capitalizes.
                     capitalizeNext = false
                 }
             }

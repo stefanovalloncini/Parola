@@ -49,4 +49,24 @@ struct SentenceCapitalizerTests {
     func ligatureStart() {
         #expect(SentenceCapitalizer.applyTo("ﬁle. done.") == "FIle. Done.")
     }
+
+    @Test("uppercases the first letter after an opening quote")
+    func afterOpeningQuote() {
+        #expect(SentenceCapitalizer.applyTo("he said. \"yes, of course.\"") == "He said. \"Yes, of course.\"")
+    }
+
+    @Test("uppercases the first letter after an opening parenthesis")
+    func afterOpeningParen() {
+        #expect(SentenceCapitalizer.applyTo("done. (next item)") == "Done. (Next item)")
+    }
+
+    @Test("uppercases a quote-led opening sentence")
+    func quoteLedStart() {
+        #expect(SentenceCapitalizer.applyTo("\"hello there\"") == "\"Hello there\"")
+    }
+
+    @Test("a number-led clause does not capitalize the following word")
+    func numberLedClause() {
+        #expect(SentenceCapitalizer.applyTo("weighs. 5.5 mg total") == "Weighs. 5.5 mg total")
+    }
 }
