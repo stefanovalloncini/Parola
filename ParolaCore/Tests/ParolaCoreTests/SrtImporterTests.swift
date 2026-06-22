@@ -67,6 +67,14 @@ struct SrtImporterTests {
         #expect(t.segments.first?.text == "Hi")
     }
 
+    @Test("CR-only (classic Mac) endings are handled")
+    func crOnly() {
+        let srt = "1\r00:00:00,000 --> 00:00:01,000\rHi\r"
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.count == 1)
+        #expect(t.segments.first?.text == "Hi")
+    }
+
     @Test("timestamp with hours parses")
     func longTimestamp() {
         let ts = SrtImporter.parseTimestamp("01:02:03,500")

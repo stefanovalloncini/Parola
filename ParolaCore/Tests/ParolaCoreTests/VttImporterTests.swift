@@ -107,6 +107,14 @@ struct VttImporterTests {
         #expect(t.segments[0].text == "Hi")
     }
 
+    @Test("CR-only (classic Mac) endings are handled")
+    func crOnly() {
+        let vtt = "WEBVTT\r\r00:00:00.000 --> 00:00:01.000\rHi\r"
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.count == 1)
+        #expect(t.segments.first?.text == "Hi")
+    }
+
     @Test("cues with optional identifier line are accepted")
     func cueIdentifier() {
         let vtt = """

@@ -8,7 +8,10 @@ enum VttImporter {
     }
 
     static func parse(_ raw: String) -> Transcript {
-        let lines = raw.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
+        let lines = raw
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .components(separatedBy: "\n")
         var segments: [TranscriptSegment] = []
         var i = 0
         var nextID = 0
