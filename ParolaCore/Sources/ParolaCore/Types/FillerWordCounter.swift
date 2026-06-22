@@ -12,9 +12,9 @@ public enum FillerWordCounter {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return 0 }
         let flattened = trimmed.lowercased().map { ch -> Character in
-            (ch.isLetter || ch.isNumber || ch.isWhitespace) ? ch : " "
+            (ch.isLetter || ch.isNumber) ? ch : " "
         }
-        let haystack = " " + String(flattened).replacingOccurrences(of: "\n", with: " ") + " "
+        let haystack = " " + String(flattened) + " "
         var total = 0
         for filler in fillers {
             let needle = " \(filler) "

@@ -32,4 +32,11 @@ struct FillerWordCounterTests {
         #expect(FillerWordCounter.count(in: "") == 0)
         #expect(FillerWordCounter.count(in: "    ") == 0)
     }
+
+    @Test("non-space whitespace between fillers still counts")
+    func nonSpaceWhitespace() {
+        #expect(FillerWordCounter.count(in: "um\tum") == 2)
+        #expect(FillerWordCounter.count(in: "um\u{00A0}um") == 2)
+        #expect(FillerWordCounter.count(in: "you\tknow it's fine.") == 1)
+    }
 }
