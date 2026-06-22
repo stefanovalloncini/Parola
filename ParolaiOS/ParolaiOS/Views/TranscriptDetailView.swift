@@ -27,12 +27,21 @@ struct TranscriptDetailView: View {
                             selection: $selectedSpeaker
                         )
                     }
-                    TranscriptScrollView(
-                        segments: filtered,
-                        query: trimmedQuery,
-                        matchingIDs: matchIDs,
-                        targetMatchID: targetMatchID(in: matchIDs)
-                    )
+                    if transcriptIsEmpty {
+                        ContentUnavailableView(
+                            "No Speech Detected",
+                            systemImage: "waveform.slash",
+                            description: Text("Parola didn't find any speech in this audio.")
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        TranscriptScrollView(
+                            segments: filtered,
+                            query: trimmedQuery,
+                            matchingIDs: matchIDs,
+                            targetMatchID: targetMatchID(in: matchIDs)
+                        )
+                    }
                     if playback.hasAudio {
                         PlayerBar()
                     }
@@ -138,11 +147,7 @@ struct TranscriptDetailView: View {
             return
         }
         speakers = transcript.uniqueSpeakers
-        if let speaker = selectedSpeaker {
-            filtered = transcript.segments.filter { $0.speaker == speaker }
-        } else {
-            filtered = transcript.segments
-        }
+        filtered = Self.visibleSegments(transcript.segments, speaker: selectedSpeaker)
         recomputeMatches()
     }
 
@@ -170,6 +175,19 @@ struct TranscriptDetailView: View {
     private func advanceMatch(total: Int) {
         guard total > 0 else { return }
         currentMatchIndex = (currentMatchIndex + 1) % total
+    }
+
+    private var transcriptIsEmpty: Bool {
+        guard let segments = loaded?.document.transcript.segments else { return false }
+        return Self.visibleSegments(segments, speaker: nil).isEmpty
+    }
+
+    static func visibleSegments(_ segments: [TranscriptSegment], speaker: String?) -> [TranscriptSegment] {
+        segments.filter { segment in
+            guard !segment.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+            guard let speaker else { return true }
+            return segment.speaker == speaker
+        }
     }
 }
 
