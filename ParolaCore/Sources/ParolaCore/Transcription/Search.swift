@@ -58,6 +58,7 @@ public extension Transcript {
     private static func applying(replacement: String, to range: Range<Int>, in text: String) -> String {
         let utf16 = text.utf16
         guard
+            range.lowerBound >= 0,
             let lo = utf16.index(utf16.startIndex, offsetBy: range.lowerBound, limitedBy: utf16.endIndex),
             let hi = utf16.index(utf16.startIndex, offsetBy: range.upperBound, limitedBy: utf16.endIndex),
             let stringLo = String.Index(lo, within: text),

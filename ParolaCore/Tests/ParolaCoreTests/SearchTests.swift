@@ -70,6 +70,13 @@ struct SearchTests {
         #expect(t.replacingAll("", with: "x").segments.map(\.text) == t.segments.map(\.text))
     }
 
+    @Test("replace with a negative-offset match range leaves the text unchanged")
+    func replaceNegativeRange() {
+        let t = sample()
+        let updated = t.applying(replacement: "X", to: TranscriptMatch(segmentID: 0, range: -1..<2))
+        #expect(updated.segments[0].text == "Hello world.")
+    }
+
     @Test("works with accented characters")
     func unicode() {
         let t = Transcript(
