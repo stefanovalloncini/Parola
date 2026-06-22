@@ -163,6 +163,15 @@ struct PeopleStoreTests {
         #expect(people.first?.usageCount == 3)
     }
 
+    @Test("recordUsage ignores an empty or whitespace-only name")
+    func recordUsageEmptyNoop() async {
+        let store = PeopleStore(storageURL: makeTempURL())
+        _ = await store.recordUsage(name: "  ")
+        _ = await store.recordUsage(name: "")
+        let people = await store.people
+        #expect(people.isEmpty)
+    }
+
     @Test("recordUsage folds composed-vs-decomposed unicode")
     func diacriticNormalization() async throws {
         let store = PeopleStore(storageURL: makeTempURL())

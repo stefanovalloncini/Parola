@@ -21,6 +21,7 @@ public actor PeopleStore {
     @discardableResult
     public func recordUsage(name: String, at date: Date = Date()) -> Person {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return Person(name: trimmed, lastUsedAt: date) }
         let normalizedKey = Self.normalize(trimmed)
         if let idx = people.firstIndex(where: { Self.normalize($0.name) == normalizedKey }) {
             people[idx].name = trimmed
