@@ -11,6 +11,7 @@ struct YouTubeURLTests {
             (name: "youtu.be short URL", url: "https://youtu.be/dQw4w9WgXcQ", isYouTube: true),
             (name: "mobile m.youtube.com", url: "https://m.youtube.com/watch?v=abc", isYouTube: true),
             (name: "YouTube shorts", url: "https://www.youtube.com/shorts/abc123", isYouTube: true),
+            (name: "YouTube live", url: "https://www.youtube.com/live/dQw4w9WgXcQ", isYouTube: true),
             (name: "YouTube music", url: "https://music.youtube.com/watch?v=abc", isYouTube: true),
             (name: "youtube.com homepage", url: "https://www.youtube.com/", isYouTube: false),
             (name: "vimeo", url: "https://vimeo.com/12345", isYouTube: false),
@@ -31,6 +32,7 @@ struct YouTubeURLTests {
         "classifies isYtDlpSupported",
         arguments: [
             (name: "youtube", url: "https://www.youtube.com/watch?v=abc", supported: true),
+            (name: "youtube live", url: "https://www.youtube.com/live/dQw4w9WgXcQ", supported: true),
             (name: "vimeo", url: "https://vimeo.com/12345", supported: true),
             (name: "x", url: "https://x.com/user/status/9", supported: true),
             (name: "twitter", url: "https://twitter.com/user/status/9", supported: true),

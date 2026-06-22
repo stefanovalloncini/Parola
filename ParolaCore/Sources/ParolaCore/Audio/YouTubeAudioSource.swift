@@ -12,6 +12,7 @@ public extension URL {
         if path.hasPrefix("/watch") { return true }
         if path.hasPrefix("/shorts/") { return true }
         if path.hasPrefix("/embed/") { return true }
+        if path.hasPrefix("/live/") { return true }
         return false
     }
 
