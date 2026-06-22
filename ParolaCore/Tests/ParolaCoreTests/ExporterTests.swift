@@ -427,6 +427,13 @@ struct ExporterTests {
         #expect(Format.decimalSeconds(0.00001).contains("e") == false)
     }
 
+    @Test("decimalSeconds renders non-finite input as a valid number")
+    func decimalSecondsNonFinite() {
+        #expect(Format.decimalSeconds(.nan) == "0.0")
+        #expect(Format.decimalSeconds(.infinity) == "0.0")
+        #expect(Format.decimalSeconds(-.infinity) == "0.0")
+    }
+
     @Test("csv renders a sub-millisecond start without an exponent")
     func csvSmallTimestampNoExponent() throws {
         let transcript = Transcript(
@@ -437,6 +444,19 @@ struct ExporterTests {
         let csv = try CsvExporter().renderText(transcript)
         #expect(csv.contains("0.00001,1.5,"))
         #expect(csv.contains("1e-05") == false)
+    }
+
+    @Test("csv renders a non-finite segment time as a numeric column")
+    func csvNonFiniteTimestamp() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: .infinity, end: .nan, text: "hi")],
+            language: "en",
+            modelName: "tiny"
+        )
+        let csv = try CsvExporter().renderText(transcript)
+        #expect(csv.contains("0.0,0.0,"))
+        #expect(csv.contains("inf") == false)
+        #expect(csv.contains("nan") == false)
     }
 
     @Test("tsv emits header and tab-separated rows")

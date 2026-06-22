@@ -22,7 +22,9 @@ public enum Format {
 
     /// Renders a seconds value for CSV/TSV numeric columns. `%f` is locale-independent and never
     /// uses scientific notation (unlike a bare Double interpolation, which prints e.g. "1e-05").
+    /// Non-finite input renders as `"0.0"` so the column stays numeric for downstream parsers.
     public static func decimalSeconds(_ v: Double) -> String {
+        guard v.isFinite else { return "0.0" }
         var s = String(format: "%.6f", v)
         while s.hasSuffix("0") { s.removeLast() }
         if s.hasSuffix(".") { s += "0" }
