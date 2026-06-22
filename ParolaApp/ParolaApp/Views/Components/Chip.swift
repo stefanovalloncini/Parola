@@ -12,7 +12,9 @@ struct Chip: View {
         case subtle
     }
 
-    let title: LocalizedStringKey
+    var title: LocalizedStringKey = ""
+    /// Bypasses `title`'s localization + markdown parsing for runtime data (e.g. speaker names that can contain `*` or `_`).
+    var verbatimTitle: String? = nil
     var tint: Color? = nil
     var isSelected: Bool
     var size: Size = .compact
@@ -34,7 +36,7 @@ struct Chip: View {
                         .fill(tint)
                         .frame(width: 8, height: 8)
                 }
-                Text(title)
+                titleLabel
                     .font(font)
                     .foregroundStyle(foreground)
             }
@@ -55,6 +57,13 @@ struct Chip: View {
         .modifier(OptionalHelp(help: help))
         .modifier(OptionalIdentifier(identifier: identifier))
         .modifier(SelectedTrait(isSelected: isSelected))
+    }
+
+    private var titleLabel: Text {
+        if let verbatimTitle {
+            return Text(verbatim: verbatimTitle)
+        }
+        return Text(title)
     }
 
     private var font: Font {

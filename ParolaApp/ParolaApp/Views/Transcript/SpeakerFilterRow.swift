@@ -18,7 +18,7 @@ struct SpeakerFilterRow: View {
                 }
                 ForEach(speakers, id: \.self) { speaker in
                     Chip(
-                        title: LocalizedStringKey(speaker),
+                        verbatimTitle: speaker,
                         tint: DS.speakerColor(for: speaker),
                         isSelected: selection == speaker,
                         size: .regular,
