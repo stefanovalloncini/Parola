@@ -146,7 +146,7 @@ public actor SummaryService {
         guard !line.isEmpty else { return nil }
         var scanner = line[...]
 
-        if scanner.first == "-" || scanner.first == "*" {
+        if scanner.first == "-" || scanner.first == "*" || scanner.first == "•" {
             scanner = scanner.dropFirst().drop(while: { $0 == " " })
         }
 

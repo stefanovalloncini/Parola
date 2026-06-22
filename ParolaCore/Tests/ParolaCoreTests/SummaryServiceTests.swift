@@ -38,6 +38,10 @@ struct SummaryServiceTests {
         let c = SummaryService.parseChapter("- 01:15 Speaker introduces topic")
         #expect(c?.title == "Speaker introduces topic")
         #expect(c?.start == 75)
+
+        let dot = SummaryService.parseChapter("• 01:15 Speaker introduces topic")
+        #expect(dot?.title == "Speaker introduces topic")
+        #expect(dot?.start == 75)
     }
 
     @Test("chapter line separated by a tab still parses")
