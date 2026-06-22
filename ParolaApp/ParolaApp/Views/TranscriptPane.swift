@@ -123,11 +123,15 @@ struct TranscriptPane: View {
 
     @ViewBuilder
     private var transcriptBody: some View {
-        switch displayMode {
-        case .segments:
-            SegmentsScroll()
-        case .transcript:
-            ContinuousTranscriptView()
+        if model.transcriptIsEmpty {
+            EmptyTranscriptPane()
+        } else {
+            switch displayMode {
+            case .segments:
+                SegmentsScroll()
+            case .transcript:
+                ContinuousTranscriptView()
+            }
         }
     }
 

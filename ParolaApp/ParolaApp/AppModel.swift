@@ -57,6 +57,11 @@ final class AppModel {
     }
     private(set) var transcriptSpeakers: [String] = []
     private(set) var transcriptVersion: Int = 0
+    // Short-circuits rather than building Transcript.text just to test for emptiness on every view update.
+    var transcriptIsEmpty: Bool {
+        guard let transcript else { return false }
+        return !transcript.segments.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
     var showingTrash: Bool = false
     var currentSegmentID: TranscriptSegment.ID?
     var currentWordID: WordTiming.ID?
