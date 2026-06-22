@@ -116,6 +116,32 @@ struct PeopleStoreTests {
         #expect(renamed.segments.map(\.speaker) == ["Stefano", "SPEAKER_02", "Stefano"])
     }
 
+    @Test("renamingSpeaker also rewrites word-level speaker labels")
+    func renamingSpeakerRewritesWords() {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(
+                    id: 0, start: 0, end: 2, text: "hi there", speaker: "SPEAKER_01",
+                    words: [
+                        WordTiming(id: "0-0", word: "hi", start: 0, end: 1, probability: 1, speaker: "SPEAKER_01"),
+                        WordTiming(id: "0-1", word: "there", start: 1, end: 2, probability: 1, speaker: "SPEAKER_01"),
+                    ]
+                ),
+                TranscriptSegment(
+                    id: 1, start: 2, end: 3, text: "ok", speaker: "SPEAKER_02",
+                    words: [
+                        WordTiming(id: "1-0", word: "ok", start: 2, end: 3, probability: 1, speaker: "SPEAKER_02"),
+                    ]
+                ),
+            ],
+            language: "en",
+            modelName: "tiny"
+        )
+        let renamed = transcript.renamingSpeaker("SPEAKER_01", to: "Stefano")
+        #expect(renamed.segments[0].words?.map(\.speaker) == ["Stefano", "Stefano"])
+        #expect(renamed.segments[1].words?.map(\.speaker) == ["SPEAKER_02"])
+    }
+
     @Test("renamingSpeaker ignores empty target")
     func renamingEmpty() {
         let transcript = Transcript(
