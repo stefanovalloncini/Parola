@@ -30,21 +30,37 @@ public enum SmartChapters {
         return parseResponse(response, maxSeconds: cap)
     }
 
+    private static let timestampWrappers = CharacterSet(charactersIn: "*_[]()`")
+
     private static func parseLine(_ raw: String) -> Chapter? {
         let trimmed = raw.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
-        var rest = trimmed[...]
-        if rest.first == "-" || rest.first == "*" || rest.first == "•" {
-            rest = rest.dropFirst().drop(while: { $0 == " " || $0 == "\t" })
+        let rest = stripLeadingMarkers(trimmed)
+        guard let space = rest.firstIndex(where: { $0 == " " || $0 == "\t" }) else { return nil }
+        let timeToken = String(rest[..<space]).trimmingCharacters(in: timestampWrappers)
+        guard let seconds = Timecode.parse(timeToken) else { return nil }
+        let title = ChapterTitle.clean(String(rest[rest.index(after: space)...]))
+        guard !title.isEmpty else { return nil }
+        return Chapter(title: title, start: seconds)
+    }
+
+    private static func stripLeadingMarkers(_ line: String) -> Substring {
+        let body = stripOrderedMarker(line[...]) ?? line[...]
+        return body
+            .drop(while: { "-*•_#".contains($0) })
+            .drop(while: { $0 == " " || $0 == "\t" })
+    }
+
+    private static func stripOrderedMarker(_ line: Substring) -> Substring? {
+        var idx = line.startIndex
+        while idx < line.endIndex, line[idx].isASCII, line[idx].isNumber {
+            idx = line.index(after: idx)
         }
-        if let space = rest.firstIndex(where: { $0 == " " || $0 == "\t" }) {
-            let timeToken = String(rest[..<space])
-            guard let seconds = Timecode.parse(timeToken) else { return nil }
-            rest = rest[rest.index(after: space)...]
-            let title = ChapterTitle.clean(String(rest))
-            guard !title.isEmpty else { return nil }
-            return Chapter(title: title, start: seconds)
-        }
-        return nil
+        guard idx > line.startIndex, idx < line.endIndex,
+              line[idx] == "." || line[idx] == ")" else { return nil }
+        let afterDelimiter = line.index(after: idx)
+        // A digit run plus "." or ")" is a list marker only when a space or line end follows, so "3.5 mg" stays prose.
+        guard afterDelimiter == line.endIndex || line[afterDelimiter].isWhitespace else { return nil }
+        return line[afterDelimiter...]
     }
 }

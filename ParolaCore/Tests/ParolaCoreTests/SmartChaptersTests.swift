@@ -63,6 +63,41 @@ struct SmartChaptersTests {
         #expect(result.map(\.start) == [0, 135, 300])
     }
 
+    @Test("parses numbered-list chapter lines")
+    func parsesNumberedLines() {
+        let result = SmartChapters.parseResponse("1. 00:00 Intro\n2. 02:15 Discussion\n3) 05:00 Wrap-up")
+        #expect(result.map(\.title) == ["Intro", "Discussion", "Wrap-up"])
+        #expect(result.map(\.start) == [0, 135, 300])
+    }
+
+    @Test("parses chapter lines with a markdown-bold timestamp")
+    func parsesBoldTimestamp() {
+        let result = SmartChapters.parseResponse("**00:00** Intro\n**02:15** Discussion")
+        #expect(result.map(\.title) == ["Intro", "Discussion"])
+        #expect(result.map(\.start) == [0, 135])
+    }
+
+    @Test("parses chapter lines wrapped entirely in bold")
+    func parsesBoldWholeLine() {
+        let result = SmartChapters.parseResponse("**00:00 Intro**\n**02:15 Discussion**")
+        #expect(result.map(\.title) == ["Intro", "Discussion"])
+        #expect(result.map(\.start) == [0, 135])
+    }
+
+    @Test("parses chapter lines with a bracketed timestamp")
+    func parsesBracketedTimestamp() {
+        let result = SmartChapters.parseResponse("[00:00] Intro\n[02:15] Discussion")
+        #expect(result.map(\.title) == ["Intro", "Discussion"])
+        #expect(result.map(\.start) == [0, 135])
+    }
+
+    @Test("a numbered marker does not turn a decimal into a timestamp")
+    func numberedMarkerKeepsDecimalAsNoise() {
+        let result = SmartChapters.parseResponse("1. 3.5 mg of caffeine\n2. 00:00 Intro")
+        #expect(result.map(\.title) == ["Intro"])
+        #expect(result.map(\.start) == [0])
+    }
+
     @Test("empty input yields empty list")
     func emptyInput() {
         #expect(SmartChapters.parseResponse("").isEmpty)
