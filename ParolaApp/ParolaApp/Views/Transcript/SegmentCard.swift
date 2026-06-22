@@ -172,10 +172,14 @@ struct SegmentCard: View {
                 .font(DS.Font.transcript)
                 .textSelection(.enabled)
         } else {
-            Text(segment.text)
+            Text(Self.displayText(segment.text))
                 .font(DS.Font.transcript)
                 .textSelection(.enabled)
         }
+    }
+
+    static func displayText(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     @State private var timingPopoverOpen = false
