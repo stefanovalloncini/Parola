@@ -21,7 +21,7 @@ struct TranscriptDetailView: View {
         return Group {
             if let loaded {
                 VStack(spacing: 0) {
-                    if speakers.count >= 2 {
+                    if Self.showsSpeakerLabels(speakerCount: speakers.count) {
                         SpeakerChipRow(
                             speakers: speakers,
                             selection: $selectedSpeaker
@@ -37,6 +37,7 @@ struct TranscriptDetailView: View {
                     } else {
                         TranscriptScrollView(
                             segments: filtered,
+                            showSpeaker: Self.showsSpeakerLabels(speakerCount: speakers.count),
                             query: trimmedQuery,
                             matchingIDs: matchIDs,
                             targetMatchID: targetMatchID(in: matchIDs)
@@ -189,6 +190,8 @@ struct TranscriptDetailView: View {
             return segment.speaker == speaker
         }
     }
+
+    static func showsSpeakerLabels(speakerCount: Int) -> Bool { speakerCount >= 2 }
 }
 
 private struct SpeakerChipRow: View {
@@ -234,6 +237,7 @@ private struct SpeakerChipRow: View {
 
 private struct TranscriptScrollView: View {
     let segments: [TranscriptSegment]
+    let showSpeaker: Bool
     let query: String
     let matchingIDs: [TranscriptSegment.ID]
     let targetMatchID: TranscriptSegment.ID?
@@ -248,6 +252,7 @@ private struct TranscriptScrollView: View {
                     ForEach(segments) { segment in
                         SegmentView(
                             segment: segment,
+                            showSpeaker: showSpeaker,
                             activeSegmentID: playback.currentSegmentID,
                             activeWordID: playback.currentWordID,
                             query: query,
@@ -276,6 +281,7 @@ private struct TranscriptScrollView: View {
 
 private struct SegmentView: View {
     let segment: TranscriptSegment
+    let showSpeaker: Bool
     let activeSegmentID: TranscriptSegment.ID?
     let activeWordID: WordTiming.ID?
     let query: String
@@ -290,6 +296,12 @@ private struct SegmentView: View {
                 Text(timestamp(segment.start))
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
+                if showSpeaker, let speaker = segment.speaker, !speaker.isEmpty {
+                    Text(speaker)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
                 Spacer(minLength: 0)
                 if playback.hasAudio {
                     Button {

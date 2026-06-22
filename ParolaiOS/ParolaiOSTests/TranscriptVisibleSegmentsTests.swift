@@ -60,4 +60,12 @@ struct TranscriptVisibleSegmentsTests {
         let transcript = Transcript(segments: segments, language: "it", modelName: "test")
         #expect(transcript.text.isEmpty)
     }
+
+    @Test("per-segment speaker labels appear only when 2+ speakers are present")
+    func speakerLabelsNeedTwoSpeakers() {
+        #expect(TranscriptDetailView.showsSpeakerLabels(speakerCount: 0) == false)
+        #expect(TranscriptDetailView.showsSpeakerLabels(speakerCount: 1) == false)
+        #expect(TranscriptDetailView.showsSpeakerLabels(speakerCount: 2) == true)
+        #expect(TranscriptDetailView.showsSpeakerLabels(speakerCount: 5) == true)
+    }
 }
