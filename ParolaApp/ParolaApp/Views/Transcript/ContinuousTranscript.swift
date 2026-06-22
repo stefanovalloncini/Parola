@@ -19,7 +19,7 @@ struct ContinuousTranscriptView: View {
 }
 
 struct ContinuousParagraph: View {
-    private struct SegmentRun {
+    struct SegmentRun {
         let offsets: Range<Int>
         let baseColor: Color?
     }
@@ -49,27 +49,35 @@ struct ContinuousParagraph: View {
             highlightedSegmentID = nil
             return
         }
+        let built = Self.paragraph(
+            segments: transcript.segments,
+            useSpeakerColor: model.transcriptSpeakers.count >= 2
+        )
+        attributedCache = built.text
+        segmentRuns = built.runs
+        highlightedSegmentID = nil
+        applyHighlight()
+    }
+
+    static func paragraph(
+        segments: [TranscriptSegment],
+        useSpeakerColor: Bool
+    ) -> (text: AttributedString, runs: [TranscriptSegment.ID: SegmentRun]) {
         var attr = AttributedString()
         var runs: [TranscriptSegment.ID: SegmentRun] = [:]
-        let segments = transcript.segments
-        let useSpeakerColor = model.transcriptSpeakers.count >= 2
         var offset = 0
-
-        for (idx, seg) in segments.enumerated() {
+        for seg in segments {
             let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !body.isEmpty else { continue }
             let baseColor: Color? = useSpeakerColor ? seg.speaker.map(DS.speakerColor(for:)) : nil
-            var piece = AttributedString(body + (idx == segments.count - 1 ? "" : " "))
+            var piece = AttributedString(offset == 0 ? body : " " + body)
             if let baseColor { piece.foregroundColor = baseColor }
             let length = piece.characters.count
             runs[seg.id] = SegmentRun(offsets: offset..<offset + length, baseColor: baseColor)
             offset += length
             attr.append(piece)
         }
-        attributedCache = attr
-        segmentRuns = runs
-        highlightedSegmentID = nil
-        applyHighlight()
+        return (attr, runs)
     }
 
     private func applyHighlight() {
