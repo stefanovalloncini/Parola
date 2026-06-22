@@ -28,6 +28,7 @@ extension AppModel {
         var out = transcript
         out.segments = IgnoredSegments.apply(rules: ignoredSegmentRules, to: out.segments)
         out.segments = GlobalFindReplace.apply(rules: findReplaceRules, to: out.segments)
+        out.segments = ItalianOrthography.apply(to: out.segments, language: out.language)
         return out
     }
 

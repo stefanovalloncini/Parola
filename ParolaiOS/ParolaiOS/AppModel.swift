@@ -60,6 +60,7 @@ final class AppModel {
             var out = transcript
             out.segments = IgnoredSegments.apply(rules: self.ignoredSegmentRules, to: out.segments)
             out.segments = GlobalFindReplace.apply(rules: self.findReplaceRules, to: out.segments)
+            out.segments = ItalianOrthography.apply(to: out.segments, language: out.language)
             return out
         }
         refreshModelList()
