@@ -22,7 +22,7 @@ public enum ActionItemParser {
 
     private static func parseLine(_ raw: String) -> ActionItem? {
         let trimmed = raw.trimmingCharacters(in: .whitespaces)
-        guard let body = stripBullet(trimmed), !body.isEmpty else { return nil }
+        guard let body = stripListMarker(trimmed), !body.isEmpty else { return nil }
 
         var rest = body
         let assignee = takeLeadingBracket(&rest)
@@ -33,11 +33,24 @@ public enum ActionItemParser {
         return ActionItem(assignee: assignee, task: task, dueDate: dueDate)
     }
 
-    private static func stripBullet(_ line: String) -> String? {
+    private static func stripListMarker(_ line: String) -> String? {
         for marker in ["-", "*", "•"] where line.hasPrefix(marker) {
             return String(line.dropFirst(marker.count)).trimmingCharacters(in: .whitespaces)
         }
-        return nil
+        return stripOrderedMarker(line)
+    }
+
+    private static func stripOrderedMarker(_ line: String) -> String? {
+        var idx = line.startIndex
+        while idx < line.endIndex, line[idx].isASCII, line[idx].isNumber {
+            idx = line.index(after: idx)
+        }
+        guard idx > line.startIndex, idx < line.endIndex,
+              line[idx] == "." || line[idx] == ")" else { return nil }
+        let afterDelimiter = line.index(after: idx)
+        // A digit run plus "." or ")" is a list marker only when a space or line end follows, so "3.5 mg" stays prose.
+        guard afterDelimiter == line.endIndex || line[afterDelimiter].isWhitespace else { return nil }
+        return String(line[afterDelimiter...]).trimmingCharacters(in: .whitespaces)
     }
 
     private static func takeLeadingBracket(_ rest: inout String) -> String? {

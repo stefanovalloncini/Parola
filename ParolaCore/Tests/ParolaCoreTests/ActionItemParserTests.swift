@@ -80,4 +80,37 @@ struct ActionItemParserTests {
         #expect(items[0].task == "draft the spec")
         #expect(items[0].dueDate == "Friday")
     }
+
+    @Test("parses numbered list markers")
+    func parsesNumberedList() {
+        let items = ActionItemParser.parse("""
+        1. send the report
+        2. call the vendor
+        10. file the receipt
+        """)
+        #expect(items.map(\.task) == ["send the report", "call the vendor", "file the receipt"])
+    }
+
+    @Test("parses parenthesized numbered markers")
+    func parsesParenNumbered() {
+        let items = ActionItemParser.parse("""
+        1) ship the migration
+        2) review the PR
+        """)
+        #expect(items.map(\.task) == ["ship the migration", "review the PR"])
+    }
+
+    @Test("parses fields inside a numbered item")
+    func numberedItemFields() {
+        let items = ActionItemParser.parse("1. [Alice] should send the report [by Friday]")
+        #expect(items.count == 1)
+        #expect(items[0].assignee == "Alice")
+        #expect(items[0].task == "should send the report")
+        #expect(items[0].dueDate == "Friday")
+    }
+
+    @Test("does not treat a decimal number as a list marker")
+    func decimalNotMarker() {
+        #expect(ActionItemParser.parse("3.5 mg is the dosage").isEmpty)
+    }
 }
