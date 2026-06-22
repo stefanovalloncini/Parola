@@ -154,6 +154,13 @@ struct VttImporterTests {
         #expect(t.durationSeconds == 65.0)
     }
 
+    @Test("trims the leading space a YouTube timing tag leaves in cue text")
+    func trimsLeadingTagSpace() {
+        let vtt = "WEBVTT\n\n00:00:03.000 --> 00:00:05.000\n<00:00:03.200><c> continued</c> text"
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.first?.text == "continued text")
+    }
+
     @Test("decodes HTML entities in cue text")
     func decodesEntities() {
         let vtt = """

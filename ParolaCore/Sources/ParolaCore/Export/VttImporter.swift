@@ -50,7 +50,12 @@ enum VttImporter {
                 i += 1
             }
 
-            let text = decodeEntities(textLines.joined(separator: " "))
+            let text = decodeEntities(
+                textLines
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " ")
+            )
             if !text.isEmpty {
                 segments.append(TranscriptSegment(
                     id: nextID,

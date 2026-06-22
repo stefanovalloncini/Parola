@@ -196,6 +196,13 @@ struct SrtImporterTests {
         #expect(t.segments.first?.end == 2.0)
     }
 
+    @Test("trims surrounding and collapses indented whitespace in cue text")
+    func trimsWhitespace() {
+        let srt = "1\n00:00:00,000 --> 00:00:02,000\n  First\n   Second  \n"
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.first?.text == "First Second")
+    }
+
     @Test("skips a cue whose text is empty and keeps ids sequential")
     func skipsEmptyTextCue() {
         let srt = """
