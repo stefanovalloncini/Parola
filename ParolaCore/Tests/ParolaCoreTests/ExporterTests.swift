@@ -288,6 +288,18 @@ struct ExporterTests {
         #expect(out.contains("\"line1\r\nline2\""))
     }
 
+    @Test("csv trims leading/trailing newlines from the text cell")
+    func csvTrimsEdgeNewlines() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "\nHello world\n")],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try CsvExporter().renderText(transcript)
+        #expect(out.contains("0.0,1.0,,Hello world\n"))
+        #expect(out.contains("\"") == false)
+    }
+
     @Test("csv emits empty speaker column when nil")
     func csvEmptySpeaker() throws {
         let out = try CsvExporter().renderText(sample())
@@ -667,6 +679,18 @@ struct ExporterTests {
         #expect(out.contains("tab\\there"))
         #expect(out.contains("line1\\nline2"))
         #expect(out.contains("tab\there") == false)
+    }
+
+    @Test("tsv trims leading/trailing newlines from the text field")
+    func tsvTrimsEdgeNewlines() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "\nHello world\n")],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try TsvExporter().renderText(transcript)
+        #expect(out.contains("\tHello world\n"))
+        #expect(out.contains("\\n") == false)
     }
 
     @Test("tsv is a recognized ExportFormat")
