@@ -115,10 +115,14 @@ struct SegmentsScroll: View {
             visibleSegmentsCache = []
             return
         }
-        if let filter = speakerFilter {
-            visibleSegmentsCache = segments.filter { $0.speaker == filter }
-        } else {
-            visibleSegmentsCache = segments
+        visibleSegmentsCache = Self.visibleSegments(from: segments, speakerFilter: speakerFilter)
+    }
+
+    static func visibleSegments(from segments: [TranscriptSegment], speakerFilter: String?) -> [TranscriptSegment] {
+        segments.filter { segment in
+            guard !segment.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+            guard let speakerFilter else { return true }
+            return segment.speaker == speakerFilter
         }
     }
 
