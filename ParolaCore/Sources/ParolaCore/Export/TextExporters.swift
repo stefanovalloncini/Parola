@@ -5,7 +5,8 @@ struct TxtExporter: TranscriptExporter {
     init() {}
     func render(_ transcript: Transcript) throws -> Data {
         let text = transcript.segments
-            .map { $0.text.trimmingCharacters(in: .whitespaces) }
+            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
             .joined(separator: "\n")
         return utf8(text)
     }
@@ -30,7 +31,8 @@ public struct MarkdownExporter: TranscriptExporter {
     public func render(_ transcript: Transcript) throws -> Data {
         var out = ""
         for seg in transcript.segments {
-            let body = seg.text.trimmingCharacters(in: .whitespaces)
+            let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !body.isEmpty else { continue }
             switch (seg.speaker, options.showTimestamps) {
             case (let speaker?, true) where !speaker.isEmpty:
                 out += "**\(speaker)** *[\(Format.timestampHHMMSS(seg.start))]*: \(body)\n\n"

@@ -25,6 +25,22 @@ struct ExporterTests {
         #expect(out == "Hello world.\nThis is Parola.\nGoodbye.")
     }
 
+    @Test("txt drops a segment whose text trims to empty")
+    func txtDropsEmptySegment() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello."),
+                TranscriptSegment(id: 1, start: 1, end: 2, text: "   "),
+                TranscriptSegment(id: 2, start: 2, end: 3, text: " \n "),
+                TranscriptSegment(id: 3, start: 3, end: 4, text: "World."),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try TxtExporter().renderText(transcript)
+        #expect(out == "Hello.\nWorld.")
+    }
+
     @Test("srt has indexed blocks with comma-millisecond timestamps")
     func srt() throws {
         let out = try SrtExporter().renderText(sample())
@@ -112,6 +128,32 @@ struct ExporterTests {
         let timed = try MarkdownExporter(options: MarkdownOptions(showTimestamps: true)).renderText(transcript)
         #expect(timed == "*[00:00:00]* Hello.\n")
         #expect(timed.contains("****") == false)
+    }
+
+    @Test("markdown drops a segment whose body trims to empty")
+    func markdownDropsEmptyBodySegment() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello."),
+                TranscriptSegment(id: 1, start: 1, end: 2, text: "   "),
+                TranscriptSegment(id: 2, start: 2, end: 3, text: "World."),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        #expect(try MarkdownExporter().renderText(transcript) == "Hello.\n\nWorld.\n")
+
+        let withSpeaker = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: "Speaker 1"),
+                TranscriptSegment(id: 1, start: 1, end: 2, text: "  ", speaker: "Speaker 2"),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try MarkdownExporter().renderText(withSpeaker)
+        #expect(out == "**Speaker 1:** Hello.\n")
+        #expect(out.contains("Speaker 2") == false)
     }
 
     @Test("md is a recognized ExportFormat with .md extension")
