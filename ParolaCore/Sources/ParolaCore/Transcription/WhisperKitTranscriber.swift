@@ -183,7 +183,7 @@ actor WhisperKitTranscriber: Transcriber {
         }
 
         return Transcript(
-            segments: segments,
+            segments: segments.chronologicallyOrdered(),
             language: detectedLanguage,
             modelName: modelName,
             sourceURL: url,
