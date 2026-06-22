@@ -1414,7 +1414,9 @@ final class AppModel {
     func editSegment(id: TranscriptSegment.ID, newText: String) {
         guard var t = transcript else { return }
         guard let idx = t.segments.firstIndex(where: { $0.id == id }) else { return }
-        t.segments[idx].text = newText
+        let trimmed = newText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != t.segments[idx].text else { return }
+        t.segments[idx].text = trimmed
         transcript = t
         persistCurrentTranscriptIfLoaded()
     }
