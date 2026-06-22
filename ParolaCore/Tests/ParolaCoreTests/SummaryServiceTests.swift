@@ -11,6 +11,21 @@ struct SummaryServiceTests {
         #expect(SummaryService.parseClock("not a time") == nil)
     }
 
+    @Test("clock parsing rejects non-finite, non-decimal, and out-of-range times", arguments: [
+        "0:inf",
+        "0:nan",
+        "0:1e3",
+        "0:0x1p4",
+        "0:-5",
+        "1:00:inf",
+        "-5:00",
+        "99999999:00",
+        "1000:00:01",
+    ])
+    func clockRejectsPoison(_ input: String) {
+        #expect(SummaryService.parseClock(input) == nil)
+    }
+
     @Test("chapter line parses timestamp + title")
     func chapter() {
         let c = SummaryService.parseChapter("00:30 Opening greetings")
@@ -57,6 +72,21 @@ struct SummaryServiceTests {
         let summary = SummaryService.parse(response)
         #expect(summary.text == "A one-sentence summary.")
         #expect(summary.chapters.isEmpty)
+    }
+
+    @Test("a chapter line with a malformed timestamp is dropped, valid ones kept")
+    func dropsMalformedChapterTime() {
+        let response = """
+        SUMMARY:
+        A summary.
+
+        CHAPTERS:
+        00:00 Good intro
+        0:inf Poisoned chapter
+        01:30 Good outro
+        """
+        let summary = SummaryService.parse(response)
+        #expect(summary.chapters.map(\.title) == ["Good intro", "Good outro"])
     }
 
     @Test("two-paragraph summary preserves both paragraphs joined by a blank line")

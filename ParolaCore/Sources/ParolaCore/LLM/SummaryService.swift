@@ -161,17 +161,7 @@ public actor SummaryService {
     }
 
     static func parseClock(_ s: String) -> Double? {
-        let bits = s.split(separator: ":").map(String.init)
-        switch bits.count {
-        case 2:
-            guard let m = Int(bits[0]), let sec = Double(bits[1]) else { return nil }
-            return Double(m) * 60 + sec
-        case 3:
-            guard let h = Int(bits[0]), let m = Int(bits[1]), let sec = Double(bits[2]) else { return nil }
-            return Double(h) * 3600 + Double(m) * 60 + sec
-        default:
-            return nil
-        }
+        Format.parseClockTimestamp(s)
     }
 }
 
