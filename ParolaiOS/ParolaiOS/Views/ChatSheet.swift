@@ -180,19 +180,38 @@ struct ChatSheet: View {
     }
 }
 
-private struct ChatBubble: View {
+struct ChatBubble: View {
     let message: ChatMessage
 
     var body: some View {
         HStack {
             if message.role == .user { Spacer(minLength: 40) }
-            Text(message.text)
-                .textSelection(.enabled)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(message.role == .user ? Color.accentColor.opacity(0.18) : Color(uiColor: .secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            bubble
             if message.role == .assistant { Spacer(minLength: 40) }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(message.role == .user ? "You" : "Assistant"): \(Self.displayText(message.text).isEmpty ? "No response" : message.text)")
+    }
+
+    private var bubble: some View {
+        let shown = Self.displayText(message.text)
+        return Group {
+            if shown.isEmpty {
+                Text("No response")
+                    .italic()
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(shown)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(message.role == .user ? Color.accentColor.opacity(0.18) : Color(uiColor: .secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    static func displayText(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
