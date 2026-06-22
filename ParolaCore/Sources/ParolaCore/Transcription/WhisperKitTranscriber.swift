@@ -174,7 +174,7 @@ actor WhisperKitTranscriber: Transcriber {
                     id: nextID,
                     start: Double(seg.start),
                     end: Double(seg.end),
-                    text: seg.text.trimmingCharacters(in: .whitespacesAndNewlines),
+                    text: SpokenText.normalized(seg.text),
                     words: words
                 ))
                 nextID += 1
