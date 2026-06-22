@@ -120,6 +120,23 @@ struct VttImporterTests {
         #expect(t.segments.first?.text == "Hello")
     }
 
+    @Test("durationSeconds is the max cue end on out-of-order input")
+    func durationIsMaxEndOnOutOfOrder() {
+        let vtt = """
+        WEBVTT
+
+        00:01:00.000 --> 00:01:05.000
+        Early in file, late in time.
+
+        00:00:00.000 --> 00:00:03.000
+        Late in file, early in time.
+        """
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.count == 2)
+        #expect(t.segments.last?.end == 3.0)
+        #expect(t.durationSeconds == 65.0)
+    }
+
     @Test("decodes HTML entities in cue text")
     func decodesEntities() {
         let vtt = """

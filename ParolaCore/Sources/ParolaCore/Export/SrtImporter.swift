@@ -48,7 +48,7 @@ public enum SrtImporter {
             segments: segments,
             language: "unknown",
             modelName: "imported-srt",
-            durationSeconds: segments.last?.end
+            durationSeconds: segments.map(\.end).max()
         )
     }
 

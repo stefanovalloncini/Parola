@@ -63,7 +63,7 @@ enum VttImporter {
             segments: segments,
             language: "unknown",
             modelName: "youtube-subs",
-            durationSeconds: segments.last?.end
+            durationSeconds: segments.map(\.end).max()
         )
     }
 
