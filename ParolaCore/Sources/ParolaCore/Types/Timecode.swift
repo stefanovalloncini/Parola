@@ -18,7 +18,12 @@ public enum Timecode {
         var total: Int = 0
         for part in parts {
             guard let value = Int(part), value >= 0 else { return nil }
-            total = total * 60 + value
+            // A huge field (reachable from the jump-to-time box and t= deep links) traps a plain total * 60.
+            let (scaled, mulOverflow) = total.multipliedReportingOverflow(by: 60)
+            guard !mulOverflow else { return nil }
+            let (sum, addOverflow) = scaled.addingReportingOverflow(value)
+            guard !addOverflow else { return nil }
+            total = sum
         }
         return Double(total)
     }

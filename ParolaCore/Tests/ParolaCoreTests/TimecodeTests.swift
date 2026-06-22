@@ -33,4 +33,15 @@ struct TimecodeTests {
         #expect(Timecode.format(.nan) == "00:00")
         #expect(Timecode.format(-5) == "00:00")
     }
+
+    @Test("parse returns nil instead of trapping when a field overflows Int")
+    func parseOverflows() {
+        #expect(Timecode.parse("200000000000000000:0") == nil)
+        #expect(Timecode.parse("9000000000000000000:0:0") == nil)
+    }
+
+    @Test("parse still accepts a large in-range timecode")
+    func parseLargeInRange() {
+        #expect(Timecode.parse("1000:00:00") == 3_600_000)
+    }
 }
