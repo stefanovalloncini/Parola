@@ -40,6 +40,13 @@ struct SummaryServiceTests {
         #expect(c?.start == 75)
     }
 
+    @Test("chapter line separated by a tab still parses")
+    func chapterTabSeparated() {
+        let c = SummaryService.parseChapter("00:30\tOpening greetings")
+        #expect(c?.title == "Opening greetings")
+        #expect(c?.start == 30)
+    }
+
     @Test("full response parse extracts summary + chapters")
     func fullResponse() {
         let response = """

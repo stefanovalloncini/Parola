@@ -150,7 +150,7 @@ public actor SummaryService {
             scanner = scanner.dropFirst().drop(while: { $0 == " " })
         }
 
-        let parts = scanner.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+        let parts = scanner.split(maxSplits: 1, omittingEmptySubsequences: true, whereSeparator: { $0 == " " || $0 == "\t" })
         guard parts.count == 2 else { return nil }
         let timeToken = String(parts[0])
         let title = parts[1].trimmingCharacters(in: .whitespaces)
