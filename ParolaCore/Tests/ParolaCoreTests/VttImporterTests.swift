@@ -77,6 +77,13 @@ struct VttImporterTests {
         #expect(SubtitleMarkup.stripInlineTags("<i>italic</i> normal") == "italic normal")
     }
 
+    @Test("keeps an unclosed '<' as literal text instead of eating the line")
+    func unclosedAngleBracket() {
+        #expect(SubtitleMarkup.stripInlineTags("I love <3 you") == "I love <3 you")
+        #expect(SubtitleMarkup.stripInlineTags("when x < 5 holds") == "when x < 5 holds")
+        #expect(SubtitleMarkup.stripInlineTags("<i>tag</i> then x < 5") == "tag then x < 5")
+    }
+
     @Test("accepts MM:SS.mmm without an hour field")
     func shortTimestamp() {
         let ts = VttImporter.parseTimestamp("01:30.500")

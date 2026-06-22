@@ -5,11 +5,14 @@ enum SubtitleMarkup {
         guard line.contains("<") else { return line }
         var out = ""
         out.reserveCapacity(line.count)
-        var inside = false
-        for ch in line {
-            if ch == "<" { inside = true; continue }
-            if ch == ">" { inside = false; continue }
-            if !inside { out.append(ch) }
+        var i = line.startIndex
+        while i < line.endIndex {
+            if line[i] == "<", let close = line[line.index(after: i)...].firstIndex(of: ">") {
+                i = line.index(after: close)
+            } else {
+                out.append(line[i])
+                i = line.index(after: i)
+            }
         }
         return out
     }
