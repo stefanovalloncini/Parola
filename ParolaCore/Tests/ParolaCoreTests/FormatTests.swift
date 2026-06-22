@@ -148,4 +148,25 @@ struct FormatTests {
         #expect(Format.escapeHTML(input).contains("&quot;"))
         #expect(Format.escapeHTML(input).contains("&#39;"))
     }
+
+    @Test("escapeXML strips characters XML 1.0 forbids", arguments: [
+        "\u{0}", "\u{1}", "\u{8}", "\u{B}", "\u{C}", "\u{E}", "\u{1F}",
+    ])
+    func xmlStripsForbiddenControlChars(_ control: String) {
+        #expect(Format.escapeXML("a\(control)b") == "ab")
+    }
+
+    @Test("escapeXML keeps legal whitespace, astral scalars, and entity escaping")
+    func xmlKeepsLegalContent() {
+        #expect(Format.escapeXML("a\tb\nc\rd") == "a\tb\nc\rd")
+        #expect(Format.escapeXML("a😀b") == "a😀b")
+        #expect(Format.escapeXML("<a> & 'q'") == "&lt;a&gt; &amp; &#39;q&#39;")
+    }
+
+    @Test("escapeXML output is valid XML character data")
+    func xmlOutputParses() {
+        let dirty = "ok\u{0}\u{1F}text <tag> & more"
+        let parser = XMLParser(data: Data("<r>\(Format.escapeXML(dirty))</r>".utf8))
+        #expect(parser.parse())
+    }
 }

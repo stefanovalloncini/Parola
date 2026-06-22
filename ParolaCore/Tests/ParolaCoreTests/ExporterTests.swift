@@ -291,6 +291,19 @@ struct ExporterTests {
         #expect(asString.contains("5 &lt; 10 &amp; true"))
     }
 
+    @Test("docx strips control characters that would corrupt the document")
+    func docxStripsControlChars() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hi\u{0}there\u{1F}!")],
+            language: "en",
+            modelName: "x"
+        )
+        let data = try DocxExporter().render(transcript)
+        let asString = String(decoding: data, as: UTF8.self)
+        #expect(asString.contains("Hithere!"))
+        #expect(asString.contains("Hi\u{0}there") == false)
+    }
+
     @Test("docx is a recognized ExportFormat")
     func docxFormat() {
         #expect(ExportFormat.docx.fileExtension == "docx")

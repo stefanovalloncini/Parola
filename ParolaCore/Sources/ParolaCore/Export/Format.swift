@@ -66,8 +66,22 @@ public enum Format {
             .replacingOccurrences(of: "'", with: "&#39;")
     }
 
+    /// Like ``escapeHTML(_:)`` but also drops scalars outside XML 1.0's `Char` production
+    /// (NUL and other C0 controls except tab/newline/CR, plus noncharacters). Such bytes can't
+    /// appear in XML even as numeric references, so leaving one in a segment yields a `.docx`
+    /// Word refuses to open.
     public static func escapeXML(_ s: String) -> String {
-        escapeHTML(s)
+        let valid = s.unicodeScalars.filter(isXMLChar)
+        return escapeHTML(String(String.UnicodeScalarView(valid)))
+    }
+
+    private static func isXMLChar(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.value {
+        case 0x9, 0xA, 0xD, 0x20...0xD7FF, 0xE000...0xFFFD, 0x10000...0x10FFFF:
+            return true
+        default:
+            return false
+        }
     }
 
     /// WebVTT cue text only decodes `&amp;`, `&lt;`, `&gt;` (and a few named entities), not numeric
