@@ -111,7 +111,7 @@ private struct LiveRecordingPane: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
                         ForEach(model.coordinator.liveSegments) { seg in
-                            Text(seg.text.trimmingCharacters(in: .whitespaces))
+                            Text(seg.text.trimmingCharacters(in: .whitespacesAndNewlines))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .id(seg.id)
                         }

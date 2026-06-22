@@ -192,6 +192,10 @@ struct TranscriptDetailView: View {
     }
 
     static func showsSpeakerLabels(speakerCount: Int) -> Bool { speakerCount >= 2 }
+
+    static func displayText(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 private struct SpeakerChipRow: View {
@@ -340,7 +344,7 @@ private struct SegmentTextView: View {
     @Environment(PlaybackController.self) private var playback
 
     var body: some View {
-        let label = Text(highlighted(text: text.trimmingCharacters(in: .whitespaces), query: query))
+        let label = Text(highlighted(text: TranscriptDetailView.displayText(text), query: query))
             .padding(6)
             .background(isActive ? Color.accentColor.opacity(0.15) : .clear)
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
