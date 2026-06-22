@@ -112,13 +112,18 @@ actor DiarizationService {
             guard !text.isEmpty else { continue }
             let id = parts.isEmpty ? segment.id : startingID
             if !parts.isEmpty { startingID += 1 }
+            let renumbered = runWords.enumerated().map { index, word -> WordTiming in
+                var word = word
+                word.id = "\(id)-\(index)"
+                return word
+            }
             parts.append(TranscriptSegment(
                 id: id,
                 start: first.start,
                 end: last.end,
                 text: text,
                 speaker: run.speaker,
-                words: runWords
+                words: renumbered
             ))
         }
         return parts.isEmpty ? [segment] : parts

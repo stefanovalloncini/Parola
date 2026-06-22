@@ -122,4 +122,27 @@ struct DiarizationTests {
         let firstWord = try? #require(merged.segments.first?.words?.first)
         #expect(firstWord?.speaker == "Speaker 3")
     }
+
+    @Test("a speaker split renumbers each part's words to its own segment id")
+    func splitRenumbersWordIDs() throws {
+        let words = [
+            word(0, 0, 1, "hi"),
+            word(1, 1, 2, "there"),
+            word(2, 2, 3, "ok"),
+            word(3, 3, 4, "sure")
+        ]
+        let seg = TranscriptSegment(id: 10, start: 0, end: 4, text: "hi there ok sure", words: words)
+        let transcript = Transcript(segments: [seg], language: "en", modelName: "tiny")
+        let result = diarization([
+            speakerSegment(0, 0, 2),
+            speakerSegment(1, 2, 4)
+        ])
+        let merged = DiarizationService.merge(transcript: transcript, diarization: result)
+        #expect(merged.segments.count == 2)
+        for segment in merged.segments {
+            let segWords = try #require(segment.words)
+            let expected = segWords.indices.map { "\(segment.id)-\($0)" }
+            #expect(segWords.map(\.id) == expected)
+        }
+    }
 }
