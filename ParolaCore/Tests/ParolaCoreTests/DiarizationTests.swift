@@ -87,6 +87,28 @@ struct DiarizationTests {
         #expect(merged.segments[1].words?.count == 2)
     }
 
+    @Test("a speaker-split run keeps elisions whole when rebuilding text")
+    func splitRunKeepsElisionsWhole() {
+        let words = [
+            word(0, 0, 1, "l"),
+            word(1, 1, 2, "'altro"),
+            word(2, 2, 3, "che"),
+            word(3, 3, 4, "un"),
+            word(4, 4, 5, "po'"),
+            word(5, 5, 6, "qua")
+        ]
+        let seg = TranscriptSegment(id: 0, start: 0, end: 6, text: "l'altro che un po' qua", words: words)
+        let transcript = Transcript(segments: [seg], language: "it", modelName: "tiny")
+        let result = diarization([
+            speakerSegment(0, 0, 3),
+            speakerSegment(1, 3, 6)
+        ])
+        let merged = DiarizationService.merge(transcript: transcript, diarization: result)
+        #expect(merged.segments.count == 2)
+        #expect(merged.segments[0].text == "l'altro che")
+        #expect(merged.segments[1].text == "un po' qua")
+    }
+
     @Test("words inherit their per-word speaker when present")
     func wordsCarrySpeakerLabel() {
         let words = [

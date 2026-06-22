@@ -108,7 +108,7 @@ actor DiarizationService {
         for run in runs {
             let runWords = Array(labeledWords[run.range])
             guard let first = runWords.first, let last = runWords.last else { continue }
-            let text = runWords.map(\.word).joined(separator: " ").trimmingCharacters(in: .whitespaces)
+            let text = Self.joinWordTexts(runWords.map(\.word)).trimmingCharacters(in: .whitespaces)
             guard !text.isEmpty else { continue }
             let id = parts.isEmpty ? segment.id : startingID
             if !parts.isEmpty { startingID += 1 }
@@ -122,6 +122,19 @@ actor DiarizationService {
             ))
         }
         return parts.isEmpty ? [segment] : parts
+    }
+
+    /// Space-joins word tokens but keeps a leading-apostrophe elision tail attached: WhisperKit splits "l'altro" into ["l", "'altro"], which a plain join would space out to "l 'altro".
+    static func joinWordTexts(_ words: [String]) -> String {
+        var text = ""
+        for word in words {
+            if text.isEmpty || word.first == "'" || word.first == "\u{2019}" {
+                text += word
+            } else {
+                text += " " + word
+            }
+        }
+        return text
     }
 
     private struct SpeakerRun {
