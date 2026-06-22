@@ -134,6 +134,30 @@ struct SrtImporterTests {
         #expect(t.segments.map(\.text) == ["hello", "world"])
     }
 
+    @Test("strips inline formatting tags from cue text")
+    func stripsInlineTags() {
+        let srt = """
+        1
+        00:00:00,000 --> 00:00:02,000
+        <i>Hello</i> <font color="#ff0000">world</font>.
+        """
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.count == 1)
+        #expect(t.segments.first?.text == "Hello world.")
+    }
+
+    @Test("strips a formatting tag spanning two text lines")
+    func stripsTagAcrossLines() {
+        let srt = """
+        1
+        00:00:00,000 --> 00:00:02,000
+        <i>First line
+        second line</i>
+        """
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.first?.text == "First line second line")
+    }
+
     @Test("skips a cue whose text is empty and keeps ids sequential")
     func skipsEmptyTextCue() {
         let srt = """

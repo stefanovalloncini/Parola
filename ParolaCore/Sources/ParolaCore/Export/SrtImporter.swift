@@ -28,7 +28,7 @@ public enum SrtImporter {
 
             var textLines: [String] = []
             while i < lines.count, !lines[i].trimmingCharacters(in: .whitespaces).isEmpty {
-                textLines.append(lines[i])
+                textLines.append(SubtitleMarkup.stripInlineTags(lines[i]))
                 i += 1
             }
 

@@ -72,9 +72,9 @@ struct VttImporterTests {
 
     @Test("strips inline tags like <v Speaker> and <i>")
     func inlineTags() {
-        #expect(VttImporter.stripInlineTags("<v Stefano>Hello there</v>") == "Hello there")
-        #expect(VttImporter.stripInlineTags("Plain text") == "Plain text")
-        #expect(VttImporter.stripInlineTags("<i>italic</i> normal") == "italic normal")
+        #expect(SubtitleMarkup.stripInlineTags("<v Stefano>Hello there</v>") == "Hello there")
+        #expect(SubtitleMarkup.stripInlineTags("Plain text") == "Plain text")
+        #expect(SubtitleMarkup.stripInlineTags("<i>italic</i> normal") == "italic normal")
     }
 
     @Test("accepts MM:SS.mmm without an hour field")
