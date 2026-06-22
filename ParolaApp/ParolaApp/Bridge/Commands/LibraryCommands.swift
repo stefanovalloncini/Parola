@@ -14,7 +14,7 @@ extension ParolaAutomationServer {
                     .init(name: "category", kind: .string(), required: false, summary: "Filter by EntryCategory.rawValue"),
                 ],
                 handler: { args, ctx in
-                    let limit = (try args.optionalInt("limit")) ?? 50
+                    let limit = max(0, (try args.optionalInt("limit")) ?? 50)
                     let category = try args.optionalString("category")
                     let entries = ctx.model.libraryEntries.filter { entry in
                         guard let category, !category.isEmpty else { return true }
@@ -82,7 +82,7 @@ extension ParolaAutomationServer {
                         waitedMs += 50
                     }
                     let results = ctx.model.searchResults ?? []
-                    let limit = (try args.optionalInt("limit")) ?? 20
+                    let limit = max(0, (try args.optionalInt("limit")) ?? 20)
                     return .array(results.prefix(limit).map { e in
                         .object([
                             "id": .string(e.id),
@@ -132,7 +132,7 @@ extension ParolaAutomationServer {
                     .init(name: "limit", kind: .integer, required: false, summary: "Max entries", defaultValue: .int(50)),
                 ],
                 handler: { args, ctx in
-                    let limit = (try args.optionalInt("limit")) ?? 50
+                    let limit = max(0, (try args.optionalInt("limit")) ?? 50)
                     return .array(ctx.model.deletedEntries.prefix(limit).map { e in
                         .object([
                             "id": .string(e.id),
