@@ -430,6 +430,40 @@ struct ExporterTests {
         #expect(out.contains("&quot;") == false)
     }
 
+    @Test("srt flattens newlines in a speaker so a blank line can't split the cue")
+    func srtSpeakerNewline() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 5, text: "Hello", speaker: "Alice\n\nBob"),
+            ],
+            language: "en",
+            modelName: "m",
+            sourceURL: URL(fileURLWithPath: "/tmp/x.wav"),
+            durationSeconds: 5
+        )
+        let out = try SrtExporter(options: SubtitleOptions(includeSpeakers: true)).renderText(transcript)
+        #expect(out.contains("Alice Bob: Hello"))
+        let blocks = out
+            .components(separatedBy: "\n\n")
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        #expect(blocks.count == 1)
+    }
+
+    @Test("vtt flattens newlines in a speaker so the <v> tag stays valid")
+    func vttSpeakerNewline() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 5, text: "Hello", speaker: "Alice\nBob"),
+            ],
+            language: "en",
+            modelName: "m",
+            sourceURL: URL(fileURLWithPath: "/tmp/x.wav"),
+            durationSeconds: 5
+        )
+        let out = try VttExporter(options: SubtitleOptions(includeSpeakers: true)).renderText(transcript)
+        #expect(out.contains("<v Alice Bob>Hello</v>"))
+    }
+
     @Test("decimalSeconds avoids scientific notation and trims trailing zeros")
     func decimalSecondsFormatting() {
         #expect(Format.decimalSeconds(0.00001) == "0.00001")

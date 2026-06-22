@@ -34,7 +34,7 @@ public struct SrtExporter: TranscriptExporter {
             out += "\(i + 1)\n"
             out += "\(Self.srtTimestamp(seg.start)) --> \(Self.srtTimestamp(seg.end))\n"
             let body = CaptionWrapper.wrap(seg.text, length: options.captionLength)
-            if options.includeSpeakers, let speaker = seg.speaker, !speaker.isEmpty {
+            if options.includeSpeakers, let speaker = cueSpeakerLabel(seg.speaker) {
                 out += "\(speaker): \(body)\n\n"
             } else {
                 out += body + "\n\n"
@@ -61,7 +61,7 @@ public struct VttExporter: TranscriptExporter {
         for seg in transcript.segments {
             out += "\(Self.vttTimestamp(seg.start)) --> \(Self.vttTimestamp(seg.end))\n"
             let body = Format.escapeWebVTT(CaptionWrapper.wrap(seg.text, length: options.captionLength))
-            if options.includeSpeakers, let speaker = seg.speaker, !speaker.isEmpty {
+            if options.includeSpeakers, let speaker = cueSpeakerLabel(seg.speaker) {
                 out += "<v \(Format.escapeWebVTT(speaker))>\(body)</v>\n\n"
             } else {
                 out += body + "\n\n"
@@ -73,4 +73,11 @@ public struct VttExporter: TranscriptExporter {
     static func vttTimestamp(_ seconds: Double) -> String {
         Format.subtitleTimestamp(seconds, msSeparator: ".")
     }
+}
+
+// A speaker label sits on the cue's first line, so a newline in it would split the cue.
+private func cueSpeakerLabel(_ speaker: String?) -> String? {
+    guard let speaker else { return nil }
+    let flattened = speaker.split(whereSeparator: \.isNewline).joined(separator: " ")
+    return flattened.isEmpty ? nil : flattened
 }
