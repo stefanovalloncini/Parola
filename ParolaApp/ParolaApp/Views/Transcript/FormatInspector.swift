@@ -12,7 +12,7 @@ struct FormatInspector: View {
         VStack(spacing: DS.Spacing.medium) {
             copyButton
 
-            displayModesCard
+            displayModesSection
 
             InspectorGroup(title: "People") {
                 TextField("Add a speaker…", text: $newSpeaker)
@@ -45,8 +45,8 @@ struct FormatInspector: View {
         .axLeaf("Inspector.Button.CopyTranscript")
     }
 
-    private var displayModesCard: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+    private var displayModesSection: some View {
+        InspectorGroup(title: "Display Modes") {
             HStack(spacing: DS.Spacing.small) {
                 DisplayModeCard(
                     title: "Transcript",
@@ -61,17 +61,9 @@ struct FormatInspector: View {
                 ) { model.transcriptDisplayMode = .segments }
             }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Display Modes")
-                    .font(DS.Font.heading)
-                Text("Toggle between transcript and segment layouts.")
-                    .font(DS.Font.caption)
-                    .foregroundStyle(DS.Color.secondaryText)
-            }
-            .padding(DS.Spacing.small)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(DS.Color.surfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular))
+            Text("Toggle between transcript and segment layouts.")
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.secondaryText)
         }
     }
 
