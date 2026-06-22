@@ -57,11 +57,7 @@ public enum TranscriptChat {
 
 
         """
-        for segment in transcript.segments {
-            let ts = Timecode.format(segment.start)
-            let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            out += "\(ts)  \(body)\n"
-        }
+        out += TranscriptPromptContext.timestampedLines(for: transcript)
         return out
     }
 

@@ -18,11 +18,7 @@ public enum SmartChapters {
         for transcript: Transcript,
         model: any LanguageModel
     ) async throws -> [Chapter] {
-        var body = ""
-        for segment in transcript.segments {
-            let ts = Timecode.format(segment.start)
-            body += "\(ts)  \(segment.text.trimmingCharacters(in: .whitespacesAndNewlines))\n"
-        }
+        let body = TranscriptPromptContext.timestampedLines(for: transcript)
         let envelope = """
         Read the transcript below and propose between 4 and 10 chapter markers that capture the major topic shifts. Output only the markers, one per line, in the form 'MM:SS Title' (or 'HH:MM:SS Title' for content over an hour). The first marker MUST start at 00:00. Titles are 3 to 7 plain words — no bullets, no quotes, no commentary.
 

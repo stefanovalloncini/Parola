@@ -84,9 +84,7 @@ public actor SummaryService {
 
     static func buildPrompt(for transcript: Transcript) -> String {
         var out = "Transcript follows. Each line is prefixed with its timestamp.\n\n"
-        for segment in transcript.segments {
-            out += "\(Timecode.format(segment.start))  \(segment.text.trimmingCharacters(in: .whitespaces))\n"
-        }
+        out += TranscriptPromptContext.timestampedLines(for: transcript)
         return out
     }
 
