@@ -72,4 +72,26 @@ struct TranscriptTimestampedTextTests {
         ))
         #expect(text.hasSuffix("hello"))
     }
+
+    @Test("drops a segment whose text trims to empty")
+    func dropsEmptySegment() {
+        let text = TranscriptTimestampedText.render(transcript(
+            [(1, 0, 2, "Hello", nil), (2, 5, 7, "   ", nil), (3, 90, 95, "World", nil)]
+        ))
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        #expect(lines.count == 2)
+        #expect(lines[0].hasPrefix("00:00"))
+        #expect(lines[1].hasPrefix("01:30"))
+        #expect(!text.contains("00:05"))
+    }
+
+    @Test("drops a speaker-tagged segment whose text trims to empty")
+    func dropsEmptySpeakerSegment() {
+        let text = TranscriptTimestampedText.render(transcript(
+            [(1, 0, 2, "Hi", "Alice"), (2, 5, 7, "  ", "Bob")]
+        ))
+        #expect(text.contains("Alice"))
+        #expect(!text.contains("Bob"))
+        #expect(text.split(separator: "\n").count == 1)
+    }
 }

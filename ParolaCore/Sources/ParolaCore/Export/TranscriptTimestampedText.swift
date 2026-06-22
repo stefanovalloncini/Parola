@@ -7,8 +7,9 @@ public enum TranscriptTimestampedText {
         let useHours = maxEnd >= 3600
         var lines: [String] = []
         for segment in transcript.segments {
-            let stamp = format(segment.start, hours: useHours)
             let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !body.isEmpty else { continue }
+            let stamp = format(segment.start, hours: useHours)
             if let speaker = segment.speaker, !speaker.isEmpty {
                 lines.append("\(stamp)  \(speaker): \(body)")
             } else {
