@@ -8,7 +8,8 @@ struct SummaryPane: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: DS.Spacing.tight) {
                 header
-                if let summary = model.transcript?.summary, !summary.text.isEmpty {
+                if let summary = model.transcript?.summary,
+                   !summary.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     metadataStrip(summary: summary)
                 }
             }
