@@ -77,6 +77,26 @@ struct CorrectionRuleTests {
                 from: "foo", to: "$1bar",
                 input: "say foo please", expected: "say $1bar please"
             ),
+            SingleRuleCase(
+                "leading-punctuation rule matches when attached to a word",
+                from: "...", to: "…",
+                input: "wait... really...", expected: "wait… really…"
+            ),
+            SingleRuleCase(
+                "punctuation-only rule matches between words",
+                from: "->", to: "→",
+                input: "if a->b then b->c", expected: "if a→b then b→c"
+            ),
+            SingleRuleCase(
+                "bracketed punctuation rule matches attached to a word",
+                from: "(c)", to: "©",
+                input: "Acme(c) 2026", expected: "Acme© 2026"
+            ),
+            SingleRuleCase(
+                "word-leading rule still respects the leading boundary",
+                from: "c++", to: "C++",
+                input: "abc++ and c++", expected: "abc++ and C++"
+            ),
         ]
     )
     func singleRule(_ testCase: SingleRuleCase) {

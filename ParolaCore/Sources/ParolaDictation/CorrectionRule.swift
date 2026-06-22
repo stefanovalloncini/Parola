@@ -51,8 +51,12 @@ public struct CorrectionRuleSet: TextPostProcessor, Sendable {
         self.compiled = rules.compactMap { rule -> Compiled? in
             guard rule.enabled, !rule.from.isEmpty else { return nil }
             let escaped = NSRegularExpression.escapedPattern(for: rule.from)
-            guard !escaped.isEmpty else { return nil }
-            let bounded = "(?<![\\p{L}\\p{N}])\(escaped)(?![\\p{L}\\p{N}])"
+            guard !escaped.isEmpty, let first = rule.from.first, let last = rule.from.last else { return nil }
+            let isWord: (Character) -> Bool = { $0.isLetter || $0.isNumber }
+            // Anchor an edge only when it's a word char — a boundary anchor on a punctuation edge ("...", "(c)") could never match next to a letter.
+            let lead = isWord(first) ? "(?<![\\p{L}\\p{N}])" : ""
+            let trail = isWord(last) ? "(?![\\p{L}\\p{N}])" : ""
+            let bounded = "\(lead)\(escaped)\(trail)"
             var options: NSRegularExpression.Options = []
             if !rule.caseSensitive { options.insert(.caseInsensitive) }
             guard let regex = try? NSRegularExpression(pattern: bounded, options: options) else {
