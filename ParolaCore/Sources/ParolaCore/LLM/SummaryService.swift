@@ -135,9 +135,8 @@ public actor SummaryService {
         flushParagraph()
 
         let summaryText = summaryParagraphs
-            .map { $0.joined(separator: " ") }
+            .map { $0.joined(separator: " ").split(whereSeparator: { $0.isWhitespace }).joined(separator: " ") }
             .joined(separator: "\n\n")
-            .replacingOccurrences(of: "  ", with: " ")
             .trimmingCharacters(in: .whitespaces)
         return Summary(text: summaryText, chapters: chapters)
     }

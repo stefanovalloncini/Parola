@@ -126,6 +126,21 @@ struct SummaryServiceTests {
         #expect(summary.text.contains("\n\n"))
     }
 
+    @Test("summary collapses inner whitespace runs without losing paragraph breaks")
+    func collapsesInnerWhitespace() {
+        let response = """
+        SUMMARY:
+        The   speaker    paused.
+
+        Then they\tcontinued.
+
+        CHAPTERS:
+        00:00 Intro
+        """
+        let summary = SummaryService.parse(response)
+        #expect(summary.text == "The speaker paused.\n\nThen they continued.")
+    }
+
     @Test("summarise injects an external model so callers can swap providers")
     func summariseWithInjectedModel() async throws {
         let model = MockLanguageModel(scriptedResponses: ["""
