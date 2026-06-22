@@ -70,6 +70,15 @@ struct VttImporterTests {
         #expect(t.segments[0].text == "Tagged cue.")
     }
 
+    @Test("strips cue settings separated from the end time by a tab")
+    func tabSeparatedSettings() {
+        let vtt = "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\talign:start position:10%\nTab-separated settings."
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.count == 1)
+        #expect(t.segments.first?.text == "Tab-separated settings.")
+        #expect(t.segments.first?.end == 1.0)
+    }
+
     @Test("strips inline tags like <v Speaker> and <i>")
     func inlineTags() {
         #expect(SubtitleMarkup.stripInlineTags("<v Stefano>Hello there</v>") == "Hello there")

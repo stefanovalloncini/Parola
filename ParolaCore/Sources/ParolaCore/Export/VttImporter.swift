@@ -82,7 +82,7 @@ enum VttImporter {
         guard parts.count == 2 else { return nil }
         let startSide = parts[0].trimmingCharacters(in: .whitespaces)
         let endSide = parts[1].trimmingCharacters(in: .whitespaces)
-            .split(separator: " ").first.map(String.init) ?? parts[1]
+            .split(whereSeparator: { $0 == " " || $0 == "\t" }).first.map(String.init) ?? parts[1]
         guard let start = parseTimestamp(startSide), let end = parseTimestamp(endSide) else {
             return nil
         }
