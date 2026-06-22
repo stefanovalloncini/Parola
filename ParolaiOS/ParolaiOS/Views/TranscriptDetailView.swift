@@ -324,26 +324,51 @@ private struct SegmentTextView: View {
     }
 }
 
-private struct WordsView: View {
+struct WordsView: View {
     let words: [WordTiming]
     let activeWordID: WordTiming.ID?
     let query: String
 
     var body: some View {
         FlowLayout(spacing: 4) {
-            ForEach(words) { word in
+            ForEach(Self.mergeElidedWords(words)) { word in
                 WordChip(
                     word: word,
-                    isActive: word.id == activeWordID,
-                    isMatch: !query.isEmpty && word.word.range(of: query, options: .caseInsensitive) != nil
+                    isActive: activeWordID.map(word.wordIDs.contains) ?? false,
+                    isMatch: !query.isEmpty && word.text.range(of: query, options: .caseInsensitive) != nil
                 )
             }
         }
     }
+
+    struct MergedWord: Identifiable, Equatable {
+        let id: WordTiming.ID
+        let text: String
+        let start: Double
+        let wordIDs: Set<WordTiming.ID>
+    }
+
+    /// WhisperKit word timings split an elision into an apostrophe-leading tail ("l'altro" → ["l", "'altro"]); fold that tail back so the chips read as one word instead of "l" and "'altro" split by the layout gap.
+    static func mergeElidedWords(_ words: [WordTiming]) -> [MergedWord] {
+        var merged: [MergedWord] = []
+        for word in words {
+            if let last = merged.last, word.word.first == "'" || word.word.first == "\u{2019}" {
+                merged[merged.count - 1] = MergedWord(
+                    id: last.id,
+                    text: last.text + word.word,
+                    start: last.start,
+                    wordIDs: last.wordIDs.union([word.id])
+                )
+            } else {
+                merged.append(MergedWord(id: word.id, text: word.word, start: word.start, wordIDs: [word.id]))
+            }
+        }
+        return merged
+    }
 }
 
 private struct WordChip: View, Equatable {
-    let word: WordTiming
+    let word: WordsView.MergedWord
     let isActive: Bool
     let isMatch: Bool
     @Environment(PlaybackController.self) private var playback
@@ -353,7 +378,7 @@ private struct WordChip: View, Equatable {
     }
 
     var body: some View {
-        let chip = Text(word.word)
+        let chip = Text(word.text)
             .fontWeight(isMatch ? .semibold : .regular)
             .padding(.horizontal, 4).padding(.vertical, 2)
             .background(background)
