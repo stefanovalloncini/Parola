@@ -42,6 +42,14 @@ struct TranscriptTimestampedTextTests {
         #expect(text.contains("1:01:40"))
     }
 
+    @Test("uses H:MM:SS when an over-an-hour segment isn't last in the array")
+    func hourFormatOutOfOrder() {
+        let text = TranscriptTimestampedText.render(transcript(
+            [(1, 3700, 3702, "Late", nil), (2, 10, 12, "Early", nil)]
+        ))
+        #expect(text.contains("1:01:40"))
+    }
+
     @Test("empty transcript returns empty string")
     func emptyTranscript() {
         let text = TranscriptTimestampedText.render(transcript([]))

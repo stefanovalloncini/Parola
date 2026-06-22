@@ -3,8 +3,8 @@ import Foundation
 public enum TranscriptTimestampedText {
     public static func render(_ transcript: Transcript) -> String {
         guard !transcript.segments.isEmpty else { return "" }
-        let lastEnd = transcript.segments.last?.end ?? 0
-        let useHours = lastEnd >= 3600
+        let maxEnd = transcript.segments.map(\.end).max() ?? 0
+        let useHours = maxEnd >= 3600
         var lines: [String] = []
         for segment in transcript.segments {
             let stamp = format(segment.start, hours: useHours)
