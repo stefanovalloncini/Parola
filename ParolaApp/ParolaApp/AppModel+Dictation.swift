@@ -247,7 +247,8 @@ extension AppModel {
             overrides: currentDictationOverrides(),
             triggerPrompts: cachedDictationTriggerPrompts,
             contextProvider: contextProvider,
-            contextConfig: contextConfig
+            contextConfig: contextConfig,
+            language: selectedLanguage
         )
         var chain: [any TextPostProcessor] = []
         if dictationStripSelfCorrections {

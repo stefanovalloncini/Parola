@@ -14,6 +14,7 @@ struct PromptDictationProcessor: TextPostProcessor {
     let triggerPrompts: [Prompt]
     let contextProvider: DictationContextProvider?
     let contextConfig: DictationContextConfig
+    let language: String?
     let urlResolver: (@Sendable @MainActor (String) -> URL?)?
 
     init(
@@ -22,6 +23,7 @@ struct PromptDictationProcessor: TextPostProcessor {
         triggerPrompts: [Prompt] = [],
         contextProvider: DictationContextProvider? = nil,
         contextConfig: DictationContextConfig = DictationContextConfig(),
+        language: String? = nil,
         urlResolver: (@Sendable @MainActor (String) -> URL?)? = nil
     ) {
         self.defaultPrompt = defaultPrompt
@@ -29,11 +31,12 @@ struct PromptDictationProcessor: TextPostProcessor {
         self.triggerPrompts = triggerPrompts
         self.contextProvider = contextProvider
         self.contextConfig = contextConfig
+        self.language = language
         self.urlResolver = urlResolver ?? { bundleID in BrowserURLResolver.shared.currentURL(for: bundleID) }
     }
 
     func process(_ text: String) async -> String {
-        let preprocessed = SentenceCapitalizer.applyTo(PronounCapitalizer.applyTo(VoiceCommands.applyTo(text)))
+        let preprocessed = SentenceCapitalizer.applyTo(PronounCapitalizer.applyTo(VoiceCommands.applyTo(text), language: language))
         let frontmost = await frontmostAppContext()
         let basePrompt: Prompt? = await selectOverridePrompt(bundleID: frontmost.bundleID) ?? defaultPrompt
 

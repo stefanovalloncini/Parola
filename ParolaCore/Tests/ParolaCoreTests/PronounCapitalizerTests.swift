@@ -37,4 +37,19 @@ struct PronounCapitalizerTests {
     func empty() {
         #expect(PronounCapitalizer.applyTo("") == "")
     }
+
+    @Test("leaves a lone i alone in non-English dictation")
+    func nonEnglishLeavesI() {
+        #expect(PronounCapitalizer.applyTo("compra i libri", language: "it") == "compra i libri")
+        #expect(PronounCapitalizer.applyTo("i ragazzi sono qui", language: "it") == "i ragazzi sono qui")
+        #expect(PronounCapitalizer.applyTo("i ragazzi", language: "it-IT") == "i ragazzi")
+        #expect(PronounCapitalizer.applyTo("voici i amis", language: "fr") == "voici i amis")
+    }
+
+    @Test("still capitalizes i for English or unknown language")
+    func englishStillCapitalizes() {
+        #expect(PronounCapitalizer.applyTo("i think so", language: "en") == "I think so")
+        #expect(PronounCapitalizer.applyTo("i think so", language: "en-US") == "I think so")
+        #expect(PronounCapitalizer.applyTo("i think so", language: nil) == "I think so")
+    }
 }
