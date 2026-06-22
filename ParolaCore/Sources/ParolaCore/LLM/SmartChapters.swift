@@ -35,7 +35,7 @@ public enum SmartChapters {
         guard !trimmed.isEmpty else { return nil }
         var rest = trimmed[...]
         if rest.first == "-" || rest.first == "*" || rest.first == "•" {
-            rest = rest.dropFirst().drop(while: { $0 == " " })
+            rest = rest.dropFirst().drop(while: { $0 == " " || $0 == "\t" })
         }
         if let space = rest.firstIndex(where: { $0 == " " || $0 == "\t" }) {
             let timeToken = String(rest[..<space])

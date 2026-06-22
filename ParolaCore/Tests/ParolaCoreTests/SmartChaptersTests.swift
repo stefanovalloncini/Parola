@@ -56,6 +56,13 @@ struct SmartChaptersTests {
         #expect(result.map(\.start) == [0, 135, 300])
     }
 
+    @Test("parses bulleted chapter lines with a tab after the bullet")
+    func parsesBulletedTabLines() {
+        let result = SmartChapters.parseResponse("-\t00:00 Intro\n*\t02:15 Discussion\n• \t05:00 Wrap-up")
+        #expect(result.map(\.title) == ["Intro", "Discussion", "Wrap-up"])
+        #expect(result.map(\.start) == [0, 135, 300])
+    }
+
     @Test("empty input yields empty list")
     func emptyInput() {
         #expect(SmartChapters.parseResponse("").isEmpty)
