@@ -119,7 +119,12 @@ struct TranscriptDetailView: View {
                     .environment(model)
                 }
             } else if let loadError {
-                Text(loadError).foregroundStyle(.red)
+                ContentUnavailableView(
+                    "Couldn't Open Transcript",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text(loadError)
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ProgressView()
             }
