@@ -83,7 +83,8 @@ struct PdfExporter: TranscriptExporter {
             guard cursor < end else { return chunk.length == 0 ? nil : chunk }
             for index in cursor..<end {
                 let seg = transcript.segments[index]
-                let text = seg.text.trimmingCharacters(in: .whitespaces)
+                let text = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { continue }
                 if let speaker = seg.speaker, !speaker.isEmpty {
                     chunk.append(NSAttributedString(string: "\(speaker): ", attributes: [fontKey: fonts.speaker]))
                 }

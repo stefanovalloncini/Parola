@@ -209,6 +209,24 @@ struct ExporterTests {
         #expect(out.contains("Hello."))
     }
 
+    @Test("html drops a segment whose text trims to empty")
+    func htmlDropsEmptySegment() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 2, text: "First"),
+                TranscriptSegment(id: 1, start: 2, end: 4, text: "  \n ", speaker: "Speaker 1"),
+                TranscriptSegment(id: 2, start: 4, end: 6, text: "Third"),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try HtmlExporter().renderText(transcript)
+        #expect(out.contains("id=\"t-0\""))
+        #expect(out.contains("id=\"t-2\""))
+        #expect(out.contains("id=\"t-1\"") == false)
+        #expect(out.contains("Speaker 1") == false)
+    }
+
     @Test("html escapes special characters")
     func htmlEscapes() throws {
         let transcript = Transcript(
@@ -321,6 +339,25 @@ struct ExporterTests {
         #expect(asString.contains("Hello."))
     }
 
+    @Test("docx drops a segment whose text trims to empty")
+    func docxDropsEmptySegment() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 2, text: "First"),
+                TranscriptSegment(id: 1, start: 2, end: 4, text: "  \n ", speaker: "Speaker 1"),
+                TranscriptSegment(id: 2, start: 4, end: 6, text: "Third"),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        let data = try DocxExporter().render(transcript)
+        let asString = String(decoding: data, as: UTF8.self)
+        #expect(asString.contains("First"))
+        #expect(asString.contains("Third"))
+        #expect(asString.contains("Speaker 1") == false)
+        #expect(asString.components(separatedBy: "<w:p>").count - 1 == 2)
+    }
+
     @Test("docx escapes XML-significant characters")
     func docxEscapes() throws {
         let transcript = Transcript(
@@ -398,6 +435,25 @@ struct ExporterTests {
         let text = (0..<doc.pageCount).compactMap { doc.page(at: $0)?.string }.joined(separator: " ")
         #expect(text.contains(":") == false)
         #expect(text.contains("Hello."))
+    }
+
+    @Test("pdf drops a segment whose text trims to empty")
+    func pdfDropsEmptySegment() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 2, text: "First"),
+                TranscriptSegment(id: 1, start: 2, end: 4, text: "  \n ", speaker: "Speaker 1"),
+                TranscriptSegment(id: 2, start: 4, end: 6, text: "Third"),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        let data = try PdfExporter().render(transcript)
+        let doc = try #require(PDFDocument(data: data))
+        let text = (0..<doc.pageCount).compactMap { doc.page(at: $0)?.string }.joined(separator: " ")
+        #expect(text.contains("First"))
+        #expect(text.contains("Third"))
+        #expect(text.contains("Speaker 1") == false)
     }
 
     @Test("pdf paginates long transcripts onto multiple pages")
