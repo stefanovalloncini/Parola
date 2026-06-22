@@ -82,7 +82,7 @@ public actor LibrarySearchIndex {
         guard !queryTokens.isEmpty else { return [] }
 
         var scores: [String: Int] = [:]
-        for queryToken in queryTokens {
+        for queryToken in Set(queryTokens) {
             for (indexToken, ids) in inverted where indexToken.hasPrefix(queryToken) {
                 for id in ids { scores[id, default: 0] += 1 }
             }

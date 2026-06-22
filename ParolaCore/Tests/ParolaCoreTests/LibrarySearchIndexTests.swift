@@ -96,6 +96,15 @@ struct LibrarySearchIndexTests {
         #expect(first.score >= last.score)
     }
 
+    @Test("repeating a query token does not inflate the score")
+    func repeatedQueryTokenScore() async throws {
+        let (index, _) = makeTempIndex()
+        await index.index(id: "e1", title: "Notes", text: "sprint", createdAt: Date())
+        let once = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
+        let twice = try #require(await index.search("sprint sprint").first(where: { $0.entryID == "e1" }))
+        #expect(once.score == twice.score)
+    }
+
     @Test("match snippet includes highlight ranges around each hit")
     func snippetHighlights() async throws {
         let (index, _) = makeTempIndex()
