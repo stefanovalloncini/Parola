@@ -245,9 +245,11 @@ public actor LibraryStore {
             throw LibraryError.notFound(id)
         }
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            var seen = Set<String>()
             manifest.labels = labels.compactMap { name -> String? in
                 let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                return trimmed.isEmpty ? nil : trimmed
+                guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { return nil }
+                return trimmed
             }
         }
         invalidateListCaches()

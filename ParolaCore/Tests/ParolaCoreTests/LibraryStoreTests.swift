@@ -61,6 +61,18 @@ struct LibraryStoreTests {
         #expect(afterPlain.first?.title == "Standup")
     }
 
+    @Test("setLabels trims, drops empties, and dedupes")
+    func setLabelsNormalizes() async throws {
+        let (store, _) = try makeTempLibrary()
+        let audio = try makeFakeAudio()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: audio)
+
+        try await store.setLabels(["work", "work", "  work  ", "", "done"], for: entry.id)
+
+        let entries = await store.list()
+        #expect(entries.first?.labels == ["work", "done"])
+    }
+
     @Test("flush persists the search index so a freshly opened store finds the entry")
     func flushPersistsSearchIndex() async throws {
         let (store, url) = try makeTempLibrary()
