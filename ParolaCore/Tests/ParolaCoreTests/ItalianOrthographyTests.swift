@@ -74,4 +74,57 @@ struct ItalianOrthographyTests {
         let out = ItalianOrthography.apply(to: input, language: "it")
         #expect(out.first?.text == "operchè perché")
     }
+
+    @Test("bare po is corrected to the apostrophe truncation")
+    func correctsTruncatedPo() {
+        let input = [seg(0, "esiste un po da capire")]
+        let out = ItalianOrthography.apply(to: input, language: "it")
+        #expect(out.map(\.text) == ["esiste un po' da capire"])
+    }
+
+    @Test("po at the end of a segment is corrected")
+    func correctsTrailingPo() {
+        let input = [seg(0, "aspetta un po")]
+        let out = ItalianOrthography.apply(to: input, language: "it")
+        #expect(out.first?.text == "aspetta un po'")
+    }
+
+    @Test("an already-apostrophed po is left alone")
+    func leavesApostrophedPoAlone() {
+        let straight = [seg(0, "un po' di pane")]
+        let curly = [seg(0, "un po\u{2019} di pane")]
+        #expect(ItalianOrthography.apply(to: straight, language: "it").first?.text == "un po' di pane")
+        #expect(ItalianOrthography.apply(to: curly, language: "it").first?.text == "un po\u{2019} di pane")
+    }
+
+    @Test("the capitalised river Po is never apostrophed")
+    func leavesRiverPoAlone() {
+        let input = [seg(0, "il fiume Po è lungo"), seg(1, "Po è un fiume")]
+        let out = ItalianOrthography.apply(to: input, language: "it")
+        #expect(out.map(\.text) == ["il fiume Po è lungo", "Po è un fiume"])
+    }
+
+    @Test("po inside a longer word is not touched")
+    func leavesPoInWordsAlone() {
+        let input = [seg(0, "dopo poco a Napoli")]
+        let out = ItalianOrthography.apply(to: input, language: "it")
+        #expect(out.first?.text == "dopo poco a Napoli")
+    }
+
+    @Test("word-level po token is corrected")
+    func correctsPoWordToken() {
+        let words = [
+            WordTiming(id: "0-0", word: "un", start: 0, end: 0.5, probability: 1),
+            WordTiming(id: "0-1", word: "po", start: 0.5, end: 1, probability: 1),
+        ]
+        let out = ItalianOrthography.apply(to: [seg(0, "un po", words: words)], language: "it")
+        #expect(out.first?.words?.map(\.word) == ["un", "po'"])
+        #expect(out.first?.text == "un po'")
+    }
+
+    @Test("bare po is only corrected for Italian")
+    func truncationIsItalianOnly() {
+        let input = [seg(0, "type po then enter")]
+        #expect(ItalianOrthography.apply(to: input, language: "en").first?.text == "type po then enter")
+    }
 }

@@ -1,10 +1,10 @@
 import Foundation
 
-/// Corrects a narrow set of objective Italian orthographic errors that ASR engines emit. Today
-/// that's the `-ché` conjunction family written with a grave accent ("perchè") where standard
-/// Italian requires the acute ("perché"). The word list is closed and every entry is always
-/// acute, so there are no false positives — `caffè`, `cioè`, `è` and other legitimately-grave
-/// words are never matched. Applied only when the transcript language is Italian.
+/// Corrects a narrow set of objective Italian orthographic errors that ASR engines emit: the
+/// `-ché` conjunction family written with a grave accent ("perchè" → "perché"), and the bare
+/// truncation "po" written without its apostrophe ("un po" → "un po'"). Every correction targets
+/// a form that is always wrong in standard Italian — legitimately-grave words (`caffè`, `cioè`)
+/// and the capitalised river "Po" are never matched. Applied only when the language is Italian.
 public enum ItalianOrthography {
     public static func apply(to segments: [TranscriptSegment], language: String?) -> [TranscriptSegment] {
         guard isItalian(language) else { return segments }
@@ -41,11 +41,19 @@ public enum ItalianOrthography {
         return (regex, acute)
     }
 
+    private static let truncations: [(regex: NSRegularExpression, replacement: String)] = {
+        guard let po = try? NSRegularExpression(pattern: "\\bpo\\b(?![\u{27}\u{2019}])") else { return [] }
+        return [(po, "po'")]
+    }()
+
     static func correct(_ text: String) -> String {
         guard !text.isEmpty else { return text }
         var result = text
         for (regex, acute) in corrections {
             result = replaceMatches(of: regex, in: result, with: acute)
+        }
+        for (regex, replacement) in truncations {
+            result = replaceMatches(of: regex, in: result, with: replacement)
         }
         return result
     }
