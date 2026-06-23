@@ -189,7 +189,11 @@ struct ChatPane: View {
     }
 
     private var isSendDisabled: Bool {
-        input.trimmingCharacters(in: .whitespaces).isEmpty || isSending
+        Self.isSendDisabled(input: input, isSending: isSending)
+    }
+
+    static func isSendDisabled(input: String, isSending: Bool) -> Bool {
+        input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending
     }
 
     private var sessionKey: ChatSessionKey {
