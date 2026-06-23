@@ -131,7 +131,7 @@ struct CsvExporter: TranscriptExporter {
     func render(_ transcript: Transcript) throws -> Data {
         var out = "start_seconds,end_seconds,speaker,text\n"
         for seg in transcript.segments {
-            let speaker = seg.speaker ?? ""
+            let speaker = Format.presentationSpeakerLabel(seg.speaker) ?? ""
             let text = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
             out += "\(Format.decimalSeconds(seg.start)),\(Format.decimalSeconds(seg.end)),\(Self.quote(speaker)),\(Self.quote(text))\n"
         }

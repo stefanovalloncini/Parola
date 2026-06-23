@@ -306,6 +306,40 @@ struct ExporterTests {
         #expect(out.contains(",,"))   // empty speaker between start_seconds,end_seconds,,text
     }
 
+    @Test("csv flattens newlines in a speaker so the row stays intact")
+    func csvSpeakerNewline() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 5, text: "Hello", speaker: "Alice\nBob")],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try CsvExporter().renderText(transcript)
+        #expect(out.contains("0.0,5.0,Alice Bob,Hello"))
+        #expect(out.contains("\"") == false)
+    }
+
+    @Test("csv emits an empty speaker column for a whitespace-only speaker")
+    func csvWhitespaceOnlySpeaker() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 5, text: "Hello", speaker: "   ")],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try CsvExporter().renderText(transcript)
+        #expect(out.contains("0.0,5.0,,Hello"))
+    }
+
+    @Test("csv trims surrounding whitespace from a padded speaker label")
+    func csvPaddedSpeaker() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 5, text: "Hello", speaker: " Marco ")],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try CsvExporter().renderText(transcript)
+        #expect(out.contains("0.0,5.0,Marco,Hello"))
+    }
+
     @Test("csv is a recognized ExportFormat")
     func csvFormat() {
         #expect(ExportFormat.csv.fileExtension == "csv")
@@ -837,6 +871,40 @@ struct ExporterTests {
         let out = try TsvExporter().renderText(transcript)
         #expect(out.contains("\tHello world\n"))
         #expect(out.contains("\\n") == false)
+    }
+
+    @Test("tsv flattens newlines in a speaker so the row stays intact")
+    func tsvSpeakerNewline() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 5, text: "Hello", speaker: "Alice\nBob")],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try TsvExporter().renderText(transcript)
+        #expect(out.contains("\tAlice Bob\tHello"))
+        #expect(out.contains("\\n") == false)
+    }
+
+    @Test("tsv emits an empty speaker column for a whitespace-only speaker")
+    func tsvWhitespaceOnlySpeaker() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 5, text: "Hello", speaker: "   ")],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try TsvExporter().renderText(transcript)
+        #expect(out.contains("0.0\t5.0\t\tHello"))
+    }
+
+    @Test("tsv trims surrounding whitespace from a padded speaker label")
+    func tsvPaddedSpeaker() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 5, text: "Hello", speaker: " Marco ")],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try TsvExporter().renderText(transcript)
+        #expect(out.contains("\tMarco\tHello"))
     }
 
     @Test("tsv is a recognized ExportFormat")
