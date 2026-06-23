@@ -34,3 +34,37 @@ struct LanguageDisplayTests {
         #expect(LanguageDisplay.name(for: "xx") == "XX")
     }
 }
+
+@Suite("LanguageDisplay code")
+struct LanguageDisplayCodeTests {
+    @Test("uppercases a real language code")
+    func uppercasesRealCode() {
+        #expect(LanguageDisplay.code(for: "it") == "IT")
+        #expect(LanguageDisplay.code(for: "en") == "EN")
+    }
+
+    @Test("keeps a regioned code uppercased")
+    func regionedCode() {
+        #expect(LanguageDisplay.code(for: "en-US") == "EN-US")
+    }
+
+    @Test("is case-insensitive for the code")
+    func caseInsensitiveCode() {
+        #expect(LanguageDisplay.code(for: "It") == "IT")
+        #expect(LanguageDisplay.code(for: " it ") == "IT")
+    }
+
+    @Test("treats the unknown sentinel as no badge")
+    func unknownIsNoBadge() {
+        #expect(LanguageDisplay.code(for: "unknown") == nil)
+        #expect(LanguageDisplay.code(for: "UNKNOWN") == nil)
+        #expect(LanguageDisplay.code(for: "  unknown  ") == nil)
+    }
+
+    @Test("treats empty, whitespace, and nil as no badge")
+    func blankIsNoBadge() {
+        #expect(LanguageDisplay.code(for: "") == nil)
+        #expect(LanguageDisplay.code(for: "   ") == nil)
+        #expect(LanguageDisplay.code(for: nil) == nil)
+    }
+}

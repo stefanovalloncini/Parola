@@ -115,8 +115,7 @@ struct TranscriptHeaderBar: View {
     }
 
     private var languageLabel: String? {
-        guard let code = model.transcript?.language, !code.isEmpty else { return nil }
-        return code.uppercased()
+        LanguageDisplay.code(for: model.transcript?.language)
     }
 
     private var jumpPopover: some View {
