@@ -21,7 +21,7 @@ struct InfoInspector: View {
 
             InfoSection(title: "Transcription Details") {
                 InfoRow(icon: "globe", label: "Language", value: languageLabel)
-                InfoRow(icon: "cube", label: "Model", value: model.transcript?.modelName ?? "—")
+                InfoRow(icon: "cube", label: "Model", value: modelLabel)
                 InfoRow(icon: "cpu", label: "Engine", value: engineLabel)
                 InfoRow(icon: "character", label: "Characters", value: "\(charCount)")
                 InfoRow(icon: "text.word.spacing", label: "Words", value: "\(wordCount)")
@@ -49,6 +49,11 @@ struct InfoInspector: View {
 
     private var languageLabel: String {
         LanguageDisplay.name(for: model.transcript?.language) ?? String(localized: "Auto")
+    }
+
+    private var modelLabel: String {
+        guard let modelName = model.transcript?.modelName else { return "—" }
+        return AppModel.modelLabel(modelName)
     }
 
     private var engineLabel: String {
