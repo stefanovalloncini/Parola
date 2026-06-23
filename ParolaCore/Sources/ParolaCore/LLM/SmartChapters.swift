@@ -39,9 +39,7 @@ public enum SmartChapters {
         guard let space = rest.firstIndex(where: { $0 == " " || $0 == "\t" }) else { return nil }
         let timeToken = String(rest[..<space]).trimmingCharacters(in: timestampWrappers)
         guard let seconds = Timecode.parse(timeToken) else { return nil }
-        let title = ChapterTitle.clean(String(rest[rest.index(after: space)...]))
-        guard !title.isEmpty else { return nil }
-        return Chapter(title: title, start: seconds)
+        return Chapter.cleaned(title: String(rest[rest.index(after: space)...]), start: seconds)
     }
 
     static func stripLeadingMarkers(_ line: String) -> Substring {

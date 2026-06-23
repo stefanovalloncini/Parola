@@ -151,9 +151,8 @@ public actor SummaryService {
         let parts = scanner.split(maxSplits: 1, omittingEmptySubsequences: true, whereSeparator: { $0 == " " || $0 == "\t" })
         guard parts.count == 2 else { return nil }
         let timeToken = String(parts[0]).trimmingCharacters(in: CharacterSet(charactersIn: "*_[]()`"))
-        let title = ChapterTitle.clean(String(parts[1]))
-        guard let seconds = SummaryService.parseClock(timeToken), !title.isEmpty else { return nil }
-        return Chapter(title: title, start: seconds)
+        guard let seconds = SummaryService.parseClock(timeToken) else { return nil }
+        return Chapter.cleaned(title: String(parts[1]), start: seconds)
     }
 
     static func parseClock(_ s: String) -> Double? {
@@ -174,7 +173,7 @@ struct GenerableSummary: Sendable {
     func toSummary() -> Summary {
         Summary(
             text: summary.trimmingCharacters(in: .whitespacesAndNewlines),
-            chapters: chapters.map { Chapter(title: $0.title, start: $0.startSeconds) }
+            chapters: chapters.compactMap { Chapter.cleaned(title: $0.title, start: $0.startSeconds) }
         )
     }
 }

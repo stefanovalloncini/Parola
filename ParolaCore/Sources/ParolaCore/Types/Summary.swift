@@ -26,6 +26,12 @@ public struct Chapter: Codable, Hashable, Sendable, Identifiable {
         let startKey = Int(exactly: max(0, start).rounded()) ?? .max
         return "ch-\(startKey)-\(String(hash, radix: 16))"
     }
+
+    static func cleaned(title rawTitle: String, start: Double) -> Chapter? {
+        let title = ChapterTitle.clean(rawTitle)
+        guard !title.isEmpty else { return nil }
+        return Chapter(title: title, start: start)
+    }
 }
 
 public struct Summary: Codable, Hashable, Sendable {
