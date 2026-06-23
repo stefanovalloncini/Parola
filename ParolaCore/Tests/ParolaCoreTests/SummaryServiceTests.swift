@@ -104,6 +104,17 @@ struct SummaryServiceTests {
         #expect(decimal == nil)
     }
 
+    @Test("chapter line with stacked list markers still parses")
+    func chapterStackedMarkers() {
+        let numberThenDash = SummaryService.parseChapter("1. - 00:00 Welcome and intro")
+        #expect(numberThenDash?.title == "Welcome and intro")
+        #expect(numberThenDash?.start == 0)
+
+        let dashThenNumber = SummaryService.parseChapter("- 2) 05:30 How WhisperKit works")
+        #expect(dashThenNumber?.title == "How WhisperKit works")
+        #expect(dashThenNumber?.start == 330)
+    }
+
     @Test("full response parse recovers numbered chapter markers")
     func numberedChapters() {
         let response = """

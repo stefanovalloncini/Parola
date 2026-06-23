@@ -43,10 +43,16 @@ public enum SmartChapters {
     }
 
     static func stripLeadingMarkers(_ line: String) -> Substring {
-        let body = stripOrderedMarker(line[...]) ?? line[...]
-        return body
-            .drop(while: { "-*•_#".contains($0) })
-            .drop(while: { $0 == " " || $0 == "\t" })
+        // Loop so stacked decoration ("1. - 00:00 Title", "- 2) 02:15 Title") fully unwinds; a
+        // single drop-markers-then-spaces pass can't return to strip a marker that follows a space.
+        var body = line[...]
+        while true {
+            let next = (stripOrderedMarker(body) ?? body)
+                .drop(while: { "-*•_#".contains($0) })
+                .drop(while: { $0 == " " || $0 == "\t" })
+            if next.startIndex == body.startIndex { return next }
+            body = next
+        }
     }
 
     private static func stripOrderedMarker(_ line: Substring) -> Substring? {

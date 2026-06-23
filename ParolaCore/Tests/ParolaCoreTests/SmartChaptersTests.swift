@@ -70,6 +70,13 @@ struct SmartChaptersTests {
         #expect(result.map(\.start) == [0, 135, 300])
     }
 
+    @Test("parses chapter lines with stacked list markers")
+    func parsesStackedMarkers() {
+        let result = SmartChapters.parseResponse("1. - 00:00 Intro\n- 2) 02:15 Discussion\n* • 05:00 Wrap-up")
+        #expect(result.map(\.title) == ["Intro", "Discussion", "Wrap-up"])
+        #expect(result.map(\.start) == [0, 135, 300])
+    }
+
     @Test("parses chapter lines with a markdown-bold timestamp")
     func parsesBoldTimestamp() {
         let result = SmartChapters.parseResponse("**00:00** Intro\n**02:15** Discussion")
