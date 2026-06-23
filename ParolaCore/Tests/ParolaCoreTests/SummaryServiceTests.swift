@@ -60,6 +60,21 @@ struct SummaryServiceTests {
         #expect(dashed?.title == "Discussion")
     }
 
+    @Test("chapter line with a bold-markdown timestamp still parses")
+    func chapterBoldTimestamp() {
+        let bold = SummaryService.parseChapter("**00:00** Welcome and intro")
+        #expect(bold?.title == "Welcome and intro")
+        #expect(bold?.start == 0)
+
+        let wholeLine = SummaryService.parseChapter("**01:30 Roadmap review**")
+        #expect(wholeLine?.title == "Roadmap review")
+        #expect(wholeLine?.start == 90)
+
+        let underscored = SummaryService.parseChapter("_02:10_ Closing thoughts")
+        #expect(underscored?.title == "Closing thoughts")
+        #expect(underscored?.start == 130)
+    }
+
     @Test("full response parse extracts summary + chapters")
     func fullResponse() {
         let response = """
