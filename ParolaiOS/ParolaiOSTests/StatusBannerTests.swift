@@ -9,8 +9,9 @@ struct StatusBannerTests {
         arguments: [
             (TranscriptionCoordinator.Phase.idle, nil),
             (.recording, nil),
-            (.downloadingModel(name: "openai_whisper-tiny", progress: 0.42), "Downloading openai_whisper-tiny · 42%"),
-            (.loadingModel(name: "openai_whisper-tiny"), "Loading openai_whisper-tiny…"),
+            (.downloadingModel(name: "openai_whisper-tiny", progress: 0.42), "Downloading Whisper Tiny · 42%"),
+            (.loadingModel(name: "openai_whisper-tiny"), "Loading Whisper Tiny…"),
+            (.downloadingModel(name: "made-up-model-id", progress: 0.5), "Downloading made-up-model-id · 50%"),
             (.transcribing(file: URL(fileURLWithPath: "/tmp/clip.wav")), "Transcribing clip.wav…"),
             (.failed(message: "no model"), "no model"),
         ] as [(TranscriptionCoordinator.Phase, String?)]

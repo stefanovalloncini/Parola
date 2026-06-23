@@ -1,3 +1,4 @@
+import ParolaCore
 import SwiftUI
 
 enum StatusBannerCopy {
@@ -6,9 +7,9 @@ enum StatusBannerCopy {
         case .idle, .recording:
             return nil
         case .downloadingModel(let name, let progress):
-            return "Downloading \(name) · \(Int(progress * 100))%"
+            return "Downloading \(modelLabel(name)) · \(Int(progress * 100))%"
         case .loadingModel(let name):
-            return "Loading \(name)…"
+            return "Loading \(modelLabel(name))…"
         case .transcribing(let file):
             return "Transcribing \(file.lastPathComponent)…"
         case .failed(let message):
@@ -19,6 +20,10 @@ enum StatusBannerCopy {
     static func isError(for phase: TranscriptionCoordinator.Phase) -> Bool {
         if case .failed = phase { return true }
         return false
+    }
+
+    private static func modelLabel(_ id: String) -> String {
+        ModelCatalog.variant(id: id)?.displayName ?? id
     }
 }
 
