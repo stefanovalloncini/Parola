@@ -82,6 +82,9 @@ public struct VttExporter: TranscriptExporter {
 // A speaker label sits on the cue's first line, so a newline in it would split the cue.
 private func cueSpeakerLabel(_ speaker: String?) -> String? {
     guard let speaker else { return nil }
-    let flattened = speaker.split(whereSeparator: \.isNewline).joined(separator: " ")
+    let flattened = speaker
+        .split(whereSeparator: \.isNewline)
+        .joined(separator: " ")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
     return flattened.isEmpty ? nil : flattened
 }

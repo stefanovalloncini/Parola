@@ -574,6 +574,47 @@ struct ExporterTests {
         #expect(out.contains("<v Alice Bob>Hello</v>"))
     }
 
+    @Test("srt drops a whitespace-only speaker instead of prefixing a blank label")
+    func srtWhitespaceOnlySpeaker() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 5, text: "Hello", speaker: "   "),
+            ],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try SrtExporter(options: SubtitleOptions(includeSpeakers: true)).renderText(transcript)
+        #expect(out.contains("Hello"))
+        #expect(out.contains(": Hello") == false)
+    }
+
+    @Test("vtt drops a whitespace-only speaker instead of emitting an empty <v> tag")
+    func vttWhitespaceOnlySpeaker() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 5, text: "Hello", speaker: "   "),
+            ],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try VttExporter(options: SubtitleOptions(includeSpeakers: true)).renderText(transcript)
+        #expect(out.contains("Hello"))
+        #expect(out.contains("<v") == false)
+    }
+
+    @Test("srt trims surrounding whitespace from a padded speaker label")
+    func srtPaddedSpeaker() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 5, text: "Hello", speaker: " Marco "),
+            ],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try SrtExporter(options: SubtitleOptions(includeSpeakers: true)).renderText(transcript)
+        #expect(out.contains("Marco: Hello"))
+    }
+
     @Test("srt drops an empty segment and keeps cue numbers contiguous")
     func srtDropsEmptyCue() throws {
         let transcript = Transcript(
