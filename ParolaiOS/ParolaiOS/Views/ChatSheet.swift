@@ -135,9 +135,17 @@ struct ChatSheet: View {
                     .foregroundStyle(.tint)
             }
             .accessibilityLabel(Text("Send"))
-            .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty || isSending)
+            .disabled(isSendDisabled)
         }
         .padding()
+    }
+
+    private var isSendDisabled: Bool {
+        Self.isSendDisabled(input: input, isSending: isSending)
+    }
+
+    static func isSendDisabled(input: String, isSending: Bool) -> Bool {
+        input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending
     }
 
     private func rebuildSession() async {
