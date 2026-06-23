@@ -238,7 +238,7 @@ final class AppModel {
     var snippets: [Snippet] = [] {
         didSet {
             saveSnippets()
-            applyDictationCleanupPromptChange()
+            if !isReloadingSettings { applyDictationCleanupPromptChange() }
         }
     }
 
@@ -294,28 +294,28 @@ final class AppModel {
     var dictationEnabled: Bool = false {
         didSet {
             defaults.set(dictationEnabled, forKey: "dictationEnabled")
-            applyDictationEnabledChange()
+            if !isReloadingSettings { applyDictationEnabledChange() }
         }
     }
 
     var dictationModeRaw: String = DictationMode.pushToTalk.rawValue {
         didSet {
             defaults.set(dictationModeRaw, forKey: "dictationModeRaw")
-            applyDictationModeChange()
+            if !isReloadingSettings { applyDictationModeChange() }
         }
     }
 
     var dictationKeyCode: Int = 96 {
         didSet {
             defaults.set(dictationKeyCode, forKey: "dictationKeyCode")
-            restartDictation()
+            if !isReloadingSettings { restartDictation() }
         }
     }
 
     var dictationKeyModifiers: Int = 0 {
         didSet {
             defaults.set(dictationKeyModifiers, forKey: "dictationKeyModifiers")
-            restartDictation()
+            if !isReloadingSettings { restartDictation() }
         }
     }
 
@@ -327,7 +327,7 @@ final class AppModel {
     var dictationIndicatorStyleRaw: String = DictationIndicatorStyle.overlay.rawValue {
         didSet {
             defaults.set(dictationIndicatorStyleRaw, forKey: "dictationIndicatorStyleRaw")
-            applyIndicatorStyleChange()
+            if !isReloadingSettings { applyIndicatorStyleChange() }
         }
     }
 
@@ -363,6 +363,110 @@ final class AppModel {
             if raw != transcriptDisplayModeRaw { transcriptDisplayModeRaw = raw }
         default:
             break
+        }
+    }
+
+    @ObservationIgnored private var isReloadingSettings = false
+    @ObservationIgnored private var activeSideEffects: Set<BootstrapSideEffect> = []
+
+    private func themeKeySnapshot() -> [String] {
+        [appTheme, appAccentRaw, String(themeIsCustom), themeCustomPaletteJSON]
+    }
+
+    /// Re-reads every persisted setting into its observed property after a Reset or Import, suppressing the
+    /// side-effecting didSets during the bulk read, then re-applying the side effects once. Avoids a relaunch.
+    func reloadSettings() {
+        let themeBefore = themeKeySnapshot()
+        let watchedFoldersBefore = defaults.data(forKey: "watchedFolders")
+
+        isReloadingSettings = true
+        self.dictationEnabled = defaults.bool(forKey: "dictationEnabled")
+        self.dictationModeRaw = defaults.string(forKey: "dictationModeRaw") ?? DictationMode.pushToTalk.rawValue
+        self.dictationKeyCode = defaults.object(forKey: "dictationKeyCode") == nil ? 96 : defaults.integer(forKey: "dictationKeyCode")
+        self.dictationKeyModifiers = defaults.object(forKey: "dictationKeyModifiers") == nil ? 0 : defaults.integer(forKey: "dictationKeyModifiers")
+        self.dictationIndicatorStyleRaw = defaults.string(forKey: "dictationIndicatorStyleRaw") ?? DictationIndicatorStyle.overlay.rawValue
+        self.dictationCleanupPromptID = defaults.string(forKey: "dictationCleanupPromptID") ?? ""
+        self.dictationPerAppOverridesJSON = defaults.string(forKey: "dictationPerAppOverridesJSON") ?? "{}"
+        self.transcriptDisplayModeRaw = defaults.string(forKey: "transcriptDisplayMode") ?? TranscriptDisplayMode.transcript.rawValue
+        self.useStreaming = readBool("useStreaming", default: true)
+        self.wordTimestamps = defaults.bool(forKey: "wordTimestamps")
+        self.karaokeHighlight = readBool("karaokeHighlight", default: true)
+        self.initialPrompt = defaults.string(forKey: "initialPrompt") ?? ""
+        self.diarize = defaults.bool(forKey: "diarize")
+        self.autoTitleEntries = defaults.bool(forKey: "autoTitleEntries")
+        self.subtitleFPS = readDouble("subtitleFPS", default: 30)
+        self.subtitleCaptionLengthRaw = defaults.string(forKey: "subtitleCaptionLength") ?? CaptionLength.none.rawValue
+        self.transcriptCompact = defaults.bool(forKey: "transcriptCompact")
+        self.skipSilences = defaults.bool(forKey: "skipSilences")
+        self.pausePlayerOnAppHidden = defaults.bool(forKey: "pausePlayerOnAppHidden")
+        self.markdownTimestamps = defaults.bool(forKey: "markdownTimestamps")
+        self.htmlExportThemeRaw = defaults.string(forKey: "htmlExportTheme") ?? HtmlExportTheme.light.rawValue
+        self.dictationHudOpacity = readDouble("dictationHudOpacity", default: 1.0)
+        self.lastFindQuery = defaults.string(forKey: "lastFindQuery") ?? ""
+        self.userPrivacyMode = defaults.bool(forKey: "parola.userPrivacyMode")
+        self.pinnedModel = defaults.string(forKey: "pinnedModel") ?? ""
+        self.mainWindowAlwaysOnTop = defaults.bool(forKey: "mainWindowAlwaysOnTop")
+        self.recentFilesRaw = defaults.string(forKey: "recentFiles") ?? "[]"
+        self.micHotkeyKeyCode = readInt("micHotkeyKeyCode", default: 15)
+        self.micHotkeyModifiers = readInt("micHotkeyModifiers", default: 786721)
+        self.micHotkeyEnabled = defaults.bool(forKey: "micHotkeyEnabled")
+        self.dictationStripSelfCorrections = defaults.bool(forKey: "dictationStripSelfCorrections")
+        self.dictationPasteDelayMs = defaults.integer(forKey: "dictationPasteDelayMs")
+        self.dictationContextSelection = defaults.bool(forKey: "dictationContextSelection")
+        self.dictationContextClipboard = defaults.bool(forKey: "dictationContextClipboard")
+        self.dictationContextScreen = defaults.bool(forKey: "dictationContextScreen")
+        self.recordingMaxMinutes = defaults.integer(forKey: "recordingMaxMinutes")
+        self.showMenuBarExtra = defaults.bool(forKey: "showMenuBarExtra")
+        self.recordingCountInSeconds = defaults.integer(forKey: "recordingCountInSeconds")
+        self.autoMuteWhileRecording = defaults.bool(forKey: "autoMuteWhileRecording")
+        self.autoPauseMediaWhileRecording = defaults.bool(forKey: "autoPauseMediaWhileRecording")
+        self.batchExportFormatsRaw = defaults.string(forKey: "batchExportFormats") ?? "txt,srt"
+        self.batchExportToSourceFolder = readBool("batchExportToSourceFolder", default: true)
+        self.batchExportIncludeTimestamps = defaults.bool(forKey: "batchExportIncludeTimestamps")
+        self.batchExportFormatOptionsJSON = defaults.string(forKey: "batchExportFormatOptions") ?? "{}"
+        self.inputDeviceUID = defaults.string(forKey: "inputDeviceUID") ?? ""
+        self.selectedModel = defaults.string(forKey: "selectedModel") ?? "openai_whisper-tiny"
+        self.selectedLanguageRaw = defaults.string(forKey: "selectedLanguageRaw") ?? ""
+        self.translate = defaults.bool(forKey: "translate")
+        self.appTheme = defaults.string(forKey: "appTheme") ?? "system"
+        self.monospacedTimestamps = readBool("monospacedTimestamps", default: true)
+        self.sidebarDensity = defaults.string(forKey: "sidebarDensity") ?? "comfortable"
+        self.appAccentRaw = defaults.string(forKey: AppAccent.storageKey) ?? AppAccent.terracotta.rawValue
+        self.themeIsCustom = defaults.bool(forKey: "themeIsCustom")
+        self.themeCustomPaletteJSON = defaults.string(forKey: "themeCustomPaletteJSON") ?? ""
+        self.automationBridgeEnabled = readBool("automationBridgeEnabled", default: AppModel.defaultBridgeEnabled)
+        self.sparkleChannelRaw = defaults.string(forKey: "sparkleChannel") ?? SparkleChannel.stable.rawValue
+        self.sparkleAutomatic = readBool("sparkleAutomatic", default: true)
+        self.liveCaptionsTranslate = defaults.bool(forKey: "liveCaptionsTranslate")
+        loadAutoExportRules()
+        loadIgnoredSegmentRules()
+        loadFindReplaceRules()
+        loadSnippets()
+        loadCorrectionRules()
+        isReloadingSettings = false
+
+        refreshModelList()
+        if themeKeySnapshot() != themeBefore {
+            applyTheme()
+            themeRevision &+= 1
+        }
+        // Re-apply only the side effects this launch actually wired (skipped under skipBootstrap tests).
+        if activeSideEffects.contains(.dictationHotkey) {
+            if dictationEnabled { stopDictation(); startDictation() } else { stopDictation() }
+        }
+        if activeSideEffects.contains(.sparkle) {
+            applySparkleChannelChange()
+            SparkleUpdater.shared.automaticallyChecks = sparkleAutomatic
+        }
+        if activeSideEffects.contains(.liveCaptionsTranslateRestore) {
+            applyLiveCaptionsTranslateChange()
+        }
+        if activeSideEffects.contains(.meetingDetector) {
+            meetingDetector.isEnabled = (defaults.object(forKey: "meetingDetectorEnabled") as? Bool) ?? true
+        }
+        if activeSideEffects.contains(.watchedFolders), mode != .test,
+           defaults.data(forKey: "watchedFolders") != watchedFoldersBefore {
+            SettingsRelaunch.promptToApply("Quit and relaunch Parola to apply watched-folder changes.")
         }
     }
     var appAccentRaw: String = AppAccent.terracotta.rawValue { didSet { defaults.set(appAccentRaw, forKey: AppAccent.storageKey) } }
@@ -442,7 +546,7 @@ final class AppModel {
     var dictationCleanupPromptID: String = "" {
         didSet {
             defaults.set(dictationCleanupPromptID, forKey: "dictationCleanupPromptID")
-            applyDictationCleanupPromptChange()
+            if !isReloadingSettings { applyDictationCleanupPromptChange() }
         }
     }
 
@@ -450,8 +554,10 @@ final class AppModel {
         didSet {
             defaults.set(dictationPerAppOverridesJSON, forKey: "dictationPerAppOverridesJSON")
             cachedDictationWorkflows = nil
-            applyDictationCleanupPromptChange()
-            restartDictation()
+            if !isReloadingSettings {
+                applyDictationCleanupPromptChange()
+                restartDictation()
+            }
         }
     }
 
@@ -639,11 +745,11 @@ final class AppModel {
     // MARK: - Sparkle
 
     var sparkleChannelRaw: String = SparkleChannel.stable.rawValue {
-        didSet { applySparkleChannelChange(); defaults.set(sparkleChannelRaw, forKey: "sparkleChannel") }
+        didSet { if !isReloadingSettings { applySparkleChannelChange() }; defaults.set(sparkleChannelRaw, forKey: "sparkleChannel") }
     }
 
     var sparkleAutomatic: Bool = true {
-        didSet { SparkleUpdater.shared.automaticallyChecks = sparkleAutomatic; defaults.set(sparkleAutomatic, forKey: "sparkleAutomatic") }
+        didSet { if !isReloadingSettings { SparkleUpdater.shared.automaticallyChecks = sparkleAutomatic }; defaults.set(sparkleAutomatic, forKey: "sparkleAutomatic") }
     }
 
     var sparkleChannel: SparkleChannel {
@@ -657,7 +763,7 @@ final class AppModel {
     // MARK: - Live captions translation
 
     var liveCaptionsTranslate: Bool = false {
-        didSet { applyLiveCaptionsTranslateChange(); defaults.set(liveCaptionsTranslate, forKey: "liveCaptionsTranslate") }
+        didSet { if !isReloadingSettings { applyLiveCaptionsTranslateChange() }; defaults.set(liveCaptionsTranslate, forKey: "liveCaptionsTranslate") }
     }
 
     private func applyLiveCaptionsTranslateChange() {
@@ -765,6 +871,7 @@ final class AppModel {
         wireDictationController()
 
         let sideEffects = bootstrap.sideEffects
+        self.activeSideEffects = sideEffects
         if sideEffects.contains(.refreshYtDlp) {
             refreshYtDlpAvailability()
         }

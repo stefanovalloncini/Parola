@@ -42,7 +42,6 @@ enum SettingsExportService {
                 throw NSError(domain: "ParolaSettings", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not a valid settings file."])
             }
             apply(payload)
-            SettingsRelaunch.promptToApply("Quit and relaunch Parola to apply the imported settings.")
         } catch {
             NSAlert(error: error).runModal()
         }
@@ -68,11 +67,9 @@ enum SettingsExportService {
     @MainActor
     private static func apply(_ payload: [String: Any]) {
         let defaults = UserDefaults.standard
-        for key in exportedKeys {
-            guard let raw = payload[key] else {
-                defaults.removeObject(forKey: key)
-                continue
-            }
+        let allowed = Set(exportedKeys)
+        // Additive: only overwrite keys the file carries; absent keys keep their current value.
+        for (key, raw) in payload where allowed.contains(key) {
             if let envelope = raw as? [String: Any],
                envelope["__type"] as? String == "data",
                let base64 = envelope["value"] as? String,
@@ -82,5 +79,6 @@ enum SettingsExportService {
                 defaults.set(raw, forKey: key)
             }
         }
+        NotificationCenter.default.post(name: .parolaSettingsReset, object: nil)
     }
 }

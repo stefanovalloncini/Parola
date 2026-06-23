@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let provider = ServicesProvider()
     private var dictationStatusItem: DictationStatusItem?
     private var dictationSubscription: DictationSubscription?
+    private var settingsResetSubscription: (any NSObjectProtocol)?
     private let menuBar = MenuBarController()
     private var recordingTickTask: Task<Void, Never>?
     private var recordingStartedAt: Date?
@@ -28,6 +29,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     default: break
                     }
                 }
+            }
+        }
+        if settingsResetSubscription == nil {
+            settingsResetSubscription = NotificationCenter.default.addObserver(
+                forName: .parolaSettingsReset, object: nil, queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in self?.model?.reloadSettings() }
             }
         }
     }
