@@ -53,7 +53,9 @@ struct FindReplaceSettings: View {
                 } else {
                     ForEach($model.findReplaceRules) { $rule in
                         if visible.contains(rule.id) {
-                            ruleRow($rule)
+                            FindReplaceRuleRow(rule: $rule) {
+                                model.findReplaceRules.removeAll { $0.id == rule.id }
+                            }
                         }
                     }
                 }
@@ -92,37 +94,73 @@ struct FindReplaceSettings: View {
         .background(.bar)
     }
 
-    @ViewBuilder
-    private func ruleRow(_ rule: Binding<FindReplaceRule>) -> some View {
+}
+
+private struct FindReplaceRuleRow: View {
+    @Binding var rule: FindReplaceRule
+    let onDelete: () -> Void
+
+    @State private var cachedRegexError: String?
+
+    private var regexError: String? {
+        guard rule.regex,
+              !rule.find.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return nil }
+        return cachedRegexError
+    }
+
+    private var canEnable: Bool {
+        !rule.find.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && regexError == nil
+    }
+
+    private var enabledBinding: Binding<Bool> {
+        Binding(
+            get: { rule.enabled && canEnable },
+            set: { if canEnable { rule.enabled = $0 } }
+        )
+    }
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Toggle("Enabled", isOn: rule.enabled).labelsHidden()
-                TextField("find", text: rule.find)
+                Toggle("Enabled", isOn: enabledBinding)
+                    .labelsHidden()
+                    .disabled(!canEnable)
+                TextField("find", text: $rule.find)
                     .textFieldStyle(.roundedBorder)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(regexError == nil ? .clear : .red.opacity(0.8), lineWidth: 1)
+                    )
                 Text("→").foregroundStyle(.secondary)
-                TextField("replace", text: rule.replace)
+                TextField("replace", text: $rule.replace)
                     .textFieldStyle(.roundedBorder)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
-                Button(role: .destructive) {
-                    let id = rule.wrappedValue.id
-                    model.findReplaceRules.removeAll { $0.id == id }
-                } label: {
+                Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash")
                 }
                 .accessibilityLabel(Text("Delete rule"))
             }
             HStack(spacing: 16) {
-                Toggle("Case-sensitive", isOn: rule.caseSensitive)
-                Toggle("Regex", isOn: rule.regex)
+                Toggle("Case-sensitive", isOn: $rule.caseSensitive)
+                Toggle("Regex", isOn: $rule.regex)
             }
             .font(.caption)
             .toggleStyle(.switch)
             .controlSize(.small)
+            if let regexError {
+                Label(regexError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         }
         .padding(.vertical, 6)
+        .onAppear { cachedRegexError = GlobalFindReplace.validate(rule) }
+        .onChange(of: rule.find) { _, _ in cachedRegexError = GlobalFindReplace.validate(rule) }
+        .onChange(of: rule.regex) { _, _ in cachedRegexError = GlobalFindReplace.validate(rule) }
     }
 }
 
