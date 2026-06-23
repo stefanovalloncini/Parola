@@ -157,7 +157,7 @@ struct LibraryListView: View {
             HStack(spacing: 8) {
                 Text(entry.createdAt, style: .date)
                 Text("·")
-                Text(entry.manifest.modelName)
+                Text(AppModel.modelLabel(entry.manifest.modelName))
             }
             .font(.caption)
             .foregroundStyle(.secondary)

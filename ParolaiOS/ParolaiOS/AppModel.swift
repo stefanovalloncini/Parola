@@ -35,6 +35,10 @@ final class AppModel {
 
     static let trashRetentionDays = 30
 
+    nonisolated static func modelLabel(_ id: String) -> String {
+        ModelCatalog.variant(id: id)?.displayName ?? id
+    }
+
     struct PromptOutput: Identifiable {
         let id = UUID()
         let promptName: String
