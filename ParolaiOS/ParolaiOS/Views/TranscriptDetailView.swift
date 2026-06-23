@@ -201,6 +201,10 @@ struct TranscriptDetailView: View {
     static func displayText(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    static func segmentTimecode(_ start: Double) -> String {
+        Timecode.format(start)
+    }
 }
 
 private struct SpeakerChipRow: View {
@@ -302,7 +306,7 @@ private struct SegmentView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                Text(timestamp(segment.start))
+                Text(TranscriptDetailView.segmentTimecode(segment.start))
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
                 if showSpeaker, let speaker = segment.speaker, !speaker.isEmpty {
@@ -322,7 +326,7 @@ private struct SegmentView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(isActive ? Color.accentColor : .secondary)
-                    .accessibilityLabel(Text("Play from \(timestamp(segment.start))"))
+                    .accessibilityLabel(Text("Play from \(TranscriptDetailView.segmentTimecode(segment.start))"))
                 }
             }
             if let words = segment.words, !words.isEmpty {
@@ -332,12 +336,6 @@ private struct SegmentView: View {
             }
         }
         .opacity(isDimmed ? 0.4 : 1)
-    }
-
-    private func timestamp(_ s: Double) -> String {
-        Duration.seconds(s).formatted(
-            .time(pattern: s >= 3600 ? .hourMinuteSecond : .minuteSecond)
-        )
     }
 }
 
