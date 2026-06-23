@@ -2,9 +2,10 @@ import Foundation
 
 /// Corrects a narrow set of objective Italian orthographic errors that ASR engines emit: the
 /// `-ché` conjunction family written with a grave accent ("perchè" → "perché"), and the bare
-/// truncation "po" written without its apostrophe ("un po" → "un po'"). Every correction targets
-/// a form that is always wrong in standard Italian — legitimately-grave words (`caffè`, `cioè`)
-/// and the capitalised river "Po" are never matched. Applied only when the language is Italian.
+/// truncation of "poco" written without its apostrophe — both the plain "po" and the common
+/// misspelling "pò" ("un po", "un pò" → "un po'"). Every correction targets a form that is always
+/// wrong in standard Italian — legitimately-grave words (`caffè`, `cioè`) and the capitalised
+/// river "Po" are never matched. Applied only when the language is Italian.
 public enum ItalianOrthography {
     public static func apply(to segments: [TranscriptSegment], language: String?) -> [TranscriptSegment] {
         guard isItalian(language) else { return segments }
@@ -42,7 +43,7 @@ public enum ItalianOrthography {
     }
 
     private static let truncations: [(regex: NSRegularExpression, replacement: String)] = {
-        guard let po = try? NSRegularExpression(pattern: "\\bpo\\b(?![\u{27}\u{2019}])") else { return [] }
+        guard let po = try? NSRegularExpression(pattern: "\\bp[oò]\\b(?![\u{27}\u{2019}])") else { return [] }
         return [(po, "po'")]
     }()
 

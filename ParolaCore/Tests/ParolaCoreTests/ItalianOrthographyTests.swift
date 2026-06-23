@@ -127,4 +127,44 @@ struct ItalianOrthographyTests {
         let input = [seg(0, "type po then enter")]
         #expect(ItalianOrthography.apply(to: input, language: "en").first?.text == "type po then enter")
     }
+
+    @Test("grave-accented pò is corrected to the apostrophe truncation")
+    func correctsGravePo() {
+        let input = [seg(0, "esiste un pò da capire"), seg(1, "aspetta un pò")]
+        let out = ItalianOrthography.apply(to: input, language: "it")
+        #expect(out.map(\.text) == ["esiste un po' da capire", "aspetta un po'"])
+    }
+
+    @Test("an already-apostrophed pò is left alone")
+    func leavesApostrophedGravePoAlone() {
+        let straight = [seg(0, "un pò' di pane")]
+        let curly = [seg(0, "un pò\u{2019} di pane")]
+        #expect(ItalianOrthography.apply(to: straight, language: "it").first?.text == "un pò' di pane")
+        #expect(ItalianOrthography.apply(to: curly, language: "it").first?.text == "un pò\u{2019} di pane")
+    }
+
+    @Test("the capitalised river Pò is never apostrophed")
+    func leavesCapitalisedGravePoAlone() {
+        let input = [seg(0, "il fiume Pò è lungo"), seg(1, "Pò è un fiume")]
+        let out = ItalianOrthography.apply(to: input, language: "it")
+        #expect(out.map(\.text) == ["il fiume Pò è lungo", "Pò è un fiume"])
+    }
+
+    @Test("pò inside a longer word is not touched")
+    func leavesGravePoInWordsAlone() {
+        let input = [seg(0, "il dopòscuola")]
+        let out = ItalianOrthography.apply(to: input, language: "it")
+        #expect(out.first?.text == "il dopòscuola")
+    }
+
+    @Test("word-level pò token is corrected")
+    func correctsGravePoWordToken() {
+        let words = [
+            WordTiming(id: "0-0", word: "un", start: 0, end: 0.5, probability: 1),
+            WordTiming(id: "0-1", word: "pò", start: 0.5, end: 1, probability: 1),
+        ]
+        let out = ItalianOrthography.apply(to: [seg(0, "un pò", words: words)], language: "it")
+        #expect(out.first?.words?.map(\.word) == ["un", "po'"])
+        #expect(out.first?.text == "un po'")
+    }
 }
