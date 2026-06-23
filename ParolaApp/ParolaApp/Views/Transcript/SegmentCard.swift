@@ -19,11 +19,14 @@ struct SegmentCard: View {
 
     private let radius: CGFloat = 12
 
+    // Hover reserves room for the floating actionStrip (~200pt with every button) so it never covers the first text line.
+    private let actionStripReserve: CGFloat = 200
+
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             content
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.trailing, hovering && !isEditing ? 88 : 0)
+                .padding(.trailing, hovering && !isEditing ? actionStripReserve : 0)
 
             HStack(spacing: DS.Spacing.small) {
                 Text(Timecode.format(segment.start))
