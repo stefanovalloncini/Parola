@@ -58,6 +58,17 @@ public enum Format {
         return value
     }
 
+    // A speaker rendered inline (SRT/VTT cue, HTML span, DOCX run, MD bold) must stay on one line,
+    // so a newline would split the cue or break the tag; a whitespace-only label renders blank.
+    static func presentationSpeakerLabel(_ speaker: String?) -> String? {
+        guard let speaker else { return nil }
+        let flattened = speaker
+            .split(whereSeparator: \.isNewline)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return flattened.isEmpty ? nil : flattened
+    }
+
     public static func escapeHTML(_ s: String) -> String {
         s.replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")

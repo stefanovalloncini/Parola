@@ -615,6 +615,111 @@ struct ExporterTests {
         #expect(out.contains("Marco: Hello"))
     }
 
+    @Test("html drops a whitespace-only speaker instead of rendering a blank label")
+    func htmlWhitespaceOnlySpeaker() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: "   ")],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try HtmlExporter().renderText(transcript)
+        #expect(out.contains("class=\"s\"") == false)
+        #expect(out.contains("</span>:") == false)
+        #expect(out.contains("Hello."))
+    }
+
+    @Test("html flattens newlines in a speaker so the label stays on one line")
+    func htmlSpeakerNewline() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: "Alice\nBob")],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try HtmlExporter().renderText(transcript)
+        #expect(out.contains("class=\"s\">Alice Bob</span>"))
+    }
+
+    @Test("html trims surrounding whitespace from a padded speaker label")
+    func htmlPaddedSpeaker() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: " Marco ")],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try HtmlExporter().renderText(transcript)
+        #expect(out.contains("class=\"s\">Marco</span>"))
+    }
+
+    @Test("docx drops a whitespace-only speaker instead of a blank bold run")
+    func docxWhitespaceOnlySpeaker() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: "   ")],
+            language: "en",
+            modelName: "m"
+        )
+        let asString = String(decoding: try DocxExporter().render(transcript), as: UTF8.self)
+        #expect(asString.contains("<w:rPr><w:b/></w:rPr>") == false)
+        #expect(asString.contains(": </w:t>") == false)
+        #expect(asString.contains("Hello."))
+    }
+
+    @Test("docx flattens newlines in a speaker so the bold run stays one line")
+    func docxSpeakerNewline() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: "Alice\nBob")],
+            language: "en",
+            modelName: "m"
+        )
+        let asString = String(decoding: try DocxExporter().render(transcript), as: UTF8.self)
+        #expect(asString.contains("Alice Bob: "))
+    }
+
+    @Test("docx trims surrounding whitespace from a padded speaker label")
+    func docxPaddedSpeaker() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: " Marco ")],
+            language: "en",
+            modelName: "m"
+        )
+        let asString = String(decoding: try DocxExporter().render(transcript), as: UTF8.self)
+        #expect(asString.contains("Marco: "))
+        #expect(asString.contains(" Marco : ") == false)
+    }
+
+    @Test("markdown drops a whitespace-only speaker instead of a blank bold label")
+    func markdownWhitespaceOnlySpeaker() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: "   ")],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try MarkdownExporter().renderText(transcript)
+        #expect(out == "Hello.\n")
+        #expect(out.contains("**") == false)
+    }
+
+    @Test("markdown flattens newlines in a speaker so the bold label stays one line")
+    func markdownSpeakerNewline() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: "Alice\nBob")],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try MarkdownExporter().renderText(transcript)
+        #expect(out.contains("**Alice Bob:** Hello."))
+    }
+
+    @Test("markdown trims surrounding whitespace from a padded speaker label")
+    func markdownPaddedSpeaker() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: " Marco ")],
+            language: "en",
+            modelName: "m"
+        )
+        let out = try MarkdownExporter().renderText(transcript)
+        #expect(out.contains("**Marco:** Hello."))
+    }
+
     @Test("srt drops an empty segment and keeps cue numbers contiguous")
     func srtDropsEmptyCue() throws {
         let transcript = Transcript(
