@@ -18,17 +18,22 @@ struct Library: AsyncParsableCommand {
         @Flag(help: "Output as JSON.")
         var json: Bool = false
 
+        @Option(name: .long, help: "Library folder to verify. Defaults to the app's library.")
+        var library: String?
+
         func run() async throws {
-            let store = LibraryStore.shared
+            let store = library.map {
+                LibraryStore(libraryURL: URL(fileURLWithPath: $0, isDirectory: true), extraIndexer: nil)
+            } ?? LibraryStore.shared
             let report = await store.verify()
             if json {
                 print(jsonOutput(report))
-                return
-            }
-            print("Healthy: \(report.healthy.count)")
-            print("Problems: \(report.problems.count)")
-            for problem in report.problems {
-                print("  \(problem.bundleURL.lastPathComponent): \(describe(problem.issue))")
+            } else {
+                print("Healthy: \(report.healthy.count)")
+                print("Problems: \(report.problems.count)")
+                for problem in report.problems {
+                    print("  \(problem.bundleURL.lastPathComponent): \(describe(problem.issue))")
+                }
             }
             if !report.problems.isEmpty {
                 throw ExitCode(1)
