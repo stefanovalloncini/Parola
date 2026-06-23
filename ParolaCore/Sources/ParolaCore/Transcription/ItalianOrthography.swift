@@ -1,7 +1,7 @@
 import Foundation
 
 /// Corrects a narrow set of objective Italian orthographic errors that ASR engines emit: the
-/// `-ché` conjunction family written with a grave accent ("perchè" → "perché"), and the bare
+/// `-ché` family written with a grave accent ("perchè" → "perché"), and the bare
 /// truncation of "poco" written without its apostrophe — both the plain "po" and the common
 /// misspelling "pò" ("un po", "un pò" → "un po'"). Every correction targets a form that is always
 /// wrong in standard Italian — legitimately-grave words (`caffè`, `cioè`) and the capitalised
@@ -31,7 +31,8 @@ public enum ItalianOrthography {
     private static let acuteForms = [
         "perché", "poiché", "affinché", "benché", "finché", "sicché", "giacché",
         "nonché", "anziché", "cosicché", "fuorché", "purché", "dopodiché",
-        "macché", "dacché", "allorché", "acciocché", "ché",
+        "macché", "dacché", "allorché", "acciocché", "sennonché",
+        "granché", "checché", "ché",
     ]
 
     private static let corrections: [(regex: NSRegularExpression, acute: String)] = acuteForms.compactMap { acute in

@@ -22,6 +22,21 @@ struct ItalianOrthographyTests {
         #expect(out.first?.text == "poiché benché finché sicché giacché nonché anziché cosicché purché affinché")
     }
 
+    @Test("the non-conjunction -ché members are corrected from the grave misspelling")
+    func correctsExtendedFamily() {
+        let input = [
+            seg(0, "non è un granchè"),
+            seg(1, "checchè se ne dica"),
+            seg(2, "andava tutto bene sennonchè ha iniziato a piovere"),
+        ]
+        let out = ItalianOrthography.apply(to: input, language: "it")
+        #expect(out.map(\.text) == [
+            "non è un granché",
+            "checché se ne dica",
+            "andava tutto bene sennonché ha iniziato a piovere",
+        ])
+    }
+
     @Test("capitalization of the matched word is preserved")
     func preservesCase() {
         let input = [seg(0, "Perchè no"), seg(1, "PERCHÈ")]
