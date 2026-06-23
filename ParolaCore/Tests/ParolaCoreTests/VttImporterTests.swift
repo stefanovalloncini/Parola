@@ -201,4 +201,40 @@ struct VttImporterTests {
         let t = VttImporter.parse(vtt)
         #expect(t.segments.first?.text == "use <b> to make text bold")
     }
+
+    @Test("decodes the numeric apostrophe entity YouTube emits in contractions")
+    func decodesNumericApostrophe() {
+        let vtt = """
+        WEBVTT
+
+        00:00:00.000 --> 00:00:02.000
+        it&#39;s a beautiful day and I don&#39;t mind
+        """
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.first?.text == "it's a beautiful day and I don't mind")
+    }
+
+    @Test("decodes the quote entity in cue text")
+    func decodesQuoteEntity() {
+        let vtt = """
+        WEBVTT
+
+        00:00:00.000 --> 00:00:02.000
+        she said &quot;hello&quot; to everyone
+        """
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.first?.text == "she said \"hello\" to everyone")
+    }
+
+    @Test("keeps a double-escaped apostrophe entity as a literal")
+    func keepsDoubleEscapedApostrophe() {
+        let vtt = """
+        WEBVTT
+
+        00:00:00.000 --> 00:00:02.000
+        the entity &amp;#39; is written like this
+        """
+        let t = VttImporter.parse(vtt)
+        #expect(t.segments.first?.text == "the entity &#39; is written like this")
+    }
 }
