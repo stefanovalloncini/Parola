@@ -340,6 +340,26 @@ struct ExporterTests {
         #expect(out.contains("0.0,5.0,Marco,Hello"))
     }
 
+    @Test("csv drops a segment whose text trims to empty")
+    func csvDropsEmptySegment() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 2, text: "First"),
+                TranscriptSegment(id: 1, start: 2, end: 4, text: "  \n ", speaker: "Speaker 1"),
+                TranscriptSegment(id: 2, start: 4, end: 6, text: "Third"),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try CsvExporter().renderText(transcript)
+        let rows = out.split(separator: "\n", omittingEmptySubsequences: true)
+        #expect(rows.count == 3)   // header + First + Third
+        #expect(out.contains("0.0,2.0,,First"))
+        #expect(out.contains("4.0,6.0,,Third"))
+        #expect(out.contains("2.0,4.0") == false)
+        #expect(out.contains("Speaker 1") == false)
+    }
+
     @Test("csv is a recognized ExportFormat")
     func csvFormat() {
         #expect(ExportFormat.csv.fileExtension == "csv")
@@ -905,6 +925,25 @@ struct ExporterTests {
         )
         let out = try TsvExporter().renderText(transcript)
         #expect(out.contains("\tMarco\tHello"))
+    }
+
+    @Test("tsv drops a segment whose text trims to empty")
+    func tsvDropsEmptySegment() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 2, text: "First"),
+                TranscriptSegment(id: 1, start: 2, end: 4, text: "  \n ", speaker: "Speaker 1"),
+                TranscriptSegment(id: 2, start: 4, end: 6, text: "Third"),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try TsvExporter().renderText(transcript)
+        let rows = out.split(separator: "\n", omittingEmptySubsequences: true)
+        #expect(rows.count == 3)   // header + First + Third
+        #expect(out.contains("0.0\t2.0\t\tFirst"))
+        #expect(out.contains("4.0\t6.0\t\tThird"))
+        #expect(out.contains("Speaker 1") == false)
     }
 
     @Test("tsv is a recognized ExportFormat")
