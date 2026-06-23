@@ -265,4 +265,29 @@ struct AppModelBatchTests {
         let read = model.batchExportFormatOptions
         #expect(read == options)
     }
+
+    @Test("a completed batch job is post-processed before it is stored and shown")
+    func completedBatchJobIsPostProcessed() {
+        let model = makeModel()
+        model.batchExportFormats = []
+        model.ignoredSegmentRules = [IgnoredSegmentRule(pattern: "uh")]
+        model.findReplaceRules = [FindReplaceRule(find: "acme", replace: "Acme")]
+        let job = Self.makeJob("clip", status: .transcribing)
+        model.batchJobs = [job]
+        model.selectedBatchJobID = job.id
+
+        let raw = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "uh"),
+                TranscriptSegment(id: 1, start: 1, end: 2, text: "perchè acme spende un po"),
+            ],
+            language: "it",
+            modelName: "stub"
+        )
+        model.handleBatchEvent(.completed(jobID: job.id, transcript: raw))
+
+        #expect(model.transcript?.segments.map(\.text) == ["perché Acme spende un po'"])
+        #expect(model.batchJobs[0].transcript?.segments.map(\.text) == ["perché Acme spende un po'"])
+        #expect(model.batchJobs[0].status == .done)
+    }
 }

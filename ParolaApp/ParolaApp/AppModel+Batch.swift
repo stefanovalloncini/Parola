@@ -72,7 +72,7 @@ extension AppModel {
         runBatchTask(jobs: jobs)
     }
 
-    private func handleBatchEvent(_ event: BatchEvent) {
+    func handleBatchEvent(_ event: BatchEvent) {
         switch event {
         case .started(let id):
             guard !isCancelled(id) else { return }
@@ -80,10 +80,11 @@ extension AppModel {
             phase = .transcribing(file: batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/"))
         case .completed(let id, let transcript):
             guard !isCancelled(id) else { return }
-            mutateBatchJob(id) { $0.status = .done; $0.transcript = transcript; $0.progress = 1 }
-            if id == selectedBatchJobID { self.transcript = transcript }
+            let processed = postProcess(transcript)
+            mutateBatchJob(id) { $0.status = .done; $0.transcript = processed; $0.progress = 1 }
+            if id == selectedBatchJobID { self.transcript = processed }
             if let job = batchJobs.first(where: { $0.id == id }) {
-                writeBatchExports(transcript: transcript, sourceURL: job.url)
+                writeBatchExports(transcript: processed, sourceURL: job.url)
             }
         case .failed(let id, let reason):
             guard !isCancelled(id) else { return }
