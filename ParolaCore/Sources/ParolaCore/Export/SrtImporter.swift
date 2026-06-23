@@ -50,11 +50,12 @@ public enum SrtImporter {
             }
         }
 
+        let ordered = segments.chronologicallyOrdered()
         return Transcript(
-            segments: segments,
+            segments: ordered,
             language: "unknown",
             modelName: "imported-srt",
-            durationSeconds: segments.map(\.end).max()
+            durationSeconds: ordered.map(\.end).max()
         )
     }
 

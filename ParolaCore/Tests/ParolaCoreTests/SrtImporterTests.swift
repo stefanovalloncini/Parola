@@ -179,8 +179,25 @@ struct SrtImporterTests {
         """
         let t = SrtImporter.parse(srt)
         #expect(t.segments.count == 2)
-        #expect(t.segments.last?.end == 3.0)
+        #expect(t.segments.last?.end == 65.0)
         #expect(t.durationSeconds == 65.0)
+    }
+
+    @Test("imports out-of-order cues in chronological order with sequential ids")
+    func sortsOutOfOrderCues() {
+        let srt = """
+        1
+        00:01:00,000 --> 00:01:05,000
+        Early in file, late in time.
+
+        2
+        00:00:00,000 --> 00:00:03,000
+        Late in file, early in time.
+        """
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.map(\.start) == [0.0, 60.0])
+        #expect(t.segments.map(\.text) == ["Late in file, early in time.", "Early in file, late in time."])
+        #expect(t.segments.map(\.id) == [0, 1])
     }
 
     @Test("ignores SubRip positional coordinates on the time line")

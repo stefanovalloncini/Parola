@@ -67,11 +67,12 @@ enum VttImporter {
             }
         }
 
+        let ordered = segments.chronologicallyOrdered()
         return Transcript(
-            segments: segments,
+            segments: ordered,
             language: "unknown",
             modelName: "youtube-subs",
-            durationSeconds: segments.map(\.end).max()
+            durationSeconds: ordered.map(\.end).max()
         )
     }
 
