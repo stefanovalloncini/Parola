@@ -111,7 +111,7 @@ struct Transcribe: AsyncParsableCommand {
         if case .youtube(let url) = input, preferExistingSubs {
             stderr("Fetching captions from \(url.absoluteString)…")
             emitter.progress(.downloading, detail: url.absoluteString)
-            let transcript = try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: language)
+            let transcript = orthographyCorrected(try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: language))
             try emitTranscript(transcript, sourceURL: url, emitter: emitter)
             return
         }
@@ -145,6 +145,7 @@ struct Transcribe: AsyncParsableCommand {
             }
         )
         progress.finish()
+        transcript = orthographyCorrected(transcript)
 
         if summarise {
             do {
@@ -185,6 +186,12 @@ struct Transcribe: AsyncParsableCommand {
         emitter.progress(.finished, fraction: 1.0)
     }
 
+    private func orthographyCorrected(_ transcript: Transcript) -> Transcript {
+        var out = transcript
+        out.segments = ItalianOrthography.apply(to: out.segments, language: out.language)
+        return out
+    }
+
     private func transcribeBatch(urls: [URL], options: TranscriptionOptions) async throws {
         guard let outputDir else {
             throw ValidationError("Multiple inputs require --output-dir.")
@@ -204,7 +211,7 @@ struct Transcribe: AsyncParsableCommand {
             case .completed(let id, let transcript):
                 guard let job = jobByID[id] else { continue }
                 let target = outDirURL.appendingPathComponent("\(job.displayName).\(format.fileExtension)")
-                let rendered = try Exporters.exporter(for: format).render(transcript)
+                let rendered = try Exporters.exporter(for: format).render(orthographyCorrected(transcript))
                 try rendered.write(to: target, options: .atomic)
                 stderr("✓ \(job.url.lastPathComponent) → \(target.path)")
             case .failed(let id, let reason):
