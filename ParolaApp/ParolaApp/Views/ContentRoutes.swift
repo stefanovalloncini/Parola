@@ -45,9 +45,9 @@ struct ContentRoutes: View {
             case .idle:
                 EmptyDropZone()
             case .downloadingModel(let name, let progress):
-                ProgressPane(title: "Downloading \(name)", progress: progress)
+                ProgressPane(title: "Downloading \(AppModel.modelLabel(name))", progress: progress)
             case .loadingModel(let name):
-                ProgressPane(title: "Loading \(name)…", progress: nil)
+                ProgressPane(title: "Loading \(AppModel.modelLabel(name))…", progress: nil)
             case .transcribing(let file):
                 TranscribingPane(file: file, partial: model.filePartialText, progress: model.fileTranscribeFraction)
             case .recording(let source):

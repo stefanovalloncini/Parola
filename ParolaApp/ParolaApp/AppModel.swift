@@ -197,12 +197,15 @@ final class AppModel {
         return cachedCapabilities
     }
 
+    nonisolated static func modelLabel(_ id: String) -> String {
+        ModelCatalog.variant(id: id)?.displayName ?? id
+    }
+
     /// Non-blocking advisory when the selected model rejects the explicitly chosen language; nil for Auto-detect, matching TranscriptionSession.validate.
     var languageMismatchWarning: String? {
         guard let language = selectedLanguage,
               !selectedModelCapabilities.supportedLanguages.allows(language) else { return nil }
-        let modelLabel = ModelCatalog.variant(id: selectedModel)?.displayName ?? selectedModel
-        return "\(modelLabel) is English-only. Pick a multilingual model (like Whisper) to transcribe other languages."
+        return "\(AppModel.modelLabel(selectedModel)) is English-only. Pick a multilingual model (like Whisper) to transcribe other languages."
     }
 
     var selectedLanguage: String? {
