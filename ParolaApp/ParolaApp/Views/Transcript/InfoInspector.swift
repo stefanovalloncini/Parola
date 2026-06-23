@@ -61,7 +61,7 @@ struct InfoInspector: View {
 
     private var durationLabel: String {
         guard let d = model.transcript?.durationSeconds else { return "—" }
-        return Duration.seconds(d).formatted(.time(pattern: .hourMinuteSecond))
+        return Timecode.format(d.rounded())
     }
 
     private func dateLabel(_ date: Date?) -> String {

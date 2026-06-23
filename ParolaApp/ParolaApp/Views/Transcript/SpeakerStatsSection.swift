@@ -49,7 +49,6 @@ private struct StatRow: View {
     }
 
     private var durationLabel: String {
-        Duration.seconds(stats.durationSeconds)
-            .formatted(.time(pattern: stats.durationSeconds >= 3600 ? .hourMinuteSecond : .minuteSecond))
+        Timecode.format(stats.durationSeconds.rounded())
     }
 }
