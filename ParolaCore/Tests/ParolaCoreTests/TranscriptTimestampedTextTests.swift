@@ -94,4 +94,29 @@ struct TranscriptTimestampedTextTests {
         #expect(!text.contains("Bob"))
         #expect(text.split(separator: "\n").count == 1)
     }
+
+    @Test("omits a whitespace-only speaker label")
+    func whitespaceOnlySpeaker() {
+        let text = TranscriptTimestampedText.render(transcript(
+            [(1, 0, 2, "Hello", "   ")]
+        ))
+        #expect(text == "00:00  Hello")
+    }
+
+    @Test("flattens a newline-bearing speaker onto one line")
+    func newlineSpeaker() {
+        let text = TranscriptTimestampedText.render(transcript(
+            [(1, 0, 2, "Hello", "Marco\nRossi")]
+        ))
+        #expect(text == "00:00  Marco Rossi: Hello")
+        #expect(!text.contains("\n"))
+    }
+
+    @Test("trims a padded speaker label")
+    func paddedSpeaker() {
+        let text = TranscriptTimestampedText.render(transcript(
+            [(1, 0, 2, "Hello", " Marco ")]
+        ))
+        #expect(text == "00:00  Marco: Hello")
+    }
 }

@@ -10,7 +10,7 @@ public enum TranscriptTimestampedText {
             let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !body.isEmpty else { continue }
             let stamp = format(segment.start, hours: useHours)
-            if let speaker = segment.speaker, !speaker.isEmpty {
+            if let speaker = Format.presentationSpeakerLabel(segment.speaker) {
                 lines.append("\(stamp)  \(speaker): \(body)")
             } else {
                 lines.append("\(stamp)  \(body)")
