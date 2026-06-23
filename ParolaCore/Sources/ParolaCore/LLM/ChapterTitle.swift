@@ -6,7 +6,7 @@ enum ChapterTitle {
         while let first = result.first, "-—–•\"'*_".contains(first) {
             result = String(result.dropFirst()).trimmingCharacters(in: .whitespaces)
         }
-        while let last = result.last, "\"'*_".contains(last) {
+        while let last = result.last, "-—–•\"'*_".contains(last) {
             result = String(result.dropLast()).trimmingCharacters(in: .whitespaces)
         }
         return result
