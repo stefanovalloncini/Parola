@@ -26,7 +26,7 @@ struct SegmentCard: View {
                 .padding(.trailing, hovering && !isEditing ? 88 : 0)
 
             HStack(spacing: DS.Spacing.small) {
-                Text(timestamp(segment.start))
+                Text(Timecode.format(segment.start))
                     .font(model.monospacedTimestamps ? DS.Font.captionMono : DS.Font.caption)
                     .foregroundStyle(isCurrent ? DS.Color.accent : DS.Color.secondaryText)
                 if let speaker = Self.speakerLabel(for: segment.speaker) {
@@ -339,17 +339,11 @@ struct SegmentCard: View {
     }
 
     private var draggablePayload: String {
-        let stamp = timestamp(segment.start)
+        let stamp = Timecode.format(segment.start)
         let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
         if let speaker = segment.speaker, !speaker.isEmpty {
             return "\(stamp)  \(speaker): \(body)"
         }
         return "\(stamp)  \(body)"
-    }
-
-    private func timestamp(_ s: Double) -> String {
-        Duration.seconds(s).formatted(
-            .time(pattern: s >= 3600 ? .hourMinuteSecond : .minuteSecond)
-        )
     }
 }

@@ -20,6 +20,13 @@ struct TimecodeTests {
         #expect(Timecode.format(Double(twoHFiveMSeven)) == "2:05:07")
     }
 
+    @Test("truncates fractional seconds toward the second a position falls in")
+    func truncatesFractionalSeconds() {
+        #expect(Timecode.format(22.8) == "00:22")
+        #expect(Timecode.format(14.9) == "00:14")
+        #expect(Timecode.format(3605.5) == "1:00:05")
+    }
+
     @Test("saturates instead of trapping past Int range")
     func saturatesOnOverflow() {
         let huge = Timecode.format(1e19)
