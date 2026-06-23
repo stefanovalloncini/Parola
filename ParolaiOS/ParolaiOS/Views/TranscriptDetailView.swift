@@ -205,6 +205,15 @@ struct TranscriptDetailView: View {
     static func segmentTimecode(_ start: Double) -> String {
         Timecode.format(start)
     }
+
+    static func speakerLabel(for speaker: String?) -> String? {
+        guard let speaker else { return nil }
+        let flattened = speaker
+            .split(whereSeparator: \.isNewline)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return flattened.isEmpty ? nil : flattened
+    }
 }
 
 private struct SpeakerChipRow: View {
@@ -309,7 +318,7 @@ private struct SegmentView: View {
                 Text(TranscriptDetailView.segmentTimecode(segment.start))
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
-                if showSpeaker, let speaker = segment.speaker, !speaker.isEmpty {
+                if showSpeaker, let speaker = TranscriptDetailView.speakerLabel(for: segment.speaker) {
                     Text(speaker)
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
