@@ -91,6 +91,13 @@ struct SmartChaptersTests {
         #expect(result.map(\.start) == [0, 135])
     }
 
+    @Test("keeps chapters with fractional-second timestamps")
+    func parsesFractionalSeconds() {
+        let result = SmartChapters.parseResponse("00:00 Intro\n00:30.5 Deep dive\n1:00:30.25 Wrap")
+        #expect(result.map(\.title) == ["Intro", "Deep dive", "Wrap"])
+        #expect(result.map(\.start) == [0, 30.5, 3630.25])
+    }
+
     @Test("a numbered marker does not turn a decimal into a timestamp")
     func numberedMarkerKeepsDecimalAsNoise() {
         let result = SmartChapters.parseResponse("1. 3.5 mg of caffeine\n2. 00:00 Intro")

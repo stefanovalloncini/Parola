@@ -38,7 +38,7 @@ public enum SmartChapters {
         let rest = stripLeadingMarkers(trimmed)
         guard let space = rest.firstIndex(where: { $0 == " " || $0 == "\t" }) else { return nil }
         let timeToken = String(rest[..<space]).trimmingCharacters(in: timestampWrappers)
-        guard let seconds = Timecode.parse(timeToken) else { return nil }
+        guard let seconds = Format.parseClockTimestamp(timeToken) else { return nil }
         return Chapter.cleaned(title: String(rest[rest.index(after: space)...]), start: seconds)
     }
 
