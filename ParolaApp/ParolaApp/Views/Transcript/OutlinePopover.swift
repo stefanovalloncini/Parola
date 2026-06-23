@@ -80,10 +80,10 @@ private struct OutlineRow: View {
                         .font(DS.Font.callout)
                         .foregroundStyle(DS.Color.primaryText)
                         .multilineTextAlignment(.leading)
-                    if let speaker = entry.speaker {
+                    if let rawSpeaker = entry.speaker, let speaker = SegmentCard.speakerLabel(for: rawSpeaker) {
                         HStack(spacing: 4) {
                             Circle()
-                                .fill(DS.speakerColor(for: speaker))
+                                .fill(DS.speakerColor(for: rawSpeaker))
                                 .frame(width: 5, height: 5)
                             Text(speaker)
                                 .font(DS.Font.caption2)
