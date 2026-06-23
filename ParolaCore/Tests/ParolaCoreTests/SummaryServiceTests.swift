@@ -75,6 +75,17 @@ struct SummaryServiceTests {
         #expect(underscored?.start == 130)
     }
 
+    @Test("chapter line with a bracketed or parenthesized timestamp still parses")
+    func chapterBracketedTimestamp() {
+        let bracketed = SummaryService.parseChapter("[00:00] Welcome and intro")
+        #expect(bracketed?.title == "Welcome and intro")
+        #expect(bracketed?.start == 0)
+
+        let parenthesized = SummaryService.parseChapter("(01:30) Roadmap review")
+        #expect(parenthesized?.title == "Roadmap review")
+        #expect(parenthesized?.start == 90)
+    }
+
     @Test("full response parse extracts summary + chapters")
     func fullResponse() {
         let response = """

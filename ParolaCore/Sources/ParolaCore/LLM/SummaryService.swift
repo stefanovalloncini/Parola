@@ -154,7 +154,7 @@ public actor SummaryService {
 
         let parts = scanner.split(maxSplits: 1, omittingEmptySubsequences: true, whereSeparator: { $0 == " " || $0 == "\t" })
         guard parts.count == 2 else { return nil }
-        let timeToken = String(parts[0]).trimmingCharacters(in: CharacterSet(charactersIn: "*_"))
+        let timeToken = String(parts[0]).trimmingCharacters(in: CharacterSet(charactersIn: "*_[]()`"))
         let title = ChapterTitle.clean(String(parts[1]))
         guard let seconds = SummaryService.parseClock(timeToken), !title.isEmpty else { return nil }
         return Chapter(title: title, start: seconds)
