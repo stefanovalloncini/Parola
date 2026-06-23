@@ -20,4 +20,21 @@ struct SpeakerLabelTests {
     func emptyIsNoLabel() {
         #expect(SegmentCard.speakerLabel(for: "") == nil)
     }
+
+    @Test("treats a whitespace-only speaker as no label")
+    func whitespaceOnlyIsNoLabel() {
+        #expect(SegmentCard.speakerLabel(for: "   ") == nil)
+        #expect(SegmentCard.speakerLabel(for: "\n") == nil)
+    }
+
+    @Test("trims surrounding whitespace from a padded speaker")
+    func trimsPaddedSpeaker() {
+        #expect(SegmentCard.speakerLabel(for: " Anna ") == "Anna")
+    }
+
+    @Test("flattens internal newlines to a single line")
+    func flattensNewlines() {
+        #expect(SegmentCard.speakerLabel(for: "Marco\nRossi") == "Marco Rossi")
+        #expect(SegmentCard.speakerLabel(for: "A\nB\nC") == "A B C")
+    }
 }

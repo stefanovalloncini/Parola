@@ -29,12 +29,12 @@ struct SegmentCard: View {
                 Text(Timecode.format(segment.start))
                     .font(model.monospacedTimestamps ? DS.Font.captionMono : DS.Font.caption)
                     .foregroundStyle(isCurrent ? DS.Color.accent : DS.Color.secondaryText)
-                if let speaker = Self.speakerLabel(for: segment.speaker) {
+                if let rawSpeaker = segment.speaker, let speaker = Self.speakerLabel(for: rawSpeaker) {
                     Text(speaker)
                         .font(DS.Font.caption)
-                        .foregroundStyle(DS.speakerColor(for: speaker))
+                        .foregroundStyle(DS.speakerColor(for: rawSpeaker))
                         .onHover { hovering in
-                            hoveredSpeaker.wrappedValue = hovering ? speaker : nil
+                            hoveredSpeaker.wrappedValue = hovering ? rawSpeaker : nil
                         }
                         .contextMenu {
                             Button("Rename \(speaker)…") {
@@ -183,7 +183,12 @@ struct SegmentCard: View {
     }
 
     static func speakerLabel(for speaker: String?) -> String? {
-        speaker.flatMap { $0.isEmpty ? nil : $0 }
+        guard let speaker else { return nil }
+        let flattened = speaker
+            .split(whereSeparator: \.isNewline)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return flattened.isEmpty ? nil : flattened
     }
 
     @State private var timingPopoverOpen = false
@@ -341,7 +346,7 @@ struct SegmentCard: View {
     private var draggablePayload: String {
         let stamp = Timecode.format(segment.start)
         let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let speaker = segment.speaker, !speaker.isEmpty {
+        if let speaker = Self.speakerLabel(for: segment.speaker) {
             return "\(stamp)  \(speaker): \(body)"
         }
         return "\(stamp)  \(body)"
