@@ -67,4 +67,26 @@ struct TermPackTests {
         #expect(merged.count == 1)
         #expect(merged[0].find == "grpc")
     }
+
+    @Test("merge imports an invalid-regex rule disabled so it can't silently no-op")
+    func mergeDisablesInvalidRegex() {
+        let pack = TermPack(name: "X", locale: "en", rules: [
+            TermPackRule(find: "h(ello", replace: "Hi", regex: true),
+            TermPackRule(find: "grpc", replace: "gRPC"),
+        ])
+        let merged = TermPackIO.merge(pack: pack, into: [])
+        #expect(merged.count == 2)
+        #expect(merged.first { $0.find == "h(ello" }?.enabled == false)
+        #expect(merged.first { $0.find == "grpc" }?.enabled == true)
+    }
+
+    @Test("merge keeps a valid regex rule enabled")
+    func mergeKeepsValidRegexEnabled() {
+        let pack = TermPack(name: "X", locale: "en", rules: [
+            TermPackRule(find: #"\bk8s\b"#, replace: "Kubernetes", regex: true),
+        ])
+        let merged = TermPackIO.merge(pack: pack, into: [])
+        #expect(merged.count == 1)
+        #expect(merged[0].enabled == true)
+    }
 }

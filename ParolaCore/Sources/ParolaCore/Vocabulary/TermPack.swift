@@ -56,13 +56,15 @@ public enum TermPackIO {
         let key: (FindReplaceRule) -> String = { "\($0.find)|\($0.caseSensitive)|\($0.regex)" }
         var seen = Set(out.map(key))
         for rule in pack.rules where !rule.find.isEmpty {
-            let candidate = FindReplaceRule(
+            var candidate = FindReplaceRule(
                 find: rule.find,
                 replace: rule.replace,
                 caseSensitive: rule.caseSensitive,
                 regex: rule.regex,
                 enabled: true
             )
+            // An invalid regex silently no-ops in GlobalFindReplace.apply, so import it disabled rather than looking active.
+            if GlobalFindReplace.validate(candidate) != nil { candidate.enabled = false }
             guard seen.insert(key(candidate)).inserted else { continue }
             out.append(candidate)
         }
