@@ -348,6 +348,7 @@ private struct SegmentTextView: View {
 
     var body: some View {
         let label = Text(highlighted(text: TranscriptDetailView.displayText(text), query: query))
+            .textSelection(.enabled)
             .padding(6)
             .background(isActive ? Color.accentColor.opacity(0.15) : .clear)
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
