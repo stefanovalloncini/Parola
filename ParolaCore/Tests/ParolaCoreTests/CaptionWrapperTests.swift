@@ -108,4 +108,24 @@ struct CaptionWrapperTests {
             #expect(line.count <= 32)
         }
     }
+
+    @Test("wrapping balances lines instead of leaving an orphaned last word (short)")
+    func balancesShort() {
+        let wrapped = CaptionWrapper.wrap("Hello everyone welcome back today", length: .short)
+        #expect(wrapped == "Hello everyone\nwelcome back today")
+    }
+
+    @Test("wrapping balances lines instead of leaving an orphaned last word (medium)")
+    func balancesMedium() {
+        let wrapped = CaptionWrapper.wrap("The committee will reconvene tomorrow at noon", length: .medium)
+        #expect(wrapped == "The committee will\nreconvene tomorrow at noon")
+    }
+
+    @Test("balancing never adds lines beyond the greedy minimum")
+    func balancingKeepsLineCount() {
+        let text = "The committee will reconvene tomorrow at noon"
+        let lineCount = CaptionWrapper.wrap(text, length: .medium)
+            .split(separator: "\n", omittingEmptySubsequences: false).count
+        #expect(lineCount == 2)
+    }
 }
