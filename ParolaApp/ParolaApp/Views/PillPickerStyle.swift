@@ -8,6 +8,7 @@ struct PillPickerButton<MenuContent: View>: View {
 
     @State private var isPresented = false
     @State private var hovering = false
+    @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
         Button {
@@ -40,7 +41,8 @@ struct PillPickerButton<MenuContent: View>: View {
             .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .opacity(isEnabled ? 1 : 0.45)
+        .onHover { hovering = isEnabled && $0 }
         .accessibilityLabel("\(caption): \(value)")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             menuContent()
