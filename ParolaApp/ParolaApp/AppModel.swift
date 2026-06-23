@@ -33,6 +33,12 @@ final class AppModel {
             case .systemAudio: return String(localized: "System audio")
             }
         }
+        var systemImage: String {
+            switch self {
+            case .microphone: return "mic.fill"
+            case .systemAudio: return "waveform"
+            }
+        }
     }
 
     enum Route: String, Hashable, CaseIterable {

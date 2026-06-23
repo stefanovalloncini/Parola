@@ -86,7 +86,7 @@ struct RecordingCard: View {
                 Circle()
                     .fill(DS.Color.accent.opacity(0.12))
                     .frame(width: 120, height: 120)
-                Image(systemName: "mic.fill")
+                Image(systemName: source.systemImage)
                     .font(.system(size: iconSize, weight: .regular))
                     .foregroundStyle(DS.Color.accent)
             }
