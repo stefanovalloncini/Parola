@@ -11,7 +11,7 @@ struct SummaryChapterRow: View {
             model.seekTo(chapter: chapter)
         } label: {
             HStack(spacing: DS.Spacing.regular) {
-                Text(timestamp(chapter.start))
+                Text(Timecode.format(chapter.start))
                     .font(DS.Font.captionMono)
                     .foregroundStyle(DS.Color.secondaryText)
                     .frame(width: 64, alignment: .leading)
@@ -31,11 +31,5 @@ struct SummaryChapterRow: View {
         .buttonStyle(.plain)
         .background(hovering ? DS.Color.accent.opacity(0.06) : Color.clear)
         .onHover { hovering = $0 }
-    }
-
-    private func timestamp(_ s: Double) -> String {
-        Duration.seconds(s).formatted(
-            .time(pattern: s >= 3600 ? .hourMinuteSecond : .minuteSecond)
-        )
     }
 }
