@@ -11,7 +11,7 @@ public enum NotesMarkdownRenderer {
             .sorted { $0.segment.start < $1.segment.start }
         for entry in entries {
             let stamp = Timecode.format(entry.segment.start)
-            if let speaker = entry.segment.speaker, !speaker.isEmpty {
+            if let speaker = Format.presentationSpeakerLabel(entry.segment.speaker) {
                 out += "- **\(stamp) · \(speaker)** — \(entry.note)\n"
             } else {
                 out += "- **\(stamp)** — \(entry.note)\n"

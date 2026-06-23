@@ -54,4 +54,28 @@ struct NotesMarkdownRendererTests {
         let md = NotesMarkdownRenderer.render(transcript: t, notes: ["99": "stray"], title: "x")
         #expect(md.contains("stray") == false)
     }
+
+    @Test("drops a whitespace-only speaker instead of rendering a blank label")
+    func whitespaceOnlySpeaker() {
+        let t = transcript([(1, 0, "hello", "   ")])
+        let md = NotesMarkdownRenderer.render(transcript: t, notes: ["1": "note"], title: "x")
+        #expect(md.contains("·") == false)
+        #expect(md.contains("- **00:00** — note"))
+    }
+
+    @Test("flattens a newline-bearing speaker onto one line")
+    func newlineSpeaker() {
+        let t = transcript([(1, 0, "hello", "Marco\nRossi")])
+        let md = NotesMarkdownRenderer.render(transcript: t, notes: ["1": "note"], title: "x")
+        #expect(md.contains("Marco Rossi"))
+        let bullets = md.split(separator: "\n").filter { $0.hasPrefix("- ") }
+        #expect(bullets.count == 1)
+    }
+
+    @Test("trims a padded speaker")
+    func paddedSpeaker() {
+        let t = transcript([(1, 0, "hello", " Marco ")])
+        let md = NotesMarkdownRenderer.render(transcript: t, notes: ["1": "note"], title: "x")
+        #expect(md.contains("· Marco**"))
+    }
 }
