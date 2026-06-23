@@ -1535,6 +1535,7 @@ final class AppModel {
         let trimmed = newText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != t.segments[idx].text else { return }
         t.segments[idx].text = trimmed
+        t.segments[idx].words = nil
         transcript = t
         persistCurrentTranscriptIfLoaded()
     }

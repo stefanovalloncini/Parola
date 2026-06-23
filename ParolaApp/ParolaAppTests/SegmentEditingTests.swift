@@ -51,4 +51,41 @@ struct SegmentEditingTests {
 
         #expect(model.transcript?.segments[1].text == "Changed.")
     }
+
+    @Test("editing a segment drops its now-stale word timings, leaving siblings intact")
+    func editDropsStaleWordTimings() throws {
+        let words = [
+            WordTiming(id: "0-0", word: "Hello", start: 0, end: 0.5, probability: 1),
+            WordTiming(id: "0-1", word: "world.", start: 0.5, end: 1, probability: 1),
+        ]
+        model.transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello world.", words: words),
+                TranscriptSegment(id: 1, start: 1, end: 2, text: "Second segment.", words: words),
+            ],
+            language: "en",
+            modelName: "tiny"
+        )
+
+        model.editSegment(id: 0, newText: "Howdy there.")
+
+        let segments = try #require(model.transcript?.segments)
+        #expect(segments[0].text == "Howdy there.")
+        #expect(segments[0].words == nil)
+        #expect(segments[1].words == words)
+    }
+
+    @Test("a rejected edit leaves the segment's word timings intact")
+    func rejectedEditKeepsWordTimings() throws {
+        let words = [WordTiming(id: "0-0", word: "Hello", start: 0, end: 1, probability: 1)]
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello world.", words: words)],
+            language: "en",
+            modelName: "tiny"
+        )
+
+        model.editSegment(id: 0, newText: "  Hello world.  ")
+
+        #expect(model.transcript?.segments[0].words == words)
+    }
 }

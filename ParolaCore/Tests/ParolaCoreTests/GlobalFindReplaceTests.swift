@@ -8,6 +8,13 @@ struct GlobalFindReplaceTests {
         TranscriptSegment(id: id, start: Double(id), end: Double(id) + 1, text: text)
     }
 
+    private func segWithWords(_ id: Int, _ text: String) -> TranscriptSegment {
+        let words = text.split(separator: " ").enumerated().map { index, word in
+            WordTiming(id: "\(id)-\(index)", word: String(word), start: Double(index), end: Double(index) + 1, probability: 1)
+        }
+        return TranscriptSegment(id: id, start: Double(id), end: Double(id) + 1, text: text, words: words)
+    }
+
     @Test("empty rules return segments unchanged")
     func empty() {
         let input = [seg(0, "Hello")]
@@ -94,6 +101,23 @@ struct GlobalFindReplaceTests {
         let trailRule = FindReplaceRule(find: "okay", replace: "")
         let trailing = GlobalFindReplace.apply(rules: [trailRule], to: [seg(0, "well okay")])
         #expect(trailing.first?.text == "well")
+    }
+
+    @Test("a replaced segment drops its now-stale word timings")
+    func replacedSegmentDropsWords() {
+        let rule = FindReplaceRule(find: "world", replace: "Parola")
+        let out = GlobalFindReplace.apply(rules: [rule], to: [segWithWords(0, "Hello world")])
+        #expect(out.first?.text == "Hello Parola")
+        #expect(out.first?.words == nil)
+    }
+
+    @Test("an untouched segment keeps its word timings")
+    func untouchedSegmentKeepsWords() {
+        let rule = FindReplaceRule(find: "absent", replace: "X")
+        let input = segWithWords(0, "Hello world")
+        let out = GlobalFindReplace.apply(rules: [rule], to: [input])
+        #expect(out.first?.text == "Hello world")
+        #expect(out.first?.words == input.words)
     }
 
     @Test("rule round-trips through JSON")
