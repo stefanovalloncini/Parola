@@ -86,6 +86,40 @@ struct SummaryServiceTests {
         #expect(parenthesized?.start == 90)
     }
 
+    @Test("chapter line with an ordered-list marker still parses")
+    func chapterNumberedMarker() {
+        let dotted = SummaryService.parseChapter("1. 00:00 Welcome and intro")
+        #expect(dotted?.title == "Welcome and intro")
+        #expect(dotted?.start == 0)
+
+        let parenthesized = SummaryService.parseChapter("2) 05:30 How WhisperKit works")
+        #expect(parenthesized?.title == "How WhisperKit works")
+        #expect(parenthesized?.start == 330)
+
+        let multiDigit = SummaryService.parseChapter("10. 12:00 Wrap up")
+        #expect(multiDigit?.title == "Wrap up")
+        #expect(multiDigit?.start == 720)
+
+        let decimal = SummaryService.parseChapter("3.5 hours of footage")
+        #expect(decimal == nil)
+    }
+
+    @Test("full response parse recovers numbered chapter markers")
+    func numberedChapters() {
+        let response = """
+        SUMMARY:
+        The speaker walks through the release plan.
+
+        CHAPTERS:
+        1. 00:00 Welcome and intro
+        2. 00:45 How WhisperKit works
+        3. 02:10 Closing thoughts
+        """
+        let summary = SummaryService.parse(response)
+        #expect(summary.chapters.map(\.start) == [0, 45, 130])
+        #expect(summary.chapters.map(\.title) == ["Welcome and intro", "How WhisperKit works", "Closing thoughts"])
+    }
+
     @Test("full response parse extracts summary + chapters")
     func fullResponse() {
         let response = """

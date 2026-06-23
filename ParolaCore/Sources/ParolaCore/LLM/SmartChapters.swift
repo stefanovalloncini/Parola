@@ -44,7 +44,7 @@ public enum SmartChapters {
         return Chapter(title: title, start: seconds)
     }
 
-    private static func stripLeadingMarkers(_ line: String) -> Substring {
+    static func stripLeadingMarkers(_ line: String) -> Substring {
         let body = stripOrderedMarker(line[...]) ?? line[...]
         return body
             .drop(while: { "-*•_#".contains($0) })

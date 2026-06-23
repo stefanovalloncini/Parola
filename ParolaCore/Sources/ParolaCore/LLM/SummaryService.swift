@@ -146,11 +146,7 @@ public actor SummaryService {
 
     static func parseChapter(_ line: String) -> Chapter? {
         guard !line.isEmpty else { return nil }
-        var scanner = line[...]
-
-        if scanner.first == "-" || scanner.first == "*" || scanner.first == "•" {
-            scanner = scanner.dropFirst().drop(while: { $0 == " " })
-        }
+        let scanner = SmartChapters.stripLeadingMarkers(line)
 
         let parts = scanner.split(maxSplits: 1, omittingEmptySubsequences: true, whereSeparator: { $0 == " " || $0 == "\t" })
         guard parts.count == 2 else { return nil }
