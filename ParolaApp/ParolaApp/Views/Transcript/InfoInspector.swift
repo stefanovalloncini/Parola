@@ -48,8 +48,7 @@ struct InfoInspector: View {
     }
 
     private var languageLabel: String {
-        guard let code = model.transcript?.language, !code.isEmpty else { return String(localized: "Auto") }
-        return Locale.current.localizedString(forLanguageCode: code) ?? code.uppercased()
+        LanguageDisplay.name(for: model.transcript?.language) ?? String(localized: "Auto")
     }
 
     private var engineLabel: String {

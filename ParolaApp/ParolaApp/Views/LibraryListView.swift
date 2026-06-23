@@ -295,12 +295,7 @@ private struct LibraryRow: View {
     private var compact: Bool { model.sidebarDensity == "compact" }
 
     private var languageLabel: String? {
-        let code = entry.language.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !code.isEmpty else { return nil }
-        if let localized = Locale.current.localizedString(forLanguageCode: code) {
-            return localized.capitalized
-        }
-        return code.uppercased()
+        LanguageDisplay.name(for: entry.language)
     }
 
     private var tooltip: String {
