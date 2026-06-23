@@ -235,4 +235,48 @@ struct SrtImporterTests {
         #expect(t.segments.first?.text == "Real text.")
         #expect(t.segments.first?.id == 0)
     }
+
+    @Test("decodes the ampersand entity in cue text")
+    func decodesAmpersandEntity() {
+        let srt = """
+        1
+        00:00:00,000 --> 00:00:02,000
+        Tom &amp; Jerry are back
+        """
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.first?.text == "Tom & Jerry are back")
+    }
+
+    @Test("decodes the numeric apostrophe and quote entities in cue text")
+    func decodesApostropheAndQuoteEntities() {
+        let srt = """
+        1
+        00:00:00,000 --> 00:00:02,000
+        she said &quot;it&#39;s fine&quot;
+        """
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.first?.text == "she said \"it's fine\"")
+    }
+
+    @Test("keeps escaped angle brackets as literal text instead of stripping them as a tag")
+    func keepsEscapedAngleBrackets() {
+        let srt = """
+        1
+        00:00:00,000 --> 00:00:02,000
+        use &lt;b&gt; to make text bold
+        """
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.first?.text == "use <b> to make text bold")
+    }
+
+    @Test("keeps a double-escaped ampersand entity as a literal")
+    func keepsDoubleEscapedAmpersand() {
+        let srt = """
+        1
+        00:00:00,000 --> 00:00:02,000
+        the entity &amp;#39; is written like this
+        """
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.first?.text == "the entity &#39; is written like this")
+    }
 }

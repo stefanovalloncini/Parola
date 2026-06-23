@@ -16,4 +16,15 @@ enum SubtitleMarkup {
         }
         return out
     }
+
+    // Must run after tag stripping, else an escaped `&lt;b&gt;` is eaten as a tag; `&amp;` last so `&amp;lt;` stays `&lt;`.
+    static func decodeEntities(_ s: String) -> String {
+        guard s.contains("&") else { return s }
+        return s
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&amp;", with: "&")
+    }
 }

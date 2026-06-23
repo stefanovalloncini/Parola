@@ -35,10 +35,12 @@ public enum SrtImporter {
                 i += 1
             }
 
-            let text = textLines
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-                .joined(separator: " ")
+            let text = SubtitleMarkup.decodeEntities(
+                textLines
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " ")
+            )
             if !text.isEmpty {
                 segments.append(TranscriptSegment(
                     id: nextID,
