@@ -33,6 +33,17 @@ struct TranscriptPromptContextTests {
         #expect(out == "00:00  hi\n")
     }
 
+    @Test("skips empty and whitespace-only segments so the prompt has no bare timestamp lines")
+    func skipsEmptySegments() {
+        let out = TranscriptPromptContext.timestampedLines(for: transcript([
+            TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello"),
+            TranscriptSegment(id: 1, start: 22, end: 23, text: ""),
+            TranscriptSegment(id: 2, start: 40, end: 41, text: "   \n"),
+            TranscriptSegment(id: 3, start: 65, end: 70, text: "world"),
+        ]))
+        #expect(out == "00:00  Hello\n01:05  world\n")
+    }
+
     @Test("an empty transcript renders nothing")
     func empty() {
         #expect(TranscriptPromptContext.timestampedLines(for: transcript([])).isEmpty)
