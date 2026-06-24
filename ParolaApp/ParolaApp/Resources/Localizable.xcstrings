@@ -7490,6 +7490,17 @@
         }
       }
     },
+    "Transcription failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione non riuscita: %@"
+          }
+        }
+      }
+    },
     "Transcriptions": {
       "extractionState": "manual",
       "localizations": {

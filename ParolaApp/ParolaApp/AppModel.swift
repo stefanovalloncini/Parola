@@ -1265,8 +1265,15 @@ final class AppModel {
         if error is CancellationError || Task.isCancelled {
             phase = .idle
         } else {
-            phase = .failed(message: error.localizedDescription)
+            phase = .failed(message: Self.transcriptionFailureMessage(for: error))
         }
+    }
+
+    nonisolated static func transcriptionFailureMessage(for error: Error, bundle: Bundle = .main) -> String {
+        if case ParolaError.transcriptionFailed(let reason) = error {
+            return String(localized: "Transcription failed: \(reason)", bundle: bundle)
+        }
+        return error.localizedDescription
     }
 
     func dismissError() {
@@ -1445,7 +1452,7 @@ final class AppModel {
                 }
             } catch {
                 teardownStreaming()
-                phase = .failed(message: error.localizedDescription)
+                phase = .failed(message: Self.transcriptionFailureMessage(for: error))
             }
             await mediaSession.exitRecording()
         }
@@ -1526,7 +1533,7 @@ final class AppModel {
             } catch {
                 liveSource = nil
                 stopRecordingLevelObserver()
-                phase = .failed(message: error.localizedDescription)
+                phase = .failed(message: Self.transcriptionFailureMessage(for: error))
             }
         }
     }
