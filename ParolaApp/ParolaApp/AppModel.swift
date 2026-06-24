@@ -655,7 +655,8 @@ final class AppModel {
     var librarySortOrder: LibrarySortOrder = .newest {
         didSet { reapplyLibrarySort() }
     }
-    @ObservationIgnored var libraryBundleSizes: [String: Int64] = [:]
+    // Observed on purpose: LibraryRow and the list totals read these, and refreshBundleSizes fills them asynchronously, so the assignment must re-render.
+    var libraryBundleSizes: [String: Int64] = [:]
     @ObservationIgnored var searchTask: Task<Void, Never>?
     static let trashRetentionDays = 30
 
