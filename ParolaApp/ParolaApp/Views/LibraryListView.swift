@@ -287,7 +287,7 @@ private func libraryCategoryName(_ category: EntryCategory) -> String {
     }
 }
 
-private struct LibraryRow: View {
+struct LibraryRow: View {
     let entry: LibraryEntry
     let sizeBytes: Int64?
 

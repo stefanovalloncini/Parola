@@ -69,6 +69,10 @@ struct EmptyDropZone: View {
                     .axLeaf("Empty.Button.RecentlyDeleted")
                 }
 
+                if !model.libraryEntries.isEmpty {
+                    recentSection
+                }
+
                 if model.libraryEntries.isEmpty {
                     VStack(spacing: DS.Spacing.regular) {
                         Image(systemName: "clock")
@@ -86,6 +90,58 @@ struct EmptyDropZone: View {
             .padding(.vertical, DS.Spacing.large)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private var recentSection: some View {
+        let recents = RecentEntries.most(of: model.libraryEntries)
+        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            Text("Recent")
+                .font(DS.Font.heading)
+                .foregroundStyle(DS.Color.primaryText)
+            VStack(spacing: 0) {
+                ForEach(Array(recents.enumerated()), id: \.element.id) { index, entry in
+                    RecentEntryRow(entry: entry)
+                    if index < recents.count - 1 {
+                        Divider()
+                            .padding(.leading, DS.Spacing.regular)
+                    }
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(DS.Color.surfaceElevated)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(DS.Color.separator.opacity(0.5), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+    }
+}
+
+private struct RecentEntryRow: View {
+    @Environment(AppModel.self) private var model
+    let entry: LibraryEntry
+    @State private var isHovering = false
+
+    var body: some View {
+        Button {
+            model.loadEntry(entry.id)
+        } label: {
+            LibraryRow(entry: entry, sizeBytes: model.libraryBundleSizes[entry.id])
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, DS.Spacing.regular)
+                .padding(.vertical, DS.Spacing.tight)
+                .background(SwiftUI.Color.primary.opacity(isHovering ? 0.06 : 0))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering }
+        }
+        .axLeaf("Empty.Recent.\(entry.id)")
     }
 }
 
