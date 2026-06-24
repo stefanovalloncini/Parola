@@ -37,6 +37,8 @@ private struct SpeechRateSparkline: View {
     let values: [Double]
     let maxValue: Double
 
+    private static let lineWidth: CGFloat = 2
+
     var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
@@ -46,24 +48,21 @@ private struct SpeechRateSparkline: View {
                 Path { p in
                     guard !values.isEmpty else { return }
                     for (idx, value) in values.enumerated() {
-                        let x = CGFloat(idx) * step
-                        let y = height - CGFloat(value / maxValue) * height
+                        let point = CGPoint(x: CGFloat(idx) * step, y: y(for: value, height: height))
                         if idx == 0 {
-                            p.move(to: CGPoint(x: x, y: y))
+                            p.move(to: point)
                         } else {
-                            p.addLine(to: CGPoint(x: x, y: y))
+                            p.addLine(to: point)
                         }
                     }
                 }
-                .stroke(DS.Color.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                .stroke(DS.Color.accent, style: StrokeStyle(lineWidth: Self.lineWidth, lineCap: .round, lineJoin: .round))
 
                 Path { p in
                     guard !values.isEmpty else { return }
                     p.move(to: CGPoint(x: 0, y: height))
                     for (idx, value) in values.enumerated() {
-                        let x = CGFloat(idx) * step
-                        let y = height - CGFloat(value / maxValue) * height
-                        p.addLine(to: CGPoint(x: x, y: y))
+                        p.addLine(to: CGPoint(x: CGFloat(idx) * step, y: y(for: value, height: height)))
                     }
                     p.addLine(to: CGPoint(x: CGFloat(values.count - 1) * step, y: height))
                     p.closeSubpath()
@@ -71,5 +70,21 @@ private struct SpeechRateSparkline: View {
                 .fill(DS.Color.accent.opacity(0.18))
             }
         }
+    }
+
+    private func y(for value: Double, height: CGFloat) -> CGFloat {
+        SparklineGeometry.y(value: value, maxValue: maxValue, height: height, lineWidth: Self.lineWidth)
+    }
+}
+
+enum SparklineGeometry {
+    /// Maps a value to a vertical position, reserving half the stroke width at the top and
+    /// bottom so a peak (or zero) bin's round-capped stroke stays inside the frame instead of
+    /// clipping at the edge.
+    static func y(value: Double, maxValue: Double, height: CGFloat, lineWidth: CGFloat) -> CGFloat {
+        let inset = lineWidth / 2
+        let usableHeight = max(height - lineWidth, 0)
+        let fraction = maxValue > 0 ? value / maxValue : 0
+        return inset + (1 - CGFloat(fraction)) * usableHeight
     }
 }
