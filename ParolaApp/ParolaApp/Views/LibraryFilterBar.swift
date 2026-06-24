@@ -3,7 +3,7 @@ import SwiftUI
 enum LibraryDateRangeFilter: String, CaseIterable, Identifiable {
     case all, today, week, month, year
     var id: String { rawValue }
-    var label: String {
+    var label: LocalizedStringKey {
         switch self {
         case .all: return "Any time"
         case .today: return "Today"
