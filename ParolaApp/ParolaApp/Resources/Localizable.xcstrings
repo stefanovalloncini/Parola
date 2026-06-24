@@ -8643,6 +8643,61 @@
           }
         }
       }
+    },
+    "Search results": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Risultati della ricerca"
+          }
+        }
+      }
+    },
+    "No transcriptions yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna trascrizione"
+          }
+        }
+      }
+    },
+    "No meetings yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna riunione"
+          }
+        }
+      }
+    },
+    "No dictations yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna dettatura"
+          }
+        }
+      }
+    },
+    "No entries yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessun elemento"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

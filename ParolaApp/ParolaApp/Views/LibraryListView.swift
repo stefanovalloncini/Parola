@@ -249,7 +249,7 @@ struct LibraryListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var headerTitle: String {
+    private var headerTitle: LocalizedStringKey {
         if searchResults != nil { return "Search results" }
         switch category {
         case .transcription: return "Transcriptions"
@@ -259,7 +259,7 @@ struct LibraryListView: View {
         }
     }
 
-    private var emptyTitle: String {
+    private var emptyTitle: LocalizedStringKey {
         if searchResults != nil { return "No matches" }
         switch category {
         case .transcription: return "No transcriptions yet"
