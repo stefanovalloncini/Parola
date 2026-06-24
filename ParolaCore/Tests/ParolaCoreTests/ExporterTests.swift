@@ -25,6 +25,35 @@ struct ExporterTests {
         #expect(out == "Hello world.\nThis is Parola.\nGoodbye.")
     }
 
+    @Test("txt prefixes each segment with its speaker label")
+    func txtIncludesSpeakerLabels() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: "Alice"),
+                TranscriptSegment(id: 1, start: 1, end: 2, text: " Hi there.", speaker: "Bob"),
+                TranscriptSegment(id: 2, start: 2, end: 3, text: "Anything else?", speaker: "Alice"),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try TxtExporter().renderText(transcript)
+        #expect(out == "Alice: Hello.\nBob: Hi there.\nAlice: Anything else?")
+    }
+
+    @Test("txt leaves unlabeled segments bare and labels the rest")
+    func txtMixedSpeakerLabels() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "Intro.", speaker: nil),
+                TranscriptSegment(id: 1, start: 1, end: 2, text: "Over to you.", speaker: "Alice"),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try TxtExporter().renderText(transcript)
+        #expect(out == "Intro.\nAlice: Over to you.")
+    }
+
     @Test("txt drops a segment whose text trims to empty")
     func txtDropsEmptySegment() throws {
         let transcript = Transcript(

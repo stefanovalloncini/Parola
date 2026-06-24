@@ -5,8 +5,12 @@ struct TxtExporter: TranscriptExporter {
     init() {}
     func render(_ transcript: Transcript) throws -> Data {
         let text = transcript.segments
-            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+            .compactMap { seg -> String? in
+                let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !body.isEmpty else { return nil }
+                guard let speaker = Format.presentationSpeakerLabel(seg.speaker) else { return body }
+                return "\(speaker): \(body)"
+            }
             .joined(separator: "\n")
         return utf8(text)
     }
