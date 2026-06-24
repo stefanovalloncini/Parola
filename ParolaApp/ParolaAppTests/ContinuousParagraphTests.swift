@@ -14,6 +14,17 @@ struct ContinuousParagraphTests {
         String(ContinuousParagraph.paragraph(segments: segments, useSpeakerColor: useSpeakerColor).text.characters)
     }
 
+    private func runText(_ segments: [TranscriptSegment], id: TranscriptSegment.ID, useSpeakerColor: Bool) -> String? {
+        let built = ContinuousParagraph.paragraph(segments: segments, useSpeakerColor: useSpeakerColor)
+        guard let run = built.runs[id] else { return nil }
+        let chars = built.text.characters
+        guard
+            let lo = chars.index(chars.startIndex, offsetBy: run.offsets.lowerBound, limitedBy: chars.endIndex),
+            let hi = chars.index(chars.startIndex, offsetBy: run.offsets.upperBound, limitedBy: chars.endIndex)
+        else { return nil }
+        return String(chars[lo..<hi]).trimmingCharacters(in: .whitespaces)
+    }
+
     @Test("joins segments with a single space and no trailing space")
     func joinsWithSingleSpace() {
         let segments = [segment(0, "Hello."), segment(1, "World.")]
@@ -51,13 +62,44 @@ struct ContinuousParagraphTests {
         #expect(plainText(segments) == transcript.text)
     }
 
-    @Test("speaker-colored rendering keeps the same plain text")
-    func speakerColorPreservesText() {
+    @Test("a speaker change starts a new labelled paragraph")
+    func speakerChangeAddsLabelAndBreak() {
         let segments = [
             segment(0, "Hi.", speaker: "Alice"),
             segment(1, "Yo.", speaker: "Bob"),
             segment(2, "   ", speaker: "Alice")
         ]
-        #expect(plainText(segments, useSpeakerColor: true) == "Hi. Yo.")
+        #expect(plainText(segments, useSpeakerColor: true) == "Alice\nHi.\n\nBob\nYo.")
+    }
+
+    @Test("consecutive same-speaker segments stay in one paragraph")
+    func sameSpeakerRunStaysInline() {
+        let segments = [
+            segment(0, "Hi.", speaker: "Alice"),
+            segment(1, "Still me.", speaker: "Alice"),
+            segment(2, "Yo.", speaker: "Bob")
+        ]
+        #expect(plainText(segments, useSpeakerColor: true) == "Alice\nHi. Still me.\n\nBob\nYo.")
+    }
+
+    @Test("without speaker color the plain text has no labels")
+    func noSpeakerColorHasNoLabels() {
+        let segments = [
+            segment(0, "Hi.", speaker: "Alice"),
+            segment(1, "Yo.", speaker: "Bob")
+        ]
+        #expect(plainText(segments, useSpeakerColor: false) == "Hi. Yo.")
+    }
+
+    @Test("segment runs map to body text, not the speaker label")
+    func runsMapToBodyNotLabel() {
+        let segments = [
+            segment(0, "Hi.", speaker: "Alice"),
+            segment(1, "Still me.", speaker: "Alice"),
+            segment(2, "Yo.", speaker: "Bob")
+        ]
+        #expect(runText(segments, id: 0, useSpeakerColor: true) == "Hi.")
+        #expect(runText(segments, id: 1, useSpeakerColor: true) == "Still me.")
+        #expect(runText(segments, id: 2, useSpeakerColor: true) == "Yo.")
     }
 }

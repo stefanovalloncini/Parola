@@ -66,11 +66,27 @@ struct ContinuousParagraph: View {
         var attr = AttributedString()
         var runs: [TranscriptSegment.ID: SegmentRun] = [:]
         var offset = 0
+        var shownSpeaker: String?
         for seg in segments {
             let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !body.isEmpty else { continue }
             let baseColor: Color? = useSpeakerColor ? seg.speaker.map(DS.speakerColor(for:)) : nil
-            var piece = AttributedString(offset == 0 ? body : " " + body)
+            if let label = useSpeakerColor ? SegmentCard.speakerLabel(for: seg.speaker) : nil,
+               label != shownSpeaker {
+                if !attr.characters.isEmpty {
+                    let separator = AttributedString("\n\n")
+                    offset += separator.characters.count
+                    attr.append(separator)
+                }
+                var heading = AttributedString(label + "\n")
+                heading.foregroundColor = baseColor
+                heading.inlinePresentationIntent = .stronglyEmphasized
+                offset += heading.characters.count
+                attr.append(heading)
+                shownSpeaker = label
+            }
+            let startsLine = attr.characters.isEmpty || attr.characters.last == "\n"
+            var piece = AttributedString(startsLine ? body : " " + body)
             if let baseColor { piece.foregroundColor = baseColor }
             let length = piece.characters.count
             runs[seg.id] = SegmentRun(offsets: offset..<offset + length, baseColor: baseColor)
