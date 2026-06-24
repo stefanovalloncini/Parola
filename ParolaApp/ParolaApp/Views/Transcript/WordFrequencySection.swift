@@ -3,37 +3,31 @@ import ParolaCore
 
 struct WordFrequencySection: View {
     @Environment(AppModel.self) private var model
-    @State private var entries: [WordFrequency.Entry] = []
+
+    private var entries: [WordFrequency.Entry] {
+        guard let text = model.transcript?.text else { return [] }
+        let stopWords = WordFrequency.stopWords(for: model.transcript?.language)
+        return WordFrequency.compute(text: text, limit: 12, stopWords: stopWords)
+    }
 
     var body: some View {
-        Group {
-            if !entries.isEmpty {
-                InfoSection(title: "Top words") {
-                    let maxCount = entries.first?.count ?? 1
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(entries) { entry in
-                            WordFrequencyBar(
-                                word: entry.word,
-                                count: entry.count,
-                                fraction: Double(entry.count) / Double(max(1, maxCount))
-                            ) {
-                                model.findQuery = entry.word
-                                if !model.findIsOpen { model.toggleFind() }
-                            }
+        if !entries.isEmpty {
+            InfoSection(title: "Top words") {
+                let maxCount = entries.first?.count ?? 1
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(entries) { entry in
+                        WordFrequencyBar(
+                            word: entry.word,
+                            count: entry.count,
+                            fraction: Double(entry.count) / Double(max(1, maxCount))
+                        ) {
+                            model.findQuery = entry.word
+                            if !model.findIsOpen { model.toggleFind() }
                         }
                     }
                 }
             }
         }
-        .onAppear { recompute() }
-        .onChange(of: model.transcript?.segments.count ?? 0) { _, _ in recompute() }
-        .onChange(of: model.selectedEntryID) { _, _ in recompute() }
-    }
-
-    private func recompute() {
-        guard let text = model.transcript?.text else { entries = []; return }
-        let stopWords = WordFrequency.stopWords(for: model.transcript?.language)
-        entries = WordFrequency.compute(text: text, limit: 12, stopWords: stopWords)
     }
 }
 

@@ -3,39 +3,33 @@ import ParolaCore
 
 struct SpeechRateSection: View {
     @Environment(AppModel.self) private var model
-    @State private var bins: [SpeechRateBin] = []
+
+    private var bins: [SpeechRateBin] {
+        guard let segments = model.transcript?.segments else { return [] }
+        return SpeechRateSeries.compute(segments: segments, binSeconds: 30)
+    }
 
     var body: some View {
-        Group {
-            if bins.count >= 2 {
-                InfoSection(title: "Speech rate") {
-                    let values = bins.map(\.wordsPerMinute)
-                    let maxValue = max(values.max() ?? 1, 1)
-                    let average = values.reduce(0, +) / Double(values.count)
-                    VStack(alignment: .leading, spacing: 6) {
-                        SpeechRateSparkline(values: values, maxValue: maxValue)
-                            .frame(height: 44)
-                        HStack {
-                            Text("Avg \(Int(average)) wpm")
-                                .font(DS.Font.caption)
-                                .foregroundStyle(DS.Color.secondaryText)
-                            Spacer()
-                            Text("Peak \(Int(maxValue)) wpm")
-                                .font(DS.Font.caption)
-                                .foregroundStyle(DS.Color.secondaryText)
-                        }
+        if bins.count >= 2 {
+            InfoSection(title: "Speech rate") {
+                let values = bins.map(\.wordsPerMinute)
+                let maxValue = max(values.max() ?? 1, 1)
+                let average = values.reduce(0, +) / Double(values.count)
+                VStack(alignment: .leading, spacing: 6) {
+                    SpeechRateSparkline(values: values, maxValue: maxValue)
+                        .frame(height: 44)
+                    HStack {
+                        Text("Avg \(Int(average)) wpm")
+                            .font(DS.Font.caption)
+                            .foregroundStyle(DS.Color.secondaryText)
+                        Spacer()
+                        Text("Peak \(Int(maxValue)) wpm")
+                            .font(DS.Font.caption)
+                            .foregroundStyle(DS.Color.secondaryText)
                     }
                 }
             }
         }
-        .onAppear { recompute() }
-        .onChange(of: model.transcript?.segments.count ?? 0) { _, _ in recompute() }
-        .onChange(of: model.selectedEntryID) { _, _ in recompute() }
-    }
-
-    private func recompute() {
-        guard let segments = model.transcript?.segments else { bins = []; return }
-        bins = SpeechRateSeries.compute(segments: segments, binSeconds: 30)
     }
 }
 
