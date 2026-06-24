@@ -84,6 +84,7 @@ enum DS {
 
     enum Color {
         static var accent: SwiftUI.Color { DS.theme.accent.color }
+        static var highlight: SwiftUI.Color { DS.theme.highlight.color }
         static var primaryText: SwiftUI.Color { DS.theme.textPrimary.color }
         static var secondaryText: SwiftUI.Color { DS.theme.textSecondary.color }
         static var surface: SwiftUI.Color { DS.theme.surface.color }

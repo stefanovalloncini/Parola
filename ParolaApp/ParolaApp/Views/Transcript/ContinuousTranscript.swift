@@ -103,7 +103,7 @@ struct ContinuousParagraph: View {
             recolor(run, with: run.baseColor)
         }
         if let nextID, let run = segmentRuns[nextID] {
-            recolor(run, with: DS.Color.accent)
+            recolor(run, with: DS.Color.highlight)
         }
         highlightedSegmentID = nextID
     }

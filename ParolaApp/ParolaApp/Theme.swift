@@ -57,6 +57,9 @@ struct RGBA: Sendable, Codable, Equatable {
         return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
     }
 
+    /// Max-min RGB spread — a cheap saturation proxy, near zero for greys.
+    var chroma: Double { Swift.max(r, g, b) - Swift.min(r, g, b) }
+
     /// Parses `#RRGGBB` / `#RRGGBBAA` (with or without the leading `#`). Returns nil on malformed input.
     init?(hex: String) {
         var s = hex.trimmingCharacters(in: .whitespaces)
@@ -138,6 +141,27 @@ extension ThemePalette {
             warning: sharedNeutrals.warning,
             danger: .system(.red)
         )
+    }
+
+    /// Active-segment highlight tint: the accent, unless it's too grey to stand out (Mono) — then azure.
+    var highlight: ThemeColor { accent.asHighlight }
+}
+
+extension ThemeColor {
+    /// Accents below this RGB chroma read as grey and fail as a highlight; substitute azure instead.
+    private static let highlightChromaFloor = 0.15
+    private static let highlightFallback = RGBA(0.30, 0.56, 0.98)
+
+    var asHighlight: ThemeColor {
+        func legible(_ rgba: RGBA) -> RGBA {
+            rgba.chroma >= Self.highlightChromaFloor ? rgba : Self.highlightFallback
+        }
+        switch self {
+        case .system:
+            return self
+        case .dynamic(let light, let dark):
+            return .dynamic(light: legible(light), dark: legible(dark))
+        }
     }
 }
 

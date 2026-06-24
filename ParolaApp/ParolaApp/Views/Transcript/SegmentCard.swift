@@ -31,7 +31,7 @@ struct SegmentCard: View {
             HStack(spacing: DS.Spacing.small) {
                 Text(Timecode.format(segment.start))
                     .font(model.monospacedTimestamps ? DS.Font.captionMono : DS.Font.caption)
-                    .foregroundStyle(isCurrent ? DS.Color.accent : DS.Color.secondaryText)
+                    .foregroundStyle(isCurrent ? DS.Color.highlight : DS.Color.secondaryText)
                 if let rawSpeaker = segment.speaker, let speaker = Self.speakerLabel(for: rawSpeaker) {
                     Text(speaker)
                         .font(DS.Font.caption)
@@ -133,7 +133,7 @@ struct SegmentCard: View {
     }
 
     private var cardBackground: Color {
-        isCurrent ? DS.Color.accent.opacity(0.10) : DS.Color.surfaceElevated
+        isCurrent ? DS.Color.highlight.opacity(0.10) : DS.Color.surfaceElevated
     }
 
     private func confidenceColor(_ bucket: SegmentConfidence.Bucket) -> Color {
@@ -145,7 +145,7 @@ struct SegmentCard: View {
     }
 
     private var borderColor: Color {
-        if isCurrent { return DS.Color.accent.opacity(0.55) }
+        if isCurrent { return DS.Color.highlight.opacity(0.55) }
         if hovering { return DS.Color.accent.opacity(0.25) }
         return DS.Color.separator.opacity(0.6)
     }
@@ -285,7 +285,7 @@ struct SegmentCard: View {
             acc += token.count
             var piece = AttributedString(token + (i == tokens.count - 1 ? "" : " "))
             if !marked && (acc >= target || i == tokens.count - 1) {
-                piece.foregroundColor = DS.Color.accent
+                piece.foregroundColor = DS.Color.highlight
                 piece.font = .body.bold()
                 marked = true
             }
@@ -324,7 +324,7 @@ struct SegmentCard: View {
             }
             var piece = AttributedString(word.word)
             if word.id == activeWordID {
-                piece.foregroundColor = DS.Color.accent
+                piece.foregroundColor = DS.Color.highlight
                 piece.font = .body.bold()
             }
             attr.append(piece)
