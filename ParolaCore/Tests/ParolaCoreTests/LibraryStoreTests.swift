@@ -46,6 +46,25 @@ struct LibraryStoreTests {
         #expect(entries.first?.id == entry.id)
     }
 
+    @Test("dropCaches makes a wiped library directory read empty instead of resurrecting it")
+    func dropCachesAfterDirectoryWipe() async throws {
+        let (store, libraryURL) = try makeTempLibrary()
+        let audio = try makeFakeAudio()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: audio)
+
+        #expect(await store.list().count == 1)
+        #expect(try await store.load(entry.id).entry.id == entry.id)
+
+        try FileManager.default.removeItem(at: libraryURL)
+
+        #expect(await store.list().count == 1)
+
+        await store.dropCaches()
+
+        #expect(await store.list().isEmpty)
+        await #expect(throws: LibraryStore.LibraryError.self) { try await store.load(entry.id) }
+    }
+
     @Test("renaming an entry to a title with a dot keeps the whole title")
     func renamePreservesDottedTitle() async throws {
         let (store, _) = try makeTempLibrary()

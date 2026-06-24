@@ -41,6 +41,7 @@ extension ParolaAutomationServer {
                     model.libraryEntries = []
                     let libraryURL = model.library.libraryURL
                     try? FileManager.default.removeItem(at: libraryURL)
+                    await model.library.dropCaches()
                     for key in model.defaults.dictionaryRepresentation().keys {
                         model.defaults.removeObject(forKey: key)
                     }

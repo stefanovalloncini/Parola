@@ -401,6 +401,15 @@ public actor LibraryStore {
         cachedDeleted = nil
     }
 
+    /// Drops every in-memory cache so the next read re-scans disk. The app's `--test-mode` reset
+    /// wipes the library directory directly, behind this actor's back; without this the stale list
+    /// cache would resurrect entries whose bundles are already gone.
+    public func dropCaches() {
+        cachedActive = nil
+        cachedDeleted = nil
+        cachedLoaded = nil
+    }
+
     private nonisolated func makeEntry(bundleURL: URL) throws -> LibraryEntry {
         let manifestURL = bundleURL.appendingPathComponent("manifest.json")
         let data = try Data(contentsOf: manifestURL)
