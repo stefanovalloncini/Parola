@@ -113,7 +113,7 @@ struct QueueRow: View {
             return "Failed: \(job.error ?? "unknown reason")"
         case .done:
             let segments = job.transcript?.segments.count ?? 0
-            return "Completed · \(segments) segments"
+            return "Completed · \(SegmentCount.label(segments))"
         }
     }
 

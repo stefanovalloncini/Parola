@@ -83,7 +83,7 @@ private struct BatchRow: View {
         case .transcribing: return "Transcribing…"
         case .done:
             let count = job.transcript?.segments.count ?? 0
-            return "\(count) segments"
+            return SegmentCount.label(count)
         case .failed: return job.error ?? "Failed"
         case .cancelled: return "Cancelled"
         }
