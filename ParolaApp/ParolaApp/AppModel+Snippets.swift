@@ -32,7 +32,7 @@ extension AppModel {
                 try data.write(to: url, options: .atomic)
             } catch {
                 await MainActor.run {
-                    self?.phase = .failed(message: "Export failed: \(error.localizedDescription)")
+                    self?.phase = .failed(message: AppModel.exportFailureMessage(for: error))
                 }
             }
         }

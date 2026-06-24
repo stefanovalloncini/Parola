@@ -1281,6 +1281,10 @@ final class AppModel {
         String(localized: "That URL isn't on a host yt-dlp can fetch.", bundle: bundle)
     }
 
+    nonisolated static func exportFailureMessage(for error: Error, bundle: Bundle = .main) -> String {
+        String(localized: "Export failed: \(error.localizedDescription)", bundle: bundle)
+    }
+
     nonisolated static func recordingFailureMessage(
         for error: Error,
         source: RecordSource,
@@ -1859,7 +1863,7 @@ final class AppModel {
                     try data.write(to: url, options: .atomic)
                 }.value
             } catch {
-                self.phase = .failed(message: "Export failed: \(error.localizedDescription)")
+                self.phase = .failed(message: Self.exportFailureMessage(for: error))
             }
         }
     }
