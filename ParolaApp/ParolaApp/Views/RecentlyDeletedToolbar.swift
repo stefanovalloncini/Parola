@@ -201,17 +201,19 @@ struct RecentlyDeletedFilterBar: View {
 
     @ViewBuilder
     private func chipRow<Option: Identifiable & Hashable>(
-        label: String,
+        label: LocalizedStringKey,
         options: [Option],
         selection: Binding<Option>,
         title: KeyPath<Option, String>
     ) -> some View {
         HStack(spacing: 6) {
-            Text(label.uppercased())
+            Text(label)
+                .textCase(.uppercase)
                 .font(.caption2.weight(.semibold))
                 .tracking(0.6)
                 .foregroundStyle(.secondary)
-                .frame(width: 38, alignment: .leading)
+                .lineLimit(1)
+                .frame(width: 50, alignment: .leading)
             ForEach(options) { option in
                 Chip(
                     title: LocalizedStringKey(option[keyPath: title]),

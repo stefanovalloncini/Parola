@@ -3689,6 +3689,17 @@
         }
       }
     },
+    "Kind": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tipo"
+          }
+        }
+      }
+    },
     "Labels": {
       "extractionState": "manual",
       "localizations": {
@@ -8083,6 +8094,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "WebVTT (.vtt)"
+          }
+        }
+      }
+    },
+    "When": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando"
           }
         }
       }
