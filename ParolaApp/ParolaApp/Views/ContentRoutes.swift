@@ -50,7 +50,11 @@ struct ContentRoutes: View {
             case .recording(let source):
                 RecordingPane(source: source)
             case .ready:
-                TranscriptPane()
+                if model.transcript != nil {
+                    TranscriptPane()
+                } else {
+                    EmptyDropZone()
+                }
             case .failed(let message):
                 ErrorPane(message: message)
             }
