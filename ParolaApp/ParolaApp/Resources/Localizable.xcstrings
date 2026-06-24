@@ -7179,6 +7179,17 @@
         }
       }
     },
+    "That URL isn't on a host yt-dlp can fetch.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo URL non proviene da una sorgente supportata da yt-dlp."
+          }
+        }
+      }
+    },
     "TRANSCRIPTION": {
       "extractionState": "manual",
       "localizations": {

@@ -1255,7 +1255,7 @@ final class AppModel {
 
     private func makeYouTubeURL(_ urlString: String) -> URL? {
         guard let url = URL(string: urlString), url.isYtDlpSupported else {
-            phase = .failed(message: "That URL isn't on a host yt-dlp can fetch.")
+            phase = .failed(message: Self.unsupportedURLMessage())
             return nil
         }
         youtubeSheetOpen = false
@@ -1275,6 +1275,10 @@ final class AppModel {
             return String(localized: "Transcription failed: \(reason)", bundle: bundle)
         }
         return error.localizedDescription
+    }
+
+    nonisolated static func unsupportedURLMessage(bundle: Bundle = .main) -> String {
+        String(localized: "That URL isn't on a host yt-dlp can fetch.", bundle: bundle)
     }
 
     nonisolated static func recordingFailureMessage(
