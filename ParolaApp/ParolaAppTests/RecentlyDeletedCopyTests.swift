@@ -38,4 +38,18 @@ struct RecentlyDeletedCopyTests {
     func emptySingularItalian() throws {
         #expect(RecentlyDeletedCopy.emptyTrashMessage(1, bundle: try italianBundle()) == "1 elemento sarà eliminato per sempre.")
     }
+
+    @Test("every sort label resolves to Italian")
+    func sortLabelsItalian() throws {
+        let it = try italianBundle()
+        let expected: [RecentlyDeletedSort: String] = [
+            .recentlyDeleted: "Eliminati di recente",
+            .deletedEarliest: "Eliminati per primi",
+            .titleAZ: "Titolo A→Z",
+            .titleZA: "Titolo Z→A",
+        ]
+        for option in RecentlyDeletedSort.allCases {
+            #expect(it.localizedString(forKey: option.title, value: "MISSING", table: nil) == expected[option])
+        }
+    }
 }

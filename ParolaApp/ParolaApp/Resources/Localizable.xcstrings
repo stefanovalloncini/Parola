@@ -2185,6 +2185,17 @@
         }
       }
     },
+    "Deleted earliest": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminati per primi"
+          }
+        }
+      }
+    },
     "Deleted transcripts appear here for %@ days.": {
       "comment": "A description of the contents of the \"Recently Deleted\" section of the trash.",
       "extractionState": "stale",
@@ -5707,6 +5718,17 @@
         }
       }
     },
+    "Recently deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminati di recente"
+          }
+        }
+      }
+    },
     "Record": {
       "extractionState": "manual",
       "localizations": {
@@ -7461,6 +7483,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Titolo"
+          }
+        }
+      }
+    },
+    "Title A→Z": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Titolo A→Z"
+          }
+        }
+      }
+    },
+    "Title Z→A": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Titolo Z→A"
           }
         }
       }

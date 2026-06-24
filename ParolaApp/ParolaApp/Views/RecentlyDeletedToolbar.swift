@@ -113,7 +113,7 @@ struct RecentlyDeletedToolbar: View {
         Menu {
             Picker("Sort by", selection: $sortOption) {
                 ForEach(RecentlyDeletedSort.allCases) { option in
-                    Text(option.title).tag(option)
+                    Text(LocalizedStringKey(option.title)).tag(option)
                 }
             }
             .pickerStyle(.inline)
