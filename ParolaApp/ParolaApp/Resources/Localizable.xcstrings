@@ -8984,6 +8984,39 @@
           }
         }
       }
+    },
+    "SubRip Subtitles": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli SubRip"
+          }
+        }
+      }
+    },
+    "WebVTT Subtitles": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli WebVTT"
+          }
+        }
+      }
+    },
+    "Word Document": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Documento Word"
+          }
+        }
+      }
     }
   },
   "version": "1.1"

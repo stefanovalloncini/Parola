@@ -54,7 +54,7 @@ struct BatchFormatCard: View {
                         .font(DS.Font.subheadlineBold)
                         .foregroundStyle(DS.Color.secondaryText)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                    Text(formatLabel)
+                    Text(LocalizedStringKey(formatLabel))
                         .font(DS.Font.body.weight(.semibold))
                         .foregroundStyle(DS.Color.primaryText)
                     BatchFormatChip(extension: format.fileExtension)
