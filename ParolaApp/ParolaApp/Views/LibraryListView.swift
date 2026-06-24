@@ -350,14 +350,15 @@ struct LibraryRow: View {
                             .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
                         Text(lang)
                     }
+                    if !compact, let opened = entry.lastOpenedAt {
+                        Text("·")
+                            .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
+                        Text("Last opened: \(opened.formatted(.relative(presentation: .named)))")
+                    }
                 }
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.secondaryText)
-                if !compact, let opened = entry.lastOpenedAt {
-                    Text("Last opened: \(opened.formatted(.relative(presentation: .named)))")
-                        .font(DS.Font.caption)
-                        .foregroundStyle(DS.Color.secondaryText.opacity(0.75))
-                }
+                .lineLimit(1)
             }
             Spacer()
         }
