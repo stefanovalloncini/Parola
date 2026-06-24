@@ -4815,6 +4815,17 @@
         }
       }
     },
+    "Parola needs Screen Recording permission to capture system audio. Open System Settings → Privacy & Security → Screen Recording and grant Parola access, then start recording again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola ha bisogno del permesso Registrazione schermo per catturare l'audio di sistema. Apri Impostazioni di Sistema → Privacy e sicurezza → Registrazione schermo e concedi l'accesso a Parola, poi avvia di nuovo la registrazione."
+          }
+        }
+      }
+    },
     "Open System Settings…": {
       "extractionState": "manual",
       "localizations": {

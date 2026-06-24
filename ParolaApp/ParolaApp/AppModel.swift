@@ -1,4 +1,5 @@
 import Combine
+import CoreGraphics
 import Foundation
 import SwiftUI
 import AVFoundation
@@ -1276,6 +1277,21 @@ final class AppModel {
         return error.localizedDescription
     }
 
+    nonisolated static func recordingFailureMessage(
+        for error: Error,
+        source: RecordSource,
+        screenRecordingGranted: Bool = CGPreflightScreenCaptureAccess(),
+        bundle: Bundle = .main
+    ) -> String {
+        if source == .systemAudio, case ParolaError.captureUnavailable = error, !screenRecordingGranted {
+            return String(
+                localized: "Parola needs Screen Recording permission to capture system audio. Open System Settings → Privacy & Security → Screen Recording and grant Parola access, then start recording again.",
+                bundle: bundle
+            )
+        }
+        return transcriptionFailureMessage(for: error, bundle: bundle)
+    }
+
     func dismissError() {
         phase = .idle
     }
@@ -1364,7 +1380,7 @@ final class AppModel {
                 scheduleRecordingAutoStop()
             } catch {
                 await mediaSession.exitRecording()
-                phase = .failed(message: error.localizedDescription)
+                phase = .failed(message: Self.recordingFailureMessage(for: error, source: source))
             }
         }
     }
