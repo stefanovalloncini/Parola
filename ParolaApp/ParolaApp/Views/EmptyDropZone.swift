@@ -63,7 +63,6 @@ struct EmptyDropZone: View {
                     ActionCard(
                         title: "Recently Deleted",
                         systemImage: "trash.fill",
-                        isEnabled: !model.deletedEntries.isEmpty,
                         action: { model.showingTrash = true }
                     )
                     .axLeaf("Empty.Button.RecentlyDeleted")
