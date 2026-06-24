@@ -90,7 +90,7 @@ struct MacRecentlyDeletedView: View {
 
     private var selectionBar: some View {
         HStack(spacing: DS.Spacing.regular) {
-            Text("\(selection.count) selected")
+            Text(RecentlyDeletedCopy.selectionCount(selection.count))
                 .font(DS.Font.body.weight(.medium))
             Spacer()
             Button {

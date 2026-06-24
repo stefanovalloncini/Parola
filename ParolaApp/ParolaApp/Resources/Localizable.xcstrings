@@ -2119,6 +2119,17 @@
         }
       }
     },
+    "1 selected": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 selezionato"
+          }
+        }
+      }
+    },
     "Delete from disk": {
       "extractionState": "manual",
       "localizations": {

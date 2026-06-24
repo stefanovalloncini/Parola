@@ -39,6 +39,26 @@ struct RecentlyDeletedCopyTests {
         #expect(RecentlyDeletedCopy.emptyTrashMessage(1, bundle: try italianBundle()) == "1 elemento sarà eliminato per sempre.")
     }
 
+    @Test("selection count uses the bare singular for one item")
+    func selectionCountSingular() {
+        #expect(RecentlyDeletedCopy.selectionCount(1) == "1 selected")
+    }
+
+    @Test("selection count uses the plural for several items")
+    func selectionCountPlural() {
+        #expect(RecentlyDeletedCopy.selectionCount(3) == "3 selected")
+    }
+
+    @Test("the singular selection count is localized to Italian")
+    func selectionCountSingularItalian() throws {
+        #expect(RecentlyDeletedCopy.selectionCount(1, bundle: try italianBundle()) == "1 selezionato")
+    }
+
+    @Test("the plural selection count is localized to Italian")
+    func selectionCountPluralItalian() throws {
+        #expect(RecentlyDeletedCopy.selectionCount(4, bundle: try italianBundle()) == "4 selezionati")
+    }
+
     @Test("every sort label resolves to Italian")
     func sortLabelsItalian() throws {
         let it = try italianBundle()
