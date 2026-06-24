@@ -64,6 +64,28 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "openRecentlyDeleted",
+                area: .window,
+                summary: "Opens the Recently Deleted sheet.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    ctx.model.showingTrash = true
+                    return .object(["open": .bool(true)])
+                }
+            ),
+
+            AutomationCommand(
+                name: "closeRecentlyDeleted",
+                area: .window,
+                summary: "Closes the Recently Deleted sheet.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    ctx.model.showingTrash = false
+                    return .object(["open": .bool(false)])
+                }
+            ),
+
+            AutomationCommand(
                 name: "screenshot",
                 area: .window,
                 summary: "Captures the main window via ScreenCaptureKit and writes a PNG. Needs Screen Recording; if denied it errors with the windowNumber so a granted process can `screencapture -l<n>`.",
