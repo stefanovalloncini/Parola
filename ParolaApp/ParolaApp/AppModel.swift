@@ -52,6 +52,7 @@ final class AppModel {
     var phase: Phase = .idle
     var transcript: Transcript? {
         didSet {
+            if transcript == nil, promptOutput != nil { promptOutput = nil }
             if let d = pendingMediaDuration, transcript != nil, (transcript?.durationSeconds ?? 0) < d - 0.05 {
                 transcript?.durationSeconds = d
             }
