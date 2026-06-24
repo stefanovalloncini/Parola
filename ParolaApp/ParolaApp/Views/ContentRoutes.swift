@@ -1,4 +1,5 @@
 import SwiftUI
+import ParolaCore
 
 struct ContentRoutes: View {
     @Environment(AppModel.self) private var model
@@ -63,7 +64,25 @@ struct ContentRoutes: View {
         } else if model.transcript != nil {
             TranscriptPane()
         } else {
-            ProgressPane(title: "Transcribing batch…", progress: nil)
+            switch BatchDetailPlaceholder(
+                isRunning: model.batchIsRunning,
+                hasCompletedJob: model.batchJobs.contains { $0.status == .done }
+            ) {
+            case .running:
+                ProgressPane(title: "Transcribing batch…", progress: nil)
+            case .selectFile:
+                ContentUnavailableView {
+                    Label("Select a file", systemImage: "doc.text")
+                } description: {
+                    Text("Choose a completed file to see its transcript.")
+                }
+            case .noTranscripts:
+                ContentUnavailableView {
+                    Label("No transcripts", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text("None of these files was transcribed. Check the list for details.")
+                }
+            }
         }
     }
 

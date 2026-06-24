@@ -1229,6 +1229,17 @@
         }
       }
     },
+    "Choose a completed file to see its transcript.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli un file completato per vederne la trascrizione."
+          }
+        }
+      }
+    },
     "CSV (.csv)": {
       "extractionState": "manual",
       "localizations": {
@@ -4562,6 +4573,17 @@
         }
       }
     },
+    "No transcripts": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna trascrizione"
+          }
+        }
+      }
+    },
     "No voice detected — check your microphone.": {
       "extractionState": "manual",
       "localizations": {
@@ -4579,6 +4601,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ancora nessuna cartella sorvegliata."
+          }
+        }
+      }
+    },
+    "None of these files was transcribed. Check the list for details.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuno di questi file è stato trascritto. Controlla l'elenco per i dettagli."
           }
         }
       }
@@ -6281,6 +6314,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "I segmenti che corrispondono a un pattern (case-insensitive, ripuliti) sono rimossi prima del salvataggio."
+          }
+        }
+      }
+    },
+    "Select a file": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seleziona un file"
           }
         }
       }
