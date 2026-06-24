@@ -112,10 +112,11 @@ public struct HtmlExporter: TranscriptExporter {
             body += paragraph
         }
         let theme = options.theme
+        let title = Format.escapeHTML(Format.documentTitle(for: transcript))
         let css = "body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.5;background:\(theme.background);color:\(theme.foreground)}.t{color:\(theme.timestamp);font-family:ui-monospace,monospace;font-size:.85em;text-decoration:none;margin-right:.4em}.s{font-weight:600}p{margin:0 0 1em}"
         let doc = """
         <!DOCTYPE html>
-        <html><head><meta charset="utf-8"><title>Transcript</title>
+        <html><head><meta charset="utf-8"><title>\(title)</title>
         <style>\(css)</style>
         </head><body>
         \(body)</body></html>

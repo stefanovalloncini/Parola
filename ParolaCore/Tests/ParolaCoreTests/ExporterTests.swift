@@ -189,8 +189,43 @@ struct ExporterTests {
     func htmlSkeleton() throws {
         let out = try HtmlExporter().renderText(sample())
         #expect(out.hasPrefix("<!DOCTYPE html>"))
-        #expect(out.contains("<title>Transcript</title>"))
+        #expect(out.contains("<title>x</title>"))
         #expect(out.hasSuffix("</html>"))
+    }
+
+    @Test("html titles the document from the source filename")
+    func htmlTitleFromSource() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.")],
+            language: "en",
+            modelName: "x",
+            sourceURL: URL(fileURLWithPath: "/tmp/Kennedy Inaugural.m4a")
+        )
+        let out = try HtmlExporter().renderText(transcript)
+        #expect(out.contains("<title>Kennedy Inaugural</title>"))
+    }
+
+    @Test("html falls back to a generic title without a source")
+    func htmlTitleFallback() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.")],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try HtmlExporter().renderText(transcript)
+        #expect(out.contains("<title>Transcript</title>"))
+    }
+
+    @Test("html escapes markup in the source-derived title")
+    func htmlTitleEscaped() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hi.")],
+            language: "en",
+            modelName: "x",
+            sourceURL: URL(fileURLWithPath: "/tmp/A <b> & C.m4a")
+        )
+        let out = try HtmlExporter().renderText(transcript)
+        #expect(out.contains("<title>A &lt;b&gt; &amp; C</title>"))
     }
 
     @Test("html has one paragraph per segment with anchored timestamp")
@@ -510,6 +545,33 @@ struct ExporterTests {
         let text = (0..<doc.pageCount).compactMap { doc.page(at: $0)?.string }.joined(separator: " ")
         #expect(text.contains("Hello world."))
         #expect(text.contains("Goodbye."))
+    }
+
+    @Test("pdf titles the document from the source filename")
+    func pdfTitleFromSource() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.")],
+            language: "en",
+            modelName: "x",
+            sourceURL: URL(fileURLWithPath: "/tmp/Kennedy Inaugural.m4a")
+        )
+        let data = try PdfExporter().render(transcript)
+        let doc = try #require(PDFDocument(data: data))
+        let text = (0..<doc.pageCount).compactMap { doc.page(at: $0)?.string }.joined(separator: " ")
+        #expect(text.contains("Kennedy Inaugural"))
+    }
+
+    @Test("pdf falls back to a generic title without a source")
+    func pdfTitleFallback() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.")],
+            language: "en",
+            modelName: "x"
+        )
+        let data = try PdfExporter().render(transcript)
+        let doc = try #require(PDFDocument(data: data))
+        let text = (0..<doc.pageCount).compactMap { doc.page(at: $0)?.string }.joined(separator: " ")
+        #expect(text.contains("Transcript"))
     }
 
     @Test("pdf omits the speaker label for an empty-string speaker")

@@ -76,7 +76,7 @@ struct PdfExporter: TranscriptExporter {
             let fontKey = NSAttributedString.Key(kCTFontAttributeName as String)
             let chunk = NSMutableAttributedString()
             if !emittedTitle {
-                chunk.append(NSAttributedString(string: "Transcript\n\n", attributes: [fontKey: fonts.title]))
+                chunk.append(NSAttributedString(string: "\(Format.documentTitle(for: transcript))\n\n", attributes: [fontKey: fonts.title]))
                 emittedTitle = true
             }
             let end = min(cursor + chunkSize, transcript.segments.count)
