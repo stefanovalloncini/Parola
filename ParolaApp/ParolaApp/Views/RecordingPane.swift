@@ -162,8 +162,36 @@ private struct LiveRecordingWaveform: View {
 
 struct LiveTranscriptView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var isAwaitingSpeech: Bool {
+        model.liveSegments.isEmpty && model.livePartialText.isEmpty
+    }
 
     var body: some View {
+        if isAwaitingSpeech {
+            placeholder
+        } else {
+            transcript
+        }
+    }
+
+    private var placeholder: some View {
+        VStack(spacing: DS.Spacing.small) {
+            Image(systemName: "waveform")
+                .font(.system(size: 30, weight: .regular))
+                .symbolEffect(.variableColor.iterative, isActive: !reduceMotion)
+                .accessibilityHidden(true)
+            Text("Your transcript appears here as you speak")
+                .font(DS.Font.callout)
+                .multilineTextAlignment(.center)
+        }
+        .foregroundStyle(DS.Color.secondaryText.opacity(0.6))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(DS.Spacing.large)
+    }
+
+    private var transcript: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {

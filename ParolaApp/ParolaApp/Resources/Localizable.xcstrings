@@ -8025,6 +8025,17 @@
         }
       }
     },
+    "Your transcript appears here as you speak": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La trascrizione appare qui mentre parli"
+          }
+        }
+      }
+    },
     "any": {
       "extractionState": "manual",
       "localizations": {
