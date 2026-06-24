@@ -6924,7 +6924,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Speaker · %lld"
+            "value": "Persone · %lld"
           }
         }
       }
@@ -6935,7 +6935,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Speaker…"
+            "value": "Persone…"
           }
         }
       }
