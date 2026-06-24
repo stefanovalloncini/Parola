@@ -137,11 +137,7 @@ struct SegmentCard: View {
     }
 
     private func confidenceColor(_ bucket: SegmentConfidence.Bucket) -> Color {
-        switch bucket {
-        case .high:   return DS.Palette.success.opacity(0.7)
-        case .medium: return DS.Palette.warning.opacity(0.7)
-        case .low:    return Color.red.opacity(0.7)
-        }
+        DS.confidenceColor(for: bucket).opacity(0.7)
     }
 
     private var borderColor: Color {

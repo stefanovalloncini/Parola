@@ -1,4 +1,5 @@
 import SwiftUI
+import ParolaCore
 
 enum DS {
     enum Spacing {
@@ -107,6 +108,15 @@ enum DS {
         static var pillFillHover: SwiftUI.Color { SwiftUI.Color.primary.opacity(0.14) }
         static var success: SwiftUI.Color { DS.theme.success.color }
         static var warning: SwiftUI.Color { DS.theme.warning.color }
+    }
+
+    /// Traffic-light tint shared by every confidence indicator (segment stripes + the overall dot).
+    static func confidenceColor(for bucket: SegmentConfidence.Bucket) -> SwiftUI.Color {
+        switch bucket {
+        case .high:   return Palette.success
+        case .medium: return Palette.warning
+        case .low:    return Color.danger
+        }
     }
 
     static let speakerPalette: [SwiftUI.Color] = [

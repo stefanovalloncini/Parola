@@ -87,11 +87,7 @@ struct ConfidenceSection: View {
     }
 
     private func color(for value: Double) -> Color {
-        switch SegmentConfidence.bucket(for: value) {
-        case .low: return DS.Palette.warning
-        case .medium: return DS.Color.accent.opacity(0.7)
-        case .high: return DS.Palette.success
-        }
+        DS.confidenceColor(for: SegmentConfidence.bucket(for: value))
     }
 
     private func percentLabel(_ value: Double) -> String {
