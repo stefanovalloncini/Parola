@@ -4748,6 +4748,17 @@
         }
       }
     },
+    "Older": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meno recenti"
+          }
+        }
+      }
+    },
     "On-device speech-to-text for macOS, built on WhisperKit.": {
       "localizations": {
         "it": {
@@ -7307,6 +7318,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Verranno spostate in Eliminati di recente."
+          }
+        }
+      }
+    },
+    "This Month": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo mese"
+          }
+        }
+      }
+    },
+    "This Week": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa settimana"
           }
         }
       }
