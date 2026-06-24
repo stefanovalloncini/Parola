@@ -2916,6 +2916,17 @@
         }
       }
     },
+    "Export to folder of audio file": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva nella cartella del file audio"
+          }
+        }
+      }
+    },
     "Export…": {
       "extractionState": "manual",
       "localizations": {
@@ -3506,6 +3517,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Includi testo selezionato"
+          }
+        }
+      }
+    },
+    "Include timestamps": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Includi i timestamp"
           }
         }
       }
@@ -6274,6 +6296,17 @@
         }
       }
     },
+    "Saves the %@ next to each transcribed file.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva il %@ accanto a ogni file trascritto."
+          }
+        }
+      }
+    },
     "Search": {
       "extractionState": "manual",
       "localizations": {
@@ -8268,6 +8301,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parole"
+          }
+        }
+      }
+    },
+    "Writes start times alongside each segment.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrive l'orario di inizio accanto a ogni segmento."
           }
         }
       }

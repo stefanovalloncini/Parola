@@ -169,11 +169,11 @@ struct BatchFormatChip: View {
 }
 
 struct BatchSettingRow<Control: View>: View {
-    let title: String
-    let description: String
+    let title: LocalizedStringKey
+    let description: LocalizedStringKey
     @ViewBuilder var control: Control
 
-    init(title: String, description: String, @ViewBuilder control: () -> Control) {
+    init(title: LocalizedStringKey, description: LocalizedStringKey, @ViewBuilder control: () -> Control) {
         self.title = title
         self.description = description
         self.control = control()
