@@ -284,7 +284,7 @@ struct LibraryListView: View {
     }
 }
 
-private func libraryCategoryName(_ category: EntryCategory) -> String {
+private func libraryCategoryName(_ category: EntryCategory) -> LocalizedStringKey {
     switch category {
     case .transcription: return "Transcriptions"
     case .meeting: return "Meetings"
