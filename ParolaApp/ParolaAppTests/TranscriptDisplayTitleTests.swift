@@ -67,3 +67,49 @@ struct TranscriptDisplayTitleTests {
         #expect(title == "Untitled")
     }
 }
+
+@MainActor
+@Suite("Current transcript title")
+struct CurrentTranscriptTitleTests {
+    private func makeModel() -> AppModel {
+        AppModel(
+            skipBootstrap: true,
+            defaults: UserDefaults(suiteName: "test-\(UUID().uuidString)")!,
+            libraryURL: makeTempLibraryURL("current-title")
+        )
+    }
+
+    private func entry(id: String, original: String, title: String? = nil) -> LibraryEntry {
+        LibraryEntry(
+            id: id,
+            bundleURL: URL(fileURLWithPath: "/lib/\(id).parola"),
+            manifest: ParolaDocument.Manifest(
+                originalAudioName: original,
+                title: title,
+                modelName: "stub",
+                language: "en",
+                audioFilename: "audio.wav"
+            )
+        )
+    }
+
+    @Test("a reopened entry titles share/print with its name, not the bundled audio file")
+    func reopenedEntryUsesEntryTitle() {
+        let model = makeModel()
+        let e = entry(id: "20260624-abc", original: "jfk.wav")
+        model.libraryEntries = [e]
+        model.selectedEntryID = e.id
+        model.sourceFileURL = e.bundleURL.appendingPathComponent("audio.wav")
+        #expect(model.currentTranscriptTitle == "jfk")
+    }
+
+    @Test("a fresh transcribe over a still-selected entry keeps the source filename")
+    func freshTranscribeKeepsSourceName() {
+        let model = makeModel()
+        let stale = entry(id: "20260624-abc", original: "jfk.wav")
+        model.libraryEntries = [stale]
+        model.selectedEntryID = stale.id
+        model.sourceFileURL = URL(fileURLWithPath: "/Users/me/Downloads/New Recording 133.m4a")
+        #expect(model.currentTranscriptTitle == "New Recording 133")
+    }
+}

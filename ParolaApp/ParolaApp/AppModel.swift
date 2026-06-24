@@ -1783,9 +1783,17 @@ final class AppModel {
         }
     }
 
+    var currentTranscriptTitle: String {
+        Self.transcriptDisplayTitle(
+            sourceFileURL: sourceFileURL,
+            entry: selectedEntryID.flatMap { libraryEntry(id: $0) },
+            fallback: String(localized: "Transcript")
+        )
+    }
+
     func shareTranscriptViaMail() {
         guard let transcript else { return }
-        let title = sourceFileURL?.deletingPathExtension().lastPathComponent ?? "Transcript"
+        let title = currentTranscriptTitle
         guard let url = TranscriptMail.mailtoURL(title: title, transcript: transcript) else { return }
         NSWorkspace.shared.open(url)
     }
@@ -1814,7 +1822,7 @@ final class AppModel {
 
     func printTranscript() {
         guard let transcript else { return }
-        let title = sourceFileURL?.deletingPathExtension().lastPathComponent ?? "Transcript"
+        let title = currentTranscriptTitle
         let attributed = Self.makePrintableAttributedString(for: transcript, title: title)
 
         let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 612, height: 792))
