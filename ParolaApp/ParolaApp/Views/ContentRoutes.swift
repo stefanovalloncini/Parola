@@ -32,11 +32,7 @@ struct ContentRoutes: View {
             HSplitView {
                 BatchSidebar()
                     .frame(minWidth: 240, idealWidth: 280)
-                if model.transcript != nil {
-                    TranscriptPane()
-                } else {
-                    ProgressPane(title: "Transcribing batch…", progress: nil)
-                }
+                batchDetail
             }
         } else if showsLibraryBrowse {
             libraryBrowseList
@@ -57,6 +53,17 @@ struct ContentRoutes: View {
             case .failed(let message):
                 ErrorPane(message: message)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var batchDetail: some View {
+        if case .failed(let message) = model.phase {
+            ErrorPane(message: message)
+        } else if model.transcript != nil {
+            TranscriptPane()
+        } else {
+            ProgressPane(title: "Transcribing batch…", progress: nil)
         }
     }
 
