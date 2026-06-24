@@ -54,3 +54,24 @@ struct RecordingFailureMessageTests {
         #expect(message == "Trascrizione non riuscita: formato non valido")
     }
 }
+
+@Suite("Microphone access message")
+struct MicrophoneAccessMessageTests {
+    private func italianBundle() throws -> Bundle {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        return try #require(Bundle(path: path))
+    }
+
+    @Test("the microphone-off guidance is localized to Italian")
+    func localizedToItalian() throws {
+        let message = AppModel.microphoneAccessOffMessage(bundle: try italianBundle())
+        #expect(message == "L'accesso al microfono è disattivato. Attivalo in Impostazioni di Sistema → Privacy e sicurezza → Microfono, poi avvia di nuovo la registrazione.")
+    }
+
+    @Test("the English guidance uses arrow separators, not chevrons")
+    func englishUsesArrowSeparators() {
+        let message = AppModel.microphoneAccessOffMessage()
+        #expect(message == "Microphone access is off. Turn it on in System Settings → Privacy & Security → Microphone, then start recording again.")
+        #expect(!message.contains("›"))
+    }
+}

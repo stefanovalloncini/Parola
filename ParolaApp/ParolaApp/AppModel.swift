@@ -1301,6 +1301,13 @@ final class AppModel {
         return transcriptionFailureMessage(for: error, bundle: bundle)
     }
 
+    nonisolated static func microphoneAccessOffMessage(bundle: Bundle = .main) -> String {
+        String(
+            localized: "Microphone access is off. Turn it on in System Settings → Privacy & Security → Microphone, then start recording again.",
+            bundle: bundle
+        )
+    }
+
     nonisolated static func transcriptDisplayTitle(
         sourceFileURL: URL?,
         entry: LibraryEntry?,
@@ -1381,7 +1388,7 @@ final class AppModel {
         let config = mediaSessionConfig(allowMute: source == .microphone)
         Task {
             if source == .microphone, mode == .normal, await AVCaptureDevice.requestAccess(for: .audio) == false {
-                phase = .failed(message: "Microphone access is off. Turn it on in System Settings › Privacy & Security › Microphone, then start recording again.")
+                phase = .failed(message: Self.microphoneAccessOffMessage())
                 return
             }
             if source == .microphone, await shouldUseStreamingMic() {
