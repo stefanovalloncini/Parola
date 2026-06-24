@@ -2097,6 +2097,28 @@
         }
       }
     },
+    "Delete 1 item permanently?": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare 1 elemento definitivamente?"
+          }
+        }
+      }
+    },
+    "1 item will be deleted for good.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 elemento sarà eliminato per sempre."
+          }
+        }
+      }
+    },
     "Delete from disk": {
       "extractionState": "manual",
       "localizations": {

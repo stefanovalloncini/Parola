@@ -62,7 +62,7 @@ struct MacRecentlyDeletedView: View {
             Text("This can't be undone.")
         }
         .confirmationDialog(
-            "Delete \(confirmingPurgeBulk.count) items permanently?",
+            RecentlyDeletedCopy.bulkPurgeTitle(confirmingPurgeBulk.count),
             isPresented: isPurgingBulk
         ) {
             Button("Delete permanently", role: .destructive) {
@@ -83,7 +83,7 @@ struct MacRecentlyDeletedView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("All \(model.deletedEntries.count) items will be deleted for good.")
+            Text(RecentlyDeletedCopy.emptyTrashMessage(model.deletedEntries.count))
         }
         .axBranch("RecentlyDeleted")
     }
