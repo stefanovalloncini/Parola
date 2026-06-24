@@ -81,14 +81,11 @@ struct TranscriptPane: View {
     }
 
     private var headerTitle: String {
-        if let url = model.sourceFileURL {
-            return url.deletingPathExtension().lastPathComponent
-        }
-        if let entryID = model.selectedEntryID,
-           let entry = model.libraryEntry(id: entryID) {
-            return entry.title
-        }
-        return String(localized: "Untitled")
+        AppModel.transcriptDisplayTitle(
+            sourceFileURL: model.sourceFileURL,
+            entry: model.selectedEntryID.flatMap { model.libraryEntry(id: $0) },
+            fallback: String(localized: "Untitled")
+        )
     }
 
     private func advanceToNext() {

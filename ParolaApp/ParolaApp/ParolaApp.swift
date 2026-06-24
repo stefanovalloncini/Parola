@@ -234,7 +234,11 @@ struct ParolaApp: App {
                 Divider()
                 Button("Open in New Window") {
                     if let t = model.transcript {
-                        let title = model.sourceFileURL?.deletingPathExtension().lastPathComponent ?? "Transcript"
+                        let title = AppModel.transcriptDisplayTitle(
+                            sourceFileURL: model.sourceFileURL,
+                            entry: model.selectedEntryID.flatMap { model.libraryEntry(id: $0) },
+                            fallback: String(localized: "Transcript")
+                        )
                         TranscriptWindowController.shared.open(transcript: t, title: title)
                     }
                 }

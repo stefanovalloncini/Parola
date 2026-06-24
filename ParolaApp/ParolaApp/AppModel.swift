@@ -1300,6 +1300,26 @@ final class AppModel {
         return transcriptionFailureMessage(for: error, bundle: bundle)
     }
 
+    nonisolated static func transcriptDisplayTitle(
+        sourceFileURL: URL?,
+        entry: LibraryEntry?,
+        fallback: String
+    ) -> String {
+        if let entry, sourceBelongsToEntry(sourceFileURL, bundleURL: entry.bundleURL) {
+            return entry.title
+        }
+        if let sourceFileURL {
+            return sourceFileURL.deletingPathExtension().lastPathComponent
+        }
+        return entry?.title ?? fallback
+    }
+
+    private nonisolated static func sourceBelongsToEntry(_ source: URL?, bundleURL: URL) -> Bool {
+        guard let source else { return false }
+        // Match the entry's unique <id>.parola bundle by name; a full-path compare breaks on the test sandbox's /tmp symlink.
+        return source.deletingLastPathComponent().lastPathComponent == bundleURL.lastPathComponent
+    }
+
     func dismissError() {
         phase = .idle
     }
