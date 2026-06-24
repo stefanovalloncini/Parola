@@ -29,7 +29,7 @@ public struct MarkdownExporter: TranscriptExporter {
     }
 
     public func render(_ transcript: Transcript) throws -> Data {
-        var out = ""
+        var out = "# \(Format.documentTitle(for: transcript))\n\n"
         for seg in transcript.segments {
             let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !body.isEmpty else { continue }

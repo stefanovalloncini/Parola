@@ -69,6 +69,15 @@ public enum Format {
         return flattened.isEmpty ? nil : flattened
     }
 
+    static func documentTitle(for transcript: Transcript) -> String {
+        let derived = transcript.sourceURL?
+            .deletingPathExtension()
+            .lastPathComponent
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let derived, !derived.isEmpty { return derived }
+        return "Transcript"
+    }
+
     public static func escapeHTML(_ s: String) -> String {
         s.replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")

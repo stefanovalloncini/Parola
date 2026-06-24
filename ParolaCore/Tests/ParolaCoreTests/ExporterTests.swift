@@ -87,7 +87,30 @@ struct ExporterTests {
     @Test("markdown default: paragraphs only, no timestamps, no speakers")
     func markdownDefault() throws {
         let out = try MarkdownExporter().renderText(sample())
-        #expect(out == "Hello world.\n\nThis is Parola.\n\nGoodbye.\n")
+        #expect(out == "# x\n\nHello world.\n\nThis is Parola.\n\nGoodbye.\n")
+    }
+
+    @Test("markdown opens with an H1 title taken from the source filename")
+    func markdownTitleFromSource() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.")],
+            language: "en",
+            modelName: "x",
+            sourceURL: URL(fileURLWithPath: "/tmp/Kennedy Inaugural.m4a")
+        )
+        let out = try MarkdownExporter().renderText(transcript)
+        #expect(out.hasPrefix("# Kennedy Inaugural\n\n"))
+    }
+
+    @Test("markdown falls back to a generic H1 title without a source")
+    func markdownTitleFallback() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.")],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try MarkdownExporter().renderText(transcript)
+        #expect(out.hasPrefix("# Transcript\n\n"))
     }
 
     @Test("markdown with timestamps adds italic [HH:MM:SS] prefix")
@@ -122,11 +145,11 @@ struct ExporterTests {
             modelName: "x"
         )
         let plain = try MarkdownExporter().renderText(transcript)
-        #expect(plain == "Hello.\n")
+        #expect(plain == "# Transcript\n\nHello.\n")
         #expect(plain.contains("**:**") == false)
 
         let timed = try MarkdownExporter(options: MarkdownOptions(showTimestamps: true)).renderText(transcript)
-        #expect(timed == "*[00:00:00]* Hello.\n")
+        #expect(timed == "# Transcript\n\n*[00:00:00]* Hello.\n")
         #expect(timed.contains("****") == false)
     }
 
@@ -141,7 +164,7 @@ struct ExporterTests {
             language: "en",
             modelName: "x"
         )
-        #expect(try MarkdownExporter().renderText(transcript) == "Hello.\n\nWorld.\n")
+        #expect(try MarkdownExporter().renderText(transcript) == "# Transcript\n\nHello.\n\nWorld.\n")
 
         let withSpeaker = Transcript(
             segments: [
@@ -152,7 +175,7 @@ struct ExporterTests {
             modelName: "x"
         )
         let out = try MarkdownExporter().renderText(withSpeaker)
-        #expect(out == "**Speaker 1:** Hello.\n")
+        #expect(out == "# Transcript\n\n**Speaker 1:** Hello.\n")
         #expect(out.contains("Speaker 2") == false)
     }
 
@@ -748,7 +771,7 @@ struct ExporterTests {
             modelName: "m"
         )
         let out = try MarkdownExporter().renderText(transcript)
-        #expect(out == "Hello.\n")
+        #expect(out == "# Transcript\n\nHello.\n")
         #expect(out.contains("**") == false)
     }
 
