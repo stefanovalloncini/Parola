@@ -5680,6 +5680,28 @@
         }
       }
     },
+    "Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione"
+          }
+        }
+      }
+    },
+    "Recording from %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione da %@"
+          }
+        }
+      }
+    },
     "Recording from %@, %@": {
       "localizations": {
         "en": {

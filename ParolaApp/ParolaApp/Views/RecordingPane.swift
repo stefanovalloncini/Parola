@@ -7,9 +7,7 @@ struct RecordingPane: View {
     @State private var startedAt: Date = Date()
 
     private var isStreaming: Bool { source == .microphone && model.useStreaming }
-    private var stateLabel: String {
-        model.liveVoiceActive ? String(localized: "Listening") : String(localized: "Standing by")
-    }
+    private var stateLabel: String { String(localized: "Recording") }
     private var stopTitle: String {
         isStreaming ? String(localized: "Finish") : String(localized: "Stop")
     }
@@ -46,7 +44,7 @@ struct RecordingPane: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { startedAt = Date() }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Recording from \(source.label.lowercased()), \(stateLabel.lowercased())")
+        .accessibilityLabel("Recording from \(source.label.lowercased())")
     }
 
     private var silenceBanner: some View {
