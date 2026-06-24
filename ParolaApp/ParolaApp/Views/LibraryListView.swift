@@ -114,6 +114,11 @@ struct LibraryListView: View {
         }
         .onChange(of: labelFilter) { _, _ in recomputeEntries() }
         .onChange(of: dateRangeFilter) { _, _ in recomputeEntries() }
+        .onChange(of: category) { _, _ in
+            let newEntries = recomputeEntries()
+            recomputeLabelOptions()
+            selection = selection.intersection(Set(newEntries.map(\.id)))
+        }
         .alert("Delete \(selection.count) entries?", isPresented: $pendingBulkDelete) {
             Button("Cancel", role: .cancel) {}
                 .accessibilityIdentifier("alert.bulkDelete.cancel")
