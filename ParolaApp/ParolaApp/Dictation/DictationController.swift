@@ -236,7 +236,10 @@ final class DictationController {
         let size: NSSize
         switch style {
         case .overlay:
-            size = NSSize(width: hasPartial ? 380 : 268, height: hasPartial ? 156 : 64)
+            let listeningCompact: Bool
+            if case .listening = state { listeningCompact = true } else { listeningCompact = false }
+            let compactWidth: CGFloat = listeningCompact ? 336 : 268
+            size = NSSize(width: hasPartial ? 380 : compactWidth, height: hasPartial ? 156 : 64)
         case .notch:
             size = NSSize(width: hasPartial ? 372 : 252, height: 36)
         case .minimal:

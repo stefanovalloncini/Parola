@@ -32,6 +32,11 @@ struct DictationView: View {
         !controller.partialText.isEmpty
     }
 
+    private var isListening: Bool {
+        if case .listening = state { return true }
+        return false
+    }
+
     private var overlayBody: some View {
         VStack(alignment: .leading, spacing: hasPartial ? 6 : 0) {
             HStack(spacing: 12) {
@@ -41,6 +46,8 @@ struct DictationView: View {
                 if let modeName = currentModeName {
                     Text(modeName)
                         .font(DS.Font.caption2Emphasized)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -48,6 +55,8 @@ struct DictationView: View {
                 }
                 Spacer(minLength: 0)
                 timer
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                     .foregroundStyle(.white.opacity(0.7))
                 stopButton
             }
@@ -58,7 +67,7 @@ struct DictationView: View {
         }
         .padding(.horizontal, DS.Spacing.medium)
         .padding(.vertical, DS.Spacing.regular)
-        .frame(width: hasPartial ? 344 : 256, alignment: .leading)
+        .frame(width: hasPartial ? 344 : (isListening ? 324 : 256), alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(Color.black.opacity(0.85))
@@ -173,6 +182,8 @@ struct DictationView: View {
     private var statusLabel: some View {
         Text(label)
             .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
     }
 
     @ViewBuilder
