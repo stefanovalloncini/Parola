@@ -2463,6 +2463,28 @@
         }
       }
     },
+    "Earlier This Month": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prima questo mese"
+          }
+        }
+      }
+    },
+    "Earlier This Week": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prima questa settimana"
+          }
+        }
+      }
+    },
     "Edit Prompt": {
       "extractionState": "manual",
       "localizations": {
@@ -7845,6 +7867,17 @@
         }
       }
     },
+    "Unknown": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sconosciuto"
+          }
+        }
+      }
+    },
     "Unpin": {
       "extractionState": "manual",
       "localizations": {
@@ -8180,6 +8213,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parole"
+          }
+        }
+      }
+    },
+    "Yesterday": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ieri"
           }
         }
       }
