@@ -4,6 +4,27 @@ import ParolaCore
 
 extension AppModel {
 
+    enum PromptFailure {
+        case prompt
+        case actionItems
+        case chapterExtraction
+        case chapterGeneration
+    }
+
+    nonisolated static func promptFailureMessage(_ kind: PromptFailure, error: Error, bundle: Bundle = .main) -> String {
+        let reason = error.localizedDescription
+        switch kind {
+        case .prompt:
+            return String(localized: "Prompt failed: \(reason)", bundle: bundle)
+        case .actionItems:
+            return String(localized: "Action item extraction failed: \(reason)", bundle: bundle)
+        case .chapterExtraction:
+            return String(localized: "Chapter extraction failed: \(reason)", bundle: bundle)
+        case .chapterGeneration:
+            return String(localized: "Chapter generation failed: \(reason)", bundle: bundle)
+        }
+    }
+
     func runPrompt(_ prompt: Prompt) {
         guard let transcript = self.transcript else { return }
         guard !isRunningPrompt else { return }
@@ -16,7 +37,7 @@ extension AppModel {
                 let result = try await PromptRunner.run(prompt, on: transcript.text, model: model)
                 promptOutput = PromptOutput(promptName: prompt.name, text: result)
             } catch {
-                phase = .failed(message: "Prompt failed: \(error.localizedDescription)")
+                phase = .failed(message: Self.promptFailureMessage(.prompt, error: error))
             }
             isRunningPrompt = false
         }
@@ -34,7 +55,7 @@ extension AppModel {
                 let result = try await PromptRunner.run(prompt, on: transcript.text, model: model)
                 actionItems = ActionItemParser.parse(result)
             } catch {
-                phase = .failed(message: "Action item extraction failed: \(error.localizedDescription)")
+                phase = .failed(message: Self.promptFailureMessage(.actionItems, error: error))
             }
             isExtractingActionItems = false
         }
@@ -55,7 +76,7 @@ extension AppModel {
                 let chapters = try await SmartChapters.generate(for: transcript, model: model)
                 smartChapters = chapters
             } catch {
-                phase = .failed(message: "Chapter extraction failed: \(error.localizedDescription)")
+                phase = .failed(message: Self.promptFailureMessage(.chapterExtraction, error: error))
             }
             isExtractingChapters = false
         }
@@ -106,7 +127,7 @@ extension AppModel {
                 let result = try await YouTubeChapters.generate(for: transcript, model: model)
                 promptOutput = PromptOutput(promptName: "YouTube Chapters", text: result)
             } catch {
-                phase = .failed(message: "Chapter generation failed: \(error.localizedDescription)")
+                phase = .failed(message: Self.promptFailureMessage(.chapterGeneration, error: error))
             }
             isRunningPrompt = false
         }

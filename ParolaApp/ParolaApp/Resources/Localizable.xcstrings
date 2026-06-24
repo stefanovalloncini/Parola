@@ -7578,6 +7578,50 @@
         }
       }
     },
+    "Action item extraction failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estrazione delle azioni non riuscita: %@"
+          }
+        }
+      }
+    },
+    "Chapter extraction failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estrazione dei capitoli non riuscita: %@"
+          }
+        }
+      }
+    },
+    "Chapter generation failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generazione dei capitoli non riuscita: %@"
+          }
+        }
+      }
+    },
+    "Prompt failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prompt non riuscito: %@"
+          }
+        }
+      }
+    },
     "Transcription failed: %@": {
       "extractionState": "manual",
       "localizations": {
