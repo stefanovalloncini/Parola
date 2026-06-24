@@ -125,6 +125,9 @@ extension ParolaAutomationServer {
                         await MockTranscriberRegistry.shared.clear()
                         MockStreamingTranscriberRegistry.shared.clear()
                         CapturedInsertionStore.shared.clear()
+                        // The session caches the resolved transcriber by engineID; without this the
+                        // next transcribe reuses the cached mock and ignores the now-empty registry.
+                        await ctx.model.unloadTranscriptionSession()
                     }
                     if scope == "llm" || scope == "all" {
                         await MockLanguageModelStore.shared.clear()
