@@ -180,22 +180,21 @@ struct RecentlyDeletedFilterBar: View {
     @Binding var categoryFilter: RecentlyDeletedCategoryFilter
 
     var body: some View {
-        HStack(alignment: .center, spacing: DS.Spacing.regular) {
+        VStack(alignment: .leading, spacing: DS.Spacing.small) {
             chipRow(
                 label: "When",
                 options: RecentlyDeletedDateFilter.allCases,
                 selection: $dateFilter,
                 title: \.title
             )
-            Divider().frame(height: 18)
             chipRow(
                 label: "Kind",
                 options: RecentlyDeletedCategoryFilter.allCases,
                 selection: $categoryFilter,
                 title: \.title
             )
-            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, 6)
     }
@@ -212,6 +211,7 @@ struct RecentlyDeletedFilterBar: View {
                 .font(.caption2.weight(.semibold))
                 .tracking(0.6)
                 .foregroundStyle(.secondary)
+                .frame(width: 38, alignment: .leading)
             ForEach(options) { option in
                 Chip(
                     title: LocalizedStringKey(option[keyPath: title]),
@@ -223,6 +223,7 @@ struct RecentlyDeletedFilterBar: View {
                 }
             }
         }
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
 
