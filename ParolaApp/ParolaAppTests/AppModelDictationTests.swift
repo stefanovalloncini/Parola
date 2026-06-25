@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Parola
@@ -252,6 +253,35 @@ struct AppModelDictationTests {
         model.dictationContextScreen = true
         let afterScreen = model.dictationController.configuration?.postProcessor as? PromptDictationProcessor
         #expect(afterScreen?.contextConfig.screenEnabled == true)
+
+        model.stopDictation()
+    }
+
+    @Test("changing the dictation keycode rebinds a running session to the new key")
+    func keyCodeChangeRebindsRunningSession() {
+        let model = makeModel()
+        model.dictationEnabled = true
+        #expect(model.dictationController.isRunning)
+        #expect(model.dictationController.configuration?.hotkeyKeyCode == 96)  // default F5
+
+        model.dictationKeyCode = 97  // F6
+
+        #expect(model.dictationController.isRunning)
+        #expect(model.dictationController.configuration?.hotkeyKeyCode == 97)
+
+        model.stopDictation()
+    }
+
+    @Test("changing the dictation modifiers rebinds a running session with the new mask")
+    func keyModifiersChangeRebindRunningSession() {
+        let model = makeModel()
+        model.dictationEnabled = true
+        #expect(model.dictationController.isRunning)
+        #expect(model.dictationController.configuration?.hotkeyModifiers == [])
+
+        model.dictationKeyModifiers = Int(NSEvent.ModifierFlags.command.rawValue)
+
+        #expect(model.dictationController.configuration?.hotkeyModifiers == .command)
 
         model.stopDictation()
     }
