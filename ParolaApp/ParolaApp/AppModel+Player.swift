@@ -59,7 +59,7 @@ extension AppModel {
         }
     }
 
-    private func updateCurrentSegment(time: Double) {
+    func updateCurrentSegment(time: Double) {
         guard let segments = transcript?.segments else { return }
         let match: TranscriptSegment?
         if let cached = currentSegmentID,

@@ -202,4 +202,122 @@ struct AppModelPlayerTests {
 
         #expect(model.player == nil)
     }
+
+    // MARK: - updateCurrentSegment (karaoke time → highlighted segment/word)
+
+    private static func wordedSegment(
+        id: Int, start: Double, end: Double, words: [(id: String, start: Double, end: Double)]
+    ) -> TranscriptSegment {
+        TranscriptSegment(
+            id: id, start: start, end: end, text: "seg-\(id)",
+            words: words.map { WordTiming(id: $0.id, word: $0.id, start: $0.start, end: $0.end, probability: 1) }
+        )
+    }
+
+    @Test("updateCurrentSegment resolves the segment covering the time")
+    func updateCurrentSegmentResolvesCoveringSegment() {
+        let model = makeModel()
+        model.transcript = Self.makeTranscript([(0, 0, 2), (1, 3, 5)])
+
+        model.updateCurrentSegment(time: 1)
+        #expect(model.currentSegmentID == 0)
+
+        model.updateCurrentSegment(time: 4)
+        #expect(model.currentSegmentID == 1)
+    }
+
+    @Test("updateCurrentSegment clears the highlight in a gap or outside the range")
+    func updateCurrentSegmentClearsOffSegment() {
+        let model = makeModel()
+        model.transcript = Self.makeTranscript([(0, 0, 2), (1, 3, 5)])
+
+        model.updateCurrentSegment(time: 1)
+        #expect(model.currentSegmentID == 0)
+        model.updateCurrentSegment(time: 2.5)
+        #expect(model.currentSegmentID == nil)
+
+        model.updateCurrentSegment(time: 1)
+        model.updateCurrentSegment(time: -0.5)
+        #expect(model.currentSegmentID == nil)
+
+        model.updateCurrentSegment(time: 1)
+        model.updateCurrentSegment(time: 9)
+        #expect(model.currentSegmentID == nil)
+    }
+
+    @Test("updateCurrentSegment keeps the cached segment while it still covers the time")
+    func updateCurrentSegmentCacheKeepsCoveringSegment() {
+        let model = makeModel()
+        model.transcript = Self.makeTranscript([(0, 0, 4), (1, 2, 6)])
+
+        model.currentSegmentID = nil
+        model.updateCurrentSegment(time: 3)
+        #expect(model.currentSegmentID == 0)
+
+        model.currentSegmentID = 1
+        model.updateCurrentSegment(time: 3)
+        #expect(model.currentSegmentID == 1)
+    }
+
+    @Test("updateCurrentSegment re-resolves once the cached segment no longer covers the time")
+    func updateCurrentSegmentReResolvesWhenCacheStops() {
+        let model = makeModel()
+        model.transcript = Self.makeTranscript([(0, 0, 4), (1, 2, 6)])
+        model.currentSegmentID = 0
+
+        model.updateCurrentSegment(time: 5)
+        #expect(model.currentSegmentID == 1)
+    }
+
+    @Test("updateCurrentSegment recovers from a stale cached id that no longer exists")
+    func updateCurrentSegmentRecoversFromStaleCache() {
+        let model = makeModel()
+        model.transcript = Self.makeTranscript([(0, 0, 2), (1, 3, 5)])
+        model.currentSegmentID = 99
+
+        model.updateCurrentSegment(time: 1)
+        #expect(model.currentSegmentID == 0)
+    }
+
+    @Test("updateCurrentSegment tracks the spoken word inside a segment")
+    func updateCurrentSegmentTracksWord() {
+        let model = makeModel()
+        let seg = Self.wordedSegment(id: 0, start: 0, end: 4, words: [
+            (id: "0-0", start: 0, end: 1),
+            (id: "0-1", start: 1, end: 2)
+        ])
+        model.transcript = Transcript(segments: [seg], language: "en", modelName: "stub")
+
+        model.updateCurrentSegment(time: 1.5)
+        #expect(model.currentSegmentID == 0)
+        #expect(model.currentWordID == "0-1")
+
+        model.updateCurrentSegment(time: 3)
+        #expect(model.currentSegmentID == 0)
+        #expect(model.currentWordID == nil)
+    }
+
+    @Test("updateCurrentSegment clears the word when the highlight leaves all segments")
+    func updateCurrentSegmentClearsWordOffSegment() {
+        let model = makeModel()
+        let seg = Self.wordedSegment(id: 0, start: 0, end: 2, words: [(id: "0-0", start: 0, end: 1)])
+        model.transcript = Transcript(segments: [seg], language: "en", modelName: "stub")
+
+        model.updateCurrentSegment(time: 0.5)
+        #expect(model.currentWordID == "0-0")
+
+        model.updateCurrentSegment(time: 5)
+        #expect(model.currentSegmentID == nil)
+        #expect(model.currentWordID == nil)
+    }
+
+    @Test("updateCurrentSegment is a safe no-op without a transcript")
+    func updateCurrentSegmentNoTranscript() {
+        let model = makeModel()
+        model.transcript = nil
+        model.currentSegmentID = 7
+
+        model.updateCurrentSegment(time: 1)
+        #expect(model.currentSegmentID == 7)
+    }
 }
