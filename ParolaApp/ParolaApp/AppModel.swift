@@ -1122,9 +1122,9 @@ final class AppModel {
             } catch {
                 filePartialText = ""
                 fileTranscribeFraction = nil
-                applyTranscriptionError(error)
+                if !Task.isCancelled { applyTranscriptionError(error) }
             }
-            self.fileTranscribeTask = nil
+            if !Task.isCancelled { self.fileTranscribeTask = nil }
         }
     }
 
