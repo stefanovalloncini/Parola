@@ -38,6 +38,44 @@ extension ScenarioSuite {
             #expect(state["hasTranscript"]?.boolValue == false)
         }
 
+        @Test("resetTestState clears the loaded-entry selection")
+        func resetClearsLoadedEntrySelection() async throws {
+            let client = try ScenarioBridgeClient()
+            try await client.connect()
+            defer { Task { await client.close() } }
+
+            _ = try await client.send("resetTestState")
+
+            _ = try await client.send("installMockTranscriber", [
+                "engineID": "all",
+                "response": [
+                    "segments": [["start": 0, "end": 1, "text": "loaded entry"]],
+                    "language": "en",
+                    "modelName": "mock",
+                ],
+            ])
+            let audioURL = try Self.makeFixtureWav()
+            defer { try? FileManager.default.removeItem(at: audioURL) }
+            _ = try await client.send("transcribeFile", ["path": audioURL.path])
+            _ = try await client.send("waitForPhase", ["phase": "ready", "timeoutMs": 15000])
+
+            // The entry persists asynchronously after `ready`; poll until it is selected.
+            var selectedBefore = ""
+            for _ in 0..<20 {
+                let loaded = try await client.send("waitForTranscriptLoaded", ["timeoutMs": 200])
+                selectedBefore = loaded["observed"]?["selectedEntryID"]?.stringValue ?? ""
+                if !selectedBefore.isEmpty { break }
+                try await Task.sleep(for: .milliseconds(100))
+            }
+            #expect(!selectedBefore.isEmpty, "precondition: an entry should be selected after a transcribe")
+
+            _ = try await client.send("resetTestState")
+
+            let after = try await client.send("waitForTranscriptLoaded", ["timeoutMs": 500])
+            #expect(after["observed"]?["selectedEntryID"]?.stringValue == "")
+            #expect(after["observed"]?["hasTranscript"]?.boolValue == false)
+        }
+
         private static func makeFixtureWav() throws -> URL {
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("parola-reset-fixture-\(UUID().uuidString).wav")

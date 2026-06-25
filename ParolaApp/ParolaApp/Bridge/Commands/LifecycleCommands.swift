@@ -37,7 +37,7 @@ extension ParolaAutomationServer {
                     model.cancelAllTasks()
                     await model.unloadTranscriptionSession()
                     model.batchJobs = []
-                    model.transcript = nil
+                    model.clearLoadedEntry()
                     model.phase = .idle
                     model.libraryEntries = []
                     let libraryURL = model.library.libraryURL

@@ -214,7 +214,7 @@ extension AppModel {
         }
     }
 
-    private func clearLoadedEntry() {
+    func clearLoadedEntry() {
         selectedEntryID = nil
         transcript = nil
         sourceFileURL = nil
