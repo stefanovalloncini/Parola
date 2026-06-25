@@ -145,6 +145,43 @@ struct LibraryStoreTests {
         #expect(loaded.document.transcript.segments.first?.text == "hi")
     }
 
+    @Test("load round-trips a transcript's chat history, timestamps included")
+    func loadPreservesChatHistory() async throws {
+        let (store, _) = try makeTempLibrary()
+        let conversation = [
+            ChatMessage(role: .user, text: "What's the main point?",
+                        createdAt: Date(timeIntervalSince1970: 1_700_000_000)),
+            ChatMessage(role: .assistant, text: "Two people say hi.",
+                        createdAt: Date(timeIntervalSince1970: 1_700_000_042)),
+        ]
+        var transcript = makeTranscript()
+        transcript.chatHistory = conversation
+        let entry = try await store.add(transcript: transcript, audioSource: nil)
+
+        let loaded = try await store.load(entry.id).document.transcript.chatHistory
+        #expect(loaded == conversation)
+    }
+
+    @Test("updateTranscript persists chat recorded after the initial save")
+    func updateTranscriptPersistsChatHistory() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        #expect(try await store.load(entry.id).document.transcript.chatHistory == nil)
+
+        let conversation = [
+            ChatMessage(role: .user, text: "Summarize it.",
+                        createdAt: Date(timeIntervalSince1970: 1_700_000_100)),
+            ChatMessage(role: .assistant, text: "A short greeting.",
+                        createdAt: Date(timeIntervalSince1970: 1_700_000_140)),
+        ]
+        var edited = makeTranscript()
+        edited.chatHistory = conversation
+        try await store.updateTranscript(edited, for: entry.id)
+
+        let reloaded = try await store.load(entry.id).document.transcript.chatHistory
+        #expect(reloaded == conversation)
+    }
+
     @Test("delete sets deletedAt and excludes from list")
     func deleteSetsTimestamp() async throws {
         let (store, _) = try makeTempLibrary()
