@@ -76,6 +76,33 @@ extension ScenarioSuite {
             #expect(after["observed"]?["hasTranscript"]?.boolValue == false)
         }
 
+        @Test("resetTestState tears down a running dictation session")
+        func resetTearsDownDictation() async throws {
+            let client = try ScenarioBridgeClient()
+            try await client.connect()
+            defer { Task { await client.close() } }
+
+            _ = try await client.send("resetTestState")
+            _ = try await client.send("selectModel", ["name": "openai_whisper-tiny"])
+            _ = try await client.send("installMockStreamingTranscriber", [
+                "response": ["segments": [], "partials": []],
+            ])
+
+            // Begin a dictation session (press → listening): the coordinator is now running.
+            _ = try await client.send("startDictation")
+            let listening = try await client.send("waitForDictationState", ["state": "listening", "timeoutMs": 5000])
+            #expect(listening["matched"]?.boolValue == true, "precondition: dictation never reached listening")
+            #expect(listening["observed"]?["running"]?.boolValue == true)
+
+            // A reset must discard the in-flight session — not leak a running, listening
+            // coordinator, which leaves the dictation HUD stuck on screen for the next test.
+            _ = try await client.send("resetTestState")
+
+            let after = try await client.send("waitForDictationState", ["state": "idle", "timeoutMs": 2000])
+            #expect(after["observed"]?["running"]?.boolValue == false, "resetTestState left the dictation coordinator running")
+            #expect(after["observed"]?["state"]?.stringValue == "idle", "resetTestState left dictation in a non-idle state")
+        }
+
         private static func makeFixtureWav() throws -> URL {
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("parola-reset-fixture-\(UUID().uuidString).wav")

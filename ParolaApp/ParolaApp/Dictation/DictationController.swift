@@ -117,6 +117,27 @@ final class DictationController {
         state = .idle
     }
 
+    /// Tears dictation down and DISCARDS any in-flight recording without transcribing
+    /// or inserting it. Unlike `stop()` (which flushes the pending utterance) this is the
+    /// teardown for a hard reset, so a leaked listening session can't bleed — coordinator,
+    /// HUD, and state — into the next test.
+    func abort() {
+        guard let coord = coordinator else {
+            state = .idle
+            appModel?.dictationState = .idle
+            hideHUD()
+            return
+        }
+        coordinator = nil
+        failedHideTask?.cancel()
+        failedHideTask = nil
+        Task { await coord.abortMonitoring() }
+        stopPartialStream()
+        hideHUD()
+        state = .idle
+        appModel?.dictationState = .idle
+    }
+
     func setMode(_ mode: DictationMode) {
         guard let coord = coordinator else { return }
         configuration?.mode = mode

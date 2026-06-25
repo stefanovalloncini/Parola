@@ -291,6 +291,10 @@ extension AppModel {
         dictationController.stop()
     }
 
+    func abortDictation() {
+        dictationController.abort()
+    }
+
     func applyIndicatorStyleChange() {
         dictationController.indicatorStyle = dictationIndicatorStyle
     }
