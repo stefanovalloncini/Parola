@@ -50,6 +50,10 @@ struct RootView: View {
                 selectedEntry = id
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .parolaStartRecording)) { _ in
+            showingNew = true
+            model.coordinator.startRecording()
+        }
     }
 
     private var stackView: some View {
