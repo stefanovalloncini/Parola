@@ -29,10 +29,14 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
 extension AppModel {
 
     func refreshLibrary() {
-        Task { [weak self] in
+        libraryRefreshTask?.cancel()
+        libraryRefreshTask = Task { [weak self] in
             guard let self else { return }
             let active = await library.list()
-            deletedEntries = await library.listDeleted()
+            let deleted = await library.listDeleted()
+            // A later refreshLibrary() cancels this one; its snapshot may predate a mutation, so don't let it overwrite the newer result.
+            if Task.isCancelled { return }
+            deletedEntries = deleted
             refreshBundleSizes(for: active)
             libraryEntries = sortedLibraryEntries(active)
         }

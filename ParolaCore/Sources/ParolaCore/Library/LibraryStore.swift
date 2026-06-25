@@ -22,6 +22,7 @@ public actor LibraryStore {
     private var cachedActive: [LibraryEntry]?
     private var cachedDeleted: [LibraryEntry]?
     private var cachedLoaded: (id: LibraryEntry.ID, value: LoadedEntry)?
+    private var listCacheEpoch = 0
 
     public init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
         self.init(libraryURL: libraryURL, extraIndexer: SpotlightIndexer())
@@ -62,17 +63,20 @@ public actor LibraryStore {
 
     private func primeCaches() async {
         let url = libraryURL
+        let epoch = listCacheEpoch
         let entries = await Task.detached(priority: .userInitiated) { [self] in
             scanEntries(at: url)
         }.value
-        let active = entries
+        // The scan is an await, so a mutation can invalidate the caches mid-scan. Caching this snapshot
+        // would then resurrect the pre-mutation state for the next reader (e.g. an un-renamed title), so
+        // skip the cache when the epoch moved; the next read re-scans.
+        guard epoch == listCacheEpoch else { return }
+        cachedActive = entries
             .filter { $0.deletedAt == nil }
             .sorted { $0.createdAt > $1.createdAt }
-        let deleted = entries
+        cachedDeleted = entries
             .filter { $0.deletedAt != nil }
             .sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
-        cachedActive = active
-        cachedDeleted = deleted
     }
 
     private nonisolated func scanEntries(at libraryURL: URL) -> [LibraryEntry] {
@@ -399,6 +403,7 @@ public actor LibraryStore {
     private func invalidateListCaches() {
         cachedActive = nil
         cachedDeleted = nil
+        listCacheEpoch &+= 1
     }
 
     /// Drops every in-memory cache so the next read re-scans disk. The app's `--test-mode` reset
@@ -408,6 +413,7 @@ public actor LibraryStore {
         cachedActive = nil
         cachedDeleted = nil
         cachedLoaded = nil
+        listCacheEpoch &+= 1
     }
 
     private nonisolated func makeEntry(bundleURL: URL) throws -> LibraryEntry {

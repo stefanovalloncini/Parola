@@ -220,4 +220,28 @@ struct AppModelLibraryTests {
         let raws = LibrarySortOrder.allCases.map(\.rawValue)
         #expect(Set(raws).count == raws.count)
     }
+
+    @Test("refreshLibrary cancels any prior in-flight refresh so a stale snapshot can't win")
+    func refreshLibraryCancelsPrior() {
+        let model = makeModel()
+
+        model.refreshLibrary()
+        let first = model.libraryRefreshTask
+        model.refreshLibrary()
+
+        #expect(first?.isCancelled == true)
+    }
+
+    @Test("a superseded refresh does not overwrite libraryEntries with its stale snapshot")
+    func cancelledRefreshDoesNotClobber() async throws {
+        let model = makeModel()
+        let fresh = Self.entry(id: "fresh", title: "Fresh", createdAt: Self.baseDate)
+        model.libraryEntries = [fresh]
+
+        model.refreshLibrary()
+        model.libraryRefreshTask?.cancel()
+        await model.libraryRefreshTask?.value
+
+        #expect(model.libraryEntries.map(\.id) == ["fresh"])
+    }
 }

@@ -651,6 +651,7 @@ final class AppModel {
     // Observed on purpose: LibraryRow and the list totals read these, and refreshBundleSizes fills them asynchronously, so the assignment must re-render.
     var libraryBundleSizes: [String: Int64] = [:]
     @ObservationIgnored var searchTask: Task<Void, Never>?
+    @ObservationIgnored var libraryRefreshTask: Task<Void, Never>?
     static let trashRetentionDays = 30
 
     // MARK: - Engine
@@ -930,6 +931,7 @@ final class AppModel {
     deinit {
         recordingLevelTask?.cancel()
         streamingConsumer?.cancel()
+        libraryRefreshTask?.cancel()
     }
 
     /// A non-fatal warning (e.g. a failed library save) shown without replacing the open transcript.
