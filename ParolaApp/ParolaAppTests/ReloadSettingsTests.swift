@@ -70,6 +70,61 @@ struct ReloadSettingsTests {
         #expect(model.translate == true)
     }
 
+    @Test("inputDeviceUID persists to defaults and reloadSettings re-reads it")
+    func inputDeviceUIDPersistsAndReloads() {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let model = makeModel(defaults)
+        #expect(model.inputDeviceUID == "")
+        #expect(model.preferredInputDeviceUID == nil)
+
+        model.inputDeviceUID = "BuiltInMicrophoneDevice"
+        #expect(defaults.string(forKey: "inputDeviceUID") == "BuiltInMicrophoneDevice")
+        #expect(model.preferredInputDeviceUID == "BuiltInMicrophoneDevice")
+
+        defaults.set("USBAudioDevice", forKey: "inputDeviceUID")
+        model.reloadSettings()
+        #expect(model.inputDeviceUID == "USBAudioDevice")
+        #expect(model.preferredInputDeviceUID == "USBAudioDevice")
+    }
+
+    @Test("preferredInputDeviceUID maps an empty selection to nil (system default)")
+    func preferredInputDeviceUIDMapsEmptyToNil() {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let model = makeModel(defaults)
+
+        model.inputDeviceUID = ""
+        #expect(model.preferredInputDeviceUID == nil)
+        model.inputDeviceUID = "SomeDevice"
+        #expect(model.preferredInputDeviceUID == "SomeDevice")
+        model.inputDeviceUID = ""
+        #expect(model.preferredInputDeviceUID == nil)
+    }
+
+    @Test("resetTestState restores inputDeviceUID to the system default")
+    func resetTestStateRestoresInputDevice() async throws {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let bootstrap = AppBootstrap(
+            mode: .test,
+            library: makeTempLibraryURL("reset-mic"),
+            defaultsOverride: defaults,
+            sideEffects: [],
+            filePicker: TestFilePicker()
+        )
+        let model = AppModel(bootstrap: bootstrap)
+        let server = try ParolaAutomationServer(model: model)
+        let context = AutomationContext(model: model, server: server)
+        let reset = try #require(server.lifecycleCommands().first { $0.name == "resetTestState" })
+
+        model.inputDeviceUID = "USBAudioDevice"
+        #expect(model.preferredInputDeviceUID == "USBAudioDevice")
+
+        _ = try await reset.handler(reset.validate(AutomationArgs([:])), context)
+        withExtendedLifetime(server) {}
+
+        #expect(model.inputDeviceUID == "")
+        #expect(model.preferredInputDeviceUID == nil)
+    }
+
     @Test("resetTestState restores live settings properties, not just UserDefaults")
     func resetTestStateRestoresLiveSettings() async throws {
         let defaults = UserDefaults(suiteName: "test-\(UUID())")!
