@@ -468,6 +468,7 @@ final class ParolaAutomationServer {
             "youtubeSheetOpen": .bool(model.youtubeSheetOpen),
             "liveCaptionsActive": .bool(model.liveCaptions?.isActive ?? false),
             "batchJobCount": .int(model.batchJobs.count),
+            "meetingDetectedApp": model.meetingDetectedApp.map { .string($0) } ?? .null,
         ])
     }
 
