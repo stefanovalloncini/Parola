@@ -39,7 +39,10 @@ public extension Transcript {
     func applying(replacement: String, to match: TranscriptMatch) -> Transcript {
         var copy = self
         guard let idx = copy.segments.firstIndex(where: { $0.id == match.segmentID }) else { return self }
-        copy.segments[idx].text = Self.applying(replacement: replacement, to: match.range, in: copy.segments[idx].text)
+        let newText = Self.applying(replacement: replacement, to: match.range, in: copy.segments[idx].text)
+        guard newText != copy.segments[idx].text else { return copy }
+        copy.segments[idx].text = newText
+        copy.segments[idx].words = nil
         return copy
     }
 
@@ -49,8 +52,11 @@ public extension Transcript {
         let options: String.CompareOptions = caseSensitive ? [] : [.caseInsensitive]
         var copy = self
         for i in copy.segments.indices {
-            copy.segments[i].text = copy.segments[i].text
+            let newText = copy.segments[i].text
                 .replacingOccurrences(of: query, with: replacement, options: options)
+            guard newText != copy.segments[i].text else { continue }
+            copy.segments[i].text = newText
+            copy.segments[i].words = nil
         }
         return copy
     }

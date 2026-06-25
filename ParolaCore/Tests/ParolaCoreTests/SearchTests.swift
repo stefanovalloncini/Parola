@@ -87,4 +87,55 @@ struct SearchTests {
         #expect(t.findMatches("caffè").count == 3)
         #expect(t.findMatches("caffè", caseSensitive: true).count == 1)
     }
+
+    private func wordTimed() -> Transcript {
+        Transcript(
+            segments: [
+                TranscriptSegment(
+                    id: 0, start: 0, end: 1, text: "Hello world.",
+                    words: [
+                        WordTiming(id: "0-0", word: "Hello", start: 0, end: 0.5, probability: 1),
+                        WordTiming(id: "0-1", word: "world.", start: 0.5, end: 1, probability: 1),
+                    ]
+                ),
+                TranscriptSegment(
+                    id: 1, start: 1, end: 2, text: "Goodbye world.",
+                    words: [
+                        WordTiming(id: "1-0", word: "Goodbye", start: 1, end: 1.5, probability: 1),
+                        WordTiming(id: "1-1", word: "world.", start: 1.5, end: 2, probability: 1),
+                    ]
+                ),
+            ],
+            language: "en",
+            modelName: "tiny"
+        )
+    }
+
+    @Test("replacing a match drops the edited segment's stale word timings, leaving siblings intact")
+    func applyingDropsWords() {
+        let t = wordTimed()
+        let match = t.findMatches("Hello")[0]
+        let updated = t.applying(replacement: "Hi", to: match)
+        #expect(updated.segments[0].text == "Hi world.")
+        #expect(updated.segments[0].words == nil)
+        #expect(updated.segments[1].words != nil)
+    }
+
+    @Test("a no-op replacement keeps the segment's word timings")
+    func applyingNoChangeKeepsWords() {
+        let t = wordTimed()
+        let updated = t.applying(replacement: "X", to: TranscriptMatch(segmentID: 0, range: -1..<2))
+        #expect(updated.segments[0].text == "Hello world.")
+        #expect(updated.segments[0].words != nil)
+    }
+
+    @Test("replaceAll drops word timings only on segments whose text changed")
+    func replacingAllDropsWordsWhereChanged() {
+        let t = wordTimed()
+        let updated = t.replacingAll("Goodbye", with: "Farewell")
+        #expect(updated.segments[0].text == "Hello world.")
+        #expect(updated.segments[0].words != nil)
+        #expect(updated.segments[1].text == "Farewell world.")
+        #expect(updated.segments[1].words == nil)
+    }
 }
