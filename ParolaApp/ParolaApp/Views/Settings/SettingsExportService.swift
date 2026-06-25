@@ -47,9 +47,8 @@ enum SettingsExportService {
         }
     }
 
-    private static func exportPayload() -> [String: Any] {
+    static func exportPayload(defaults: UserDefaults = .standard) -> [String: Any] {
         var payload: [String: Any] = [:]
-        let defaults = UserDefaults.standard
         for key in exportedKeys {
             guard let value = defaults.object(forKey: key) else { continue }
             payload[key] = encode(value)
@@ -65,8 +64,7 @@ enum SettingsExportService {
     }
 
     @MainActor
-    private static func apply(_ payload: [String: Any]) {
-        let defaults = UserDefaults.standard
+    static func apply(_ payload: [String: Any], defaults: UserDefaults = .standard) {
         let allowed = Set(exportedKeys)
         // Additive: only overwrite keys the file carries; absent keys keep their current value.
         for (key, raw) in payload where allowed.contains(key) {

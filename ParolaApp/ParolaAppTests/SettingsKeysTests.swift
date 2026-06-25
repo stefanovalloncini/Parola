@@ -138,3 +138,81 @@ struct SettingsResetServiceTests {
         }
     }
 }
+
+@MainActor
+@Suite("Settings export/import", .serialized)
+struct SettingsExportServiceTests {
+
+    private func makeSuite() -> (UserDefaults, String) {
+        let name = "parola.test.export.\(UUID().uuidString)"
+        return (UserDefaults(suiteName: name)!, name)
+    }
+
+    @Test("export → .parola-settings JSON → import round-trips every value type")
+    func roundTripsAllTypes() throws {
+        let (src, srcName) = makeSuite()
+        let (dst, dstName) = makeSuite()
+        defer {
+            UserDefaults.standard.removePersistentDomain(forName: srcName)
+            UserDefaults.standard.removePersistentDomain(forName: dstName)
+        }
+
+        let blob = Data([0x01, 0x02, 0xFF, 0x00, 0x7E])
+        src.set(true, forKey: "useStreaming")
+        src.set(49, forKey: "dictationKeyCode")
+        src.set("graphite", forKey: "appTheme")
+        src.set(blob, forKey: "snippets")
+
+        let payload = SettingsExportService.exportPayload(defaults: src)
+        let fileData = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+        let reparsed = try #require(try JSONSerialization.jsonObject(with: fileData) as? [String: Any])
+
+        SettingsExportService.apply(reparsed, defaults: dst)
+
+        #expect(dst.bool(forKey: "useStreaming") == true)
+        #expect(dst.integer(forKey: "dictationKeyCode") == 49)
+        #expect(dst.string(forKey: "appTheme") == "graphite")
+        #expect(dst.data(forKey: "snippets") == blob)
+    }
+
+    @Test("import is additive — keys absent from the file keep their current value")
+    func importIsAdditive() {
+        let (src, srcName) = makeSuite()
+        let (dst, dstName) = makeSuite()
+        defer {
+            UserDefaults.standard.removePersistentDomain(forName: srcName)
+            UserDefaults.standard.removePersistentDomain(forName: dstName)
+        }
+
+        src.set("graphite", forKey: "appTheme")
+        dst.set(true, forKey: "wordTimestamps")
+
+        SettingsExportService.apply(SettingsExportService.exportPayload(defaults: src), defaults: dst)
+
+        #expect(dst.string(forKey: "appTheme") == "graphite")
+        #expect(dst.bool(forKey: "wordTimestamps") == true)
+    }
+
+    @Test("import ignores keys outside the settings allow-list")
+    func importEnforcesAllowList() {
+        let (dst, dstName) = makeSuite()
+        defer { UserDefaults.standard.removePersistentDomain(forName: dstName) }
+
+        SettingsExportService.apply(["notASetting": "evil", "appTheme": "graphite"], defaults: dst)
+
+        #expect(dst.object(forKey: "notASetting") == nil)
+        #expect(dst.string(forKey: "appTheme") == "graphite")
+    }
+
+    @Test("export skips keys with no stored value")
+    func exportSkipsUnsetKeys() {
+        let (src, srcName) = makeSuite()
+        defer { UserDefaults.standard.removePersistentDomain(forName: srcName) }
+
+        src.set("graphite", forKey: "appTheme")
+        let payload = SettingsExportService.exportPayload(defaults: src)
+
+        #expect(payload["appTheme"] as? String == "graphite")
+        #expect(payload["useStreaming"] == nil)
+    }
+}
