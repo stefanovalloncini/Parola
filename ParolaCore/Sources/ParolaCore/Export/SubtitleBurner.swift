@@ -149,14 +149,8 @@ public enum SubtitleBurner {
         )
     }
 
-    private static func makeTextLayer(text: String, language: String, style: Style, renderSize: CGSize) -> CATextLayer {
-        let layer = CATextLayer()
-        layer.string = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        layer.font = Format.cascadingFont(name: style.fontName, size: style.fontSize, language: language)
-        layer.fontSize = style.fontSize
-        layer.foregroundColor = style.textColor
-        layer.alignmentMode = .center
-        layer.isWrapped = true
+    private static func makeTextLayer(text: String, language: String, style: Style, renderSize: CGSize) -> CALayer {
+        let layer = CALayer()
         layer.contentsScale = 2
 
         let horizontalInset: CGFloat = 40
@@ -168,12 +162,71 @@ public enum SubtitleBurner {
             width: maxWidth,
             height: height
         )
+
+        // CATextLayer draws no glyphs inside AVVideoCompositionCoreAnimationTool's export; rasterize via Core Text and composite as contents.
+        let font = Format.cascadingFont(name: style.fontName, size: style.fontSize, language: language)
+        if let image = renderTextImage(
+            text: text.trimmingCharacters(in: .whitespacesAndNewlines),
+            font: font,
+            color: style.textColor,
+            size: layer.bounds.size,
+            scale: layer.contentsScale
+        ) {
+            layer.contents = image
+        }
+
         layer.opacity = 0
         layer.shadowColor = style.strokeColor
         layer.shadowOpacity = 1
         layer.shadowRadius = style.strokeWidth
         layer.shadowOffset = .zero
         return layer
+    }
+
+    static func renderTextImage(text: String, font: CTFont, color: CGColor, size: CGSize, scale: CGFloat) -> CGImage? {
+        guard !text.isEmpty, size.width > 0, size.height > 0 else { return nil }
+
+        var alignment = CTTextAlignment.center
+        let paragraphStyle = withUnsafeBytes(of: &alignment) { raw -> CTParagraphStyle in
+            var setting = CTParagraphStyleSetting(
+                spec: .alignment,
+                valueSize: MemoryLayout<CTTextAlignment>.size,
+                value: raw.baseAddress!
+            )
+            return CTParagraphStyleCreate(&setting, 1)
+        }
+        let attributed = NSAttributedString(string: text, attributes: [
+            .init(kCTFontAttributeName as String): font,
+            .init(kCTForegroundColorAttributeName as String): color,
+            .init(kCTParagraphStyleAttributeName as String): paragraphStyle,
+        ])
+
+        let pixelWidth = Int((size.width * scale).rounded())
+        let pixelHeight = Int((size.height * scale).rounded())
+        guard pixelWidth > 0, pixelHeight > 0,
+              let ctx = CGContext(
+                data: nil,
+                width: pixelWidth,
+                height: pixelHeight,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ) else { return nil }
+        ctx.scaleBy(x: scale, y: scale)
+
+        let framesetter = CTFramesetterCreateWithAttributedString(attributed)
+        let fullRange = CFRangeMake(0, attributed.length)
+        let suggested = CTFramesetterSuggestFrameSizeWithConstraints(
+            framesetter, fullRange, nil,
+            CGSize(width: size.width, height: .greatestFiniteMagnitude), nil
+        )
+        let textHeight = min(suggested.height.rounded(.up), size.height)
+        let originY = ((size.height - textHeight) / 2).rounded()
+        let path = CGPath(rect: CGRect(x: 0, y: originY, width: size.width, height: textHeight), transform: nil)
+        let frame = CTFramesetterCreateFrame(framesetter, fullRange, path, nil)
+        CTFrameDraw(frame, ctx)
+        return ctx.makeImage()
     }
 
     private static func attachVisibility(
