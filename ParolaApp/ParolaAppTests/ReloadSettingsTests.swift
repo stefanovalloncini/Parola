@@ -69,4 +69,33 @@ struct ReloadSettingsTests {
         model.reloadObservedSetting(key: "translate")
         #expect(model.translate == true)
     }
+
+    @Test("resetTestState restores live settings properties, not just UserDefaults")
+    func resetTestStateRestoresLiveSettings() async throws {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let bootstrap = AppBootstrap(
+            mode: .test,
+            library: makeTempLibraryURL("reset-live"),
+            defaultsOverride: defaults,
+            sideEffects: [],
+            filePicker: TestFilePicker()
+        )
+        let model = AppModel(bootstrap: bootstrap)
+        let server = try ParolaAutomationServer(model: model)
+        let context = AutomationContext(model: model, server: server)
+        let reset = try #require(server.lifecycleCommands().first { $0.name == "resetTestState" })
+
+        model.selectedModel = "openai_whisper-base"
+        model.selectedLanguage = "it"
+        model.translate = true
+        model.wordTimestamps = true
+
+        _ = try await reset.handler(reset.validate(AutomationArgs([:])), context)
+        withExtendedLifetime(server) {}
+
+        #expect(model.selectedModel == "openai_whisper-tiny")
+        #expect(model.selectedLanguage == nil)
+        #expect(model.translate == false)
+        #expect(model.wordTimestamps == false)
+    }
 }
