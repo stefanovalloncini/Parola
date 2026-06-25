@@ -159,6 +159,116 @@ struct FolderWatcherTests {
         #expect(inserted.snapshot().count == 2, "recreated same-name file must be detected again")
     }
 
+    @Test("a media file present before start() is never emitted (existing files are ignored)")
+    func existingFilesAtStartAreIgnored() async throws {
+        let tempDir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let clock = FixedClock(start: Date())
+        let existing = tempDir.appendingPathComponent("already-here.wav")
+        try writeSettled(existing, clock: clock)
+
+        let inserted = CollectedURLs()
+        let scheduler = ManualScheduler()
+        let options = FolderWatcher.Options(
+            recursive: false,
+            settledInterval: .milliseconds(50),
+            clock: clock,
+            scheduler: scheduler
+        )
+        let watcher = FolderWatcher(folderURL: tempDir, options: options) { url in
+            inserted.append(url)
+        }
+        await watcher.start()  // seeds knownFiles with already-here.wav
+
+        // A genuinely new drop rides the same settle tick, so the test still drives processPending
+        // (and would catch the pre-existing file if start() failed to seed it).
+        let fresh = tempDir.appendingPathComponent("new-drop.wav")
+        try writeSettled(fresh, clock: clock)
+        await watcher.checkForNewFiles()
+        try await scheduler.advanceAndWait()
+        await watcher.stop()
+
+        let captured = inserted.snapshot()
+        #expect(captured.contains { $0.lastPathComponent == "new-drop.wav" })
+        #expect(!captured.contains { $0.lastPathComponent == "already-here.wav" },
+                "a file present before start() must never be transcribed")
+    }
+
+    @Test("non-media files dropped into the folder are not emitted")
+    func nonMediaFilesAreNotEmitted() async throws {
+        let tempDir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let inserted = CollectedURLs()
+        let scheduler = ManualScheduler()
+        let clock = FixedClock(start: Date())
+        let options = FolderWatcher.Options(
+            recursive: false,
+            settledInterval: .milliseconds(50),
+            clock: clock,
+            scheduler: scheduler
+        )
+        let watcher = FolderWatcher(folderURL: tempDir, options: options) { url in
+            inserted.append(url)
+        }
+        await watcher.start()
+
+        try writeSettled(tempDir.appendingPathComponent("notes.txt"), clock: clock)
+        try writeSettled(tempDir.appendingPathComponent("audio.wav"), clock: clock)
+        await watcher.checkForNewFiles()
+        try await scheduler.advanceAndWait()
+        await watcher.stop()
+
+        let captured = inserted.snapshot()
+        #expect(captured.contains { $0.lastPathComponent == "audio.wav" })
+        #expect(!captured.contains { $0.lastPathComponent == "notes.txt" })
+    }
+
+    @Test("a zero-byte media file is never emitted")
+    func zeroByteMediaFileIsNotEmitted() async throws {
+        let tempDir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let inserted = CollectedURLs()
+        let scheduler = ManualScheduler()
+        let clock = FixedClock(start: Date())
+        let options = FolderWatcher.Options(
+            recursive: false,
+            settledInterval: .milliseconds(50),
+            clock: clock,
+            scheduler: scheduler
+        )
+        let watcher = FolderWatcher(folderURL: tempDir, options: options) { url in
+            inserted.append(url)
+        }
+        await watcher.start()
+
+        let empty = tempDir.appendingPathComponent("empty.wav")
+        try Data(count: 0).write(to: empty)
+        try FileManager.default.setAttributes(
+            [.modificationDate: clock.start.addingTimeInterval(-10)],
+            ofItemAtPath: empty.path
+        )
+        await watcher.checkForNewFiles()
+        try await scheduler.advanceAndWait()  // stays pending (size 0), re-arms the settle tick
+        #expect(inserted.snapshot().isEmpty, "a zero-byte file has nothing to transcribe")
+
+        // Drain the re-armed tick so stop() isn't cancelling a parked scheduler continuation.
+        try FileManager.default.removeItem(at: empty)
+        try await scheduler.advanceAndWait()  // file gone → dropped from pending, no re-arm
+        await watcher.stop()
+        #expect(inserted.snapshot().isEmpty)
+    }
+
+    private func writeSettled(_ url: URL, clock: FixedClock) throws {
+        try Data(count: 1024).write(to: url)
+        try FileManager.default.setAttributes(
+            [.modificationDate: clock.start.addingTimeInterval(-10)],
+            ofItemAtPath: url.path
+        )
+    }
+
     private func makeTempDir() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-folderwatch-\(UUID().uuidString)")
