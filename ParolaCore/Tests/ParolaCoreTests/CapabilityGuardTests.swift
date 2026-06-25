@@ -26,6 +26,17 @@ struct CapabilityGuardTests {
         func loadedModelName() async -> String? { nil }
     }
 
+    actor StubAppleSpeechTranscriber: Transcriber {
+        static let engineID = EngineID.appleSpeech
+        static let capabilities = EngineCapabilities.appleSpeechDefaults
+        func load(model: String) async throws {}
+        func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+            Transcript(segments: [], language: "en", modelName: "stub", sourceURL: url)
+        }
+        func unload() async {}
+        func loadedModelName() async -> String? { nil }
+    }
+
     struct DummyAudioSource: AudioSource {
         let url: URL
         func prepare() async throws -> URL { url }
@@ -42,6 +53,10 @@ struct CapabilityGuardTests {
             engineID: StubParakeetTranscriber.engineID,
             capabilities: StubParakeetTranscriber.capabilities
         ) { _ in StubParakeetTranscriber() }
+        await registry.register(
+            engineID: StubAppleSpeechTranscriber.engineID,
+            capabilities: StubAppleSpeechTranscriber.capabilities
+        ) { _ in StubAppleSpeechTranscriber() }
 
         let tmpDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-guard-\(UUID().uuidString)")
@@ -92,6 +107,33 @@ struct CapabilityGuardTests {
         case .unsupportedForEngine: break
         default: Issue.record("expected unsupportedForEngine, got \(String(describing: thrown))")
         }
+    }
+
+    @Test("Apple Speech rejects diarization before attempting any download")
+    func appleSpeechRejectsDiarize() async throws {
+        let session = await makeSession()
+        let audio = DummyAudioSource(url: FileManager.default.temporaryDirectory.appendingPathComponent("none.wav"))
+
+        var thrown: ParolaError?
+        do {
+            _ = try await session.transcribe(
+                source: audio,
+                options: TranscriptionOptions(model: "apple-speech-analyzer", diarize: true)
+            )
+        } catch let e as ParolaError {
+            thrown = e
+        }
+        switch thrown {
+        case .unsupportedForEngine: break
+        default: Issue.record("expected unsupportedForEngine, got \(String(describing: thrown))")
+        }
+    }
+
+    @Test("diarization support is declared per engine")
+    func diarizationCapabilityByEngine() {
+        #expect(EngineCapabilities.whisperKitDefaults.supportsDiarization)
+        #expect(EngineCapabilities.parakeetDefaults.supportsDiarization)
+        #expect(EngineCapabilities.appleSpeechDefaults.supportsDiarization == false)
     }
 
     @Test("English-only engine accepts language=en explicitly")
