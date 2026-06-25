@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Parola
 import ParolaCore
+import ParolaDictation
 
 @MainActor
 @Suite("reloadSettings")
@@ -216,5 +217,41 @@ struct ReloadSettingsTests {
         #expect(model.recordingCountInSeconds == 0)
         #expect(model.autoMuteWhileRecording == false)
         #expect(model.autoPauseMediaWhileRecording == false)
+    }
+
+    @Test("reloading clears in-memory snippets once the defaults key is gone")
+    func snippetsResetWhenKeyAbsent() {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let model = makeModel(defaults)
+        model.snippets = [Snippet(trigger: "omw", replacement: "on my way")]
+
+        defaults.removeObject(forKey: AppModel.snippetsDefaultsKey)
+        model.loadSnippets()
+
+        #expect(model.snippets.isEmpty)
+    }
+
+    @Test("reloading clears in-memory correction rules once the defaults key is gone")
+    func correctionRulesResetWhenKeyAbsent() {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let model = makeModel(defaults)
+        model.correctionRules = [CorrectionRule(from: "teh", to: "the")]
+
+        defaults.removeObject(forKey: AppModel.correctionRulesDefaultsKey)
+        model.loadCorrectionRules()
+
+        #expect(model.correctionRules.isEmpty)
+    }
+
+    @Test("reloading clears in-memory auto-export rules once the defaults key is gone")
+    func autoExportRulesResetWhenKeyAbsent() {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let model = makeModel(defaults)
+        model.autoExportRules = [AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.txt])]
+
+        defaults.removeObject(forKey: "autoExportRules")
+        model.loadAutoExportRules()
+
+        #expect(model.autoExportRules.isEmpty)
     }
 }

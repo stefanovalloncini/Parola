@@ -5,9 +5,7 @@ import ParolaCore
 extension AppModel {
 
     func loadAutoExportRules() {
-        if let rules = readJSON([AutoExportRule].self, forKey: "autoExportRules") {
-            autoExportRules = rules
-        }
+        autoExportRules = readJSON([AutoExportRule].self, forKey: "autoExportRules") ?? []
     }
 
     func saveAutoExportRules() {

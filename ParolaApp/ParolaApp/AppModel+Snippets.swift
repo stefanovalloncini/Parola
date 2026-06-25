@@ -9,9 +9,7 @@ extension AppModel {
     static let correctionRulesDefaultsKey = "correctionRules"
 
     func loadSnippets() {
-        if let decoded = readJSON([Snippet].self, forKey: AppModel.snippetsDefaultsKey) {
-            snippets = decoded
-        }
+        snippets = readJSON([Snippet].self, forKey: AppModel.snippetsDefaultsKey) ?? []
     }
 
     func saveSnippets() {
@@ -61,9 +59,7 @@ extension AppModel {
     }
 
     func loadCorrectionRules() {
-        if let decoded = readJSON([CorrectionRule].self, forKey: AppModel.correctionRulesDefaultsKey) {
-            correctionRules = decoded
-        }
+        correctionRules = readJSON([CorrectionRule].self, forKey: AppModel.correctionRulesDefaultsKey) ?? []
     }
 
     func saveCorrectionRules() {
