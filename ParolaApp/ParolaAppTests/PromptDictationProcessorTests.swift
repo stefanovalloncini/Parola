@@ -151,4 +151,36 @@ struct PromptDictationProcessorTests {
         let chosen = await proc.selectOverridePrompt(bundleID: "com.google.Chrome")
         #expect(chosen == nil)
     }
+
+    private func contextProc() -> PromptDictationProcessor {
+        PromptDictationProcessor(defaultPrompt: nil, overrides: [:])
+    }
+
+    @Test("contextualizing prepends present context blocks to a system-instruction prompt")
+    func contextualizingInjectsContext() {
+        let prompt = Prompt(name: "Cleanup", instructions: "Fix the grammar.")
+        let context = DictationContext(selection: "Acme Corp", clipboard: "kubectl", screen: nil)
+        let situated = contextProc().contextualizing(prompt, with: "Mail", context: context)
+        #expect(situated.instructions.contains("Context: the user is dictating into Mail."))
+        #expect(situated.instructions.contains("<CURRENTLY_SELECTED_TEXT>Acme Corp</CURRENTLY_SELECTED_TEXT>"))
+        #expect(situated.instructions.contains("<CLIPBOARD_CONTEXT>kubectl</CLIPBOARD_CONTEXT>"))
+        #expect(situated.instructions.contains("<CURRENT_WINDOW_CONTEXT>") == false)
+        #expect(situated.instructions.hasSuffix("Fix the grammar."))
+    }
+
+    @Test("contextualizing leaves a verbatim (non-system-instruction) prompt untouched")
+    func contextualizingSkipsRawPrompt() {
+        var prompt = Prompt(name: "Raw", instructions: "verbatim")
+        prompt.useSystemInstructions = false
+        let context = DictationContext(selection: "Acme Corp", clipboard: nil, screen: nil)
+        let situated = contextProc().contextualizing(prompt, with: "Mail", context: context)
+        #expect(situated.instructions == "verbatim")
+    }
+
+    @Test("contextualizing with empty context and no app name leaves the instructions unchanged")
+    func contextualizingEmptyContext() {
+        let prompt = Prompt(name: "Cleanup", instructions: "Fix it.")
+        let situated = contextProc().contextualizing(prompt, with: nil, context: .empty)
+        #expect(situated.instructions == "Fix it.")
+    }
 }

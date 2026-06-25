@@ -109,9 +109,24 @@ final class AppModel {
         }
     }
     var dictationPasteDelayMs: Int = 0 { didSet { defaults.set(dictationPasteDelayMs, forKey: "dictationPasteDelayMs") } }
-    var dictationContextSelection: Bool = false { didSet { defaults.set(dictationContextSelection, forKey: "dictationContextSelection") } }
-    var dictationContextClipboard: Bool = false { didSet { defaults.set(dictationContextClipboard, forKey: "dictationContextClipboard") } }
-    var dictationContextScreen: Bool = false { didSet { defaults.set(dictationContextScreen, forKey: "dictationContextScreen") } }
+    var dictationContextSelection: Bool = false {
+        didSet {
+            defaults.set(dictationContextSelection, forKey: "dictationContextSelection")
+            if !isReloadingSettings { applyDictationCleanupPromptChange() }
+        }
+    }
+    var dictationContextClipboard: Bool = false {
+        didSet {
+            defaults.set(dictationContextClipboard, forKey: "dictationContextClipboard")
+            if !isReloadingSettings { applyDictationCleanupPromptChange() }
+        }
+    }
+    var dictationContextScreen: Bool = false {
+        didSet {
+            defaults.set(dictationContextScreen, forKey: "dictationContextScreen")
+            if !isReloadingSettings { applyDictationCleanupPromptChange() }
+        }
+    }
     var recordingMaxMinutes: Int = 0 { didSet { defaults.set(recordingMaxMinutes, forKey: "recordingMaxMinutes") } }
     var showMenuBarExtra: Bool = false { didSet { defaults.set(showMenuBarExtra, forKey: "showMenuBarExtra") } }
     var recordingCountInSeconds: Int = 0 { didSet { defaults.set(recordingCountInSeconds, forKey: "recordingCountInSeconds") } }

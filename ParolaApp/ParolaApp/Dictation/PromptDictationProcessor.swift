@@ -89,7 +89,7 @@ struct PromptDictationProcessor: TextPostProcessor {
         return await contextProvider.gather(contextConfig, timeout: .milliseconds(1500))
     }
 
-    private func contextualizing(_ prompt: Prompt, with appName: String?, context: DictationContext) -> Prompt {
+    func contextualizing(_ prompt: Prompt, with appName: String?, context: DictationContext) -> Prompt {
         guard prompt.useSystemInstructions else { return prompt }
         var copy = prompt
         var prefixLines: [String] = []

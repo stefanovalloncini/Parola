@@ -228,4 +228,31 @@ struct AppModelDictationTests {
 
         model.stopDictation()
     }
+
+    @Test("toggling dictation context sources refreshes a running dictation processor")
+    func contextSourcesRefreshRunningProcessor() {
+        let model = makeModel()
+        model.startDictation()
+        #expect(model.dictationController.isRunning)
+
+        // Built with every context source off → no provider, all-disabled config.
+        let initial = model.dictationController.configuration?.postProcessor as? PromptDictationProcessor
+        #expect(initial?.contextConfig.isAllDisabled == true)
+        #expect(initial?.contextProvider == nil)
+
+        model.dictationContextSelection = true
+        let afterSelection = model.dictationController.configuration?.postProcessor as? PromptDictationProcessor
+        #expect(afterSelection?.contextConfig.selectionEnabled == true)
+        #expect(afterSelection?.contextProvider != nil)
+
+        model.dictationContextClipboard = true
+        let afterClipboard = model.dictationController.configuration?.postProcessor as? PromptDictationProcessor
+        #expect(afterClipboard?.contextConfig.clipboardEnabled == true)
+
+        model.dictationContextScreen = true
+        let afterScreen = model.dictationController.configuration?.postProcessor as? PromptDictationProcessor
+        #expect(afterScreen?.contextConfig.screenEnabled == true)
+
+        model.stopDictation()
+    }
 }
