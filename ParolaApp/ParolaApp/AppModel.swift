@@ -248,7 +248,10 @@ final class AppModel {
     }
 
     var correctionRules: [CorrectionRule] = [] {
-        didSet { saveCorrectionRules() }
+        didSet {
+            saveCorrectionRules()
+            if !isReloadingSettings { applyDictationCleanupPromptChange() }
+        }
     }
 
     // MARK: - People (speakers)

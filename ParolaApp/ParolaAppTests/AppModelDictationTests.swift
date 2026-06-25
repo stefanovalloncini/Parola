@@ -198,4 +198,19 @@ struct AppModelDictationTests {
         #expect(workflow.promptID == "default-prompt")
         #expect(workflow.urlPattern == nil)
     }
+
+    @Test("editing correction rules refreshes a running dictation processor")
+    func correctionRulesRefreshRunningProcessor() async {
+        let model = makeModel()
+        model.startDictation()
+        #expect(model.dictationController.isRunning)
+
+        model.correctionRules = [CorrectionRule(from: "q three", to: "Q3")]
+
+        let processor = model.dictationController.configuration?.postProcessor
+        let out = await processor?.process("q three results")
+        #expect(out == "Q3 results")
+
+        model.stopDictation()
+    }
 }
