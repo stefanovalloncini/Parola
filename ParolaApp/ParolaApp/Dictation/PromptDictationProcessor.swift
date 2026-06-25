@@ -61,7 +61,7 @@ struct PromptDictationProcessor: TextPostProcessor {
         }
     }
 
-    private func selectOverridePrompt(bundleID: String?) async -> Prompt? {
+    func selectOverridePrompt(bundleID: String?) async -> Prompt? {
         guard let bundleID, let entries = overrides[bundleID], !entries.isEmpty else { return nil }
         let url: URL? = await resolveURL(bundleID: bundleID)
         if let url, let match = entries.first(where: { entry in
