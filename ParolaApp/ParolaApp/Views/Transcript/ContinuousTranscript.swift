@@ -36,6 +36,8 @@ struct ContinuousParagraph: View {
             .font(.system(size: model.transcriptCompact ? compactSize : comfortableSize, weight: .regular))
             .lineSpacing(model.transcriptCompact ? 3 : 6)
             .textSelection(.enabled)
+            // Definite height; without it the inspector's constraint pass re-typesets the whole-transcript Text in a loop (main-thread freeze on long audio).
+            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             .onAppear { rebuildAttributedText() }
             .onChange(of: model.transcriptVersion) { _, _ in rebuildAttributedText() }
