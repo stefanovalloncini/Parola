@@ -17,13 +17,17 @@ struct ContentRoutes: View {
 
     @ViewBuilder
     private var content: some View {
-        switch model.route {
-        case .batch:
-            BatchView()
-        case .queue:
-            QueueView()
-        case .transcript:
-            transcriptContent
+        if model.mode == .test, model.settingsRoutePreview {
+            SettingsView()
+        } else {
+            switch model.route {
+            case .batch:
+                BatchView()
+            case .queue:
+                QueueView()
+            case .transcript:
+                transcriptContent
+            }
         }
     }
 

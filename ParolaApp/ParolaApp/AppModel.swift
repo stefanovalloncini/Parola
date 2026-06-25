@@ -50,6 +50,7 @@ final class AppModel {
 
     var route: Route = .transcript
     var settingsPane: String = "general"
+    var settingsRoutePreview = false  // test-mode only: renders SettingsView in the main window so the bridge can screenshot panes
     var phase: Phase = .idle
     var transcript: Transcript? {
         didSet {

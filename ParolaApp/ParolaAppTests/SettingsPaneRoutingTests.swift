@@ -7,12 +7,36 @@ import ParolaCore
 @Suite("Settings pane deep-linking")
 struct SettingsPaneRoutingTests {
 
-    private func makeRig() throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
-        let model = AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("settingsrouting"))
+    private func makeModel(mode: AppBootstrap.Mode) -> AppModel {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let library = makeTempLibraryURL("settingsrouting")
+        switch mode {
+        case .normal:
+            return AppModel(skipBootstrap: true, defaults: defaults, libraryURL: library)
+        case .test:
+            let bootstrap = AppBootstrap(
+                mode: .test,
+                library: library,
+                defaultsOverride: defaults,
+                sideEffects: [],
+                filePicker: TestFilePicker()
+            )
+            return AppModel(bootstrap: bootstrap)
+        }
+    }
+
+    private func makeRig(mode: AppBootstrap.Mode = .normal) throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
+        let model = makeModel(mode: mode)
         let server = try ParolaAutomationServer(model: model)
         let context = AutomationContext(model: model, server: server)
         let commands = Dictionary(uniqueKeysWithValues: server.settingsCommands().map { ($0.name, $0) })
         return (model, server, context, commands)
+    }
+
+    private func routeEnum(_ command: AutomationCommand?) -> [String]? {
+        guard let arg = command?.args.first(where: { $0.name == "route" }) else { return nil }
+        guard case .string(let allowed) = arg.kind else { return nil }
+        return allowed
     }
 
     @Test("openSettings with a pane points SettingsView at that pane")
@@ -52,5 +76,52 @@ struct SettingsPaneRoutingTests {
         withExtendedLifetime(server) {}
 
         #expect(model.settingsPane == "dictation")
+    }
+
+    @Test("test mode: setRoute settings renders the Settings preview in the main window")
+    func setRouteSettingsEnablesPreviewInTestMode() async throws {
+        let (model, server, context, commands) = try makeRig(mode: .test)
+        #expect(model.settingsRoutePreview == false)
+
+        let command = try #require(commands["setRoute"])
+        let args = try command.validate(AutomationArgs(["route": .string("settings")]))
+        _ = try await command.handler(args, context)
+        withExtendedLifetime(server) {}
+
+        #expect(model.settingsRoutePreview == true)
+    }
+
+    @Test("test mode: switching to a real route clears the Settings preview")
+    func setRouteRealRouteClearsPreview() async throws {
+        let (model, server, context, commands) = try makeRig(mode: .test)
+        model.settingsRoutePreview = true
+
+        let command = try #require(commands["setRoute"])
+        let args = try command.validate(AutomationArgs(["route": .string("transcript")]))
+        _ = try await command.handler(args, context)
+        withExtendedLifetime(server) {}
+
+        #expect(model.settingsRoutePreview == false)
+        #expect(model.route == .transcript)
+    }
+
+    @Test("release build: setRoute rejects the settings route")
+    func setRouteSettingsRejectedInProduction() throws {
+        let (_, server, _, commands) = try makeRig(mode: .normal)
+        let command = try #require(commands["setRoute"])
+
+        #expect(throws: AutomationError.self) {
+            _ = try command.validate(AutomationArgs(["route": .string("settings")]))
+        }
+        withExtendedLifetime(server) {}
+    }
+
+    @Test("settings route is advertised only in test mode")
+    func settingsRouteAdvertisedOnlyInTestMode() throws {
+        let prod = try makeRig(mode: .normal).3["setRoute"]
+        let test = try makeRig(mode: .test).3["setRoute"]
+        #expect(routeEnum(prod)?.isEmpty == false)
+        #expect(routeEnum(prod)?.contains("settings") == false)
+        #expect(routeEnum(test)?.contains("settings") == true)
     }
 }

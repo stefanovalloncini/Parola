@@ -80,6 +80,8 @@ final class ParolaAutomationServer {
 
     func commandNames() -> [String] { commands.keys.sorted() }
 
+    var isTestMode: Bool { model?.mode == .test }
+
     func capabilities() -> [String] {
         [
             "envelope.v2",

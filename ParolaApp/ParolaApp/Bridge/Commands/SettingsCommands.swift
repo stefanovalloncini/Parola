@@ -122,16 +122,24 @@ extension ParolaAutomationServer {
                 args: [
                     .init(
                         name: "route",
-                        kind: .string(enum: AppModel.Route.allCases.map(\.rawValue)),
+                        kind: .string(enum: AppModel.Route.allCases.map(\.rawValue) + (isTestMode ? ["settings"] : [])),
                         required: true,
                         summary: "Route name"
                     ),
                 ],
                 handler: { args, ctx in
                     let raw = try args.string("route")
+                    if raw == "settings" {
+                        guard ctx.model.mode == .test else {
+                            throw AutomationError.invalidArgs(field: "route", reason: "unknown route: settings")
+                        }
+                        ctx.model.settingsRoutePreview = true
+                        return .object(["route": .string("settings")])
+                    }
                     guard let route = AppModel.Route(rawValue: raw) else {
                         throw AutomationError.invalidArgs(field: "route", reason: "unknown route: \(raw)")
                     }
+                    ctx.model.settingsRoutePreview = false
                     ctx.model.route = route
                     return .object(["route": .string(route.rawValue)])
                 }
