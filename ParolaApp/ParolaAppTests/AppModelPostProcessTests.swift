@@ -113,4 +113,28 @@ struct AppModelPostProcessTests {
         #expect(reloaded.findReplaceRules.map(\.find) == ["gmt", #"\d+"#])
         #expect(reloaded.findReplaceRules.last?.regex == true)
     }
+
+    @Test("reloading clears in-memory ignore rules once the defaults key is gone")
+    func ignoredRulesResetWhenKeyAbsent() {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let model = makeModel(defaults)
+        model.ignoredSegmentRules = [IgnoredSegmentRule(pattern: "secret")]
+
+        defaults.removeObject(forKey: "ignoredSegmentRules")
+        model.loadIgnoredSegmentRules()
+
+        #expect(model.ignoredSegmentRules.isEmpty)
+    }
+
+    @Test("reloading clears in-memory find/replace rules once the defaults key is gone")
+    func findReplaceRulesResetWhenKeyAbsent() {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let model = makeModel(defaults)
+        model.findReplaceRules = [FindReplaceRule(find: "color", replace: "colour")]
+
+        defaults.removeObject(forKey: "findReplaceRules")
+        model.loadFindReplaceRules()
+
+        #expect(model.findReplaceRules.isEmpty)
+    }
 }
