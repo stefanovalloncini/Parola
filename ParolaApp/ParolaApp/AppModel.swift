@@ -359,16 +359,9 @@ final class AppModel {
         set { transcriptDisplayModeRaw = newValue.rawValue }
     }
 
-    /// Re-reads an externally written default into its observed property so the bridge `setSetting`
-    /// path drives the live UI the same way the in-app control does.
+    /// Syncs the live model after a bridge `setSetting` writes `key` to defaults; reloads the whole snapshot, not just `key`, since many observed properties (transcribe options, theme, dictation) drive live behavior.
     func reloadObservedSetting(key: String) {
-        switch key {
-        case "transcriptDisplayMode":
-            let raw = defaults.string(forKey: key) ?? TranscriptDisplayMode.transcript.rawValue
-            if raw != transcriptDisplayModeRaw { transcriptDisplayModeRaw = raw }
-        default:
-            break
-        }
+        reloadSettings()
     }
 
     @ObservationIgnored private var isReloadingSettings = false

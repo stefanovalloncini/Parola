@@ -48,4 +48,25 @@ struct ReloadSettingsTests {
         #expect(model.selectedModel != "totally-uninstalled-model")
         #expect(model.availableModels.contains { $0.name == model.selectedModel })
     }
+
+    @Test("reloadObservedSetting syncs an arbitrary writable key into its live property")
+    func reloadObservedSettingSyncsAnyKey() {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let model = makeModel(defaults)
+        #expect(model.autoTitleEntries == false)
+        #expect(model.wordTimestamps == false)
+        #expect(model.translate == false)
+
+        defaults.set(true, forKey: "autoTitleEntries")
+        model.reloadObservedSetting(key: "autoTitleEntries")
+        #expect(model.autoTitleEntries == true)
+
+        defaults.set(true, forKey: "wordTimestamps")
+        model.reloadObservedSetting(key: "wordTimestamps")
+        #expect(model.wordTimestamps == true)
+
+        defaults.set(true, forKey: "translate")
+        model.reloadObservedSetting(key: "translate")
+        #expect(model.translate == true)
+    }
 }
