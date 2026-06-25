@@ -801,6 +801,10 @@ final class AppModel {
         self.mode = bootstrap.mode
         self.clock = bootstrap.clock
         self.library = LibraryStore(libraryURL: bootstrap.library ?? LibraryStore.defaultLibraryURL)
+        // Suppress the settings didSets during the bulk read: side effects (notably startDictation)
+        // must wait until after wireDictationController + the gated side-effect block below, or the
+        // dictation coordinator is built before appModel is wired.
+        isReloadingSettings = true
         self.dictationEnabled = defaults.bool(forKey: "dictationEnabled")
         self.dictationModeRaw = defaults.string(forKey: "dictationModeRaw") ?? DictationMode.pushToTalk.rawValue
         self.dictationKeyCode = defaults.object(forKey: "dictationKeyCode") == nil ? 96 : defaults.integer(forKey: "dictationKeyCode")
@@ -859,6 +863,7 @@ final class AppModel {
         self.sparkleChannelRaw = defaults.string(forKey: "sparkleChannel") ?? SparkleChannel.stable.rawValue
         self.sparkleAutomatic = readBool("sparkleAutomatic", default: true)
         self.liveCaptionsTranslate = defaults.bool(forKey: "liveCaptionsTranslate")
+        isReloadingSettings = false
         applyTheme()
         loadAutoExportRules()
         loadIgnoredSegmentRules()

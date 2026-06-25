@@ -18,6 +18,22 @@ struct AppModelDictationTests {
         return model
     }
 
+    @Test("persisted dictationEnabled does not auto-start the controller during init")
+    func persistedDictationEnabledDoesNotAutoStartDuringInit() {
+        let defaults = makeIsolatedDefaults()
+        defaults.set(true, forKey: "dictationEnabled")
+        // skipBootstrap => sideEffects = [] (no .dictationHotkey), matching --test-mode.
+        let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("dictation-init"))
+
+        // The setting itself loads…
+        #expect(model.dictationEnabled == true)
+        // …but the controller must NOT have started during the bulk settings read. Auto-starting
+        // there builds the coordinator before wireDictationController sets appModel, so in test mode
+        // it wrongly selects the real inserter (PerAppTextInserter) over CapturingTextInserter and
+        // dictation output never reaches CapturedInsertionStore.
+        #expect(model.dictationController.isRunning == false)
+    }
+
     @Test("dictationWorkflows decodes from the per-app overrides JSON")
     func decodeWorkflows() {
         let model = makeModel()
