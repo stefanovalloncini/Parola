@@ -49,7 +49,7 @@ public enum StdioRunner {
     }
 
     /// Second-pass parse so a malformed body still surfaces the envelope id, letting the client correlate the error.
-    private static func recoverRequestID(from data: Data) -> JSONRPCID? {
+    static func recoverRequestID(from data: Data) -> JSONRPCID? {
         struct Envelope: Decodable {
             let id: JSONRPCID?
         }
