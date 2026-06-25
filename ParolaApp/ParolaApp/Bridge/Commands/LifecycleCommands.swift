@@ -38,6 +38,7 @@ extension ParolaAutomationServer {
                     await model.unloadTranscriptionSession()
                     model.batchJobs = []
                     model.transcript = nil
+                    model.phase = .idle
                     model.libraryEntries = []
                     let libraryURL = model.library.libraryURL
                     try? FileManager.default.removeItem(at: libraryURL)
