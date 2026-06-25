@@ -213,4 +213,19 @@ struct AppModelDictationTests {
 
         model.stopDictation()
     }
+
+    @Test("toggling self-correction strip refreshes a running dictation processor")
+    func selfCorrectionStripRefreshesRunningProcessor() async {
+        let model = makeModel()
+        model.startDictation()
+        #expect(model.dictationController.isRunning)
+
+        model.dictationStripSelfCorrections = true
+
+        let processor = model.dictationController.configuration?.postProcessor
+        let out = await processor?.process("scratch that, hello world")
+        #expect(out == "Hello world")
+
+        model.stopDictation()
+    }
 }

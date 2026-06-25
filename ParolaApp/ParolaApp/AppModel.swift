@@ -102,7 +102,12 @@ final class AppModel {
     var micHotkeyKeyCode: Int = 15 { didSet { defaults.set(micHotkeyKeyCode, forKey: "micHotkeyKeyCode") } } // kVK_ANSI_R
     var micHotkeyModifiers: Int = 786721 { didSet { defaults.set(micHotkeyModifiers, forKey: "micHotkeyModifiers") } } // ⌃⌥⌘
     var micHotkeyEnabled: Bool = false { didSet { defaults.set(micHotkeyEnabled, forKey: "micHotkeyEnabled") } }
-    var dictationStripSelfCorrections: Bool = false { didSet { defaults.set(dictationStripSelfCorrections, forKey: "dictationStripSelfCorrections") } }
+    var dictationStripSelfCorrections: Bool = false {
+        didSet {
+            defaults.set(dictationStripSelfCorrections, forKey: "dictationStripSelfCorrections")
+            if !isReloadingSettings { applyDictationCleanupPromptChange() }
+        }
+    }
     var dictationPasteDelayMs: Int = 0 { didSet { defaults.set(dictationPasteDelayMs, forKey: "dictationPasteDelayMs") } }
     var dictationContextSelection: Bool = false { didSet { defaults.set(dictationContextSelection, forKey: "dictationContextSelection") } }
     var dictationContextClipboard: Bool = false { didSet { defaults.set(dictationContextClipboard, forKey: "dictationContextClipboard") } }
