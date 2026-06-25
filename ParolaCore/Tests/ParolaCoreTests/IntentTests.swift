@@ -104,4 +104,62 @@ struct IntentTests {
             received()
         }
     }
+
+    @Test("Darwin dictation signal delivers the stop name")
+    func dictationStopSignalRoundTrip() async {
+        let delivered = SignalGate()
+        let subscription = DictationSignal.subscribe { name in
+            if name == DictationSignal.stopName { delivered.fulfill() }
+        }
+        defer { subscription.cancel() }
+
+        await confirmation("received stop") { received in
+            DictationSignal.stop()
+            await delivered.wait()
+            received()
+        }
+    }
+
+    private func confirmIntentPosts(
+        _ name: Notification.Name,
+        when action: () async throws -> Void
+    ) async throws {
+        try await confirmation("posted \(name.rawValue)") { posted in
+            let token = NotificationCenter.default.addObserver(
+                forName: name,
+                object: nil,
+                queue: nil
+            ) { _ in posted() }
+            defer { NotificationCenter.default.removeObserver(token) }
+            try await action()
+        }
+    }
+
+    @Test("StartRecordingIntent posts the start-recording notification")
+    func startRecordingIntentPostsNotification() async throws {
+        try await confirmIntentPosts(.parolaStartRecording) {
+            _ = try await StartRecordingIntent().perform()
+        }
+    }
+
+    @Test("SummarizeLastTranscriptIntent posts the summarize notification")
+    func summarizeIntentPostsNotification() async throws {
+        try await confirmIntentPosts(.parolaSummarizeLast) {
+            _ = try await SummarizeLastTranscriptIntent().perform()
+        }
+    }
+
+    @Test("StartDictationIntent posts the start-dictation notification")
+    func startDictationIntentPostsNotification() async throws {
+        try await confirmIntentPosts(.parolaStartDictation) {
+            _ = try await StartDictationIntent().perform()
+        }
+    }
+
+    @Test("StopDictationIntent posts the stop-dictation notification")
+    func stopDictationIntentPostsNotification() async throws {
+        try await confirmIntentPosts(.parolaStopDictation) {
+            _ = try await StopDictationIntent().perform()
+        }
+    }
 }
