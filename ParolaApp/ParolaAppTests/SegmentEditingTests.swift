@@ -88,4 +88,101 @@ struct SegmentEditingTests {
 
         #expect(model.transcript?.segments[0].words == words)
     }
+
+    @Test("deleting a segment removes only it and keeps the others in order")
+    func deleteRemovesTargetedSegment() throws {
+        model.transcript = Self.makeTranscript(["First.", "Second.", "Third."])
+
+        model.deleteSegment(id: 1)
+
+        let segments = try #require(model.transcript?.segments)
+        #expect(segments.map(\.id) == [0, 2])
+        #expect(segments.map(\.text) == ["First.", "Third."])
+    }
+
+    @Test("deleting an unknown id leaves the transcript untouched")
+    func deleteUnknownIdIsNoOp() {
+        model.transcript = Self.makeTranscript(["First.", "Second."])
+        let before = model.transcript
+
+        model.deleteSegment(id: 99)
+
+        #expect(model.transcript == before)
+    }
+
+    @Test("deleting a segment leaves a sibling's word timings intact")
+    func deletePreservesSiblingWordTimings() throws {
+        let words = [WordTiming(id: "1-0", word: "Second", start: 1, end: 2, probability: 1)]
+        model.transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "First."),
+                TranscriptSegment(id: 1, start: 1, end: 2, text: "Second.", words: words),
+            ],
+            language: "en",
+            modelName: "tiny"
+        )
+
+        model.deleteSegment(id: 0)
+
+        let segments = try #require(model.transcript?.segments)
+        #expect(segments.map(\.id) == [1])
+        #expect(segments[0].words == words)
+    }
+
+    @Test("nudging a segment's start shifts it by frames over the subtitle fps, leaving the end put")
+    func nudgeStartShiftsBoundaryViaSubtitleFps() throws {
+        model.subtitleFPS = 30
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 1, end: 2, text: "Only.")],
+            language: "en",
+            modelName: "tiny"
+        )
+
+        model.nudgeSegmentStart(id: 0, frames: 3)
+
+        let segment = try #require(model.transcript?.segments.first)
+        #expect(abs(segment.start - 1.1) < 1e-9)
+        #expect(segment.end == 2)
+    }
+
+    @Test("nudging a segment's end shifts it by frames over the subtitle fps, leaving the start put")
+    func nudgeEndShiftsBoundaryViaSubtitleFps() throws {
+        model.subtitleFPS = 30
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 1, end: 2, text: "Only.")],
+            language: "en",
+            modelName: "tiny"
+        )
+
+        model.nudgeSegmentEnd(id: 0, frames: -3)
+
+        let segment = try #require(model.transcript?.segments.first)
+        #expect(segment.start == 1)
+        #expect(abs(segment.end - 1.9) < 1e-9)
+    }
+
+    @Test("nudging with no transcript loaded is a graceful no-op")
+    func nudgeWithoutTranscriptIsNoOp() {
+        model.transcript = nil
+
+        model.nudgeSegmentStart(id: 0, frames: 5)
+        model.nudgeSegmentEnd(id: 0, frames: 5)
+
+        #expect(model.transcript == nil)
+    }
+
+    @Test("nudging a segment boundary keeps its word timings (unlike a text edit)")
+    func nudgeKeepsWordTimings() throws {
+        let words = [WordTiming(id: "0-0", word: "Only.", start: 1, end: 2, probability: 1)]
+        model.subtitleFPS = 30
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 1, end: 2, text: "Only.", words: words)],
+            language: "en",
+            modelName: "tiny"
+        )
+
+        model.nudgeSegmentEnd(id: 0, frames: -3)
+
+        #expect(model.transcript?.segments[0].words == words)
+    }
 }
