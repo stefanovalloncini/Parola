@@ -19,6 +19,15 @@ public final class ModelStore: Sendable {
         "models/openai",
     ]
 
+    /// Tokenizer/config assets WhisperKit caches alongside a model. A directory holding only
+    /// these (e.g. an `openai/whisper-tiny` tokenizer dir) is not a runnable model.
+    private static let modelMetadataFilenames: Set<String> = [
+        "config.json", "tokenizer.json", "tokenizer_config.json",
+        "generation_config.json", "preprocessor_config.json",
+        "special_tokens_map.json", "vocab.json", "merges.txt",
+        "added_tokens.json", "normalizer.json", "readme.md",
+    ]
+
     private var orphanScanRoots: [URL] {
         Self.orphanScanRootRelativePaths.map {
             modelsDirectory.appendingPathComponent($0, isDirectory: true)
@@ -87,6 +96,19 @@ public final class ModelStore: Sendable {
         return !FileManager.default.fileExists(atPath: sidecar.path)
     }
 
+    /// True when an orphan directory holds something other than tokenizer/config metadata —
+    /// i.e. it actually carries model weights. Hidden entries (`.cache`) are ignored.
+    private func containsModelWeights(at url: URL) -> Bool {
+        guard let entries = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil) else {
+            return false
+        }
+        return entries.contains { entry in
+            let name = entry.lastPathComponent
+            guard !name.hasPrefix(".") else { return false }
+            return !Self.modelMetadataFilenames.contains(name.lowercased())
+        }
+    }
+
     /// Returns models present on disk, even if not in the curated catalog. Includes
     /// orphan directories left by older app versions or by engine wrappers that
     /// used a different naming convention.
@@ -121,6 +143,7 @@ public final class ModelStore: Sendable {
                 if catalogDirNames.contains(url.lastPathComponent + "-coreml") { continue }
                 let id = url.lastPathComponent
                 if seen[id] != nil { continue }
+                guard containsModelWeights(at: url) else { continue }
                 seen[id] = ModelInfo(
                     name: id,
                     label: id,

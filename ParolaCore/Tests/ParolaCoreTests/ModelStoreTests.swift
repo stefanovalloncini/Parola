@@ -79,6 +79,25 @@ struct ModelStoreTests {
         #expect(!installed.contains { $0.name == "parakeet-tdt-0.6b-v2" })
     }
 
+    @Test("a tokenizer-only directory (no model weights) is not reported as an installed model")
+    func excludesTokenizerOnlyOrphan() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let tok = tmp.appendingPathComponent("models/openai/whisper-tiny", isDirectory: true)
+        try FileManager.default.createDirectory(at: tok, withIntermediateDirectories: true)
+        for name in ["config.json", "tokenizer.json", "tokenizer_config.json"] {
+            try Data("{}".utf8).write(to: tok.appendingPathComponent(name))
+        }
+        try FileManager.default.createDirectory(at: tok.appendingPathComponent(".cache"), withIntermediateDirectories: true)
+
+        let installed = try store.installedModels()
+        #expect(!installed.contains { $0.name == "whisper-tiny" })
+    }
+
     @Test("an unrelated FluidInference directory is still reported as installed")
     func keepsUnrelatedFluidInferenceDir() throws {
         let tmp = FileManager.default.temporaryDirectory
