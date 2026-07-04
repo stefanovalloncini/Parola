@@ -10,8 +10,11 @@ struct TranscribingPane: View {
     @State private var etaLabel: String?
     @State private var startDate = Date()
     @State private var settled = ""
+    @State private var isFinishing = false
 
     private static let tailID = "transcribing.tail"
+    private static let finishingProgressThreshold = 0.9
+    private static let finishingStallSeconds: Double = 3
     private var hasText: Bool { !partial.isEmpty }
 
     var body: some View {
@@ -21,14 +24,23 @@ struct TranscribingPane: View {
         }
         .padding(DS.Spacing.large)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onChange(of: progress) { _, newValue in updateETA(for: newValue) }
+        .onChange(of: progress) { _, newValue in
+            updateETA(for: newValue)
+            if isFinishing { withAnimation(.easeOut(duration: 0.25)) { isFinishing = false } }
+        }
         .onChange(of: file) { _, _ in
             startDate = Date()
             settled = ""
+            isFinishing = false
         }
         .task(id: partial) {
             try? await Task.sleep(for: .milliseconds(900))
             withAnimation(.easeOut(duration: 0.4)) { settled = partial }
+        }
+        .task(id: progress) {
+            guard let progress, progress >= Self.finishingProgressThreshold else { return }
+            try? await Task.sleep(for: .seconds(Self.finishingStallSeconds))
+            withAnimation(.easeInOut(duration: 0.3)) { isFinishing = true }
         }
         .onAppear { updateETA(for: progress) }
     }
@@ -40,7 +52,12 @@ struct TranscribingPane: View {
                     .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.primaryText)
                 Spacer()
-                if let progress {
+                if isFinishing {
+                    Text("Finishing…")
+                        .font(DS.Font.captionMono)
+                        .foregroundStyle(DS.Color.secondaryText)
+                        .transition(.opacity)
+                } else if let progress {
                     Text("\(Int(progress * 100))%")
                         .font(DS.Font.captionMono)
                         .foregroundStyle(DS.Color.secondaryText)
@@ -60,7 +77,7 @@ struct TranscribingPane: View {
                     }
                 }
             }
-            if let progress {
+            if let progress, !isFinishing {
                 ProgressView(value: progress)
                     .progressViewStyle(.linear)
                     .tint(DS.Color.accent)
