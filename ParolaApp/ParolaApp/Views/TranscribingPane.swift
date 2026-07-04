@@ -8,6 +8,7 @@ struct TranscribingPane: View {
 
     @State private var eta = ETACalculator()
     @State private var etaLabel: String?
+    @State private var startDate = Date()
 
     private static let tailID = "transcribing.tail"
     private var hasText: Bool { !partial.isEmpty }
@@ -20,6 +21,7 @@ struct TranscribingPane: View {
         .padding(DS.Spacing.large)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onChange(of: progress) { _, newValue in updateETA(for: newValue) }
+        .onChange(of: file) { _, _ in startDate = Date() }
         .onAppear { updateETA(for: progress) }
     }
 
@@ -46,6 +48,13 @@ struct TranscribingPane: View {
                         Text("\(etaLabel) left")
                             .font(DS.Font.captionMono)
                             .foregroundStyle(DS.Color.secondaryText)
+                    }
+                } else {
+                    TimelineView(.periodic(from: startDate, by: 1)) { context in
+                        Text("\(ETACalculator.format(context.date.timeIntervalSince(startDate))) elapsed")
+                            .font(DS.Font.captionMono)
+                            .foregroundStyle(DS.Color.secondaryText)
+                            .monospacedDigit()
                     }
                 }
             }
