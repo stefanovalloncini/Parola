@@ -137,4 +137,21 @@ struct AppModelPostProcessTests {
 
         #expect(model.findReplaceRules.isEmpty)
     }
+
+    @Test("static pipeline matches the instance postProcess result")
+    func staticPipelineMatchesInstance() {
+        let model = makeModel()
+        model.ignoredSegmentRules = [IgnoredSegmentRule(pattern: "noise")]
+        model.findReplaceRules = [FindReplaceRule(find: "teh", replace: "the")]
+        let input = Self.transcript(["noise", "teh perchè", "un pò"])
+
+        let viaInstance = model.postProcess(input)
+        let viaStatic = AppModel.postProcess(
+            input,
+            ignoredRules: model.ignoredSegmentRules,
+            findReplaceRules: model.findReplaceRules
+        )
+
+        #expect(viaStatic.segments == viaInstance.segments)
+    }
 }

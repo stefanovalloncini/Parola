@@ -1151,7 +1151,7 @@ final class AppModel {
                     progressHandler: makeFileProgressHandler()
                 )
                 try Task.checkCancellation()
-                let processed = postProcess(result)
+                let processed = await postProcessDetached(result)
                 selectedEntryID = nil
                 transcript = processed
                 filePartialText = ""
@@ -1285,7 +1285,7 @@ final class AppModel {
                     downloadProgress: makeDownloadProgressHandler(for: selectedModel)
                 )
                 try Task.checkCancellation()
-                let processed = postProcess(result)
+                let processed = await postProcessDetached(result)
                 selectedEntryID = nil
                 transcript = processed
                 phase = .ready
@@ -1309,7 +1309,7 @@ final class AppModel {
                 phase = .transcribing(file: url)
                 let result = try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: selectedLanguage)
                 try Task.checkCancellation()
-                let processed = postProcess(result)
+                let processed = await postProcessDetached(result)
                 selectedEntryID = nil
                 transcript = processed
                 phase = .ready
@@ -1568,7 +1568,7 @@ final class AppModel {
                 let events = try await s.start(options: opts, speakerLabeler: nil, downloadProgress: progress)
                 phase = .recording(source: .microphone)
                 for await event in events {
-                    handleStreamingEvent(event)
+                    await handleStreamingEvent(event)
                 }
             } catch {
                 teardownStreaming()
@@ -1591,7 +1591,7 @@ final class AppModel {
         stopSilenceWatch()
     }
 
-    func handleStreamingEvent(_ event: StreamingEvent) {
+    func handleStreamingEvent(_ event: StreamingEvent) async {
         switch event {
         case .partial(let text):
             if livePartialText != text { livePartialText = text }
@@ -1609,7 +1609,7 @@ final class AppModel {
             phase = .failed(message: msg)
             drainDeferredArrivals()
         case .finished(let transcript):
-            let processed = postProcess(transcript)
+            let processed = await postProcessDetached(transcript)
             self.selectedEntryID = nil
             self.transcript = processed
             self.livePartialText = ""
@@ -1652,7 +1652,7 @@ final class AppModel {
                     source: FileAudioSource(url: url),
                     options: currentOptions
                 )
-                let processed = postProcess(result)
+                let processed = await postProcessDetached(result)
                 selectedEntryID = nil
                 transcript = processed
                 phase = .ready

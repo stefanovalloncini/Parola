@@ -182,4 +182,23 @@ struct ItalianOrthographyTests {
         #expect(out.first?.words?.map(\.word) == ["un", "po'"])
         #expect(out.first?.text == "un po'")
     }
+
+    @Test("all-caps grave form is still corrected")
+    func correctsAllCapsGrave() {
+        let out = ItalianOrthography.apply(to: [seg(0, "PERCHÈ NO")], language: "it")
+        #expect(out.first?.text == "PERCHÉ NO")
+    }
+
+    @Test("text without accents or po returns unchanged")
+    func leavesPlainTextUntouched() {
+        let text = "una frase del tutto normale senza correzioni"
+        let out = ItalianOrthography.apply(to: [seg(0, text)], language: "it")
+        #expect(out.first?.text == text)
+    }
+
+    @Test("grave family and truncation both fire in one segment")
+    func correctsMixedSegment() {
+        let out = ItalianOrthography.apply(to: [seg(0, "perchè un pò così")], language: "it")
+        #expect(out.first?.text == "perché un po' così")
+    }
 }

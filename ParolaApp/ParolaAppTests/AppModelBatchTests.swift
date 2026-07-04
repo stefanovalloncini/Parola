@@ -267,7 +267,7 @@ struct AppModelBatchTests {
     }
 
     @Test("a completed batch job is post-processed before it is stored and shown")
-    func completedBatchJobIsPostProcessed() {
+    func completedBatchJobIsPostProcessed() async {
         let model = makeModel()
         model.batchExportFormats = []
         model.ignoredSegmentRules = [IgnoredSegmentRule(pattern: "uh")]
@@ -284,7 +284,7 @@ struct AppModelBatchTests {
             language: "it",
             modelName: "stub"
         )
-        model.handleBatchEvent(.completed(jobID: job.id, transcript: raw))
+        await model.handleBatchEvent(.completed(jobID: job.id, transcript: raw))
 
         #expect(model.transcript?.segments.map(\.text) == ["perché Acme spende un po'"])
         #expect(model.batchJobs[0].transcript?.segments.map(\.text) == ["perché Acme spende un po'"])
@@ -292,10 +292,10 @@ struct AppModelBatchTests {
     }
 
     @Test("cancelCurrentWork marks all in-flight batch jobs cancelled and returns phase to idle")
-    func cancelCurrentWorkMarksBatchJobsCancelled() {
+    func cancelCurrentWorkMarksBatchJobsCancelled() async {
         let model = makeModel()
         model.startBatch(urls: [URL(fileURLWithPath: "/tmp/a.wav"), URL(fileURLWithPath: "/tmp/b.wav")])
-        model.handleBatchEvent(.started(jobID: model.batchJobs[0].id))
+        await model.handleBatchEvent(.started(jobID: model.batchJobs[0].id))
         model.cancelCurrentWork()
         #expect(model.batchJobs.allSatisfy { $0.status == .cancelled })
         #expect(model.phase == .idle)
@@ -313,13 +313,13 @@ struct AppModelBatchTests {
     }
 
     @Test("batch job selection clears the loaded library entry")
-    func selectBatchJobClearsSelectedEntry() {
+    func selectBatchJobClearsSelectedEntry() async {
         let model = makeModel()
         model.startBatch(urls: [URL(fileURLWithPath: "/tmp/a.wav")])
         let jobID = model.batchJobs[0].id
-        model.handleBatchEvent(.started(jobID: jobID))
+        await model.handleBatchEvent(.started(jobID: jobID))
         let t = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")], language: "en", modelName: "m")
-        model.handleBatchEvent(.completed(jobID: jobID, transcript: t))
+        await model.handleBatchEvent(.completed(jobID: jobID, transcript: t))
 
         model.selectedEntryID = "stale-entry"
         model.selectBatchJob(jobID)
@@ -346,13 +346,13 @@ struct AppModelBatchTests {
     }
 
     @Test("deferred arrivals drain into the batch when recording finishes")
-    func deferredArrivalsDrainOnFinish() {
+    func deferredArrivalsDrainOnFinish() async {
         let model = makeModel()
         model.phase = .recording(source: .microphone)
         let url = URL(fileURLWithPath: "/tmp/arrival.wav")
         model.transcribe(fileURL: url)
         let final = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")], language: "en", modelName: "m")
-        model.handleStreamingEvent(.finished(final))
+        await model.handleStreamingEvent(.finished(final))
         #expect(model.deferredArrivals.isEmpty)
         #expect(model.batchJobs.contains { $0.url == url })
     }
@@ -368,10 +368,10 @@ struct AppModelBatchTests {
     }
 
     @Test("single-file arrivals during a running batch join the queue")
-    func runningBatchAbsorbsSingleArrival() {
+    func runningBatchAbsorbsSingleArrival() async {
         let model = makeModel()
         model.startBatch(urls: [URL(fileURLWithPath: "/tmp/a.wav")])
-        model.handleBatchEvent(.started(jobID: model.batchJobs[0].id))
+        await model.handleBatchEvent(.started(jobID: model.batchJobs[0].id))
         let url = URL(fileURLWithPath: "/tmp/late.wav")
         model.transcribe(fileURL: url)
         #expect(model.batchJobs.contains { $0.url == url && $0.status == .pending })

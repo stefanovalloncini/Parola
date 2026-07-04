@@ -50,12 +50,21 @@ public enum ItalianOrthography {
 
     static func correct(_ text: String) -> String {
         guard !text.isEmpty else { return text }
+        // Every grave-family match contains è/È and every truncation match contains po/pò,
+        // so this prefilter lets most text skip the regex pipeline entirely.
+        let mayHaveGrave = text.contains("è") || text.contains("È")
+        let mayHaveTruncation = text.contains("po") || text.contains("pò")
+        guard mayHaveGrave || mayHaveTruncation else { return text }
         var result = text
-        for (regex, acute) in corrections {
-            result = replaceMatches(of: regex, in: result, with: acute)
+        if mayHaveGrave {
+            for (regex, acute) in corrections {
+                result = replaceMatches(of: regex, in: result, with: acute)
+            }
         }
-        for (regex, replacement) in truncations {
-            result = replaceMatches(of: regex, in: result, with: replacement)
+        if mayHaveTruncation {
+            for (regex, replacement) in truncations {
+                result = replaceMatches(of: regex, in: result, with: replacement)
+            }
         }
         return result
     }

@@ -76,7 +76,7 @@ extension AppModel {
         runBatchTask(jobs: jobs)
     }
 
-    func handleBatchEvent(_ event: BatchEvent) {
+    func handleBatchEvent(_ event: BatchEvent) async {
         switch event {
         case .started(let id):
             guard !isCancelled(id) else { return }
@@ -84,7 +84,7 @@ extension AppModel {
             phase = .transcribing(file: batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/"))
         case .completed(let id, let transcript):
             guard !isCancelled(id) else { return }
-            let processed = postProcess(transcript)
+            let processed = await postProcessDetached(transcript)
             mutateBatchJob(id) { $0.status = .done; $0.transcript = processed; $0.progress = 1 }
             if id == selectedBatchJobID { selectedEntryID = nil; self.transcript = processed }
             if let job = batchJobs.first(where: { $0.id == id }) {
@@ -116,7 +116,7 @@ extension AppModel {
             let events = await queue.process(jobs: jobs, options: opts)
             for await event in events {
                 if Task.isCancelled { break }
-                self?.handleBatchEvent(event)
+                await self?.handleBatchEvent(event)
             }
         }
     }
