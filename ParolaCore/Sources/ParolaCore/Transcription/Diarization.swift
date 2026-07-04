@@ -6,6 +6,7 @@ import Foundation
 /// with speaker IDs. Invoked by ``TranscriptionSession`` when diarization is requested.
 actor DiarizationService {
     private var speakerKit: SpeakerKit?
+    private(set) var unloadCount = 0
 
     init() {}
 
@@ -48,6 +49,7 @@ actor DiarizationService {
     }
 
     func unload() async {
+        unloadCount += 1
         await speakerKit?.unloadModels()
         speakerKit = nil
     }

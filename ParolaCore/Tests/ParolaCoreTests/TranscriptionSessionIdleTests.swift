@@ -1,0 +1,183 @@
+import Foundation
+import Testing
+@testable import ParolaCore
+
+final class TestClock: Clock, @unchecked Sendable {
+    struct Instant: InstantProtocol, Hashable {
+        var offset: Swift.Duration
+
+        func advanced(by duration: Swift.Duration) -> Instant { Instant(offset: offset + duration) }
+        func duration(to other: Instant) -> Swift.Duration { other.offset - offset }
+        static func < (lhs: Instant, rhs: Instant) -> Bool { lhs.offset < rhs.offset }
+    }
+
+    typealias Duration = Swift.Duration
+
+    private struct Sleeper {
+        let id: UUID
+        let deadline: Instant
+        let continuation: CheckedContinuation<Void, any Error>
+    }
+
+    private let lock = NSLock()
+    private var currentInstant = Instant(offset: .zero)
+    private var sleepers: [Sleeper] = []
+    private var cancelledIDs: Set<UUID> = []
+
+    var now: Instant {
+        lock.lock()
+        defer { lock.unlock() }
+        return currentInstant
+    }
+
+    var minimumResolution: Swift.Duration { .zero }
+
+    var sleeperCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return sleepers.count
+    }
+
+    func sleep(until deadline: Instant, tolerance: Swift.Duration?) async throws {
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                lock.lock()
+                if cancelledIDs.remove(id) != nil {
+                    lock.unlock()
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                if deadline <= currentInstant {
+                    lock.unlock()
+                    continuation.resume()
+                    return
+                }
+                sleepers.append(Sleeper(id: id, deadline: deadline, continuation: continuation))
+                lock.unlock()
+            }
+        } onCancel: {
+            lock.lock()
+            if let index = sleepers.firstIndex(where: { $0.id == id }) {
+                let sleeper = sleepers.remove(at: index)
+                lock.unlock()
+                sleeper.continuation.resume(throwing: CancellationError())
+            } else {
+                cancelledIDs.insert(id)
+                lock.unlock()
+            }
+        }
+    }
+
+    func advance(by duration: Swift.Duration) {
+        lock.lock()
+        currentInstant = currentInstant.advanced(by: duration)
+        let now = currentInstant
+        var due: [Sleeper] = []
+        sleepers.removeAll { sleeper in
+            guard sleeper.deadline <= now else { return false }
+            due.append(sleeper)
+            return true
+        }
+        lock.unlock()
+        for sleeper in due { sleeper.continuation.resume() }
+    }
+}
+
+@Suite("Transcription session idle policy")
+struct TranscriptionSessionIdleTests {
+    actor IdleStubTranscriber: Transcriber {
+        static let engineID = EngineID.whisperKit
+        static let capabilities = EngineCapabilities.whisperKitDefaults
+
+        private var loaded: String?
+
+        func load(model: String) async throws { loaded = model }
+        func unload() async { loaded = nil }
+        func loadedModelName() async -> String? { loaded }
+
+        func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+            Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "ok")],
+                language: "en",
+                modelName: loaded ?? "?",
+                sourceURL: url,
+                durationSeconds: 1
+            )
+        }
+    }
+
+    private func makeSession(clock: TestClock) async throws -> (session: TranscriptionSession, audioURL: URL) {
+        let registry = EngineRegistry()
+        await registry.register(
+            engineID: .whisperKit,
+            capabilities: .whisperKitDefaults
+        ) { _ in IdleStubTranscriber() }
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-idle-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let store = ModelStore(modelsDirectory: dir)
+        try FileManager.default.createDirectory(
+            at: store.installedURL(for: "openai_whisper-tiny"),
+            withIntermediateDirectories: true
+        )
+        let session = TranscriptionSession(modelStore: store, registry: registry, clock: clock)
+        let audioURL = dir.appendingPathComponent("input.wav")
+        try Data("RIFFstub".utf8).write(to: audioURL)
+        return (session, audioURL)
+    }
+
+    private func poll(
+        budget: Duration = .seconds(10),
+        until condition: @Sendable () async -> Bool
+    ) async -> Bool {
+        let deadline = ContinuousClock.now + budget
+        while ContinuousClock.now < deadline {
+            if await condition() { return true }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return await condition()
+    }
+
+    @Test("diarizer unloads at its short idle while the model stays warm; model unloads at the long idle")
+    func splitIdleUnload() async throws {
+        let clock = TestClock()
+        let (session, audioURL) = try await makeSession(clock: clock)
+        _ = try await session.transcribe(
+            source: FileAudioSource(url: audioURL),
+            options: TranscriptionOptions(model: "openai_whisper-tiny")
+        )
+
+        let bothTimersArmed = await poll { clock.sleeperCount == 2 }
+        #expect(bothTimersArmed, "expected separate diarizer and model idle timers")
+
+        clock.advance(by: .seconds(60))
+        let diarizerDropped = await poll { await session.diarizer.unloadCount >= 1 }
+        #expect(diarizerDropped, "diarizer should unload at the 60s idle")
+        #expect(await session.currentModel() == "openai_whisper-tiny", "ASR model must stay warm past the diarizer idle")
+
+        clock.advance(by: .seconds(540))
+        let modelDropped = await poll { await session.currentModel() == nil }
+        #expect(modelDropped, "ASR model should unload at the 600s idle")
+    }
+
+    @Test("a new transcribe within the diarizer idle window rearms both timers")
+    func newWorkRearmsTimers() async throws {
+        let clock = TestClock()
+        let (session, audioURL) = try await makeSession(clock: clock)
+        let options = TranscriptionOptions(model: "openai_whisper-tiny")
+        _ = try await session.transcribe(source: FileAudioSource(url: audioURL), options: options)
+        _ = await poll { clock.sleeperCount == 2 }
+
+        clock.advance(by: .seconds(30))
+        _ = try await session.transcribe(source: FileAudioSource(url: audioURL), options: options)
+        _ = await poll { clock.sleeperCount == 2 }
+
+        clock.advance(by: .seconds(45))
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(await session.diarizer.unloadCount == 0, "75s after first use but 45s after the last: no unload yet")
+        #expect(await session.currentModel() == "openai_whisper-tiny")
+
+        await session.unloadModel()
+    }
+}

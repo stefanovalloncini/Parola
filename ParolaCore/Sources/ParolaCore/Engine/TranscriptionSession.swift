@@ -3,24 +3,28 @@ import Foundation
 /// Top-level orchestrator. Resolves the right `Transcriber` for the selected model via the
 /// shared `EngineRegistry`, manages model loading, and emits transcription events.
 ///
-/// Idle-unload: after `idleTimeout` seconds of inactivity, the active transcriber is released
-/// to free memory; the next transcribe call transparently reloads.
+/// Idle-unload: the diarizer is released after a short fixed idle; the active transcriber
+/// stays warm until `idleTimeout` seconds of inactivity or critical memory pressure, then
+/// the next transcribe call transparently reloads.
 public actor TranscriptionSession {
     public let modelStore: ModelStore
     public var idleTimeout: TimeInterval
 
     private let registry: EngineRegistry
-    private let diarizer = DiarizationService()
+    let diarizer = DiarizationService()
+    private let diarizerIdleTimeout: TimeInterval = 60
     private let clock: any Clock<Duration>
     private var transcriber: (any Transcriber)?
     private var transcriberEngineID: EngineID?
     private var idleTask: Task<Void, Never>?
+    private var diarizerIdleTask: Task<Void, Never>?
     private var idleEpoch: Int = 0
+    private var pressureSource: (any DispatchSourceMemoryPressure)?
 
     public init(
         modelStore: ModelStore = .shared,
         registry: EngineRegistry = .shared,
-        idleTimeout: TimeInterval = 60,
+        idleTimeout: TimeInterval = 600,
         clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.modelStore = modelStore
@@ -37,6 +41,7 @@ public actor TranscriptionSession {
         partialHandler: (@Sendable (String) -> Void)? = nil,
         progressHandler: (@Sendable (Double) -> Void)? = nil
     ) async throws -> Transcript {
+        installPressureSourceIfNeeded()
         await ensureBootstrap()
         let modelName = options.model ?? defaultModelName()
         try Task.checkCancellation()
@@ -78,6 +83,7 @@ public actor TranscriptionSession {
     /// Best-effort warm-up: bootstraps the engine and loads the requested model if it's installed.
     /// Silently no-ops if the model isn't downloaded or load fails — pre-warming is opportunistic.
     public func prewarm(modelName: String) async {
+        installPressureSourceIfNeeded()
         await ensureBootstrap()
         guard modelStore.isInstalled(modelName) else { return }
         let engineID = ModelCatalog.variant(id: modelName)?.engineID ?? .whisperKit
@@ -164,15 +170,26 @@ public actor TranscriptionSession {
 
     private func scheduleIdleUnload() {
         cancelIdleTimer()
-        let timeout = idleTimeout
+        let modelTimeout = idleTimeout
+        let diarizerTimeout = min(diarizerIdleTimeout, idleTimeout)
         let clock = clock
         idleEpoch &+= 1
         let myEpoch = idleEpoch
+        diarizerIdleTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(diarizerTimeout), clock: clock)
+            if Task.isCancelled { return }
+            await self?.unloadDiarizerIfIdle(epoch: myEpoch)
+        }
         idleTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(timeout), clock: clock)
+            try? await Task.sleep(for: .seconds(modelTimeout), clock: clock)
             if Task.isCancelled { return }
             await self?.unloadIfIdle(epoch: myEpoch)
         }
+    }
+
+    private func unloadDiarizerIfIdle(epoch: Int) async {
+        guard epoch == idleEpoch else { return }
+        await diarizer.unload()
     }
 
     private func unloadIfIdle(epoch: Int) async {
@@ -183,8 +200,21 @@ public actor TranscriptionSession {
     private func cancelIdleTimer() {
         idleTask?.cancel()
         idleTask = nil
+        diarizerIdleTask?.cancel()
+        diarizerIdleTask = nil
         // Invalidate any timer that already slipped past its isCancelled check, so it can't
         // unload mid-transcribe (cancel() alone doesn't bump the epoch its guard compares).
         idleEpoch &+= 1
+    }
+
+    private func installPressureSourceIfNeeded() {
+        guard pressureSource == nil else { return }
+        let source = DispatchSource.makeMemoryPressureSource(eventMask: .critical, queue: .global())
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            Task { await self.unloadModel() }
+        }
+        source.activate()
+        pressureSource = source
     }
 }
