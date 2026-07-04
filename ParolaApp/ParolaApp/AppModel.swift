@@ -224,6 +224,15 @@ final class AppModel {
         ModelCatalog.variant(id: id)?.displayName ?? id
     }
 
+    // False only for Parakeet, which emits nothing until the end — so its empty window isn't "preparing".
+    nonisolated static func engineStreamsPartials(_ id: String) -> Bool {
+        ModelCatalog.variant(id: id)?.engineID != .parakeet
+    }
+
+    var activeEngineStreamsPartials: Bool {
+        AppModel.engineStreamsPartials(selectedModel)
+    }
+
     /// Non-blocking advisory when the selected model rejects the explicitly chosen language; nil for Auto-detect, matching TranscriptionSession.validate.
     var languageMismatchWarning: String? {
         guard let language = selectedLanguage,

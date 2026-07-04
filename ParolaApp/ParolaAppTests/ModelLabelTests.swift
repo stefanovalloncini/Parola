@@ -23,3 +23,25 @@ struct ModelLabelTests {
         #expect(AppModel.modelLabel("made-up-model-id") == "made-up-model-id")
     }
 }
+
+@Suite("Engine streams-partials gate")
+struct EngineStreamsPartialsTests {
+    @Test("streaming engines report progressively, so an empty window means preparing", arguments: [
+        "openai_whisper-large-v3_turbo",
+        "openai_whisper-tiny",
+        "apple-speech-analyzer",
+    ])
+    func streamingEnginesQualify(id: String) {
+        #expect(AppModel.engineStreamsPartials(id))
+    }
+
+    @Test("Parakeet works silently until the end, so it never shows a preparing label")
+    func parakeetDoesNotQualify() {
+        #expect(!AppModel.engineStreamsPartials("nvidia_parakeet-tdt-0.6b-v2"))
+    }
+
+    @Test("an unknown model id defaults to streaming")
+    func unknownIDDefaultsToStreaming() {
+        #expect(AppModel.engineStreamsPartials("made-up-model-id"))
+    }
+}

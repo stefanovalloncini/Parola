@@ -5,19 +5,30 @@ struct TranscribingPane: View {
     let file: URL
     let partial: String
     let progress: Double?
+    var expectsPartials: Bool = true
 
     @State private var eta = ETACalculator()
     @State private var etaLabel: String?
     @State private var startDate = Date()
     @State private var settled = ""
     @State private var isFinishing = false
+    @State private var isPreparing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let tailID = "transcribing.tail"
     private static let caretBlinkPeriod: Double = 0.6
     private static let finishingProgressThreshold = 0.9
     private static let finishingStallSeconds: Double = 3
+    private static let preparingGraceSeconds: Double = 2.5
     private var hasText: Bool { !partial.isEmpty }
+    private var awaitingFirstOutput: Bool { !hasText && progress == nil }
+    private var showsPreparing: Bool { isPreparing && awaitingFirstOutput }
+
+    private var titleKey: LocalizedStringKey {
+        showsPreparing
+            ? "Preparing \(file.lastPathComponent)…"
+            : "Transcribing \(file.lastPathComponent)…"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.regular) {
@@ -34,6 +45,16 @@ struct TranscribingPane: View {
             startDate = Date()
             settled = ""
             isFinishing = false
+            isPreparing = false
+        }
+        .task(id: awaitingFirstOutput) {
+            guard expectsPartials, awaitingFirstOutput else {
+                if isPreparing { withAnimation(.easeOut(duration: 0.25)) { isPreparing = false } }
+                return
+            }
+            try? await Task.sleep(for: .seconds(Self.preparingGraceSeconds))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.3)) { isPreparing = true }
         }
         .task(id: partial) {
             try? await Task.sleep(for: .milliseconds(900))
@@ -50,9 +71,10 @@ struct TranscribingPane: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             HStack(spacing: DS.Spacing.small) {
-                Text("Transcribing \(file.lastPathComponent)…")
+                Text(titleKey)
                     .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.primaryText)
+                    .contentTransition(.interpolate)
                 Spacer()
                 if isFinishing {
                     Text("Finishing…")
