@@ -1573,7 +1573,7 @@ final class AppModel {
         stopSilenceWatch()
     }
 
-    private func handleStreamingEvent(_ event: StreamingEvent) {
+    func handleStreamingEvent(_ event: StreamingEvent) {
         switch event {
         case .partial(let text):
             if livePartialText != text { livePartialText = text }
@@ -1593,6 +1593,7 @@ final class AppModel {
             let processed = postProcess(transcript)
             self.transcript = processed
             self.livePartialText = ""
+            self.liveSegments = []
             self.phase = .ready
             persistToLibrary(processed, audioSource: nil)
         }

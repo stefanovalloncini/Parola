@@ -63,4 +63,17 @@ struct AppModelRecordingMockTests {
 
         #expect(await model.shouldUseStreamingMic() == false)
     }
+
+    @Test("streaming finish clears live buffers and installs the transcript")
+    func finishedClearsLiveSegments() {
+        let model = makeModel()
+        model.liveSegments = [TranscriptSegment(id: 0, start: 0, end: 1, text: "live")]
+        model.livePartialText = "partial"
+        let final = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "done")], language: "en", modelName: "mock")
+        model.handleStreamingEvent(.finished(final))
+        #expect(model.liveSegments.isEmpty)
+        #expect(model.livePartialText.isEmpty)
+        #expect(model.transcript?.segments.first?.text == "done")
+        #expect(model.phase == .ready)
+    }
 }
