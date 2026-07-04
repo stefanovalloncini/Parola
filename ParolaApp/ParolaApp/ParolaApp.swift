@@ -172,6 +172,14 @@ struct ParolaApp: App {
                     .keyboardShortcut("d", modifiers: [.command, .shift])
                 FocusChatComposerCommand()
             }
+            CommandMenu("Playback") {
+                Button(model.isPlaying ? "Pause" : "Play") { model.togglePlayPause() }
+                    .disabled(model.player == nil)
+                Button("Skip Back 5 Seconds") { model.skip(by: -5) }
+                    .disabled(model.player == nil)
+                Button("Skip Forward 5 Seconds") { model.skip(by: 5) }
+                    .disabled(model.player == nil)
+            }
             CommandMenu("Captions") {
                 Button(scratchpad.isOpen ? "Hide Scratchpad" : "Show Scratchpad") {
                     scratchpad.toggle()

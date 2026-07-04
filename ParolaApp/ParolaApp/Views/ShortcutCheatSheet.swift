@@ -26,6 +26,11 @@ struct ShortcutCatalog {
             Entry(label: "Focus Chat Composer",    keys: "⌘ L"),
             Entry(label: "Toggle Inspector",       keys: "⌘ ⇧ I"),
         ]),
+        Section(title: "Playback", entries: [
+            Entry(label: "Play / Pause",           keys: "Space"),
+            Entry(label: "Skip Back 5 Seconds",    keys: "⌘ ←"),
+            Entry(label: "Skip Forward 5 Seconds", keys: "⌘ →"),
+        ]),
         Section(title: "Navigation", entries: [
             Entry(label: "Open Settings",          keys: "⌘ ,"),
             Entry(label: "Open File",              keys: "⌘ O"),

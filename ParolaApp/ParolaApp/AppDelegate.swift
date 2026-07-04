@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let menuBar = MenuBarController()
     private var recordingTickTask: Task<Void, Never>?
     private var recordingStartedAt: Date?
+    private let playbackKeys = PlaybackKeyMonitor()
 
     func bind(model: AppModel) {
         self.model = model
@@ -19,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             dictationStatusItem = DictationStatusItem(model: model)
         }
         menuBar.bind(model)
+        playbackKeys.bind(model)
         if dictationSubscription == nil {
             dictationSubscription = DictationSignal.subscribe { [weak self] name in
                 Task { @MainActor [weak self] in
