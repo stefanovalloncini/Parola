@@ -9,6 +9,7 @@ struct TranscribingPane: View {
     @State private var eta = ETACalculator()
     @State private var etaLabel: String?
     @State private var startDate = Date()
+    @State private var settled = ""
 
     private static let tailID = "transcribing.tail"
     private var hasText: Bool { !partial.isEmpty }
@@ -21,7 +22,14 @@ struct TranscribingPane: View {
         .padding(DS.Spacing.large)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onChange(of: progress) { _, newValue in updateETA(for: newValue) }
-        .onChange(of: file) { _, _ in startDate = Date() }
+        .onChange(of: file) { _, _ in
+            startDate = Date()
+            settled = ""
+        }
+        .task(id: partial) {
+            try? await Task.sleep(for: .milliseconds(900))
+            withAnimation(.easeOut(duration: 0.4)) { settled = partial }
+        }
         .onAppear { updateETA(for: progress) }
     }
 
@@ -82,16 +90,28 @@ struct TranscribingPane: View {
         }
     }
 
+    private var streamingTranscript: Text {
+        let parts = StreamingText.split(shown: settled, latest: partial)
+        var text = AttributedString(parts.settled)
+        text.foregroundColor = DS.Color.primaryText
+        if !parts.fresh.isEmpty {
+            var tail = AttributedString(parts.fresh)
+            tail.foregroundColor = DS.Color.primaryText.opacity(0.5)
+            text.append(tail)
+        }
+        return Text(text)
+    }
+
     private var transcriptBox: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.Spacing.regular) {
                     if hasText {
-                        Text(partial)
+                        streamingTranscript
                             .font(DS.Font.transcript)
-                            .foregroundStyle(DS.Color.primaryText)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .textSelection(.enabled)
+                            .contentTransition(.interpolate)
                             .transition(.opacity)
                     }
                     SkeletonLines(count: hasText ? 3 : 6)
@@ -101,7 +121,8 @@ struct TranscribingPane: View {
                 .animation(.easeOut(duration: 0.28), value: partial)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .onChange(of: partial) { _, _ in
+            .onChange(of: partial) { old, _ in
+                settled = old
                 withAnimation(.easeOut(duration: 0.3)) {
                     proxy.scrollTo(Self.tailID, anchor: .bottom)
                 }
