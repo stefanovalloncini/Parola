@@ -49,6 +49,7 @@ public enum BatchEvent: Sendable {
 /// warm beats lighting up two copies in parallel.
 public actor BatchQueue {
     private let session: TranscriptionSession
+    private var jobInFlight = false
 
     public init(session: TranscriptionSession = TranscriptionSession()) {
         self.session = session
@@ -58,34 +59,49 @@ public actor BatchQueue {
         jobs: [BatchJob],
         options: TranscriptionOptions
     ) -> AsyncStream<BatchEvent> {
-        let session = self.session
-        return AsyncStream { continuation in
+        AsyncStream { continuation in
             let processingTask = Task {
-                for job in jobs {
-                    if Task.isCancelled {
-                        continuation.yield(.cancelled(jobID: job.id))
-                        continue
-                    }
-                    continuation.yield(.started(jobID: job.id))
-                    do {
-                        let transcript = try await session.transcribe(
-                            source: FileAudioSource(url: job.url),
-                            options: options
-                        )
-                        continuation.yield(.completed(jobID: job.id, transcript: transcript))
-                    } catch is CancellationError {
-                        continuation.yield(.cancelled(jobID: job.id))
-                    } catch {
-                        continuation.yield(.failed(jobID: job.id, reason: String(describing: error)))
-                    }
-                }
-                continuation.yield(.finished)
-                continuation.finish()
+                await self.run(jobs: jobs, options: options, continuation: continuation)
             }
             continuation.onTermination = { _ in
                 processingTask.cancel()
-                Task { await session.cancelInFlight() }
+                Task { await self.cancelOwnInFlight() }
             }
         }
+    }
+
+    private func run(
+        jobs: [BatchJob],
+        options: TranscriptionOptions,
+        continuation: AsyncStream<BatchEvent>.Continuation
+    ) async {
+        for job in jobs {
+            if Task.isCancelled {
+                continuation.yield(.cancelled(jobID: job.id))
+                continue
+            }
+            continuation.yield(.started(jobID: job.id))
+            do {
+                jobInFlight = true
+                defer { jobInFlight = false }
+                let transcript = try await session.transcribe(
+                    source: FileAudioSource(url: job.url),
+                    options: options
+                )
+                continuation.yield(.completed(jobID: job.id, transcript: transcript))
+            } catch is CancellationError {
+                continuation.yield(.cancelled(jobID: job.id))
+            } catch {
+                continuation.yield(.failed(jobID: job.id, reason: String(describing: error)))
+            }
+        }
+        continuation.yield(.finished)
+        continuation.finish()
+    }
+
+    // The session is shared; a stale termination must not cancel work it now runs for someone else.
+    private func cancelOwnInFlight() async {
+        guard jobInFlight else { return }
+        await session.cancelInFlight()
     }
 }

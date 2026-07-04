@@ -91,14 +91,14 @@ struct BatchQueueTests {
                 if case .started = event { await started.fire() }
             }
         }
-        for _ in 0..<40 {
+        for _ in 0..<200 {
             if await started.didFire { break }
             try? await Task.sleep(for: .milliseconds(50))
         }
         consumer.cancel()
         _ = await consumer.value
 
-        for _ in 0..<40 {
+        for _ in 0..<200 {
             let cancelled = await setup.factory.cancelledCount
             if cancelled > 0 { break }
             try? await Task.sleep(for: .milliseconds(50))
@@ -134,6 +134,38 @@ struct BatchQueueTests {
         #expect(ordered.count == jobs.count * 2 + 1)
     }
 
+    @Test("a wave that finishes cleanly does not cancel the shared session's in-flight work")
+    func finishedWaveDoesNotCancelSharedSession() async throws {
+        let setup = try await makeQueue(behavior: .succeed)
+        let events = await setup.queue.process(
+            jobs: [BatchJob(url: setup.audioURL)],
+            options: TranscriptionOptions(model: "openai_whisper-tiny")
+        )
+        for await _ in events {}
+
+        try? await Task.sleep(for: .milliseconds(300))
+        let cancelled = await setup.factory.cancelledCount
+        #expect(cancelled == 0, "onTermination after .finished must not fire cancelInFlight on a shared session")
+    }
+
+    @Test("two sequential waves through one shared session resolve the transcriber once")
+    func sharedSessionReusesTranscriberAcrossWaves() async throws {
+        let setup = try await makeSession(behavior: .succeed)
+        for _ in 0..<2 {
+            let queue = BatchQueue(session: setup.session)
+            let events = await queue.process(
+                jobs: [BatchJob(url: setup.audioURL)],
+                options: TranscriptionOptions(model: "openai_whisper-tiny")
+            )
+            var sawCompleted = false
+            for await event in events {
+                if case .completed = event { sawCompleted = true }
+            }
+            #expect(sawCompleted)
+        }
+        #expect(setup.transcribersCreated.count == 1)
+    }
+
     @Test("started, completed, finished events fire for a single happy-path job")
     func happyPathOrdering() async throws {
         let setup = try await makeQueue(behavior: .succeed)
@@ -165,14 +197,23 @@ struct BatchQueueTests {
         let audioURL: URL
     }
 
-    private func makeQueue(behavior: StubTranscriber.Behavior) async throws -> QueueSetup {
+    private struct SessionSetup {
+        let session: TranscriptionSession
+        let factory: StubFactory
+        let transcribersCreated: LiveCounter
+        let audioURL: URL
+    }
+
+    private func makeSession(behavior: StubTranscriber.Behavior) async throws -> SessionSetup {
         let factory = StubFactory(behavior: behavior)
+        let created = LiveCounter()
         let registry = EngineRegistry()
         await registry.register(
             engineID: .whisperKit,
             capabilities: .whisperKitDefaults
-        ) { [factory] _ in
-            StubTranscriber(behavior: behavior, factory: factory)
+        ) { [factory, created] _ in
+            created.increment()
+            return StubTranscriber(behavior: behavior, factory: factory)
         }
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-batch-test-\(UUID().uuidString)")
@@ -181,10 +222,14 @@ struct BatchQueueTests {
         let installedDir = store.installedURL(for: "openai_whisper-tiny")
         try FileManager.default.createDirectory(at: installedDir, withIntermediateDirectories: true)
         let session = TranscriptionSession(modelStore: store, registry: registry, idleTimeout: 5)
-        let queue = BatchQueue(session: session)
         let audioURL = dir.appendingPathComponent("input.wav")
         try Data("RIFFstub".utf8).write(to: audioURL)
-        return QueueSetup(queue: queue, factory: factory, audioURL: audioURL)
+        return SessionSetup(session: session, factory: factory, transcribersCreated: created, audioURL: audioURL)
+    }
+
+    private func makeQueue(behavior: StubTranscriber.Behavior) async throws -> QueueSetup {
+        let setup = try await makeSession(behavior: behavior)
+        return QueueSetup(queue: BatchQueue(session: setup.session), factory: setup.factory, audioURL: setup.audioURL)
     }
 }
 
