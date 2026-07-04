@@ -4,6 +4,11 @@ public extension Array where Element == TranscriptSegment {
     /// Binary-search for the segment whose `[start, end]` range covers `time`.
     /// Assumes segments are sorted by `start` and don't overlap.
     func binarySearchSegment(coveringTime time: Double) -> TranscriptSegment? {
+        binarySearchSegmentIndex(coveringTime: time).map { self[$0] }
+    }
+
+    /// Index variant of `binarySearchSegment(coveringTime:)` for callers that cache positions.
+    func binarySearchSegmentIndex(coveringTime time: Double) -> Int? {
         var lo = 0
         var hi = count - 1
         while lo <= hi {
@@ -14,7 +19,7 @@ public extension Array where Element == TranscriptSegment {
             } else if time > segment.end {
                 lo = mid + 1
             } else {
-                return segment
+                return mid
             }
         }
         return nil

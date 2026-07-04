@@ -352,4 +352,41 @@ struct AppModelPlayerTests {
         #expect(model.transcript?.durationSeconds == 100)
         #expect(model.transcriptVersion == before + 1)
     }
+
+    @Test("playback tick caches the segment index and stays correct across segments")
+    func segmentIndexCacheTracksPlayback() {
+        let model = makeModel()
+        model.transcript = Self.makeTranscript([(10, 0, 1), (11, 1.5, 3), (12, 3.5, 5)])
+
+        model.updateCurrentSegment(time: 2.0)
+        #expect(model.currentSegmentID == 11)
+        #expect(model.currentSegmentIndex == 1)
+
+        model.updateCurrentSegment(time: 2.5)
+        #expect(model.currentSegmentID == 11)
+        #expect(model.currentSegmentIndex == 1)
+
+        model.updateCurrentSegment(time: 4.0)
+        #expect(model.currentSegmentID == 12)
+        #expect(model.currentSegmentIndex == 2)
+
+        model.updateCurrentSegment(time: 1.2)
+        #expect(model.currentSegmentID == nil)
+        #expect(model.currentSegmentIndex == nil)
+    }
+
+    @Test("transcript replacement invalidates the cached segment index")
+    func segmentIndexCacheInvalidatesOnTranscriptChange() {
+        let model = makeModel()
+        model.transcript = Self.makeTranscript([(10, 0, 1), (11, 1.5, 3)])
+        model.updateCurrentSegment(time: 2.0)
+        #expect(model.currentSegmentIndex == 1)
+
+        model.transcript = Self.makeTranscript([(11, 0, 4)])
+        #expect(model.currentSegmentIndex == nil)
+
+        model.updateCurrentSegment(time: 2.0)
+        #expect(model.currentSegmentID == 11)
+        #expect(model.currentSegmentIndex == 0)
+    }
 }

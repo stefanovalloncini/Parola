@@ -61,6 +61,7 @@ final class AppModel {
                 return
             }
             if transcript == nil, promptOutput != nil { promptOutput = nil }
+            currentSegmentIndex = nil
             let speakers = transcript?.uniqueSpeakers ?? []
             if speakers != transcriptSpeakers { transcriptSpeakers = speakers }
             transcriptVersion &+= 1
@@ -77,6 +78,9 @@ final class AppModel {
     var showingTrash: Bool = false
     var currentSegmentID: TranscriptSegment.ID?
     var currentWordID: WordTiming.ID?
+    // Playback-tick cache: index of currentSegmentID in transcript.segments, so the 5 Hz tick
+    // validates in O(1) instead of scanning. Nil'd whenever the transcript is replaced.
+    @ObservationIgnored var currentSegmentIndex: Int?
 
     var liveSegments: [TranscriptSegment] = []
     var livePartialText: String = ""

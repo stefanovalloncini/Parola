@@ -66,4 +66,18 @@ struct SegmentLookupTests {
             #expect(segments.firstSegment(startingAfter: t)?.id == expected)
         }
     }
+
+    @Test("index variant agrees with the segment variant")
+    func indexVariantAgrees() {
+        let segments = [
+            TranscriptSegment(id: 1, start: 0, end: 1, text: "a"),
+            TranscriptSegment(id: 2, start: 1.5, end: 2, text: "b"),
+            TranscriptSegment(id: 3, start: 2, end: 3, text: "c"),
+        ]
+        for t in stride(from: -0.5, through: 3.5, by: 0.25) {
+            let idx = segments.binarySearchSegmentIndex(coveringTime: t)
+            #expect(idx.map { segments[$0] } == segments.binarySearchSegment(coveringTime: t))
+        }
+        #expect([TranscriptSegment]().binarySearchSegmentIndex(coveringTime: 1) == nil)
+    }
 }

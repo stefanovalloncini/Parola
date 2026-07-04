@@ -61,14 +61,9 @@ extension AppModel {
 
     func updateCurrentSegment(time: Double) {
         guard let segments = transcript?.segments else { return }
-        let match: TranscriptSegment?
-        if let cached = currentSegmentID,
-           let idx = segments.firstIndex(where: { $0.id == cached }),
-           time >= segments[idx].start && time <= segments[idx].end {
-            match = segments[idx]
-        } else {
-            match = segments.binarySearchSegment(coveringTime: time)
-        }
+        let matchIndex = cachedOrSearchedIndex(in: segments, coveringTime: time)
+        currentSegmentIndex = matchIndex
+        let match = matchIndex.map { segments[$0] }
         if currentSegmentID != match?.id {
             currentSegmentID = match?.id
         }
@@ -76,6 +71,23 @@ extension AppModel {
         if currentWordID != newWordID {
             currentWordID = newWordID
         }
+    }
+
+    private func cachedOrSearchedIndex(in segments: [TranscriptSegment], coveringTime time: Double) -> Int? {
+        if let idx = currentSegmentIndex,
+           segments.indices.contains(idx),
+           segments[idx].id == currentSegmentID,
+           time >= segments[idx].start, time <= segments[idx].end {
+            return idx
+        }
+        // Externally-set currentSegmentID (find navigation, deep links) has no cached index yet;
+        // honor its stickiness once, then the index fast path takes over.
+        if let cached = currentSegmentID,
+           let idx = segments.firstIndex(where: { $0.id == cached }),
+           time >= segments[idx].start, time <= segments[idx].end {
+            return idx
+        }
+        return segments.binarySearchSegmentIndex(coveringTime: time)
     }
 
     func seek(to segment: TranscriptSegment) {
@@ -109,7 +121,8 @@ extension AppModel {
               !segments.isEmpty else {
             return
         }
-        guard let currentSegment = segments.binarySearchSegment(coveringTime: currentTime),
+        guard let currentIndex = cachedOrSearchedIndex(in: segments, coveringTime: currentTime),
+              case let currentSegment = segments[currentIndex],
               let nextSegment = segments.firstSegment(startingAfter: currentSegment.end + 0.4) else {
             return
         }
