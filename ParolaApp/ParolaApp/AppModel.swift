@@ -1106,8 +1106,11 @@ final class AppModel {
         noteRecentFile(fileURL)
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
-        if let duration = FileAudioSource(url: fileURL).synchronousDuration() {
-            pendingMediaDuration = duration
+        let probeSource = FileAudioSource(url: fileURL)
+        Task { [weak self] in
+            let duration = await Task.detached { probeSource.synchronousDuration() }.value
+            guard let self, let duration, self.sourceFileURL == fileURL else { return }
+            if self.pendingMediaDuration == nil { self.pendingMediaDuration = duration }
         }
         filePartialText = ""
         fileTranscribeFraction = nil

@@ -29,7 +29,7 @@ public struct FileAudioSource: AudioSource {
         }
     }
 
-    /// Reads the file's duration synchronously from its header. Returns nil when the file is
+    /// Reads the file's duration synchronously from its header — blocking I/O, never call on the main actor. Returns nil when the file is
     /// unreadable or not a decodable audio track, in which case fall back to `estimatedDuration()`.
     public func synchronousDuration() -> Double? {
         guard let file = try? AVAudioFile(forReading: url) else { return nil }
