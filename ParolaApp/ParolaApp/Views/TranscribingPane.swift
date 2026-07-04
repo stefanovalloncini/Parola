@@ -11,8 +11,10 @@ struct TranscribingPane: View {
     @State private var startDate = Date()
     @State private var settled = ""
     @State private var isFinishing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let tailID = "transcribing.tail"
+    private static let caretBlinkPeriod: Double = 0.6
     private static let finishingProgressThreshold = 0.9
     private static let finishingStallSeconds: Double = 3
     private var hasText: Bool { !partial.isEmpty }
@@ -105,7 +107,7 @@ struct TranscribingPane: View {
         }
     }
 
-    private var streamingTranscript: Text {
+    private func streamingTranscript(caretVisible: Bool) -> Text {
         let parts = StreamingText.split(shown: settled, latest: partial)
         var text = AttributedString(parts.settled)
         text.foregroundColor = DS.Color.primaryText
@@ -114,7 +116,8 @@ struct TranscribingPane: View {
             tail.foregroundColor = DS.Color.primaryText.opacity(0.5)
             text.append(tail)
         }
-        return Text(text)
+        return Text(text) + Text(verbatim: "\u{258F}")
+            .foregroundStyle(DS.Color.accent.opacity(caretVisible ? 1 : 0))
     }
 
     private var transcriptBox: some View {
@@ -122,12 +125,16 @@ struct TranscribingPane: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.Spacing.regular) {
                     if hasText {
-                        streamingTranscript
-                            .font(DS.Font.transcript)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .textSelection(.enabled)
-                            .contentTransition(.interpolate)
-                            .transition(.opacity)
+                        TimelineView(.periodic(from: startDate, by: Self.caretBlinkPeriod)) { context in
+                            let ticks = Int(context.date.timeIntervalSince(startDate) / Self.caretBlinkPeriod)
+                            streamingTranscript(caretVisible: reduceMotion || ticks % 2 == 0)
+                                .font(DS.Font.transcript)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+                                .contentTransition(.interpolate)
+                                .accessibilityLabel(partial)
+                        }
+                        .transition(.opacity)
                     }
                     SkeletonLines(count: hasText ? 3 : 6)
                         .id(Self.tailID)
