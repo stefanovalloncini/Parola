@@ -320,4 +320,26 @@ struct AppModelPlayerTests {
         model.updateCurrentSegment(time: 1)
         #expect(model.currentSegmentID == 7)
     }
+
+    // MARK: - skipTarget, skip, togglePlayPause, seekToSegment
+
+    @Test("skipTarget clamps to zero")
+    func testSkipTargetClampsToZero() {
+        #expect(AppModel.skipTarget(current: 2, by: -5) == 0)
+    }
+
+    @Test("skipTarget adds delta")
+    func testSkipTargetAddsDelta() {
+        #expect(AppModel.skipTarget(current: 10, by: 5) == 15)
+        #expect(AppModel.skipTarget(current: 10, by: -5) == 5)
+    }
+
+    @Test("seekToSegment without a player is a no-op")
+    func testSeekToSegmentWithoutPlayer() {
+        let model = makeModel()
+        model.transcript = Self.makeTranscript([(7, 3, 5)])
+
+        model.seekToSegment(id: 7)
+        #expect(model.currentSegmentID == nil)
+    }
 }

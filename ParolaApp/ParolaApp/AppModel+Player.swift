@@ -125,4 +125,26 @@ extension AppModel {
         player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
         player.play()
     }
+
+    static func skipTarget(current: Double, by delta: Double) -> Double {
+        max(0, current + delta)
+    }
+
+    func togglePlayPause() {
+        guard let player else { return }
+        if player.timeControlStatus == .playing { player.pause() } else { player.play() }
+    }
+
+    func skip(by seconds: Double) {
+        guard let player else { return }
+        let target = Self.skipTarget(current: CMTimeGetSeconds(player.currentTime()), by: seconds)
+        player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        currentTimeSeconds = target
+        updateCurrentSegment(time: target)
+    }
+
+    func seekToSegment(id: TranscriptSegment.ID) {
+        guard player != nil, let seg = transcript?.segments.first(where: { $0.id == id }) else { return }
+        seek(to: seg)
+    }
 }

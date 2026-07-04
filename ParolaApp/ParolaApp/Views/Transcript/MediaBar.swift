@@ -106,17 +106,12 @@ struct MediaBar: View {
     }
 
     private func togglePlayPause() {
-        guard let player = model.player else { return }
-        if player.timeControlStatus == .playing {
-            player.pause()
-        } else {
-            let duration = model.transcript?.durationSeconds ?? 0
-            if duration > 0, model.currentTimeSeconds >= duration - 0.05 {
-                player.seek(to: .zero)
-            }
-            player.play()
-            applyRate()
+        let duration = model.transcript?.durationSeconds ?? 0
+        if duration > 0, model.currentTimeSeconds >= duration - 0.05 {
+            model.player?.seek(to: .zero)
         }
+        model.togglePlayPause()
+        applyRate()
     }
 
     private func applyRate() {
