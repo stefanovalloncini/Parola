@@ -2,98 +2,151 @@ import SwiftUI
 import ParolaCore
 
 struct ContinuousTranscriptView: View {
-    @Environment(AppModel.self) private var model
-
     var body: some View {
-        ScrollView {
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
-                ContinuousParagraph()
-                    .frame(maxWidth: 720, alignment: .leading)
-                    .padding(.horizontal, DS.Spacing.large)
-                    .padding(.vertical, DS.Spacing.large)
-                Spacer(minLength: 0)
+        ScrollViewReader { proxy in
+            ScrollView {
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    ContinuousChunks(scrollProxy: proxy)
+                        .frame(maxWidth: 720, alignment: .leading)
+                        .padding(.horizontal, DS.Spacing.large)
+                        .padding(.vertical, DS.Spacing.large)
+                    Spacer(minLength: 0)
+                }
             }
         }
     }
 }
 
-struct ContinuousParagraph: View {
+struct ContinuousChunks: View {
     struct SegmentRun {
         let offsets: Range<Int>
         let baseColor: Color?
     }
 
+    struct Chunk: Identifiable {
+        let id: Int
+        var text: AttributedString
+        let runs: [TranscriptSegment.ID: SegmentRun]
+    }
+
+    static let softSegmentCap = 40
+    static let hardSegmentCap = 48
+
+    let scrollProxy: ScrollViewProxy
+
     @Environment(AppModel.self) private var model
-    @State private var attributedCache: AttributedString = AttributedString()
-    @State private var segmentRuns: [TranscriptSegment.ID: SegmentRun] = [:]
+    @State private var chunks: [Chunk] = []
+    @State private var chunkIndexBySegment: [TranscriptSegment.ID: Int] = [:]
     @State private var highlightedSegmentID: TranscriptSegment.ID?
     @ScaledMetric(relativeTo: .body) private var compactSize: CGFloat = 14
     @ScaledMetric(relativeTo: .body) private var comfortableSize: CGFloat = 18
 
     var body: some View {
-        Text(attributedCache)
-            .font(.system(size: model.transcriptCompact ? compactSize : comfortableSize, weight: .regular))
-            .lineSpacing(model.transcriptCompact ? 3 : 6)
-            .textSelection(.enabled)
-            .tint(.primary)
-            .environment(\.openURL, OpenURLAction { url in
-                guard url.scheme == "parola-seek", let id = url.host.flatMap(Int.init) else { return .systemAction }
-                model.seekToSegment(id: id)
-                return .handled
-            })
-            // Definite height; without it the inspector's constraint pass re-typesets the whole-transcript Text in a loop (main-thread freeze on long audio).
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .onAppear { rebuildAttributedText() }
-            .onChange(of: model.transcriptVersion) { _, _ in rebuildAttributedText() }
-            .onChange(of: model.currentSegmentID) { _, _ in applyHighlight() }
+        LazyVStack(alignment: .leading, spacing: model.transcriptCompact ? DS.Spacing.small : DS.Spacing.medium) {
+            ForEach(chunks) { chunk in
+                Text(chunk.text)
+                    .font(.system(size: model.transcriptCompact ? compactSize : comfortableSize, weight: .regular))
+                    .lineSpacing(model.transcriptCompact ? 3 : 6)
+                    .textSelection(.enabled)
+                    // Definite height; without it the inspector's constraint pass re-typesets the chunk Text in a loop (main-thread freeze on long audio).
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .id(chunk.id)
+            }
+        }
+        .tint(.primary)
+        .environment(\.openURL, OpenURLAction { url in
+            guard url.scheme == "parola-seek", let id = url.host.flatMap(Int.init) else { return .systemAction }
+            model.seekToSegment(id: id)
+            return .handled
+        })
+        .onAppear { rebuildChunks() }
+        .onChange(of: model.transcriptVersion) { _, _ in rebuildChunks() }
+        .onChange(of: model.currentSegmentID) { _, _ in
+            applyHighlight()
+            followPlayback()
+        }
     }
 
-    private func rebuildAttributedText() {
+    private func rebuildChunks() {
         guard let transcript = model.transcript else {
-            attributedCache = AttributedString()
-            segmentRuns = [:]
+            chunks = []
+            chunkIndexBySegment = [:]
             highlightedSegmentID = nil
             return
         }
-        let built = Self.paragraph(
+        chunks = Self.build(
             segments: transcript.segments,
             useSpeakerColor: model.transcriptSpeakers.count >= 2
         )
-        attributedCache = built.text
-        segmentRuns = built.runs
+        chunkIndexBySegment = Self.chunkIndexBySegment(for: chunks)
         highlightedSegmentID = nil
         applyHighlight()
     }
 
-    static func paragraph(
+    private func applyHighlight() {
+        let nextID = model.currentSegmentID
+        guard nextID != highlightedSegmentID else { return }
+        Self.moveHighlight(
+            in: &chunks,
+            chunkIndexBySegment: chunkIndexBySegment,
+            from: highlightedSegmentID,
+            to: nextID,
+            highlightColor: DS.Color.highlight
+        )
+        highlightedSegmentID = nextID
+    }
+
+    private func followPlayback() {
+        guard let id = model.currentSegmentID,
+              model.player?.timeControlStatus == .playing,
+              let chunkID = chunkIndexBySegment[id] else { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            scrollProxy.scrollTo(chunkID, anchor: .center)
+        }
+    }
+
+    static func build(
         segments: [TranscriptSegment],
-        useSpeakerColor: Bool
-    ) -> (text: AttributedString, runs: [TranscriptSegment.ID: SegmentRun]) {
-        var attr = AttributedString()
+        useSpeakerColor: Bool,
+        softCap: Int = ContinuousChunks.softSegmentCap,
+        hardCap: Int = ContinuousChunks.hardSegmentCap
+    ) -> [Chunk] {
+        var chunks: [Chunk] = []
+        var text = AttributedString()
         var runs: [TranscriptSegment.ID: SegmentRun] = [:]
         var offset = 0
+        var segmentCount = 0
+        var lastEndedSentence = false
         var shownSpeaker: String?
+
+        func closeChunk() {
+            guard !text.characters.isEmpty else { return }
+            chunks.append(Chunk(id: chunks.count, text: text, runs: runs))
+            text = AttributedString()
+            runs = [:]
+            offset = 0
+            segmentCount = 0
+        }
+
         for seg in segments {
             let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !body.isEmpty else { continue }
             let baseColor: Color? = useSpeakerColor ? seg.speaker.map(DS.speakerColor(for:)) : nil
             if let label = useSpeakerColor ? SegmentCard.speakerLabel(for: seg.speaker) : nil,
                label != shownSpeaker {
-                if !attr.characters.isEmpty {
-                    let separator = AttributedString("\n\n")
-                    offset += separator.characters.count
-                    attr.append(separator)
-                }
+                closeChunk()
                 var heading = AttributedString(label + "\n")
                 heading.foregroundColor = baseColor
                 heading.inlinePresentationIntent = .stronglyEmphasized
                 offset += heading.characters.count
-                attr.append(heading)
+                text.append(heading)
                 shownSpeaker = label
+            } else if segmentCount >= hardCap || (segmentCount >= softCap && lastEndedSentence) {
+                closeChunk()
             }
-            let startsLine = attr.characters.isEmpty || attr.characters.last == "\n"
+            let startsLine = text.characters.isEmpty || text.characters.last == "\n"
             var piece = AttributedString(startsLine ? body : " " + body)
             let displayColor = baseColor ?? DS.Color.primaryText
             piece.foregroundColor = displayColor
@@ -102,29 +155,50 @@ struct ContinuousParagraph: View {
             let length = piece.characters.count
             runs[seg.id] = SegmentRun(offsets: offset..<offset + length, baseColor: displayColor)
             offset += length
-            attr.append(piece)
+            text.append(piece)
+            segmentCount += 1
+            lastEndedSentence = endsSentence(body)
         }
-        return (attr, runs)
+        closeChunk()
+        return chunks
     }
 
-    private func applyHighlight() {
-        let nextID = model.currentSegmentID
-        guard nextID != highlightedSegmentID else { return }
-        if let previousID = highlightedSegmentID, let run = segmentRuns[previousID] {
-            recolor(run, with: run.baseColor)
+    static func chunkIndexBySegment(for chunks: [Chunk]) -> [TranscriptSegment.ID: Int] {
+        var index: [TranscriptSegment.ID: Int] = [:]
+        for chunk in chunks {
+            for id in chunk.runs.keys { index[id] = chunk.id }
         }
-        if let nextID, let run = segmentRuns[nextID] {
-            recolor(run, with: DS.Color.highlight)
-        }
-        highlightedSegmentID = nextID
+        return index
     }
 
-    private func recolor(_ run: SegmentRun, with color: Color?) {
-        let chars = attributedCache.characters
+    static func moveHighlight(
+        in chunks: inout [Chunk],
+        chunkIndexBySegment: [TranscriptSegment.ID: Int],
+        from previousID: TranscriptSegment.ID?,
+        to nextID: TranscriptSegment.ID?,
+        highlightColor: Color
+    ) {
+        if let previousID, let i = chunkIndexBySegment[previousID], chunks.indices.contains(i),
+           let run = chunks[i].runs[previousID] {
+            recolor(&chunks[i].text, offsets: run.offsets, color: run.baseColor)
+        }
+        if let nextID, let i = chunkIndexBySegment[nextID], chunks.indices.contains(i),
+           let run = chunks[i].runs[nextID] {
+            recolor(&chunks[i].text, offsets: run.offsets, color: highlightColor)
+        }
+    }
+
+    private static func recolor(_ text: inout AttributedString, offsets: Range<Int>, color: Color?) {
+        let chars = text.characters
         guard
-            let lo = chars.index(chars.startIndex, offsetBy: run.offsets.lowerBound, limitedBy: chars.endIndex),
-            let hi = chars.index(chars.startIndex, offsetBy: run.offsets.upperBound, limitedBy: chars.endIndex)
+            let lo = chars.index(chars.startIndex, offsetBy: offsets.lowerBound, limitedBy: chars.endIndex),
+            let hi = chars.index(chars.startIndex, offsetBy: offsets.upperBound, limitedBy: chars.endIndex)
         else { return }
-        attributedCache[lo..<hi].foregroundColor = color
+        text[lo..<hi].foregroundColor = color
+    }
+
+    private static func endsSentence(_ body: String) -> Bool {
+        guard let terminal = body.last(where: { !"\"')]»”’".contains($0) }) else { return false }
+        return ".!?…。！？".contains(terminal)
     }
 }
