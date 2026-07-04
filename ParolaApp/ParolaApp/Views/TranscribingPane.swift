@@ -66,6 +66,7 @@ struct TranscribingPane: View {
         .task(id: progress) {
             guard let progress, progress >= Self.finishingProgressThreshold else { return }
             try? await Task.sleep(for: .seconds(Self.finishingStallSeconds))
+            guard !Task.isCancelled else { return }
             withAnimation(.easeInOut(duration: 0.3)) { isFinishing = true }
         }
         .onAppear { updateETA(for: progress) }
