@@ -1,0 +1,268 @@
+import Foundation
+import os
+@preconcurrency import WhisperKit
+
+struct ConfirmedAudioBatch: Sendable {
+    var segments: [TranscriptionSegment]
+    var audioWindow: [Float]
+    var windowStartSeconds: Double
+}
+
+/// Replaces WhisperKit's AudioStreamTranscriber with a loop that keeps only unconfirmed audio; emitted timestamps stay absolute.
+actor StreamingRealtimeLoop {
+    struct Configuration: Sendable {
+        var requiredSegmentsForConfirmation = 2
+        var silenceThreshold: Float = 0.3
+        var compressionCheckWindow = 60
+        var useVAD = true
+        var purgePadSeconds: Double = 2
+        var sampleRate = WhisperKit.sampleRate
+        var wantsConfirmedAudio = false
+    }
+
+    struct Dependencies: Sendable {
+        var requestPermission: @Sendable () async -> Bool
+        var startCapture: @Sendable (@escaping @Sendable ([Float]) -> Void) throws -> Void
+        var stopCapture: @Sendable () -> Void
+        var transcribe: @Sendable ([Float], DecodingOptions, @escaping TranscriptionCallback) async throws -> TranscriptionResult
+        var tick: @Sendable () async throws -> Void
+    }
+
+    enum Outcome: Sendable {
+        case stopped
+        case permissionDenied
+        case failed(any Error)
+    }
+
+    private struct Inbox: Sendable {
+        var pending: [Float] = []
+        var energies: [(rel: Float, avg: Float)] = []
+    }
+
+    private static let maxEnergyEntries = 4096
+    private static let waitingForSpeech = "Waiting for speech..."
+
+    private let config: Configuration
+    private let baseDecodingOptions: DecodingOptions
+    private let deps: Dependencies
+    private let onPartial: @Sendable (String) -> Void
+    private let onEnergy: @Sendable (Float) -> Void
+    private let onConfirmed: @Sendable (ConfirmedAudioBatch) -> Void
+    private let inbox = OSAllocatedUnfairLock(initialState: Inbox())
+
+    private var window: [Float] = []
+    private var windowStartSample = 0
+    private var lastTranscribedTotal = 0
+    private var lastConfirmedEndSeconds: Float = 0
+    private var unconfirmedSegments: [TranscriptionSegment] = []
+    private var currentText = ""
+    private var isRunning = false
+
+    init(
+        configuration: Configuration,
+        decodingOptions: DecodingOptions,
+        dependencies: Dependencies,
+        onPartial: @escaping @Sendable (String) -> Void,
+        onEnergy: @escaping @Sendable (Float) -> Void,
+        onConfirmed: @escaping @Sendable (ConfirmedAudioBatch) -> Void
+    ) {
+        self.config = configuration
+        self.baseDecodingOptions = decodingOptions
+        self.deps = dependencies
+        self.onPartial = onPartial
+        self.onEnergy = onEnergy
+        self.onConfirmed = onConfirmed
+    }
+
+    func run() async -> Outcome {
+        guard await deps.requestPermission() else { return .permissionDenied }
+        do {
+            try deps.startCapture { [weak self] buffer in self?.ingest(buffer) }
+        } catch {
+            return .failed(error)
+        }
+        isRunning = true
+        while isRunning {
+            do {
+                try await iterate()
+            } catch is CancellationError {
+                break
+            } catch {
+                isRunning = false
+                deps.stopCapture()
+                return .failed(error)
+            }
+        }
+        return .stopped
+    }
+
+    func stop() {
+        isRunning = false
+        deps.stopCapture()
+    }
+
+    func windowSampleCount() -> Int { window.count }
+
+    func windowStartOffsetSamples() -> Int { windowStartSample }
+
+    nonisolated private func ingest(_ buffer: [Float]) {
+        guard !buffer.isEmpty else { return }
+        let avgEnergy = AudioProcessor.calculateEnergy(of: buffer).avg
+        let rel = inbox.withLock { box -> Float in
+            let baseline = box.energies.suffix(20).map(\.avg).min() ?? .infinity
+            let rel = AudioProcessor.calculateRelativeEnergy(of: buffer, relativeTo: baseline)
+            box.pending.append(contentsOf: buffer)
+            box.energies.append((rel: rel, avg: avgEnergy))
+            if box.energies.count > Self.maxEnergyEntries {
+                box.energies.removeFirst(box.energies.count - Self.maxEnergyEntries)
+            }
+            return rel
+        }
+        onEnergy(rel)
+    }
+
+    private func iterate() async throws {
+        drainInbox()
+        let totalSamples = windowStartSample + window.count
+        let newSeconds = Float(totalSamples - lastTranscribedTotal) / Float(config.sampleRate)
+        guard newSeconds > 1 else {
+            markWaitingForSpeech()
+            return try await deps.tick()
+        }
+        if config.useVAD {
+            let energies = inbox.withLock { $0.energies.map(\.rel) }
+            let voiceDetected = AudioProcessor.isVoiceDetected(
+                in: energies,
+                nextBufferInSeconds: newSeconds,
+                silenceThreshold: config.silenceThreshold
+            )
+            guard voiceDetected else {
+                markWaitingForSpeech()
+                return try await deps.tick()
+            }
+        }
+        lastTranscribedTotal = totalSamples
+        try await transcribeWindow()
+    }
+
+    private func drainInbox() {
+        let pending = inbox.withLock { box -> [Float] in
+            let drained = box.pending
+            box.pending.removeAll(keepingCapacity: true)
+            return drained
+        }
+        window.append(contentsOf: pending)
+    }
+
+    private func transcribeWindow() async throws {
+        let offsetSeconds = Double(windowStartSample) / Double(config.sampleRate)
+        var options = baseDecodingOptions
+        // clipTimestamps is window-relative; everything emitted from here back out must be absolute.
+        options.clipTimestamps = [Float(max(0, Double(lastConfirmedEndSeconds) - offsetSeconds))]
+        let emitProgressPartials = unconfirmedSegments.isEmpty
+        let onPartial = self.onPartial
+        let compressionCheckWindow = config.compressionCheckWindow
+        let result = try await deps.transcribe(window, options) { [options] progress in
+            if emitProgressPartials {
+                onPartial(progress.text.trimmingCharacters(in: .whitespaces))
+            }
+            return Self.shouldStopEarly(
+                progress: progress,
+                options: options,
+                compressionCheckWindow: compressionCheckWindow
+            )
+        }
+        currentText = ""
+        let offset = Float(offsetSeconds)
+        let segments = result.segments.map { segment -> TranscriptionSegment in
+            var shifted = segment
+            shifted.start += offset
+            shifted.end += offset
+            shifted.words = shifted.words?.map { word in
+                var shiftedWord = word
+                shiftedWord.start += offset
+                shiftedWord.end += offset
+                return shiftedWord
+            }
+            return shifted
+        }
+        if segments.count > config.requiredSegmentsForConfirmation {
+            let confirmable = Array(segments.prefix(segments.count - config.requiredSegmentsForConfirmation))
+            if let last = confirmable.last, last.end > lastConfirmedEndSeconds {
+                lastConfirmedEndSeconds = last.end
+                onConfirmed(makeBatch(confirmable))
+            }
+            unconfirmedSegments = Array(segments.suffix(config.requiredSegmentsForConfirmation))
+        } else {
+            unconfirmedSegments = segments
+        }
+        emitPartial()
+        purgeConfirmedAudio()
+    }
+
+    private func makeBatch(_ segments: [TranscriptionSegment]) -> ConfirmedAudioBatch {
+        guard config.wantsConfirmedAudio, let first = segments.first, let last = segments.last else {
+            return ConfirmedAudioBatch(segments: segments, audioWindow: [], windowStartSeconds: 0)
+        }
+        let sampleRate = Double(config.sampleRate)
+        let windowStart = Double(windowStartSample) / sampleRate
+        let windowEnd = windowStart + Double(window.count) / sampleRate
+        let sliceStart = max(windowStart, Double(first.start) - 0.5)
+        let sliceEnd = min(windowEnd, Double(last.end) + 0.5)
+        let lowerBound = Int((sliceStart - windowStart) * sampleRate)
+        let upperBound = min(window.count, Int((sliceEnd - windowStart) * sampleRate))
+        guard lowerBound >= 0, lowerBound < upperBound else {
+            return ConfirmedAudioBatch(segments: segments, audioWindow: [], windowStartSeconds: 0)
+        }
+        return ConfirmedAudioBatch(
+            segments: segments,
+            audioWindow: Array(window[lowerBound..<upperBound]),
+            windowStartSeconds: sliceStart
+        )
+    }
+
+    private func purgeConfirmedAudio() {
+        let cutSeconds = Double(lastConfirmedEndSeconds) - config.purgePadSeconds
+        let cutSample = Int(cutSeconds * Double(config.sampleRate))
+        let drop = min(max(0, cutSample - windowStartSample), window.count)
+        guard drop > 0 else { return }
+        window.removeFirst(drop)
+        windowStartSample += drop
+    }
+
+    private func markWaitingForSpeech() {
+        if currentText.isEmpty { currentText = Self.waitingForSpeech }
+        emitPartial()
+    }
+
+    private func emitPartial() {
+        let text: String
+        if !unconfirmedSegments.isEmpty {
+            text = unconfirmedSegments.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespaces)
+        } else {
+            text = currentText.trimmingCharacters(in: .whitespaces)
+        }
+        onPartial(text)
+    }
+
+    private static func shouldStopEarly(
+        progress: TranscriptionProgress,
+        options: DecodingOptions,
+        compressionCheckWindow: Int
+    ) -> Bool? {
+        let currentTokens = progress.tokens
+        if currentTokens.count > compressionCheckWindow {
+            let checkTokens: [Int] = currentTokens.suffix(compressionCheckWindow)
+            let compressionRatio = TextUtilities.compressionRatio(of: checkTokens)
+            if compressionRatio > options.compressionRatioThreshold ?? 0.0 {
+                return false
+            }
+        }
+        if let avgLogprob = progress.avgLogprob, let logProbThreshold = options.logProbThreshold {
+            if avgLogprob < logProbThreshold {
+                return false
+            }
+        }
+        return nil
+    }
+}

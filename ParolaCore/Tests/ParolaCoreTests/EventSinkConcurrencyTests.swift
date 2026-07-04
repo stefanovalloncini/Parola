@@ -8,7 +8,7 @@ struct EventSinkConcurrencyTests {
     @Test("concurrent partial and energy calls never crash and leave a coherent last value")
     func concurrentCallsStayCoherent() async {
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .unbounded)
-        let sink = EventSink(continuation: cont, onConfirmed: { _ in })
+        let sink = EventSink(continuation: cont)
 
         await withTaskGroup(of: Void.self) { group in
             for i in 0..<256 {
@@ -41,7 +41,7 @@ struct EventSinkConcurrencyTests {
     @Test("a value emitted once is never emitted again after a concurrent storm")
     func dedupesUnderConcurrency() async {
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .unbounded)
-        let sink = EventSink(continuation: cont, onConfirmed: { _ in })
+        let sink = EventSink(continuation: cont)
 
         await withTaskGroup(of: Void.self) { group in
             for _ in 0..<512 {

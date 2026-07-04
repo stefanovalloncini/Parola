@@ -8,7 +8,7 @@ struct StreamingTranscriptionSessionTests {
     @Test("voice activity is silent until the buffer has at least one energy sample")
     func voiceActivityWaitsForFirstSample() async {
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(16))
-        let sink = EventSink(continuation: cont, onConfirmed: { _ in })
+        let sink = EventSink(continuation: cont)
         sink.handleEnergy(last: nil)
         cont.finish()
 
@@ -22,7 +22,7 @@ struct StreamingTranscriptionSessionTests {
     @Test("voice activity flips once when energy crosses the threshold")
     func voiceActivityFlipsOnce() async {
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(16))
-        let sink = EventSink(continuation: cont, onConfirmed: { _ in })
+        let sink = EventSink(continuation: cont)
         sink.handleEnergy(last: 0.01)
         sink.handleEnergy(last: 0.5)
         sink.handleEnergy(last: 0.9)
@@ -38,7 +38,7 @@ struct StreamingTranscriptionSessionTests {
     @Test("voice activity flips back to false after dropping below the threshold")
     func voiceActivityFlipsBoth() async {
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(16))
-        let sink = EventSink(continuation: cont, onConfirmed: { _ in })
+        let sink = EventSink(continuation: cont)
         sink.handleEnergy(last: 0.5)
         sink.handleEnergy(last: 0.5)
         sink.handleEnergy(last: 0.01)
@@ -55,7 +55,7 @@ struct StreamingTranscriptionSessionTests {
     @Test("voice activity drops duplicate readings on the same side of the threshold")
     func voiceActivityDedupesOnSameSide() async {
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(16))
-        let sink = EventSink(continuation: cont, onConfirmed: { _ in })
+        let sink = EventSink(continuation: cont)
         sink.handleEnergy(last: 0.4)
         sink.handleEnergy(last: 0.6)
         sink.handleEnergy(last: 0.7)
@@ -71,7 +71,7 @@ struct StreamingTranscriptionSessionTests {
     @Test("partial text only fires when it changes")
     func partialDeduped() async {
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(16))
-        let sink = EventSink(continuation: cont, onConfirmed: { _ in })
+        let sink = EventSink(continuation: cont)
         sink.handlePartial(text: "hello")
         sink.handlePartial(text: "hello")
         sink.handlePartial(text: "hello world")
@@ -87,7 +87,7 @@ struct StreamingTranscriptionSessionTests {
     @Test("empty partial text never emits an event")
     func emptyPartialIgnored() async {
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(16))
-        let sink = EventSink(continuation: cont, onConfirmed: { _ in })
+        let sink = EventSink(continuation: cont)
         sink.handlePartial(text: "")
         cont.finish()
 
@@ -101,7 +101,7 @@ struct StreamingTranscriptionSessionTests {
     @Test("partial that becomes empty after first non-empty stays unreported")
     func partialBecomingEmptyEmitsNothing() async {
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(16))
-        let sink = EventSink(continuation: cont, onConfirmed: { _ in })
+        let sink = EventSink(continuation: cont)
         sink.handlePartial(text: "hello")
         sink.handlePartial(text: "")
         sink.handlePartial(text: "")

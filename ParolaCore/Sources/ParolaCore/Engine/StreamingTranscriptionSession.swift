@@ -17,7 +17,7 @@ public protocol StreamingSpeakerLabeler: Sendable {
     ) async -> String?
 }
 
-/// Drives real-time microphone transcription via WhisperKit's `AudioStreamTranscriber`.
+/// Drives real-time microphone transcription with a windowed loop over WhisperKit's decoder.
 ///
 /// Lifecycle:
 /// ```
@@ -32,9 +32,9 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     public let modelStore: ModelStore
 
     private var whisperKit: WhisperKit?
-    private var streamer: AudioStreamTranscriber?
+    private var loop: StreamingRealtimeLoop?
     private var continuation: AsyncStream<StreamingEvent>.Continuation?
-    private var segmentContinuation: AsyncStream<[TranscriptionSegment]>.Continuation?
+    private var segmentContinuation: AsyncStream<ConfirmedAudioBatch>.Continuation?
     private var consumerTask: Task<Void, Never>?
     private var streamerTask: Task<Void, Never>?
     private var allConfirmed: [TranscriptSegment] = []
@@ -58,7 +58,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         speakerLabeler: (any StreamingSpeakerLabeler)? = nil,
         downloadProgress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> AsyncStream<StreamingEvent> {
-        guard streamer == nil else {
+        guard loop == nil else {
             throw ParolaError.transcriptionFailed("session already started")
         }
 
@@ -96,37 +96,50 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         }
 
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(256))
-        let (segStream, segCont) = AsyncStream<[TranscriptionSegment]>.makeStream(bufferingPolicy: .bufferingNewest(64))
+        let (segStream, segCont) = AsyncStream<ConfirmedAudioBatch>.makeStream(bufferingPolicy: .bufferingNewest(64))
 
-        let sink = EventSink(
-            continuation: cont,
-            onConfirmed: { segments in segCont.yield(segments) }
+        let sink = EventSink(continuation: cont)
+
+        nonisolated(unsafe) let processor = kit.audioProcessor
+        nonisolated(unsafe) let transcriber = TranscribeTask(
+            currentTimings: TranscriptionTimings(),
+            progress: Progress(),
+            audioProcessor: kit.audioProcessor,
+            audioEncoder: kit.audioEncoder,
+            featureExtractor: kit.featureExtractor,
+            segmentSeeker: kit.segmentSeeker,
+            textDecoder: kit.textDecoder,
+            tokenizer: tokenizer
         )
+        let keepCapturedAudio = persistAudio
 
-        nonisolated(unsafe) let streamerAudioEncoder = kit.audioEncoder
-        nonisolated(unsafe) let streamerFeatureExtractor = kit.featureExtractor
-        nonisolated(unsafe) let streamerSegmentSeeker = kit.segmentSeeker
-        nonisolated(unsafe) let streamerTextDecoder = kit.textDecoder
-        nonisolated(unsafe) let streamerTokenizer = tokenizer
-        nonisolated(unsafe) let streamerAudioProcessor = kit.audioProcessor
-
-        let st = AudioStreamTranscriber(
-            audioEncoder: streamerAudioEncoder,
-            featureExtractor: streamerFeatureExtractor,
-            segmentSeeker: streamerSegmentSeeker,
-            textDecoder: streamerTextDecoder,
-            tokenizer: streamerTokenizer,
-            audioProcessor: streamerAudioProcessor,
+        let loop = StreamingRealtimeLoop(
+            configuration: .init(wantsConfirmedAudio: speakerLabeler != nil),
             decodingOptions: decoding,
-            stateChangeCallback: { [sink] oldState, newState in
-                sink.handle(oldState: oldState, newState: newState)
-            }
+            dependencies: .init(
+                requestPermission: { await AudioProcessor.requestRecordPermission() },
+                startCapture: { ingest in
+                    try processor.startRecordingLive(inputDeviceID: nil) { buffer in
+                        ingest(buffer)
+                        // Runs on the tap thread, serialized with processBuffer's appends, so this purge can't race them.
+                        if !keepCapturedAudio { processor.purgeAudioSamples(keepingLast: 0) }
+                    }
+                },
+                stopCapture: { processor.stopRecording() },
+                transcribe: { samples, decodeOptions, progress in
+                    try await transcriber.run(audioArray: samples, decodeOptions: decodeOptions, callback: progress)
+                },
+                tick: { try await Task.sleep(nanoseconds: 100_000_000) }
+            ),
+            onPartial: { sink.handlePartial(text: $0) },
+            onEnergy: { sink.handleEnergy(last: $0) },
+            onConfirmed: { segCont.yield($0) }
         )
 
         self.whisperKit = kit
         self.loadedModel = modelName
         self.optionsForRun = options
-        self.streamer = st
+        self.loop = loop
         self.continuation = cont
         self.segmentContinuation = segCont
         self.speakerLabeler = speakerLabeler
@@ -138,16 +151,12 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         }
 
         streamerTask = Task { [weak self] in
-            do {
-                try await st.startStreamTranscription()
-                guard let self else { cont.finish(); return }
+            let outcome = await loop.run()
+            guard let self else { cont.finish(); return }
+            switch outcome {
+            case .stopped, .permissionDenied:
                 await self.handleStreamerEndedWithoutStop()
-            } catch {
-                guard let self else {
-                    cont.yield(.failed(error.localizedDescription))
-                    cont.finish()
-                    return
-                }
+            case .failed(let error):
                 await self.handleStreamerFailure(error)
             }
         }
@@ -157,9 +166,9 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
     /// Stops the mic stream, flushes a final transcript, and finishes the stream.
     public func stop() async {
-        guard let streamer else { return }
-        self.streamer = nil
-        await streamer.stopStreamTranscription()
+        guard let loop else { return }
+        self.loop = nil
+        await loop.stop()
         segmentContinuation?.finish()
         await consumerTask?.value
         streamerTask?.cancel()
@@ -221,6 +230,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     }
 
     private func handleStreamerFailure(_ error: Error) async {
+        guard loop != nil else { return }
         continuation?.yield(.failed(error.localizedDescription))
         segmentContinuation?.finish()
         await consumerTask?.value
@@ -228,9 +238,9 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         teardown()
     }
 
-    // WhisperKit's startStreamTranscription() returns without throwing when it can't capture (e.g. denied mic); if stop() didn't drive that return (streamer still set), surface a failure so the consumer doesn't wait forever.
+    // The loop returns without failing when it can't capture (e.g. denied mic); if stop() didn't drive that return (loop still set), surface a failure so the consumer doesn't wait forever.
     private func handleStreamerEndedWithoutStop() async {
-        guard streamer != nil else { return }
+        guard loop != nil else { return }
         continuation?.yield(.failed("Couldn't start the microphone. Check Microphone access in System Settings › Privacy & Security › Microphone."))
         segmentContinuation?.finish()
         await consumerTask?.value
@@ -243,13 +253,13 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         segmentContinuation = nil
         consumerTask = nil
         streamerTask = nil
-        streamer = nil
+        loop = nil
         whisperKit = nil
         speakerLabeler = nil
     }
 
-    private func appendConfirmed(_ segments: [TranscriptionSegment]) async {
-        for seg in segments {
+    private func appendConfirmed(_ batch: ConfirmedAudioBatch) async {
+        for seg in batch.segments {
             var mapped = TranscriptSegment(
                 id: nextSegmentID,
                 start: Double(seg.start),
@@ -258,7 +268,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             )
             nextSegmentID += 1
             if let labeler = speakerLabeler,
-               let label = await labelSpeaker(for: mapped, with: labeler) {
+               let label = await labelSpeaker(for: mapped, in: batch, with: labeler) {
                 mapped.speaker = label
             }
             allConfirmed.append(mapped)
@@ -268,23 +278,21 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
     private func labelSpeaker(
         for segment: TranscriptSegment,
+        in batch: ConfirmedAudioBatch,
         with labeler: any StreamingSpeakerLabeler
     ) async -> String? {
-        guard let kit = whisperKit else { return nil }
-        nonisolated(unsafe) let processor = kit.audioProcessor
-        let allSamples = processor.audioSamples
+        guard !batch.audioWindow.isEmpty else { return nil }
         let sampleRate = Double(WhisperKit.sampleRate)
-        let totalSeconds = Double(allSamples.count) / sampleRate
-        let segmentStart = max(0, segment.start)
-        let segmentEnd = max(segmentStart, segment.end)
+        let batchStart = batch.windowStartSeconds
+        let batchEnd = batchStart + Double(batch.audioWindow.count) / sampleRate
         let windowPadding: Double = 0.5
-        let windowStartTime = max(0, segmentStart - windowPadding)
-        let windowEndTime = min(totalSeconds, segmentEnd + windowPadding)
+        let windowStartTime = max(batchStart, segment.start - windowPadding)
+        let windowEndTime = min(batchEnd, segment.end + windowPadding)
         guard windowEndTime > windowStartTime else { return nil }
-        let startIndex = Int(windowStartTime * sampleRate)
-        let endIndex = min(allSamples.count, Int(windowEndTime * sampleRate))
-        guard startIndex < endIndex else { return nil }
-        let window = Array(allSamples[startIndex..<endIndex])
+        let startIndex = Int((windowStartTime - batchStart) * sampleRate)
+        let endIndex = min(batch.audioWindow.count, Int((windowEndTime - batchStart) * sampleRate))
+        guard startIndex >= 0, startIndex < endIndex else { return nil }
+        let window = Array(batch.audioWindow[startIndex..<endIndex])
         return await labeler.labelSpeaker(
             for: segment,
             audioWindow: window,
@@ -294,9 +302,9 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     }
 }
 
-// MARK: - State → event translator
+// MARK: - Event dedupe
 
-/// Adapts AudioStreamTranscriber's coarse state-diff callback into our finer-grained events.
+/// Dedupes the loop's partial-text and energy readings into `StreamingEvent`s.
 final class EventSink: Sendable {
     private struct State {
         var lastPartial = ""
@@ -304,28 +312,10 @@ final class EventSink: Sendable {
     }
 
     let continuation: AsyncStream<StreamingEvent>.Continuation
-    let onConfirmed: @Sendable ([TranscriptionSegment]) -> Void
     private let state = OSAllocatedUnfairLock(initialState: State())
 
-    init(
-        continuation: AsyncStream<StreamingEvent>.Continuation,
-        onConfirmed: @escaping @Sendable ([TranscriptionSegment]) -> Void
-    ) {
+    init(continuation: AsyncStream<StreamingEvent>.Continuation) {
         self.continuation = continuation
-        self.onConfirmed = onConfirmed
-    }
-
-    func handle(
-        oldState: AudioStreamTranscriber.State,
-        newState: AudioStreamTranscriber.State
-    ) {
-        let oldCount = oldState.confirmedSegments.count
-        let newCount = newState.confirmedSegments.count
-        if newCount > oldCount {
-            onConfirmed(Array(newState.confirmedSegments.suffix(newCount - oldCount)))
-        }
-        handlePartial(text: Self.partial(from: newState))
-        handleEnergy(last: newState.bufferEnergy.last)
     }
 
     func handlePartial(text: String) {
@@ -348,12 +338,5 @@ final class EventSink: Sendable {
         }
         guard changed else { return }
         continuation.yield(.voiceActivity(active: voice))
-    }
-
-    private static func partial(from state: AudioStreamTranscriber.State) -> String {
-        if !state.unconfirmedSegments.isEmpty {
-            return state.unconfirmedSegments.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespaces)
-        }
-        return state.currentText.trimmingCharacters(in: .whitespaces)
     }
 }
