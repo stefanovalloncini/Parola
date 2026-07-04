@@ -703,7 +703,7 @@ final class AppModel {
         )
     }
 
-    @ObservationIgnored private var liveSource: AudioSource?
+    @ObservationIgnored var liveSource: AudioSource?
     @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
     @ObservationIgnored private var streamingConsumer: Task<Void, Never>?
     @ObservationIgnored private var fileTranscribeTask: Task<Void, Never>?
@@ -1621,11 +1621,12 @@ final class AppModel {
         }
 
         guard let source = liveSource else { return }
+        // Hand off synchronously so a racing auto-stop or second click can't start a duplicate run.
+        liveSource = nil
         fileTranscribeTask = Task {
             await mediaSession.exitRecording()
             do {
                 let url = try await source.prepare()
-                liveSource = nil
                 stopRecordingLevelObserver()
                 sourceFileURL = url
                 installPlayer(for: url)
@@ -1642,7 +1643,6 @@ final class AppModel {
                 refreshModelList()
                 persistToLibrary(processed, audioSource: url)
             } catch {
-                liveSource = nil
                 stopRecordingLevelObserver()
                 phase = .failed(message: Self.transcriptionFailureMessage(for: error))
             }

@@ -78,4 +78,19 @@ struct AppModelRecordingMockTests {
         #expect(model.transcript?.segments.first?.text == "done")
         #expect(model.phase == .ready)
     }
+
+    private struct StubAudioSource: AudioSource {
+        func prepare() async throws -> URL { URL(fileURLWithPath: "/tmp/stub-\(UUID()).wav") }
+        func cancel() async {}
+        func estimatedDuration() async -> Double? { nil }
+    }
+
+    @Test("stop hands off the live source synchronously so a second stop is a no-op")
+    func doubleStopSingleHandoff() {
+        let model = makeModel()
+        model.liveSource = StubAudioSource()
+        model.phase = .recording(source: .microphone)
+        model.stopRecordingAndTranscribe()
+        #expect(model.liveSource == nil)
+    }
 }
