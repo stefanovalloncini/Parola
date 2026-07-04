@@ -137,7 +137,9 @@ extension AppModel {
 
     func skip(by seconds: Double) {
         guard let player else { return }
-        let target = Self.skipTarget(current: CMTimeGetSeconds(player.currentTime()), by: seconds)
+        let current = CMTimeGetSeconds(player.currentTime())
+        guard current.isFinite else { return }
+        let target = Self.skipTarget(current: current, by: seconds)
         player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
         currentTimeSeconds = target
         updateCurrentSegment(time: target)

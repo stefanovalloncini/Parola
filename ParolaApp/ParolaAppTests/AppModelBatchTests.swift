@@ -300,4 +300,15 @@ struct AppModelBatchTests {
         #expect(model.batchJobs.allSatisfy { $0.status == .cancelled })
         #expect(model.phase == .idle)
     }
+
+    @Test("cancelCurrentWork with a loaded transcript and nothing in flight leaves phase .ready")
+    func cancelCurrentWorkWithReadyPhaseAndNoWorkKeepsReady() {
+        let model = makeModel()
+        model.transcript = Self.makeTranscript()
+        model.phase = .ready
+
+        model.cancelCurrentWork()
+
+        #expect(model.phase == .ready)
+    }
 }

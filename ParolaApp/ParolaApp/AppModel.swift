@@ -735,6 +735,7 @@ final class AppModel {
     }
 
     func cancelCurrentWork() {
+        let hadWork = canCancel || liveSource != nil
         cancelAllInFlightBatchJobs()
         downloadTask?.cancel()
         downloadTask = nil
@@ -745,7 +746,7 @@ final class AppModel {
         youtubeSubsTask?.cancel()
         youtubeSubsTask = nil
         teardownActiveCapture()
-        phase = .idle
+        if hadWork || phase != .ready { phase = .idle }
     }
 
     func cancelAllTasks() {
@@ -756,6 +757,7 @@ final class AppModel {
         silenceWatchTask?.cancel(); silenceWatchTask = nil
         recordingAutoStopTask?.cancel(); recordingAutoStopTask = nil
         searchTask?.cancel(); searchTask = nil
+        downloadTask?.cancel(); downloadTask = nil
         fileTranscribeTask?.cancel(); fileTranscribeTask = nil
         youtubeTranscribeTask?.cancel(); youtubeTranscribeTask = nil
         youtubeSubsTask?.cancel(); youtubeSubsTask = nil
