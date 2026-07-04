@@ -73,24 +73,30 @@ extension AppModel {
     }
 
     private func refreshBundleSizes(for entries: [LibraryEntry]) {
-        let bundles = entries.map { (id: $0.id, url: $0.bundleURL) }
+        let knownSizes = libraryBundleSizes
+        let activeIDs = Set(entries.map(\.id))
+        let needsScan = entries.filter { knownSizes[$0.id] == nil }
+        guard !needsScan.isEmpty || knownSizes.keys.contains(where: { !activeIDs.contains($0) }) else { return }
+        let bundles = needsScan.map { (id: $0.id, url: $0.bundleURL) }
         Task.detached(priority: .utility) { [weak self] in
             let fm = FileManager.default
-            var sizes: [String: Int64] = [:]
+            var newSizes: [String: Int64] = [:]
             for bundle in bundles {
                 let contents = (try? fm.contentsOfDirectory(at: bundle.url, includingPropertiesForKeys: nil)) ?? []
                 let audio = contents.first(where: { $0.lastPathComponent.hasPrefix("audio.") })
                 if let audio,
                    let values = try? audio.resourceValues(forKeys: [.fileSizeKey]),
                    let size = values.fileSize {
-                    sizes[bundle.id] = Int64(size)
+                    newSizes[bundle.id] = Int64(size)
                 } else {
-                    sizes[bundle.id] = 0
+                    newSizes[bundle.id] = 0
                 }
             }
             await MainActor.run {
                 guard let self else { return }
-                self.libraryBundleSizes = sizes
+                var merged = self.libraryBundleSizes.filter { activeIDs.contains($0.key) }
+                merged.merge(newSizes) { _, new in new }
+                self.libraryBundleSizes = merged
                 if self.librarySortOrder == .longest || self.librarySortOrder == .shortest {
                     self.reapplyLibrarySort()
                 }

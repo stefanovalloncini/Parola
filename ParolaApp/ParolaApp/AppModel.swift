@@ -1163,7 +1163,6 @@ final class AppModel {
                 filePartialText = ""
                 fileTranscribeFraction = nil
                 phase = .ready
-                refreshModelList()
                 persistToLibrary(processed, audioSource: fileURL)
             } catch {
                 filePartialText = ""
@@ -1295,7 +1294,6 @@ final class AppModel {
                 selectedEntryID = nil
                 transcript = processed
                 phase = .ready
-                refreshModelList()
                 persistToLibrary(processed, audioSource: audioURL)
             } catch {
                 if !Task.isCancelled { applyTranscriptionError(error) }
@@ -1662,7 +1660,6 @@ final class AppModel {
                 selectedEntryID = nil
                 transcript = processed
                 phase = .ready
-                refreshModelList()
                 persistToLibrary(processed, audioSource: url)
                 drainDeferredArrivals()
             } catch {
