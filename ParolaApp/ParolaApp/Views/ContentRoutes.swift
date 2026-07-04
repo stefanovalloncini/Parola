@@ -42,26 +42,52 @@ struct ContentRoutes: View {
         } else if showsLibraryBrowse {
             libraryBrowseList
         } else {
-            switch model.phase {
-            case .idle:
+            phaseContent
+        }
+    }
+
+    private var phaseContent: some View {
+        ZStack {
+            phaseView
+                .id(phaseViewID)
+                .transition(.opacity)
+        }
+        .animation(.easeInOut(duration: 0.3), value: phaseViewID)
+    }
+
+    @ViewBuilder
+    private var phaseView: some View {
+        switch model.phase {
+        case .idle:
+            EmptyDropZone()
+        case .downloadingModel(let name, let progress):
+            ProgressPane(title: "Downloading \(AppModel.modelLabel(name))", progress: progress)
+        case .loadingModel(let name):
+            ProgressPane(title: "Loading \(AppModel.modelLabel(name))…", progress: nil)
+        case .transcribing(let file):
+            TranscribingPane(file: file, partial: model.filePartialText, progress: model.fileTranscribeFraction, expectsPartials: model.activeEngineStreamsPartials)
+        case .recording(let source):
+            RecordingPane(source: source)
+        case .ready:
+            if model.transcript != nil {
+                TranscriptPane()
+            } else {
                 EmptyDropZone()
-            case .downloadingModel(let name, let progress):
-                ProgressPane(title: "Downloading \(AppModel.modelLabel(name))", progress: progress)
-            case .loadingModel(let name):
-                ProgressPane(title: "Loading \(AppModel.modelLabel(name))…", progress: nil)
-            case .transcribing(let file):
-                TranscribingPane(file: file, partial: model.filePartialText, progress: model.fileTranscribeFraction, expectsPartials: model.activeEngineStreamsPartials)
-            case .recording(let source):
-                RecordingPane(source: source)
-            case .ready:
-                if model.transcript != nil {
-                    TranscriptPane()
-                } else {
-                    EmptyDropZone()
-                }
-            case .failed(let message):
-                ErrorPane(message: message)
             }
+        case .failed(let message):
+            ErrorPane(message: message)
+        }
+    }
+
+    private var phaseViewID: Int {
+        switch model.phase {
+        case .idle: 0
+        case .downloadingModel: 1
+        case .loadingModel: 2
+        case .transcribing: 3
+        case .recording: 4
+        case .ready: 5
+        case .failed: 6
         }
     }
 
