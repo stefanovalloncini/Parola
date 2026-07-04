@@ -28,4 +28,14 @@ public struct FileAudioSource: AudioSource {
             return nil
         }
     }
+
+    /// Reads the file's duration synchronously from its header. Returns nil when the file is
+    /// unreadable or not a decodable audio track, in which case fall back to `estimatedDuration()`.
+    public func synchronousDuration() -> Double? {
+        guard let file = try? AVAudioFile(forReading: url) else { return nil }
+        let sampleRate = file.processingFormat.sampleRate
+        guard sampleRate > 0 else { return nil }
+        let seconds = Double(file.length) / sampleRate
+        return seconds.isFinite && seconds > 0 ? seconds : nil
+    }
 }

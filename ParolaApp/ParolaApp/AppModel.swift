@@ -1099,6 +1099,9 @@ final class AppModel {
         noteRecentFile(fileURL)
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
+        if let duration = FileAudioSource(url: fileURL).synchronousDuration() {
+            pendingMediaDuration = duration
+        }
         filePartialText = ""
         fileTranscribeFraction = nil
 
