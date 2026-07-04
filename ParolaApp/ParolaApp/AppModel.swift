@@ -88,6 +88,7 @@ final class AppModel {
     var filePartialText: String = ""
     /// 0–1 fraction of the media transcribed so far, or nil while indeterminate (duration unknown, or the engine reports no progress).
     var fileTranscribeFraction: Double?
+    var fileTranscribeStage: TranscribeStage?
     var useStreaming: Bool = true { didSet { defaults.set(useStreaming, forKey: "useStreaming") } }
     var wordTimestamps: Bool = false { didSet { defaults.set(wordTimestamps, forKey: "wordTimestamps") } }
     var karaokeHighlight: Bool = true { didSet { defaults.set(karaokeHighlight, forKey: "karaokeHighlight") } }
@@ -1137,6 +1138,7 @@ final class AppModel {
         }
         filePartialText = ""
         fileTranscribeFraction = nil
+        fileTranscribeStage = nil
 
         let task: TranscriptionTask = (translateOverride ?? translate) ? .translate : .transcribe
 
@@ -1155,7 +1157,8 @@ final class AppModel {
                     options: makeOptions(task: task),
                     downloadProgress: makeDownloadProgressHandler(for: selectedModel),
                     partialHandler: makeFilePartialHandler(),
-                    progressHandler: makeFileProgressHandler()
+                    progressHandler: makeFileProgressHandler(),
+                    stageHandler: makeFileStageHandler()
                 )
                 try Task.checkCancellation()
                 let processed = await postProcessDetached(result)
@@ -1163,11 +1166,13 @@ final class AppModel {
                 transcript = processed
                 filePartialText = ""
                 fileTranscribeFraction = nil
+                fileTranscribeStage = nil
                 phase = .ready
                 persistToLibrary(processed, audioSource: fileURL)
             } catch {
                 filePartialText = ""
                 fileTranscribeFraction = nil
+                fileTranscribeStage = nil
                 if !Task.isCancelled { applyTranscriptionError(error) }
             }
             if !Task.isCancelled { self.fileTranscribeTask = nil }
@@ -1179,6 +1184,14 @@ final class AppModel {
             Task { @MainActor in
                 guard let self, self.filePartialText != text else { return }
                 self.filePartialText = text
+            }
+        }
+    }
+
+    private func makeFileStageHandler() -> @Sendable (TranscribeStage) -> Void {
+        return { [weak self] stage in
+            Task { @MainActor in
+                self?.fileTranscribeStage = stage
             }
         }
     }

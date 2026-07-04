@@ -45,3 +45,40 @@ struct EngineStreamsPartialsTests {
         #expect(AppModel.engineStreamsPartials("made-up-model-id"))
     }
 }
+
+@Suite("Preparing label stage gate")
+struct PreparingStageGateTests {
+    private func makeIsolatedDefaults() -> UserDefaults {
+        UserDefaults(suiteName: "test-\(UUID())")!
+    }
+
+    @Test("a reported preparingAudio stage shows the label without waiting for the heuristic")
+    func preparingStageShowsImmediately() {
+        #expect(TranscribingPane.showsPreparing(stage: .preparingAudio, heuristic: false, awaitingFirstOutput: true))
+    }
+
+    @Test("a reported transcribing stage hides the label even before any output")
+    func transcribingStageHidesLabel() {
+        #expect(!TranscribingPane.showsPreparing(stage: .transcribing, heuristic: true, awaitingFirstOutput: true))
+    }
+
+    @Test("output on screen wins over a stale preparingAudio stage")
+    func outputBeatsStaleStage() {
+        #expect(!TranscribingPane.showsPreparing(stage: .preparingAudio, heuristic: true, awaitingFirstOutput: false))
+    }
+
+    @Test("without stage reports the grace-period heuristic still decides", arguments: [true, false])
+    func noStageFallsBackToHeuristic(heuristic: Bool) {
+        #expect(TranscribingPane.showsPreparing(stage: nil, heuristic: heuristic, awaitingFirstOutput: true) == heuristic)
+    }
+
+    @Test("stage reports drive AppModel.fileTranscribeStage")
+    @MainActor func modelTracksStages() {
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("stage"))
+        #expect(model.fileTranscribeStage == nil)
+        model.fileTranscribeStage = .preparingAudio
+        #expect(TranscribingPane.showsPreparing(stage: model.fileTranscribeStage, heuristic: false, awaitingFirstOutput: true))
+        model.fileTranscribeStage = .transcribing
+        #expect(!TranscribingPane.showsPreparing(stage: model.fileTranscribeStage, heuristic: false, awaitingFirstOutput: true))
+    }
+}

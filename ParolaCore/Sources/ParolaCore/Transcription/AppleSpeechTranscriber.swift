@@ -39,6 +39,22 @@ actor AppleSpeechTranscriber: Transcriber {
         partialHandler: (@Sendable (String) -> Void)?,
         progressHandler: (@Sendable (Double) -> Void)?
     ) async throws -> Transcript {
+        try await transcribe(
+            url: url,
+            options: options,
+            partialHandler: partialHandler,
+            progressHandler: progressHandler,
+            stageHandler: nil
+        )
+    }
+
+    func transcribe(
+        url: URL,
+        options: TranscriptionOptions,
+        partialHandler: (@Sendable (String) -> Void)?,
+        progressHandler: (@Sendable (Double) -> Void)?,
+        stageHandler: (@Sendable (TranscribeStage) -> Void)?
+    ) async throws -> Transcript {
         guard let modelName = loadedModel else {
             throw ParolaError.transcriptionFailed("Apple Speech engine not loaded")
         }
@@ -72,7 +88,8 @@ actor AppleSpeechTranscriber: Transcriber {
             modelName: modelName,
             cancellation: cancellation,
             partialHandler: partialHandler,
-            progressHandler: progressHandler
+            progressHandler: progressHandler,
+            stageHandler: stageHandler
         )
         #else
         throw ParolaError.unsupportedForEngine("Apple Speech framework not available in this build.")
@@ -99,9 +116,11 @@ actor AppleSpeechTranscriber: Transcriber {
         modelName: String,
         cancellation: AnalyzerCancellation,
         partialHandler: (@Sendable (String) -> Void)?,
-        progressHandler: (@Sendable (Double) -> Void)?
+        progressHandler: (@Sendable (Double) -> Void)?,
+        stageHandler: (@Sendable (TranscribeStage) -> Void)?
     ) async throws -> Transcript {
         #if canImport(Speech)
+        stageHandler?(.preparingAudio)
         let locale = Self.pickLocale(language: options.language)
 
         let transcriber = SpeechTranscriber(
@@ -132,7 +151,12 @@ actor AppleSpeechTranscriber: Transcriber {
             var segments: [TranscriptSegment] = []
             var nextID = 0
             var assembler = SpeechPartialAssembler()
+            var sawFirstResult = false
             for try await result in transcriber.results {
+                if !sawFirstResult {
+                    sawFirstResult = true
+                    stageHandler?(.transcribing)
+                }
                 guard result.isFinal else { continue }
                 let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty else { continue }

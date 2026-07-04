@@ -95,6 +95,22 @@ actor WhisperKitTranscriber: Transcriber {
         partialHandler: (@Sendable (String) -> Void)?,
         progressHandler: (@Sendable (Double) -> Void)?
     ) async throws -> Transcript {
+        try await transcribe(
+            url: url,
+            options: options,
+            partialHandler: partialHandler,
+            progressHandler: progressHandler,
+            stageHandler: nil
+        )
+    }
+
+    func transcribe(
+        url: URL,
+        options: TranscriptionOptions,
+        partialHandler: (@Sendable (String) -> Void)?,
+        progressHandler: (@Sendable (Double) -> Void)?,
+        stageHandler: (@Sendable (TranscribeStage) -> Void)?
+    ) async throws -> Transcript {
         if let requested = options.computeUnits, requested != loadedComputeUnits, let current = loadedModel {
             do {
                 try await load(model: current, computeUnits: requested)
@@ -122,16 +138,26 @@ actor WhisperKitTranscriber: Transcriber {
             decoding.usePrefillPrompt = true
         }
 
-        let builder = OSAllocatedUnfairLock(initialState: StreamingPartialBuilder())
-        if partialHandler != nil || progressHandler != nil {
+        struct DiscoveryState {
+            var builder = StreamingPartialBuilder()
+            var sawFirstSegments = false
+        }
+        let discovery = OSAllocatedUnfairLock(initialState: DiscoveryState())
+        if partialHandler != nil || progressHandler != nil || stageHandler != nil {
             kit.segmentDiscoveryCallback = { @Sendable segments in
-                if let partialHandler {
-                    let text = builder.withLock { state -> String in
-                        for segment in segments {
-                            state.add(seek: segment.seek, text: segment.text)
-                        }
-                        return state.tail()
+                let (isFirst, text) = discovery.withLock { state -> (Bool, String?) in
+                    let isFirst = !state.sawFirstSegments
+                    state.sawFirstSegments = true
+                    guard partialHandler != nil else { return (isFirst, nil) }
+                    for segment in segments {
+                        state.builder.add(seek: segment.seek, text: segment.text)
                     }
+                    return (isFirst, state.builder.tail())
+                }
+                if isFirst {
+                    stageHandler?(.transcribing)
+                }
+                if let partialHandler, let text {
                     partialHandler(text)
                 }
                 if let progressHandler, let latest = segments.map({ Double($0.end) }).max() {
@@ -141,6 +167,7 @@ actor WhisperKitTranscriber: Transcriber {
         }
         defer { kit.segmentDiscoveryCallback = nil }
 
+        stageHandler?(.preparingAudio)
         let results = await kit.transcribe(
             audioPaths: [url.path],
             decodeOptions: decoding,

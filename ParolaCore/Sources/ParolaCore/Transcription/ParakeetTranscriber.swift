@@ -38,6 +38,16 @@ actor ParakeetTranscriber: Transcriber {
     }
 
     func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+        try await transcribe(url: url, options: options, partialHandler: nil, progressHandler: nil, stageHandler: nil)
+    }
+
+    func transcribe(
+        url: URL,
+        options: TranscriptionOptions,
+        partialHandler: (@Sendable (String) -> Void)?,
+        progressHandler: (@Sendable (Double) -> Void)?,
+        stageHandler: (@Sendable (TranscribeStage) -> Void)?
+    ) async throws -> Transcript {
         guard let asr = manager, let modelName = loadedModel else {
             throw ParolaError.transcriptionFailed("Parakeet model not loaded")
         }
@@ -50,7 +60,10 @@ actor ParakeetTranscriber: Transcriber {
         let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
         defer { signposter.endInterval("transcribe", interval) }
 
+        stageHandler?(.preparingAudio)
         var decoderState = TdtDecoderState.make()
+        // FluidAudio decodes and infers inside one opaque call, so the run counts as transcribing from here.
+        stageHandler?(.transcribing)
         let result: ASRResult
         do {
             result = try await asr.transcribe(url, decoderState: &decoderState, language: nil)

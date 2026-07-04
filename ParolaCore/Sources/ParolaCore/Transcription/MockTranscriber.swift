@@ -192,6 +192,22 @@ public actor MockTranscriber: Transcriber {
         partialHandler: (@Sendable (String) -> Void)?,
         progressHandler: (@Sendable (Double) -> Void)?
     ) async throws -> Transcript {
+        try await transcribe(
+            url: url,
+            options: options,
+            partialHandler: partialHandler,
+            progressHandler: progressHandler,
+            stageHandler: nil
+        )
+    }
+
+    public func transcribe(
+        url: URL,
+        options: TranscriptionOptions,
+        partialHandler: (@Sendable (String) -> Void)?,
+        progressHandler: (@Sendable (Double) -> Void)?,
+        stageHandler: (@Sendable (TranscribeStage) -> Void)?
+    ) async throws -> Transcript {
         if let failure = response.failure {
             if response.delayMs > 0 {
                 try? await sleeper(response.delayMs)
@@ -199,11 +215,17 @@ public actor MockTranscriber: Transcriber {
             throw failure.asError()
         }
 
+        stageHandler?(.preparingAudio)
         let stepCount = max(response.partials.count, response.progressSeconds.count)
         let perStepMs = stepCount > 0 ? max(0, response.delayMs / stepCount) : response.delayMs
 
+        var startedTranscribing = false
         for step in 0..<stepCount {
             try Task.checkCancellation()
+            if !startedTranscribing {
+                startedTranscribing = true
+                stageHandler?(.transcribing)
+            }
             if step < response.partials.count {
                 partialHandler?(response.partials[step])
             }
@@ -217,6 +239,9 @@ public actor MockTranscriber: Transcriber {
 
         if stepCount == 0 && response.delayMs > 0 {
             try? await sleeper(response.delayMs)
+        }
+        if !startedTranscribing {
+            stageHandler?(.transcribing)
         }
 
         try Task.checkCancellation()

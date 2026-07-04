@@ -39,7 +39,8 @@ public actor TranscriptionSession {
         options: TranscriptionOptions,
         downloadProgress: (@Sendable (Double) -> Void)? = nil,
         partialHandler: (@Sendable (String) -> Void)? = nil,
-        progressHandler: (@Sendable (Double) -> Void)? = nil
+        progressHandler: (@Sendable (Double) -> Void)? = nil,
+        stageHandler: (@Sendable (TranscribeStage) -> Void)? = nil
     ) async throws -> Transcript {
         installPressureSourceIfNeeded()
         await ensureBootstrap()
@@ -66,7 +67,8 @@ public actor TranscriptionSession {
             url: audioURL,
             options: options,
             partialHandler: partialHandler,
-            progressHandler: progressHandler
+            progressHandler: progressHandler,
+            stageHandler: stageHandler
         )
         if options.diarize {
             try Task.checkCancellation()

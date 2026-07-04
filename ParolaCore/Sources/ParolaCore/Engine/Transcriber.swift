@@ -1,5 +1,12 @@
 import Foundation
 
+/// Coarse phase of a transcribe call: `preparingAudio` covers the engine's internal decode and
+/// chunking before inference, `transcribing` starts with its first output.
+public enum TranscribeStage: Sendable {
+    case preparingAudio
+    case transcribing
+}
+
 public protocol Transcriber: Sendable {
     static var engineID: EngineID { get }
     static var capabilities: EngineCapabilities { get }
@@ -20,6 +27,15 @@ public protocol Transcriber: Sendable {
         options: TranscriptionOptions,
         partialHandler: (@Sendable (String) -> Void)?,
         progressHandler: (@Sendable (Double) -> Void)?
+    ) async throws -> Transcript
+
+    /// Streaming variant that also reports pipeline stages. Default forwards to the progressHandler overload.
+    func transcribe(
+        url: URL,
+        options: TranscriptionOptions,
+        partialHandler: (@Sendable (String) -> Void)?,
+        progressHandler: (@Sendable (Double) -> Void)?,
+        stageHandler: (@Sendable (TranscribeStage) -> Void)?
     ) async throws -> Transcript
 
     func unload() async
@@ -49,5 +65,20 @@ public extension Transcriber {
         progressHandler: (@Sendable (Double) -> Void)?
     ) async throws -> Transcript {
         try await transcribe(url: url, options: options, partialHandler: partialHandler)
+    }
+
+    func transcribe(
+        url: URL,
+        options: TranscriptionOptions,
+        partialHandler: (@Sendable (String) -> Void)?,
+        progressHandler: (@Sendable (Double) -> Void)?,
+        stageHandler: (@Sendable (TranscribeStage) -> Void)?
+    ) async throws -> Transcript {
+        try await transcribe(
+            url: url,
+            options: options,
+            partialHandler: partialHandler,
+            progressHandler: progressHandler
+        )
     }
 }

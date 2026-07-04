@@ -6,6 +6,7 @@ struct TranscribingPane: View {
     let partial: String
     let progress: Double?
     var expectsPartials: Bool = true
+    var stage: TranscribeStage?
 
     @Environment(AppModel.self) private var model
     @State private var eta = ETACalculator()
@@ -24,7 +25,16 @@ struct TranscribingPane: View {
     private static let preparingGraceSeconds: Double = 2.5
     private var hasText: Bool { !partial.isEmpty }
     private var awaitingFirstOutput: Bool { !hasText && progress == nil }
-    private var showsPreparing: Bool { isPreparing && awaitingFirstOutput }
+    private var showsPreparing: Bool {
+        Self.showsPreparing(stage: stage, heuristic: isPreparing, awaitingFirstOutput: awaitingFirstOutput)
+    }
+
+    // The engine-reported stage wins; the grace-period heuristic only covers runs that never report one.
+    static func showsPreparing(stage: TranscribeStage?, heuristic: Bool, awaitingFirstOutput: Bool) -> Bool {
+        guard awaitingFirstOutput else { return false }
+        if let stage { return stage == .preparingAudio }
+        return heuristic
+    }
 
     private var titleKey: LocalizedStringKey {
         showsPreparing
