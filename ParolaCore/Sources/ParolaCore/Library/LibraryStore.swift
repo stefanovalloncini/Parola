@@ -23,6 +23,7 @@ public actor LibraryStore {
     private var cachedDeleted: [LibraryEntry]?
     private var cachedLoaded: (id: LibraryEntry.ID, value: LoadedEntry)?
     private var listCacheEpoch = 0
+    private var indexReadyTask: Task<Void, Never>?
 
     public init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
         self.init(libraryURL: libraryURL, extraIndexer: SpotlightIndexer())
@@ -34,6 +35,7 @@ public actor LibraryStore {
         try? FileManager.default.createDirectory(at: libraryURL, withIntermediateDirectories: true)
         let indexURL = libraryURL.appendingPathComponent(".search-index.json")
         self.searchIndex = LibrarySearchIndex(indexURL: indexURL)
+        Task { await self.ensureSearchIndexReady() }
     }
 
     public func list() async -> [LibraryEntry] {
@@ -49,16 +51,35 @@ public actor LibraryStore {
     }
 
     public func search(_ query: String) async -> [LibrarySearchIndex.Match] {
+        await ensureSearchIndexReady()
         if cachedActive == nil { await primeCaches() }
         let activeIDs = Set((cachedActive ?? []).map(\.id))
         let matches = await searchIndex.search(query)
         return matches.filter { activeIDs.contains($0.entryID) }
     }
 
-    /// Writes any pending debounced search-index snapshot to disk. The index is loaded from this
-    /// snapshot (never rebuilt from bundles), so call this before the app terminates.
+    /// Writes any pending debounced search-index snapshot to disk. Call before the app terminates.
     public func flush() async {
         await searchIndex.flush()
+    }
+
+    private func ensureSearchIndexReady() async {
+        if indexReadyTask == nil {
+            indexReadyTask = Task { await self.rebuildSearchIndexIfStale() }
+        }
+        await indexReadyTask?.value
+    }
+
+    private func rebuildSearchIndexIfStale() async {
+        guard await searchIndex.needsRebuild() else { return }
+        let url = libraryURL
+        let rebuilt = await Task.detached(priority: .utility) { [self] in
+            scanEntries(at: url).compactMap { entry -> LibrarySearchIndex.RebuildEntry? in
+                guard let doc = try? ParolaDocument.read(at: entry.bundleURL) else { return nil }
+                return .init(id: entry.id, title: entry.title, text: doc.transcript.text)
+            }
+        }.value
+        await searchIndex.rebuild(entries: rebuilt)
     }
 
     private func primeCaches() async {
@@ -144,12 +165,14 @@ public actor LibraryStore {
     }
 
     private func indexEntry(_ entry: LibraryEntry, transcriptText: String) async {
+        await ensureSearchIndexReady()
         await searchIndex.index(id: entry.id, title: entry.title, text: transcriptText, createdAt: entry.createdAt)
         guard let extraIndexer else { return }
         await extraIndexer.index(id: entry.id, title: entry.title, text: transcriptText, createdAt: entry.createdAt)
     }
 
     private func deindexEntry(id: String) async {
+        await ensureSearchIndexReady()
         await searchIndex.remove(id)
         guard let extraIndexer else { return }
         await extraIndexer.deindex(id: id)

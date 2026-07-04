@@ -391,6 +391,46 @@ struct LibraryStoreTests {
         #expect(results.contains(where: { $0.entryID == entry.id }))
     }
 
+    @Test("a stale old-format index snapshot is discarded and rebuilt from bundles")
+    func staleIndexSnapshotRebuild() async throws {
+        let (store1, libraryURL) = try makeTempLibrary()
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "kryptonite meeting notes")],
+            language: "en",
+            modelName: "tiny"
+        )
+        let entry = try await store1.add(transcript: transcript, audioSource: nil)
+        await store1.flush()
+
+        let indexURL = libraryURL.appendingPathComponent(".search-index.json")
+        let oldFormat = """
+        {"entries":{"ghost":{"id":"ghost","title":"Ghost","text":"phantom words"}},"inverted":{"phantom":["ghost"],"words":["ghost"]}}
+        """
+        try Data(oldFormat.utf8).write(to: indexURL)
+
+        let store2 = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+        let matches = await store2.search("kryptonite")
+        #expect(matches.contains(where: { $0.entryID == entry.id }))
+        let ghost = await store2.search("phantom")
+        #expect(ghost.isEmpty)
+    }
+
+    @Test("search on a fresh store instance finds previously indexed entries")
+    func coldStoreSearch() async throws {
+        let (store1, libraryURL) = try makeTempLibrary()
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "kryptonite meeting notes")],
+            language: "en",
+            modelName: "tiny"
+        )
+        let entry = try await store1.add(transcript: transcript, audioSource: nil)
+        await store1.flush()
+
+        let store2 = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+        let matches = await store2.search("kryptonite")
+        #expect(matches.contains(where: { $0.entryID == entry.id }))
+    }
+
     @Test("adopt rejects a source that is not a valid bundle and leaves nothing behind")
     func adoptInvalidSource() async throws {
         let (store, libraryURL) = try makeTempLibrary()

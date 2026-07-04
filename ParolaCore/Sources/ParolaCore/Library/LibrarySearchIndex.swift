@@ -26,19 +26,48 @@ public actor LibrarySearchIndex {
         }
     }
 
-    private struct IndexedEntry: Codable {
+    struct RebuildEntry: Sendable {
         let id: String
         let title: String
         let text: String
     }
 
-    private struct Snapshot: Codable {
-        let entries: [String: IndexedEntry]
-        let inverted: [String: [String]]
+    private struct IndexedEntry: Sendable {
+        let title: String
+        let excerpt: String
+        let tokens: Set<String>
     }
 
-    private var entries: [String: IndexedEntry]
-    private var inverted: [String: Set<String>]
+    private struct SnapshotEntry: Codable {
+        let title: String
+        let excerpt: String
+        let tokens: [String]
+    }
+
+    private struct Snapshot: Codable {
+        let version: Int
+        let entries: [String: SnapshotEntry]
+    }
+
+    private struct LoadedState: Sendable {
+        let entries: [String: IndexedEntry]
+        let inverted: [String: Set<String>]
+    }
+
+    private enum LoadOutcome: Sendable {
+        case loaded(LoadedState)
+        case staleDiscarded
+        case missing
+    }
+
+    private static let snapshotVersion = 2
+    private static let excerptLength = 200
+
+    private var entries: [String: IndexedEntry] = [:]
+    private var inverted: [String: Set<String>] = [:]
+    private var isLoaded = false
+    private var staleSnapshotDiscarded = false
+    private let loadTask: Task<LoadOutcome, Never>
     private let indexURL: URL
     private let saveDebounce: Duration
     private let clock: any Clock<Duration>
@@ -52,34 +81,28 @@ public actor LibrarySearchIndex {
         self.indexURL = indexURL
         self.saveDebounce = saveDebounce
         self.clock = clock
-        if let data = try? Data(contentsOf: indexURL),
-           let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) {
-            self.entries = snapshot.entries
-            self.inverted = snapshot.inverted.mapValues { Set($0) }
-        } else {
-            self.entries = [:]
-            self.inverted = [:]
+        self.loadTask = Task.detached(priority: .utility) {
+            Self.loadSnapshot(at: indexURL)
         }
     }
 
-    public func index(id: String, title: String, text: String, createdAt: Date) {
+    public func index(id: String, title: String, text: String, createdAt: Date) async {
+        await ensureLoaded()
         removeFromIndex(id)
-        entries[id] = IndexedEntry(id: id, title: title, text: text)
-        let tokens = Self.tokenize(title) + Self.tokenize(text)
-        for token in Set(tokens) {
-            inverted[token, default: []].insert(id)
-        }
+        addToIndex(id: id, title: title, text: text)
         scheduleSave()
     }
 
-    public func remove(_ id: String) {
+    public func remove(_ id: String) async {
+        await ensureLoaded()
         removeFromIndex(id)
         scheduleSave()
     }
 
-    public func search(_ query: String) -> [Match] {
+    public func search(_ query: String) async -> [Match] {
         let queryTokens = Self.tokenize(query)
         guard !queryTokens.isEmpty else { return [] }
+        await ensureLoaded()
 
         var scores: [String: Int] = [:]
         for queryToken in Set(queryTokens) {
@@ -92,7 +115,7 @@ public actor LibrarySearchIndex {
             .sorted { $0.value > $1.value }
             .compactMap { (id, score) -> Match? in
                 guard let entry = entries[id] else { return nil }
-                let snippet = Self.makeSnippet(text: entry.text, tokens: queryTokens)
+                let snippet = Self.makeSnippet(text: entry.excerpt, tokens: queryTokens)
                 return Match(
                     entryID: id,
                     score: score,
@@ -107,18 +130,84 @@ public actor LibrarySearchIndex {
         let task = pendingSaveTask
         pendingSaveTask = nil
         task?.cancel()
+        guard isLoaded else { return }
         saveSnapshot()
     }
 
+    func needsRebuild() async -> Bool {
+        await ensureLoaded()
+        return staleSnapshotDiscarded
+    }
+
+    func rebuild(entries rebuilt: [RebuildEntry]) async {
+        await ensureLoaded()
+        entries.removeAll()
+        inverted.removeAll()
+        for entry in rebuilt {
+            addToIndex(id: entry.id, title: entry.title, text: entry.text)
+        }
+        staleSnapshotDiscarded = false
+        pendingSaveTask?.cancel()
+        pendingSaveTask = nil
+        saveSnapshot()
+    }
+
+    private func ensureLoaded() async {
+        guard !isLoaded else { return }
+        let outcome = await loadTask.value
+        guard !isLoaded else { return }
+        isLoaded = true
+        switch outcome {
+        case .loaded(let state):
+            entries = state.entries
+            inverted = state.inverted
+        case .staleDiscarded:
+            staleSnapshotDiscarded = true
+        case .missing:
+            break
+        }
+    }
+
+    private static func loadSnapshot(at url: URL) -> LoadOutcome {
+        guard let data = try? Data(contentsOf: url) else { return .missing }
+        guard let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data),
+              snapshot.version == snapshotVersion else {
+            return .staleDiscarded
+        }
+        var entries: [String: IndexedEntry] = [:]
+        var inverted: [String: Set<String>] = [:]
+        entries.reserveCapacity(snapshot.entries.count)
+        for (id, entry) in snapshot.entries {
+            let tokens = Set(entry.tokens)
+            entries[id] = IndexedEntry(title: entry.title, excerpt: entry.excerpt, tokens: tokens)
+            for token in tokens {
+                inverted[token, default: []].insert(id)
+            }
+        }
+        return .loaded(LoadedState(entries: entries, inverted: inverted))
+    }
+
+    private func addToIndex(id: String, title: String, text: String) {
+        let tokens = Set(Self.tokenize(title) + Self.tokenize(text))
+        entries[id] = IndexedEntry(
+            title: title,
+            excerpt: String(text.prefix(Self.excerptLength)),
+            tokens: tokens
+        )
+        for token in tokens {
+            inverted[token, default: []].insert(id)
+        }
+    }
+
     private func removeFromIndex(_ id: String) {
-        entries.removeValue(forKey: id)
-        for (token, ids) in inverted {
-            var copy = ids
-            copy.remove(id)
-            if copy.isEmpty {
+        guard let entry = entries.removeValue(forKey: id) else { return }
+        for token in entry.tokens {
+            guard var ids = inverted[token] else { continue }
+            ids.remove(id)
+            if ids.isEmpty {
                 inverted.removeValue(forKey: token)
             } else {
-                inverted[token] = copy
+                inverted[token] = ids
             }
         }
     }
@@ -200,9 +289,14 @@ public actor LibrarySearchIndex {
     }
 
     private func saveSnapshot() {
+        // A save between a stale-snapshot discard and the rebuild would persist a partial
+        // current-version index, which a later launch would trust. Suppress until rebuilt.
+        guard !staleSnapshotDiscarded else { return }
         let snapshot = Snapshot(
-            entries: entries,
-            inverted: inverted.mapValues { Array($0).sorted() }
+            version: Self.snapshotVersion,
+            entries: entries.mapValues {
+                SnapshotEntry(title: $0.title, excerpt: $0.excerpt, tokens: $0.tokens.sorted())
+            }
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         try? data.write(to: indexURL, options: .atomic)

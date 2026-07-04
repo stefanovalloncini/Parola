@@ -146,4 +146,64 @@ struct LibrarySearchIndexTests {
         let exists = FileManager.default.fileExists(atPath: url.path)
         #expect(exists)
     }
+
+    @Test("snapshot stores an excerpt, not the full text")
+    func snapshotExcerptOnly() async throws {
+        let (index, url) = makeTempIndex()
+        let filler = String(repeating: "lorem ipsum dolor sit amet ", count: 10)
+        let text = filler + "ZzyzxMarker closing remarks"
+        await index.index(id: "e1", title: "Notes", text: text, createdAt: Date())
+        await index.flush()
+
+        let raw = try #require(String(data: Data(contentsOf: url), encoding: .utf8))
+        #expect(!raw.contains("ZzyzxMarker"))
+        #expect(raw.contains("zzyzxmarker"))
+
+        let matches = await index.search("zzyzxmarker")
+        #expect(matches.contains(where: { $0.entryID == "e1" }))
+    }
+
+    @Test("tokens beyond the excerpt survive a reload")
+    func tokensBeyondExcerptSurviveReload() async throws {
+        let (index1, url) = makeTempIndex()
+        let filler = String(repeating: "lorem ipsum dolor sit amet ", count: 10)
+        await index1.index(id: "e1", title: "Notes", text: filler + "zzyzxmarker tail", createdAt: Date())
+        await index1.flush()
+
+        let index2 = LibrarySearchIndex(indexURL: url)
+        let matches = await index2.search("zzyzxmarker")
+        #expect(matches.contains(where: { $0.entryID == "e1" }))
+        let headMatches = await index2.search("lorem")
+        let head = try #require(headMatches.first(where: { $0.entryID == "e1" }))
+        #expect(head.snippet.lowercased().contains("lorem"))
+    }
+
+    @Test("removing one entry leaves shared tokens for the other")
+    func removalKeepsSharedTokens() async throws {
+        let (index, _) = makeTempIndex()
+        await index.index(id: "e1", title: "First", text: "sprint planning alpha", createdAt: Date())
+        await index.index(id: "e2", title: "Second", text: "sprint review alpha", createdAt: Date())
+        await index.remove("e1")
+
+        let shared = await index.search("alpha")
+        #expect(shared.map(\.entryID) == ["e2"])
+        let sprint = await index.search("sprint")
+        #expect(sprint.map(\.entryID) == ["e2"])
+        let gone = await index.search("planning")
+        #expect(gone.isEmpty)
+    }
+
+    @Test("indexing on a cold instance does not clobber the loaded snapshot")
+    func coldMutationPreservesSnapshot() async throws {
+        let (index1, url) = makeTempIndex()
+        await index1.index(id: "e1", title: "Old", text: "sprint planning", createdAt: Date())
+        await index1.flush()
+
+        let index2 = LibrarySearchIndex(indexURL: url)
+        await index2.index(id: "e2", title: "New", text: "retro feedback", createdAt: Date())
+        let old = await index2.search("sprint")
+        #expect(old.contains(where: { $0.entryID == "e1" }))
+        let new = await index2.search("retro")
+        #expect(new.contains(where: { $0.entryID == "e2" }))
+    }
 }
