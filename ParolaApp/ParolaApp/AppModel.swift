@@ -1258,6 +1258,7 @@ final class AppModel {
         youtubeTranscribeTask = Task { [weak self] in
             guard let self else { return }
             do {
+                try Task.checkCancellation()
                 phase = .downloadingModel(name: "youtube", progress: 0)
                 let fetcher = MediaFetcherFactory.make()
                 let audioURL = try await fetcher.prepare(url: url)
@@ -1278,9 +1279,9 @@ final class AppModel {
                 refreshModelList()
                 persistToLibrary(processed, audioSource: audioURL)
             } catch {
-                applyTranscriptionError(error)
+                if !Task.isCancelled { applyTranscriptionError(error) }
             }
-            self.youtubeTranscribeTask = nil
+            if !Task.isCancelled { self.youtubeTranscribeTask = nil }
         }
     }
 
@@ -1291,6 +1292,7 @@ final class AppModel {
         youtubeSubsTask = Task { [weak self] in
             guard let self else { return }
             do {
+                try Task.checkCancellation()
                 phase = .transcribing(file: url)
                 let result = try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: selectedLanguage)
                 try Task.checkCancellation()
@@ -1299,9 +1301,9 @@ final class AppModel {
                 phase = .ready
                 persistToLibrary(processed, audioSource: nil)
             } catch {
-                applyTranscriptionError(error)
+                if !Task.isCancelled { applyTranscriptionError(error) }
             }
-            self.youtubeSubsTask = nil
+            if !Task.isCancelled { self.youtubeSubsTask = nil }
         }
     }
 
