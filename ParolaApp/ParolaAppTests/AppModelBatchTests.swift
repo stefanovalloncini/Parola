@@ -329,4 +329,52 @@ struct AppModelBatchTests {
         model.openBatchJobTranscript(jobID)
         #expect(model.selectedEntryID == nil)
     }
+
+    @Test("arrivals during recording defer instead of stomping capture")
+    func recordingDefersArrivals() {
+        let model = makeModel()
+        model.phase = .recording(source: .microphone)
+        let url = URL(fileURLWithPath: "/tmp/arrival.wav")
+        model.transcribe(fileURL: url)
+        #expect(model.deferredArrivals == [url])
+        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.batchJobs.isEmpty)
+
+        model.startBatch(urls: [URL(fileURLWithPath: "/tmp/b.wav")])
+        #expect(model.deferredArrivals.count == 2)
+        #expect(model.batchJobs.isEmpty)
+    }
+
+    @Test("deferred arrivals drain into the batch when recording finishes")
+    func deferredArrivalsDrainOnFinish() {
+        let model = makeModel()
+        model.phase = .recording(source: .microphone)
+        let url = URL(fileURLWithPath: "/tmp/arrival.wav")
+        model.transcribe(fileURL: url)
+        let final = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")], language: "en", modelName: "m")
+        model.handleStreamingEvent(.finished(final))
+        #expect(model.deferredArrivals.isEmpty)
+        #expect(model.batchJobs.contains { $0.url == url })
+    }
+
+    @Test("cancelling discards deferred arrivals")
+    func cancelDiscardsDeferredArrivals() {
+        let model = makeModel()
+        model.phase = .recording(source: .microphone)
+        model.transcribe(fileURL: URL(fileURLWithPath: "/tmp/arrival.wav"))
+        model.cancelCurrentWork()
+        #expect(model.deferredArrivals.isEmpty)
+        #expect(model.batchJobs.isEmpty)
+    }
+
+    @Test("single-file arrivals during a running batch join the queue")
+    func runningBatchAbsorbsSingleArrival() {
+        let model = makeModel()
+        model.startBatch(urls: [URL(fileURLWithPath: "/tmp/a.wav")])
+        model.handleBatchEvent(.started(jobID: model.batchJobs[0].id))
+        let url = URL(fileURLWithPath: "/tmp/late.wav")
+        model.transcribe(fileURL: url)
+        #expect(model.batchJobs.contains { $0.url == url && $0.status == .pending })
+        #expect(model.deferredArrivals.isEmpty)
+    }
 }

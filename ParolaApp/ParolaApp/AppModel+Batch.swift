@@ -65,6 +65,10 @@ extension AppModel {
     }
 
     func startBatch(urls: [URL]) {
+        if case .recording = phase {
+            deferredArrivals.append(contentsOf: urls)
+            return
+        }
         let jobs = urls.map { BatchJob(url: $0) }
         batchJobs = jobs
         selectedBatchJobID = jobs.first?.id
@@ -155,6 +159,13 @@ extension AppModel {
             batchJobs.append(contentsOf: newJobs)
             resumeBatch(pendingJobs: newJobs)
         }
+    }
+
+    func drainDeferredArrivals() {
+        guard !deferredArrivals.isEmpty else { return }
+        let urls = deferredArrivals
+        deferredArrivals = []
+        addBatchFiles(urls)
     }
 
     var batchIsRunning: Bool {

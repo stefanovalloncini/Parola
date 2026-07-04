@@ -704,6 +704,7 @@ final class AppModel {
     }
 
     @ObservationIgnored var liveSource: AudioSource?
+    @ObservationIgnored var deferredArrivals: [URL] = []
     @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
     @ObservationIgnored private var streamingConsumer: Task<Void, Never>?
     @ObservationIgnored private var fileTranscribeTask: Task<Void, Never>?
@@ -740,6 +741,7 @@ final class AppModel {
     func cancelCurrentWork() {
         let hadWork = canCancel || liveSource != nil
         cancelAllInFlightBatchJobs()
+        deferredArrivals = []
         downloadTask?.cancel()
         downloadTask = nil
         fileTranscribeTask?.cancel()
@@ -1108,6 +1110,15 @@ final class AppModel {
             openProjectDocument(at: fileURL)
             return
         }
+        // Arrivals must never stomp an active capture or batch (drops, watched folders, Services, URL scheme).
+        if case .recording = phase {
+            deferredArrivals.append(fileURL)
+            return
+        }
+        if batchIsRunning {
+            addBatchFiles([fileURL])
+            return
+        }
         noteRecentFile(fileURL)
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
@@ -1473,6 +1484,7 @@ final class AppModel {
             } catch {
                 await mediaSession.exitRecording()
                 phase = .failed(message: Self.recordingFailureMessage(for: error, source: source))
+                drainDeferredArrivals()
             }
         }
     }
@@ -1561,6 +1573,7 @@ final class AppModel {
             } catch {
                 teardownStreaming()
                 phase = .failed(message: Self.transcriptionFailureMessage(for: error))
+                drainDeferredArrivals()
             }
             await mediaSession.exitRecording()
         }
@@ -1594,6 +1607,7 @@ final class AppModel {
         case .failed(let msg):
             teardownStreaming()
             phase = .failed(message: msg)
+            drainDeferredArrivals()
         case .finished(let transcript):
             let processed = postProcess(transcript)
             self.selectedEntryID = nil
@@ -1602,6 +1616,7 @@ final class AppModel {
             self.liveSegments = []
             self.phase = .ready
             persistToLibrary(processed, audioSource: nil)
+            drainDeferredArrivals()
         }
     }
 
@@ -1643,9 +1658,11 @@ final class AppModel {
                 phase = .ready
                 refreshModelList()
                 persistToLibrary(processed, audioSource: url)
+                drainDeferredArrivals()
             } catch {
                 stopRecordingLevelObserver()
                 phase = .failed(message: Self.transcriptionFailureMessage(for: error))
+                drainDeferredArrivals()
             }
         }
     }
