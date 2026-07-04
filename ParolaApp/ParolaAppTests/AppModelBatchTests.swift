@@ -290,4 +290,14 @@ struct AppModelBatchTests {
         #expect(model.batchJobs[0].transcript?.segments.map(\.text) == ["perché Acme spende un po'"])
         #expect(model.batchJobs[0].status == .done)
     }
+
+    @Test("cancelCurrentWork marks all in-flight batch jobs cancelled and returns phase to idle")
+    func cancelCurrentWorkMarksBatchJobsCancelled() {
+        let model = makeModel()
+        model.startBatch(urls: [URL(fileURLWithPath: "/tmp/a.wav"), URL(fileURLWithPath: "/tmp/b.wav")])
+        model.handleBatchEvent(.started(jobID: model.batchJobs[0].id))
+        model.cancelCurrentWork()
+        #expect(model.batchJobs.allSatisfy { $0.status == .cancelled })
+        #expect(model.phase == .idle)
+    }
 }

@@ -704,18 +704,22 @@ final class AppModel {
     @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
     @ObservationIgnored private var streamingConsumer: Task<Void, Never>?
     @ObservationIgnored private var fileTranscribeTask: Task<Void, Never>?
+    @ObservationIgnored private var downloadTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeSubsTask: Task<Void, Never>?
     var canCancel: Bool {
         if batchTask != nil { return true }
         if streamingConsumer != nil { return true }
         if fileTranscribeTask != nil { return true }
+        if downloadTask != nil { return true }
         if youtubeTranscribeTask != nil { return true }
         if youtubeSubsTask != nil { return true }
         return false
     }
 
     private func teardownActiveCapture() {
+        stopSilenceWatch()
+        stopRecordingLevelObserver()
         streamingConsumer?.cancel()
         streamingConsumer = nil
         if let s = streamingSession {
@@ -731,8 +735,9 @@ final class AppModel {
     }
 
     func cancelCurrentWork() {
-        batchTask?.cancel()
-        batchTask = nil
+        cancelAllInFlightBatchJobs()
+        downloadTask?.cancel()
+        downloadTask = nil
         fileTranscribeTask?.cancel()
         fileTranscribeTask = nil
         youtubeTranscribeTask?.cancel()
@@ -1064,15 +1069,17 @@ final class AppModel {
 
     func downloadModel(_ name: String) {
         let progress = makeDownloadProgressHandler(for: name)
-        Task {
+        downloadTask?.cancel()
+        downloadTask = Task {
             do {
                 phase = .downloadingModel(name: name, progress: 0)
                 _ = try await store.download(variant: name, progress: progress)
                 phase = .idle
                 refreshModelList()
             } catch {
-                phase = .failed(message: "Download failed: \(error.localizedDescription)")
+                if !Task.isCancelled { phase = .failed(message: "Download failed: \(error.localizedDescription)") }
             }
+            if !Task.isCancelled { downloadTask = nil }
         }
     }
 
@@ -1599,7 +1606,7 @@ final class AppModel {
         }
 
         guard let source = liveSource else { return }
-        Task {
+        fileTranscribeTask = Task {
             await mediaSession.exitRecording()
             do {
                 let url = try await source.prepare()

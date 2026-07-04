@@ -4,15 +4,21 @@ import ParolaCore
 struct ProgressPane: View {
     let title: LocalizedStringKey
     let progress: Double?
+    @Environment(AppModel.self) private var model
     @State private var eta = ETACalculator()
     @State private var etaLabel: String?
     @State private var startDate = Date()
 
     var body: some View {
         VStack(spacing: DS.Spacing.regular) {
-            Text(title)
-                .font(DS.Font.heading)
-                .foregroundStyle(DS.Color.primaryText)
+            HStack {
+                Text(title)
+                    .font(DS.Font.heading)
+                    .foregroundStyle(DS.Color.primaryText)
+                Button("Cancel") { model.cancelCurrentWork() }
+                    .controlSize(.small)
+                    .axLeaf("Progress.Button.Cancel")
+            }
             if let progress {
                 ProgressView(value: progress)
                     .progressViewStyle(.linear)

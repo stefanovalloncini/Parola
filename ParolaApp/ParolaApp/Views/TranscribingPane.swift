@@ -7,6 +7,7 @@ struct TranscribingPane: View {
     let progress: Double?
     var expectsPartials: Bool = true
 
+    @Environment(AppModel.self) private var model
     @State private var eta = ETACalculator()
     @State private var etaDeadline: Date?
     @State private var startDate = Date()
@@ -110,6 +111,9 @@ struct TranscribingPane: View {
                             .monospacedDigit()
                     }
                 }
+                Button("Cancel") { model.cancelCurrentWork() }
+                    .controlSize(.small)
+                    .axLeaf("Transcribing.Button.Cancel")
             }
             if let progress, !isFinishing {
                 ProgressView(value: progress)
