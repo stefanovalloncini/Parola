@@ -134,7 +134,7 @@ struct TranscribingPane: View {
         etaDeadline = eta.projectedFinish()
     }
 
-    private func streamingTranscript(caretVisible: Bool) -> Text {
+    private var transcriptBodyText: Text {
         let parts = StreamingText.split(shown: settled, latest: partial)
         var text = AttributedString(parts.settled)
         text.foregroundColor = DS.Color.primaryText
@@ -143,18 +143,23 @@ struct TranscribingPane: View {
             tail.foregroundColor = DS.Color.primaryText.opacity(0.5)
             text.append(tail)
         }
-        return Text(text) + Text(verbatim: "\u{258F}")
-            .foregroundStyle(DS.Color.accent.opacity(caretVisible ? 1 : 0))
+        return Text(text)
+    }
+
+    private func caret(visible: Bool) -> Text {
+        Text(verbatim: "\u{258F}")
+            .foregroundStyle(DS.Color.accent.opacity(visible ? 1 : 0))
     }
 
     private var transcriptBox: some View {
-        ScrollViewReader { proxy in
+        let bodyText = transcriptBodyText
+        return ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.Spacing.regular) {
                     if hasText {
                         TimelineView(.periodic(from: startDate, by: Self.caretBlinkPeriod)) { context in
                             let ticks = Int(context.date.timeIntervalSince(startDate) / Self.caretBlinkPeriod)
-                            streamingTranscript(caretVisible: reduceMotion || ticks % 2 == 0)
+                            (bodyText + caret(visible: reduceMotion || ticks % 2 == 0))
                                 .font(DS.Font.transcript)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .textSelection(.enabled)
