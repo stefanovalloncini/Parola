@@ -32,7 +32,8 @@ final class PlaybackKeyMonitor {
         self.model = model
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, let model = self.model else { return event }
-            let textInputActive = event.window?.firstResponder is NSTextView
+            let responder = (event.window ?? NSApp.keyWindow)?.firstResponder
+            let textInputActive = (responder as? NSTextView)?.isEditable == true
             guard let action = Self.action(
                 keyCode: event.keyCode,
                 modifiers: event.modifierFlags,
