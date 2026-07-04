@@ -14,14 +14,16 @@ extension AppModel {
                 message: "Pick a Parola term pack (.json)."
             )
             guard let url = urls.first else { return }
-            self.importTermPack(from: url)
+            await self.importTermPack(from: url)
         }
     }
 
-    func importTermPack(from url: URL) {
+    func importTermPack(from url: URL) async {
         do {
-            let data = try Data(contentsOf: url)
-            let pack = try TermPackIO.decode(data)
+            let pack = try await Task.detached {
+                let data = try Data(contentsOf: url)
+                return try TermPackIO.decode(data)
+            }.value
             findReplaceRules = TermPackIO.merge(pack: pack, into: findReplaceRules)
         } catch {
             phase = .failed(message: "Couldn't import term pack: \(error.localizedDescription)")

@@ -246,7 +246,7 @@ extension AppModel {
             for entry in targets {
                 do {
                     let loaded = try await library.load(entry.id)
-                    let data = try exporter.render(loaded.document.transcript)
+                    let transcript = loaded.document.transcript
                     let safe = entry.title.replacingOccurrences(of: "/", with: "-")
                     var name = safe
                     var suffix = 2
@@ -256,7 +256,10 @@ extension AppModel {
                     }
                     usedNames.insert(name)
                     let url = folder.appendingPathComponent("\(name).\(format.fileExtension)")
-                    try data.write(to: url, options: .atomic)
+                    try await Task.detached {
+                        let data = try exporter.render(transcript)
+                        try data.write(to: url, options: .atomic)
+                    }.value
                 } catch {
                     await MainActor.run { [weak self] in
                         self?.phase = .failed(message: "Export of \(entry.title) failed: \(error.localizedDescription)")

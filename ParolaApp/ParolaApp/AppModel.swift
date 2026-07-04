@@ -1113,7 +1113,7 @@ final class AppModel {
 
     func transcribe(fileURL: URL, translateOverride: Bool? = nil) {
         if fileURL.pathExtension == "parola" {
-            openProjectDocument(at: fileURL)
+            Task { [weak self] in await self?.openProjectDocument(at: fileURL) }
             return
         }
         // Arrivals must never stomp an active capture or batch (drops, watched folders, Services, URL scheme).
@@ -1769,9 +1769,9 @@ final class AppModel {
 
     // MARK: - Project document
 
-    func openProjectDocument(at url: URL) {
+    func openProjectDocument(at url: URL) async {
         do {
-            let doc = try ParolaDocument.read(at: url)
+            let doc = try await Task.detached { try ParolaDocument.read(at: url) }.value
             sourceFileURL = doc.audioURL
             transcript = doc.transcript
             if let audio = doc.audioURL {
@@ -1924,24 +1924,26 @@ final class AppModel {
 
     func copyTranscriptToPasteboard(withTimestamps: Bool) {
         guard let transcript else { return }
-        let text: String
-        if withTimestamps {
-            text = TranscriptTimestampedText.render(transcript)
-        } else {
-            text = transcript.text
+        Task {
+            let text = await Task.detached {
+                withTimestamps ? TranscriptTimestampedText.render(transcript) : transcript.text
+            }.value
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
         }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
     }
 
     func copyTranscriptAsFormat(_ format: ExportFormat) {
         guard let transcript else { return }
-        guard let data = try? makeExporter(for: format).render(transcript),
-              let text = String(data: data, encoding: .utf8) else {
-            return
+        let exporter = makeExporter(for: format)
+        Task {
+            guard let data = try? await Task.detached(operation: { try exporter.render(transcript) }).value,
+                  let text = String(data: data, encoding: .utf8) else {
+                return
+            }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
         }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
     }
 
     func printTranscript() {

@@ -21,7 +21,7 @@ struct AppModelTermPacksTests {
     }
 
     @Test("importing a term pack appends its rules to find/replace")
-    func importMergesRules() throws {
+    func importMergesRules() async throws {
         let model = makeModel()
         model.findReplaceRules = []
         let url = try writePack(TermPack(
@@ -34,7 +34,7 @@ struct AppModelTermPacksTests {
         ))
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
 
-        model.importTermPack(from: url)
+        await model.importTermPack(from: url)
 
         let allEnabled = model.findReplaceRules.allSatisfy { $0.enabled }
         #expect(model.findReplaceRules.map(\.find) == ["kubernetes", "postgres"])
@@ -43,7 +43,7 @@ struct AppModelTermPacksTests {
     }
 
     @Test("importing a term pack skips rules already present")
-    func importDeduplicates() throws {
+    func importDeduplicates() async throws {
         let model = makeModel()
         model.findReplaceRules = [FindReplaceRule(find: "swift", replace: "Swift")]
         let url = try writePack(TermPack(
@@ -56,13 +56,13 @@ struct AppModelTermPacksTests {
         ))
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
 
-        model.importTermPack(from: url)
+        await model.importTermPack(from: url)
 
         #expect(model.findReplaceRules.map(\.find) == ["swift", "xcode"])
     }
 
     @Test("importing a pack with empty finds drops those rules")
-    func importDropsEmptyFinds() throws {
+    func importDropsEmptyFinds() async throws {
         let model = makeModel()
         model.findReplaceRules = []
         let url = try writePack(TermPack(
@@ -75,18 +75,18 @@ struct AppModelTermPacksTests {
         ))
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
 
-        model.importTermPack(from: url)
+        await model.importTermPack(from: url)
 
         #expect(model.findReplaceRules.map(\.find) == ["redis"])
     }
 
     @Test("importing from a missing file reports a failure")
-    func importMissingFileFails() {
+    func importMissingFileFails() async {
         let model = makeModel()
         let missing = FileManager.default.temporaryDirectory
             .appendingPathComponent("does-not-exist-\(UUID().uuidString).json")
 
-        model.importTermPack(from: missing)
+        await model.importTermPack(from: missing)
 
         guard case .failed(let message) = model.phase else {
             Issue.record("expected a failed phase, got \(model.phase)")
@@ -96,7 +96,7 @@ struct AppModelTermPacksTests {
     }
 
     @Test("importing malformed JSON reports a failure")
-    func importMalformedFails() throws {
+    func importMalformedFails() async throws {
         let model = makeModel()
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("TermPackTests-\(UUID().uuidString)", isDirectory: true)
@@ -105,7 +105,7 @@ struct AppModelTermPacksTests {
         let url = dir.appendingPathComponent("bad.json")
         try Data("not json".utf8).write(to: url)
 
-        model.importTermPack(from: url)
+        await model.importTermPack(from: url)
 
         guard case .failed = model.phase else {
             Issue.record("expected a failed phase, got \(model.phase)")
