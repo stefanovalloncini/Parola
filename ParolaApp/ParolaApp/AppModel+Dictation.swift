@@ -205,6 +205,32 @@ extension AppModel {
         )
         dictationController.indicatorStyle = dictationIndicatorStyle
         dictationController.start(configuration: configuration)
+        prewarmDictationModel()
+    }
+
+    /// Warms the streaming model as soon as the dictation hotkey is armed, so the first press
+    /// doesn't lose speech to the model load. Gated to real launches: test runs wire no hotkey.
+    func prewarmDictationModel() {
+        guard activeSideEffects.contains(.dictationHotkey) else { return }
+        guard let name = AppModel.streamingPrewarmCandidate(
+            model: selectedModel,
+            useStreaming: useStreaming,
+            isInstalled: { ModelStore.shared.isInstalled($0) }
+        ) else { return }
+        Task.detached {
+            await StreamingTranscriberFactory.prewarm(modelName: name)
+        }
+    }
+
+    static func streamingPrewarmCandidate(
+        model: String,
+        useStreaming: Bool,
+        isInstalled: (String) -> Bool
+    ) -> String? {
+        guard useStreaming else { return nil }
+        guard ModelCatalog.variant(id: model)?.engineID == .whisperKit else { return nil }
+        guard isInstalled(model) else { return nil }
+        return model
     }
 
     func applyDictationModeChange() {

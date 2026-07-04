@@ -37,6 +37,10 @@ struct DictationView: View {
         return false
     }
 
+    private var isDownloadingModel: Bool {
+        controller.modelDownloadProgress != nil
+    }
+
     private var overlayBody: some View {
         VStack(alignment: .leading, spacing: hasPartial ? 6 : 0) {
             HStack(spacing: 12) {
@@ -67,7 +71,7 @@ struct DictationView: View {
         }
         .padding(.horizontal, DS.Spacing.medium)
         .padding(.vertical, DS.Spacing.regular)
-        .frame(width: hasPartial ? 344 : (isListening ? 324 : 256), alignment: .leading)
+        .frame(width: hasPartial ? 344 : (isListening || isDownloadingModel ? 324 : 256), alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(Color.black.opacity(0.85))
@@ -153,7 +157,11 @@ struct DictationView: View {
     private var indicator: some View {
         switch state {
         case .idle:
-            Circle().fill(Color.gray.opacity(0.6)).frame(width: 14, height: 14)
+            if isDownloadingModel {
+                SpinningRing().frame(width: 14, height: 14)
+            } else {
+                Circle().fill(Color.gray.opacity(0.6)).frame(width: 14, height: 14)
+            }
         case .listening:
             LiveWaveformBars(levelSubject: controller.audioLevel)
         case .transcribing:
@@ -236,6 +244,9 @@ struct DictationView: View {
     }
 
     private var label: String {
+        if let progress = controller.modelDownloadProgress {
+            return String(localized: "Downloading model… \(Int(progress * 100))%")
+        }
         switch state {
         case .idle: return String(localized: "Ready")
         case .listening: return String(localized: "Listening")

@@ -18,6 +18,13 @@ final class DictationController {
     }
     private(set) var recentDictation: String = ""
 
+    private(set) var modelDownloadProgress: Double? {
+        didSet {
+            guard (oldValue == nil) != (modelDownloadProgress == nil), let panel = hud else { return }
+            panel.setFrame(preferredHUDFrame(), display: true, animate: false)
+        }
+    }
+
     private static let recentDictationCharLimit = 600
 
     private static func capped(_ text: String) -> String {
@@ -76,6 +83,9 @@ final class DictationController {
             streamingEnabled: configuration.streamingEnabled,
             workflowResolver: { @Sendable in
                 await Self.resolveWorkflow(in: workflows)
+            },
+            downloadProgress: { [weak self] fraction in
+                Task { @MainActor in self?.noteModelDownloadProgress(fraction) }
             }
         )
         let inserter: any TextInserter
@@ -105,6 +115,7 @@ final class DictationController {
     func stop() {
         guard let coord = coordinator else {
             state = .idle
+            modelDownloadProgress = nil
             hideHUD()
             return
         }
@@ -113,6 +124,7 @@ final class DictationController {
         failedHideTask = nil
         Task { await coord.stopMonitoring() }
         stopPartialStream()
+        modelDownloadProgress = nil
         hideHUD()
         state = .idle
     }
@@ -125,6 +137,7 @@ final class DictationController {
         guard let coord = coordinator else {
             state = .idle
             appModel?.dictationState = .idle
+            modelDownloadProgress = nil
             hideHUD()
             return
         }
@@ -133,6 +146,7 @@ final class DictationController {
         failedHideTask = nil
         Task { await coord.abortMonitoring() }
         stopPartialStream()
+        modelDownloadProgress = nil
         hideHUD()
         state = .idle
         appModel?.dictationState = .idle
@@ -162,9 +176,23 @@ final class DictationController {
 
     var isRunning: Bool { coordinator != nil }
 
+    /// A first-ever dictation press downloads the model while the coordinator is still `.idle`
+    /// and the HUD hidden; showing it here is the only feedback the user gets during that wait.
+    func noteModelDownloadProgress(_ fraction: Double) {
+        if fraction >= 1 {
+            modelDownloadProgress = nil
+            return
+        }
+        let percent = Int(fraction * 100)
+        guard percent != modelDownloadProgress.map({ Int($0 * 100) }) else { return }
+        modelDownloadProgress = fraction
+        showHUD()
+    }
+
     private func handleStateChange(_ state: DictationCoordinator.State) {
         self.state = state
         appModel?.dictationState = state
+        modelDownloadProgress = nil
         failedHideTask?.cancel()
         failedHideTask = nil
         switch state {
@@ -258,7 +286,7 @@ final class DictationController {
         switch style {
         case .overlay:
             let listeningCompact: Bool
-            if case .listening = state { listeningCompact = true } else { listeningCompact = false }
+            if case .listening = state { listeningCompact = true } else { listeningCompact = modelDownloadProgress != nil }
             let compactWidth: CGFloat = listeningCompact ? 336 : 268
             size = NSSize(width: hasPartial ? 380 : compactWidth, height: hasPartial ? 156 : 64)
         case .notch:

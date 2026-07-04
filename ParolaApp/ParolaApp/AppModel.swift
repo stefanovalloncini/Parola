@@ -405,7 +405,7 @@ final class AppModel {
     }
 
     @ObservationIgnored private var isReloadingSettings = false
-    @ObservationIgnored private var activeSideEffects: Set<BootstrapSideEffect> = []
+    @ObservationIgnored private(set) var activeSideEffects: Set<BootstrapSideEffect> = []
 
     private func themeKeySnapshot() -> [String] {
         [appTheme, appAccentRaw, String(themeIsCustom), themeCustomPaletteJSON]

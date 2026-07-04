@@ -285,4 +285,44 @@ struct AppModelDictationTests {
 
         model.stopDictation()
     }
+
+    @Test("prewarm candidate is the model only for installed streaming WhisperKit variants")
+    func prewarmCandidateGates() {
+        let whisper = "openai_whisper-large-v3_turbo"
+        let parakeet = "nvidia_parakeet-tdt-0.6b-v2"
+
+        #expect(AppModel.streamingPrewarmCandidate(model: whisper, useStreaming: true, isInstalled: { _ in true }) == whisper)
+        #expect(AppModel.streamingPrewarmCandidate(model: whisper, useStreaming: false, isInstalled: { _ in true }) == nil)
+        #expect(AppModel.streamingPrewarmCandidate(model: whisper, useStreaming: true, isInstalled: { _ in false }) == nil)
+        #expect(AppModel.streamingPrewarmCandidate(model: parakeet, useStreaming: true, isInstalled: { _ in true }) == nil)
+        #expect(AppModel.streamingPrewarmCandidate(model: "not-a-model", useStreaming: true, isInstalled: { _ in true }) == nil)
+    }
+
+    @Test("model download progress updates once per whole percent and clears at completion")
+    func downloadProgressThrottlesAndClears() {
+        let controller = DictationController()
+
+        controller.noteModelDownloadProgress(0.421)
+        #expect(controller.modelDownloadProgress == 0.421)
+
+        controller.noteModelDownloadProgress(0.429)
+        #expect(controller.modelDownloadProgress == 0.421)
+
+        controller.noteModelDownloadProgress(0.43)
+        #expect(controller.modelDownloadProgress == 0.43)
+
+        controller.noteModelDownloadProgress(1.0)
+        #expect(controller.modelDownloadProgress == nil)
+    }
+
+    @Test("stopping dictation clears a stale download progress")
+    func stopClearsDownloadProgress() {
+        let controller = DictationController()
+        controller.noteModelDownloadProgress(0.5)
+        #expect(controller.modelDownloadProgress == 0.5)
+
+        controller.stop()
+
+        #expect(controller.modelDownloadProgress == nil)
+    }
 }
