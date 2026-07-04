@@ -59,11 +59,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // The search index loads from a debounced snapshot and is never rebuilt from bundles,
-        // so a mutation in the last ~250ms would be lost. Force the pending write out.
-        guard let library = model?.library else { return }
+        guard let model else { return }
+        let pending = model.cancelAndDrainPendingTranscriptSave()
+        let library = model.library
         let semaphore = DispatchSemaphore(value: 0)
         Task.detached {
+            if let pending {
+                try? await library.updateTranscript(pending.transcript, for: pending.id)
+            }
             await library.flush()
             semaphore.signal()
         }

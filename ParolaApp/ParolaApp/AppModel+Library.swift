@@ -215,6 +215,8 @@ extension AppModel {
     }
 
     func clearLoadedEntry() {
+        pendingTranscriptSaveTask?.cancel()
+        pendingTranscriptSaveTask = nil
         selectedEntryID = nil
         transcript = nil
         sourceFileURL = nil
@@ -262,6 +264,7 @@ extension AppModel {
     func loadEntry(_ id: LibraryEntry.ID) {
         Task { [weak self] in
             guard let self else { return }
+            await flushPendingTranscriptSave()
             do {
                 let loaded = try await library.load(id)
                 transcript = loaded.document.transcript

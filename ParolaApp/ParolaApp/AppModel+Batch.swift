@@ -212,9 +212,15 @@ extension AppModel {
     func selectBatchJob(_ id: BatchJob.ID) {
         selectedBatchJobID = id
         if let job = batchJobs.first(where: { $0.id == id }), let t = job.transcript {
+            let pending = cancelAndDrainPendingTranscriptSave()
             selectedEntryID = nil
             transcript = t
             installPlayer(for: job.url)
+            if let pending {
+                Task { [library] in
+                    try? await library.updateTranscript(pending.transcript, for: pending.id)
+                }
+            }
         }
     }
 

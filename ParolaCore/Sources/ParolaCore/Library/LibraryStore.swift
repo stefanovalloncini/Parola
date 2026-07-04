@@ -156,8 +156,14 @@ public actor LibraryStore {
     }
 
     /// Overwrites the transcript.json inside an existing bundle, bumps the manifest `updatedAt`,
-    /// and re-indexes the entry so search and Spotlight reflect the edited text.
-    public func updateTranscript(_ transcript: Transcript, for id: LibraryEntry.ID, at now: Date = Date()) async throws {
+    /// and (when `reindex` is true) re-indexes the entry so search and Spotlight reflect the edited text.
+    /// Pass `reindex: false` for timing-only nudges where segment text is unchanged — saves the index hop.
+    public func updateTranscript(
+        _ transcript: Transcript,
+        for id: LibraryEntry.ID,
+        at now: Date = Date(),
+        reindex: Bool = true
+    ) async throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
@@ -165,7 +171,7 @@ public actor LibraryStore {
         let transcriptURL = bundleURL.appendingPathComponent("transcript.json")
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         let data = try encoder.encode(transcript)
         try data.write(to: transcriptURL, options: .atomic)
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
@@ -173,8 +179,10 @@ public actor LibraryStore {
         }
         invalidateListCaches()
         if cachedLoaded?.id == id { cachedLoaded = nil }
-        let entry = try makeEntry(bundleURL: bundleURL)
-        await indexEntry(entry, transcriptText: transcript.text)
+        if reindex {
+            let entry = try makeEntry(bundleURL: bundleURL)
+            await indexEntry(entry, transcriptText: transcript.text)
+        }
     }
 
     /// Changes the category of an entry.

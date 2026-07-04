@@ -692,6 +692,8 @@ final class AppModel {
     var libraryBundleSizes: [String: Int64] = [:]
     @ObservationIgnored var searchTask: Task<Void, Never>?
     @ObservationIgnored var libraryRefreshTask: Task<Void, Never>?
+    @ObservationIgnored var pendingTranscriptSaveTask: Task<Void, Never>?
+    @ObservationIgnored var pendingTranscriptSaveGeneration: Int = 0
     static let trashRetentionDays = 30
 
     // MARK: - Engine
@@ -1699,7 +1701,7 @@ final class AppModel {
             segments: t.segments, id: id, frameDelta: frames, fps: subtitleFPS
         )
         transcript = t
-        persistCurrentTranscriptIfLoaded()
+        persistCurrentTranscriptIfLoaded(textChanged: false)
     }
 
     func nudgeSegmentEnd(id: TranscriptSegment.ID, frames: Int) {
@@ -1708,13 +1710,49 @@ final class AppModel {
             segments: t.segments, id: id, frameDelta: frames, fps: subtitleFPS
         )
         transcript = t
-        persistCurrentTranscriptIfLoaded()
+        persistCurrentTranscriptIfLoaded(textChanged: false)
     }
 
-    /// Persists in-place transcript edits to the open library entry, mirroring applySpeakerRenames/recordChat.
-    func persistCurrentTranscriptIfLoaded() {
+    /// Schedules a debounced (~1 s) persist of the current transcript. Rapid edits coalesce: only the
+    /// latest snapshot (identified by the generation counter) is written; earlier tasks cancel themselves.
+    func persistCurrentTranscriptIfLoaded(textChanged: Bool = true) {
         guard let id = selectedEntryID, let transcript else { return }
-        Task { [library] in try? await library.updateTranscript(transcript, for: id) }
+        pendingTranscriptSaveGeneration &+= 1
+        let generation = pendingTranscriptSaveGeneration
+        pendingTranscriptSaveTask?.cancel()
+        let clock = clock
+        pendingTranscriptSaveTask = Task { [weak self, library] in
+            try? await Task.sleep(for: .seconds(1), clock: clock)
+            guard !Task.isCancelled else { return }
+            guard await self?.pendingTranscriptSaveGeneration == generation else { return }
+            try? await library.updateTranscript(transcript, for: id, reindex: textChanged)
+            await MainActor.run { [weak self] in
+                if self?.pendingTranscriptSaveGeneration == generation {
+                    self?.pendingTranscriptSaveTask = nil
+                }
+            }
+        }
+    }
+
+    /// Flushes any pending debounced transcript write immediately. Call at entry-switch or batch-select.
+    func flushPendingTranscriptSave() async {
+        guard let id = selectedEntryID, let transcript else {
+            pendingTranscriptSaveTask?.cancel()
+            pendingTranscriptSaveTask = nil
+            return
+        }
+        pendingTranscriptSaveTask?.cancel()
+        pendingTranscriptSaveTask = nil
+        try? await library.updateTranscript(transcript, for: id)
+    }
+
+    /// Synchronously cancels any pending debounced save and returns the snapshot to write.
+    /// Used by AppDelegate.applicationWillTerminate, which cannot await async functions.
+    func cancelAndDrainPendingTranscriptSave() -> (id: LibraryEntry.ID, transcript: Transcript)? {
+        pendingTranscriptSaveTask?.cancel()
+        pendingTranscriptSaveTask = nil
+        guard let id = selectedEntryID, let transcript else { return nil }
+        return (id, transcript)
     }
 
     // MARK: - Find & replace
