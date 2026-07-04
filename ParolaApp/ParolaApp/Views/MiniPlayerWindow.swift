@@ -1,6 +1,7 @@
 import SwiftUI
 import AVKit
 import AppKit
+import ParolaCore
 
 struct MiniPlayerWindow: View {
     @Environment(AppModel.self) private var model
@@ -21,7 +22,7 @@ struct MiniPlayerWindow: View {
         let text: String = {
             guard let transcript = model.transcript,
                   let id = model.currentSegmentID,
-                  let seg = transcript.segments.first(where: { $0.id == id })
+                  let seg = Self.segment(withID: id, in: transcript.segments, hint: model.currentSegmentIndex)
             else {
                 return model.transcript == nil ? "No transcript loaded" : "—"
             }
@@ -33,6 +34,13 @@ struct MiniPlayerWindow: View {
             .lineLimit(2)
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    static func segment(withID id: TranscriptSegment.ID, in segments: [TranscriptSegment], hint: Int?) -> TranscriptSegment? {
+        if let hint, segments.indices.contains(hint), segments[hint].id == id {
+            return segments[hint]
+        }
+        return segments.first(where: { $0.id == id })
     }
 
     private var controls: some View {
@@ -70,22 +78,8 @@ struct MiniPlayerWindow: View {
 
             Spacer()
 
-            Text(timeLabel)
-                .font(DS.Font.subheadlineMono)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
+            MiniPlayerTimeLabel()
         }
-    }
-
-    private var timeLabel: String {
-        let cur = Int(max(0, model.currentTimeSeconds.rounded()))
-        let total = Int(max(0, (model.transcript?.durationSeconds ?? 0).rounded()))
-        return "\(format(cur)) / \(format(total))"
-    }
-
-    private func format(_ s: Int) -> String {
-        let h = s / 3600, m = (s % 3600) / 60, sec = s % 60
-        return h > 0 ? String(format: "%d:%02d:%02d", h, m, sec) : String(format: "%02d:%02d", m, sec)
     }
 
     private func togglePlayPause() {
@@ -113,6 +107,20 @@ struct MiniPlayerWindow: View {
         } else if let first = transcript.segments.first {
             model.seek(to: first)
         }
+    }
+}
+
+private struct MiniPlayerTimeLabel: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Text(PlaybackProgressView.timeLabel(
+            current: model.currentTimeSeconds,
+            total: model.transcript?.durationSeconds ?? 0
+        ))
+        .font(DS.Font.subheadlineMono)
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
     }
 }
 

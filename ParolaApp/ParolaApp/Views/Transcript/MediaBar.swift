@@ -4,14 +4,10 @@ import AVKit
 struct MediaBar: View {
     @Environment(AppModel.self) private var model
     @AppStorage("playbackRate") private var playbackRate: Double = 1.0
-    @State private var scrubbingTo: Double?
 
     private let speeds: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
 
     var body: some View {
-        let duration = model.transcript?.durationSeconds ?? 0
-        let progress = scrubbingTo ?? model.currentTimeSeconds
-
         HStack(spacing: DS.Spacing.regular) {
             Button(action: togglePlayPause) {
                 Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
@@ -26,23 +22,7 @@ struct MediaBar: View {
             .accessibilityIdentifier("transcript.player.playPause")
             .axLeaf("MediaBar.Button.PlayPause")
 
-            ScrubberTrack(
-                progress: progress,
-                duration: duration,
-                onScrub: { scrubbingTo = $0 },
-                onCommit: { target in
-                    model.player?.seek(to: CMTime(seconds: target, preferredTimescale: 600))
-                    scrubbingTo = nil
-                }
-            )
-            .frame(height: 18)
-            .accessibilityIdentifier("transcript.player.scrub")
-
-            Text(timeLabel(current: progress, total: duration))
-                .font(DS.Font.calloutMono)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .frame(minWidth: 96, alignment: .trailing)
+            PlaybackProgressView()
 
             Button { model.skipSilences.toggle() } label: {
                 Image(systemName: model.skipSilences ? "forward.end.fill" : "forward.end")
@@ -131,12 +111,42 @@ struct MediaBar: View {
         }
         return "\(value)×"
     }
+}
 
-    private func timeLabel(current: Double, total: Double) -> String {
+struct PlaybackProgressView: View {
+    @Environment(AppModel.self) private var model
+    @State private var scrubbingTo: Double?
+
+    var body: some View {
+        let duration = model.transcript?.durationSeconds ?? 0
+        let progress = scrubbingTo ?? model.currentTimeSeconds
+
+        HStack(spacing: DS.Spacing.regular) {
+            ScrubberTrack(
+                progress: progress,
+                duration: duration,
+                onScrub: { scrubbingTo = $0 },
+                onCommit: { target in
+                    model.player?.seek(to: CMTime(seconds: target, preferredTimescale: 600))
+                    scrubbingTo = nil
+                }
+            )
+            .frame(height: 18)
+            .accessibilityIdentifier("transcript.player.scrub")
+
+            Text(Self.timeLabel(current: progress, total: duration))
+                .font(DS.Font.calloutMono)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 96, alignment: .trailing)
+        }
+    }
+
+    static func timeLabel(current: Double, total: Double) -> String {
         "\(format(current)) / \(format(total))"
     }
 
-    private func format(_ t: Double) -> String {
+    private static func format(_ t: Double) -> String {
         let total = Int(max(0, t.rounded()))
         let h = total / 3600
         let m = (total % 3600) / 60
