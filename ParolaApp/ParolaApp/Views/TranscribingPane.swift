@@ -105,6 +105,7 @@ struct TranscribingPane: View {
                 ProgressView(value: progress)
                     .progressViewStyle(.linear)
                     .tint(DS.Color.accent)
+                    .animation(.easeOut(duration: 0.5), value: progress)
             } else {
                 ProgressView()
                     .progressViewStyle(.linear)
