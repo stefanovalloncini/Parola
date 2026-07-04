@@ -16,6 +16,7 @@ actor StreamingRealtimeLoop {
         var compressionCheckWindow = 60
         var useVAD = true
         var purgePadSeconds: Double = 2
+        var maxWindowSeconds: Double = 60
         var sampleRate = WhisperKit.sampleRate
         var wantsConfirmedAudio = false
     }
@@ -39,6 +40,7 @@ actor StreamingRealtimeLoop {
         var energies: [(rel: Float, avg: Float)] = []
     }
 
+    // Trimming old entries is safe: VAD only reads a recent suffix (baseline over the last 20, voice check over the new-audio span).
     private static let maxEnergyEntries = 4096
     private static let waitingForSpeech = "Waiting for speech..."
 
@@ -123,6 +125,7 @@ actor StreamingRealtimeLoop {
 
     private func iterate() async throws {
         drainInbox()
+        enforceWindowCap()
         let totalSamples = windowStartSample + window.count
         let newSeconds = Float(totalSamples - lastTranscribedTotal) / Float(config.sampleRate)
         guard newSeconds > 1 else {
@@ -152,6 +155,15 @@ actor StreamingRealtimeLoop {
             return drained
         }
         window.append(contentsOf: pending)
+    }
+
+    // Audio still unconfirmed after maxWindowSeconds could only confirm with unbounded latency; dropping it keeps the eventual decode bounded when speech resumes.
+    private func enforceWindowCap() {
+        let excess = window.count - Int(config.maxWindowSeconds * Double(config.sampleRate))
+        guard excess > 0 else { return }
+        window.removeFirst(excess)
+        windowStartSample += excess
+        lastTranscribedTotal = max(lastTranscribedTotal, windowStartSample)
     }
 
     private func transcribeWindow() async throws {

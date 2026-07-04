@@ -113,6 +113,7 @@ private func makeLoop(
     failure: (any Error)? = nil,
     useVAD: Bool = false,
     wantsConfirmedAudio: Bool = false,
+    maxWindowSeconds: Double = 60,
     permissionGranted: Bool = true
 ) -> (loop: StreamingRealtimeLoop, capture: FakeCapture, script: TranscribeScript, recorder: EventRecorder) {
     let capture = FakeCapture()
@@ -121,6 +122,7 @@ private func makeLoop(
     var config = StreamingRealtimeLoop.Configuration()
     config.useVAD = useVAD
     config.wantsConfirmedAudio = wantsConfirmedAudio
+    config.maxWindowSeconds = maxWindowSeconds
     let loop = StreamingRealtimeLoop(
         configuration: config,
         decodingOptions: DecodingOptions(),
@@ -233,6 +235,46 @@ struct StreamingRealtimeLoopTests {
 
         capture.pushBuffers(count: 20, secondsEach: 0.1, value: 0.5)
         #expect(await eventually { await script.callCount >= 1 })
+
+        await loop.stop()
+        _ = await runTask.value
+    }
+
+    @Test("sustained silence caps the retained window")
+    func silenceCapsWindow() async throws {
+        let (loop, capture, script, _) = makeLoop(responses: [], useVAD: true)
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        capture.pushBuffers(count: 70, secondsEach: 1, value: 0)
+        #expect(await eventually { await loop.windowStartOffsetSamples() == 10 * sampleRate })
+        #expect(await loop.windowSampleCount() == 60 * sampleRate)
+
+        capture.pushBuffers(count: 10, secondsEach: 1, value: 0)
+        #expect(await eventually { await loop.windowStartOffsetSamples() == 20 * sampleRate })
+        #expect(await loop.windowSampleCount() == 60 * sampleRate)
+        #expect(await script.callCount == 0)
+
+        await loop.stop()
+        _ = await runTask.value
+    }
+
+    @Test("the cap bounds the decode when segments never confirm")
+    func capBoundsDecodeWithoutConfirmations() async throws {
+        let (loop, capture, script, _) = makeLoop(responses: [[], []], maxWindowSeconds: 4)
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        capture.push(seconds: 3, value: 0.5)
+        #expect(await eventually { await script.callCount == 1 })
+        let call1 = try #require(await script.calls.first)
+        #expect(call1.sampleCount == 3 * sampleRate)
+
+        capture.push(seconds: 3, value: 0.5)
+        #expect(await eventually { await script.callCount == 2 })
+        let call2 = try #require(await script.calls.last)
+        #expect(call2.sampleCount == 4 * sampleRate)
+        #expect(await loop.windowStartOffsetSamples() == 2 * sampleRate)
 
         await loop.stop()
         _ = await runTask.value
