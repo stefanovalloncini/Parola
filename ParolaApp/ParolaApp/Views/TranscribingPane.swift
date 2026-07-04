@@ -135,9 +135,11 @@ struct TranscribingPane: View {
                                 .accessibilityLabel(partial)
                         }
                         .transition(.opacity)
-                    }
-                    SkeletonLines(count: hasText ? 3 : 6)
                         .id(Self.tailID)
+                    } else {
+                        SkeletonLines(count: 6)
+                            .id(Self.tailID)
+                    }
                 }
                 .padding(DS.Spacing.large)
                 .animation(.easeOut(duration: 0.28), value: partial)
