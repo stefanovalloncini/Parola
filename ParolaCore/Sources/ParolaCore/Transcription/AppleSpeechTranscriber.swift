@@ -71,6 +71,7 @@ actor AppleSpeechTranscriber: Transcriber {
             options: options,
             modelName: modelName,
             cancellation: cancellation,
+            partialHandler: partialHandler,
             progressHandler: progressHandler
         )
         #else
@@ -97,6 +98,7 @@ actor AppleSpeechTranscriber: Transcriber {
         options: TranscriptionOptions,
         modelName: String,
         cancellation: AnalyzerCancellation,
+        partialHandler: (@Sendable (String) -> Void)?,
         progressHandler: (@Sendable (Double) -> Void)?
     ) async throws -> Transcript {
         #if canImport(Speech)
@@ -129,6 +131,7 @@ actor AppleSpeechTranscriber: Transcriber {
         let collectorTask = Task { () async throws -> [TranscriptSegment] in
             var segments: [TranscriptSegment] = []
             var nextID = 0
+            var assembler = SpeechPartialAssembler()
             for try await result in transcriber.results {
                 guard result.isFinal else { continue }
                 let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -144,6 +147,8 @@ actor AppleSpeechTranscriber: Transcriber {
                     words: nil
                 ))
                 nextID += 1
+                assembler.addFinal(text)
+                partialHandler?(assembler.text)
             }
             return segments
         }
