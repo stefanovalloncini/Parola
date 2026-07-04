@@ -85,6 +85,8 @@ struct TranscribingPane: View {
                     Text("\(Int(progress * 100))%")
                         .font(DS.Font.captionMono)
                         .foregroundStyle(DS.Color.secondaryText)
+                        .contentTransition(.numericText())
+                        .animation(reduceMotion ? nil : .easeOut(duration: 0.5), value: progress)
                     if let etaLabel {
                         Text(verbatim: "·")
                             .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
