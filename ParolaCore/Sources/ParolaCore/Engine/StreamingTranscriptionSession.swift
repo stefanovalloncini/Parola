@@ -32,6 +32,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     public let modelStore: ModelStore
 
     private var whisperKit: WhisperKit?
+    private var captureProcessor: AudioProcessor?
     private var loop: StreamingRealtimeLoop?
     private var continuation: AsyncStream<StreamingEvent>.Continuation?
     private var segmentContinuation: AsyncStream<ConfirmedAudioBatch>.Continuation?
@@ -67,16 +68,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             _ = try await modelStore.download(variant: modelName, progress: downloadProgress)
         }
 
-        let kit = try await WhisperKit(
-            model: modelName,
-            downloadBase: modelStore.directory,
-            modelFolder: modelStore.installedURL(for: modelName).path,
-            verbose: false,
-            logLevel: .none,
-            prewarm: false,
-            load: true,
-            download: false
-        )
+        let kit = try await StreamingModelCache.shared.borrow(modelName, store: modelStore).kit
         guard let tokenizer = kit.tokenizer else {
             throw ParolaError.transcriptionFailed("WhisperKit tokenizer was nil after model load")
         }
@@ -100,11 +92,13 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
         let sink = EventSink(continuation: cont)
 
-        nonisolated(unsafe) let processor = kit.audioProcessor
+        // Capture must not share the cached kit's AudioProcessor: its AVAudioEngine and sample
+        // buffer are per-recording state, and another session could be borrowing the same kit.
+        nonisolated(unsafe) let processor = AudioProcessor()
         nonisolated(unsafe) let transcriber = TranscribeTask(
             currentTimings: TranscriptionTimings(),
             progress: Progress(),
-            audioProcessor: kit.audioProcessor,
+            audioProcessor: processor,
             audioEncoder: kit.audioEncoder,
             featureExtractor: kit.featureExtractor,
             segmentSeeker: kit.segmentSeeker,
@@ -137,6 +131,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         )
 
         self.whisperKit = kit
+        self.captureProcessor = processor
         self.loadedModel = modelName
         self.optionsForRun = options
         self.loop = loop
@@ -190,8 +185,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
     /// Persists the samples WhisperKit accumulated during the live stream to a 16 kHz mono WAV.
     private func writeCapturedAudio() -> URL? {
-        guard let kit = whisperKit else { return nil }
-        nonisolated(unsafe) let processor = kit.audioProcessor
+        guard let processor = captureProcessor else { return nil }
         let samples = processor.audioSamples
         guard !samples.isEmpty,
               let format = AVAudioFormat(
@@ -255,6 +249,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         streamerTask = nil
         loop = nil
         whisperKit = nil
+        captureProcessor = nil
         speakerLabeler = nil
     }
 
