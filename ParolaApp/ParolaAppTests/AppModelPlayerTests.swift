@@ -342,4 +342,14 @@ struct AppModelPlayerTests {
         model.seekToSegment(id: 7)
         #expect(model.currentSegmentID == nil)
     }
+
+    @Test("duration backfill bumps transcriptVersion once")
+    func durationBackfillSingleVersionBump() {
+        let model = makeModel()
+        model.pendingMediaDuration = 100
+        let before = model.transcriptVersion
+        model.transcript = Self.makeTranscript([(0, 0, 2)])
+        #expect(model.transcript?.durationSeconds == 100)
+        #expect(model.transcriptVersion == before + 1)
+    }
 }

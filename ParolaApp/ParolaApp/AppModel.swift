@@ -54,10 +54,13 @@ final class AppModel {
     var phase: Phase = .idle
     var transcript: Transcript? {
         didSet {
-            if transcript == nil, promptOutput != nil { promptOutput = nil }
-            if let d = pendingMediaDuration, transcript != nil, (transcript?.durationSeconds ?? 0) < d - 0.05 {
-                transcript?.durationSeconds = d
+            // Backfill re-assigns and returns so the recursive didSet pass runs the side effects exactly once.
+            if let d = pendingMediaDuration, var patched = transcript, (patched.durationSeconds ?? 0) < d - 0.05 {
+                patched.durationSeconds = d
+                transcript = patched
+                return
             }
+            if transcript == nil, promptOutput != nil { promptOutput = nil }
             let speakers = transcript?.uniqueSpeakers ?? []
             if speakers != transcriptSpeakers { transcriptSpeakers = speakers }
             transcriptVersion &+= 1
