@@ -8,7 +8,7 @@ struct TranscribingPane: View {
     var expectsPartials: Bool = true
 
     @State private var eta = ETACalculator()
-    @State private var etaLabel: String?
+    @State private var etaDeadline: Date?
     @State private var startDate = Date()
     @State private var settled = ""
     @State private var isFinishing = false
@@ -46,6 +46,8 @@ struct TranscribingPane: View {
             settled = ""
             isFinishing = false
             isPreparing = false
+            eta.reset()
+            etaDeadline = nil
         }
         .task(id: awaitingFirstOutput) {
             guard expectsPartials, awaitingFirstOutput else {
@@ -87,12 +89,16 @@ struct TranscribingPane: View {
                         .foregroundStyle(DS.Color.secondaryText)
                         .contentTransition(.numericText())
                         .animation(reduceMotion ? nil : .easeOut(duration: 0.5), value: progress)
-                    if let etaLabel {
+                    if let etaDeadline {
                         Text(verbatim: "·")
                             .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
-                        Text("\(etaLabel) left")
-                            .font(DS.Font.captionMono)
-                            .foregroundStyle(DS.Color.secondaryText)
+                        TimelineView(.periodic(from: startDate, by: 1)) { context in
+                            let remaining = max(0, etaDeadline.timeIntervalSince(context.date))
+                            Text("\(ETACalculator.format(remaining)) left")
+                                .font(DS.Font.captionMono)
+                                .foregroundStyle(DS.Color.secondaryText)
+                                .monospacedDigit()
+                        }
                     }
                 } else {
                     TimelineView(.periodic(from: startDate, by: 1)) { context in
@@ -119,17 +125,11 @@ struct TranscribingPane: View {
     private func updateETA(for value: Double?) {
         guard let value else {
             eta.reset()
-            etaLabel = nil
+            etaDeadline = nil
             return
         }
         eta.observe(progress: value)
-        if let seconds = eta.remainingSeconds(), seconds > 1 {
-            etaLabel = ETACalculator.format(seconds)
-        } else if value >= 1 {
-            etaLabel = "0:00"
-        } else {
-            etaLabel = nil
-        }
+        etaDeadline = eta.projectedFinish()
     }
 
     private func streamingTranscript(caretVisible: Bool) -> Text {

@@ -62,4 +62,51 @@ struct ETACalculatorTests {
         #expect(ETACalculator.format(-5) == "0:00")
         #expect(ETACalculator.format(.infinity) == ETACalculator.format(.greatestFiniteMagnitude))
     }
+
+    @Test("projected finish is nil before a rate can be estimated")
+    func projectedFinishNilBeforeEstimate() {
+        var calc = ETACalculator()
+        #expect(calc.projectedFinish() == nil)
+        calc.observe(progress: 0.0, at: Date(timeIntervalSince1970: 0))
+        #expect(calc.projectedFinish() == nil)
+    }
+
+    @Test("projected finish equals the raw estimate on the first computable sample")
+    func projectedFinishFirstEstimate() {
+        var calc = ETACalculator()
+        let start = Date(timeIntervalSince1970: 0)
+        calc.observe(progress: 0.0, at: start)
+        calc.observe(progress: 0.25, at: start.addingTimeInterval(10))
+        #expect(calc.projectedFinish() == start.addingTimeInterval(40))
+    }
+
+    @Test("projected finish damps toward a jumped estimate instead of snapping")
+    func projectedFinishSmoothsUpwardJump() {
+        var calc = ETACalculator()
+        let start = Date(timeIntervalSince1970: 0)
+        calc.observe(progress: 0.0, at: start)
+        calc.observe(progress: 0.25, at: start.addingTimeInterval(10))
+        calc.observe(progress: 0.25, at: start.addingTimeInterval(20))
+        #expect(calc.projectedFinish() == start.addingTimeInterval(60))
+    }
+
+    @Test("projected finish is the current sample once progress completes")
+    func projectedFinishAtCompletion() {
+        var calc = ETACalculator()
+        let start = Date(timeIntervalSince1970: 0)
+        calc.observe(progress: 0.0, at: start)
+        calc.observe(progress: 0.25, at: start.addingTimeInterval(10))
+        calc.observe(progress: 1.0, at: start.addingTimeInterval(30))
+        #expect(calc.projectedFinish() == start.addingTimeInterval(30))
+    }
+
+    @Test("reset clears the projected finish")
+    func resetClearsProjectedFinish() {
+        var calc = ETACalculator()
+        let start = Date(timeIntervalSince1970: 0)
+        calc.observe(progress: 0.0, at: start)
+        calc.observe(progress: 0.25, at: start.addingTimeInterval(10))
+        calc.reset()
+        #expect(calc.projectedFinish() == nil)
+    }
 }
