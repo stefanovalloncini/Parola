@@ -14,6 +14,7 @@ struct TranscribingPane: View {
     @State private var isFinishing = false
     @State private var isPreparing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private static let tailID = "transcribing.tail"
     private static let caretBlinkPeriod: Double = 0.6
@@ -176,8 +177,21 @@ struct TranscribingPane: View {
                     proxy.scrollTo(Self.tailID, anchor: .bottom)
                 }
             }
+            .mask { topFadeMask }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .cardBackground(radius: DS.Radius.large)
+    }
+
+    @ViewBuilder private var topFadeMask: some View {
+        if hasText && !reduceTransparency {
+            VStack(spacing: 0) {
+                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                    .frame(height: DS.Spacing.large)
+                Color.black
+            }
+        } else {
+            Color.black
+        }
     }
 }
