@@ -82,7 +82,7 @@ extension AppModel {
             guard !isCancelled(id) else { return }
             let processed = postProcess(transcript)
             mutateBatchJob(id) { $0.status = .done; $0.transcript = processed; $0.progress = 1 }
-            if id == selectedBatchJobID { self.transcript = processed }
+            if id == selectedBatchJobID { selectedEntryID = nil; self.transcript = processed }
             if let job = batchJobs.first(where: { $0.id == id }) {
                 writeBatchExports(transcript: processed, sourceURL: job.url)
             }
@@ -201,6 +201,7 @@ extension AppModel {
     func selectBatchJob(_ id: BatchJob.ID) {
         selectedBatchJobID = id
         if let job = batchJobs.first(where: { $0.id == id }), let t = job.transcript {
+            selectedEntryID = nil
             transcript = t
             installPlayer(for: job.url)
         }
@@ -244,6 +245,7 @@ extension AppModel {
     func openBatchJobTranscript(_ id: BatchJob.ID) {
         guard let job = batchJobs.first(where: { $0.id == id }), let t = job.transcript else { return }
         selectedBatchJobID = id
+        selectedEntryID = nil
         transcript = t
         installPlayer(for: job.url)
         phase = .ready

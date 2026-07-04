@@ -1141,6 +1141,7 @@ final class AppModel {
                 )
                 try Task.checkCancellation()
                 let processed = postProcess(result)
+                selectedEntryID = nil
                 transcript = processed
                 filePartialText = ""
                 fileTranscribeFraction = nil
@@ -1274,6 +1275,7 @@ final class AppModel {
                 )
                 try Task.checkCancellation()
                 let processed = postProcess(result)
+                selectedEntryID = nil
                 transcript = processed
                 phase = .ready
                 refreshModelList()
@@ -1297,6 +1299,7 @@ final class AppModel {
                 let result = try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: selectedLanguage)
                 try Task.checkCancellation()
                 let processed = postProcess(result)
+                selectedEntryID = nil
                 transcript = processed
                 phase = .ready
                 persistToLibrary(processed, audioSource: nil)
@@ -1593,6 +1596,7 @@ final class AppModel {
             phase = .failed(message: msg)
         case .finished(let transcript):
             let processed = postProcess(transcript)
+            self.selectedEntryID = nil
             self.transcript = processed
             self.livePartialText = ""
             self.liveSegments = []
@@ -1632,6 +1636,7 @@ final class AppModel {
                     options: currentOptions
                 )
                 let processed = postProcess(result)
+                selectedEntryID = nil
                 transcript = processed
                 phase = .ready
                 refreshModelList()

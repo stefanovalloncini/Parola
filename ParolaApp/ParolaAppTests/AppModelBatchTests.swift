@@ -311,4 +311,22 @@ struct AppModelBatchTests {
 
         #expect(model.phase == .ready)
     }
+
+    @Test("batch job selection clears the loaded library entry")
+    func selectBatchJobClearsSelectedEntry() {
+        let model = makeModel()
+        model.startBatch(urls: [URL(fileURLWithPath: "/tmp/a.wav")])
+        let jobID = model.batchJobs[0].id
+        model.handleBatchEvent(.started(jobID: jobID))
+        let t = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")], language: "en", modelName: "m")
+        model.handleBatchEvent(.completed(jobID: jobID, transcript: t))
+
+        model.selectedEntryID = "stale-entry"
+        model.selectBatchJob(jobID)
+        #expect(model.selectedEntryID == nil)
+
+        model.selectedEntryID = "stale-entry"
+        model.openBatchJobTranscript(jobID)
+        #expect(model.selectedEntryID == nil)
+    }
 }
