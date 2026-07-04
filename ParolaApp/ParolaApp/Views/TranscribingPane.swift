@@ -36,12 +36,6 @@ struct TranscribingPane: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             HStack(spacing: DS.Spacing.small) {
-                if progress == nil {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .controlSize(.small)
-                        .tint(DS.Color.accent)
-                }
                 Text("Transcribing \(file.lastPathComponent)…")
                     .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.primaryText)
@@ -68,6 +62,10 @@ struct TranscribingPane: View {
             }
             if let progress {
                 ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .tint(DS.Color.accent)
+            } else {
+                ProgressView()
                     .progressViewStyle(.linear)
                     .tint(DS.Color.accent)
             }
