@@ -14,7 +14,7 @@ actor MicDictationRecorder: DictationRecorder {
     private var partialContinuations: [UUID: AsyncStream<String>.Continuation] = [:]
 
     private var fallbackSource: (any LiveAudioSource)?
-    private let fallbackSession = TranscriptionSession()
+    private let fallbackSession: TranscriptionSession
     private var fallbackForwardingTask: Task<Void, Never>?
     private let clock: any Clock<Duration>
 
@@ -28,6 +28,7 @@ actor MicDictationRecorder: DictationRecorder {
         language: String?,
         deviceUID: String? = nil,
         streamingEnabled: Bool = true,
+        session: TranscriptionSession? = nil,
         workflowResolver: (@Sendable () async -> DictationWorkflow?)? = nil,
         downloadProgress: (@Sendable (Double) -> Void)? = nil,
         clock: any Clock<Duration> = ContinuousClock()
@@ -37,6 +38,7 @@ actor MicDictationRecorder: DictationRecorder {
         self.effectiveLanguage = language
         self.deviceUID = deviceUID
         self.streamingEnabled = streamingEnabled
+        self.fallbackSession = session ?? TranscriptionSession()
         self.workflowResolver = workflowResolver
         self.downloadProgress = downloadProgress
         self.clock = clock

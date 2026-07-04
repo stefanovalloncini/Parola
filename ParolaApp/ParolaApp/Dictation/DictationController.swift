@@ -81,6 +81,7 @@ final class DictationController {
             language: configuration.language,
             deviceUID: configuration.deviceUID,
             streamingEnabled: configuration.streamingEnabled,
+            session: appModel?.session,
             workflowResolver: { @Sendable in
                 await Self.resolveWorkflow(in: workflows)
             },

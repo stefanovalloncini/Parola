@@ -110,7 +110,7 @@ extension AppModel {
 
     private func runBatchTask(jobs: [BatchJob]) {
         batchTask?.cancel()
-        let queue = BatchQueue()
+        let queue = BatchQueue(session: session)
         let opts = currentOptions
         batchTask = Task { @MainActor [weak self] in
             let events = await queue.process(jobs: jobs, options: opts)

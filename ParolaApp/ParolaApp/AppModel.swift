@@ -699,7 +699,7 @@ final class AppModel {
 
     // MARK: - Engine
 
-    @ObservationIgnored private let session = TranscriptionSession()
+    @ObservationIgnored let session = TranscriptionSession()
     @ObservationIgnored private let store = ModelStore.shared
     @ObservationIgnored let mediaSession = MediaSession()
 
