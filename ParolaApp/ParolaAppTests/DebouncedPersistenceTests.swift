@@ -3,6 +3,16 @@ import Testing
 @testable import Parola
 import ParolaCore
 
+private struct ImmediateClock: Clock {
+    typealias Instant = ContinuousClock.Instant
+    var now: Instant { ContinuousClock().now }
+    var minimumResolution: Duration { .zero }
+    func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+        try Task.checkCancellation()
+        await Task.yield()
+    }
+}
+
 @MainActor
 @Suite("Debounced transcript persistence")
 struct DebouncedPersistenceTests {
@@ -124,5 +134,45 @@ struct DebouncedPersistenceTests {
         let goodbyeResults = await store.search("goodbye")
         #expect(helloResults.count == 0)
         #expect(goodbyeResults.count == 1)
+    }
+
+    private func makeImmediateModel() -> AppModel {
+        let bootstrap = AppBootstrap(
+            mode: .test,
+            library: makeTempLibraryURL("debounce-immediate"),
+            defaultsOverride: makeIsolatedDefaults(),
+            sideEffects: [],
+            filePicker: TestFilePicker(),
+            clock: ImmediateClock()
+        )
+        return AppModel(bootstrap: bootstrap)
+    }
+
+    @Test("text edit followed by timing nudge still reindexes when timer fires")
+    func textEditThenNudgeReindexesViaTimer() async throws {
+        let model = makeImmediateModel()
+        let entry = try await Self.seedEntry(in: model)
+        model.selectedEntryID = entry.id
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "original")],
+            language: "en",
+            modelName: "stub"
+        )
+
+        // text edit (textChanged: true) followed by a timing nudge (textChanged: false)
+        // both within the coalesce window; the nudge reschedules with textChanged: false,
+        // which without the sticky flag causes the coalesced write to skip reindex
+        model.editSegment(id: 0, newText: "kryptonite")
+        model.nudgeSegmentEnd(id: 0, frames: 1)
+
+        // Wait for the ImmediateClock debounce task to fire and complete
+        for _ in 0..<50 {
+            if model.pendingTranscriptSaveTask == nil { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.pendingTranscriptSaveTask == nil, "debounce task should have fired")
+
+        let results = await model.library.search("kryptonite")
+        #expect(results.count == 1, "search index must reflect the text edit even when the final coalesced call was a timing nudge")
     }
 }

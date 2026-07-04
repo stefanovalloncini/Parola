@@ -694,6 +694,7 @@ final class AppModel {
     @ObservationIgnored var libraryRefreshTask: Task<Void, Never>?
     @ObservationIgnored var pendingTranscriptSaveTask: Task<Void, Never>?
     @ObservationIgnored var pendingTranscriptSaveGeneration: Int = 0
+    @ObservationIgnored private var pendingSaveTextChanged = false
     static let trashRetentionDays = 30
 
     // MARK: - Engine
@@ -1199,6 +1200,7 @@ final class AppModel {
 
     @MainActor private final class DownloadProgressThrottle {
         var lastPercent = -1
+        var didRefresh = false
     }
 
     private func makeDownloadProgressHandler(for modelName: String) -> @Sendable (Double) -> Void {
@@ -1209,6 +1211,10 @@ final class AppModel {
                 guard let self, percent != throttle.lastPercent else { return }
                 throttle.lastPercent = percent
                 self.phase = .downloadingModel(name: modelName, progress: frac)
+                if percent >= 100, !throttle.didRefresh {
+                    throttle.didRefresh = true
+                    self.refreshModelList()
+                }
             }
         }
     }
@@ -1714,6 +1720,7 @@ final class AppModel {
     /// latest snapshot (identified by the generation counter) is written; earlier tasks cancel themselves.
     func persistCurrentTranscriptIfLoaded(textChanged: Bool = true) {
         guard let id = selectedEntryID, let transcript else { return }
+        if textChanged { pendingSaveTextChanged = true }
         pendingTranscriptSaveGeneration &+= 1
         let generation = pendingTranscriptSaveGeneration
         pendingTranscriptSaveTask?.cancel()
@@ -1722,7 +1729,12 @@ final class AppModel {
             try? await Task.sleep(for: .seconds(1), clock: clock)
             guard !Task.isCancelled else { return }
             guard await self?.pendingTranscriptSaveGeneration == generation else { return }
-            try? await library.updateTranscript(transcript, for: id, reindex: textChanged)
+            let reindex: Bool = await MainActor.run { [weak self] in
+                let flag = self?.pendingSaveTextChanged ?? false
+                self?.pendingSaveTextChanged = false
+                return flag
+            }
+            try? await library.updateTranscript(transcript, for: id, reindex: reindex)
             await MainActor.run { [weak self] in
                 if self?.pendingTranscriptSaveGeneration == generation {
                     self?.pendingTranscriptSaveTask = nil
@@ -1736,11 +1748,14 @@ final class AppModel {
         guard let id = selectedEntryID, let transcript else {
             pendingTranscriptSaveTask?.cancel()
             pendingTranscriptSaveTask = nil
+            pendingSaveTextChanged = false
             return
         }
         pendingTranscriptSaveTask?.cancel()
         pendingTranscriptSaveTask = nil
-        try? await library.updateTranscript(transcript, for: id)
+        let reindex = pendingSaveTextChanged
+        pendingSaveTextChanged = false
+        try? await library.updateTranscript(transcript, for: id, reindex: reindex)
     }
 
     /// Synchronously cancels any pending debounced save and returns the snapshot to write.
@@ -1748,6 +1763,7 @@ final class AppModel {
     func cancelAndDrainPendingTranscriptSave() -> (id: LibraryEntry.ID, transcript: Transcript)? {
         pendingTranscriptSaveTask?.cancel()
         pendingTranscriptSaveTask = nil
+        pendingSaveTextChanged = false
         guard let id = selectedEntryID, let transcript else { return nil }
         return (id, transcript)
     }
