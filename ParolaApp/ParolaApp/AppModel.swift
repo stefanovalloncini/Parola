@@ -1612,7 +1612,8 @@ final class AppModel {
             Task { @MainActor in
                 await s.stop()
                 streamingSession = nil
-                streamingConsumer?.cancel()
+                // Await delivery of the final .finished event; cancelling here can drop the whole recording.
+                await streamingConsumer?.value
                 streamingConsumer = nil
                 stopRecordingLevelObserver()
                 stopSilenceWatch()
