@@ -36,6 +36,52 @@ struct MockTranscriberTests {
         #expect(received.value == ["hello", "hello world"])
     }
 
+    @Test("transcribe fires progressSeconds through the progress handler, in step with partials")
+    func transcribeEmitsProgress() async throws {
+        let response = MockTranscriberResponse(
+            segments: [TranscriptSegmentSeed(start: 0, end: 3, text: "hi there")],
+            partials: ["hi", "hi there"],
+            progressSeconds: [1.5, 3.0],
+            language: "en",
+            durationSeconds: 3,
+            modelName: "mock"
+        )
+        let mock = MockTranscriber.make(response: response, clock: ImmediateClock())
+
+        let partials = LockedBox<[String]>(value: [])
+        let progresses = LockedBox<[Double]>(value: [])
+        _ = try await mock.transcribe(
+            url: URL(fileURLWithPath: "/tmp/mock-input.wav"),
+            options: .default,
+            partialHandler: { text in partials.mutate { $0.append(text) } },
+            progressHandler: { value in progresses.mutate { $0.append(value) } }
+        )
+
+        #expect(partials.value == ["hi", "hi there"])
+        #expect(progresses.value == [1.5, 3.0])
+    }
+
+    @Test("a response with no progressSeconds never fires the progress handler")
+    func transcribeWithoutProgressStaysSilent() async throws {
+        let response = MockTranscriberResponse(
+            partials: ["a", "b"],
+            durationSeconds: 2
+        )
+        let mock = MockTranscriber.make(response: response, clock: ImmediateClock())
+
+        let partials = LockedBox<[String]>(value: [])
+        let progresses = LockedBox<[Double]>(value: [])
+        _ = try await mock.transcribe(
+            url: URL(fileURLWithPath: "/tmp/mock-input.wav"),
+            options: .default,
+            partialHandler: { text in partials.mutate { $0.append(text) } },
+            progressHandler: { value in progresses.mutate { $0.append(value) } }
+        )
+
+        #expect(partials.value == ["a", "b"])
+        #expect(progresses.value.isEmpty)
+    }
+
     @Test("transcribe throws the failure error when one is installed")
     func transcribeFailureThrows() async {
         let response = MockTranscriberResponse(

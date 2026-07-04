@@ -77,6 +77,7 @@ public struct MockTranscriberFailure: Sendable {
 public struct MockTranscriberResponse: Sendable {
     public var segments: [TranscriptSegmentSeed]
     public var partials: [String]
+    public var progressSeconds: [Double]
     public var downloadFractions: [Double]
     public var language: String
     public var durationSeconds: Double
@@ -87,6 +88,7 @@ public struct MockTranscriberResponse: Sendable {
     public init(
         segments: [TranscriptSegmentSeed] = [],
         partials: [String] = [],
+        progressSeconds: [Double] = [],
         downloadFractions: [Double] = [],
         language: String = "en",
         durationSeconds: Double = 0,
@@ -96,6 +98,7 @@ public struct MockTranscriberResponse: Sendable {
     ) {
         self.segments = segments
         self.partials = partials
+        self.progressSeconds = progressSeconds
         self.downloadFractions = downloadFractions
         self.language = language
         self.durationSeconds = durationSeconds
@@ -172,13 +175,22 @@ public actor MockTranscriber: Transcriber {
     }
 
     public func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
-        try await transcribe(url: url, options: options, partialHandler: nil)
+        try await transcribe(url: url, options: options, partialHandler: nil, progressHandler: nil)
     }
 
     public func transcribe(
         url: URL,
         options: TranscriptionOptions,
         partialHandler: (@Sendable (String) -> Void)?
+    ) async throws -> Transcript {
+        try await transcribe(url: url, options: options, partialHandler: partialHandler, progressHandler: nil)
+    }
+
+    public func transcribe(
+        url: URL,
+        options: TranscriptionOptions,
+        partialHandler: (@Sendable (String) -> Void)?,
+        progressHandler: (@Sendable (Double) -> Void)?
     ) async throws -> Transcript {
         if let failure = response.failure {
             if response.delayMs > 0 {
@@ -187,18 +199,23 @@ public actor MockTranscriber: Transcriber {
             throw failure.asError()
         }
 
-        let partialCount = response.partials.count
-        let perStepMs = partialCount > 0 ? max(0, response.delayMs / partialCount) : response.delayMs
+        let stepCount = max(response.partials.count, response.progressSeconds.count)
+        let perStepMs = stepCount > 0 ? max(0, response.delayMs / stepCount) : response.delayMs
 
-        for partial in response.partials {
+        for step in 0..<stepCount {
             try Task.checkCancellation()
-            partialHandler?(partial)
+            if step < response.partials.count {
+                partialHandler?(response.partials[step])
+            }
+            if step < response.progressSeconds.count {
+                progressHandler?(response.progressSeconds[step])
+            }
             if perStepMs > 0 {
                 try? await sleeper(perStepMs)
             }
         }
 
-        if partialCount == 0 && response.delayMs > 0 {
+        if stepCount == 0 && response.delayMs > 0 {
             try? await sleeper(response.delayMs)
         }
 

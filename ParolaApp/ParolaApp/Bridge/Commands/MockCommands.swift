@@ -8,7 +8,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "installMockTranscriber",
                 area: .test,
-                summary: "Installs a canned transcriber response. Test-mode only.",
+                summary: "Installs a canned transcriber response (segments, partials, progressSeconds, delayMs). Test-mode only.",
                 kind: .mutating,
                 args: [
                     .init(name: "engineID", kind: .string(enum: ["whisperKit", "parakeet", "appleSpeech", "all"]), required: true, summary: "Engine to mock, or 'all'"),
@@ -255,6 +255,7 @@ private func buildTranscriberResponse(args: AutomationArgs) throws -> MockTransc
     }
     let segments = try decodeSegments(obj["segments"])
     let partials = decodeStringArray(obj["partials"])
+    let progressSeconds = decodeDoubleArray(obj["progressSeconds"])
     let downloadFractions = decodeDoubleArray(obj["downloadFractions"])
     let language = decodeString(obj["language"]) ?? "en"
     let durationSeconds = decodeDouble(obj["durationSeconds"]) ?? 0
@@ -263,6 +264,7 @@ private func buildTranscriberResponse(args: AutomationArgs) throws -> MockTransc
     return MockTranscriberResponse(
         segments: segments,
         partials: partials,
+        progressSeconds: progressSeconds,
         downloadFractions: downloadFractions,
         language: language,
         durationSeconds: durationSeconds,
