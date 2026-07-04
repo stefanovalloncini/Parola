@@ -36,6 +36,12 @@ struct ContinuousParagraph: View {
             .font(.system(size: model.transcriptCompact ? compactSize : comfortableSize, weight: .regular))
             .lineSpacing(model.transcriptCompact ? 3 : 6)
             .textSelection(.enabled)
+            .tint(.primary)
+            .environment(\.openURL, OpenURLAction { url in
+                guard url.scheme == "parola-seek", let id = url.host.flatMap(Int.init) else { return .systemAction }
+                model.seekToSegment(id: id)
+                return .handled
+            })
             // Definite height; without it the inspector's constraint pass re-typesets the whole-transcript Text in a loop (main-thread freeze on long audio).
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -89,9 +95,12 @@ struct ContinuousParagraph: View {
             }
             let startsLine = attr.characters.isEmpty || attr.characters.last == "\n"
             var piece = AttributedString(startsLine ? body : " " + body)
-            if let baseColor { piece.foregroundColor = baseColor }
+            let displayColor = baseColor ?? DS.Color.primaryText
+            piece.foregroundColor = displayColor
+            piece.link = URL(string: "parola-seek://\(seg.id)")
+            piece.underlineStyle = nil
             let length = piece.characters.count
-            runs[seg.id] = SegmentRun(offsets: offset..<offset + length, baseColor: baseColor)
+            runs[seg.id] = SegmentRun(offsets: offset..<offset + length, baseColor: displayColor)
             offset += length
             attr.append(piece)
         }

@@ -102,4 +102,15 @@ struct ContinuousParagraphTests {
         #expect(runText(segments, id: 1, useSpeakerColor: true) == "Still me.")
         #expect(runText(segments, id: 2, useSpeakerColor: true) == "Yo.")
     }
+
+    @Test("paragraph runs carry seek links")
+    func paragraphRunsCarrySeekLinks() {
+        let segs = [
+            segment(0, "Hello there."),
+            segment(1, "Second bit."),
+        ]
+        let built = ContinuousParagraph.paragraph(segments: segs, useSpeakerColor: false)
+        let links = built.text.runs.compactMap(\.link?.absoluteString)
+        #expect(links == ["parola-seek://0", "parola-seek://1"])
+    }
 }
