@@ -10,6 +10,7 @@ struct SpeechRateSection: View {
     }
 
     var body: some View {
+        let bins = self.bins
         if bins.count >= 2 {
             InfoSection(title: "Speech rate") {
                 let values = bins.map(\.wordsPerMinute)

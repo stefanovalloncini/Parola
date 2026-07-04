@@ -3,30 +3,34 @@ import ParolaCore
 
 struct WordFrequencySection: View {
     @Environment(AppModel.self) private var model
-
-    private var entries: [WordFrequency.Entry] {
-        guard let text = model.transcript?.text else { return [] }
-        let stopWords = WordFrequency.stopWords(for: model.transcript?.language)
-        return WordFrequency.compute(text: text, limit: 12, stopWords: stopWords)
-    }
+    @State private var entries: [WordFrequency.Entry] = []
 
     var body: some View {
-        if !entries.isEmpty {
-            InfoSection(title: "Top words") {
-                let maxCount = entries.first?.count ?? 1
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(entries) { entry in
-                        WordFrequencyBar(
-                            word: entry.word,
-                            count: entry.count,
-                            fraction: Double(entry.count) / Double(max(1, maxCount))
-                        ) {
-                            model.findQuery = entry.word
-                            if !model.findIsOpen { model.toggleFind() }
+        VStack(alignment: .leading, spacing: 0) {
+            if !entries.isEmpty {
+                InfoSection(title: "Top words") {
+                    let maxCount = entries.first?.count ?? 1
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(entries) { entry in
+                            WordFrequencyBar(
+                                word: entry.word,
+                                count: entry.count,
+                                fraction: Double(entry.count) / Double(max(1, maxCount))
+                            ) {
+                                model.findQuery = entry.word
+                                if !model.findIsOpen { model.toggleFind() }
+                            }
                         }
                     }
                 }
             }
+        }
+        .task(id: model.transcriptVersion) {
+            let text = model.transcript?.text ?? ""
+            let stopWords = WordFrequency.stopWords(for: model.transcript?.language)
+            entries = await Task.detached {
+                WordFrequency.compute(text: text, limit: 12, stopWords: stopWords)
+            }.value
         }
     }
 }

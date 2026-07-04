@@ -3,6 +3,7 @@ import ParolaCore
 
 struct InfoInspector: View {
     @Environment(AppModel.self) private var model
+    @State private var stats = TranscriptTextStats()
 
     private var entry: LibraryEntry? {
         guard let id = model.selectedEntryID else { return nil }
@@ -45,6 +46,10 @@ struct InfoInspector: View {
                 WordFrequencySection()
             }
         }
+        .task(id: model.transcriptVersion) {
+            let text = model.transcript?.text ?? ""
+            stats = await Task.detached { TranscriptTextStats.compute(text: text) }.value
+        }
     }
 
     private var languageLabel: String {
@@ -74,32 +79,21 @@ struct InfoInspector: View {
         return date.formatted(date: .abbreviated, time: .shortened)
     }
 
-    private var charCount: Int {
-        model.transcript?.text.count ?? 0
-    }
+    private var charCount: Int { stats.charCount }
 
     private var speakerCount: Int {
         model.transcriptSpeakers.count
     }
 
-    private var fillerCount: Int {
-        guard let text = model.transcript?.text else { return 0 }
-        return FillerWordCounter.count(in: text)
-    }
+    private var fillerCount: Int { stats.fillerCount }
 
     private var readingTimeLabel: String {
         ReadingTime.label(forMinutes: ReadingTime.minutes(forWordCount: wordCount))
     }
 
-    private var sentenceCount: Int {
-        guard let text = model.transcript?.text else { return 0 }
-        return SentenceCounter.count(text)
-    }
+    private var sentenceCount: Int { stats.sentenceCount }
 
-    private var wordCount: Int {
-        guard let text = model.transcript?.text else { return 0 }
-        return text.split { $0.isWhitespace || $0.isNewline }.count
-    }
+    private var wordCount: Int { stats.wordCount }
 }
 
 struct InfoSection<Content: View>: View {

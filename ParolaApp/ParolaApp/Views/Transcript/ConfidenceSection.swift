@@ -19,6 +19,7 @@ struct ConfidenceSection: View {
 
     var body: some View {
         if let overall {
+            let lows = self.lows
             InfoSection(title: "Confidence") {
                 summaryRow(overall: overall)
                 if !lows.isEmpty {
