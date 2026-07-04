@@ -29,9 +29,16 @@ struct SegmentCard: View {
                 .padding(.trailing, hovering && !isEditing ? actionStripReserve : 0)
 
             HStack(spacing: DS.Spacing.small) {
-                Text(Timecode.format(segment.start))
-                    .font(model.monospacedTimestamps ? DS.Font.captionMono : DS.Font.caption)
-                    .foregroundStyle(isCurrent ? DS.Color.highlight : DS.Color.secondaryText)
+                Button {
+                    if model.player != nil { model.seek(to: segment) }
+                } label: {
+                    Text(Timecode.format(segment.start))
+                        .font(model.monospacedTimestamps ? DS.Font.captionMono : DS.Font.caption)
+                        .foregroundStyle(isCurrent ? DS.Color.highlight : DS.Color.secondaryText)
+                }
+                .buttonStyle(.plain)
+                .help("Play from here")
+                .axLeaf("Card.Button.SeekTimestamp")
                 if let rawSpeaker = segment.speaker, let speaker = Self.speakerLabel(for: rawSpeaker) {
                     Text(speaker)
                         .font(DS.Font.caption)
@@ -81,9 +88,10 @@ struct SegmentCard: View {
         .onHover { hover in
             withAnimation(.easeOut(duration: 0.12)) { hovering = hover }
         }
-        .onTapGesture {
+        // simultaneousGesture: .textSelection consumes plain taps, so a card-level .onTapGesture never fires on text.
+        .simultaneousGesture(TapGesture().onEnded {
             if !isEditing, model.player != nil { model.seek(to: segment) }
-        }
+        })
         .alert("Rename speaker", isPresented: $renamingSpeaker, presenting: segment.speaker) { current in
             TextField("Name", text: $draftSpeakerName)
             Button("Cancel", role: .cancel) {}
