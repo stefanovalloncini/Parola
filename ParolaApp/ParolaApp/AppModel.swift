@@ -1112,13 +1112,13 @@ final class AppModel {
     }
 
     func transcribe(fileURL: URL, translateOverride: Bool? = nil) {
-        if fileURL.pathExtension == "parola" {
-            Task { [weak self] in await self?.openProjectDocument(at: fileURL) }
-            return
-        }
         // Arrivals must never stomp an active capture or batch (drops, watched folders, Services, URL scheme).
         if case .recording = phase {
             deferredArrivals.append(fileURL)
+            return
+        }
+        if fileURL.pathExtension == "parola" {
+            Task { [weak self] in await self?.openProjectDocument(at: fileURL) }
             return
         }
         if batchIsRunning {

@@ -377,4 +377,32 @@ struct AppModelBatchTests {
         #expect(model.batchJobs.contains { $0.url == url && $0.status == .pending })
         #expect(model.deferredArrivals.isEmpty)
     }
+
+    @Test(".parola drop during recording defers instead of opening")
+    func parolaDropDuringRecordingDefers() {
+        let model = makeModel()
+        model.transcript = Transcript(segments: [], language: "en", modelName: "m")
+        model.phase = .recording(source: .microphone)
+        let url = URL(fileURLWithPath: "/tmp/arrival.parola")
+        model.transcribe(fileURL: url)
+        #expect(model.deferredArrivals == [url])
+        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.transcript?.segments.isEmpty == true)
+    }
+
+    @Test(".parola arrivals drain separately from audio arrivals")
+    func parolaArrivalsDrainSeparately() async {
+        let model = makeModel()
+        model.phase = .recording(source: .microphone)
+        let audio = URL(fileURLWithPath: "/tmp/audio.wav")
+        let parola = URL(fileURLWithPath: "/tmp/doc.parola")
+        model.transcribe(fileURL: audio)
+        model.transcribe(fileURL: parola)
+        #expect(model.deferredArrivals == [audio, parola])
+        let final = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")], language: "en", modelName: "m")
+        await model.handleStreamingEvent(.finished(final))
+        #expect(model.deferredArrivals.isEmpty)
+        #expect(model.batchJobs.contains { $0.url == audio })
+        #expect(!model.batchJobs.contains { $0.url == parola })
+    }
 }

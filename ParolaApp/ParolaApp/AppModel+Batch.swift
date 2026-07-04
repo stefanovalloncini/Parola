@@ -165,7 +165,12 @@ extension AppModel {
         guard !deferredArrivals.isEmpty else { return }
         let urls = deferredArrivals
         deferredArrivals = []
-        addBatchFiles(urls)
+        let audioURLs = urls.filter { $0.pathExtension != "parola" }
+        let parolaURLs = urls.filter { $0.pathExtension == "parola" }
+        if !audioURLs.isEmpty { addBatchFiles(audioURLs) }
+        for url in parolaURLs {
+            Task { [weak self] in await self?.openProjectDocument(at: url) }
+        }
     }
 
     var batchIsRunning: Bool {
