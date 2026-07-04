@@ -31,4 +31,18 @@ struct StreamingTextTests {
         #expect(parts.settled == "Goodbye")
         #expect(parts.fresh == "")
     }
+
+    @Test("a slid tail window keeps the overlap settled and marks the appended text fresh")
+    func slidTailWindow() {
+        let parts = StreamingText.split(shown: "one two three", latest: "two three four")
+        #expect(parts.settled == "two three")
+        #expect(parts.fresh == " four")
+    }
+
+    @Test("a rewrite with only a token of overlap is still all settled")
+    func rewriteWithTinyOverlap() {
+        let parts = StreamingText.split(shown: "Hello", latest: "or not this time")
+        #expect(parts.settled == "or not this time")
+        #expect(parts.fresh == "")
+    }
 }

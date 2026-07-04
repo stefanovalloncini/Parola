@@ -130,7 +130,7 @@ actor WhisperKitTranscriber: Transcriber {
                         for segment in segments {
                             state.add(seek: segment.seek, text: segment.text)
                         }
-                        return state.text
+                        return state.tail()
                     }
                     partialHandler(text)
                 }

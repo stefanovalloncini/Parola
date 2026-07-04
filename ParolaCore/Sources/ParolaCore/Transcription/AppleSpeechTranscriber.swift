@@ -148,7 +148,7 @@ actor AppleSpeechTranscriber: Transcriber {
                 ))
                 nextID += 1
                 assembler.addFinal(text)
-                partialHandler?(assembler.text)
+                partialHandler?(assembler.tail())
             }
             return segments
         }

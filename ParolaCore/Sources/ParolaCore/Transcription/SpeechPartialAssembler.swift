@@ -6,15 +6,24 @@ import Foundation
 /// arrives lets the UI grow the transcript sentence by sentence. Volatile (in-progress) results are
 /// intentionally not accumulated here — they fire far more often and add no committed text.
 struct SpeechPartialAssembler {
-    private var finalized: [String] = []
+    private var joined = ""
 
     mutating func addFinal(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        finalized.append(trimmed)
+        if joined.isEmpty {
+            joined = trimmed
+        } else {
+            joined += " " + trimmed
+        }
     }
 
     var text: String {
-        finalized.joined(separator: " ")
+        joined
+    }
+
+    /// The trailing `maxChars` of the partial, cut so it never starts mid-word.
+    func tail(maxChars: Int = 2000) -> String {
+        StreamingText.tail(of: joined, maxChars: maxChars)
     }
 }
