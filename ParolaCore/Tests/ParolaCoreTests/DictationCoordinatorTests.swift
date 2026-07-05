@@ -114,6 +114,67 @@ struct DictationCoordinatorTests {
         func record(_ s: DictationCoordinator.State) { captured.append(s) }
     }
 
+    private actor SpyMuter: SystemAudioMuter {
+        private(set) var current = false
+        func isMuted() async -> Bool { current }
+        func setMuted(_ muted: Bool) async { current = muted }
+    }
+
+    private actor SpyPlayer: MediaPlaybackToggler {
+        private(set) var pauseCalls = 0
+        private(set) var playCalls = 0
+        func pause() async { pauseCalls += 1 }
+        func play() async { playCalls += 1 }
+    }
+
+    @Test("media session enters on listening and exits when the utterance finishes")
+    func mediaSessionAroundListening() async throws {
+        let muter = SpyMuter()
+        let player = SpyPlayer()
+        let media = MediaSession(muter: muter, player: player)
+        let coord = DictationCoordinator(
+            hotkey: MockHotkey(),
+            recorder: MockRecorder(outcome: .text("hi")),
+            inserter: MockInserter(),
+            mediaSession: media,
+            mediaConfigProvider: { MediaSessionConfig(muteSystemAudio: true, pausePlayback: true) }
+        )
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        let mutedWhileListening = await muter.current
+        let pausesAfterPress = await player.pauseCalls
+        #expect(mutedWhileListening)
+        #expect(pausesAfterPress == 1)
+
+        await coord.handle(.release)
+        let mutedAfterRelease = await muter.current
+        let playsAfterRelease = await player.playCalls
+        #expect(mutedAfterRelease == false)
+        #expect(playsAfterRelease == 1)
+    }
+
+    @Test("abort while listening exits the media session")
+    func abortExitsMediaSession() async throws {
+        let muter = SpyMuter()
+        let player = SpyPlayer()
+        let media = MediaSession(muter: muter, player: player)
+        let coord = DictationCoordinator(
+            hotkey: MockHotkey(),
+            recorder: MockRecorder(outcome: .text("hi")),
+            inserter: MockInserter(),
+            mediaSession: media,
+            mediaConfigProvider: { MediaSessionConfig(muteSystemAudio: true, pausePlayback: true) }
+        )
+        await coord.startMonitoring()
+        await coord.handle(.press)
+
+        await coord.abortMonitoring()
+        let muted = await muter.current
+        let plays = await player.playCalls
+        #expect(muted == false)
+        #expect(plays == 1)
+    }
+
     @Test("transcriber failure rests in an observable failed state")
     func transcribeFailure() async throws {
         let hotkey = MockHotkey()

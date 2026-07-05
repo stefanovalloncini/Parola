@@ -202,7 +202,11 @@ extension AppModel {
             mode: dictationMode,
             workflows: dictationWorkflows(),
             postProcessor: currentDictationProcessor(),
-            pasteDelayMs: max(0, min(2000, dictationPasteDelayMs))
+            pasteDelayMs: max(0, min(2000, dictationPasteDelayMs)),
+            mediaSession: mediaSession,
+            mediaConfigProvider: { [weak self] in
+                await MainActor.run { self?.mediaSessionConfig(allowMute: true) ?? .none }
+            }
         )
         dictationController.indicatorStyle = dictationIndicatorStyle
         dictationController.start(configuration: configuration)

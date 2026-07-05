@@ -341,6 +341,25 @@ struct AppModelDictationTests {
         model.stopDictation()
     }
 
+    @Test("startDictation wires the shared media session into the configuration")
+    func startDictationWiresMediaSession() async {
+        let model = makeModel()
+        model.autoMuteWhileRecording = true
+        model.autoPauseMediaWhileRecording = false
+        model.startDictation()
+
+        #expect(model.dictationController.configuration?.mediaSession === model.mediaSession)
+        let config = await model.dictationController.configuration?.mediaConfigProvider?()
+        #expect(config == MediaSessionConfig(muteSystemAudio: true, pausePlayback: false))
+
+        model.autoMuteWhileRecording = false
+        model.autoPauseMediaWhileRecording = true
+        let updated = await model.dictationController.configuration?.mediaConfigProvider?()
+        #expect(updated == MediaSessionConfig(muteSystemAudio: false, pausePlayback: true))
+
+        model.stopDictation()
+    }
+
     @Test("prewarm candidate is the model only for installed streaming WhisperKit variants")
     func prewarmCandidateGates() {
         let whisper = "openai_whisper-large-v3_turbo"
