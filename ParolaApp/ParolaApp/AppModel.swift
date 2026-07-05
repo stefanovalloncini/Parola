@@ -197,6 +197,12 @@ final class AppModel {
             .intersection(.deviceIndependentFlagsMask)
     }
 
+    var pendingRecovery: RecoveryCheckpoint?
+    @ObservationIgnored var recoveryGeneration: Int = 0
+    @ObservationIgnored var activeRecoveryGeneration: Int?
+    @ObservationIgnored var recordingRecoveryStartedAt: Date?
+    @ObservationIgnored var recordingWatchTask: Task<Void, Never>?
+
     var batchJobs: [BatchJob] = [] {
         didSet { saveBatchQueueSnapshot() }
     }
@@ -768,6 +774,8 @@ final class AppModel {
     private func teardownActiveCapture() {
         stopSilenceWatch()
         stopRecordingLevelObserver()
+        stopRecordingWatch()
+        endActiveRecovery()
         streamingConsumer?.cancel()
         streamingConsumer = nil
         if let s = streamingSession {
@@ -808,6 +816,7 @@ final class AppModel {
         recordingLevelTask?.cancel(); recordingLevelTask = nil
         silenceWatchTask?.cancel(); silenceWatchTask = nil
         recordingAutoStopTask?.cancel(); recordingAutoStopTask = nil
+        recordingWatchTask?.cancel(); recordingWatchTask = nil
         searchTask?.cancel(); searchTask = nil
         downloadTask?.cancel(); downloadTask = nil
         fileTranscribeTask?.cancel(); fileTranscribeTask = nil
@@ -992,6 +1001,7 @@ final class AppModel {
         refreshModelList()
         refreshLibrary()
         restoreBatchQueue()
+        loadPendingRecovery()
         wireDictationController()
 
         let sideEffects = bootstrap.sideEffects
@@ -1049,6 +1059,7 @@ final class AppModel {
 
     deinit {
         recordingLevelTask?.cancel()
+        recordingWatchTask?.cancel()
         streamingConsumer?.cancel()
         libraryRefreshTask?.cancel()
     }
@@ -1275,6 +1286,7 @@ final class AppModel {
         fileTranscribeStage = nil
 
         let task: TranscriptionTask = (translateOverride ?? translate) ? .translate : .transcribe
+        let recoveryToken = beginFileTranscribeRecovery(sourceURL: fileURL)
 
         fileTranscribeTask?.cancel()
         fileTranscribeTask = Task { [weak self] in
@@ -1302,9 +1314,11 @@ final class AppModel {
                 filePartialText = ""
                 fileTranscribeFraction = nil
                 fileTranscribeStage = nil
+                endRecovery(recoveryToken)
                 phase = .ready
                 persistToLibrary(processed, audioSource: fileURL)
             } catch {
+                endRecovery(recoveryToken)
                 filePartialText = ""
                 fileTranscribeFraction = nil
                 fileTranscribeStage = nil
@@ -1718,6 +1732,8 @@ final class AppModel {
         phase = .recording(source: .microphone)
         startSilenceWatch()
         scheduleRecordingAutoStop()
+        beginRecordingRecovery()
+        startRecordingWatch(checkpoints: true)
 
         let opts = currentOptions
         let progress = makeDownloadProgressHandler(for: selectedModel)
@@ -1767,6 +1783,8 @@ final class AppModel {
             Task { await session.stop() }
         }
         stopSilenceWatch()
+        stopRecordingWatch()
+        endActiveRecovery()
     }
 
     func handleStreamingEvent(_ event: StreamingEvent) async {
@@ -1788,6 +1806,8 @@ final class AppModel {
             resolveRecordingOutcome(.failure(IntentActionError.failed(msg)))
             drainDeferredArrivals()
         case .finished(let transcript):
+            stopRecordingWatch()
+            endActiveRecovery()
             let processed = await postProcessDetached(transcript)
             clearDerivedArtifacts()
             self.selectedEntryID = nil
@@ -1817,7 +1837,9 @@ final class AppModel {
                 streamingConsumer = nil
                 stopRecordingLevelObserver()
                 stopSilenceWatch()
-                // No-op when .finished already resolved them; covers a stream that ends without one.
+                stopRecordingWatch()
+                // Both no-op when .finished already ran; they cover a stream that ends without one.
+                endActiveRecovery()
                 resolveRecordingOutcome(.failure(IntentActionError.failed("The recording ended without a transcript.")))
             }
             return
