@@ -1,6 +1,6 @@
 import Foundation
 
-public enum ExportFormat: String, CaseIterable, Sendable, Codable {
+public enum ExportFormat: String, CaseIterable, Sendable, Codable, Identifiable {
     case txt
     case srt
     case vtt
@@ -13,6 +13,7 @@ public enum ExportFormat: String, CaseIterable, Sendable, Codable {
     case docx
     case pdf
 
+    public var id: String { rawValue }
     public var fileExtension: String { rawValue }
 }
 

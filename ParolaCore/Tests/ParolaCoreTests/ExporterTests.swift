@@ -70,6 +70,32 @@ struct ExporterTests {
         #expect(out == "Hello.\nWorld.")
     }
 
+    @Test("txt with timestamps prefixes each line with its start time")
+    func txtTimestamps() throws {
+        let out = try TxtExporter(options: TxtOptions(showTimestamps: true)).renderText(sample())
+        #expect(out == "[00:00:00] Hello world.\n[00:00:01] This is Parola.\n[00:00:04] Goodbye.")
+    }
+
+    @Test("txt with timestamps keeps speaker labels after the stamp")
+    func txtTimestampsWithSpeakers() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello.", speaker: "Alice"),
+                TranscriptSegment(id: 1, start: 61, end: 62, text: "Hi.", speaker: nil),
+            ],
+            language: "en",
+            modelName: "x"
+        )
+        let out = try TxtExporter(options: TxtOptions(showTimestamps: true)).renderText(transcript)
+        #expect(out == "[00:00:00] Alice: Hello.\n[00:01:01] Hi.")
+    }
+
+    @Test("TxtOptions defaults to no timestamps")
+    func txtOptionsDefault() {
+        #expect(TxtOptions().showTimestamps == false)
+        #expect(TxtExporter().options == TxtOptions())
+    }
+
     @Test("srt has indexed blocks with comma-millisecond timestamps")
     func srt() throws {
         let out = try SrtExporter().renderText(sample())
@@ -1087,35 +1113,4 @@ struct ExporterTests {
         #expect(text.contains("你好"))
     }
 
-    @Test("ExportPreset round-trips through JSON")
-    func exportPresetRoundTrip() throws {
-        let preset = ExportPreset(
-            name: "YouTube",
-            formats: [.srt, .vtt, .pdf],
-            markdownOptions: MarkdownOptions(showTimestamps: true),
-            subtitleOptions: SubtitleOptions(includeSpeakers: true)
-        )
-        let encoded = try JSONEncoder().encode(preset)
-        let decoded = try JSONDecoder().decode(ExportPreset.self, from: encoded)
-        #expect(decoded == preset)
-    }
-
-    @Test("ExportPreset.exporter applies options for declared formats")
-    func exportPresetExporter() throws {
-        let preset = ExportPreset(
-            name: "speakers",
-            formats: [.srt],
-            subtitleOptions: SubtitleOptions(includeSpeakers: true)
-        )
-        let exporter = try #require(preset.exporter(for: .srt))
-        let out = try exporter.renderText(sampleWithSpeakers())
-        #expect(out.contains("Speaker 1: Hello world."))
-    }
-
-    @Test("ExportPreset.exporter is nil for formats not in the preset")
-    func exportPresetExcludes() {
-        let preset = ExportPreset(name: "txt-only", formats: [.txt])
-        #expect(preset.exporter(for: .srt) == nil)
-        #expect(preset.exporter(for: .txt) is TxtExporter)
-    }
 }

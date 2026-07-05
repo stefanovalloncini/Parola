@@ -148,6 +148,7 @@ extension AppModel {
         htmlTheme: HtmlExportTheme
     ) -> any TranscriptExporter {
         switch format {
+        case .txt:  TxtExporter(options: TxtOptions(showTimestamps: includeTimestamps))
         case .srt:  SrtExporter(options: SubtitleOptions(captionLength: captionLength))
         case .vtt:  VttExporter(options: SubtitleOptions(captionLength: captionLength))
         case .md:   MarkdownExporter(options: MarkdownOptions(showTimestamps: includeTimestamps))

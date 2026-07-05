@@ -171,7 +171,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
                 "batchExportFormatOptions"
             ]
         case .autoExport:
-            return ["autoExportRules", "subtitleCaptionLength", "markdownTimestamps", "htmlExportTheme"]
+            return ["autoExportRules", "subtitleCaptionLength", "markdownTimestamps", "txtExportTimestamps", "htmlExportTheme"]
         case .integrations, .prompts:
             return []
         case .automation:

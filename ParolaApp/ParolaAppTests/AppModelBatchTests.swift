@@ -281,8 +281,11 @@ struct AppModelBatchTests {
         let md = AppModel.batchExporter(for: .md, includeTimestamps: true, captionLength: .none, htmlTheme: .light)
         #expect((md as? MarkdownExporter)?.options.showTimestamps == true)
 
-        let txt = AppModel.batchExporter(for: .txt, includeTimestamps: false, captionLength: .none, htmlTheme: .light)
-        #expect(txt.format == .txt)
+        let txt = AppModel.batchExporter(for: .txt, includeTimestamps: true, captionLength: .none, htmlTheme: .light)
+        #expect((txt as? TxtExporter)?.options.showTimestamps == true)
+
+        let plainTxt = AppModel.batchExporter(for: .txt, includeTimestamps: false, captionLength: .none, htmlTheme: .light)
+        #expect((plainTxt as? TxtExporter)?.options.showTimestamps == false)
     }
 
     @Test("a completed batch job is post-processed before it is stored and shown")

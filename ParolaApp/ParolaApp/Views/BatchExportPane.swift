@@ -93,7 +93,7 @@ struct BatchFormatCard: View {
                             .accessibilityIdentifier("batch.format.\(format.fileExtension).toggle")
                             .axLeaf("Export.Toggle.WriteToSourceFolder.\(format.fileExtension)")
                     }
-                    if format == .md || format == .html {
+                    if format == .txt || format == .md || format == .html {
                         BatchSettingRow(
                             title: "Include timestamps",
                             description: "Writes start times alongside each segment."

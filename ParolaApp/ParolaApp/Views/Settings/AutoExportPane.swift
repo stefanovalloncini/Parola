@@ -74,6 +74,11 @@ struct AutoExportPane: View {
                     Toggle("", isOn: $model.markdownTimestamps).labelsHidden()
                         .axLeaf("AutoExport.Toggle.MarkdownTimestamps")
                 }
+                SettingRow("Plain text timestamps",
+                           description: "Prefix each TXT line with its start time.") {
+                    Toggle("", isOn: $model.txtExportTimestamps).labelsHidden()
+                        .axLeaf("AutoExport.Toggle.TxtTimestamps")
+                }
                 SettingRow("HTML theme",
                            description: "Color scheme used by the HTML export.") {
                     Picker("", selection: $model.htmlExportThemeRaw) {

@@ -64,7 +64,7 @@ struct SettingsPaneScopeTests {
             "dictationHudOpacity", "dictationStripSelfCorrections", "dictationPasteDelayMs",
             "dictationContextSelection", "dictationContextClipboard", "dictationContextScreen",
             "micHotkeyEnabled", "micHotkeyKeyCode", "micHotkeyModifiers",
-            "subtitleCaptionLength", "markdownTimestamps", "htmlExportTheme",
+            "subtitleCaptionLength", "markdownTimestamps", "htmlExportTheme", "txtExportTimestamps",
             "pausePlayerOnAppHidden", "parola.userPrivacyMode", "batchExportFormatOptions",
         ]
         for key in expected {

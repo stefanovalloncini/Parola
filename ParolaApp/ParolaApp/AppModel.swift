@@ -103,6 +103,7 @@ final class AppModel {
     var skipSilences: Bool = false { didSet { defaults.set(skipSilences, forKey: "skipSilences") } }
     var pausePlayerOnAppHidden: Bool = false { didSet { defaults.set(pausePlayerOnAppHidden, forKey: "pausePlayerOnAppHidden") } }
     var markdownTimestamps: Bool = false { didSet { defaults.set(markdownTimestamps, forKey: "markdownTimestamps") } }
+    var txtExportTimestamps: Bool = false { didSet { defaults.set(txtExportTimestamps, forKey: "txtExportTimestamps") } }
     var htmlExportThemeRaw: String = HtmlExportTheme.light.rawValue { didSet { defaults.set(htmlExportThemeRaw, forKey: "htmlExportTheme") } }
     var dictationHudOpacity: Double = 1.0 { didSet { defaults.set(dictationHudOpacity, forKey: "dictationHudOpacity") } }
     var lastFindQuery: String = "" { didSet { defaults.set(lastFindQuery, forKey: "lastFindQuery") } }
@@ -277,6 +278,7 @@ final class AppModel {
     @ObservationIgnored var pendingMediaDuration: Double?
 
     var pendingExport: ExportFormat?
+    var exportOptionsFormat: ExportFormat?
 
     // MARK: - Post-process rules
 
@@ -450,6 +452,7 @@ final class AppModel {
         self.skipSilences = defaults.bool(forKey: "skipSilences")
         self.pausePlayerOnAppHidden = defaults.bool(forKey: "pausePlayerOnAppHidden")
         self.markdownTimestamps = defaults.bool(forKey: "markdownTimestamps")
+        self.txtExportTimestamps = defaults.bool(forKey: "txtExportTimestamps")
         self.htmlExportThemeRaw = defaults.string(forKey: "htmlExportTheme") ?? HtmlExportTheme.light.rawValue
         self.dictationHudOpacity = readDouble("dictationHudOpacity", default: 1.0)
         self.lastFindQuery = defaults.string(forKey: "lastFindQuery") ?? ""
@@ -923,6 +926,7 @@ final class AppModel {
         self.skipSilences = defaults.bool(forKey: "skipSilences")
         self.pausePlayerOnAppHidden = defaults.bool(forKey: "pausePlayerOnAppHidden")
         self.markdownTimestamps = defaults.bool(forKey: "markdownTimestamps")
+        self.txtExportTimestamps = defaults.bool(forKey: "txtExportTimestamps")
         self.htmlExportThemeRaw = defaults.string(forKey: "htmlExportTheme") ?? HtmlExportTheme.light.rawValue
         self.dictationHudOpacity = readDouble("dictationHudOpacity", default: 1.0)
         self.lastFindQuery = defaults.string(forKey: "lastFindQuery") ?? ""
@@ -2103,9 +2107,21 @@ final class AppModel {
 
     // MARK: - Export
 
+    /// True when the format has exporter options worth a sheet; option-free formats go straight to the save panel.
+    nonisolated static func exportHasOptions(_ format: ExportFormat) -> Bool {
+        switch format {
+        case .txt, .md, .html, .srt, .vtt: return true
+        case .json, .jsonl, .csv, .tsv, .docx, .pdf: return false
+        }
+    }
+
     func exportRequest(_ format: ExportFormat) {
         guard transcript != nil else { return }
-        pendingExport = format
+        if Self.exportHasOptions(format) {
+            exportOptionsFormat = format
+        } else {
+            pendingExport = format
+        }
     }
 
     func exportSegmentNotesAsMarkdown() {
@@ -2278,6 +2294,7 @@ final class AppModel {
 
     func makeExporter(for format: ExportFormat) -> TranscriptExporter {
         switch format {
+        case .txt: return TxtExporter(options: TxtOptions(showTimestamps: txtExportTimestamps))
         case .srt: return SrtExporter(options: SubtitleOptions(captionLength: subtitleCaptionLength))
         case .vtt: return VttExporter(options: SubtitleOptions(captionLength: subtitleCaptionLength))
         case .md:  return MarkdownExporter(options: MarkdownOptions(showTimestamps: markdownTimestamps))

@@ -18,6 +18,9 @@ struct ContentSheetsModifier: ViewModifier {
                     SpeakersSheet(transcript: transcript)
                 }
             }
+            .sheet(item: $model.exportOptionsFormat) { format in
+                ExportOptionsSheet(format: format)
+            }
             .onChange(of: model.meetingDetectedApp) { _, name in
                 if let name { meetingAppSnapshot = name }
             }

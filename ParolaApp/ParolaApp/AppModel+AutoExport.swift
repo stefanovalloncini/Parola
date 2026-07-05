@@ -19,6 +19,7 @@ extension AppModel {
         )
         guard !formats.isEmpty else { return }
         let markdownTimestamps = self.markdownTimestamps
+        let txtTimestamps = self.txtExportTimestamps
         let htmlTheme = HtmlExportTheme(rawValue: htmlExportThemeRaw) ?? .light
         let captionLength = subtitleCaptionLength
         Task.detached(priority: .utility) {
@@ -27,6 +28,7 @@ extension AppModel {
                     let target = sourceURL.deletingPathExtension().appendingPathExtension(format.fileExtension)
                     guard !skippingTargets.contains(target) else { continue }
                     let exporter: any TranscriptExporter = switch format {
+                    case .txt:  TxtExporter(options: TxtOptions(showTimestamps: txtTimestamps))
                     case .srt:  SrtExporter(options: SubtitleOptions(captionLength: captionLength))
                     case .vtt:  VttExporter(options: SubtitleOptions(captionLength: captionLength))
                     case .md:   MarkdownExporter(options: MarkdownOptions(showTimestamps: markdownTimestamps))

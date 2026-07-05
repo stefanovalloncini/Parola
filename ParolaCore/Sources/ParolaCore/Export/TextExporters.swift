@@ -1,15 +1,34 @@
 import Foundation
 
-struct TxtExporter: TranscriptExporter {
-    let format: ExportFormat = .txt
-    init() {}
-    func render(_ transcript: Transcript) throws -> Data {
+public struct TxtOptions: Sendable, Codable, Hashable {
+    public var showTimestamps: Bool
+
+    public init(showTimestamps: Bool = false) {
+        self.showTimestamps = showTimestamps
+    }
+}
+
+public struct TxtExporter: TranscriptExporter {
+    public let format: ExportFormat = .txt
+    public let options: TxtOptions
+
+    public init(options: TxtOptions = TxtOptions()) {
+        self.options = options
+    }
+
+    public func render(_ transcript: Transcript) throws -> Data {
         let text = transcript.segments
             .compactMap { seg -> String? in
                 let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !body.isEmpty else { return nil }
-                guard let speaker = Format.presentationSpeakerLabel(seg.speaker) else { return body }
-                return "\(speaker): \(body)"
+                let line: String
+                if let speaker = Format.presentationSpeakerLabel(seg.speaker) {
+                    line = "\(speaker): \(body)"
+                } else {
+                    line = body
+                }
+                guard options.showTimestamps else { return line }
+                return "[\(Format.timestampHHMMSS(seg.start))] \(line)"
             }
             .joined(separator: "\n")
         return utf8(text)
