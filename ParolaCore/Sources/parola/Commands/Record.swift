@@ -28,7 +28,7 @@ struct Record: AsyncParsableCommand {
     @Flag(help: "Translate to English.")
     var translate: Bool = false
 
-    @Option(name: .shortAndLong, help: "Output format: txt | md | html | docx | pdf | csv | tsv | srt | vtt | json | jsonl | fcpxml.")
+    @Option(name: .shortAndLong, help: "Output format: txt | md | html | docx | pdf | csv | tsv | srt | vtt | json | jsonl | fcpxml | lrc.")
     var format: ExportFormat = .txt
 
     @Option(name: .shortAndLong, help: "Write output to this path. Defaults to stdout.")

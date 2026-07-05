@@ -204,7 +204,7 @@ public enum TypedToolRegistry {
             bridgeCmd: "exportTranscript",
             description: "Export the current transcript. The save panel is shown by the app.",
             properties: [
-                .string("format", enum: ["txt", "md", "html", "docx", "pdf", "csv", "tsv", "srt", "vtt", "json", "jsonl", "fcpxml"], description: "Output format."),
+                .string("format", enum: ["txt", "md", "html", "docx", "pdf", "csv", "tsv", "srt", "vtt", "json", "jsonl", "fcpxml", "lrc"], description: "Output format."),
                 .bool("includeTimestamps", description: "Embed segment timestamps in formats that support them."),
             ],
             required: ["format"]

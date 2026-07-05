@@ -13,6 +13,7 @@ public enum ExportFormat: String, CaseIterable, Sendable, Codable, Identifiable 
     case docx
     case pdf
     case fcpxml
+    case lrc
 
     public var id: String { rawValue }
     public var fileExtension: String { rawValue }
@@ -50,6 +51,7 @@ public enum Exporters {
         case .docx: return DocxExporter()
         case .pdf:  return PdfExporter()
         case .fcpxml: return FcpxmlExporter()
+        case .lrc:  return LrcExporter()
         }
     }
 }

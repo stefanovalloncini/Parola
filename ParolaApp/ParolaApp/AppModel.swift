@@ -2183,7 +2183,7 @@ final class AppModel {
     nonisolated static func exportHasOptions(_ format: ExportFormat) -> Bool {
         switch format {
         case .txt, .md, .html, .srt, .vtt: return true
-        case .json, .jsonl, .csv, .tsv, .docx, .pdf, .fcpxml: return false
+        case .json, .jsonl, .csv, .tsv, .docx, .pdf, .fcpxml, .lrc: return false
         }
     }
 

@@ -244,6 +244,8 @@ struct ParolaApp: App {
                     .disabled(model.transcript == nil)
                 Button("Export as Final Cut Pro XML…") { model.exportRequest(.fcpxml) }
                     .disabled(model.transcript == nil)
+                Button("Export as LRC…") { model.exportRequest(.lrc) }
+                    .disabled(model.transcript == nil)
                 Divider()
                 Button("Open in New Window") {
                     if let t = model.transcript {

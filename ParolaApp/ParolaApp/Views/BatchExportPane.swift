@@ -131,6 +131,7 @@ struct BatchFormatCard: View {
         case .docx: return "Word Document"
         case .pdf: return "PDF"
         case .fcpxml: return "Final Cut Pro XML"
+        case .lrc: return "LRC Lyrics"
         }
     }
 

@@ -276,8 +276,8 @@ public enum AppTools {
         AppTool(
             name: "parola_app_export_transcript",
             bridgeCmd: "exportTranscript",
-            description: "Export the current transcript via the app's export pipeline. 'format' is one of txt, md, html, docx, pdf, csv, tsv, srt, vtt, json, jsonl, fcpxml. The save panel is shown by the app.",
-            properties: [.string("format", enum: ["txt", "md", "html", "docx", "pdf", "csv", "tsv", "srt", "vtt", "json", "jsonl", "fcpxml"])],
+            description: "Export the current transcript via the app's export pipeline. 'format' is one of txt, md, html, docx, pdf, csv, tsv, srt, vtt, json, jsonl, fcpxml, lrc. The save panel is shown by the app.",
+            properties: [.string("format", enum: ["txt", "md", "html", "docx", "pdf", "csv", "tsv", "srt", "vtt", "json", "jsonl", "fcpxml", "lrc"])],
             required: ["format"]
         ),
         AppTool(
