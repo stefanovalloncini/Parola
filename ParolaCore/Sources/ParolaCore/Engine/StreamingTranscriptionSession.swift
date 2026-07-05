@@ -283,7 +283,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         }
     }
 
-    private func labelSpeaker(
+    func labelSpeaker(
         for segment: TranscriptSegment,
         in batch: ConfirmedAudioBatch,
         with labeler: any StreamingSpeakerLabeler

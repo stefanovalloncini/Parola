@@ -1615,8 +1615,9 @@ final class AppModel {
 
         streamingConsumer = Task { @MainActor in
             await mediaSession.enterRecording(config: config)
+            let labeler = await streamingSpeakerLabeler()
             do {
-                let events = try await s.start(options: opts, speakerLabeler: nil, downloadProgress: progress)
+                let events = try await s.start(options: opts, speakerLabeler: labeler, downloadProgress: progress)
                 phase = .recording(source: .microphone)
                 for await event in events {
                     await handleStreamingEvent(event)
@@ -1628,6 +1629,20 @@ final class AppModel {
             }
             await mediaSession.exitRecording()
         }
+    }
+
+    /// Session-local speaker labels for streaming mic recordings. When the diarizer models
+    /// aren't downloaded yet, this recording stays unlabeled and the fetch runs in the
+    /// background so the next one can label.
+    private func streamingSpeakerLabeler() async -> (any StreamingSpeakerLabeler)? {
+        guard diarize else { return nil }
+        if IncrementalSpeakerLabeler.modelsInstalled() {
+            return try? await IncrementalSpeakerLabeler.loadInstalled()
+        }
+        if mode == .normal {
+            Task.detached { try? await IncrementalSpeakerLabeler.downloadModels() }
+        }
+        return nil
     }
 
     /// Stops and clears the live streaming session, its consumer, and the silence watch.

@@ -1,7 +1,43 @@
 import Foundation
 import Testing
+import os
 @preconcurrency import WhisperKit
 @testable import ParolaCore
+
+private final class RecordingLabeler: StreamingSpeakerLabeler {
+    struct Call {
+        var sampleCount: Int
+        var firstSample: Float?
+        var windowStartTime: TimeInterval
+        var sampleRate: Double
+    }
+
+    private let state = OSAllocatedUnfairLock<[Call]>(initialState: [])
+    private let result: String?
+
+    init(result: String?) {
+        self.result = result
+    }
+
+    func labelSpeaker(
+        for segment: TranscriptSegment,
+        audioWindow: [Float],
+        windowStartTime: TimeInterval,
+        sampleRate: Double
+    ) async -> String? {
+        state.withLock {
+            $0.append(Call(
+                sampleCount: audioWindow.count,
+                firstSample: audioWindow.first,
+                windowStartTime: windowStartTime,
+                sampleRate: sampleRate
+            ))
+        }
+        return result
+    }
+
+    var calls: [Call] { state.withLock { $0 } }
+}
 
 @Suite("Streaming session event translation")
 struct StreamingTranscriptionSessionTests {
@@ -127,5 +163,76 @@ struct StreamingTranscriptionSessionTests {
         await session.stop()
         let model = await session.currentModel()
         #expect(model == nil)
+    }
+
+    @Test("the labeler receives the padded per-segment slice of the batch audio")
+    func labelerGetsSegmentWindow() async {
+        let sampleRate = 16_000
+        let session = StreamingTranscriptionSession()
+        let labeler = RecordingLabeler(result: "Speaker 1")
+        let batch = ConfirmedAudioBatch(
+            segments: [],
+            audioWindow: (0..<(5 * sampleRate)).map { Float($0) },
+            windowStartSeconds: 1.0
+        )
+        let segment = TranscriptSegment(id: 0, start: 2.0, end: 4.0, text: "hi")
+
+        let label = await session.labelSpeaker(for: segment, in: batch, with: labeler)
+        #expect(label == "Speaker 1")
+        let call = labeler.calls.first
+        #expect(labeler.calls.count == 1)
+        #expect(call?.windowStartTime == 1.5)
+        #expect(call?.sampleCount == 3 * sampleRate)
+        #expect(call?.firstSample == Float(sampleRate / 2))
+        #expect(call?.sampleRate == Double(sampleRate))
+    }
+
+    @Test("the segment window is clamped to the batch audio bounds")
+    func labelerWindowClampedToBatch() async {
+        let sampleRate = 16_000
+        let session = StreamingTranscriptionSession()
+        let labeler = RecordingLabeler(result: "Speaker 2")
+        let batch = ConfirmedAudioBatch(
+            segments: [],
+            audioWindow: (0..<(2 * sampleRate)).map { Float($0) },
+            windowStartSeconds: 10.0
+        )
+        let segment = TranscriptSegment(id: 0, start: 9.0, end: 13.0, text: "hi")
+
+        let label = await session.labelSpeaker(for: segment, in: batch, with: labeler)
+        #expect(label == "Speaker 2")
+        let call = labeler.calls.first
+        #expect(call?.windowStartTime == 10.0)
+        #expect(call?.sampleCount == 2 * sampleRate)
+        #expect(call?.firstSample == 0)
+    }
+
+    @Test("a batch without audio never reaches the labeler")
+    func emptyBatchAudioSkipsLabeler() async {
+        let session = StreamingTranscriptionSession()
+        let labeler = RecordingLabeler(result: "Speaker 1")
+        let batch = ConfirmedAudioBatch(segments: [], audioWindow: [], windowStartSeconds: 0)
+        let segment = TranscriptSegment(id: 0, start: 0, end: 1, text: "hi")
+
+        let label = await session.labelSpeaker(for: segment, in: batch, with: labeler)
+        #expect(label == nil)
+        #expect(labeler.calls.isEmpty)
+    }
+
+    @Test("a segment outside the batch window is left unlabeled")
+    func segmentOutsideBatchSkipsLabeler() async {
+        let sampleRate = 16_000
+        let session = StreamingTranscriptionSession()
+        let labeler = RecordingLabeler(result: "Speaker 1")
+        let batch = ConfirmedAudioBatch(
+            segments: [],
+            audioWindow: [Float](repeating: 0, count: sampleRate),
+            windowStartSeconds: 0
+        )
+        let segment = TranscriptSegment(id: 0, start: 5.0, end: 6.0, text: "hi")
+
+        let label = await session.labelSpeaker(for: segment, in: batch, with: labeler)
+        #expect(label == nil)
+        #expect(labeler.calls.isEmpty)
     }
 }
