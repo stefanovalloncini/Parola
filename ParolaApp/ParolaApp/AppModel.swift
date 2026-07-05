@@ -203,6 +203,9 @@ final class AppModel {
     @ObservationIgnored var recordingRecoveryStartedAt: Date?
     @ObservationIgnored var recordingWatchTask: Task<Void, Never>?
 
+    var recordingDiskSpaceLow: Bool = false
+    @ObservationIgnored var freeDiskSpaceProvider: () -> Int64? = { AppModel.systemFreeDiskSpace() }
+
     var batchJobs: [BatchJob] = [] {
         didSet { saveBatchQueueSnapshot() }
     }
@@ -1586,6 +1589,7 @@ final class AppModel {
     // MARK: - Recording
 
     func startRecording(source: RecordSource) {
+        guard applyPreRecordingDiskCheck() else { return }
         let countIn = max(0, recordingCountInSeconds)
         if countIn > 0 {
             beginCountIn(seconds: countIn) { [weak self] in
@@ -1656,8 +1660,10 @@ final class AppModel {
                     observeRecordingLevels(from: sys)
                 }
                 scheduleRecordingAutoStop()
+                startRecordingWatch(checkpoints: false)
             } catch {
                 await mediaSession.exitRecording()
+                stopRecordingWatch()
                 phase = .failed(message: Self.recordingFailureMessage(for: error, source: source))
                 drainDeferredArrivals()
             }
@@ -1848,6 +1854,7 @@ final class AppModel {
         guard let source = liveSource else { return }
         // Hand off synchronously so a racing auto-stop or second click can't start a duplicate run.
         liveSource = nil
+        stopRecordingWatch()
         fileTranscribeTask = Task {
             await mediaSession.exitRecording()
             do {

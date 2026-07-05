@@ -35,10 +35,12 @@ struct RecordingPane: View {
                     .padding(.top, DS.Spacing.large)
                     .padding(.bottom, DS.Spacing.medium)
                 if model.recordingIsSilent { silenceBanner }
+                if model.recordingDiskSpaceLow { diskSpaceBanner }
                 Divider()
                 LiveTranscriptView()
             } else {
                 card.frame(maxWidth: .infinity, maxHeight: .infinity)
+                if model.recordingDiskSpaceLow { diskSpaceBanner }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -48,10 +50,18 @@ struct RecordingPane: View {
     }
 
     private var silenceBanner: some View {
+        warningBanner(icon: "speaker.slash.fill", message: "No voice detected — check your microphone.")
+    }
+
+    private var diskSpaceBanner: some View {
+        warningBanner(icon: "internaldrive", message: "Low disk space — recording stops automatically below 200 MB.")
+    }
+
+    private func warningBanner(icon: String, message: LocalizedStringKey) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "speaker.slash.fill")
+            Image(systemName: icon)
                 .foregroundStyle(.white)
-            Text("No voice detected — check your microphone.")
+            Text(message)
                 .font(DS.Font.calloutMedium)
                 .foregroundStyle(.white)
             Spacer()
