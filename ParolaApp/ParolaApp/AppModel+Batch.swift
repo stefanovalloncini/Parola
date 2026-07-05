@@ -213,6 +213,46 @@ extension AppModel {
         batchJobs.contains { $0.status == .transcribing }
     }
 
+    // MARK: - Queue persistence across quit
+
+    var batchQueueFileURL: URL {
+        library.libraryURL.appendingPathComponent("batch-queue.json")
+    }
+
+    func saveBatchQueueSnapshot() {
+        let restorable: Set<BatchJob.Status> = [.pending, .transcribing, .failed]
+        let urls = batchJobs.filter { restorable.contains($0.status) }.map(\.url)
+        guard urls != lastSavedBatchQueueURLs else { return }
+        lastSavedBatchQueueURLs = urls
+        if urls.isEmpty {
+            try? FileManager.default.removeItem(at: batchQueueFileURL)
+        } else if let data = try? Self.batchOptionsEncoder.encode(urls) {
+            try? data.write(to: batchQueueFileURL, options: .atomic)
+        }
+    }
+
+    /// Rebuilds a queue that a quit interrupted: jobs come back pending and wait for Resume.
+    func restoreBatchQueue() {
+        guard batchJobs.isEmpty,
+              let data = try? Data(contentsOf: batchQueueFileURL),
+              let urls = try? Self.batchOptionsDecoder.decode([URL].self, from: data),
+              !urls.isEmpty
+        else { return }
+        lastSavedBatchQueueURLs = urls
+        batchJobs = urls.map { BatchJob(url: $0) }
+        selectedBatchJobID = batchJobs.first?.id
+        route = .batch
+    }
+
+    var canResumeBatch: Bool {
+        batchTask == nil && !batchIsRunning && batchJobs.contains { $0.status == .pending }
+    }
+
+    func resumePendingBatchJobs() {
+        guard canResumeBatch else { return }
+        runBatchTask(jobs: batchJobs.filter { $0.status == .pending })
+    }
+
     func cancelBatchJob(_ id: BatchJob.ID) {
         guard let idx = batchJobs.firstIndex(where: { $0.id == id }) else { return }
         let job = batchJobs[idx]

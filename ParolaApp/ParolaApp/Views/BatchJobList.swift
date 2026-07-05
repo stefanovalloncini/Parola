@@ -51,6 +51,19 @@ struct BatchJobList: View {
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
                 .axLeaf("Queue.Button.AddFiles")
+
+                if model.canResumeBatch {
+                    Button {
+                        model.resumePendingBatchJobs()
+                    } label: {
+                        Label("Resume", systemImage: "play.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(DS.Color.accent)
+                    .controlSize(.regular)
+                    .help("Continue transcribing the queued files.")
+                    .axLeaf("Queue.Button.Resume")
+                }
             }
             .padding(.horizontal, DS.Spacing.large)
             .padding(.bottom, DS.Spacing.regular)

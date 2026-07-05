@@ -189,9 +189,12 @@ final class AppModel {
             .intersection(.deviceIndependentFlagsMask)
     }
 
-    var batchJobs: [BatchJob] = []
+    var batchJobs: [BatchJob] = [] {
+        didSet { saveBatchQueueSnapshot() }
+    }
     var selectedBatchJobID: BatchJob.ID?
     @ObservationIgnored var batchTask: Task<Void, Never>?
+    @ObservationIgnored var lastSavedBatchQueueURLs: [URL]?
 
     var batchExportFormatsRaw: String = "txt,srt" { didSet { defaults.set(batchExportFormatsRaw, forKey: "batchExportFormats") } }
     var batchExportToSourceFolder: Bool = true { didSet { defaults.set(batchExportToSourceFolder, forKey: "batchExportToSourceFolder") } }
@@ -954,6 +957,7 @@ final class AppModel {
         loadCorrectionRules()
         refreshModelList()
         refreshLibrary()
+        restoreBatchQueue()
         wireDictationController()
 
         let sideEffects = bootstrap.sideEffects

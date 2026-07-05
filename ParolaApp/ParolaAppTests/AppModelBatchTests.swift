@@ -448,6 +448,55 @@ struct AppModelBatchTests {
         #expect(!FileManager.default.fileExists(atPath: txt.path))
     }
 
+    @Test("pending, failed, and in-flight jobs survive relaunch as pending")
+    func batchQueueSurvivesRelaunch() {
+        let libURL = makeTempLibraryURL("batch-queue")
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: libURL)
+        let pending = Self.makeJob("a")
+        let failed = Self.makeJob("b", status: .failed)
+        let running = Self.makeJob("c", status: .transcribing)
+        let done = Self.makeJob("d", status: .done)
+        model.batchJobs = [pending, failed, running, done]
+
+        let restored = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: libURL)
+
+        #expect(restored.batchJobs.map(\.url) == [pending.url, failed.url, running.url])
+        #expect(restored.batchJobs.allSatisfy { $0.status == .pending })
+        #expect(restored.batchTask == nil)
+        #expect(restored.route == .batch)
+    }
+
+    @Test("the queue file is deleted when the batch clears or finishes")
+    func batchQueueFileDeletedOnClear() {
+        let model = makeModel()
+        model.batchJobs = [Self.makeJob("a")]
+        #expect(FileManager.default.fileExists(atPath: model.batchQueueFileURL.path))
+        model.clearBatch()
+        #expect(!FileManager.default.fileExists(atPath: model.batchQueueFileURL.path))
+
+        model.batchJobs = [Self.makeJob("b")]
+        #expect(FileManager.default.fileExists(atPath: model.batchQueueFileURL.path))
+        model.batchJobs[0].status = .done
+        #expect(!FileManager.default.fileExists(atPath: model.batchQueueFileURL.path))
+    }
+
+    @Test("resumePendingBatchJobs starts the queue only when idle with pending jobs")
+    func resumeStartsIdlePendingQueue() {
+        let model = makeModel()
+        #expect(model.canResumeBatch == false)
+
+        model.batchJobs = [Self.makeJob("a"), Self.makeJob("run", status: .transcribing)]
+        #expect(model.canResumeBatch == false)
+
+        model.batchJobs[1].status = .done
+        #expect(model.canResumeBatch)
+
+        model.resumePendingBatchJobs()
+        #expect(model.batchTask != nil)
+        model.batchTask?.cancel()
+        model.batchTask = nil
+    }
+
     @Test("cancelCurrentWork marks all in-flight batch jobs cancelled and returns phase to idle")
     func cancelCurrentWorkMarksBatchJobsCancelled() async {
         let model = makeModel()
