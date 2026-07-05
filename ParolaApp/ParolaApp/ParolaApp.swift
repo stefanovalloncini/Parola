@@ -260,7 +260,7 @@ struct ParolaApp: App {
                     .keyboardShortcut("p", modifiers: [.command])
                     .disabled(model.transcript == nil)
                 Divider()
-                Button("Burn Subtitles into Video…") { model.burnSubtitlesIntoVideo() }
+                Button("Burn Subtitles into Video…") { model.requestBurnSubtitles() }
                     .disabled(model.transcript == nil)
             }
         }

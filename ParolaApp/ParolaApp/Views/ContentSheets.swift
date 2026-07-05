@@ -21,6 +21,7 @@ struct ContentSheetsModifier: ViewModifier {
             .sheet(item: $model.exportOptionsFormat) { format in
                 ExportOptionsSheet(format: format)
             }
+            .sheet(isPresented: $model.burnSheetOpen) { BurnStyleSheet() }
             .onChange(of: model.meetingDetectedApp) { _, name in
                 if let name { meetingAppSnapshot = name }
             }

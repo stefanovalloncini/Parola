@@ -481,6 +481,7 @@ final class ParolaAutomationServer {
         case .loadingModel: return "loadingModel"
         case .transcribing: return "transcribing"
         case .recording: return "recording"
+        case .exporting: return "exporting"
         case .ready: return "ready"
         case .failed: return "failed"
         }
@@ -498,6 +499,8 @@ final class ParolaAutomationServer {
             return .object(["file": .string(file.path)])
         case .recording(let source):
             return .object(["source": .string(source.rawValue)])
+        case .exporting(let progress):
+            return .object(["progress": .double(progress)])
         case .failed(let message):
             return .object(["message": .string(message)])
         }

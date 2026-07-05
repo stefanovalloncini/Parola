@@ -68,6 +68,8 @@ struct ContentRoutes: View {
             TranscribingPane(file: file, partial: model.filePartialText, progress: model.fileTranscribeFraction, expectsPartials: model.activeEngineStreamsPartials, stage: model.fileTranscribeStage)
         case .recording(let source):
             RecordingPane(source: source)
+        case .exporting(let progress):
+            ProgressPane(title: "Burning subtitles…", progress: progress)
         case .ready:
             if model.transcript != nil {
                 TranscriptPane()
@@ -88,6 +90,7 @@ struct ContentRoutes: View {
         case .recording: 4
         case .ready: 5
         case .failed: 6
+        case .exporting: 7
         }
     }
 

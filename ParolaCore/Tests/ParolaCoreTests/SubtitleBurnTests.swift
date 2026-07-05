@@ -25,8 +25,17 @@ struct SubtitleBurnTests {
             modelName: "test",
             durationSeconds: 2.0
         )
-        try await SubtitleBurner.burn(transcript: transcript, video: src, to: out)
+        let reports = ProgressReports()
+        try await SubtitleBurner.burn(transcript: transcript, video: src, to: out) { fraction in
+            reports.append(fraction)
+        }
         #expect(FileManager.default.fileExists(atPath: out.path))
+
+        // A short clip can finish between polls, so the callback may never fire; when it does,
+        // every report must be a sane, non-decreasing fraction.
+        let observed = reports.values
+        #expect(observed.allSatisfy { (0.0...1.0).contains($0) })
+        #expect(observed == observed.sorted())
 
         let duringCue = try await brightPixelCount(of: out, atSeconds: 1.0)
         let beforeCue = try await brightPixelCount(of: out, atSeconds: 0.1)
@@ -49,6 +58,24 @@ struct SubtitleBurnTests {
         #expect(brightPixelCount(in: image) > 50)
 
         #expect(SubtitleBurner.renderTextImage(text: "", font: font, color: white, size: box, scale: 2) == nil)
+    }
+}
+
+private final class ProgressReports: @unchecked Sendable {
+    // NSLock-guarded storage; the burner invokes the callback off the test's task.
+    private let lock = NSLock()
+    private var storage: [Double] = []
+
+    func append(_ value: Double) {
+        lock.lock()
+        storage.append(value)
+        lock.unlock()
+    }
+
+    var values: [Double] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
     }
 }
 

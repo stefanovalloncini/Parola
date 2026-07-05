@@ -101,7 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .idle, .ready, .failed:
             stopRecordingTick()
             NSApp.dockTile.badgeLabel = nil
-        case .downloadingModel(_, let progress):
+        case .downloadingModel(_, let progress), .exporting(let progress):
             stopRecordingTick()
             NSApp.dockTile.badgeLabel = "\(Int(progress * 100))%"
         case .loadingModel:

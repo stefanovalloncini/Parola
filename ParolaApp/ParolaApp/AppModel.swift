@@ -20,6 +20,7 @@ final class AppModel {
         case loadingModel(name: String)
         case transcribing(file: URL)
         case recording(source: RecordSource)
+        case exporting(progress: Double)
         case ready
         case failed(message: String)
     }
@@ -104,6 +105,9 @@ final class AppModel {
     var pausePlayerOnAppHidden: Bool = false { didSet { defaults.set(pausePlayerOnAppHidden, forKey: "pausePlayerOnAppHidden") } }
     var markdownTimestamps: Bool = false { didSet { defaults.set(markdownTimestamps, forKey: "markdownTimestamps") } }
     var txtExportTimestamps: Bool = false { didSet { defaults.set(txtExportTimestamps, forKey: "txtExportTimestamps") } }
+    var burnFontSizeRaw: String = BurnFontSize.medium.rawValue { didSet { defaults.set(burnFontSizeRaw, forKey: "burnFontSize") } }
+    var burnTextColorRaw: String = BurnTextColor.white.rawValue { didSet { defaults.set(burnTextColorRaw, forKey: "burnTextColor") } }
+    var burnOutline: Bool = true { didSet { defaults.set(burnOutline, forKey: "burnOutline") } }
     var htmlExportThemeRaw: String = HtmlExportTheme.light.rawValue { didSet { defaults.set(htmlExportThemeRaw, forKey: "htmlExportTheme") } }
     var dictationHudOpacity: Double = 1.0 { didSet { defaults.set(dictationHudOpacity, forKey: "dictationHudOpacity") } }
     var lastFindQuery: String = "" { didSet { defaults.set(lastFindQuery, forKey: "lastFindQuery") } }
@@ -453,6 +457,9 @@ final class AppModel {
         self.pausePlayerOnAppHidden = defaults.bool(forKey: "pausePlayerOnAppHidden")
         self.markdownTimestamps = defaults.bool(forKey: "markdownTimestamps")
         self.txtExportTimestamps = defaults.bool(forKey: "txtExportTimestamps")
+        self.burnFontSizeRaw = defaults.string(forKey: "burnFontSize") ?? BurnFontSize.medium.rawValue
+        self.burnTextColorRaw = defaults.string(forKey: "burnTextColor") ?? BurnTextColor.white.rawValue
+        self.burnOutline = readBool("burnOutline", default: true)
         self.htmlExportThemeRaw = defaults.string(forKey: "htmlExportTheme") ?? HtmlExportTheme.light.rawValue
         self.dictationHudOpacity = readDouble("dictationHudOpacity", default: 1.0)
         self.lastFindQuery = defaults.string(forKey: "lastFindQuery") ?? ""
@@ -752,6 +759,7 @@ final class AppModel {
         if downloadTask != nil { return true }
         if youtubeTranscribeTask != nil { return true }
         if youtubeSubsTask != nil { return true }
+        if burnTask != nil { return true }
         return false
     }
 
@@ -784,6 +792,8 @@ final class AppModel {
         youtubeTranscribeTask = nil
         youtubeSubsTask?.cancel()
         youtubeSubsTask = nil
+        burnTask?.cancel()
+        burnTask = nil
         teardownActiveCapture()
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
         if hadWork || phase != .ready { phase = .idle }
@@ -801,6 +811,7 @@ final class AppModel {
         fileTranscribeTask?.cancel(); fileTranscribeTask = nil
         youtubeTranscribeTask?.cancel(); youtubeTranscribeTask = nil
         youtubeSubsTask?.cancel(); youtubeSubsTask = nil
+        burnTask?.cancel(); burnTask = nil
         teardownActiveCapture()
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
     }
@@ -927,6 +938,9 @@ final class AppModel {
         self.pausePlayerOnAppHidden = defaults.bool(forKey: "pausePlayerOnAppHidden")
         self.markdownTimestamps = defaults.bool(forKey: "markdownTimestamps")
         self.txtExportTimestamps = defaults.bool(forKey: "txtExportTimestamps")
+        self.burnFontSizeRaw = defaults.string(forKey: "burnFontSize") ?? BurnFontSize.medium.rawValue
+        self.burnTextColorRaw = defaults.string(forKey: "burnTextColor") ?? BurnTextColor.white.rawValue
+        self.burnOutline = readBool("burnOutline", default: true)
         self.htmlExportThemeRaw = defaults.string(forKey: "htmlExportTheme") ?? HtmlExportTheme.light.rawValue
         self.dictationHudOpacity = readDouble("dictationHudOpacity", default: 1.0)
         self.lastFindQuery = defaults.string(forKey: "lastFindQuery") ?? ""
@@ -2078,30 +2092,56 @@ final class AppModel {
 
     // MARK: - Burn subtitles into video
 
+    var burnSheetOpen: Bool = false
+    @ObservationIgnored private var burnTask: Task<Void, Never>?
+    /// Test seam: replaces SubtitleBurner.burn so burn timing and progress are deterministic.
+    @ObservationIgnored var burnOperation: (@Sendable (Transcript, URL, URL, SubtitleBurner.Style, @escaping @Sendable (Double) -> Void) async throws -> Void)?
+
+    var burnFontSize: BurnFontSize { BurnFontSize(rawValue: burnFontSizeRaw) ?? .medium }
+    var burnTextColor: BurnTextColor { BurnTextColor(rawValue: burnTextColorRaw) ?? .white }
+
+    func requestBurnSubtitles() {
+        guard transcript != nil else { return }
+        burnSheetOpen = true
+    }
+
     func burnSubtitlesIntoVideo() {
         guard let transcript else { return }
-        Task { [weak self] in
+        let style = SubtitleBurner.Style.make(fontSize: burnFontSize, textColor: burnTextColor, outline: burnOutline)
+        let burn = burnOperation ?? { transcript, video, output, style, progress in
+            try await SubtitleBurner.burn(transcript: transcript, video: video, to: output, style: style, progress: progress)
+        }
+        burnTask?.cancel()
+        burnTask = Task { [weak self] in
             guard let self else { return }
             let inputURLs = await self.filePicker.chooseInputFiles(
                 allowedTypes: [.movie, .mpeg4Movie, .quickTimeMovie],
                 allowsMultiple: false,
                 message: "Pick the video to burn subtitles into."
             )
-            guard let videoURL = inputURLs.first else { return }
+            guard let videoURL = inputURLs.first else { self.burnTask = nil; return }
             let suggested = videoURL.deletingPathExtension().lastPathComponent + " (captioned).mp4"
             guard let outputURL = await self.filePicker.chooseSaveDestination(
                 suggestedName: suggested,
                 allowedTypes: [.mpeg4Movie]
-            ) else { return }
+            ) else { self.burnTask = nil; return }
 
-            let snapshot = transcript
-            self.phase = .transcribing(file: outputURL)
+            self.phase = .exporting(progress: 0)
             do {
-                try await SubtitleBurner.burn(transcript: snapshot, video: videoURL, to: outputURL)
+                try await burn(transcript, videoURL, outputURL, style) { fraction in
+                    Task { @MainActor [weak self] in
+                        guard let self, case .exporting = self.phase else { return }
+                        self.phase = .exporting(progress: fraction)
+                    }
+                }
                 self.phase = .ready
+            } catch is CancellationError {
+                try? FileManager.default.removeItem(at: outputURL)
+                self.phase = self.transcript != nil ? .ready : .idle
             } catch {
                 self.phase = .failed(message: "Burn failed: \(error.localizedDescription)")
             }
+            if !Task.isCancelled { self.burnTask = nil }
         }
     }
 

@@ -32,11 +32,13 @@ public enum SubtitleBurner {
         }
     }
 
+    /// Burns the transcript into a copy of the video, reporting export progress (0–1) roughly twice a second.
     public static func burn(
         transcript: Transcript,
         video: URL,
         to output: URL,
-        style: Style = Style()
+        style: Style = Style(),
+        progress: (@Sendable (Double) -> Void)? = nil
     ) async throws {
         guard FileManager.default.fileExists(atPath: video.path) else {
             throw ParolaError.audioLoadFailed(video, underlying: "video file does not exist")
@@ -106,9 +108,23 @@ public enum SubtitleBurner {
         export.videoComposition = videoComposition
         export.shouldOptimizeForNetworkUse = true
 
+        var progressTask: Task<Void, Never>?
+        if let progress, #available(macOS 15, iOS 18, *) {
+            let states = export.states(updateInterval: 0.5)
+            progressTask = Task {
+                for await state in states {
+                    if case .exporting(let exportProgress) = state {
+                        progress(exportProgress.fractionCompleted)
+                    }
+                }
+            }
+        }
+        defer { progressTask?.cancel() }
+
         do {
             try await export.export(to: output, as: .mp4)
         } catch {
+            if error is CancellationError || Task.isCancelled { throw CancellationError() }
             throw ParolaError.ioError("Export failed: \(error.localizedDescription)")
         }
     }
