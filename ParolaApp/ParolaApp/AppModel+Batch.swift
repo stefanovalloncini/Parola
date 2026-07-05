@@ -121,6 +121,21 @@ extension AppModel {
         }
     }
 
+    nonisolated static func batchExporter(
+        for format: ExportFormat,
+        includeTimestamps: Bool,
+        captionLength: CaptionLength,
+        htmlTheme: HtmlExportTheme
+    ) -> any TranscriptExporter {
+        switch format {
+        case .srt:  SrtExporter(options: SubtitleOptions(captionLength: captionLength))
+        case .vtt:  VttExporter(options: SubtitleOptions(captionLength: captionLength))
+        case .md:   MarkdownExporter(options: MarkdownOptions(showTimestamps: includeTimestamps))
+        case .html: HtmlExporter(options: HtmlOptions(theme: htmlTheme, showTimestamps: includeTimestamps))
+        default:    Exporters.exporter(for: format)
+        }
+    }
+
     private func writeBatchExports(transcript: Transcript, sourceURL: URL) {
         let formats = batchExportFormats
         guard !formats.isEmpty else { return }
@@ -131,14 +146,17 @@ extension AppModel {
             return (format, url, opts.includeTimestamps)
         }
         guard !plans.isEmpty else { return }
+        let captionLength = subtitleCaptionLength
+        let htmlTheme = HtmlExportTheme(rawValue: htmlExportThemeRaw) ?? .light
         Task.detached {
             for (format, target, includeTimestamps) in plans {
                 do {
-                    let exporter: any TranscriptExporter = switch format {
-                    case .md:   MarkdownExporter(options: MarkdownOptions(showTimestamps: includeTimestamps))
-                    case .html: HtmlExporter(options: HtmlOptions(showTimestamps: includeTimestamps))
-                    default:    Exporters.exporter(for: format)
-                    }
+                    let exporter = AppModel.batchExporter(
+                        for: format,
+                        includeTimestamps: includeTimestamps,
+                        captionLength: captionLength,
+                        htmlTheme: htmlTheme
+                    )
                     let data = try exporter.render(transcript)
                     try data.write(to: target, options: .atomic)
                 } catch {

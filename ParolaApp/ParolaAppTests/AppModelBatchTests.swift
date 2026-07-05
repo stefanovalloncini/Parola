@@ -266,6 +266,25 @@ struct AppModelBatchTests {
         #expect(read == options)
     }
 
+    @Test("batch exporters honor caption length, HTML theme, and per-batch timestamps")
+    func batchExporterHonorsSharedOptions() {
+        let srt = AppModel.batchExporter(for: .srt, includeTimestamps: false, captionLength: .short, htmlTheme: .dark)
+        #expect((srt as? SrtExporter)?.options.captionLength == .short)
+
+        let vtt = AppModel.batchExporter(for: .vtt, includeTimestamps: false, captionLength: .medium, htmlTheme: .dark)
+        #expect((vtt as? VttExporter)?.options.captionLength == .medium)
+
+        let html = AppModel.batchExporter(for: .html, includeTimestamps: true, captionLength: .none, htmlTheme: .sepia)
+        #expect((html as? HtmlExporter)?.options.theme == .sepia)
+        #expect((html as? HtmlExporter)?.options.showTimestamps == true)
+
+        let md = AppModel.batchExporter(for: .md, includeTimestamps: true, captionLength: .none, htmlTheme: .light)
+        #expect((md as? MarkdownExporter)?.options.showTimestamps == true)
+
+        let txt = AppModel.batchExporter(for: .txt, includeTimestamps: false, captionLength: .none, htmlTheme: .light)
+        #expect(txt.format == .txt)
+    }
+
     @Test("a completed batch job is post-processed before it is stored and shown")
     func completedBatchJobIsPostProcessed() async {
         let model = makeModel()
