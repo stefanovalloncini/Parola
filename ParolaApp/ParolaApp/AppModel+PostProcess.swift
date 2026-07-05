@@ -55,10 +55,7 @@ extension AppModel {
         for (from, to) in nonEmpty {
             transcript = transcript.renamingSpeaker(from, to: to)
         }
-        self.transcript = transcript
-        if let id = selectedEntryID {
-            Task { [library] in try? await library.updateTranscript(transcript, for: id) }
-        }
+        applyTranscriptEdit(transcript, actionName: String(localized: "Rename Speaker"))
         Task { [peopleStore] in
             for to in nonEmpty.values {
                 _ = await peopleStore.recordUsage(name: to)

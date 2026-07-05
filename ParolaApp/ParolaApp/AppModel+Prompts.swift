@@ -65,8 +65,10 @@ extension AppModel {
         actionItems = []
     }
 
-    /// Drops LLM output tied to the previous transcript. Call wherever a different transcript installs.
+    /// Drops LLM output and undo history tied to the previous transcript. Call wherever a different transcript installs.
     func clearDerivedArtifacts() {
+        // Whole stack, not just our target: field-editor typing undo shares the window's manager and is stale context too.
+        undoManager?.removeAllActions()
         if promptOutput != nil { promptOutput = nil }
         if !actionItems.isEmpty { actionItems = [] }
         if !smartChapters.isEmpty { smartChapters = [] }

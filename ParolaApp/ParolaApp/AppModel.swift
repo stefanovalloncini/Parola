@@ -302,7 +302,7 @@ final class AppModel {
 
     // MARK: - People (speakers)
 
-    @ObservationIgnored let peopleStore = PeopleStore()
+    @ObservationIgnored let peopleStore: PeopleStore
     var showingSpeakersSheet: Bool = false
 
     // MARK: - Prompt library
@@ -714,6 +714,7 @@ final class AppModel {
     @ObservationIgnored var pendingTranscriptSaveTask: Task<Void, Never>?
     @ObservationIgnored var pendingTranscriptSaveGeneration: Int = 0
     @ObservationIgnored private var pendingSaveTextChanged = false
+    @ObservationIgnored weak var undoManager: UndoManager?
     static let trashRetentionDays = 30
 
     // MARK: - Engine
@@ -889,6 +890,11 @@ final class AppModel {
         self.mode = bootstrap.mode
         self.clock = bootstrap.clock
         self.library = LibraryStore(libraryURL: bootstrap.library ?? LibraryStore.defaultLibraryURL)
+        // A --library override (tests, sandbox) must keep people suggestions out of the real store too.
+        self.peopleStore = PeopleStore(
+            storageURL: bootstrap.library.map { $0.appendingPathComponent("People.json") }
+                ?? PeopleStore.defaultStorageURL
+        )
         // Suppress the settings didSets during the bulk read: side effects (notably startDictation)
         // must wait until after wireDictationController + the gated side-effect block below, or the
         // dictation coordinator is built before appModel is wired.
@@ -1827,6 +1833,33 @@ final class AppModel {
 
     // MARK: - Editing
 
+    /// The single seam for user edits to the transcript: installs the new value, schedules the
+    /// debounced persist, and registers an inverse edit with the window's undo manager.
+    func applyTranscriptEdit(_ new: Transcript, actionName: String, textChanged: Bool = true) {
+        guard let old = transcript, old != new else { return }
+        transcript = new
+        persistCurrentTranscriptIfLoaded(textChanged: textChanged)
+        registerTranscriptUndo(restoring: old, actionName: actionName, textChanged: textChanged)
+    }
+
+    private func registerTranscriptUndo(restoring old: Transcript, actionName: String, textChanged: Bool) {
+        guard let undoManager else { return }
+        let entryID = selectedEntryID
+        // Only group explicitly when event grouping is off (tests): nesting inside the window's per-event group would leave that group unnamed, and the Edit menu title reads the top-level group's name.
+        let opensGroup = !undoManager.groupsByEvent && !undoManager.isUndoing && !undoManager.isRedoing
+            && undoManager.groupingLevel == 0
+        if opensGroup { undoManager.beginUndoGrouping() }
+        undoManager.registerUndo(withTarget: self) { model in
+            // Undo always fires on the thread that calls undo()/redo(), which is the main thread here.
+            MainActor.assumeIsolated {
+                guard model.selectedEntryID == entryID else { return }
+                model.applyTranscriptEdit(old, actionName: actionName, textChanged: textChanged)
+            }
+        }
+        undoManager.setActionName(actionName)
+        if opensGroup { undoManager.endUndoGrouping() }
+    }
+
     func editSegment(id: TranscriptSegment.ID, newText: String) {
         guard var t = transcript else { return }
         guard let idx = t.segments.firstIndex(where: { $0.id == id }) else { return }
@@ -1834,17 +1867,13 @@ final class AppModel {
         guard !trimmed.isEmpty, trimmed != t.segments[idx].text else { return }
         t.segments[idx].text = trimmed
         t.segments[idx].words = nil
-        transcript = t
-        persistCurrentTranscriptIfLoaded()
+        applyTranscriptEdit(t, actionName: String(localized: "Edit Segment"))
     }
 
     func deleteSegment(id: TranscriptSegment.ID) {
         guard var t = transcript else { return }
-        let before = t.segments.count
         t.segments.removeAll { $0.id == id }
-        guard t.segments.count != before else { return }
-        transcript = t
-        persistCurrentTranscriptIfLoaded()
+        applyTranscriptEdit(t, actionName: String(localized: "Delete Segment"))
     }
 
     func nudgeSegmentStart(id: TranscriptSegment.ID, frames: Int) {
@@ -1852,8 +1881,7 @@ final class AppModel {
         t.segments = SegmentTimingNudge.nudgeStart(
             segments: t.segments, id: id, frameDelta: frames, fps: subtitleFPS
         )
-        transcript = t
-        persistCurrentTranscriptIfLoaded(textChanged: false)
+        applyTranscriptEdit(t, actionName: String(localized: "Adjust Timing"), textChanged: false)
     }
 
     func nudgeSegmentEnd(id: TranscriptSegment.ID, frames: Int) {
@@ -1861,8 +1889,7 @@ final class AppModel {
         t.segments = SegmentTimingNudge.nudgeEnd(
             segments: t.segments, id: id, frameDelta: frames, fps: subtitleFPS
         )
-        transcript = t
-        persistCurrentTranscriptIfLoaded(textChanged: false)
+        applyTranscriptEdit(t, actionName: String(localized: "Adjust Timing"), textChanged: false)
     }
 
     /// Schedules a debounced (~1 s) persist of the current transcript. Rapid edits coalesce: only the

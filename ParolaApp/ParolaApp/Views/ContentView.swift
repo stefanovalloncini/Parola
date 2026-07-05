@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.undoManager) private var windowUndoManager
 
     var body: some View {
         NavigationSplitView {
@@ -28,6 +29,8 @@ struct ContentView: View {
         } message: {
             if let warning = model.nonFatalWarning { Text(warning) }
         }
+        .onAppear { model.undoManager = windowUndoManager }
+        .onChange(of: windowUndoManager) { _, newValue in model.undoManager = newValue }
         .axBranch("App")
     }
 }

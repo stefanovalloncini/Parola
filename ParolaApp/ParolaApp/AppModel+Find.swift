@@ -53,16 +53,20 @@ extension AppModel {
     func replaceCurrentMatch() {
         guard let transcript, !matches.isEmpty else { return }
         let match = matches[currentMatchIndex]
-        self.transcript = transcript.applying(replacement: findReplacement, to: match)
+        applyTranscriptEdit(
+            transcript.applying(replacement: findReplacement, to: match),
+            actionName: String(localized: "Replace")
+        )
         recomputeMatches()
-        persistCurrentTranscriptIfLoaded()
     }
 
     func replaceAllMatches() {
         guard let transcript, !findQuery.isEmpty else { return }
-        self.transcript = transcript.replacingAll(findQuery, with: findReplacement, caseSensitive: findCaseSensitive)
+        applyTranscriptEdit(
+            transcript.replacingAll(findQuery, with: findReplacement, caseSensitive: findCaseSensitive),
+            actionName: String(localized: "Replace All")
+        )
         recomputeMatches()
-        persistCurrentTranscriptIfLoaded()
     }
 
     private func snapToCurrentMatch() {
