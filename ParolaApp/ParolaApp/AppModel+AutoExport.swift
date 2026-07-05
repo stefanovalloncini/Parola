@@ -12,7 +12,7 @@ extension AppModel {
         writeJSON(autoExportRules, forKey: "autoExportRules")
     }
 
-    func runAutoExports(transcript: Transcript, sourceURL: URL) {
+    func runAutoExports(transcript: Transcript, sourceURL: URL, skippingTargets: Set<URL> = []) {
         let formats = AutoExportEngine.plannedFormats(
             rules: autoExportRules,
             sourceExtension: sourceURL.pathExtension
@@ -25,6 +25,7 @@ extension AppModel {
             for format in formats {
                 do {
                     let target = sourceURL.deletingPathExtension().appendingPathExtension(format.fileExtension)
+                    guard !skippingTargets.contains(target) else { continue }
                     let exporter: any TranscriptExporter = switch format {
                     case .srt:  SrtExporter(options: SubtitleOptions(captionLength: captionLength))
                     case .vtt:  VttExporter(options: SubtitleOptions(captionLength: captionLength))

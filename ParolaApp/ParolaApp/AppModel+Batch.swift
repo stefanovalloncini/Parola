@@ -88,7 +88,8 @@ extension AppModel {
             mutateBatchJob(id) { $0.status = .done; $0.transcript = processed; $0.progress = 1 }
             if id == selectedBatchJobID { selectedEntryID = nil; self.transcript = processed }
             if let job = batchJobs.first(where: { $0.id == id }) {
-                writeBatchExports(transcript: processed, sourceURL: job.url)
+                let sidecarTargets = writeBatchExports(transcript: processed, sourceURL: job.url)
+                runAutoExports(transcript: processed, sourceURL: job.url, skippingTargets: sidecarTargets)
             }
         case .failed(let id, let reason):
             guard !isCancelled(id) else { return }
@@ -136,16 +137,17 @@ extension AppModel {
         }
     }
 
-    private func writeBatchExports(transcript: Transcript, sourceURL: URL) {
+    @discardableResult
+    private func writeBatchExports(transcript: Transcript, sourceURL: URL) -> Set<URL> {
         let formats = batchExportFormats
-        guard !formats.isEmpty else { return }
+        guard !formats.isEmpty else { return [] }
         let plans: [(ExportFormat, URL, Bool)] = formats.compactMap { format in
             let opts = options(for: format)
             guard opts.writeToSourceFolder else { return nil }
             let url = sourceURL.deletingPathExtension().appendingPathExtension(format.fileExtension)
             return (format, url, opts.includeTimestamps)
         }
-        guard !plans.isEmpty else { return }
+        guard !plans.isEmpty else { return [] }
         let captionLength = subtitleCaptionLength
         let htmlTheme = HtmlExportTheme(rawValue: htmlExportThemeRaw) ?? .light
         Task.detached {
@@ -164,6 +166,7 @@ extension AppModel {
                 }
             }
         }
+        return Set(plans.map { $0.1 })
     }
 
     func addBatchFiles(_ urls: [URL]) {

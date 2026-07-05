@@ -310,6 +310,67 @@ struct AppModelBatchTests {
         #expect(model.batchJobs[0].status == .done)
     }
 
+    private static func makeScratchDirectory() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AppModelBatchTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    private static func waitForFile(at url: URL, timeout: TimeInterval = 3) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if FileManager.default.fileExists(atPath: url.path) { return true }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return FileManager.default.fileExists(atPath: url.path)
+    }
+
+    @Test("a completed batch job runs the auto-export rules for its source")
+    func completedBatchJobRunsAutoExportRules() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let model = makeModel()
+        model.batchExportFormats = []
+        model.autoExportRules = [AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.txt])]
+        let source = scratch.appendingPathComponent("clip.wav")
+        try Data("fake".utf8).write(to: source)
+        let job = BatchJob(url: source, status: .transcribing)
+        model.batchJobs = [job]
+
+        await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+
+        let written = await Self.waitForFile(at: scratch.appendingPathComponent("clip.txt"))
+        #expect(written)
+    }
+
+    @Test("batch sidecars win over auto-export rules for the same target")
+    func batchSidecarWinsOverAutoExportRule() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let model = makeModel()
+        model.batchExportFormats = [.md]
+        model.setOptions(BatchExportFormatOptions(writeToSourceFolder: true, includeTimestamps: true), for: .md)
+        model.markdownTimestamps = false
+        model.autoExportRules = [AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.md, .txt])]
+        let source = scratch.appendingPathComponent("clip.wav")
+        try Data("fake".utf8).write(to: source)
+        let job = BatchJob(url: source, status: .transcribing)
+        model.batchJobs = [job]
+
+        await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+
+        let mdURL = scratch.appendingPathComponent("clip.md")
+        let mdWritten = await Self.waitForFile(at: mdURL)
+        let txtWritten = await Self.waitForFile(at: scratch.appendingPathComponent("clip.txt"))
+        #expect(mdWritten)
+        #expect(txtWritten)
+        let markdown = try String(contentsOf: mdURL, encoding: .utf8)
+        #expect(markdown.contains("*["))
+    }
+
     @Test("cancelCurrentWork marks all in-flight batch jobs cancelled and returns phase to idle")
     func cancelCurrentWorkMarksBatchJobsCancelled() async {
         let model = makeModel()
