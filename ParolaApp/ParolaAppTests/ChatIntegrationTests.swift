@@ -207,6 +207,29 @@ struct ChatIntegrationTests {
         #expect(model.isSummarising == false)
     }
 
+    @Test("summariseTranscript writes the summary into the open library entry")
+    func summarisePersistsToLibraryEntry() async throws {
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let transcript = makeTranscript()
+        let seeded = try await seedStore.add(transcript: transcript, audioSource: nil, category: .transcription)
+        model.transcript = transcript
+        model.selectedEntryID = seeded.id
+        model.summariseOperation = { _ in Summary(text: "persisted summary", chapters: []) }
+
+        model.summariseTranscript()
+        try await waitUntil { !model.isSummarising }
+        #expect(model.transcript?.summary?.text == "persisted summary")
+
+        var stored: Summary?
+        let deadline = ContinuousClock().now.advanced(by: .seconds(2))
+        while stored == nil, ContinuousClock().now < deadline {
+            stored = try await model.library.load(seeded.id).document.transcript.summary
+            if stored == nil { try await Task.sleep(for: .milliseconds(10)) }
+        }
+        #expect(stored?.text == "persisted summary")
+    }
+
     private func waitUntil(
         within timeout: Duration = .seconds(2),
         _ condition: @MainActor () -> Bool

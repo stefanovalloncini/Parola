@@ -85,6 +85,34 @@ struct AppModelLibraryTests {
         #expect(model.transcript?.segments.first?.text == "hello")
     }
 
+    @Test("loadEntry clears artifacts derived from the previous transcript")
+    func loadEntryClearsDerivedArtifacts() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        model.promptOutput = AppModel.PromptOutput(promptName: "p", text: "stale")
+        model.actionItems = [ActionItem(task: "stale task")]
+        model.smartChapters = [Chapter(title: "stale chapter", start: 0)]
+
+        model.loadEntry(seeded.id)
+        for _ in 0..<200 where model.selectedEntryID != seeded.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(model.selectedEntryID == seeded.id)
+        #expect(model.promptOutput == nil)
+        #expect(model.actionItems.isEmpty)
+        #expect(model.smartChapters.isEmpty)
+    }
+
     @Test("newest sort orders by createdAt descending")
     func sortNewest() {
         let model = makeModel()

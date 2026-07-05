@@ -1194,6 +1194,7 @@ final class AppModel {
                 )
                 try Task.checkCancellation()
                 let processed = await postProcessDetached(result)
+                clearDerivedArtifacts()
                 selectedEntryID = nil
                 transcript = processed
                 filePartialText = ""
@@ -1342,6 +1343,7 @@ final class AppModel {
                 )
                 try Task.checkCancellation()
                 let processed = await postProcessDetached(result)
+                clearDerivedArtifacts()
                 selectedEntryID = nil
                 transcript = processed
                 phase = .ready
@@ -1365,6 +1367,7 @@ final class AppModel {
                 let result = try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: selectedLanguage)
                 try Task.checkCancellation()
                 let processed = await postProcessDetached(result)
+                clearDerivedArtifacts()
                 selectedEntryID = nil
                 transcript = processed
                 phase = .ready
@@ -1680,6 +1683,7 @@ final class AppModel {
             drainDeferredArrivals()
         case .finished(let transcript):
             let processed = await postProcessDetached(transcript)
+            clearDerivedArtifacts()
             self.selectedEntryID = nil
             self.transcript = processed
             self.livePartialText = ""
@@ -1723,6 +1727,7 @@ final class AppModel {
                     options: currentOptions
                 )
                 let processed = await postProcessDetached(result)
+                clearDerivedArtifacts()
                 selectedEntryID = nil
                 transcript = processed
                 phase = .ready
@@ -1848,6 +1853,7 @@ final class AppModel {
     func openProjectDocument(at url: URL) async {
         do {
             let doc = try await Task.detached { try ParolaDocument.read(at: url) }.value
+            clearDerivedArtifacts()
             sourceFileURL = doc.audioURL
             transcript = doc.transcript
             if let audio = doc.audioURL {
@@ -1900,6 +1906,11 @@ final class AppModel {
                 guard self.selectedEntryID == entryID else { isSummarising = false; return }
                 self.transcript?.summary = summary
                 isSummarising = false
+                if let entryID, let updated = self.transcript {
+                    Task { [library] in
+                        try? await library.updateTranscript(updated, for: entryID, reindex: false)
+                    }
+                }
             } catch {
                 guard let self, generation == summaryGeneration else { return }
                 summaryError = error.localizedDescription

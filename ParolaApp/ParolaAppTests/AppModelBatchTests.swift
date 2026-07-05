@@ -536,6 +536,45 @@ struct AppModelBatchTests {
         #expect(model.selectedEntryID == nil)
     }
 
+    private static func installStaleArtifacts(on model: AppModel) {
+        model.promptOutput = AppModel.PromptOutput(promptName: "p", text: "stale")
+        model.actionItems = [ActionItem(task: "stale task")]
+        model.smartChapters = [Chapter(title: "stale chapter", start: 0)]
+    }
+
+    private static func expectArtifactsCleared(on model: AppModel) {
+        #expect(model.promptOutput == nil)
+        #expect(model.actionItems.isEmpty)
+        #expect(model.smartChapters.isEmpty)
+    }
+
+    @Test("selecting a batch job clears artifacts derived from the previous transcript")
+    func selectBatchJobClearsDerivedArtifacts() async {
+        let model = makeModel()
+        model.startBatch(urls: [URL(fileURLWithPath: "/tmp/a.wav")])
+        let jobID = model.batchJobs[0].id
+        await model.handleBatchEvent(.started(jobID: jobID))
+        await model.handleBatchEvent(.completed(jobID: jobID, transcript: Self.makeTranscript()))
+
+        Self.installStaleArtifacts(on: model)
+        model.selectBatchJob(jobID)
+        Self.expectArtifactsCleared(on: model)
+
+        Self.installStaleArtifacts(on: model)
+        model.openBatchJobTranscript(jobID)
+        Self.expectArtifactsCleared(on: model)
+    }
+
+    @Test("a finished recording clears artifacts derived from the previous transcript")
+    func streamingFinishClearsDerivedArtifacts() async {
+        let model = makeModel()
+        Self.installStaleArtifacts(on: model)
+
+        await model.handleStreamingEvent(.finished(Self.makeTranscript()))
+
+        Self.expectArtifactsCleared(on: model)
+    }
+
     @Test("arrivals during recording defer instead of stomping capture")
     func recordingDefersArrivals() {
         let model = makeModel()

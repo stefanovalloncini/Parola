@@ -65,6 +65,13 @@ extension AppModel {
         actionItems = []
     }
 
+    /// Drops LLM output tied to the previous transcript. Call wherever a different transcript installs.
+    func clearDerivedArtifacts() {
+        if promptOutput != nil { promptOutput = nil }
+        if !actionItems.isEmpty { actionItems = [] }
+        if !smartChapters.isEmpty { smartChapters = [] }
+    }
+
     func extractSmartChapters() {
         guard let transcript = self.transcript else { return }
         guard !isExtractingChapters else { return }

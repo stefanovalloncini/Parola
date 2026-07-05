@@ -223,6 +223,7 @@ extension AppModel {
     func clearLoadedEntry() {
         pendingTranscriptSaveTask?.cancel()
         pendingTranscriptSaveTask = nil
+        clearDerivedArtifacts()
         selectedEntryID = nil
         transcript = nil
         sourceFileURL = nil
@@ -276,6 +277,7 @@ extension AppModel {
             await flushPendingTranscriptSave()
             do {
                 let loaded = try await library.load(id)
+                clearDerivedArtifacts()
                 transcript = loaded.document.transcript
                 sourceFileURL = loaded.document.audioURL
                 selectedEntryID = id

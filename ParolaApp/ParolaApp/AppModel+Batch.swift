@@ -86,7 +86,11 @@ extension AppModel {
             guard !isCancelled(id) else { return }
             let processed = await postProcessDetached(transcript)
             mutateBatchJob(id) { $0.status = .done; $0.transcript = processed; $0.progress = 1 }
-            if id == selectedBatchJobID { selectedEntryID = nil; self.transcript = processed }
+            if id == selectedBatchJobID {
+                clearDerivedArtifacts()
+                selectedEntryID = nil
+                self.transcript = processed
+            }
             if let job = batchJobs.first(where: { $0.id == id }) {
                 let sidecarTargets = writeBatchExports(transcript: processed, sourceURL: job.url)
                 runAutoExports(transcript: processed, sourceURL: job.url, skippingTargets: sidecarTargets)
@@ -294,6 +298,7 @@ extension AppModel {
         selectedBatchJobID = id
         if let job = batchJobs.first(where: { $0.id == id }), let t = job.transcript {
             let pending = cancelAndDrainPendingTranscriptSave()
+            clearDerivedArtifacts()
             selectedEntryID = nil
             transcript = t
             installPlayer(for: job.url)
@@ -343,6 +348,7 @@ extension AppModel {
     func openBatchJobTranscript(_ id: BatchJob.ID) {
         guard let job = batchJobs.first(where: { $0.id == id }), let t = job.transcript else { return }
         selectedBatchJobID = id
+        clearDerivedArtifacts()
         selectedEntryID = nil
         transcript = t
         installPlayer(for: job.url)
