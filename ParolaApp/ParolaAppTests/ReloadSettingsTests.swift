@@ -219,6 +219,49 @@ struct ReloadSettingsTests {
         #expect(model.autoPauseMediaWhileRecording == false)
     }
 
+    @Test("bridge reload action starts/stops only on a normal launch that wired the bridge")
+    func bridgeReloadActionMatrix() {
+        let bridge: Set<BootstrapSideEffect> = [.automationBridge]
+        #expect(AppModel.bridgeReloadAction(sideEffects: bridge, mode: .normal, enabled: true, running: false) == .start)
+        #expect(AppModel.bridgeReloadAction(sideEffects: bridge, mode: .normal, enabled: false, running: true) == .stop)
+        #expect(AppModel.bridgeReloadAction(sideEffects: bridge, mode: .normal, enabled: true, running: true) == .keep)
+        #expect(AppModel.bridgeReloadAction(sideEffects: bridge, mode: .normal, enabled: false, running: false) == .keep)
+        #expect(AppModel.bridgeReloadAction(sideEffects: [], mode: .normal, enabled: true, running: false) == .keep)
+        #expect(AppModel.bridgeReloadAction(sideEffects: bridge, mode: .test, enabled: false, running: true) == .keep)
+        #expect(AppModel.bridgeReloadAction(sideEffects: bridge, mode: .test, enabled: true, running: false) == .keep)
+    }
+
+    @Test("reloadSettings leaves the test-mode bridge alone")
+    func reloadKeepsTestModeBridge() {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        defaults.set(false, forKey: "automationBridgeEnabled")
+        let bootstrap = AppBootstrap(
+            mode: .test,
+            library: makeTempLibraryURL("reload-bridge"),
+            defaultsOverride: defaults,
+            sideEffects: [.automationBridge],
+            filePicker: TestFilePicker()
+        )
+        let model = AppModel(bootstrap: bootstrap)
+        #expect(model.automationBridgeRunning == false)
+
+        defaults.set(true, forKey: "automationBridgeEnabled")
+        model.reloadSettings()
+
+        #expect(model.automationBridgeRunning == false)
+    }
+
+    @Test("reloadSettings never starts the bridge when the launch didn't wire it")
+    func reloadWithoutBridgeSideEffectDoesNotStart() {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let model = makeModel(defaults)
+        defaults.set(true, forKey: "automationBridgeEnabled")
+
+        model.reloadSettings()
+
+        #expect(model.automationBridgeRunning == false)
+    }
+
     @Test("reloading clears in-memory snippets once the defaults key is gone")
     func snippetsResetWhenKeyAbsent() {
         let defaults = UserDefaults(suiteName: "test-\(UUID())")!

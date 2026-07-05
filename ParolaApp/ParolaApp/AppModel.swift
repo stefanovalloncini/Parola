@@ -117,7 +117,12 @@ final class AppModel {
             if !isReloadingSettings { applyDictationCleanupPromptChange() }
         }
     }
-    var dictationPasteDelayMs: Int = 0 { didSet { defaults.set(dictationPasteDelayMs, forKey: "dictationPasteDelayMs") } }
+    var dictationPasteDelayMs: Int = 0 {
+        didSet {
+            defaults.set(dictationPasteDelayMs, forKey: "dictationPasteDelayMs")
+            if !isReloadingSettings { restartDictation() }
+        }
+    }
     var dictationContextSelection: Bool = false {
         didSet {
             defaults.set(dictationContextSelection, forKey: "dictationContextSelection")
@@ -503,6 +508,16 @@ final class AppModel {
         if activeSideEffects.contains(.meetingDetector) {
             meetingDetector.isEnabled = (defaults.object(forKey: "meetingDetectorEnabled") as? Bool) ?? true
         }
+        switch AppModel.bridgeReloadAction(
+            sideEffects: activeSideEffects,
+            mode: mode,
+            enabled: automationBridgeEnabled,
+            running: automationBridgeRunning
+        ) {
+        case .start: startAutomationBridge()
+        case .stop: stopAutomationBridge()
+        case .keep: break
+        }
         if activeSideEffects.contains(.watchedFolders), mode != .test,
            defaults.data(forKey: "watchedFolders") != watchedFoldersBefore {
             SettingsRelaunch.promptToApply("Quit and relaunch Parola to apply watched-folder changes.")
@@ -822,6 +837,19 @@ final class AppModel {
     private func applyLiveCaptionsTranslateChange() {
         let enabled = liveCaptionsTranslate
         Task { await liveCaptions?.setTranslate(enabled) }
+    }
+
+    enum BridgeReloadAction: Equatable { case start, stop, keep }
+
+    // Test-mode bridges are launch-owned: the harness that issued the import/reset is talking through one.
+    static func bridgeReloadAction(
+        sideEffects: Set<BootstrapSideEffect>,
+        mode: AppBootstrap.Mode,
+        enabled: Bool,
+        running: Bool
+    ) -> BridgeReloadAction {
+        guard sideEffects.contains(.automationBridge), mode == .normal, enabled != running else { return .keep }
+        return enabled ? .start : .stop
     }
 
     func startAutomationBridge() {

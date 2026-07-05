@@ -286,6 +286,21 @@ struct AppModelDictationTests {
         model.stopDictation()
     }
 
+    @Test("changing the paste delay re-applies to a running session")
+    func pasteDelayChangeReappliesToRunningSession() {
+        let model = makeModel()
+        model.dictationEnabled = true
+        #expect(model.dictationController.isRunning)
+        #expect(model.dictationController.configuration?.pasteDelayMs == 0)
+
+        model.dictationPasteDelayMs = 250
+
+        #expect(model.dictationController.isRunning)
+        #expect(model.dictationController.configuration?.pasteDelayMs == 250)
+
+        model.stopDictation()
+    }
+
     @Test("prewarm candidate is the model only for installed streaming WhisperKit variants")
     func prewarmCandidateGates() {
         let whisper = "openai_whisper-large-v3_turbo"
