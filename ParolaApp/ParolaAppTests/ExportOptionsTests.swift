@@ -30,7 +30,7 @@ struct ExportOptionsTests {
     @Test("formats with real exporter options ask for the sheet, the rest skip it")
     func formatsWithOptions() {
         let withSheet: [ExportFormat] = [.txt, .md, .html, .srt, .vtt]
-        let without: [ExportFormat] = [.json, .jsonl, .csv, .tsv, .docx, .pdf]
+        let without: [ExportFormat] = [.json, .jsonl, .csv, .tsv, .docx, .pdf, .fcpxml]
         for format in withSheet {
             #expect(AppModel.exportHasOptions(format), "\(format.rawValue) should offer options")
         }

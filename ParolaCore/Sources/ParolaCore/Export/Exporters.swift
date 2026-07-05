@@ -12,6 +12,7 @@ public enum ExportFormat: String, CaseIterable, Sendable, Codable, Identifiable 
     case tsv
     case docx
     case pdf
+    case fcpxml
 
     public var id: String { rawValue }
     public var fileExtension: String { rawValue }
@@ -48,6 +49,7 @@ public enum Exporters {
         case .tsv:  return TsvExporter()
         case .docx: return DocxExporter()
         case .pdf:  return PdfExporter()
+        case .fcpxml: return FcpxmlExporter()
         }
     }
 }

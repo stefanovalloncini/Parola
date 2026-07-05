@@ -130,6 +130,7 @@ struct BatchFormatCard: View {
         case .tsv: return "TSV"
         case .docx: return "Word Document"
         case .pdf: return "PDF"
+        case .fcpxml: return "Final Cut Pro XML"
         }
     }
 
