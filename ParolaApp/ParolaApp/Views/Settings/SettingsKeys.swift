@@ -6,6 +6,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     case customization
     case watchedFolders
     case recordMeetings
+    case shortcuts
     case microphone
     case liveCaptions
     case dictation
@@ -32,6 +33,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .customization: return "Customization"
         case .watchedFolders: return "Watched Folders"
         case .recordMeetings: return "Record Meetings"
+        case .shortcuts: return "Shortcuts"
         case .microphone: return "Microphone"
         case .liveCaptions: return "Live Captions"
         case .dictation: return "Dictation"
@@ -58,6 +60,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .customization: return String(localized: "Customization")
         case .watchedFolders: return String(localized: "Watched Folders")
         case .recordMeetings: return String(localized: "Record Meetings")
+        case .shortcuts: return String(localized: "Shortcuts")
         case .microphone: return String(localized: "Microphone")
         case .liveCaptions: return String(localized: "Live Captions")
         case .dictation: return String(localized: "Dictation")
@@ -85,6 +88,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .customization: return ["appearance", "theme", "light", "dark", "density", "sidebar", "monospaced", "accent", "color", "terracotta"]
         case .watchedFolders: return ["watch", "folder", "auto", "drop"]
         case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect"]
+        case .shortcuts: return ["hotkey", "key combo", "mic recording", "dictation key", "global"]
         case .microphone: return ["mic", "input device", "vu", "level", "preview"]
         case .liveCaptions: return ["captions", "translate", "live"]
         case .dictation: return ["hotkey", "f5", "push to talk", "toggle", "indicator", "notch", "overlay", "cleanup", "workflows", "per-app"]
@@ -108,15 +112,27 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     var defaultsKeys: [String] {
         switch self {
         case .general:
-            return ["useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt", "diarize"]
+            return [
+                "useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt", "diarize",
+                "showMenuBarExtra", "autoTitleEntries"
+            ]
         case .customization:
-            return ["appTheme", "monospacedTimestamps", "sidebarDensity", "appAccentColor"]
+            return [
+                "appTheme", "monospacedTimestamps", "sidebarDensity", "appAccentColor",
+                "themeIsCustom", "themeCustomPaletteJSON"
+            ]
         case .watchedFolders:
             return ["watchedFolders"]
         case .recordMeetings:
             return ["meetingDetectorEnabled"]
+        case .shortcuts:
+            return ["micHotkeyEnabled", "micHotkeyKeyCode", "micHotkeyModifiers"]
         case .microphone:
-            return ["inputDeviceUID"]
+            return [
+                "inputDeviceUID",
+                "recordingMaxMinutes", "recordingCountInSeconds",
+                "autoMuteWhileRecording", "autoPauseMediaWhileRecording"
+            ]
         case .liveCaptions:
             return ["liveCaptionsTranslate"]
         case .dictation:
@@ -127,7 +143,13 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
                 "dictationKeyModifiers",
                 "dictationIndicatorStyleRaw",
                 "dictationCleanupPromptID",
-                "dictationPerAppOverridesJSON"
+                "dictationPerAppOverridesJSON",
+                "dictationHudOpacity",
+                "dictationStripSelfCorrections",
+                "dictationPasteDelayMs",
+                "dictationContextSelection",
+                "dictationContextClipboard",
+                "dictationContextScreen"
             ]
         case .snippets:
             return ["snippets"]
@@ -136,7 +158,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .translation:
             return ["translate"]
         case .transcriptionDefaults:
-            return ["selectedModel", "selectedLanguageRaw"]
+            return ["selectedModel", "selectedLanguageRaw", "pausePlayerOnAppHidden", "parola.userPrivacyMode"]
         case .ignoredSegments:
             return ["ignoredSegmentRules"]
         case .findReplace:
@@ -144,9 +166,12 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .exportFormats:
             return []
         case .batchExport:
-            return ["batchExportFormats", "batchExportToSourceFolder", "batchExportIncludeTimestamps"]
+            return [
+                "batchExportFormats", "batchExportToSourceFolder", "batchExportIncludeTimestamps",
+                "batchExportFormatOptions"
+            ]
         case .autoExport:
-            return ["autoExportRules"]
+            return ["autoExportRules", "subtitleCaptionLength", "markdownTimestamps", "htmlExportTheme"]
         case .integrations, .prompts:
             return []
         case .automation:
@@ -154,6 +179,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .updates:
             return ["sparkleChannel", "sparkleAutomatic"]
         case .advanced:
+            // parola.modelsStoragePath stays out of every scope: it points at a machine-specific folder.
             return []
         }
     }

@@ -58,7 +58,7 @@ private struct SettingsRouteMeta {
         .customization: SettingsRouteMeta(titleKey: "Customization", symbol: "paintbrush", scope: .customization),
         .watchedFolders: SettingsRouteMeta(titleKey: "Watched Folders", symbol: "folder.badge.gearshape", scope: .watchedFolders),
         .recordMeetings: SettingsRouteMeta(titleKey: "Record Meetings", symbol: "video.bubble", scope: .recordMeetings),
-        .shortcuts: SettingsRouteMeta(titleKey: "Shortcuts", symbol: "command", scope: nil),
+        .shortcuts: SettingsRouteMeta(titleKey: "Shortcuts", symbol: "command", scope: .shortcuts),
         .microphone: SettingsRouteMeta(titleKey: "Microphone", symbol: "mic", scope: .microphone),
         .liveCaptions: SettingsRouteMeta(titleKey: "Live Captions", symbol: "captions.bubble", scope: .liveCaptions),
         .dictation: SettingsRouteMeta(titleKey: "Dictation", symbol: "text.bubble", scope: .dictation),

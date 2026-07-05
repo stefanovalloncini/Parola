@@ -27,6 +27,8 @@ struct SettingsPaneScopeTests {
         #expect(keys.contains("appTheme"))
         #expect(keys.contains("appAccentColor"))
         #expect(keys.contains("sidebarDensity"))
+        #expect(keys.contains("themeIsCustom"))
+        #expect(keys.contains("themeCustomPaletteJSON"))
     }
 
     @Test("the dictation pane resets the full hotkey and override key set")
@@ -35,6 +37,45 @@ struct SettingsPaneScopeTests {
         #expect(keys.contains("dictationEnabled"))
         #expect(keys.contains("dictationKeyCode"))
         #expect(keys.contains("dictationPerAppOverridesJSON"))
+        #expect(keys.contains("dictationHudOpacity"))
+        #expect(keys.contains("dictationStripSelfCorrections"))
+        #expect(keys.contains("dictationPasteDelayMs"))
+        #expect(keys.contains("dictationContextSelection"))
+        #expect(keys.contains("dictationContextClipboard"))
+        #expect(keys.contains("dictationContextScreen"))
+    }
+
+    @Test("the shortcuts pane resets the mic hotkey keys")
+    func shortcutsDefaultsKeys() {
+        let keys = SettingsPaneScope.shortcuts.defaultsKeys
+        #expect(keys.contains("micHotkeyEnabled"))
+        #expect(keys.contains("micHotkeyKeyCode"))
+        #expect(keys.contains("micHotkeyModifiers"))
+    }
+
+    @Test("every user-facing settings key belongs to a pane scope")
+    func userFacingKeysAreScoped() {
+        let scoped = Set(SettingsPaneScope.allCases.flatMap(\.defaultsKeys))
+        let expected = [
+            "showMenuBarExtra", "autoTitleEntries",
+            "themeIsCustom", "themeCustomPaletteJSON",
+            "recordingMaxMinutes", "recordingCountInSeconds",
+            "autoMuteWhileRecording", "autoPauseMediaWhileRecording",
+            "dictationHudOpacity", "dictationStripSelfCorrections", "dictationPasteDelayMs",
+            "dictationContextSelection", "dictationContextClipboard", "dictationContextScreen",
+            "micHotkeyEnabled", "micHotkeyKeyCode", "micHotkeyModifiers",
+            "subtitleCaptionLength", "markdownTimestamps", "htmlExportTheme",
+            "pausePlayerOnAppHidden", "parola.userPrivacyMode", "batchExportFormatOptions",
+        ]
+        for key in expected {
+            #expect(scoped.contains(key), "\(key) is missing from every pane scope")
+        }
+    }
+
+    @Test("the models storage path stays out of every scope")
+    func modelsPathStaysExcluded() {
+        let scoped = Set(SettingsPaneScope.allCases.flatMap(\.defaultsKeys))
+        #expect(scoped.contains("parola.modelsStoragePath") == false)
     }
 
     @Test("panes with no persisted state expose no reset keys")
@@ -117,6 +158,23 @@ struct SettingsResetServiceTests {
         #expect(defaults.string(forKey: otherKey) == "keep")
     }
 
+    @Test("reset-all clears every scoped key")
+    func resetAllClearsEveryScopedKey() {
+        let defaults = UserDefaults.standard
+        let keys = SettingsPaneScope.allCases.flatMap(\.defaultsKeys)
+        defer { for key in keys { defaults.removeObject(forKey: key) } }
+
+        for key in keys {
+            defaults.set("sentinel", forKey: key)
+        }
+
+        SettingsResetService.resetAll()
+
+        for key in keys {
+            #expect(defaults.object(forKey: key) == nil, "\(key) survived reset-all")
+        }
+    }
+
     @Test("reset posts a notification carrying the scope")
     func resetPostsNotification() async {
         clearScopeKeys()
@@ -173,6 +231,31 @@ struct SettingsExportServiceTests {
         #expect(dst.integer(forKey: "dictationKeyCode") == 49)
         #expect(dst.string(forKey: "appTheme") == "graphite")
         #expect(dst.data(forKey: "snippets") == blob)
+    }
+
+    @Test("every scoped key survives export → wipe → import")
+    func allScopedKeysRoundTrip() throws {
+        let (src, srcName) = makeSuite()
+        let (dst, dstName) = makeSuite()
+        defer {
+            UserDefaults.standard.removePersistentDomain(forName: srcName)
+            UserDefaults.standard.removePersistentDomain(forName: dstName)
+        }
+
+        let keys = Set(SettingsPaneScope.allCases.flatMap(\.defaultsKeys))
+        for key in keys {
+            src.set("sentinel-\(key)", forKey: key)
+        }
+
+        let payload = SettingsExportService.exportPayload(defaults: src)
+        let fileData = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+        let reparsed = try #require(try JSONSerialization.jsonObject(with: fileData) as? [String: Any])
+
+        SettingsExportService.apply(reparsed, defaults: dst)
+
+        for key in keys {
+            #expect(dst.string(forKey: key) == "sentinel-\(key)", "\(key) lost in the round-trip")
+        }
     }
 
     @Test("import is additive — keys absent from the file keep their current value")
