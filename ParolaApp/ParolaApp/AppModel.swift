@@ -1876,6 +1876,27 @@ final class AppModel {
         applyTranscriptEdit(t, actionName: String(localized: "Delete Segment"))
     }
 
+    func splitSegment(id: TranscriptSegment.ID, atWordIndex index: Int) {
+        guard var t = transcript,
+              let segments = SegmentSurgery.split(segments: t.segments, id: id, atWordIndex: index) else { return }
+        t.segments = segments
+        applyTranscriptEdit(t, actionName: String(localized: "Split Segment"))
+    }
+
+    func splitSegment(id: TranscriptSegment.ID, atFraction fraction: Double) {
+        guard var t = transcript,
+              let segments = SegmentSurgery.split(segments: t.segments, id: id, atFraction: fraction) else { return }
+        t.segments = segments
+        applyTranscriptEdit(t, actionName: String(localized: "Split Segment"))
+    }
+
+    func mergeSegmentWithNext(id: TranscriptSegment.ID) {
+        guard var t = transcript,
+              let segments = SegmentSurgery.mergeWithNext(segments: t.segments, id: id) else { return }
+        t.segments = segments
+        applyTranscriptEdit(t, actionName: String(localized: "Merge Segments"))
+    }
+
     func nudgeSegmentStart(id: TranscriptSegment.ID, frames: Int) {
         guard var t = transcript else { return }
         t.segments = SegmentTimingNudge.nudgeStart(

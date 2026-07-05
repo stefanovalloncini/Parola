@@ -19,8 +19,8 @@ struct SegmentCard: View {
 
     private let radius: CGFloat = 12
 
-    // Hover reserves room for the floating actionStrip (~200pt with every button) so it never covers the first text line.
-    private let actionStripReserve: CGFloat = 200
+    // Hover reserves room for the floating actionStrip (~250pt with every button) so it never covers the first text line.
+    private let actionStripReserve: CGFloat = 250
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
@@ -220,6 +220,16 @@ struct SegmentCard: View {
                     .environment(model)
             }
             .axLeaf("Card.Button.Timing")
+            cardButton(systemName: "scissors", help: "Split segment") {
+                splitSegment()
+            }
+            .axLeaf("Card.Button.Split")
+            cardButton(systemName: "arrow.triangle.merge", help: "Merge with next segment") {
+                model.mergeSegmentWithNext(id: segment.id)
+            }
+            .disabled(isLastSegment)
+            .opacity(isLastSegment ? 0.35 : 1)
+            .axLeaf("Card.Button.Merge")
             cardButton(systemName: "doc.on.doc", help: "Copy segment with timestamp") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(draggablePayload, forType: .string)
@@ -255,6 +265,21 @@ struct SegmentCard: View {
         .foregroundStyle(.secondary)
         .help(help)
         .accessibilityLabel(help)
+    }
+
+    private var isLastSegment: Bool {
+        model.transcript?.segments.last?.id == segment.id
+    }
+
+    private func splitSegment() {
+        if isCurrent,
+           let words = segment.words,
+           let wordID = model.currentWordID,
+           let index = words.firstIndex(where: { $0.id == wordID }) {
+            model.splitSegment(id: segment.id, atWordIndex: index)
+        } else {
+            model.splitSegment(id: segment.id, atFraction: 0.5)
+        }
     }
 
     private func beginEditing() {
