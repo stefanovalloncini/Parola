@@ -158,7 +158,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .translation:
             return ["translate"]
         case .transcriptionDefaults:
-            return ["selectedModel", "selectedLanguageRaw", "pausePlayerOnAppHidden", "parola.userPrivacyMode"]
+            return ["selectedModel", "selectedLanguageRaw", "expectedSpeakersRaw", "pausePlayerOnAppHidden", "parola.userPrivacyMode"]
         case .ignoredSegments:
             return ["ignoredSegmentRules"]
         case .findReplace:

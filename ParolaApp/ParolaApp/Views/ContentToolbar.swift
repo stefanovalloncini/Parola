@@ -37,6 +37,26 @@ struct ContentToolbar: ToolbarContent {
             .help("Identify multiple speakers in the audio (slower).")
             .accessibilityIdentifier("toolbar.diarize")
             .axLeaf("Toolbar.Toggle.Diarize")
+            if model.diarize {
+                Menu {
+                    Picker("Speakers", selection: $model.expectedSpeakersRaw) {
+                        Text("Auto").tag(0)
+                        ForEach(2...8, id: \.self) { count in
+                            Text("\(count)").tag(count)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.2")
+                        Text(model.expectedSpeakersRaw == 0 ? "Auto" : "\(model.expectedSpeakersRaw)")
+                    }
+                }
+                .help("How many speakers to expect. Auto lets the diarizer decide.")
+                .accessibilityIdentifier("toolbar.expectedSpeakers")
+                .axLeaf("Toolbar.Menu.ExpectedSpeakers")
+            }
         }
         ToolbarItemGroup(placement: .primaryAction) {
             if model.route != .batch {

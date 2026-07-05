@@ -94,6 +94,8 @@ final class AppModel {
     var karaokeHighlight: Bool = true { didSet { defaults.set(karaokeHighlight, forKey: "karaokeHighlight") } }
     var initialPrompt: String = "" { didSet { defaults.set(initialPrompt, forKey: "initialPrompt") } }
     var diarize: Bool = false { didSet { defaults.set(diarize, forKey: "diarize") } }
+    /// Diarizer speaker-count hint; 0 means auto-detect and threads nil into the options.
+    var expectedSpeakersRaw: Int = 0 { didSet { defaults.set(expectedSpeakersRaw, forKey: "expectedSpeakersRaw") } }
     var autoTitleEntries: Bool = false { didSet { defaults.set(autoTitleEntries, forKey: "autoTitleEntries") } }
     var subtitleFPS: Double = 30 { didSet { defaults.set(subtitleFPS, forKey: "subtitleFPS") } }
     var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue { didSet { defaults.set(subtitleCaptionLengthRaw, forKey: "subtitleCaptionLength") } }
@@ -440,6 +442,7 @@ final class AppModel {
         self.karaokeHighlight = readBool("karaokeHighlight", default: true)
         self.initialPrompt = defaults.string(forKey: "initialPrompt") ?? ""
         self.diarize = defaults.bool(forKey: "diarize")
+        self.expectedSpeakersRaw = defaults.integer(forKey: "expectedSpeakersRaw")
         self.autoTitleEntries = defaults.bool(forKey: "autoTitleEntries")
         self.subtitleFPS = readDouble("subtitleFPS", default: 30)
         self.subtitleCaptionLengthRaw = defaults.string(forKey: "subtitleCaptionLength") ?? CaptionLength.none.rawValue
@@ -912,6 +915,7 @@ final class AppModel {
         self.karaokeHighlight = readBool("karaokeHighlight", default: true)
         self.initialPrompt = defaults.string(forKey: "initialPrompt") ?? ""
         self.diarize = defaults.bool(forKey: "diarize")
+        self.expectedSpeakersRaw = defaults.integer(forKey: "expectedSpeakersRaw")
         self.autoTitleEntries = defaults.bool(forKey: "autoTitleEntries")
         self.subtitleFPS = readDouble("subtitleFPS", default: 30)
         self.subtitleCaptionLengthRaw = defaults.string(forKey: "subtitleCaptionLength") ?? CaptionLength.none.rawValue
@@ -1317,7 +1321,8 @@ final class AppModel {
             task: task,
             wordTimestamps: wordTimestamps,
             initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt,
-            diarize: diarize
+            diarize: diarize,
+            expectedSpeakers: expectedSpeakersRaw > 0 ? expectedSpeakersRaw : nil
         )
     }
 
@@ -1874,6 +1879,22 @@ final class AppModel {
         guard var t = transcript else { return }
         t.segments.removeAll { $0.id == id }
         applyTranscriptEdit(t, actionName: String(localized: "Delete Segment"))
+    }
+
+    func assignSpeaker(_ name: String?, toSegmentID id: TranscriptSegment.ID) {
+        guard var t = transcript, let idx = t.segments.firstIndex(where: { $0.id == id }) else { return }
+        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let speaker = (trimmed?.isEmpty ?? true) ? nil : trimmed
+        let previous = t.segments[idx].speaker
+        t.segments[idx].speaker = speaker
+        if var words = t.segments[idx].words, words.contains(where: { $0.speaker != nil }) {
+            for j in words.indices { words[j].speaker = speaker }
+            t.segments[idx].words = words
+        }
+        applyTranscriptEdit(t, actionName: String(localized: "Assign Speaker"), textChanged: false)
+        if let speaker, speaker != previous {
+            Task { [peopleStore] in _ = await peopleStore.recordUsage(name: speaker) }
+        }
     }
 
     func splitSegment(id: TranscriptSegment.ID, atWordIndex index: Int) {

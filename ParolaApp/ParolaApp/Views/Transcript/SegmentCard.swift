@@ -13,6 +13,8 @@ struct SegmentCard: View {
     @State private var draftText: String = ""
     @State private var renamingSpeaker: Bool = false
     @State private var draftSpeakerName: String = ""
+    @State private var assigningSpeaker: Bool = false
+    @State private var draftAssignSpeakerName: String = ""
     @State private var editingNote: Bool = false
     @State private var draftNote: String = ""
     @FocusState private var editingFocus: Bool
@@ -39,6 +41,8 @@ struct SegmentCard: View {
                 .buttonStyle(.plain)
                 .help("Play from here")
                 .axLeaf("Card.Button.SeekTimestamp")
+                // A speakerless segment renders no chip, so the timestamp carries the assign menu too.
+                .contextMenu { assignSpeakerMenu }
                 if let rawSpeaker = segment.speaker, let speaker = Self.speakerLabel(for: rawSpeaker) {
                     Text(speaker)
                         .font(DS.Font.caption)
@@ -51,6 +55,7 @@ struct SegmentCard: View {
                                 draftSpeakerName = speaker
                                 renamingSpeaker = true
                             }
+                            assignSpeakerMenu
                         }
                 }
             }
@@ -99,6 +104,15 @@ struct SegmentCard: View {
                 let trimmed = draftSpeakerName.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty, trimmed != current else { return }
                 model.applySpeakerRenames([current: trimmed])
+            }
+        }
+        .alert("Assign speaker", isPresented: $assigningSpeaker) {
+            TextField("Name", text: $draftAssignSpeakerName)
+            Button("Cancel", role: .cancel) {}
+            Button("Assign") {
+                let trimmed = draftAssignSpeakerName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+                model.assignSpeaker(trimmed, toSegmentID: segment.id)
             }
         }
         .alert("Segment note", isPresented: $editingNote) {
@@ -269,6 +283,32 @@ struct SegmentCard: View {
 
     private var isLastSegment: Bool {
         model.transcript?.segments.last?.id == segment.id
+    }
+
+    private var assignSpeakerMenu: some View {
+        Menu("Assign Speaker") {
+            ForEach(model.transcriptSpeakers, id: \.self) { name in
+                Button {
+                    model.assignSpeaker(name, toSegmentID: segment.id)
+                } label: {
+                    if name == segment.speaker {
+                        Label(name, systemImage: "checkmark")
+                    } else {
+                        Text(name)
+                    }
+                }
+            }
+            if !model.transcriptSpeakers.isEmpty { Divider() }
+            Button("New Speaker…") {
+                draftAssignSpeakerName = ""
+                assigningSpeaker = true
+            }
+            if segment.speaker != nil {
+                Button("No Speaker") {
+                    model.assignSpeaker(nil, toSegmentID: segment.id)
+                }
+            }
+        }
     }
 
     private func splitSegment() {
