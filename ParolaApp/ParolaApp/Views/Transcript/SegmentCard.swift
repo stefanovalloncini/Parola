@@ -103,8 +103,9 @@ struct SegmentCard: View {
             withAnimation(.easeOut(duration: 0.12)) { hovering = hover }
         }
         // simultaneousGesture: .textSelection consumes plain taps, so a card-level .onTapGesture never fires on text.
+        // Skipped while word karaoke shows: its per-word links own the click, and a simultaneous segment seek would race the word seek.
         .simultaneousGesture(TapGesture().onEnded {
-            if !isEditing, model.player != nil { model.seek(to: segment) }
+            if !isEditing, !showsWordKaraoke, model.player != nil { model.seek(to: segment) }
         })
         .alert("Rename speaker", isPresented: $renamingSpeaker, presenting: segment.speaker) { current in
             TextField("Name", text: $draftSpeakerName)
@@ -193,10 +194,19 @@ struct SegmentCard: View {
             highlightedText
                 .font(DS.Font.transcript)
                 .textSelection(.enabled)
-        } else if isCurrent, model.karaokeHighlight, let words = segment.words, !words.isEmpty {
+        } else if showsWordKaraoke, let words = segment.words {
             karaoke(words: words)
                 .font(DS.Font.transcript)
                 .textSelection(.enabled)
+                .tint(.primary)
+                .environment(\.openURL, OpenURLAction { url in
+                    guard url.scheme == "parola-seek-time",
+                          let seconds = url.host(percentEncoded: false).flatMap(Double.init) else {
+                        return .systemAction
+                    }
+                    model.seekTo(seconds: seconds)
+                    return .handled
+                })
         } else if isCurrent, model.karaokeHighlight, model.player != nil {
             syntheticKaraoke
                 .font(DS.Font.transcript)
@@ -206,6 +216,14 @@ struct SegmentCard: View {
                 .font(DS.Font.transcript)
                 .textSelection(.enabled)
         }
+    }
+
+    private var showsWordKaraoke: Bool {
+        !isEditing
+            && !(model.findIsOpen && !model.findQuery.isEmpty)
+            && isCurrent
+            && model.karaokeHighlight
+            && segment.words?.isEmpty == false
     }
 
     static func displayText(_ text: String) -> String {
@@ -414,6 +432,10 @@ struct SegmentCard: View {
                 attr.append(AttributedString(" "))
             }
             var piece = AttributedString(word.word)
+            // Explicit foreground on every linked run, or the link tint overrides it (7977ad5).
+            piece.link = URL(string: "parola-seek-time://\(word.start)")
+            piece.underlineStyle = nil
+            piece.foregroundColor = DS.Color.primaryText
             if word.id == activeWordID {
                 piece.foregroundColor = DS.Color.highlight
                 piece.font = .body.bold()
