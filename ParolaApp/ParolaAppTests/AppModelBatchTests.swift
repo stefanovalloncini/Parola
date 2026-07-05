@@ -371,6 +371,83 @@ struct AppModelBatchTests {
         #expect(markdown.contains("*["))
     }
 
+    private static func waitForEntries(in model: AppModel, timeout: TimeInterval = 3) async -> [LibraryEntry] {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let entries = await model.library.list()
+            if !entries.isEmpty { return entries }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return await model.library.list()
+    }
+
+    @Test("a completed batch job persists to the library titled from its source file")
+    func completedBatchJobPersistsToLibrary() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        model.batchExportFormats = []
+        model.selectedEntryID = "keep-me"
+        let source = scratch.appendingPathComponent("interview.wav")
+        try Data("fake".utf8).write(to: source)
+        let job = BatchJob(url: source, status: .transcribing)
+        model.batchJobs = [job]
+
+        await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+
+        let entries = await Self.waitForEntries(in: model)
+        #expect(entries.count == 1)
+        #expect(entries.first?.title == "interview")
+        let loaded = try await model.library.load(try #require(entries.first?.id))
+        #expect(loaded.document.audioURL != nil)
+        #expect(model.selectedEntryID == "keep-me")
+        #expect(model.batchJobs.first?.transcript != nil)
+    }
+
+    @Test("the library list refreshes once per wave finish, not per job")
+    func libraryRefreshesAtWaveFinish() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        await model.libraryRefreshTask?.value
+        model.batchExportFormats = []
+        let source = scratch.appendingPathComponent("clip.wav")
+        try Data("fake".utf8).write(to: source)
+        let job = BatchJob(url: source, status: .transcribing)
+        model.batchJobs = [job]
+
+        await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+        let persisted = await Self.waitForEntries(in: model)
+        #expect(persisted.count == 1)
+        #expect(model.libraryEntries.isEmpty)
+
+        await model.handleBatchEvent(.finished)
+        await model.libraryRefreshTask?.value
+        #expect(model.libraryEntries.count == 1)
+    }
+
+    @Test("persisting a batch job does not re-run its auto-export rules")
+    func batchPersistDoesNotRerunAutoExports() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        model.batchExportFormats = []
+        model.autoExportRules = [AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.txt])]
+        let source = scratch.appendingPathComponent("clip.wav")
+        try Data("fake".utf8).write(to: source)
+        let job = BatchJob(url: source, status: .transcribing)
+        model.batchJobs = [job]
+
+        await model.handleBatchEvent(.completed(jobID: job.id, transcript: Self.makeTranscript()))
+
+        let txt = scratch.appendingPathComponent("clip.txt")
+        #expect(await Self.waitForFile(at: txt))
+        _ = await Self.waitForEntries(in: model)
+        try FileManager.default.removeItem(at: txt)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(!FileManager.default.fileExists(atPath: txt.path))
+    }
+
     @Test("cancelCurrentWork marks all in-flight batch jobs cancelled and returns phase to idle")
     func cancelCurrentWorkMarksBatchJobsCancelled() async {
         let model = makeModel()

@@ -90,6 +90,7 @@ extension AppModel {
             if let job = batchJobs.first(where: { $0.id == id }) {
                 let sidecarTargets = writeBatchExports(transcript: processed, sourceURL: job.url)
                 runAutoExports(transcript: processed, sourceURL: job.url, skippingTargets: sidecarTargets)
+                persistBatchJobToLibrary(processed, sourceURL: job.url)
             }
         case .failed(let id, let reason):
             guard !isCancelled(id) else { return }
@@ -98,9 +99,23 @@ extension AppModel {
             mutateBatchJob(id) { $0.status = .cancelled }
         case .finished:
             phase = .ready
+            refreshLibrary()
             let pending = batchJobs.filter { $0.status == .pending }
             if !pending.isEmpty {
                 resumeBatch(pendingJobs: pending)
+            }
+        }
+    }
+
+    // Skips persistToLibrary on purpose: its runAutoExports call would fire a second time
+    // (handleBatchEvent already ran the rules), and it would steal selection + refresh per job.
+    private func persistBatchJobToLibrary(_ transcript: Transcript, sourceURL: URL) {
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await library.add(transcript: transcript, audioSource: sourceURL, category: .transcription)
+            } catch {
+                nonFatalWarning = "\(sourceURL.lastPathComponent) was transcribed, but Parola couldn't save it to your library. \(error.localizedDescription)"
             }
         }
     }
