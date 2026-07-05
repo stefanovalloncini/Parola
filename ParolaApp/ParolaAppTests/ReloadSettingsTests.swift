@@ -219,6 +219,18 @@ struct ReloadSettingsTests {
         #expect(model.autoPauseMediaWhileRecording == false)
     }
 
+    @Test("turning karaoke off leaves wordTimestamps as the user set it")
+    func karaokeOffKeepsWordTimestamps() {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let model = makeModel(defaults)
+        model.wordTimestamps = true
+
+        model.karaokeHighlight = false
+
+        #expect(model.wordTimestamps == true)
+        #expect(defaults.bool(forKey: "wordTimestamps") == true)
+    }
+
     @Test("bridge reload action starts/stops only on a normal launch that wired the bridge")
     func bridgeReloadActionMatrix() {
         let bridge: Set<BootstrapSideEffect> = [.automationBridge]

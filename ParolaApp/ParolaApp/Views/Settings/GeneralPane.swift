@@ -39,9 +39,6 @@ struct GeneralPane: View {
                            isFirst: true) {
                     Toggle("", isOn: $model.karaokeHighlight)
                         .labelsHidden()
-                        .onChange(of: model.karaokeHighlight) { _, isOn in
-                            if !isOn { model.wordTimestamps = false }
-                        }
                         .axLeaf("General.Toggle.KaraokeHighlight")
                 }
                 SettingRow("Use precise word timings",

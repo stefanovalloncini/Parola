@@ -289,7 +289,7 @@ struct ResetAllSettingsButton: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Clears every saved preference. Library entries, models, and dictation prompts are kept.")
+            Text("Every Settings pane returns to its defaults. Library entries, models, and dictation prompts are kept.")
         }
     }
 }
