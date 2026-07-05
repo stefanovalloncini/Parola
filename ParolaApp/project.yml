@@ -73,6 +73,29 @@ targets:
             LSItemContentTypes:
               - app.parola.document
             LSTypeIsPackage: YES
+          - CFBundleTypeName: Subtitles
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - org.subrip.srt
+              - org.w3.webvtt
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: org.subrip.srt
+            UTTypeDescription: SubRip Subtitles
+            UTTypeConformsTo:
+              - public.plain-text
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - srt
+          - UTTypeIdentifier: org.w3.webvtt
+            UTTypeDescription: WebVTT Subtitles
+            UTTypeConformsTo:
+              - public.plain-text
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - vtt
+              public.mime-type:
+                - text/vtt
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: app.parola.document
             UTTypeDescription: Parola Document

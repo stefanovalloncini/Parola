@@ -1,13 +1,14 @@
 import Foundation
 
-enum VttImporter {
-    static func parse(contentsOf url: URL) throws -> Transcript {
+/// Parses WebVTT (.vtt) subtitle files into a ``Transcript``.
+public enum VttImporter {
+    public static func parse(contentsOf url: URL) throws -> Transcript {
         let data = try Data(contentsOf: url)
         let raw = String(decoding: data, as: UTF8.self)
         return parse(raw)
     }
 
-    static func parse(_ raw: String) -> Transcript {
+    public static func parse(_ raw: String) -> Transcript {
         let lines = raw
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")

@@ -141,12 +141,7 @@ struct ContentRoutes: View {
     }
 
     private func handleDroppedURLs(_ urls: [URL]) {
-        guard !urls.isEmpty else { return }
-        if urls.count == 1 {
-            model.transcribe(fileURL: urls[0])
-        } else {
-            model.startBatch(urls: urls)
-        }
+        model.handleIncomingFiles(urls)
     }
 }
 

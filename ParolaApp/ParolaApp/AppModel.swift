@@ -1022,7 +1022,7 @@ final class AppModel {
     /// A non-fatal warning (e.g. a failed library save) shown without replacing the open transcript.
     var nonFatalWarning: String?
 
-    func persistToLibrary(_ result: Transcript, audioSource: URL?) {
+    func persistToLibrary(_ result: Transcript, audioSource: URL?, title: String? = nil) {
         let category = pendingRecordingCategory
         pendingRecordingCategory = .transcription
         Task { [weak self] in
@@ -1031,7 +1031,8 @@ final class AppModel {
                 let entry = try await library.add(
                     transcript: result,
                     audioSource: audioSource,
-                    category: category
+                    category: category,
+                    title: title
                 )
                 refreshLibrary()
                 selectedEntryID = entry.id
@@ -1135,14 +1136,77 @@ final class AppModel {
     func presentOpenPanel() {
         Task { [weak self] in
             guard let self else { return }
-            let urls = await self.filePicker.chooseInputFiles(allowedTypes: [.audio, .movie], allowsMultiple: true)
-            guard !urls.isEmpty else { return }
-            if urls.count == 1 {
-                self.transcribe(fileURL: urls[0])
-            } else {
-                self.startBatch(urls: urls)
-            }
+            let urls = await self.filePicker.chooseInputFiles(
+                allowedTypes: [.audio, .movie] + Self.subtitleContentTypes,
+                allowsMultiple: true
+            )
+            self.handleIncomingFiles(urls)
         }
+    }
+
+    func handleIncomingFiles(_ urls: [URL]) {
+        let subtitles = urls.filter(Self.isSubtitleImport)
+        let media = urls.filter { !Self.isSubtitleImport($0) }
+        for url in subtitles { importSubtitle(fileURL: url) }
+        if media.count == 1 {
+            transcribe(fileURL: media[0])
+        } else if !media.isEmpty {
+            startBatch(urls: media)
+        }
+    }
+
+    // MARK: - Subtitle import
+
+    nonisolated static let subtitleImportExtensions: Set<String> = ["srt", "vtt"]
+
+    nonisolated static func isSubtitleImport(_ url: URL) -> Bool {
+        subtitleImportExtensions.contains(url.pathExtension.lowercased())
+    }
+
+    nonisolated static var subtitleContentTypes: [UTType] {
+        subtitleImportExtensions.sorted().flatMap {
+            UTType.types(tag: $0, tagClass: .filenameExtension, conformingTo: nil)
+        }
+    }
+
+    func importSubtitle(fileURL: URL) {
+        if case .recording = phase {
+            deferredArrivals.append(fileURL)
+            return
+        }
+        if batchIsRunning {
+            deferredArrivals.append(fileURL)
+            return
+        }
+        noteRecentFile(fileURL)
+        let imported: Transcript
+        do {
+            imported = try Self.parseSubtitleFile(at: fileURL)
+        } catch {
+            phase = .failed(message: "Couldn't read \(fileURL.lastPathComponent): \(error.localizedDescription)")
+            return
+        }
+        guard !imported.segments.isEmpty else {
+            phase = .failed(message: "No subtitles found in \(fileURL.lastPathComponent).")
+            return
+        }
+        let processed = postProcess(imported)
+        clearDerivedArtifacts()
+        selectedEntryID = nil
+        sourceFileURL = fileURL
+        tearDownPlayer()
+        transcript = processed
+        phase = .ready
+        persistToLibrary(processed, audioSource: nil, title: fileURL.deletingPathExtension().lastPathComponent)
+    }
+
+    nonisolated static func parseSubtitleFile(at url: URL) throws -> Transcript {
+        if url.pathExtension.lowercased() == "vtt" {
+            var transcript = try VttImporter.parse(contentsOf: url)
+            transcript.modelName = "imported-vtt"
+            return transcript
+        }
+        return try SrtImporter.parse(contentsOf: url)
     }
 
     func transcribe(fileURL: URL, translateOverride: Bool? = nil) {
@@ -1153,6 +1217,10 @@ final class AppModel {
         }
         if fileURL.pathExtension == "parola" {
             Task { [weak self] in await self?.openProjectDocument(at: fileURL) }
+            return
+        }
+        if Self.isSubtitleImport(fileURL) {
+            importSubtitle(fileURL: fileURL)
             return
         }
         if batchIsRunning {
