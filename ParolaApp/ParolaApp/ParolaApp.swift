@@ -211,6 +211,8 @@ struct ParolaApp: App {
                 Button("Send via Mail…") { model.shareTranscriptViaMail() }
                     .keyboardShortcut("m", modifiers: [.command, .shift])
                     .disabled(model.transcript == nil)
+                Button("Share…") { model.shareTranscriptAsTextFile() }
+                    .disabled(model.transcript == nil)
                 Divider()
                 Button("Jump to Next Speaker") { model.jumpToNextSpeaker() }
                     .keyboardShortcut("j", modifiers: [.command, .shift])

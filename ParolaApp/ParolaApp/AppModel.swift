@@ -2081,6 +2081,16 @@ final class AppModel {
         NSWorkspace.shared.open(url)
     }
 
+    func shareTranscriptAsTextFile() {
+        guard let transcript,
+              let fileURL = try? TranscriptShareFile.write(title: currentTranscriptTitle, text: transcript.text),
+              let anchorView = NSApp.keyWindow?.contentView
+        else { return }
+        let picker = NSSharingServicePicker(items: [fileURL])
+        let anchor = NSRect(x: anchorView.bounds.midX, y: anchorView.bounds.maxY - 1, width: 1, height: 1)
+        picker.show(relativeTo: anchor, of: anchorView, preferredEdge: .minY)
+    }
+
     func copyTranscriptToPasteboard(withTimestamps: Bool) {
         guard let transcript else { return }
         Task {

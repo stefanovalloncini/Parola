@@ -72,6 +72,19 @@ struct TranscriptHeaderBar: View {
             .modifier(CompactHelpModifier(isCompact: model.transcriptCompact))
             .axLeaf("HeaderBar.Button.ToggleCompact")
 
+            if let transcript = model.transcript {
+                ShareLink(
+                    item: TranscriptShareFile(title: title, text: transcript.text),
+                    preview: SharePreview(title)
+                ) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .buttonStyle(.borderless)
+                .help("Share transcript")
+                .accessibilityLabel("Share transcript")
+                .axLeaf("HeaderBar.Button.Share")
+            }
+
             Button(action: onOpenSummary) {
                 Image(systemName: "sparkles")
             }
