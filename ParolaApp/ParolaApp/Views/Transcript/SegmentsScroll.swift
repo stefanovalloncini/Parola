@@ -6,6 +6,7 @@ struct SegmentsScroll: View {
     @State private var hoveredSpeaker: String?
     @State private var pauseByPrev: [Int: Double] = [:]
     @State private var confidenceByID: [Int: SegmentConfidence.Bucket] = [:]
+    @State private var qcByID: [Int: [SubtitleQC.Issue]] = [:]
     @State private var visibleSegmentsCache: [TranscriptSegment] = []
 
     private var speakerFilterBinding: Binding<String?> {
@@ -44,7 +45,8 @@ struct SegmentsScroll: View {
                                 segment: seg,
                                 isCurrent: seg.id == model.currentSegmentID,
                                 hoveredSpeaker: $hoveredSpeaker,
-                                confidenceBucket: confidenceByID[seg.id]
+                                confidenceBucket: confidenceByID[seg.id],
+                                qcIssues: qcByID[seg.id] ?? []
                             )
                             .id(seg.id)
                             .opacity(opacity(for: seg))
@@ -87,10 +89,13 @@ struct SegmentsScroll: View {
                 recomputeVisible()
             }
             .onChange(of: speakerFilter) { _, _ in recomputeVisible() }
+            .onChange(of: model.showSubtitleQC) { _, _ in recomputeQC() }
+            .onChange(of: model.subtitleCaptionLengthRaw) { _, _ in recomputeQC() }
         }
     }
 
     private func recomputeDerived() {
+        recomputeQC()
         guard let segments = model.transcript?.segments else {
             pauseByPrev = [:]
             confidenceByID = [:]
@@ -108,6 +113,26 @@ struct SegmentsScroll: View {
             }
         }
         confidenceByID = buckets
+    }
+
+    private func recomputeQC() {
+        guard model.showSubtitleQC, let segments = model.transcript?.segments else {
+            qcByID = [:]
+            return
+        }
+        qcByID = Self.subtitleQCIssues(segments: segments, captionLength: model.subtitleCaptionLength)
+    }
+
+    static func subtitleQCIssues(
+        segments: [TranscriptSegment],
+        captionLength: CaptionLength
+    ) -> [Int: [SubtitleQC.Issue]] {
+        var issuesByID: [Int: [SubtitleQC.Issue]] = [:]
+        for segment in segments {
+            let issues = SubtitleQC.issues(for: segment, captionLength: captionLength)
+            if !issues.isEmpty { issuesByID[segment.id] = issues }
+        }
+        return issuesByID
     }
 
     private func recomputeVisible() {

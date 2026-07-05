@@ -114,6 +114,17 @@ struct ContentToolbar: ToolbarContent {
                 .axLeaf("Toolbar.Menu.Record")
             }
 
+            if model.transcript != nil, model.transcriptDisplayMode == .segments {
+                Toggle(isOn: $model.showSubtitleQC) {
+                    Image(systemName: "exclamationmark.triangle")
+                }
+                .toggleStyle(.button)
+                .help("Show subtitle quality warnings on segments that read too fast, run too short, or overflow a caption line.")
+                .accessibilityLabel("Subtitle QC")
+                .accessibilityIdentifier("toolbar.subtitleQC")
+                .axLeaf("Toolbar.Toggle.SubtitleQC")
+            }
+
             PromptsMenu()
                 .disabled(model.transcript == nil || model.isRunningPrompt)
 

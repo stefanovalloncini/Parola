@@ -114,7 +114,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .general:
             return [
                 "useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt", "diarize",
-                "showMenuBarExtra", "autoTitleEntries"
+                "showMenuBarExtra", "autoTitleEntries", "showSubtitleQC"
             ]
         case .customization:
             return [

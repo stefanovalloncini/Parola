@@ -66,6 +66,7 @@ struct SettingsPaneScopeTests {
             "micHotkeyEnabled", "micHotkeyKeyCode", "micHotkeyModifiers",
             "subtitleCaptionLength", "markdownTimestamps", "htmlExportTheme", "txtExportTimestamps",
             "pausePlayerOnAppHidden", "parola.userPrivacyMode", "batchExportFormatOptions",
+            "showSubtitleQC",
         ]
         for key in expected {
             #expect(scoped.contains(key), "\(key) is missing from every pane scope")

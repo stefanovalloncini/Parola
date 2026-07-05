@@ -6,6 +6,7 @@ struct SegmentCard: View {
     let isCurrent: Bool
     var hoveredSpeaker: Binding<String?> = .constant(nil)
     var confidenceBucket: SegmentConfidence.Bucket? = nil
+    var qcIssues: [SubtitleQC.Issue] = []
 
     @Environment(AppModel.self) private var model
     @State private var hovering: Bool = false
@@ -57,6 +58,14 @@ struct SegmentCard: View {
                             }
                             assignSpeakerMenu
                         }
+                }
+                if !qcIssues.isEmpty {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(DS.Font.caption)
+                        .foregroundStyle(.secondary)
+                        .help(Self.qcHelpText(qcIssues))
+                        .accessibilityLabel("Subtitle warnings")
+                        .axLeaf("Card.Badge.SubtitleQC")
                 }
             }
             if let note = model.currentSegmentNote(for: segment.id), !note.isEmpty {
@@ -201,6 +210,19 @@ struct SegmentCard: View {
 
     static func displayText(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func qcHelpText(_ issues: [SubtitleQC.Issue]) -> String {
+        issues.map { issue in
+            switch issue {
+            case .lineTooLong(let limit):
+                return "Line longer than \(limit) characters"
+            case .tooFast(let charactersPerSecond):
+                return "\(charactersPerSecond) characters per second"
+            case .tooShort:
+                return "Shorter than \(SubtitleQC.minimumDuration) seconds"
+            }
+        }.joined(separator: "\n")
     }
 
     static func speakerLabel(for speaker: String?) -> String? {

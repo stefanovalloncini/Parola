@@ -101,6 +101,7 @@ final class AppModel {
     var subtitleFPS: Double = 30 { didSet { defaults.set(subtitleFPS, forKey: "subtitleFPS") } }
     var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue { didSet { defaults.set(subtitleCaptionLengthRaw, forKey: "subtitleCaptionLength") } }
     var transcriptCompact: Bool = false { didSet { defaults.set(transcriptCompact, forKey: "transcriptCompact") } }
+    var showSubtitleQC: Bool = false { didSet { defaults.set(showSubtitleQC, forKey: "showSubtitleQC") } }
     var skipSilences: Bool = false { didSet { defaults.set(skipSilences, forKey: "skipSilences") } }
     var pausePlayerOnAppHidden: Bool = false { didSet { defaults.set(pausePlayerOnAppHidden, forKey: "pausePlayerOnAppHidden") } }
     var markdownTimestamps: Bool = false { didSet { defaults.set(markdownTimestamps, forKey: "markdownTimestamps") } }
@@ -453,6 +454,7 @@ final class AppModel {
         self.subtitleFPS = readDouble("subtitleFPS", default: 30)
         self.subtitleCaptionLengthRaw = defaults.string(forKey: "subtitleCaptionLength") ?? CaptionLength.none.rawValue
         self.transcriptCompact = defaults.bool(forKey: "transcriptCompact")
+        self.showSubtitleQC = defaults.bool(forKey: "showSubtitleQC")
         self.skipSilences = defaults.bool(forKey: "skipSilences")
         self.pausePlayerOnAppHidden = defaults.bool(forKey: "pausePlayerOnAppHidden")
         self.markdownTimestamps = defaults.bool(forKey: "markdownTimestamps")
@@ -934,6 +936,7 @@ final class AppModel {
         self.subtitleFPS = readDouble("subtitleFPS", default: 30)
         self.subtitleCaptionLengthRaw = defaults.string(forKey: "subtitleCaptionLength") ?? CaptionLength.none.rawValue
         self.transcriptCompact = defaults.bool(forKey: "transcriptCompact")
+        self.showSubtitleQC = defaults.bool(forKey: "showSubtitleQC")
         self.skipSilences = defaults.bool(forKey: "skipSilences")
         self.pausePlayerOnAppHidden = defaults.bool(forKey: "pausePlayerOnAppHidden")
         self.markdownTimestamps = defaults.bool(forKey: "markdownTimestamps")
