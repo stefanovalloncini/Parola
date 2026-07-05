@@ -21,7 +21,7 @@ private func applyAlwaysOnTop(_ on: Bool) {
 }
 
 @MainActor
-private func handleOpen(_ url: URL, model: AppModel) {
+func handleParolaOpen(_ url: URL, model: AppModel) {
     if url.isFileURL {
         model.transcribe(fileURL: url)
         return
@@ -101,7 +101,7 @@ struct ParolaApp: App {
                 .onChange(of: model.mainWindowAlwaysOnTop) { _, on in
                     applyAlwaysOnTop(on)
                 }
-                .onOpenURL { url in handleOpen(url, model: model) }
+                .onOpenURL { url in handleParolaOpen(url, model: model) }
                 .sheet(isPresented: $shortcutSheetOpen) { ShortcutCheatSheet() }
                 .sheet(isPresented: $aboutSheetOpen) { AboutSheet().environment(model) }
         }

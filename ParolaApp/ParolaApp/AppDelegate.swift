@@ -1,4 +1,5 @@
 import AppKit
+import CoreSpotlight
 import ParolaCore
 
 @MainActor
@@ -75,6 +76,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidResignActive(_ notification: Notification) {
         model?.handleAppResignedActive()
+    }
+
+    func application(_ application: NSApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
+        guard let url = Self.spotlightOpenURL(from: userActivity), let model else { return false }
+        NSApp.activate(ignoringOtherApps: true)
+        handleParolaOpen(url, model: model)
+        return true
+    }
+
+    static func spotlightOpenURL(from userActivity: NSUserActivity) -> URL? {
+        guard userActivity.activityType == CSSearchableItemActionType,
+              let entryID = userActivity.userInfo?[CSSearchableItemActivityIdentifier] as? String
+        else { return nil }
+        var components = URLComponents()
+        components.scheme = "parola"
+        components.host = "open"
+        components.queryItems = [URLQueryItem(name: "entry", value: entryID)]
+        return components.url
     }
 
     func updateDockBadge(for phase: AppModel.Phase) {
