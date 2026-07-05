@@ -565,6 +565,29 @@ struct AppModelBatchTests {
         Self.expectArtifactsCleared(on: model)
     }
 
+    @Test("a finished streaming recording persists its captured audio for playback")
+    func streamingFinishPersistsCapturedAudio() async throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        let wav = scratch.appendingPathComponent("capture.wav")
+        try Data("fake".utf8).write(to: wav)
+        let final = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")],
+            language: "en",
+            modelName: "m",
+            sourceURL: wav
+        )
+
+        await model.handleStreamingEvent(.finished(final))
+
+        #expect(model.sourceFileURL == wav)
+        let entries = await Self.waitForEntries(in: model)
+        #expect(entries.count == 1)
+        let loaded = try await model.library.load(try #require(entries.first?.id))
+        #expect(loaded.document.audioURL != nil)
+    }
+
     @Test("a finished recording clears artifacts derived from the previous transcript")
     func streamingFinishClearsDerivedArtifacts() async {
         let model = makeModel()

@@ -44,7 +44,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private var loadedModel: String?
     private var optionsForRun: TranscriptionOptions?
     private var speakerLabeler: (any StreamingSpeakerLabeler)?
-    private var persistAudio = false
+    nonisolated let persistAudio: Bool
 
     public init(modelStore: ModelStore = .shared, persistAudio: Bool = false, deviceUID: String? = nil) {
         self.modelStore = modelStore

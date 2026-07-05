@@ -1607,7 +1607,7 @@ final class AppModel {
 
     private func startStreamingMic() {
         streamingConsumer?.cancel()
-        let s = StreamingTranscriberFactory.make(clock: clock, deviceUID: preferredInputDeviceUID)
+        let s = StreamingTranscriberFactory.make(clock: clock, deviceUID: preferredInputDeviceUID, persistAudio: true)
         streamingSession = s
         liveSegments = []
         livePartialText = ""
@@ -1689,7 +1689,11 @@ final class AppModel {
             self.livePartialText = ""
             self.liveSegments = []
             self.phase = .ready
-            persistToLibrary(processed, audioSource: nil)
+            if let audioURL = processed.sourceURL {
+                sourceFileURL = audioURL
+                installPlayer(for: audioURL)
+            }
+            persistToLibrary(processed, audioSource: processed.sourceURL)
             drainDeferredArrivals()
         }
     }

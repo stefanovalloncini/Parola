@@ -14,12 +14,13 @@ public enum StreamingTranscriberFactory {
     public static func make(
         modelStore: ModelStore = .shared,
         clock: any Clock<Duration> = ContinuousClock(),
-        deviceUID: String? = nil
+        deviceUID: String? = nil,
+        persistAudio: Bool = false
     ) -> any StreamingTranscriber {
         if let response = MockStreamingTranscriberRegistry.shared.resolve() {
             return MockStreamingTranscriber(response: response, clock: clock)
         }
-        return StreamingTranscriptionSession(modelStore: modelStore, deviceUID: deviceUID)
+        return StreamingTranscriptionSession(modelStore: modelStore, persistAudio: persistAudio, deviceUID: deviceUID)
     }
 
     /// Loads the model into the shared streaming cache so the next session start skips the load.

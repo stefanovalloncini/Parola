@@ -21,6 +21,15 @@ struct StreamingTranscriberFactoryTests {
         #expect((session as? StreamingTranscriptionSession)?.deviceUID == "test-uid")
     }
 
+    @Test("persistAudio reaches the session it builds and defaults off")
+    func persistAudioReachesSession() {
+        MockStreamingTranscriberRegistry.shared.clear()
+        let recording = StreamingTranscriberFactory.make(persistAudio: true)
+        #expect((recording as? StreamingTranscriptionSession)?.persistAudio == true)
+        let captions = StreamingTranscriberFactory.make()
+        #expect((captions as? StreamingTranscriptionSession)?.persistAudio == false)
+    }
+
     @Test("unknown or missing device UIDs resolve to no capture device")
     func unknownDeviceUIDResolvesToNil() {
         #expect(StreamingTranscriptionSession.resolveInputDeviceID(uid: nil) == nil)
