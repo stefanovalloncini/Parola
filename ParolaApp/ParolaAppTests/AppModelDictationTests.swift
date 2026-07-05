@@ -301,6 +301,37 @@ struct AppModelDictationTests {
         model.stopDictation()
     }
 
+    @Test("startDictation threads the custom vocabulary prompt into the configuration")
+    func startDictationThreadsInitialPrompt() {
+        let model = makeModel()
+        model.initialPrompt = "Parola, WhisperKit, Valloncini"
+        model.startDictation()
+        #expect(model.dictationController.configuration?.initialPrompt == "Parola, WhisperKit, Valloncini")
+        model.stopDictation()
+    }
+
+    @Test("an empty custom vocabulary reaches the recorder as nil")
+    func emptyInitialPromptBecomesNil() {
+        let model = makeModel()
+        model.initialPrompt = ""
+        model.startDictation()
+        #expect(model.dictationController.configuration?.initialPrompt == nil)
+        model.stopDictation()
+    }
+
+    @Test("the recorder builds transcription options with the initial prompt")
+    func recorderOptionsCarryInitialPrompt() async {
+        let recorder = MicDictationRecorder(
+            model: "openai_whisper-tiny",
+            language: "en",
+            initialPrompt: "Parola, WhisperKit"
+        )
+        let options = await recorder.transcriptionOptions()
+        #expect(options.initialPrompt == "Parola, WhisperKit")
+        #expect(options.model == "openai_whisper-tiny")
+        #expect(options.language == "en")
+    }
+
     @Test("prewarm candidate is the model only for installed streaming WhisperKit variants")
     func prewarmCandidateGates() {
         let whisper = "openai_whisper-large-v3_turbo"

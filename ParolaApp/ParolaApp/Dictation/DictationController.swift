@@ -49,6 +49,7 @@ final class DictationController {
     struct Configuration {
         var modelName: String
         var language: String?
+        var initialPrompt: String? = nil
         var deviceUID: String?
         var streamingEnabled: Bool
         var hotkeyKeyCode: Int
@@ -79,6 +80,7 @@ final class DictationController {
         let recorder = MicDictationRecorder(
             model: configuration.modelName,
             language: configuration.language,
+            initialPrompt: configuration.initialPrompt,
             deviceUID: configuration.deviceUID,
             streamingEnabled: configuration.streamingEnabled,
             session: appModel?.session,

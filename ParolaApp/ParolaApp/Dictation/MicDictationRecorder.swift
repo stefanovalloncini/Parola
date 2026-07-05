@@ -6,6 +6,7 @@ actor MicDictationRecorder: DictationRecorder {
     private let model: String?
     private let defaultLanguage: String?
     private var effectiveLanguage: String?
+    private let initialPrompt: String?
     private let deviceUID: String?
     private let streamingEnabled: Bool
     private let workflowResolver: (@Sendable () async -> DictationWorkflow?)?
@@ -26,6 +27,7 @@ actor MicDictationRecorder: DictationRecorder {
     init(
         model: String?,
         language: String?,
+        initialPrompt: String? = nil,
         deviceUID: String? = nil,
         streamingEnabled: Bool = true,
         session: TranscriptionSession? = nil,
@@ -36,6 +38,7 @@ actor MicDictationRecorder: DictationRecorder {
         self.model = model
         self.defaultLanguage = language
         self.effectiveLanguage = language
+        self.initialPrompt = initialPrompt
         self.deviceUID = deviceUID
         self.streamingEnabled = streamingEnabled
         self.fallbackSession = session ?? TranscriptionSession()
@@ -103,17 +106,21 @@ actor MicDictationRecorder: DictationRecorder {
         return variant.engineID == .whisperKit
     }
 
+    func transcriptionOptions() -> TranscriptionOptions {
+        TranscriptionOptions(
+            model: model,
+            language: effectiveLanguage,
+            task: .transcribe,
+            initialPrompt: initialPrompt
+        )
+    }
+
     private func startStreaming() async throws {
         let session = StreamingTranscriberFactory.make(clock: clock)
         streamingSegments = []
         streamingPartial = ""
 
-        let options = TranscriptionOptions(
-            model: model,
-            language: effectiveLanguage,
-            task: .transcribe
-        )
-        let events = try await session.start(options: options, speakerLabeler: nil, downloadProgress: downloadProgress)
+        let events = try await session.start(options: transcriptionOptions(), speakerLabeler: nil, downloadProgress: downloadProgress)
         streamingSession = session
 
         streamingConsumer = Task { [weak self] in
@@ -177,14 +184,9 @@ actor MicDictationRecorder: DictationRecorder {
         fallbackForwardingTask = nil
         broadcastLevel(0)
         let url = try await source.prepare()
-        let options = TranscriptionOptions(
-            model: model,
-            language: effectiveLanguage,
-            task: .transcribe
-        )
         let transcript = try await fallbackSession.transcribe(
             source: FileAudioSource(url: url),
-            options: options,
+            options: transcriptionOptions(),
             downloadProgress: downloadProgress
         )
         return transcript.text

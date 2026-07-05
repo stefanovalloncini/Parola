@@ -194,6 +194,7 @@ extension AppModel {
         let configuration = DictationController.Configuration(
             modelName: selectedModel,
             language: selectedLanguage,
+            initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt,
             deviceUID: preferredInputDeviceUID,
             streamingEnabled: useStreaming,
             hotkeyKeyCode: dictationKeyCode,
