@@ -391,6 +391,59 @@ struct LibraryStoreTests {
         #expect(results.contains(where: { $0.entryID == entry.id }))
     }
 
+    @Test("summary text, segment notes, and speaker names are searchable")
+    func searchFindsSummaryNotesSpeakers() async throws {
+        let (store, _) = try makeTempLibrary()
+        var transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 2, text: "Good morning everyone", speaker: "Marta")],
+            language: "en",
+            modelName: "tiny"
+        )
+        transcript.summary = Summary(text: "Renewal deadlines are slipping")
+        let entry = try await store.add(transcript: transcript, audioSource: nil)
+        try await store.setSegmentNote("check the kanban board", segmentID: 0, for: entry.id)
+
+        #expect(await store.search("renewal").contains(where: { $0.entryID == entry.id }))
+        #expect(await store.search("marta").contains(where: { $0.entryID == entry.id }))
+        #expect(await store.search("kanban").contains(where: { $0.entryID == entry.id }))
+    }
+
+    @Test("clearing a segment note removes its tokens from search")
+    func clearingNoteDeindexesIt() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        try await store.setSegmentNote("check the kanban board", segmentID: 0, for: entry.id)
+        #expect(await store.search("kanban").contains(where: { $0.entryID == entry.id }))
+
+        try await store.setSegmentNote(nil, segmentID: 0, for: entry.id)
+        #expect(await store.search("kanban").isEmpty)
+    }
+
+    @Test("a v2 index snapshot is rebuilt with summary, note, and speaker tokens")
+    func v2SnapshotRebuildRegeneratesRicherTokens() async throws {
+        let (store1, libraryURL) = try makeTempLibrary()
+        var transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 2, text: "kryptonite meeting notes", speaker: "Ines")],
+            language: "en",
+            modelName: "tiny"
+        )
+        transcript.summary = Summary(text: "Renewal deadlines")
+        let entry = try await store1.add(transcript: transcript, audioSource: nil)
+        try await store1.setSegmentNote("check the kanban board", segmentID: 0, for: entry.id)
+        await store1.flush()
+
+        let indexURL = libraryURL.appendingPathComponent(".search-index.json")
+        let v2 = """
+        {"version":2,"entries":{"\(entry.id)":{"title":"Old","excerpt":"kryptonite meeting notes","tokens":["kryptonite","meeting","notes"]}}}
+        """
+        try Data(v2.utf8).write(to: indexURL)
+
+        let store2 = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+        #expect(await store2.search("renewal").contains(where: { $0.entryID == entry.id }))
+        #expect(await store2.search("kanban").contains(where: { $0.entryID == entry.id }))
+        #expect(await store2.search("ines").contains(where: { $0.entryID == entry.id }))
+    }
+
     @Test("a stale old-format index snapshot is discarded and rebuilt from bundles")
     func staleIndexSnapshotRebuild() async throws {
         let (store1, libraryURL) = try makeTempLibrary()

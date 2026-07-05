@@ -76,7 +76,12 @@ public actor LibraryStore {
         let rebuilt = await Task.detached(priority: .utility) { [self] in
             scanEntries(at: url).compactMap { entry -> LibrarySearchIndex.RebuildEntry? in
                 guard let doc = try? ParolaDocument.read(at: entry.bundleURL) else { return nil }
-                return .init(id: entry.id, title: entry.title, text: doc.transcript.text)
+                return .init(
+                    id: entry.id,
+                    title: entry.title,
+                    text: doc.transcript.text,
+                    auxiliaryText: Self.searchAuxiliaryText(notes: entry.segmentNotes, transcript: doc.transcript)
+                )
             }
         }.value
         await searchIndex.rebuild(entries: rebuilt)
@@ -142,7 +147,7 @@ public actor LibraryStore {
         )
         invalidateListCaches()
         let entry = try makeEntry(bundleURL: bundleURL.appendingPathExtension("parola"))
-        await indexEntry(entry, transcriptText: transcript.text)
+        await indexEntry(entry, transcript: transcript)
         return entry
     }
 
@@ -160,15 +165,30 @@ public actor LibraryStore {
         }
         invalidateListCaches()
         let entry = try makeEntry(bundleURL: target)
-        await indexEntry(entry, transcriptText: sourceDoc.transcript.text)
+        await indexEntry(entry, transcript: sourceDoc.transcript)
         return entry
     }
 
-    private func indexEntry(_ entry: LibraryEntry, transcriptText: String) async {
+    private func indexEntry(_ entry: LibraryEntry, transcript: Transcript) async {
         await ensureSearchIndexReady()
-        await searchIndex.index(id: entry.id, title: entry.title, text: transcriptText, createdAt: entry.createdAt)
+        let text = transcript.text
+        await searchIndex.index(
+            id: entry.id,
+            title: entry.title,
+            text: text,
+            auxiliaryText: Self.searchAuxiliaryText(notes: entry.segmentNotes, transcript: transcript),
+            createdAt: entry.createdAt
+        )
         guard let extraIndexer else { return }
-        await extraIndexer.index(id: entry.id, title: entry.title, text: transcriptText, createdAt: entry.createdAt)
+        await extraIndexer.index(id: entry.id, title: entry.title, text: text, createdAt: entry.createdAt)
+    }
+
+    static func searchAuxiliaryText(notes: [String: String], transcript: Transcript) -> String {
+        var parts: [String] = []
+        if let summary = transcript.summary?.text, !summary.isEmpty { parts.append(summary) }
+        parts.append(contentsOf: notes.sorted { $0.key < $1.key }.map(\.value))
+        parts.append(contentsOf: transcript.uniqueSpeakers)
+        return parts.joined(separator: "\n")
     }
 
     private func deindexEntry(id: String) async {
@@ -204,7 +224,7 @@ public actor LibraryStore {
         if cachedLoaded?.id == id { cachedLoaded = nil }
         if reindex {
             let entry = try makeEntry(bundleURL: bundleURL)
-            await indexEntry(entry, transcriptText: transcript.text)
+            await indexEntry(entry, transcript: transcript)
         }
     }
 
@@ -250,12 +270,13 @@ public actor LibraryStore {
         if cachedLoaded?.id == id { cachedLoaded = nil }
         let entry = try makeEntry(bundleURL: bundleURL)
         if let doc = try? ParolaDocument.read(at: bundleURL) {
-            await indexEntry(entry, transcriptText: doc.transcript.text)
+            await indexEntry(entry, transcript: doc.transcript)
         }
     }
 
-    /// Sets a note for a segment within an entry. Pass `nil` or empty to clear it.
-    public func setSegmentNote(_ note: String?, segmentID: Int, for id: LibraryEntry.ID) throws {
+    /// Sets a note for a segment within an entry, then re-indexes so notes are searchable.
+    /// Pass `nil` or empty to clear it.
+    public func setSegmentNote(_ note: String?, segmentID: Int, for id: LibraryEntry.ID) async throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
@@ -271,6 +292,10 @@ public actor LibraryStore {
         }
         invalidateListCaches()
         if cachedLoaded?.id == id { cachedLoaded = nil }
+        let entry = try makeEntry(bundleURL: bundleURL)
+        if let doc = try? ParolaDocument.read(at: bundleURL) {
+            await indexEntry(entry, transcript: doc.transcript)
+        }
     }
 
     /// Replaces the labels on a library entry. Empty array clears them.

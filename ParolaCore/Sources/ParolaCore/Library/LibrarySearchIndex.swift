@@ -30,6 +30,14 @@ public actor LibrarySearchIndex {
         let id: String
         let title: String
         let text: String
+        let auxiliaryText: String
+
+        init(id: String, title: String, text: String, auxiliaryText: String = "") {
+            self.id = id
+            self.title = title
+            self.text = text
+            self.auxiliaryText = auxiliaryText
+        }
     }
 
     private struct IndexedEntry: Sendable {
@@ -60,7 +68,7 @@ public actor LibrarySearchIndex {
         case missing
     }
 
-    private static let snapshotVersion = 2
+    private static let snapshotVersion = 3
     private static let excerptLength = 200
 
     private var entries: [String: IndexedEntry] = [:]
@@ -86,10 +94,11 @@ public actor LibrarySearchIndex {
         }
     }
 
-    public func index(id: String, title: String, text: String, createdAt: Date) async {
+    /// Indexes an entry. `auxiliaryText` (summary, notes, speaker names) is tokenized for search but never shown in snippets.
+    public func index(id: String, title: String, text: String, auxiliaryText: String = "", createdAt: Date) async {
         await ensureLoaded()
         removeFromIndex(id)
-        addToIndex(id: id, title: title, text: text)
+        addToIndex(id: id, title: title, text: text, auxiliaryText: auxiliaryText)
         scheduleSave()
     }
 
@@ -144,7 +153,7 @@ public actor LibrarySearchIndex {
         entries.removeAll()
         inverted.removeAll()
         for entry in rebuilt {
-            addToIndex(id: entry.id, title: entry.title, text: entry.text)
+            addToIndex(id: entry.id, title: entry.title, text: entry.text, auxiliaryText: entry.auxiliaryText)
         }
         staleSnapshotDiscarded = false
         pendingSaveTask?.cancel()
@@ -187,8 +196,8 @@ public actor LibrarySearchIndex {
         return .loaded(LoadedState(entries: entries, inverted: inverted))
     }
 
-    private func addToIndex(id: String, title: String, text: String) {
-        let tokens = Set(Self.tokenize(title) + Self.tokenize(text))
+    private func addToIndex(id: String, title: String, text: String, auxiliaryText: String) {
+        let tokens = Set(Self.tokenize(title) + Self.tokenize(text) + Self.tokenize(auxiliaryText))
         entries[id] = IndexedEntry(
             title: title,
             excerpt: String(text.prefix(Self.excerptLength)),

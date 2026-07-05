@@ -26,8 +26,10 @@ enum LibraryDateRangeFilter: String, CaseIterable, Identifiable {
 
 struct LibraryFilterBar: View {
     @Binding var labelFilter: String?
+    @Binding var languageFilter: String?
     @Binding var dateRangeFilter: LibraryDateRangeFilter
     let labelOptions: [String]
+    let languageOptions: [String]
 
     var body: some View {
         Group {
@@ -53,6 +55,28 @@ struct LibraryFilterBar: View {
                 .fixedSize()
                 .axLeaf("Filter.Menu.Label")
             }
+            if languageOptions.count >= 2 {
+                Menu {
+                    Button("All languages") { languageFilter = nil }
+                        .axLeaf("Filter.MenuItem.AllLanguages")
+                    Divider()
+                    ForEach(languageOptions, id: \.self) { code in
+                        Button(languageName(code)) { languageFilter = code }
+                            .axLeaf("Filter.MenuItem.Language.\(code)")
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "globe")
+                        Text(languageFilter.map { languageName($0) } ?? String(localized: "All languages"))
+                    }
+                    .font(DS.Font.subheadlineMedium)
+                    .foregroundStyle(languageFilter == nil ? .secondary : DS.Color.accent)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .axLeaf("Filter.Menu.Language")
+            }
             Menu {
                 ForEach(LibraryDateRangeFilter.allCases) { option in
                     Button(option.label) { dateRangeFilter = option }
@@ -71,5 +95,9 @@ struct LibraryFilterBar: View {
             .fixedSize()
             .axLeaf("Filter.Menu.Date")
         }
+    }
+
+    private func languageName(_ code: String) -> String {
+        LanguageDisplay.name(for: code) ?? code.uppercased()
     }
 }

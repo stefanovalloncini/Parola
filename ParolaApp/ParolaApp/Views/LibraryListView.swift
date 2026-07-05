@@ -11,9 +11,11 @@ struct LibraryListView: View {
     @State private var renamingEntry: LibraryEntry?
     @State private var renameDraft: String = ""
     @State private var labelFilter: String?
+    @State private var languageFilter: String?
     @State private var dateRangeFilter: LibraryDateRangeFilter = .all
     @State private var entries: [LibraryEntry] = []
     @State private var labelOptions: [String] = []
+    @State private var languageOptions: [String] = []
     @ScaledMetric(relativeTo: .largeTitle) private var emptyIconSize: CGFloat = 48
 
     @discardableResult
@@ -29,6 +31,10 @@ struct LibraryListView: View {
                     return entry.labels.contains { $0.localizedCaseInsensitiveCompare(labelFilter) == .orderedSame }
                 }
                 .filter { entry in
+                    guard let languageFilter else { return true }
+                    return LanguageDisplay.code(for: entry.language) == languageFilter
+                }
+                .filter { entry in
                     guard let cutoff = dateRangeFilter.cutoff else { return true }
                     return entry.createdAt >= cutoff
                 }
@@ -41,15 +47,21 @@ struct LibraryListView: View {
         return computed
     }
 
-    private func recomputeLabelOptions() {
-        var seen = Set<String>()
-        var ordered: [String] = []
+    private func recomputeFilterOptions() {
+        var seenLabels = Set<String>()
+        var labels: [String] = []
+        var seenLanguages = Set<String>()
+        var languages: [String] = []
         for entry in model.libraryEntries where category == nil || entry.category == category {
             for label in entry.labels {
-                if seen.insert(label).inserted { ordered.append(label) }
+                if seenLabels.insert(label).inserted { labels.append(label) }
+            }
+            if let code = LanguageDisplay.code(for: entry.language), seenLanguages.insert(code).inserted {
+                languages.append(code)
             }
         }
-        labelOptions = ordered.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        labelOptions = labels.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        languageOptions = languages.sorted()
     }
 
     var body: some View {
@@ -105,18 +117,19 @@ struct LibraryListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             recomputeEntries()
-            recomputeLabelOptions()
+            recomputeFilterOptions()
         }
         .onChange(of: model.libraryVersion) { _, _ in
             let newEntries = recomputeEntries()
-            recomputeLabelOptions()
+            recomputeFilterOptions()
             selection = selection.intersection(Set(newEntries.map(\.id)))
         }
         .onChange(of: labelFilter) { _, _ in recomputeEntries() }
+        .onChange(of: languageFilter) { _, _ in recomputeEntries() }
         .onChange(of: dateRangeFilter) { _, _ in recomputeEntries() }
         .onChange(of: category) { _, _ in
             let newEntries = recomputeEntries()
-            recomputeLabelOptions()
+            recomputeFilterOptions()
             selection = selection.intersection(Set(newEntries.map(\.id)))
         }
         .alert("Delete \(selection.count) entries?", isPresented: $pendingBulkDelete) {
@@ -153,8 +166,10 @@ struct LibraryListView: View {
             if searchResults == nil {
                 LibraryFilterBar(
                     labelFilter: $labelFilter,
+                    languageFilter: $languageFilter,
                     dateRangeFilter: $dateRangeFilter,
-                    labelOptions: labelOptions
+                    labelOptions: labelOptions,
+                    languageOptions: languageOptions
                 )
             }
             Spacer()

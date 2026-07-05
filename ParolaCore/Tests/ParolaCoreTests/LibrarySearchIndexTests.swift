@@ -193,6 +193,53 @@ struct LibrarySearchIndexTests {
         #expect(gone.isEmpty)
     }
 
+    @Test("auxiliary text is searchable but stays out of the snippet")
+    func auxiliarySearchable() async throws {
+        let (index, _) = makeTempIndex()
+        await index.index(
+            id: "e1",
+            title: "Notes",
+            text: "Discussed sprint planning today.",
+            auxiliaryText: "Renewal deadlines are slipping\nMarta",
+            createdAt: Date()
+        )
+        let matches = await index.search("renewal")
+        let match = try #require(matches.first(where: { $0.entryID == "e1" }))
+        #expect(match.snippet.lowercased().contains("renewal") == false)
+        #expect(await index.search("marta").contains(where: { $0.entryID == "e1" }))
+    }
+
+    @Test("re-indexing replaces auxiliary tokens too")
+    func reindexReplacesAuxiliary() async throws {
+        let (index, _) = makeTempIndex()
+        await index.index(id: "e1", title: "Notes", text: "sprint", auxiliaryText: "kanban", createdAt: Date())
+        await index.index(id: "e1", title: "Notes", text: "sprint", auxiliaryText: "roadmap", createdAt: Date())
+        #expect(await index.search("kanban").isEmpty)
+        #expect(await index.search("roadmap").contains(where: { $0.entryID == "e1" }))
+    }
+
+    @Test("rebuild indexes each entry's auxiliary text")
+    func rebuildCarriesAuxiliary() async throws {
+        let (index, _) = makeTempIndex()
+        await index.rebuild(entries: [
+            .init(id: "e1", title: "Notes", text: "sprint planning", auxiliaryText: "kanban board")
+        ])
+        #expect(await index.search("kanban").contains(where: { $0.entryID == "e1" }))
+    }
+
+    @Test("a version-2 snapshot is discarded as stale")
+    func v2SnapshotDiscarded() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-search-test-\(UUID().uuidString).json")
+        let v2 = """
+        {"version":2,"entries":{"e1":{"title":"Old","excerpt":"sprint planning","tokens":["sprint","planning"]}}}
+        """
+        try Data(v2.utf8).write(to: url)
+        let index = LibrarySearchIndex(indexURL: url)
+        #expect(await index.needsRebuild())
+        #expect(await index.search("sprint").isEmpty)
+    }
+
     @Test("indexing on a cold instance does not clobber the loaded snapshot")
     func coldMutationPreservesSnapshot() async throws {
         let (index1, url) = makeTempIndex()
