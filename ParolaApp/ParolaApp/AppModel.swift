@@ -732,8 +732,9 @@ final class AppModel {
     @ObservationIgnored var liveSource: AudioSource?
     @ObservationIgnored var deferredArrivals: [URL] = []
     @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
-    @ObservationIgnored private var streamingConsumer: Task<Void, Never>?
-    @ObservationIgnored private var fileTranscribeTask: Task<Void, Never>?
+    @ObservationIgnored var streamingConsumer: Task<Void, Never>?
+    @ObservationIgnored var fileTranscribeTask: Task<Void, Never>?
+    @ObservationIgnored var recordingOutcomeWaiters: [CheckedContinuation<String, any Error>] = []
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeSubsTask: Task<Void, Never>?
@@ -777,6 +778,7 @@ final class AppModel {
         youtubeSubsTask?.cancel()
         youtubeSubsTask = nil
         teardownActiveCapture()
+        resolveRecordingOutcome(.failure(IntentActionError.cancelled))
         if hadWork || phase != .ready { phase = .idle }
     }
 
@@ -793,6 +795,7 @@ final class AppModel {
         youtubeTranscribeTask?.cancel(); youtubeTranscribeTask = nil
         youtubeSubsTask?.cancel(); youtubeSubsTask = nil
         teardownActiveCapture()
+        resolveRecordingOutcome(.failure(IntentActionError.cancelled))
     }
 
     func unloadTranscriptionSession() async {
@@ -1699,7 +1702,9 @@ final class AppModel {
                 }
             } catch {
                 teardownStreaming()
-                phase = .failed(message: Self.transcriptionFailureMessage(for: error))
+                let message = Self.transcriptionFailureMessage(for: error)
+                phase = .failed(message: message)
+                resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
                 drainDeferredArrivals()
             }
             await mediaSession.exitRecording()
@@ -1748,6 +1753,7 @@ final class AppModel {
         case .failed(let msg):
             teardownStreaming()
             phase = .failed(message: msg)
+            resolveRecordingOutcome(.failure(IntentActionError.failed(msg)))
             drainDeferredArrivals()
         case .finished(let transcript):
             let processed = await postProcessDetached(transcript)
@@ -1762,6 +1768,7 @@ final class AppModel {
                 installPlayer(for: audioURL)
             }
             persistToLibrary(processed, audioSource: processed.sourceURL)
+            resolveRecordingOutcome(.success(processed.text))
             drainDeferredArrivals()
         }
     }
@@ -1778,6 +1785,8 @@ final class AppModel {
                 streamingConsumer = nil
                 stopRecordingLevelObserver()
                 stopSilenceWatch()
+                // No-op when .finished already resolved them; covers a stream that ends without one.
+                resolveRecordingOutcome(.failure(IntentActionError.failed("The recording ended without a transcript.")))
             }
             return
         }
@@ -1804,10 +1813,13 @@ final class AppModel {
                 transcript = processed
                 phase = .ready
                 persistToLibrary(processed, audioSource: url)
+                resolveRecordingOutcome(.success(processed.text))
                 drainDeferredArrivals()
             } catch {
                 stopRecordingLevelObserver()
-                phase = .failed(message: Self.transcriptionFailureMessage(for: error))
+                let message = Self.transcriptionFailureMessage(for: error)
+                phase = .failed(message: message)
+                resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
                 drainDeferredArrivals()
             }
         }

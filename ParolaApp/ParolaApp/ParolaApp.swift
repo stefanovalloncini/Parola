@@ -73,6 +73,7 @@ struct ParolaApp: App {
         let m = AppModel(bootstrap: bootstrap)
         let lc = LiveCaptionsController()
         m.liveCaptions = lc
+        m.registerIntentPerformers()
         _model = State(initialValue: m)
         _liveCaptions = State(initialValue: lc)
     }
@@ -318,6 +319,18 @@ struct ParolaShortcuts: AppShortcutsProvider {
             phrases: ["Start recording in \(.applicationName)"],
             shortTitle: "Start Recording",
             systemImageName: "record.circle"
+        )
+        AppShortcut(
+            intent: StopRecordingIntent(),
+            phrases: ["Stop recording in \(.applicationName)"],
+            shortTitle: "Stop Recording",
+            systemImageName: "stop.circle"
+        )
+        AppShortcut(
+            intent: TranscribeFileIntent(),
+            phrases: ["Transcribe a file with \(.applicationName)"],
+            shortTitle: "Transcribe File",
+            systemImageName: "waveform"
         )
         AppShortcut(
             intent: SummarizeLastTranscriptIntent(),

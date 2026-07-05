@@ -21,6 +21,22 @@ public struct StartRecordingIntent: AppIntent {
     }
 }
 
+public struct StopRecordingIntent: AppIntent {
+    public static let title: LocalizedStringResource = "Stop Recording"
+    public static let description = IntentDescription("Stops the current recording in Parola and returns the transcript text.")
+    public static let openAppWhenRun: Bool = true
+
+    public init() {}
+
+    @MainActor
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        guard let stopRecording = IntentPerformers.stopRecording else {
+            throw ParolaIntentError.unavailable
+        }
+        return .result(value: try await stopRecording())
+    }
+}
+
 public struct SummarizeLastTranscriptIntent: AppIntent {
     public static let title: LocalizedStringResource = "Summarize Last Transcript"
     public static let description = IntentDescription("Generates a summary for your most recent transcript in Parola.")
