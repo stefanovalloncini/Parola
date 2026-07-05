@@ -10,11 +10,27 @@ public enum TranscriptChatProvider: Sendable, Hashable {
 }
 
 public enum TranscriptChat {
+    public static let defaultBudgetTokens = 3500
+
     public static func makeSession(
         transcript: Transcript,
-        history: [ChatMessage] = []
+        history: [ChatMessage] = [],
+        budgetTokens: Int? = nil
     ) throws -> TranscriptChatSession {
-        let model = try makeOnDeviceModel(instructions: systemInstructions(for: transcript))
+        let budget = budgetTokens ?? defaultBudgetTokens
+        let model: any LanguageModel
+        if usesCondensedContext(for: transcript, budgetTokens: budget) {
+            // Probe availability now so an over-budget session fails at creation like the plain path.
+            _ = try makeOnDeviceModel(instructions: "")
+            model = CondensedChatModel(
+                transcript: transcript,
+                budgetTokens: budget,
+                makeDigest: digestProvider(for: transcript, budgetTokens: budget),
+                makeModel: { try makeOnDeviceModel(instructions: $0) }
+            )
+        } else {
+            model = try makeOnDeviceModel(instructions: systemInstructions(for: transcript))
+        }
         return TranscriptChatSession(transcript: transcript, history: history, model: model)
     }
 
@@ -23,22 +39,39 @@ public enum TranscriptChat {
         history: [ChatMessage] = [],
         provider: TranscriptChatProvider,
         keyStore: APIKeyStore = KeychainAPIKeyStore.shared,
-        managed: ManagedConfiguration = .shared
+        managed: ManagedConfiguration = .shared,
+        budgetTokens: Int? = nil
     ) async throws -> TranscriptChatSession {
-        let instructions = systemInstructions(for: transcript)
-        let model: any LanguageModel
         switch provider {
         case .onDevice:
-            model = try makeOnDeviceModel(instructions: instructions)
+            return try makeSession(transcript: transcript, history: history, budgetTokens: budgetTokens)
         case .cloud(let id):
-            model = try await LanguageModelFactory.makeBYOKCloud(
-                provider: id,
-                instructions: instructions,
-                keyStore: keyStore,
-                managed: managed
-            )
+            let budget = budgetTokens ?? cloudBudgetTokens(for: id)
+            let makeCloudModel: @Sendable (String) async throws -> any LanguageModel = { instructions in
+                try await LanguageModelFactory.makeBYOKCloud(
+                    provider: id,
+                    instructions: instructions,
+                    keyStore: keyStore,
+                    managed: managed
+                )
+            }
+            let model: any LanguageModel
+            if usesCondensedContext(for: transcript, budgetTokens: budget) {
+                // Probe key/policy now so an over-budget session fails at creation like the plain path.
+                _ = try await makeCloudModel("")
+                model = CondensedChatModel(
+                    transcript: transcript,
+                    budgetTokens: budget,
+                    makeDigest: digestProvider(for: transcript, budgetTokens: budget, summariseModel: {
+                        try await makeCloudModel(SummaryService.textInstructions)
+                    }),
+                    makeModel: makeCloudModel
+                )
+            } else {
+                model = try await makeCloudModel(systemInstructions(for: transcript))
+            }
+            return TranscriptChatSession(transcript: transcript, history: history, model: model)
         }
-        return TranscriptChatSession(transcript: transcript, history: history, model: model)
     }
 
     public static func makeSession(
@@ -59,6 +92,94 @@ public enum TranscriptChat {
         """
         out += TranscriptPromptContext.timestampedLines(for: transcript)
         return out
+    }
+
+    static func usesCondensedContext(for transcript: Transcript, budgetTokens: Int) -> Bool {
+        TokenBudget.estimateTokens(systemInstructions(for: transcript)) > budgetTokens
+    }
+
+    static func cloudBudgetTokens(for id: CloudLLMProviderID, responseHeadroom: Int = 4096) -> Int {
+        guard let info = CloudLLMProviderInfo.info(for: id) else { return defaultBudgetTokens }
+        return max(defaultBudgetTokens, info.contextWindowTokens - responseHeadroom)
+    }
+
+    static func digestProvider(
+        for transcript: Transcript,
+        budgetTokens: Int,
+        summariseModel: (@Sendable () async throws -> any LanguageModel)? = nil
+    ) -> @Sendable () async throws -> Summary {
+        if let summary = transcript.summary, !summary.text.isEmpty {
+            return { summary }
+        }
+        return {
+            let service = SummaryService(budgetTokens: budgetTokens)
+            if let summariseModel {
+                return try await service.summarise(transcript, model: try await summariseModel())
+            }
+            return try await service.summarise(transcript)
+        }
+    }
+
+    static func condensedInstructions(
+        for transcript: Transcript,
+        question: String,
+        digest: Summary,
+        budgetTokens: Int
+    ) -> String {
+        var out = """
+        You answer questions about a transcript. Be concise — one or two sentences unless the user asks for more. When you reference a moment from the audio, include its timestamp in MM:SS or HH:MM:SS form.
+
+        The transcript is too long to include whole. Below are its summary and the excerpts most relevant to the latest question. Timestamps are from the original recording.
+
+        SUMMARY:
+        \(digest.text)
+        """
+        if !digest.chapters.isEmpty {
+            out += "\n\nCHAPTERS:\n"
+            for chapter in digest.chapters {
+                out += "\(Timecode.format(chapter.start))  \(chapter.title)\n"
+            }
+        }
+        out += "\nRELEVANT EXCERPTS:\n"
+        let remaining = budgetTokens - TokenBudget.estimateTokens(out)
+        for segment in relevantSegments(in: transcript, question: question, maxTokens: remaining) {
+            let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            out += "\(Timecode.format(segment.start))  \(body)\n"
+        }
+        return out
+    }
+
+    static func relevantSegments(
+        in transcript: Transcript,
+        question: String,
+        maxTokens: Int
+    ) -> [TranscriptSegment] {
+        let questionTokens = keywordTokens(question)
+        guard !questionTokens.isEmpty, maxTokens > 0 else { return [] }
+        let ranked = transcript.segments
+            .compactMap { segment -> (segment: TranscriptSegment, score: Int)? in
+                let overlap = keywordTokens(segment.text).intersection(questionTokens).count
+                return overlap > 0 ? (segment, overlap) : nil
+            }
+            .sorted { $0.score == $1.score ? $0.segment.start < $1.segment.start : $0.score > $1.score }
+        var budget = maxTokens
+        var picked: [TranscriptSegment] = []
+        for (segment, _) in ranked {
+            let cost = TokenBudget.estimateTokens(segment.text) + 4
+            guard cost <= budget else { continue }
+            budget -= cost
+            picked.append(segment)
+        }
+        return picked.sorted { $0.start < $1.start }
+    }
+
+    static func keywordTokens(_ text: String) -> Set<String> {
+        Set(
+            text.lowercased()
+                .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+                .filter { $0.count >= 3 }
+                .map(String.init)
+        )
     }
 
     private static func makeOnDeviceModel(instructions: String) throws -> any LanguageModel {

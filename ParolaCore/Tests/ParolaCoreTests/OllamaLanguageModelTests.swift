@@ -28,6 +28,24 @@ struct OllamaLanguageModelTests {
         #expect(messages?.last?["content"] == "Hi there")
     }
 
+    @Test("request body carries options.num_ctx defaulting to 8192")
+    func numCtxDefault() throws {
+        let model = OllamaLanguageModel(model: "llama3")
+        let (request, _) = try model.buildRequest(prompt: "Hi", streaming: false)
+        let json = try JSONSerialization.jsonObject(with: request.httpBody ?? Data()) as? [String: Any]
+        let options = json?["options"] as? [String: Any]
+        #expect(options?["num_ctx"] as? Int == 8192)
+    }
+
+    @Test("contextTokens init parameter overrides num_ctx")
+    func numCtxOverride() throws {
+        let model = OllamaLanguageModel(model: "llama3", contextTokens: 16384)
+        let (request, _) = try model.buildRequest(prompt: "Hi", streaming: true)
+        let json = try JSONSerialization.jsonObject(with: request.httpBody ?? Data()) as? [String: Any]
+        let options = json?["options"] as? [String: Any]
+        #expect(options?["num_ctx"] as? Int == 16384)
+    }
+
     @Test("streaming request sets stream=true")
     func streamingFlag() throws {
         let model = OllamaLanguageModel(model: "llama3")

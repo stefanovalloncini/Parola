@@ -44,12 +44,13 @@ public enum LanguageModelFactory {
         model: String = "llama3",
         endpoint: URL = URL(string: "http://localhost:11434")!,
         instructions: String = "You're a helpful assistant.",
+        contextTokens: Int = 8192,
         clock: any Clock<Duration> = ContinuousClock()
     ) async -> any LanguageModel {
         if let mock = await MockLanguageModelStore.shared.resolve(for: .ollama) {
             return MockLanguageModel.make(response: mock, clock: clock)
         }
-        return OllamaLanguageModel(model: model, endpoint: endpoint, instructions: instructions)
+        return OllamaLanguageModel(model: model, endpoint: endpoint, instructions: instructions, contextTokens: contextTokens)
     }
 
     public static func makeOnDevice(

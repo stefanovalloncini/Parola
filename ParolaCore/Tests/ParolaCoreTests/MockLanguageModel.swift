@@ -4,11 +4,13 @@ import Foundation
 actor MockLanguageModel: LanguageModel {
     var scriptedResponses: [String]
     var scriptedError: Error?
+    var failOnCallIndex: Int?
     private(set) var receivedHistories: [[ChatTurn]] = []
 
-    init(scriptedResponses: [String] = [], error: Error? = nil) {
+    init(scriptedResponses: [String] = [], error: Error? = nil, failOnCallIndex: Int? = nil) {
         self.scriptedResponses = scriptedResponses
         self.scriptedError = error
+        self.failOnCallIndex = failOnCallIndex
     }
 
     func setError(_ error: Error?) {
@@ -25,6 +27,9 @@ actor MockLanguageModel: LanguageModel {
 
     private func nextResponse() throws -> String {
         if let scriptedError { throw scriptedError }
+        if let failOnCallIndex, receivedHistories.count - 1 == failOnCallIndex {
+            throw NSError(domain: "MockLanguageModel", code: 99)
+        }
         guard !scriptedResponses.isEmpty else { return "" }
         return scriptedResponses.removeFirst()
     }

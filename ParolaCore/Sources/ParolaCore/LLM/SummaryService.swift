@@ -19,7 +19,15 @@ public actor SummaryService {
         public var errorDescription: String? { description }
     }
 
-    public init() {}
+    public static let defaultBudgetTokens = 3500
+
+    private let budgetTokens: Int
+
+    /// The budget is the prompt-token ceiling (chars/4 estimate); transcripts over it are
+    /// summarised per time-window and reduced. The default fits Apple's 4096-token context.
+    public init(budgetTokens: Int = SummaryService.defaultBudgetTokens) {
+        self.budgetTokens = budgetTokens
+    }
 
     public func summarise(_ transcript: Transcript) async throws -> Summary {
         #if canImport(FoundationModels)
@@ -31,13 +39,30 @@ public actor SummaryService {
     }
 
     public func summarise(_ transcript: Transcript, model: any LanguageModel) async throws -> Summary {
-        let prompt = SummaryService.buildPrompt(for: transcript)
-        do {
-            let response = try await model.respond(to: prompt)
-            return SummaryService.parse(response)
-        } catch {
-            throw FailureReason.modelError(error.localizedDescription)
+        try await summarise(transcript) { prompt in
+            do {
+                return SummaryService.parse(try await model.respond(to: prompt))
+            } catch {
+                throw FailureReason.modelError(error.localizedDescription)
+            }
         }
+    }
+
+    private func summarise(
+        _ transcript: Transcript,
+        respond: (String) async throws -> Summary
+    ) async throws -> Summary {
+        let prompt = SummaryService.buildPrompt(for: transcript)
+        guard TokenBudget.estimateTokens(prompt) > budgetTokens else {
+            return try await respond(prompt)
+        }
+        let windows = SummaryService.windows(for: transcript, budgetTokens: budgetTokens)
+        var parts: [Summary] = []
+        for window in windows {
+            parts.append(try await respond(SummaryService.buildPrompt(for: window)))
+        }
+        let reduced = try await respond(SummaryService.buildReducePrompt(parts.map(\.text)))
+        return Summary(text: reduced.text, chapters: SummaryService.mergeChapters(parts.flatMap(\.chapters)))
     }
 
     private func summariseText(_ transcript: Transcript) async throws -> Summary {
@@ -57,13 +82,14 @@ public actor SummaryService {
             throw FailureReason.notAvailable("Apple Intelligence isn't available right now.")
         }
 
-        let session = LanguageModelSession(instructions: SummaryService.structuredInstructions)
-        let prompt = SummaryService.buildPrompt(for: transcript)
-        do {
-            let response = try await session.respond(to: prompt, generating: GenerableSummary.self)
-            return response.content.toSummary()
-        } catch {
-            throw FailureReason.modelError(error.localizedDescription)
+        return try await summarise(transcript) { prompt in
+            let session = LanguageModelSession(instructions: SummaryService.structuredInstructions)
+            do {
+                let response = try await session.respond(to: prompt, generating: GenerableSummary.self)
+                return response.content.toSummary()
+            } catch {
+                throw FailureReason.modelError(error.localizedDescription)
+            }
         }
     }
     #endif
@@ -82,9 +108,50 @@ public actor SummaryService {
     You summarise transcripts. Produce a two-to-four-sentence summary plus five to ten chapter markers. Each chapter has a timestamp in seconds from the start of the transcript and a three-to-six-word title.
     """
 
+    static let promptHeader = "Transcript follows. Each line is prefixed with its timestamp.\n\n"
+
     static func buildPrompt(for transcript: Transcript) -> String {
-        var out = "Transcript follows. Each line is prefixed with its timestamp.\n\n"
-        out += TranscriptPromptContext.timestampedLines(for: transcript)
+        promptHeader + TranscriptPromptContext.timestampedLines(for: transcript)
+    }
+
+    static func windows(for transcript: Transcript, budgetTokens: Int) -> [Transcript] {
+        let lineBudget = max(1, budgetTokens - TokenBudget.estimateTokens(promptHeader))
+        var windows: [[TranscriptSegment]] = []
+        var current: [TranscriptSegment] = []
+        var used = 0
+        for segment in transcript.segments {
+            let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let cost = body.isEmpty ? 0 : TokenBudget.estimateTokens("\(Timecode.format(segment.start))  \(body)\n")
+            if !current.isEmpty && used + cost > lineBudget {
+                windows.append(current)
+                current = []
+                used = 0
+            }
+            current.append(segment)
+            used += cost
+        }
+        if !current.isEmpty { windows.append(current) }
+        return windows.map { Transcript(segments: $0, language: transcript.language, modelName: transcript.modelName) }
+    }
+
+    static func buildReducePrompt(_ partSummaries: [String]) -> String {
+        var out = "These are summaries of consecutive parts of one longer transcript, in order. Combine them into a single summary of the whole transcript, in the same response format.\n"
+        for (index, part) in partSummaries.enumerated() {
+            out += "\nPart \(index + 1):\n\(part)\n"
+        }
+        return out
+    }
+
+    static func mergeChapters(_ chapters: [Chapter], echoWindowSeconds: Double = 600) -> [Chapter] {
+        var out: [Chapter] = []
+        for chapter in chapters.sorted(by: { $0.start < $1.start }) {
+            if let last = out.last,
+               last.title.compare(chapter.title, options: .caseInsensitive) == .orderedSame,
+               chapter.start - last.start <= echoWindowSeconds {
+                continue
+            }
+            out.append(chapter)
+        }
         return out
     }
 

@@ -11,20 +11,25 @@ struct OllamaLanguageModel: LanguageModel {
         return URLSession(configuration: config)
     }()
 
+    static let defaultContextTokens = 8192
+
     private let model: String
     private let endpoint: URL
     private let instructions: String
+    private let contextTokens: Int
     private let session: URLSession
 
     init(
         model: String = OllamaLanguageModel.defaultModel,
         endpoint: URL = OllamaLanguageModel.defaultEndpoint,
         instructions: String = "You're a helpful assistant.",
+        contextTokens: Int = OllamaLanguageModel.defaultContextTokens,
         session: URLSession? = nil
     ) {
         self.model = model
         self.endpoint = endpoint
         self.instructions = instructions
+        self.contextTokens = contextTokens
         self.session = session ?? Self.streamingSession
     }
 
@@ -96,10 +101,12 @@ struct OllamaLanguageModel: LanguageModel {
         for turn in history {
             messages.append(["role": turn.role == .user ? "user" : "assistant", "content": turn.text])
         }
+        // Ollama's default num_ctx (2048-4096 depending on version) silently clips the prompt head.
         let body: [String: Any] = [
             "model": model,
             "messages": messages,
             "stream": streaming,
+            "options": ["num_ctx": contextTokens],
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         return (request, { data in
