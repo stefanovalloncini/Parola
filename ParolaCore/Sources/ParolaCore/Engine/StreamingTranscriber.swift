@@ -13,12 +13,13 @@ public protocol StreamingTranscriber: Sendable {
 public enum StreamingTranscriberFactory {
     public static func make(
         modelStore: ModelStore = .shared,
-        clock: any Clock<Duration> = ContinuousClock()
+        clock: any Clock<Duration> = ContinuousClock(),
+        deviceUID: String? = nil
     ) -> any StreamingTranscriber {
         if let response = MockStreamingTranscriberRegistry.shared.resolve() {
             return MockStreamingTranscriber(response: response, clock: clock)
         }
-        return StreamingTranscriptionSession(modelStore: modelStore)
+        return StreamingTranscriptionSession(modelStore: modelStore, deviceUID: deviceUID)
     }
 
     /// Loads the model into the shared streaming cache so the next session start skips the load.

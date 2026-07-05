@@ -332,6 +332,15 @@ struct AppModelDictationTests {
         #expect(options.language == "en")
     }
 
+    @Test("startDictation threads the preferred input device into the configuration")
+    func startDictationThreadsInputDevice() {
+        let model = makeModel()
+        model.inputDeviceUID = "usb-mic-uid"
+        model.startDictation()
+        #expect(model.dictationController.configuration?.deviceUID == "usb-mic-uid")
+        model.stopDictation()
+    }
+
     @Test("prewarm candidate is the model only for installed streaming WhisperKit variants")
     func prewarmCandidateGates() {
         let whisper = "openai_whisper-large-v3_turbo"

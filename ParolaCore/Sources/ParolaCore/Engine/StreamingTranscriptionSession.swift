@@ -30,6 +30,7 @@ public protocol StreamingSpeakerLabeler: Sendable {
 /// One session = one mic capture. Construct a new one to record again.
 public actor StreamingTranscriptionSession: StreamingTranscriber {
     public let modelStore: ModelStore
+    nonisolated let deviceUID: String?
 
     private var whisperKit: WhisperKit?
     private var captureProcessor: AudioProcessor?
@@ -45,9 +46,19 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private var speakerLabeler: (any StreamingSpeakerLabeler)?
     private var persistAudio = false
 
-    public init(modelStore: ModelStore = .shared, persistAudio: Bool = false) {
+    public init(modelStore: ModelStore = .shared, persistAudio: Bool = false, deviceUID: String? = nil) {
         self.modelStore = modelStore
         self.persistAudio = persistAudio
+        self.deviceUID = deviceUID
+    }
+
+    static func resolveInputDeviceID(uid: String?) -> DeviceID? {
+        #if os(macOS)
+        guard let uid, !uid.isEmpty else { return nil }
+        return AudioDevices.deviceID(forUID: uid)
+        #else
+        return nil
+        #endif
     }
 
     /// Loads the model, starts the mic stream, and returns an `AsyncStream` of events.
@@ -106,6 +117,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             tokenizer: tokenizer
         )
         let keepCapturedAudio = persistAudio
+        let inputDeviceID = Self.resolveInputDeviceID(uid: deviceUID)
 
         let loop = StreamingRealtimeLoop(
             configuration: .init(wantsConfirmedAudio: speakerLabeler != nil),
@@ -113,7 +125,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             dependencies: .init(
                 requestPermission: { await AudioProcessor.requestRecordPermission() },
                 startCapture: { ingest in
-                    try processor.startRecordingLive(inputDeviceID: nil) { buffer in
+                    try processor.startRecordingLive(inputDeviceID: inputDeviceID) { buffer in
                         ingest(buffer)
                         // Runs on the tap thread, serialized with processBuffer's appends, so this purge can't race them.
                         if !keepCapturedAudio { processor.purgeAudioSamples(keepingLast: 0) }

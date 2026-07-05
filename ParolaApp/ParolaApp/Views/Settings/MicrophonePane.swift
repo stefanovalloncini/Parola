@@ -26,7 +26,7 @@ struct MicrophonePane: View {
             }
             SettingsSection {
                 SettingRow("Input device",
-                           description: "Used for recording and the dictation fallback path.",
+                           description: "Used for recording and dictation.",
                            isFirst: true) {
                     Picker("", selection: $model.inputDeviceUID) {
                         Text("System default").tag("")
@@ -81,7 +81,6 @@ struct MicrophonePane: View {
             if let startError {
                 MicErrorBanner(message: startError)
             }
-            SettingHelper(text: "Streaming WhisperKit dictation always uses the system default mic. Other modes follow this picker.")
 
             SettingsSection("While recording") {
                 SettingRow("Mute system audio",

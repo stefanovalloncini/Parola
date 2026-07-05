@@ -13,4 +13,18 @@ struct StreamingTranscriberFactoryTests {
         #expect(mock is MockStreamingTranscriber)
         MockStreamingTranscriberRegistry.shared.clear()
     }
+
+    @Test("a device UID reaches the session it builds")
+    func deviceUIDReachesSession() {
+        MockStreamingTranscriberRegistry.shared.clear()
+        let session = StreamingTranscriberFactory.make(deviceUID: "test-uid")
+        #expect((session as? StreamingTranscriptionSession)?.deviceUID == "test-uid")
+    }
+
+    @Test("unknown or missing device UIDs resolve to no capture device")
+    func unknownDeviceUIDResolvesToNil() {
+        #expect(StreamingTranscriptionSession.resolveInputDeviceID(uid: nil) == nil)
+        #expect(StreamingTranscriptionSession.resolveInputDeviceID(uid: "") == nil)
+        #expect(StreamingTranscriptionSession.resolveInputDeviceID(uid: "no-such-device-uid") == nil)
+    }
 }
