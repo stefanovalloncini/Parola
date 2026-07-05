@@ -147,6 +147,21 @@ struct SubtitleImportTests {
         #expect(model.transcript == nil)
     }
 
+    @Test("subtitle arrivals during a subtitle burn defer instead of stomping the export")
+    func exportingDefersSubtitleImport() throws {
+        let scratch = try Self.makeScratchDirectory()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let model = makeModel()
+        model.phase = .exporting(progress: 0.5)
+        let url = try Self.writeSrt(named: "deferred-export", in: scratch)
+
+        model.importSubtitle(fileURL: url)
+
+        #expect(model.deferredArrivals == [url])
+        #expect(model.phase == .exporting(progress: 0.5))
+        #expect(model.transcript == nil)
+    }
+
     @Test("subtitle arrivals during a running batch defer instead of joining the queue")
     func runningBatchDefersSubtitleImport() async throws {
         let scratch = try Self.makeScratchDirectory()

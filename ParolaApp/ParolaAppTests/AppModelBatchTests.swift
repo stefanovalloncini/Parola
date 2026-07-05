@@ -616,6 +616,41 @@ struct AppModelBatchTests {
         #expect(model.batchJobs.isEmpty)
     }
 
+    @Test("arrivals during a subtitle burn defer instead of racing the export")
+    func exportingDefersArrivals() {
+        let model = makeModel()
+        model.phase = .exporting(progress: 0.3)
+        let url = URL(fileURLWithPath: "/tmp/arrival.wav")
+        model.transcribe(fileURL: url)
+        #expect(model.deferredArrivals == [url])
+        #expect(model.phase == .exporting(progress: 0.3))
+        #expect(model.batchJobs.isEmpty)
+
+        model.startBatch(urls: [URL(fileURLWithPath: "/tmp/b.wav")])
+        #expect(model.deferredArrivals.count == 2)
+        #expect(model.batchJobs.isEmpty)
+    }
+
+    @Test("only recording and exporting defer arrivals")
+    func phaseDeferralMatrix() {
+        let model = makeModel()
+        model.phase = .recording(source: .microphone)
+        #expect(model.phaseDefersArrivals)
+        model.phase = .exporting(progress: 0.5)
+        #expect(model.phaseDefersArrivals)
+
+        let passThrough: [AppModel.Phase] = [
+            .idle, .ready, .failed(message: "x"),
+            .loadingModel(name: "m"),
+            .downloadingModel(name: "m", progress: 0),
+            .transcribing(file: URL(fileURLWithPath: "/tmp/t.wav")),
+        ]
+        for phase in passThrough {
+            model.phase = phase
+            #expect(!model.phaseDefersArrivals)
+        }
+    }
+
     @Test("deferred arrivals drain into the batch when recording finishes")
     func deferredArrivalsDrainOnFinish() async {
         let model = makeModel()

@@ -65,7 +65,7 @@ extension AppModel {
     }
 
     func startBatch(urls: [URL]) {
-        if case .recording = phase {
+        if phaseDefersArrivals {
             deferredArrivals.append(contentsOf: urls)
             return
         }

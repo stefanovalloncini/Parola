@@ -119,7 +119,7 @@ struct ContentToolbar: ToolbarContent {
                     Image(systemName: "exclamationmark.triangle")
                 }
                 .toggleStyle(.button)
-                .help("Show subtitle quality warnings on segments that read too fast, run too short, or overflow a caption line.")
+                .help("Warn about segments that read too fast or fall outside caption limits.")
                 .accessibilityLabel("Subtitle QC")
                 .accessibilityIdentifier("toolbar.subtitleQC")
                 .axLeaf("Toolbar.Toggle.SubtitleQC")

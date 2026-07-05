@@ -1192,6 +1192,14 @@ final class AppModel {
         }
     }
 
+    // Arrivals must never stomp an active capture, subtitle burn, or batch (drops, watched folders, Services, URL scheme).
+    var phaseDefersArrivals: Bool {
+        switch phase {
+        case .recording, .exporting: return true
+        default: return false
+        }
+    }
+
     func handleIncomingFiles(_ urls: [URL]) {
         let subtitles = urls.filter(Self.isSubtitleImport)
         let media = urls.filter { !Self.isSubtitleImport($0) }
@@ -1218,7 +1226,7 @@ final class AppModel {
     }
 
     func importSubtitle(fileURL: URL) {
-        if case .recording = phase {
+        if phaseDefersArrivals {
             deferredArrivals.append(fileURL)
             return
         }
@@ -1258,8 +1266,7 @@ final class AppModel {
     }
 
     func transcribe(fileURL: URL, translateOverride: Bool? = nil) {
-        // Arrivals must never stomp an active capture or batch (drops, watched folders, Services, URL scheme).
-        if case .recording = phase {
+        if phaseDefersArrivals {
             deferredArrivals.append(fileURL)
             return
         }
@@ -2167,11 +2174,14 @@ final class AppModel {
                     }
                 }
                 self.phase = .ready
+                self.drainDeferredArrivals()
             } catch is CancellationError {
                 try? FileManager.default.removeItem(at: outputURL)
                 self.phase = self.transcript != nil ? .ready : .idle
+                self.drainDeferredArrivals()
             } catch {
                 self.phase = .failed(message: "Burn failed: \(error.localizedDescription)")
+                self.drainDeferredArrivals()
             }
             if !Task.isCancelled { self.burnTask = nil }
         }

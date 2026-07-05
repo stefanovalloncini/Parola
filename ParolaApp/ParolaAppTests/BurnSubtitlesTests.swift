@@ -170,6 +170,93 @@ struct BurnSubtitlesTests {
         #expect(model.canCancel == false)
     }
 
+    @Test("deferred arrivals drain into the batch when a burn finishes")
+    func finishedBurnDrainsDeferredArrivals() async {
+        let picker = TestFilePicker()
+        let model = makeModel(filePicker: picker)
+        model.transcript = Self.makeTranscript()
+        model.phase = .ready
+
+        let dir = FileManager.default.temporaryDirectory
+        await picker.queueInputResponse([dir.appendingPathComponent("in.mp4")])
+        await picker.queueSaveResponse(dir.appendingPathComponent("out.mp4"))
+
+        model.burnOperation = { _, _, _, _, progress in
+            progress(0.25)
+            try await Task.sleep(for: .milliseconds(200))
+        }
+
+        model.burnSubtitlesIntoVideo()
+        await Self.waitUntil { model.phase == .exporting(progress: 0.25) }
+
+        let url = URL(fileURLWithPath: "/tmp/mid-burn.wav")
+        model.transcribe(fileURL: url)
+        #expect(model.deferredArrivals == [url])
+        #expect(model.batchJobs.isEmpty)
+
+        await Self.waitUntil { model.batchJobs.contains { $0.url == url } }
+        #expect(model.deferredArrivals.isEmpty)
+        #expect(model.batchJobs.contains { $0.url == url })
+    }
+
+    @Test("a failed burn still drains deferred arrivals")
+    func failedBurnDrainsDeferredArrivals() async {
+        let picker = TestFilePicker()
+        let model = makeModel(filePicker: picker)
+        model.transcript = Self.makeTranscript()
+        model.phase = .ready
+
+        let dir = FileManager.default.temporaryDirectory
+        await picker.queueInputResponse([dir.appendingPathComponent("in.mp4")])
+        await picker.queueSaveResponse(dir.appendingPathComponent("out.mp4"))
+
+        model.burnOperation = { _, _, _, _, progress in
+            progress(0.25)
+            try await Task.sleep(for: .milliseconds(200))
+            throw ParolaError.ioError("boom")
+        }
+
+        model.burnSubtitlesIntoVideo()
+        await Self.waitUntil { model.phase == .exporting(progress: 0.25) }
+
+        let url = URL(fileURLWithPath: "/tmp/mid-burn-fail.wav")
+        model.transcribe(fileURL: url)
+        #expect(model.deferredArrivals == [url])
+
+        await Self.waitUntil { model.batchJobs.contains { $0.url == url } }
+        #expect(model.deferredArrivals.isEmpty)
+        #expect(model.batchJobs.contains { $0.url == url })
+    }
+
+    @Test("cancelling a burn discards deferred arrivals")
+    func cancelledBurnDiscardsDeferredArrivals() async {
+        let picker = TestFilePicker()
+        let model = makeModel(filePicker: picker)
+        model.transcript = Self.makeTranscript()
+        model.phase = .ready
+
+        let dir = FileManager.default.temporaryDirectory
+        await picker.queueInputResponse([dir.appendingPathComponent("in.mp4")])
+        await picker.queueSaveResponse(dir.appendingPathComponent("out.mp4"))
+
+        model.burnOperation = { _, _, _, _, progress in
+            progress(0.25)
+            try await Task.sleep(for: .seconds(60))
+        }
+
+        model.burnSubtitlesIntoVideo()
+        await Self.waitUntil { model.phase == .exporting(progress: 0.25) }
+
+        model.transcribe(fileURL: URL(fileURLWithPath: "/tmp/mid-burn-cancel.wav"))
+        #expect(model.deferredArrivals.count == 1)
+
+        model.cancelCurrentWork()
+
+        await Self.waitUntil { model.phase == .ready && !model.canCancel }
+        #expect(model.deferredArrivals.isEmpty)
+        #expect(model.batchJobs.isEmpty)
+    }
+
     @Test("dismissing the save panel abandons the burn without touching the phase")
     func abandonedSavePanelLeavesPhase() async {
         let picker = TestFilePicker()
