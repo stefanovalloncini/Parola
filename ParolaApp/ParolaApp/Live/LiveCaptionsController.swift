@@ -16,6 +16,7 @@ final class LiveCaptionsController {
     private var session: (any StreamingTranscriber)?
     private var consumer: Task<Void, Never>?
     private var lastOptions: TranscriptionOptions?
+    private var lastDeviceUID: String?
 
     isolated deinit {
         consumer?.cancel()
@@ -25,11 +26,11 @@ final class LiveCaptionsController {
 
     var isActive: Bool { state.isActive }
 
-    func toggle(options: TranscriptionOptions) async {
+    func toggle(options: TranscriptionOptions, deviceUID: String? = nil) async {
         if state.isActive {
             await stop()
         } else {
-            await start(options: optionsWithTranslate(options))
+            await start(options: optionsWithTranslate(options), deviceUID: deviceUID)
         }
     }
 
@@ -39,7 +40,7 @@ final class LiveCaptionsController {
         guard state.isActive else { return }
         await stop()
         guard !state.isActive, let current = lastOptions else { return }
-        await start(options: optionsWithTranslate(current))
+        await start(options: optionsWithTranslate(current), deviceUID: lastDeviceUID)
     }
 
     private func optionsWithTranslate(_ options: TranscriptionOptions) -> TranscriptionOptions {
@@ -48,14 +49,15 @@ final class LiveCaptionsController {
         return copy
     }
 
-    func start(options: TranscriptionOptions) async {
+    func start(options: TranscriptionOptions, deviceUID: String? = nil) async {
         guard !state.isActive else { return }
         lastOptions = options
+        lastDeviceUID = deviceUID
         state.reset()
         state.isActive = true
         state.isLoading = true
 
-        let s = StreamingTranscriberFactory.make()
+        let s = StreamingTranscriberFactory.make(deviceUID: deviceUID)
         session = s
         showWindow()
 

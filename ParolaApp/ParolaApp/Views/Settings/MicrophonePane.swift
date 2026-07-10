@@ -26,7 +26,7 @@ struct MicrophonePane: View {
             }
             SettingsSection {
                 SettingRow("Input device",
-                           description: "Used for recording and dictation.",
+                           description: "Used for recording, dictation, and live captions.",
                            isFirst: true) {
                     Picker("", selection: $model.inputDeviceUID) {
                         Text("System default").tag("")
