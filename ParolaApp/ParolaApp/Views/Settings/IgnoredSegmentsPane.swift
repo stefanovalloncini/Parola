@@ -51,7 +51,7 @@ struct IgnoredSegmentsPane: View {
             }
             .axLeaf("IgnoredSegments.Button.AddPattern")
 
-            SettingHelper(text: "Segments matching a pattern (case-insensitive, trimmed) are removed before saving.")
+            SettingHelper(text: "A segment is removed when its entire text equals a pattern (case-insensitive, trimmed). Catches filler-only segments like \"uh\" — not words inside sentences.")
             ResetPaneButton(scope: .ignoredSegments)
         }
     }
@@ -157,7 +157,7 @@ private struct IgnoredRuleRow: View {
                     .labelsHidden()
                     .disabled(!canEnable)
                     .axLeaf("IgnoredSegments.Toggle.RuleEnabled")
-                TextField("e.g. uh, um, hmm", text: $rule.pattern)
+                TextField("e.g. uh", text: $rule.pattern)
                     .textFieldStyle(.roundedBorder)
                     .axLeaf("IgnoredSegments.TextField.Pattern")
                 Button(role: .destructive, action: onDelete) {

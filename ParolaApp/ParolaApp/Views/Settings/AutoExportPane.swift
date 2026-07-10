@@ -50,6 +50,9 @@ struct AutoExportPane: View {
                 model.autoExportRules.append(
                     AutoExportRule(sourceExtensions: ["mp4"], outputFormats: [.srt])
                 )
+                // A live search or the Disabled filter would hide the fresh rule.
+                searchText = ""
+                enabledFilter = .all
             } label: {
                 Label("Add rule", systemImage: "plus.circle")
             }
