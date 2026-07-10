@@ -298,6 +298,10 @@ extension AppModel {
             chain.append(makeSnippetExpander())
         }
         chain.append(prompt)
+        // Deferred snippets expand after cleanup so {{CLIPBOARD}}/{{TIME}} read insert-time state.
+        if snippets.contains(where: { $0.enabled && $0.expandAtInsert }) {
+            chain.append(makeSnippetExpander().deferredOnly())
+        }
         return chain.count == 1 ? prompt : CompositePostProcessor(chain)
     }
 
