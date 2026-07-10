@@ -21,6 +21,9 @@ extension ParolaAutomationServer {
                     let engine = parseEngineID(engineRaw)
                     let response = try buildTranscriberResponse(args: args)
                     await MockTranscriberRegistry.shared.install(engineID: engine, response: response)
+                    // The session caches the resolved transcriber by engineID; without this a
+                    // re-install is silently ignored and the previous canned response keeps running.
+                    await ctx.model.unloadTranscriptionSession()
                     return .object([
                         "installed": .bool(true),
                         "engineID": .string(engineRaw),
