@@ -84,23 +84,23 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     /// Search keywords surfaced by the sidebar search beyond the label match.
     var searchKeywords: [String] {
         switch self {
-        case .general: return ["karaoke", "highlight", "word timestamps", "streaming", "diarize", "speakers", "vocabulary", "prompt"]
-        case .customization: return ["appearance", "theme", "light", "dark", "density", "sidebar", "monospaced", "accent", "color", "terracotta"]
+        case .general: return ["karaoke", "highlight", "word timestamps", "streaming", "diarize", "speakers", "vocabulary", "prompt", "menu bar", "login", "title"]
+        case .customization: return ["appearance", "theme", "light", "dark", "density", "sidebar", "monospaced", "accent", "color", "terracotta", "custom colors", "palette"]
         case .watchedFolders: return ["watch", "folder", "auto", "drop"]
         case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect"]
         case .shortcuts: return ["hotkey", "key combo", "mic recording", "dictation key", "global"]
-        case .microphone: return ["mic", "input device", "vu", "level", "preview"]
+        case .microphone: return ["mic", "input device", "vu", "level", "preview", "count-in", "mute", "pause media", "auto-stop"]
         case .liveCaptions: return ["captions", "translate", "live"]
-        case .dictation: return ["hotkey", "f5", "push to talk", "toggle", "indicator", "notch", "overlay", "cleanup", "workflows", "per-app"]
+        case .dictation: return ["hotkey", "f5", "push to talk", "toggle", "indicator", "notch", "overlay", "cleanup", "workflows", "per-app", "hud", "opacity", "context", "clipboard", "paste delay", "self-corrections", "url rule"]
         case .snippets: return ["snippet", "expand", "abbreviation"]
         case .corrections: return ["correction", "fix", "replace", "dictation", "vocabulary"]
         case .translation: return ["translate", "english"]
-        case .transcriptionDefaults: return ["default", "model", "language", "engine", "whisper"]
+        case .transcriptionDefaults: return ["default", "model", "language", "engine", "whisper", "privacy", "speakers", "diarize", "word timestamps", "apple speech", "playback"]
         case .ignoredSegments: return ["filler", "uh", "um", "ignore", "skip"]
         case .findReplace: return ["regex", "replace", "term pack", "substitution", "rule"]
-        case .exportFormats: return ["txt", "srt", "vtt", "csv", "docx", "pdf", "markdown", "html"]
+        case .exportFormats: return ["txt", "srt", "vtt", "csv", "tsv", "docx", "pdf", "markdown", "html", "json", "jsonl", "fcpxml", "final cut", "lrc", "lyrics", "subtitles"]
         case .batchExport: return ["batch", "multiple files", "drag drop"]
-        case .autoExport: return ["auto export", "rule"]
+        case .autoExport: return ["auto export", "rule", "line length", "qc", "timestamps", "html theme"]
         case .integrations: return ["yt-dlp", "youtube", "homebrew"]
         case .prompts: return ["prompt", "cleanup", "translate", "bullet", "action"]
         case .automation: return ["mcp", "bridge", "claude code", "codex", "loopback"]
@@ -222,7 +222,7 @@ struct ResetPaneButton: View {
 enum SettingsResetService {
     @MainActor
     static func reset(scope: SettingsPaneScope) {
-        let defaults = UserDefaults.standard
+        let defaults = DefaultsStore.current
         for key in scope.defaultsKeys {
             defaults.removeObject(forKey: key)
         }
@@ -231,7 +231,7 @@ enum SettingsResetService {
 
     @MainActor
     static func resetAll() {
-        let defaults = UserDefaults.standard
+        let defaults = DefaultsStore.current
         for scope in SettingsPaneScope.allCases {
             for key in scope.defaultsKeys {
                 defaults.removeObject(forKey: key)

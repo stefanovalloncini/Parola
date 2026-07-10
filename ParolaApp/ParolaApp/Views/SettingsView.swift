@@ -46,6 +46,15 @@ enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     var localizedLabelKey: LocalizedStringKey { LocalizedStringKey(meta.titleKey) }
     var symbol: String { meta.symbol }
     var paneScope: SettingsPaneScope? { meta.scope }
+
+    /// Search terms for routes without a pane scope; scoped routes get theirs from the scope.
+    var extraSearchKeywords: [String] {
+        switch self {
+        case .localModels: return ["model", "whisper", "parakeet", "apple speech", "download", "storage", "delete", "activate"]
+        case .about: return ["version", "repository"]
+        default: return []
+        }
+    }
 }
 
 private struct SettingsRouteMeta {
@@ -148,6 +157,7 @@ private struct SettingsSidebar: View {
 
     private func matches(route: SettingsRoute, query: String) -> Bool {
         if route.label.lowercased().contains(query) { return true }
+        if route.extraSearchKeywords.contains(where: { $0.lowercased().contains(query) }) { return true }
         if let scope = route.paneScope {
             return scope.searchKeywords.contains { $0.lowercased().contains(query) }
         }
