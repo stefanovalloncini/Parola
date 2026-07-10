@@ -236,6 +236,14 @@ extension ThemeColor {
         case .dynamic(let light, _): return Color(nsColor: light.nsColor)
         }
     }
+
+    /// The variant matching the given appearance, for seeding the custom-palette editor.
+    func editableColor(dark: Bool) -> Color {
+        switch self {
+        case .system(let semantic): return semantic.color
+        case .dynamic(let light, let darkVariant): return Color(nsColor: (dark ? darkVariant : light).nsColor)
+        }
+    }
 }
 
 extension ThemePalette {

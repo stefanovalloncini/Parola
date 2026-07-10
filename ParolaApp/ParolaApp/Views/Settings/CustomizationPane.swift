@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import ParolaCore
 
 struct CustomizationPane: View {
@@ -20,7 +21,7 @@ struct CustomizationPane: View {
                     .axLeaf("Customization.Picker.Appearance")
                 }
                 SettingRow("Theme",
-                           description: "Recolors the accent and surfaces across the whole app.") {
+                           description: "Recolors the accent across the whole app.") {
                     ThemePresetGallery()
                 }
                 SettingRow("Custom colors",
@@ -63,14 +64,17 @@ struct CustomizationPane: View {
 
     private func beginCustom() {
         let p = DS.theme
+        // Seed from the variant currently on screen; the light variant under dark mode
+        // pairs light surfaces with dark-resolved system text and is unreadable.
+        let dark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         model.applyCustomPalette(.custom(
-            accent: p.accent.editableColor,
-            canvas: p.canvas.editableColor,
-            surface: p.surface.editableColor,
-            surfaceElevated: p.surfaceElevated.editableColor,
-            divider: p.divider.editableColor,
-            textPrimary: p.textPrimary.editableColor,
-            textSecondary: p.textSecondary.editableColor
+            accent: p.accent.editableColor(dark: dark),
+            canvas: p.canvas.editableColor(dark: dark),
+            surface: p.surface.editableColor(dark: dark),
+            surfaceElevated: p.surfaceElevated.editableColor(dark: dark),
+            divider: p.divider.editableColor(dark: dark),
+            textPrimary: p.textPrimary.editableColor(dark: dark),
+            textSecondary: p.textSecondary.editableColor(dark: dark)
         ))
     }
 }
