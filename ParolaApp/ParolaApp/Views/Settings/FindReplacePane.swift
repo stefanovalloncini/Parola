@@ -100,10 +100,17 @@ struct FindReplacePane: View {
         return rules
     }
 
+    // Resolved by id on every access: an index captured at render time can go stale
+    // when a row is deleted before a pending write lands.
     private func binding(for id: FindReplaceRule.ID) -> Binding<FindReplaceRule>? {
-        guard let idx = model.findReplaceRules.firstIndex(where: { $0.id == id }) else { return nil }
-        @Bindable var model = model
-        return $model.findReplaceRules[idx]
+        guard let current = model.findReplaceRules.first(where: { $0.id == id }) else { return nil }
+        return Binding(
+            get: { model.findReplaceRules.first(where: { $0.id == id }) ?? current },
+            set: { newValue in
+                guard let idx = model.findReplaceRules.firstIndex(where: { $0.id == id }) else { return }
+                model.findReplaceRules[idx] = newValue
+            }
+        )
     }
 
     private var filterRow: some View {

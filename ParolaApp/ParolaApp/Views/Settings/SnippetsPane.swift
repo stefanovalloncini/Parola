@@ -75,10 +75,17 @@ struct SnippetsPane: View {
         }
     }
 
+    // Resolved by id on every access: an index captured at render time can go stale
+    // when a row is deleted before a pending write lands.
     private func binding(for id: Snippet.ID) -> Binding<Snippet>? {
-        guard let idx = model.snippets.firstIndex(where: { $0.id == id }) else { return nil }
-        @Bindable var model = model
-        return $model.snippets[idx]
+        guard let current = model.snippets.first(where: { $0.id == id }) else { return nil }
+        return Binding(
+            get: { model.snippets.first(where: { $0.id == id }) ?? current },
+            set: { newValue in
+                guard let idx = model.snippets.firstIndex(where: { $0.id == id }) else { return }
+                model.snippets[idx] = newValue
+            }
+        )
     }
 }
 
