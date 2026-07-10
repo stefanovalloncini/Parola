@@ -3,6 +3,8 @@ import ParolaCore
 import AppKit
 
 struct StorageRow: View {
+    @State private var overridePath: String? = Self.currentOverride()
+
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "folder")
@@ -18,7 +20,7 @@ struct StorageRow: View {
             Spacer()
             Button("Choose…") { chooseStorage() }
                 .controlSize(.small)
-            if isCustom {
+            if overridePath != nil {
                 Button("Use Default") { resetStorage() }
                     .controlSize(.small)
             }
@@ -29,19 +31,22 @@ struct StorageRow: View {
             RoundedRectangle(cornerRadius: 6)
                 .fill(Color.primary.opacity(0.04))
         )
+        .onAppear { overridePath = Self.currentOverride() }
+    }
+
+    // ModelStore reads this key from UserDefaults.standard itself, so this row matches it
+    // instead of the app's defaults suite.
+    private static func currentOverride() -> String? {
+        let custom = UserDefaults.standard.string(forKey: ModelStore.storageOverrideKey)?
+            .trimmingCharacters(in: .whitespaces)
+        return (custom?.isEmpty == false) ? custom : nil
     }
 
     private var displayPath: String {
-        let custom = UserDefaults.standard.string(forKey: ModelStore.storageOverrideKey)
-        if let custom, !custom.trimmingCharacters(in: .whitespaces).isEmpty {
-            return (custom as NSString).abbreviatingWithTildeInPath
+        if let overridePath {
+            return (overridePath as NSString).abbreviatingWithTildeInPath
         }
         return (ModelStore.defaultDirectory.path as NSString).abbreviatingWithTildeInPath
-    }
-
-    private var isCustom: Bool {
-        UserDefaults.standard.string(forKey: ModelStore.storageOverrideKey)?
-            .trimmingCharacters(in: .whitespaces).isEmpty == false
     }
 
     private func chooseStorage() {
@@ -52,11 +57,13 @@ struct StorageRow: View {
         panel.title = "Choose models folder"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         UserDefaults.standard.set(url.path, forKey: ModelStore.storageOverrideKey)
+        overridePath = Self.currentOverride()
         showRestartAlert()
     }
 
     private func resetStorage() {
         UserDefaults.standard.removeObject(forKey: ModelStore.storageOverrideKey)
+        overridePath = Self.currentOverride()
         showRestartAlert()
     }
 
