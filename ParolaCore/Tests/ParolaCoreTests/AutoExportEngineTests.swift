@@ -31,6 +31,19 @@ struct AutoExportEngineTests {
         #expect(formats.isEmpty)
     }
 
+    @Test("rule with no extensions matches any source")
+    func emptyExtensionsMatchAny() {
+        let rule = AutoExportRule(sourceExtensions: [], outputFormats: [.txt])
+        #expect(AutoExportEngine.plannedFormats(rules: [rule], sourceExtension: "mp4") == [.txt])
+        #expect(AutoExportEngine.plannedFormats(rules: [rule], sourceExtension: "wav") == [.txt])
+    }
+
+    @Test("disabled rule with no extensions still contributes nothing")
+    func emptyExtensionsDisabled() {
+        let rule = AutoExportRule(sourceExtensions: [], outputFormats: [.txt], enabled: false)
+        #expect(AutoExportEngine.plannedFormats(rules: [rule], sourceExtension: "mp4").isEmpty)
+    }
+
     @Test("multiple rules dedupe overlapping formats")
     func dedupe() {
         let r1 = AutoExportRule(sourceExtensions: ["mp4"], outputFormats: [.srt])

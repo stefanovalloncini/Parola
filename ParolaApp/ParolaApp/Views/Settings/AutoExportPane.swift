@@ -40,6 +40,8 @@ struct AutoExportPane: View {
                             let id = model.autoExportRules[idx].id
                             model.autoExportRules.removeAll { $0.id == id }
                         }
+                        // Row state (the extensions draft) must follow the rule, not the slot index.
+                        .id(model.autoExportRules[idx].id)
                     }
                 }
             }
@@ -57,7 +59,7 @@ struct AutoExportPane: View {
 
             SettingsSection("Export options") {
                 SettingRow("Subtitle line length",
-                           description: "Applied to SRT and VTT exports.",
+                           description: "Applied to SRT and VTT exports and to the subtitle QC badges.",
                            isFirst: true) {
                     Picker("", selection: $model.subtitleCaptionLengthRaw) {
                         ForEach(CaptionLength.allCases) { preset in

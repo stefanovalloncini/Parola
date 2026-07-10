@@ -18,8 +18,9 @@ public struct AutoExportRule: Codable, Sendable, Identifiable, Hashable {
         self.enabled = enabled
     }
 
+    /// An empty extension set matches every source, mirroring the "any" label in the rules UI.
     public func matches(sourceExtension: String) -> Bool {
-        enabled && sourceExtensions.contains(sourceExtension.lowercased())
+        enabled && (sourceExtensions.isEmpty || sourceExtensions.contains(sourceExtension.lowercased()))
     }
 }
 
