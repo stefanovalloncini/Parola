@@ -19,12 +19,27 @@ public struct TermPackRule: Codable, Sendable, Hashable {
     public let replace: String
     public let caseSensitive: Bool
     public let regex: Bool
+    public let enabled: Bool
 
-    public init(find: String, replace: String, caseSensitive: Bool = false, regex: Bool = false) {
+    public init(find: String, replace: String, caseSensitive: Bool = false, regex: Bool = false, enabled: Bool = true) {
         self.find = find
         self.replace = replace
         self.caseSensitive = caseSensitive
         self.regex = regex
+        self.enabled = enabled
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case find, replace, caseSensitive, regex, enabled
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        find = try c.decode(String.self, forKey: .find)
+        replace = try c.decode(String.self, forKey: .replace)
+        caseSensitive = try c.decodeIfPresent(Bool.self, forKey: .caseSensitive) ?? false
+        regex = try c.decodeIfPresent(Bool.self, forKey: .regex) ?? false
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
     }
 }
 
@@ -45,7 +60,8 @@ public enum TermPackIO {
                 find: rule.find,
                 replace: rule.replace,
                 caseSensitive: rule.caseSensitive,
-                regex: rule.regex
+                regex: rule.regex,
+                enabled: rule.enabled
             )
         }
         return TermPack(name: name, locale: locale, rules: packRules)
@@ -61,7 +77,7 @@ public enum TermPackIO {
                 replace: rule.replace,
                 caseSensitive: rule.caseSensitive,
                 regex: rule.regex,
-                enabled: true
+                enabled: rule.enabled
             )
             // An invalid regex silently no-ops in GlobalFindReplace.apply, so import it disabled rather than looking active.
             if GlobalFindReplace.validate(candidate) != nil { candidate.enabled = false }

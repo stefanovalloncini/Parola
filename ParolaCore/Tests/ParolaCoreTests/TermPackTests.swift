@@ -46,6 +46,22 @@ struct TermPackTests {
         #expect(pack.rules[0].caseSensitive == true)
     }
 
+    @Test("a disabled rule stays disabled through a pack round trip")
+    func disabledSurvivesRoundTrip() throws {
+        let rules = [FindReplaceRule(find: "kube", replace: "Kubernetes", enabled: false)]
+        let pack = TermPackIO.pack(from: rules, name: "X", locale: "en")
+        let decoded = try TermPackIO.decode(TermPackIO.encode(pack))
+        let merged = TermPackIO.merge(pack: decoded, into: [])
+        #expect(merged.first?.enabled == false)
+    }
+
+    @Test("a pack without enabled fields imports rules as enabled")
+    func legacyPackDefaultsEnabled() throws {
+        let json = #"{"name":"X","locale":"en","version":1,"rules":[{"find":"kube","replace":"Kubernetes","caseSensitive":false,"regex":false}]}"#
+        let decoded = try TermPackIO.decode(Data(json.utf8))
+        #expect(decoded.rules.first?.enabled == true)
+    }
+
     @Test("merge dedupes rules duplicated within the incoming pack")
     func mergeDedupesWithinPack() {
         let pack = TermPack(name: "Tech", locale: "en", rules: [
