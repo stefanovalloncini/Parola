@@ -13,9 +13,17 @@ public struct AutoExportRule: Codable, Sendable, Identifiable, Hashable {
         enabled: Bool = true
     ) {
         self.id = id
-        self.sourceExtensions = Set(sourceExtensions.map { $0.lowercased() })
+        self.sourceExtensions = Set(sourceExtensions.map(Self.normalizedExtension))
         self.outputFormats = outputFormats
         self.enabled = enabled
+    }
+
+    /// Users type ".wav" or "*.wav" as often as "wav"; matching is on the bare extension.
+    public static func normalizedExtension(_ raw: String) -> String {
+        var ext = raw.trimmingCharacters(in: .whitespaces).lowercased()
+        if ext.hasPrefix("*.") { ext.removeFirst(2) }
+        while ext.hasPrefix(".") { ext.removeFirst() }
+        return ext
     }
 
     /// An empty extension set matches every source, mirroring the "any" label in the rules UI.

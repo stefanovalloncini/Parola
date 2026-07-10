@@ -33,6 +33,9 @@ public actor FolderWatcher {
     private let options: Options
     private var fileDescriptor: Int32 = -1
     private var source: DispatchSourceFileSystemObject?
+    // A vnode source only fires for the directory it watches, so recursive mode
+    // needs one source per subdirectory, synced as directories come and go.
+    private var subdirSources: [String: DispatchSourceFileSystemObject] = [:]
     private var knownFiles: Set<String> = []
     private var pendingFiles: [String: PendingFile] = [:]
     private var scanTask: Task<Void, Never>?
@@ -63,7 +66,8 @@ public actor FolderWatcher {
         let fd = folderURL.path.withCString { open($0, O_EVTONLY) }
         guard fd >= 0 else { return }
         fileDescriptor = fd
-        knownFiles = await scanFolderOffActor()
+        let scan = await scanFolderOffActor()
+        knownFiles = scan.files
         // stop() can run on this actor during the await above; if it did, it cleared fileDescriptor
         // and closed our fd — don't resurrect a source on a closed descriptor.
         guard fileDescriptor == fd else { return }
@@ -76,6 +80,14 @@ public actor FolderWatcher {
             }
         }
 
+        source = Self.makeSource(fd: fd, continuation: continuation)
+        syncSubdirWatchers(scan.directories)
+    }
+
+    private static func makeSource(
+        fd: Int32,
+        continuation: AsyncStream<Void>.Continuation
+    ) -> DispatchSourceFileSystemObject {
         let queue = DispatchQueue(label: "com.parola.folder-watch.\(UUID().uuidString)")
         let src = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
@@ -89,7 +101,20 @@ public actor FolderWatcher {
             close(fd)
         }
         src.resume()
-        source = src
+        return src
+    }
+
+    private func syncSubdirWatchers(_ directories: Set<String>) {
+        guard options.recursive, let continuation = scanContinuation else { return }
+        for (path, src) in subdirSources where !directories.contains(path) {
+            src.cancel()
+            subdirSources.removeValue(forKey: path)
+        }
+        for path in directories where subdirSources[path] == nil {
+            let fd = path.withCString { open($0, O_EVTONLY) }
+            guard fd >= 0 else { continue }
+            subdirSources[path] = Self.makeSource(fd: fd, continuation: continuation)
+        }
     }
 
     public func stop() {
@@ -102,6 +127,10 @@ public actor FolderWatcher {
         }
         source = nil
         fileDescriptor = -1
+        for src in subdirSources.values {
+            src.cancel()
+        }
+        subdirSources.removeAll()
         scanContinuation?.finish()
         scanContinuation = nil
         scanTask?.cancel()
@@ -112,7 +141,9 @@ public actor FolderWatcher {
     }
 
     internal func checkForNewFiles() async {
-        let current = await scanFolderOffActor()
+        let scan = await scanFolderOffActor()
+        syncSubdirWatchers(scan.directories)
+        let current = scan.files
         let added = current.subtracting(knownFiles)
         // Replace, don't union: a vanished path must be forgotten so a same-name file recreated later
         // is re-detected, and so the set stays bounded to the folder's current contents.
@@ -172,28 +203,36 @@ public actor FolderWatcher {
         return Double(comp.seconds) + Double(comp.attoseconds) / 1e18
     }
 
-    private func scanFolderOffActor() async -> Set<String> {
+    private struct FolderScan: Sendable {
+        var files: Set<String> = []
+        var directories: Set<String> = []
+    }
+
+    private func scanFolderOffActor() async -> FolderScan {
         await Task.detached(priority: .userInitiated) { [self] in scanFolder() }.value
     }
 
-    private nonisolated func scanFolder() -> Set<String> {
+    private nonisolated func scanFolder() -> FolderScan {
         let fm = FileManager.default
         guard options.recursive else {
-            guard let contents = try? fm.contentsOfDirectory(atPath: folderURL.path) else { return [] }
-            return Set(contents.map { folderURL.appendingPathComponent($0).path })
+            guard let contents = try? fm.contentsOfDirectory(atPath: folderURL.path) else { return FolderScan() }
+            return FolderScan(files: Set(contents.map { folderURL.appendingPathComponent($0).path }))
         }
         guard let enumerator = fm.enumerator(
             at: folderURL,
-            includingPropertiesForKeys: [.isRegularFileKey],
+            includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey],
             options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        ) else { return [] }
-        var paths: Set<String> = []
+        ) else { return FolderScan() }
+        var scan = FolderScan()
         for case let url as URL in enumerator {
-            let resourceValues = try? url.resourceValues(forKeys: [.isRegularFileKey])
-            guard resourceValues?.isRegularFile == true else { continue }
-            paths.insert(url.path)
+            let resourceValues = try? url.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey])
+            if resourceValues?.isDirectory == true {
+                scan.directories.insert(url.path)
+            } else if resourceValues?.isRegularFile == true {
+                scan.files.insert(url.path)
+            }
         }
-        return paths
+        return scan
     }
 }
 

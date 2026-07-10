@@ -17,6 +17,25 @@ public enum ExportFormat: String, CaseIterable, Sendable, Codable, Identifiable 
 
     public var id: String { rawValue }
     public var fileExtension: String { rawValue }
+
+    /// Human-readable name shared by every export menu and format card.
+    public var displayName: String {
+        switch self {
+        case .txt: return "Plain Text"
+        case .srt: return "SubRip Subtitles"
+        case .vtt: return "WebVTT Subtitles"
+        case .json: return "JSON"
+        case .jsonl: return "JSON Lines"
+        case .md: return "Markdown"
+        case .html: return "HTML"
+        case .csv: return "CSV"
+        case .tsv: return "TSV"
+        case .docx: return "Word Document"
+        case .pdf: return "PDF"
+        case .fcpxml: return "Final Cut Pro XML"
+        case .lrc: return "LRC Lyrics"
+        }
+    }
 }
 
 public protocol TranscriptExporter: Sendable {

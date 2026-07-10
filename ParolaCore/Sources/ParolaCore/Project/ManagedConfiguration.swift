@@ -51,9 +51,15 @@ public struct ManagedConfiguration: @unchecked Sendable {
 
     public static let userPrivacyModeKey = "parola.userPrivacyMode"
 
+    /// Override for the store holding the user's own privacy-mode toggle. The app points
+    /// this at its suite-aware defaults at bootstrap so `shared` (built on .standard for
+    /// the MDM dict) sees the toggle the Settings pane writes. Set once before any reader;
+    /// UserDefaults is thread-safe on Darwin.
+    nonisolated(unsafe) public static var userSettingsStore: UserDefaults?
+
     public var disableCloudLLM: Bool {
         if managedDict?[Key.disableCloudLLM.rawValue] as? Bool == true { return true }
-        return storage.bool(forKey: Self.userPrivacyModeKey)
+        return (Self.userSettingsStore ?? storage).bool(forKey: Self.userPrivacyModeKey)
     }
 
     public var disableModelDownloads: Bool {

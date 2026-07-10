@@ -68,7 +68,11 @@ public struct SnippetExpander: TextPostProcessor {
 
     public func process(_ text: String) async -> String {
         let active = snippets.filter { snippet in
-            guard snippet.enabled, !snippet.trigger.isEmpty else { return false }
+            // Trim to match the pane's enable gate: a whitespace-only trigger renders as disabled
+            // there, and a bare-space pattern would otherwise rewrite every word boundary.
+            guard snippet.enabled,
+                  !snippet.trigger.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            else { return false }
             return expandDeferred ? snippet.expandAtInsert : !snippet.expandAtInsert
         }
         guard !active.isEmpty else { return text }

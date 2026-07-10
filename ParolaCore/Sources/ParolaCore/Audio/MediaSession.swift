@@ -24,6 +24,11 @@ public protocol SystemAudioMuter: Sendable {
 public protocol MediaPlaybackToggler: Sendable {
     func pause() async
     func play() async
+    func isPlaying() async -> Bool
+}
+
+public extension MediaPlaybackToggler {
+    func isPlaying() async -> Bool { true }
 }
 
 public actor MediaSession {
@@ -54,7 +59,9 @@ public actor MediaSession {
             }
         }
 
-        if config.pausePlayback {
+        // Only pause (and later resume) when something was actually playing, mirroring
+        // the mute path's snapshot — a blind play on exit would start paused media.
+        if config.pausePlayback, await player.isPlaying() {
             await player.pause()
             pauseIssued = true
         }
