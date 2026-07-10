@@ -13,8 +13,10 @@ struct ModelCardRow: View {
     let kind: Kind
     var actualSizeBytes: Int64? = nil
     var isDeleting: Bool = false
+    var downloadDisabled: Bool = false
     let primaryAction: () -> Void
     var deleteAction: (() -> Void)? = nil
+    var cancelAction: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -116,6 +118,8 @@ struct ModelCardRow: View {
                     }
                 }
                 .buttonStyle(ModelPillButtonStyle())
+                .disabled(downloadDisabled)
+                .help(downloadDisabled ? "Another model is downloading. Wait or cancel it first." : "")
                 .accessibilityIdentifier("model.\(variant.id).download")
                 .axLeaf("Card.Button.Download")
             case .downloading(let progress):
@@ -126,6 +130,16 @@ struct ModelCardRow: View {
                     Text(progressPercent(progress))
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
+                    if let cancelAction {
+                        Button(action: cancelAction) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Cancel this download")
+                        .accessibilityLabel("Cancel download of \(variant.displayName)")
+                        .axLeaf("Card.Button.CancelDownload")
+                    }
                 }
             }
         }

@@ -37,6 +37,7 @@ struct SnippetsPane: View {
 
             HStack(spacing: 8) {
                 Button {
+                    searchText = ""
                     model.snippets.append(Snippet(trigger: "", replacement: ""))
                 } label: {
                     Label("Add snippet", systemImage: "plus.circle")
@@ -59,7 +60,7 @@ struct SnippetsPane: View {
             }
 
             SettingHelper(text: "Triggers fire on dictated text only; matching is case-insensitive and word-bounded.")
-            Text("Placeholders: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}")
+            Text("These placeholders expand in the replacement text: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}")
                 .font(DS.Font.subheadlineMono)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)

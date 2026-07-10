@@ -7,15 +7,24 @@ struct URLRuleRow: View {
     let index: Int
     let rule: DictationWorkflow
     @Environment(AppModel.self) private var model
+    @State private var draftPattern = ""
+    @FocusState private var patternFocused: Bool
 
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "link")
                 .foregroundStyle(.secondary)
                 .frame(width: 14)
-            TextField(String(localized: "Example: gmail.com"), text: urlPatternBinding)
+            TextField(String(localized: "Example: gmail.com"), text: $draftPattern)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 160)
+                .focused($patternFocused)
+                .onAppear { draftPattern = rule.urlPattern ?? "" }
+                .onChange(of: rule.urlPattern) { draftPattern = rule.urlPattern ?? "" }
+                .onSubmit { commitPattern() }
+                .onChange(of: patternFocused) {
+                    if !patternFocused { commitPattern() }
+                }
                 .axLeaf("URLRule.TextField.Pattern")
 
             Picker("", selection: promptBinding) {
@@ -61,13 +70,15 @@ struct URLRuleRow: View {
         .padding(.leading, 6)
     }
 
-    private var urlPatternBinding: Binding<String> {
-        Binding(
-            get: { rule.urlPattern ?? "" },
-            set: { newValue in
-                model.updateDictationURLRule(for: app.bundleID, at: index) { $0.urlPattern = newValue }
-            }
-        )
+    // Commits on submit or focus loss. An empty pattern reverts to the stored value —
+    // deleting the rule is the minus button's job, not a side effect of clearing the field.
+    private func commitPattern() {
+        let trimmed = draftPattern.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            draftPattern = rule.urlPattern ?? ""
+        } else if trimmed != (rule.urlPattern ?? "") {
+            model.updateDictationURLRule(for: app.bundleID, at: index) { $0.urlPattern = trimmed }
+        }
     }
 
     private var promptBinding: Binding<String> {

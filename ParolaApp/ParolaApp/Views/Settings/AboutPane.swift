@@ -3,6 +3,8 @@ import ParolaCore
 import AppKit
 
 struct AboutPane: View {
+    @State private var copiedVersion = false
+
     var body: some View {
         VStack(spacing: 16) {
             AboutInfoView()
@@ -13,9 +15,14 @@ struct AboutPane: View {
                     NSWorkspace.shared.open(SupportLinks.repository)
                 }
                 .axLeaf("About.Button.OpenRepository")
-                Button("Copy version") {
+                Button(copiedVersion ? "Copied" : "Copy version") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString("Parola \(AboutInfo.versionString)", forType: .string)
+                    copiedVersion = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(1.5))
+                        copiedVersion = false
+                    }
                 }
                 .axLeaf("About.Button.CopyVersion")
             }

@@ -4,7 +4,7 @@ import ParolaCore
 struct FindReplacePane: View {
     @Environment(AppModel.self) private var model
     @State private var searchText: String = ""
-    @State private var statusFilter: StatusFilter = .all
+    @State private var statusFilter: RuleEnabledFilter = .all
     @State private var sortOption: SortOption = .original
 
     var body: some View {
@@ -39,6 +39,8 @@ struct FindReplacePane: View {
 
             HStack(spacing: 8) {
                 Button {
+                    searchText = ""
+                    statusFilter = .all
                     model.findReplaceRules.append(FindReplaceRule(find: "", replace: ""))
                 } label: {
                     Label("Add rule", systemImage: "plus.circle")
@@ -82,11 +84,9 @@ struct FindReplacePane: View {
                 $0.find.lowercased().contains(query) || $0.replace.lowercased().contains(query)
             }
         }
-        switch statusFilter {
-        case .all: break
-        case .enabled: rules = rules.filter { $0.enabled }
-        case .disabled: rules = rules.filter { !$0.enabled }
-        }
+        // Match the row toggle's effective value: a rule with an empty find or a broken
+        // regex renders as off, so the chips must not classify it as enabled.
+        rules = rules.filter { statusFilter.includes(Self.isEffectivelyEnabled($0)) }
         switch sortOption {
         case .original: break
         case .findAZ: rules.sort { $0.find.localizedCaseInsensitiveCompare($1.find) == .orderedAscending }
@@ -98,6 +98,13 @@ struct FindReplacePane: View {
             }
         }
         return rules
+    }
+
+    static func isEffectivelyEnabled(_ rule: FindReplaceRule) -> Bool {
+        let trimmed = rule.find.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard rule.enabled, !trimmed.isEmpty else { return false }
+        if rule.regex, (try? NSRegularExpression(pattern: trimmed)) == nil { return false }
+        return true
     }
 
     // Resolved by id on every access: an index captured at render time can go stale
@@ -115,11 +122,7 @@ struct FindReplacePane: View {
 
     private var filterRow: some View {
         HStack(spacing: 8) {
-            ForEach(StatusFilter.allCases, id: \.self) { option in
-                Chip(title: option.label, isSelected: statusFilter == option, size: .regular, style: .subtle, selectedFill: DS.Color.accent, bordered: false) {
-                    statusFilter = option
-                }
-            }
+            RuleEnabledFilterChips(filter: $statusFilter)
             Spacer()
             Menu {
                 ForEach(SortOption.allCases, id: \.self) { option in
@@ -143,18 +146,6 @@ struct FindReplacePane: View {
             .fixedSize()
             .help("Sort rules")
             .axLeaf("FindReplace.Menu.Sort")
-        }
-    }
-
-    enum StatusFilter: CaseIterable {
-        case all, enabled, disabled
-
-        var label: LocalizedStringKey {
-            switch self {
-            case .all: return "All"
-            case .enabled: return "Enabled"
-            case .disabled: return "Disabled"
-            }
         }
     }
 
@@ -195,15 +186,6 @@ private struct FindReplaceRuleRow: View {
             get: { rule.enabled && canEnable },
             set: { if canEnable { rule.enabled = $0 } }
         )
-    }
-
-    private static func compile(_ pattern: String) -> String? {
-        do {
-            _ = try NSRegularExpression(pattern: pattern)
-            return nil
-        } catch {
-            return error.localizedDescription
-        }
     }
 
     var body: some View {
@@ -251,7 +233,9 @@ private struct FindReplaceRuleRow: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
         }
-        .onAppear { cachedRegexError = Self.compile(rule.find) }
-        .onChange(of: rule.find) { _, newValue in cachedRegexError = Self.compile(newValue) }
+        .onAppear { cachedRegexError = GlobalFindReplace.validate(rule) }
+        .onChange(of: rule.find) { cachedRegexError = GlobalFindReplace.validate(rule) }
+        .onChange(of: rule.caseSensitive) { cachedRegexError = GlobalFindReplace.validate(rule) }
+        .onChange(of: rule.regex) { cachedRegexError = GlobalFindReplace.validate(rule) }
     }
 }

@@ -26,7 +26,7 @@ struct ContentSheetsModifier: ViewModifier {
                 if let name { meetingAppSnapshot = name }
             }
             .alert(
-                "\(meetingAppSnapshot) just launched",
+                "\(meetingAppSnapshot) is running",
                 isPresented: meetingPromptBinding
             ) {
                 Button("Record this meeting") { model.startMeetingRecording() }

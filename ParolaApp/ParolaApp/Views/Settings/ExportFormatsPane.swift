@@ -27,7 +27,7 @@ struct ExportFormatsPane: View {
         case .json: return "Full transcript data: segments, timings, words, speakers."
         case .jsonl: return "One JSON segment per line, for scripts and pipelines."
         case .md: return "Markdown paragraphs. Start-time prefixes optional at export."
-        case .html: return "Web page in a light or dark theme."
+        case .html: return "Web page in a light, dark, or sepia theme."
         case .csv: return "Spreadsheet rows: start, end, speaker, text."
         case .tsv: return "Tab-separated rows, same columns as CSV."
         case .docx: return "Word document with speaker names."
@@ -50,16 +50,16 @@ struct BatchExportSettingsPane: View {
                     Text("Drag & Drop").foregroundStyle(.secondary)
                 }
                 SettingRow("Sidecar files",
-                           description: "Pick formats and per-format options in the Queue view. Parola writes them next to each file as its transcription finishes.") {
-                    Button("Open Queue") {
-                        model.route = .queue
+                           description: "Pick formats and per-format options in the Batch view. Parola writes them next to each file as its transcription finishes.") {
+                    Button("Open Batch") {
+                        model.route = .batch
                         NSApp.activate(ignoringOtherApps: true)
                         for window in NSApp.windows where window.canBecomeMain {
                             window.makeKeyAndOrderFront(nil)
                             break
                         }
                     }
-                    .axLeaf("BatchExport.Button.OpenQueue")
+                    .axLeaf("BatchExport.Button.OpenBatch")
                 }
             }
             SettingHelper(text: "Drop a folder of files on the Parola window to start a batch.")

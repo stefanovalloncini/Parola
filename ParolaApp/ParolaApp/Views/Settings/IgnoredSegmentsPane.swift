@@ -45,13 +45,15 @@ struct IgnoredSegmentsPane: View {
             }
 
             Button {
+                searchText = ""
+                enabledFilter = .all
                 model.ignoredSegmentRules.append(IgnoredSegmentRule(pattern: ""))
             } label: {
                 Label("Add pattern", systemImage: "plus.circle")
             }
             .axLeaf("IgnoredSegments.Button.AddPattern")
 
-            SettingHelper(text: "A segment is removed when its entire text equals a pattern (case-insensitive, trimmed). Catches filler-only segments like \"uh\" — not words inside sentences.")
+            SettingHelper(text: "A segment is removed when its entire text equals a pattern (case-insensitive, trimmed). Catches filler-only segments like \"uh\" — not words inside sentences. Applies to new transcriptions; saved transcripts don't change.")
             ResetPaneButton(scope: .ignoredSegments)
         }
     }

@@ -232,15 +232,7 @@ struct DictationView: View {
     }
 
     private var currentModeName: String? {
-        let id = model.dictationCleanupPromptID
-        if id.isEmpty {
-            return DictationModePreset.builtIns.first { $0.promptID == nil }?.name
-        }
-        guard let uuid = UUID(uuidString: id) else { return nil }
-        if let preset = DictationModePreset.builtIns.first(where: { $0.promptID == uuid }) {
-            return preset.name
-        }
-        return Prompt.builtIns.first(where: { $0.id == uuid })?.name
+        AppModel.dictationCleanupModeName(for: model.dictationCleanupPromptID)
     }
 
     private var label: String {

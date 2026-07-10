@@ -104,9 +104,15 @@ struct AutomationPane: View {
                                 Text("parola-mcp isn't bundled in this build.")
                                     .font(DS.Font.caption)
                             }
+                            #if DEBUG
                             Text("Run `swift build --product parola-mcp` in ParolaCore and relaunch.")
                                 .font(.system(.caption, design: .monospaced))
                                 .foregroundStyle(.secondary)
+                            #else
+                            Text("Build parola-mcp from the Parola source, then point your MCP client at the binary.")
+                                .font(DS.Font.caption)
+                                .foregroundStyle(.secondary)
+                            #endif
                         }
                     }
                     .padding(16)
@@ -177,7 +183,7 @@ struct AutomationPane: View {
 
     private var bridgeBlurb: String {
         if model.automationBridgeRunning {
-            return String(localized: "parola-mcp can now connect over loopback and expose Parola actions to MCP clients. Anyone on this Mac can connect — turn it off if you're sharing the machine.")
+            return String(localized: "parola-mcp can now connect over loopback and expose Parola actions to MCP clients. Clients authenticate with a token file in ~/Library/Caches/Parola that only your macOS user can read.")
         }
         #if DEBUG
         return String(localized: "Debug builds default the bridge on for development. Toggle it off to ship the same workflow as a Release user.")

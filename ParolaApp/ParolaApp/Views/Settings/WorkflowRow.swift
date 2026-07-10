@@ -153,16 +153,5 @@ struct WorkflowRow: View {
 }
 
 enum WorkflowLanguageOptions {
-    static let options: [(code: String, name: String)] = [
-        ("en", "English"),
-        ("it", "Italian"),
-        ("fr", "French"),
-        ("de", "German"),
-        ("es", "Spanish"),
-        ("pt", "Portuguese"),
-        ("nl", "Dutch"),
-        ("ja", "Japanese"),
-        ("zh", "Chinese"),
-        ("ko", "Korean")
-    ]
+    static var options: [(code: String, name: String)] { SupportedLanguages.options }
 }

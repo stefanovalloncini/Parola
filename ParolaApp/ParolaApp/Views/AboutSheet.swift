@@ -66,13 +66,13 @@ struct AboutInfoView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .task { model.refreshModelList() }
     }
 
     private var modelsOnDiskLabel: String {
-        let installed = model.availableModels.filter { $0.isInstalled }
-        let total = installed.reduce(0) { $0 + ($1.approximateSizeBytes ?? 0) }
-        if total == 0 { return "—" }
-        return "\(installed.count) · \(ByteCountFormatter.string(fromByteCount: Int64(total), countStyle: .file))"
+        let summary = model.modelsOnDiskSummary
+        if summary.bytes == 0 { return "—" }
+        return "\(summary.count) · \(ByteCountFormatter.string(fromByteCount: summary.bytes, countStyle: .file))"
     }
 
     private func creditRow(title: LocalizedStringKey, value: String) -> some View {

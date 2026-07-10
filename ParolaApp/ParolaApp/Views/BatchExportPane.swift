@@ -117,23 +117,7 @@ struct BatchFormatCard: View {
         )
     }
 
-    private var formatLabel: String {
-        switch format {
-        case .txt: return "Transcript"
-        case .srt: return "SubRip Subtitles"
-        case .vtt: return "WebVTT Subtitles"
-        case .json: return "JSON"
-        case .jsonl: return "JSON Lines"
-        case .md: return "Markdown"
-        case .html: return "HTML"
-        case .csv: return "CSV"
-        case .tsv: return "TSV"
-        case .docx: return "Word Document"
-        case .pdf: return "PDF"
-        case .fcpxml: return "Final Cut Pro XML"
-        case .lrc: return "LRC Lyrics"
-        }
-    }
+    private var formatLabel: String { format.displayName }
 
     private var writeToSourceFolder: Binding<Bool> {
         optionBinding(\.writeToSourceFolder)

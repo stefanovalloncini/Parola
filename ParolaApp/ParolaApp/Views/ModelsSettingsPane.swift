@@ -44,6 +44,9 @@ struct ModelsSettingsPane: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                if let error = model.modelActionError {
+                    modelErrorBanner(error)
+                }
                 StorageRow()
                 modelsUsageRow
                 libraryUsageRow
@@ -89,12 +92,11 @@ struct ModelsSettingsPane: View {
     }
 
     private var modelsUsageRow: some View {
-        let totalBytes = model.modelSizes.values.reduce(Int64(0), +)
-        let installedCount = model.availableModels.filter(\.isInstalled).count
+        let summary = model.modelsOnDiskSummary
         return UsageRow(
             icon: "cpu",
             label: "Models on disk:",
-            value: "\(installedCount) installed · \(ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file))"
+            value: "\(summary.count) installed · \(ByteCountFormatter.string(fromByteCount: summary.bytes, countStyle: .file))"
         )
     }
 
@@ -266,10 +268,11 @@ struct ModelsSettingsPane: View {
                 ForEach(variants) { variant in
                     RecommendedRow(
                         variant: variant,
-                        kind: downloadKind(for: variant)
-                    ) {
-                        model.downloadModel(variant.id)
-                    }
+                        kind: downloadKind(for: variant),
+                        downloadDisabled: downloadInFlight,
+                        onDownload: { model.downloadModel(variant.id) },
+                        onCancelDownload: { model.cancelModelDownload() }
+                    )
                 }
             }
         }
@@ -282,11 +285,34 @@ struct ModelsSettingsPane: View {
         return .available
     }
 
+    private var downloadInFlight: Bool {
+        if case .downloadingModel = model.phase { return true }
+        return false
+    }
+
+    private func modelErrorBanner(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(DS.Palette.warning)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            Button("Dismiss") { model.modelActionError = nil }
+                .controlSize(.small)
+                .axLeaf("Models.Button.DismissError")
+        }
+        .padding(10)
+        .background(DS.Palette.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
     // MARK: - Categories
 
     private func categoriesSection(_ categories: [ModelsCategory]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Categories", count: nil)
+            sectionHeader("Engine families", count: nil)
             ModelCategorySection(categories: categories)
         }
     }

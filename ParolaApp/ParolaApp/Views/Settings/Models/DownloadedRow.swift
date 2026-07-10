@@ -26,7 +26,7 @@ struct DownloadedEmpty: View {
         HStack(spacing: 10) {
             Image(systemName: "tray")
                 .foregroundStyle(.secondary)
-            Text("No models on disk yet. Pick one from Recommended below.")
+            Text("No models on disk yet. Switch the filter to All to download one.")
                 .foregroundStyle(.secondary)
             Spacer()
         }

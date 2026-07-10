@@ -36,6 +36,7 @@ struct CorrectionsPane: View {
             }
 
             Button {
+                searchText = ""
                 model.correctionRules.append(CorrectionRule(from: "", to: ""))
             } label: {
                 Label("Add correction", systemImage: "plus.circle")

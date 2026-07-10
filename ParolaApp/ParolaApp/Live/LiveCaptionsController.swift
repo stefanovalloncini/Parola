@@ -38,9 +38,12 @@ final class LiveCaptionsController {
         guard translateToEnglish != enabled else { return }
         translateToEnglish = enabled
         guard state.isActive else { return }
+        let history = state.confirmedLines
         await stop()
         guard !state.isActive, let current = lastOptions else { return }
         await start(options: optionsWithTranslate(current), deviceUID: lastDeviceUID)
+        // start() resets state; keep what was already captioned before the flip.
+        state.confirmedLines = history + state.confirmedLines
     }
 
     private func optionsWithTranslate(_ options: TranscriptionOptions) -> TranscriptionOptions {

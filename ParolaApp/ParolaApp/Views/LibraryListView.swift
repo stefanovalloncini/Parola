@@ -175,22 +175,12 @@ struct LibraryListView: View {
             Spacer()
             if !selection.isEmpty {
                 Menu {
-                    Button("Plain Text (.txt)") { model.bulkExportEntries(ids: selection, format: .txt) }
-                        .axLeaf("Header.MenuItem.ExportTxt")
-                    Button("Markdown (.md)") { model.bulkExportEntries(ids: selection, format: .md) }
-                        .axLeaf("Header.MenuItem.ExportMd")
-                    Button("Subtitles (.srt)") { model.bulkExportEntries(ids: selection, format: .srt) }
-                        .axLeaf("Header.MenuItem.ExportSrt")
-                    Button("WebVTT (.vtt)") { model.bulkExportEntries(ids: selection, format: .vtt) }
-                        .axLeaf("Header.MenuItem.ExportVtt")
-                    Button("CSV (.csv)") { model.bulkExportEntries(ids: selection, format: .csv) }
-                        .axLeaf("Header.MenuItem.ExportCsv")
-                    Button("JSON (.json)") { model.bulkExportEntries(ids: selection, format: .json) }
-                        .axLeaf("Header.MenuItem.ExportJson")
-                    Button("JSON Lines (.jsonl)") { model.bulkExportEntries(ids: selection, format: .jsonl) }
-                        .axLeaf("Header.MenuItem.ExportJsonl")
-                    Button("HTML (.html)") { model.bulkExportEntries(ids: selection, format: .html) }
-                        .axLeaf("Header.MenuItem.ExportHtml")
+                    ForEach(ExportFormat.allCases) { format in
+                        Button("\(format.displayName) (.\(format.fileExtension))") {
+                            model.bulkExportEntries(ids: selection, format: format)
+                        }
+                        .axLeaf("Header.MenuItem.Export\(format.rawValue.capitalized)")
+                    }
                 } label: {
                     Label("Export \(selection.count)", systemImage: "square.and.arrow.up")
                 }

@@ -28,7 +28,13 @@ struct CustomizationPane: View {
                            description: "Pick your own palette instead of a preset.") {
                     Toggle("", isOn: Binding(
                         get: { model.themeIsCustom },
-                        set: { on in on ? beginCustom() : model.resetToPresetTheme() }
+                        set: { on in
+                            if !on {
+                                model.resetToPresetTheme()
+                            } else if !model.resumeCustomPalette() {
+                                beginCustom()
+                            }
+                        }
                     ))
                     .labelsHidden()
                     .axLeaf("Customization.Toggle.CustomColors")

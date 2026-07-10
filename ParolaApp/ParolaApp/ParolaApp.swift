@@ -70,6 +70,7 @@ struct ParolaApp: App {
     init() {
         let bootstrap = AppBootstrap.test(from: CommandLine.arguments) ?? .normal
         DefaultsStore.current = bootstrap.defaults
+        ManagedConfiguration.userSettingsStore = bootstrap.defaults
         let m = AppModel(bootstrap: bootstrap)
         let lc = LiveCaptionsController()
         m.liveCaptions = lc
@@ -145,10 +146,10 @@ struct ParolaApp: App {
             CommandGroup(after: .sidebar) {
                 @Bindable var model = model
                 Button("Toggle Inspector") {
-                    UserDefaults.standard.set(
-                        !UserDefaults.standard.bool(forKey: "inspectorVisible"),
-                        forKey: "inspectorVisible"
-                    )
+                    // Same unset-key fallback as TranscriptPane's @AppStorage default (true),
+                    // or the first toggle is a no-op.
+                    let visible = (UserDefaults.standard.object(forKey: "inspectorVisible") as? Bool) ?? true
+                    UserDefaults.standard.set(!visible, forKey: "inspectorVisible")
                 }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
                 .disabled(model.transcript == nil)
@@ -241,6 +242,10 @@ struct ParolaApp: App {
                 Button("Export as VTT…") { model.exportRequest(.vtt) }
                     .disabled(model.transcript == nil)
                 Button("Export as JSON…") { model.exportRequest(.json) }
+                    .disabled(model.transcript == nil)
+                Button("Export as JSON Lines…") { model.exportRequest(.jsonl) }
+                    .disabled(model.transcript == nil)
+                Button("Export as TSV…") { model.exportRequest(.tsv) }
                     .disabled(model.transcript == nil)
                 Button("Export as Final Cut Pro XML…") { model.exportRequest(.fcpxml) }
                     .disabled(model.transcript == nil)

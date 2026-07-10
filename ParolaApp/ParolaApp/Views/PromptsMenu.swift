@@ -7,25 +7,32 @@ struct PromptsMenu: View {
 
     var body: some View {
         Menu {
-            ForEach(Prompt.builtIns) { prompt in
-                Button(prompt.name) { model.runPrompt(prompt) }
-                    .accessibilityIdentifier("prompts.\(Self.identifierSlug(prompt.name))")
-                    .axLeaf("Toolbar.MenuItem.BuiltinPrompt.\(Self.identifierSlug(prompt.name))")
-            }
-            Divider()
-            Button("YouTube Chapters") { model.generateYouTubeChapters() }
-                .accessibilityIdentifier("prompts.youtube_chapters")
-                .axLeaf("Toolbar.MenuItem.YouTubeChapters")
-            Button("Speakers…") { model.showingSpeakersSheet = true }
-                .accessibilityIdentifier("prompts.speakers")
-                .axLeaf("Toolbar.MenuItem.Speakers")
-            if !userPrompts.isEmpty {
-                Divider()
-                ForEach(userPrompts) { prompt in
+            Group {
+                ForEach(Prompt.builtIns) { prompt in
                     Button(prompt.name) { model.runPrompt(prompt) }
                         .accessibilityIdentifier("prompts.\(Self.identifierSlug(prompt.name))")
-                        .axLeaf("Toolbar.MenuItem.UserPrompt.\(Self.identifierSlug(prompt.name))")
+                        .axLeaf("Toolbar.MenuItem.BuiltinPrompt.\(Self.identifierSlug(prompt.name))")
                 }
+                Divider()
+                Button("YouTube Chapters") { model.generateYouTubeChapters() }
+                    .accessibilityIdentifier("prompts.youtube_chapters")
+                    .axLeaf("Toolbar.MenuItem.YouTubeChapters")
+                Button("Speakers…") { model.showingSpeakersSheet = true }
+                    .accessibilityIdentifier("prompts.speakers")
+                    .axLeaf("Toolbar.MenuItem.Speakers")
+                if !userPrompts.isEmpty {
+                    Divider()
+                    ForEach(userPrompts) { prompt in
+                        Button(prompt.name) { model.runPrompt(prompt) }
+                            .accessibilityIdentifier("prompts.\(Self.identifierSlug(prompt.name))")
+                            .axLeaf("Toolbar.MenuItem.UserPrompt.\(Self.identifierSlug(prompt.name))")
+                    }
+                }
+            }
+            // The toolbar keeps this view alive, so .task runs once; re-read on every
+            // open or prompts added/renamed/deleted in Settings never show up here.
+            .onAppear {
+                Task { userPrompts = await model.promptLibrary.userPrompts }
             }
         } label: {
             if model.isRunningPrompt {

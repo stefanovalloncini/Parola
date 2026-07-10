@@ -36,7 +36,7 @@ struct ShortcutsPane: View {
                     }
                 }
             }
-            SettingHelper(text: "Menu equivalents are fixed. Global hotkeys need Input Monitoring permission.")
+            SettingHelper(text: "Menu equivalents are fixed. Global hotkeys need Input Monitoring permission. The full list is under Help \u{25B8} Keyboard Shortcuts.")
             ResetPaneButton(scope: .shortcuts)
         }
     }

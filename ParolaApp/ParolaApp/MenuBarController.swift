@@ -127,7 +127,8 @@ final class MenuBarController {
     }
 
     @objc private func recordMic() {
-        NSApp.activate(ignoringOtherApps: true)
+        // Bring the main window up so the count-in overlay (and cancel) can be seen.
+        openParola()
         model?.startRecording(source: .microphone)
     }
 

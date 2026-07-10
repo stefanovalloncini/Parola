@@ -8,6 +8,10 @@ struct LiveCaptionsPane: View {
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 12) {
+            Text("Live captions transcribe the microphone as you speak and show the words in a floating panel that stays above other windows.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             SettingsSection {
                 SettingRow("Translate to English",
                            description: "Translate captions live as you speak.",
@@ -15,6 +19,13 @@ struct LiveCaptionsPane: View {
                     Toggle("", isOn: $model.liveCaptionsTranslate)
                         .labelsHidden()
                         .axLeaf("LiveCaptions.Toggle.Translate")
+                }
+                if let warning = model.translateMismatchWarning {
+                    Label(warning, systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .padding(.top, 2)
+                        .axLeaf("LiveCaptions.Label.TranslateWarning")
                 }
                 SettingRow("Status") {
                     Text(liveCaptions.isActive ? "Running" : "Stopped")

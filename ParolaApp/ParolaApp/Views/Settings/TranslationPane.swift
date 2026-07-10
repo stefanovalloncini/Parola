@@ -9,7 +9,7 @@ struct TranslationPane: View {
         return VStack(alignment: .leading, spacing: 12) {
             SettingsSection {
                 SettingRow("Translate to English by default",
-                           description: "Applies to new file, mic, batch, and YouTube transcriptions. Dictation and live captions have their own controls.",
+                           description: "Applies to new file, mic, batch, and YouTube transcriptions. Live captions has its own toggle; dictation always keeps the spoken language.",
                            isFirst: true) {
                     Toggle("", isOn: $model.translate).labelsHidden()
                         .axLeaf("Translation.Toggle.TranslateByDefault")

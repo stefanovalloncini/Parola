@@ -70,7 +70,7 @@ struct StorageRow: View {
     private func showRestartAlert() {
         let alert = NSAlert()
         alert.messageText = "Restart required"
-        alert.informativeText = "Quit and relaunch Parola for the new models folder to take effect."
+        alert.informativeText = "Quit and relaunch Parola for the new models folder to take effect. Models already downloaded stay in the old folder."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         alert.runModal()

@@ -26,7 +26,9 @@ struct MicrophonePane: View {
             }
             SettingsSection {
                 SettingRow("Input device",
-                           description: "Used for recording, dictation, and live captions.",
+                           description: savedDeviceDisconnected
+                               ? "This microphone is disconnected. Recordings use the system default until it returns."
+                               : "Used for recording, dictation, and live captions.",
                            isFirst: true) {
                     Picker("", selection: $model.inputDeviceUID) {
                         Text("System default").tag("")
@@ -36,6 +38,9 @@ struct MicrophonePane: View {
                             } else {
                                 Text(verbatim: device.name).tag(device.uid)
                             }
+                        }
+                        if savedDeviceDisconnected {
+                            Text("Saved microphone (disconnected)").tag(model.inputDeviceUID)
                         }
                     }
                     .labelsHidden()
@@ -108,6 +113,10 @@ struct MicrophonePane: View {
             stopPreview()
             startPreview()
         }
+    }
+
+    private var savedDeviceDisconnected: Bool {
+        !model.inputDeviceUID.isEmpty && !devices.contains { $0.uid == model.inputDeviceUID }
     }
 
     private func startPreview() {

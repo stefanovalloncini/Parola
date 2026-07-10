@@ -9,7 +9,7 @@ struct TranscriptionDefaultsPane: View {
         return VStack(alignment: .leading, spacing: 12) {
             SettingsSection {
                 SettingRow("Default model",
-                           description: "Applies to every new transcription. The toolbar model picker edits this same setting.",
+                           description: "Applies to every new transcription and to dictation. The toolbar model picker edits this same setting.",
                            isFirst: true) {
                     Picker("", selection: $model.selectedModel) {
                         ForEach(model.availableModels, id: \.name) { info in
@@ -25,7 +25,7 @@ struct TranscriptionDefaultsPane: View {
                            description: "Auto detects the language from the audio with Whisper models. Pick one when the audio language is known.") {
                     Picker("", selection: languageBinding) {
                         Text("Auto").tag(String?.none)
-                        ForEach(LanguageOptions.options, id: \.code) { option in
+                        ForEach(SupportedLanguages.options, id: \.code) { option in
                             Text(option.name).tag(String?.some(option.code))
                         }
                     }
@@ -80,7 +80,6 @@ struct TranscriptionDefaultsPane: View {
             }
 
             ResetPaneButton(scope: .transcriptionDefaults)
-            ResetAllSettingsButton()
         }
     }
 
@@ -92,20 +91,3 @@ struct TranscriptionDefaultsPane: View {
     }
 }
 
-private enum LanguageOptions {
-    static let options: [(code: String, name: String)] = [
-        ("en", "English"),
-        ("it", "Italian"),
-        ("fr", "French"),
-        ("de", "German"),
-        ("es", "Spanish"),
-        ("pt", "Portuguese"),
-        ("nl", "Dutch"),
-        ("ja", "Japanese"),
-        ("zh", "Chinese"),
-        ("ko", "Korean"),
-        ("ru", "Russian"),
-        ("ar", "Arabic"),
-        ("hi", "Hindi")
-    ]
-}

@@ -24,6 +24,9 @@ struct GeneralPane: View {
                                 launchAtLoginError = error.localizedDescription
                             }
                         }
+                        // SMAppService can change in System Settings while this pane is open;
+                        // re-read on appearance.
+                        .onAppear { launchAtLogin = LaunchAtLogin.isEnabled }
                         .axLeaf("General.Toggle.LaunchAtLogin")
                 }
                 SettingRow("Show menu bar icon",
@@ -41,21 +44,28 @@ struct GeneralPane: View {
                         .labelsHidden()
                         .axLeaf("General.Toggle.KaraokeHighlight")
                 }
-                SettingRow("Use precise word timings",
-                           description: "Asks Whisper for word-level timestamps. More accurate karaoke and word click-to-seek, but slower.") {
+                SettingRow("Word timestamps",
+                           description: "Captures the start and end time of each word. More accurate karaoke and word click-to-seek, but slower.") {
                     Toggle("", isOn: $model.wordTimestamps)
                         .labelsHidden()
                         .axLeaf("General.Toggle.WordTimestamps")
                 }
                 SettingRow("Stream microphone in real time",
-                           description: "Transcript appears as you speak. Off records the whole take first, then transcribes.") {
+                           description: "Transcript appears as you speak — Whisper models only; other engines record the take first. Off always records first, then transcribes.") {
                     Toggle("", isOn: $model.useStreaming).labelsHidden()
                         .axLeaf("General.Toggle.UseStreaming")
                 }
-                SettingRow("Identify speakers",
+                SettingRow("Diarize speakers",
                            description: "Tags each segment with Speaker 1, Speaker 2, etc. Loads a second model on first use.") {
                     Toggle("", isOn: $model.diarize).labelsHidden()
                         .axLeaf("General.Toggle.Diarize")
+                }
+                if let warning = model.diarizeMismatchWarning {
+                    Label(warning, systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .padding(.top, 2)
+                        .axLeaf("General.Label.DiarizeWarning")
                 }
                 SettingRow("Name transcripts automatically",
                            description: "Generates a short title from the content on device when a transcription finishes. Batch files keep their file names.") {
@@ -71,7 +81,7 @@ struct GeneralPane: View {
                         .lineLimit(2...6)
                         .textFieldStyle(.roundedBorder)
                         .axLeaf("General.TextField.InitialPrompt")
-                    Text("A short list of names or jargon helps Whisper get unusual words right.")
+                    Text("A short list of names or jargon helps Whisper get unusual words right. Other engines ignore it.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

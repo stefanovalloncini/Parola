@@ -7,47 +7,28 @@ struct ModelsCategory: Identifiable {
     let symbol: String
     let tint: Color
 
+    // Only the engine families the catalog actually ships — this list must not drift
+    // from ModelCatalog (a "Whisper C++" row once advertised models the app never had).
     static let all: [ModelsCategory] = [
         .init(
             id: "apple-speech",
             title: "Apple Speech",
-            description: "On-device speech recognition built into macOS.",
+            description: "On-device speech recognition built into macOS. Nothing to download.",
             symbol: "waveform.and.mic",
             tint: .secondary
         ),
         .init(
-            id: "language-specific",
-            title: "Language Specific",
-            description: "Models tuned for a single language.",
-            symbol: "character.book.closed",
-            tint: .blue
-        ),
-        .init(
             id: "whisperkit",
             title: "WhisperKit",
-            description: "OpenAI Whisper compiled to Core ML.",
+            description: "OpenAI Whisper compiled to Core ML. Multilingual, can translate to English.",
             symbol: "waveform",
             tint: .teal
         ),
         .init(
-            id: "whisper-cpp",
-            title: "Whisper C++",
-            description: "Compact Whisper builds from the whisper.cpp project.",
-            symbol: "chevron.left.forwardslash.chevron.right",
-            tint: .purple
-        ),
-        .init(
-            id: "pro",
-            title: "Pro",
-            description: "Higher-accuracy variants for longer recordings.",
-            symbol: "star.fill",
-            tint: .orange
-        ),
-        .init(
-            id: "speaker-recognition",
-            title: "Speaker Recognition",
-            description: "Identify and label distinct speakers.",
-            symbol: "person.2.wave.2",
+            id: "parakeet",
+            title: "Parakeet",
+            description: "NVIDIA Parakeet via FluidAudio. Fast, English only.",
+            symbol: "bird",
             tint: .green
         )
     ]

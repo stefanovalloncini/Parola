@@ -7,15 +7,7 @@ struct DictationPane: View {
     @State private var customApps: [(bundleID: String, name: String)] = []
 
     private var currentModeName: String? {
-        let id = model.dictationCleanupPromptID
-        if id.isEmpty {
-            return DictationModePreset.builtIns.first { $0.promptID == nil }?.name
-        }
-        guard let uuid = UUID(uuidString: id) else { return nil }
-        if let preset = DictationModePreset.builtIns.first(where: { $0.promptID == uuid }) {
-            return preset.name
-        }
-        return Prompt.builtIns.first(where: { $0.id == uuid })?.name
+        AppModel.dictationCleanupModeName(for: model.dictationCleanupPromptID)
     }
 
     var body: some View {
@@ -96,7 +88,7 @@ struct DictationPane: View {
                     }
                 }
             }
-            SettingHelper(text: "Requires Input Monitoring permission. The HUD shows a live waveform while you speak.")
+            SettingHelper(text: "Needs Input Monitoring to watch the hotkey and Accessibility to insert text. The HUD shows a live waveform while you speak.")
 
             SettingsSection("Context (optional)") {
                 SettingRow("Include selected text",
@@ -137,7 +129,7 @@ struct DictationPane: View {
                 .axLeaf("Dictation.Button.AddApp")
                 Spacer()
             }
-            SettingHelper(text: "When the frontmost app matches, dictation uses these overrides. Prompt cleans up the text after transcription; language hints the engine before it. URL rules take precedence over the bundle default for supported browsers.")
+            SettingHelper(text: "When the frontmost app matches, dictation uses these overrides. Prompt cleans up the text after transcription; language hints the engine before it. In supported browsers, URL rules win over the app's own row.")
             ResetPaneButton(scope: .dictation)
         }
         .onAppear {

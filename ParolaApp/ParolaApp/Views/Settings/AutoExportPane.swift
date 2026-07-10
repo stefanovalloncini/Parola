@@ -58,11 +58,11 @@ struct AutoExportPane: View {
             }
             .axLeaf("AutoExport.Button.AddRule")
 
-            SettingHelper(text: "Auto-export writes additional files next to the source when transcription completes.")
+            SettingHelper(text: "Auto-export writes additional files next to the source when transcription completes. Leave a rule's extension field empty to match every file.")
 
             SettingsSection("Export options") {
                 SettingRow("Subtitle line length",
-                           description: "Applied to SRT and VTT exports and to the subtitle QC badges.",
+                           description: "Applied to SRT and VTT exports and to the subtitle length warnings in the transcript view.",
                            isFirst: true) {
                     Picker("", selection: $model.subtitleCaptionLengthRaw) {
                         ForEach(CaptionLength.allCases) { preset in
@@ -210,7 +210,7 @@ private struct AutoExportRuleRow: View {
                         .onChange(of: extensionsText) { _, new in
                             rule.sourceExtensions = Set(
                                 new.split(separator: ",")
-                                    .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+                                    .map { AutoExportRule.normalizedExtension(String($0)) }
                                     .filter { !$0.isEmpty }
                             )
                         }
