@@ -39,6 +39,12 @@ struct CorrectionRuleTests {
         #expect(set.apply(to: "hello world") == "hello world")
     }
 
+    @Test("a whitespace-only rule never fires")
+    func whitespaceOnlyRuleInert() {
+        let set = CorrectionRuleSet(rules: [CorrectionRule(from: "  ", to: "X")])
+        #expect(set.apply(to: "hello  world") == "hello  world")
+    }
+
     @Test(
         "applies a single rule",
         arguments: [

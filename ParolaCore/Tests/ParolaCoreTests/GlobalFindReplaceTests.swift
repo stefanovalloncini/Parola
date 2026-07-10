@@ -120,6 +120,15 @@ struct GlobalFindReplaceTests {
         #expect(out.first?.words == input.words)
     }
 
+    @Test("a whitespace-only find rule never fires")
+    func whitespaceOnlyFindInert() {
+        let rule = FindReplaceRule(find: " ", replace: "_")
+        let input = segWithWords(0, "Hello world")
+        let out = GlobalFindReplace.apply(rules: [rule], to: [input])
+        #expect(out.first?.text == "Hello world")
+        #expect(out.first?.words == input.words)
+    }
+
     @Test("rule round-trips through JSON")
     func jsonRoundTrip() throws {
         let rule = FindReplaceRule(find: "foo", replace: "bar", caseSensitive: true, regex: true)

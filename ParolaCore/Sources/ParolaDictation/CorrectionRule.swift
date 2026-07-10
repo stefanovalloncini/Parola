@@ -49,7 +49,7 @@ public struct CorrectionRuleSet: TextPostProcessor, Sendable {
     public init(rules: [CorrectionRule]) {
         self.rules = rules
         self.compiled = rules.compactMap { rule -> Compiled? in
-            guard rule.enabled, !rule.from.isEmpty else { return nil }
+            guard rule.enabled, !rule.from.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
             let escaped = NSRegularExpression.escapedPattern(for: rule.from)
             guard !escaped.isEmpty, let first = rule.from.first, let last = rule.from.last else { return nil }
             let isWord: (Character) -> Bool = { $0.isLetter || $0.isNumber }

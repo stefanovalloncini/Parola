@@ -48,7 +48,7 @@ public enum GlobalFindReplace {
         to segments: [TranscriptSegment]
     ) -> [TranscriptSegment] {
         let active = rules
-            .filter { $0.enabled && !$0.find.isEmpty }
+            .filter { $0.enabled && !$0.find.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .map { CompiledRule($0) }
         guard !active.isEmpty else { return segments }
         return segments.compactMap { seg in
