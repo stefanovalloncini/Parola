@@ -82,6 +82,9 @@ public final class ModelStore: Sendable {
     /// Filters by the managed-config engine allowlist if one is set.
     public func catalog() -> [ModelInfo] {
         ManagedConfiguration.shared.filterAllowed(ModelCatalog.all).map { variant in
+            if variant.engineID == .appleSpeech {
+                return modelInfo(for: variant, url: nil, isInstalled: true)
+            }
             let url = installedURL(for: variant.downloadSource)
             let installed = isFullyDownloaded(at: url)
             return modelInfo(for: variant, url: installed ? url : nil, isInstalled: installed)

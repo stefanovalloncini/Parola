@@ -14,7 +14,10 @@ struct ModelStoreTests {
         let store = ModelStore(modelsDirectory: tmp)
         let entries = store.catalog()
         #expect(entries.contains { $0.name == "openai_whisper-tiny" })
-        #expect(entries.allSatisfy { !$0.isInstalled })
+        // Apple Speech is built into macOS and always reports installed.
+        let appleSpeechIDs = Set(ModelCatalog.all.filter { $0.engineID == .appleSpeech }.map(\.id))
+        #expect(entries.filter { !appleSpeechIDs.contains($0.name) }.allSatisfy { !$0.isInstalled })
+        #expect(entries.filter { appleSpeechIDs.contains($0.name) }.allSatisfy { $0.isInstalled })
 
         let installedURL = store.installedURL(for: "openai_whisper-tiny")
         try FileManager.default.createDirectory(at: installedURL, withIntermediateDirectories: true)
