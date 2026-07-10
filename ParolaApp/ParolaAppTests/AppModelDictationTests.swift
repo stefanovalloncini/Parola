@@ -118,7 +118,7 @@ struct AppModelDictationTests {
     func removeOverride() {
         let model = makeModel()
         model.setDictationOverridePromptID("prompt", for: "com.apple.mail")
-        model.addDictationURLRule(for: "com.apple.mail")
+        model.addDictationURLRule(for: "com.apple.mail", pattern: "gmail.com")
 
         model.removeDictationOverride(for: "com.apple.mail")
 
@@ -137,9 +137,50 @@ struct AppModelDictationTests {
             DictationWorkflow(promptID: "keep"),
         ])
 
-        model.addDictationURLRule(for: "com.apple.mail")
+        model.addDictationURLRule(for: "com.apple.mail", pattern: "gmail.com")
 
         #expect(model.defaultDictationWorkflow(for: "com.apple.mail").promptID == "keep")
+    }
+
+    @Test("addDictationURLRule persists a visible rule with the given pattern")
+    func addURLRulePersistsPattern() {
+        let model = makeModel()
+
+        model.addDictationURLRule(for: "com.apple.mail", pattern: "  gmail.com  ")
+
+        let rules = model.urlDictationRules(for: "com.apple.mail")
+        #expect(rules.count == 1)
+        #expect(rules.first?.urlPattern == "gmail.com")
+    }
+
+    @Test("addDictationURLRule ignores an empty pattern")
+    func addURLRuleRejectsEmptyPattern() {
+        let model = makeModel()
+
+        model.addDictationURLRule(for: "com.apple.mail", pattern: "   ")
+
+        #expect(model.dictationWorkflows()["com.apple.mail"] == nil)
+    }
+
+    @Test("registerDictationOverrideApp lists the app and survives a storage round trip")
+    func registerOverrideAppSurvivesRoundTrip() {
+        let model = makeModel()
+
+        model.registerDictationOverrideApp("com.example.editor")
+
+        #expect(model.customDictationOverrideApps().contains { $0.bundleID == "com.example.editor" })
+        let reencoded = DictationWorkflowMap.decode(legacy: DictationWorkflowMap.encode(model.dictationWorkflows()))
+        #expect(reencoded["com.example.editor"]?.isEmpty == false)
+    }
+
+    @Test("registerDictationOverrideApp keeps an existing override untouched")
+    func registerOverrideAppKeepsExisting() {
+        let model = makeModel()
+        model.setDictationOverridePromptID("keep", for: "com.example.editor")
+
+        model.registerDictationOverrideApp("com.example.editor")
+
+        #expect(model.defaultDictationWorkflow(for: "com.example.editor").promptID == "keep")
     }
 
     @Test("updateDictationURLRule mutates only the matching URL-rule index")

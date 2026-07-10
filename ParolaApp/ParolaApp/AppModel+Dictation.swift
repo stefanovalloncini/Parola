@@ -88,10 +88,12 @@ extension AppModel {
         writeDictationWorkflows(map)
     }
 
-    func addDictationURLRule(for bundleID: String) {
+    func addDictationURLRule(for bundleID: String, pattern: String) {
+        let trimmed = pattern.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
         var map = dictationWorkflows()
         var entries = map[bundleID] ?? []
-        entries.append(DictationWorkflow(urlPattern: ""))
+        entries.append(DictationWorkflow(urlPattern: trimmed))
         map[bundleID] = entries
         writeDictationWorkflows(map)
     }
@@ -144,10 +146,14 @@ extension AppModel {
         panel.message = "Pick an app to give it a custom dictation workflow."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         guard let bundle = Bundle(url: url), let bundleID = bundle.bundleIdentifier else { return }
-        let workflow = defaultDictationWorkflow(for: bundleID)
-        if workflow.isEmpty {
-            setDefaultDictationWorkflow(DictationWorkflow(promptID: ""), for: bundleID)
-        }
+        registerDictationOverrideApp(bundleID)
+    }
+
+    // An all-defaults workflow can't round-trip storage (cleaned() strips empty entries),
+    // so a fresh app is pinned with an explicit .paste insertion — same behavior as the default.
+    func registerDictationOverrideApp(_ bundleID: String) {
+        guard defaultDictationWorkflow(for: bundleID).isEmpty else { return }
+        setDefaultDictationWorkflow(DictationWorkflow(insertion: .paste), for: bundleID)
     }
 
     func customDictationOverrideApps() -> [(bundleID: String, name: String)] {

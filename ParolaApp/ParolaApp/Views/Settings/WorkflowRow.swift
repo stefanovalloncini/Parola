@@ -7,6 +7,8 @@ struct WorkflowRow: View {
     let isFirst: Bool
     let isRemovable: Bool
     @Environment(AppModel.self) private var model
+    @State private var isAddingRule = false
+    @State private var draftPattern = ""
 
     private var isBrowser: Bool { BrowserURLResolver.supportedBundleIDs.contains(app.bundleID) }
 
@@ -35,21 +37,60 @@ struct WorkflowRow: View {
                     ForEach(Array(urlRules.enumerated()), id: \.offset) { idx, rule in
                         URLRuleRow(app: app, index: idx, rule: rule)
                     }
-                    HStack {
-                        Button {
-                            model.addDictationURLRule(for: app.bundleID)
-                        } label: {
-                            Label("Add URL rule", systemImage: "plus.circle")
-                                .font(DS.Font.subheadline)
+                    if isAddingRule {
+                        draftRuleRow
+                    } else {
+                        HStack {
+                            Button {
+                                isAddingRule = true
+                            } label: {
+                                Label("Add URL rule", systemImage: "plus.circle")
+                                    .font(DS.Font.subheadline)
+                            }
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(.secondary)
+                            .axLeaf("Workflow.Button.AddURLRule")
+                            Spacer()
                         }
-                        .buttonStyle(.borderless)
-                        .foregroundStyle(.secondary)
-                        .axLeaf("Workflow.Button.AddURLRule")
-                        Spacer()
                     }
                 }
             }
         }
+    }
+
+    private var draftRuleRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "link")
+                .foregroundStyle(.secondary)
+                .frame(width: 14)
+            TextField(String(localized: "Example: gmail.com"), text: $draftPattern)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 160)
+                .onSubmit(commitDraftRule)
+                .axLeaf("Workflow.TextField.NewURLRule")
+            Button("Add", action: commitDraftRule)
+                .disabled(draftPattern.trimmingCharacters(in: .whitespaces).isEmpty)
+                .axLeaf("Workflow.Button.ConfirmURLRule")
+            Button {
+                isAddingRule = false
+                draftPattern = ""
+            } label: {
+                Image(systemName: "xmark.circle")
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .axLeaf("Workflow.Button.CancelURLRule")
+            Spacer()
+        }
+        .padding(.leading, 6)
+    }
+
+    private func commitDraftRule() {
+        let pattern = draftPattern.trimmingCharacters(in: .whitespaces)
+        guard !pattern.isEmpty else { return }
+        model.addDictationURLRule(for: app.bundleID, pattern: pattern)
+        draftPattern = ""
+        isAddingRule = false
     }
 
     private var promptPicker: some View {
