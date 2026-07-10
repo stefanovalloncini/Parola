@@ -11,7 +11,7 @@ struct GeneralPane: View {
         return VStack(alignment: .leading, spacing: 16) {
             SettingsSection("Startup") {
                 SettingRow("Open at login",
-                           descriptionVerbatim: launchAtLoginError ?? String(localized: "Launches Parola in the background when you sign in."),
+                           descriptionVerbatim: launchAtLoginError ?? String(localized: "Opens Parola automatically when you sign in."),
                            isFirst: true) {
                     Toggle("", isOn: $launchAtLogin)
                         .labelsHidden()
@@ -42,10 +42,9 @@ struct GeneralPane: View {
                         .axLeaf("General.Toggle.KaraokeHighlight")
                 }
                 SettingRow("Use precise word timings",
-                           description: "Asks Whisper for word-level timestamps. More accurate karaoke, but slower.") {
+                           description: "Asks Whisper for word-level timestamps. More accurate karaoke and word click-to-seek, but slower.") {
                     Toggle("", isOn: $model.wordTimestamps)
                         .labelsHidden()
-                        .disabled(!model.karaokeHighlight)
                         .axLeaf("General.Toggle.WordTimestamps")
                 }
                 SettingRow("Stream microphone in real time",
@@ -59,7 +58,7 @@ struct GeneralPane: View {
                         .axLeaf("General.Toggle.Diarize")
                 }
                 SettingRow("Name transcripts automatically",
-                           description: "Generates a short title from the content on device when a transcription finishes.") {
+                           description: "Generates a short title from the content on device when a transcription finishes. Batch files keep their file names.") {
                     Toggle("", isOn: $model.autoTitleEntries).labelsHidden()
                         .axLeaf("General.Toggle.AutoTitle")
                 }

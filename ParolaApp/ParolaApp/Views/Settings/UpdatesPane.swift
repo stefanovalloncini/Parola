@@ -47,6 +47,7 @@ struct UpdatesPane: View {
             } else {
                 SettingHelper(text: "Updates are signed and verified with Sparkle's EdDSA keys before installation.")
             }
+            ResetPaneButton(scope: .updates)
         }
         .onAppear {
             feedConfigured = SparkleUpdater.shared.feedURLConfigured

@@ -9,13 +9,13 @@ struct TranslationPane: View {
         return VStack(alignment: .leading, spacing: 12) {
             SettingsSection {
                 SettingRow("Translate to English by default",
-                           description: "Apply translation to every new transcription unless overridden.",
+                           description: "Applies to new file, mic, batch, and YouTube transcriptions. Dictation and live captions have their own controls.",
                            isFirst: true) {
                     Toggle("", isOn: $model.translate).labelsHidden()
                         .axLeaf("Translation.Toggle.TranslateByDefault")
                 }
             }
-            SettingHelper(text: "Whisper translates from the detected source language into English.")
+            SettingHelper(text: "Whisper translates from the detected source language into English. Only multilingual Whisper models can translate.")
             ResetPaneButton(scope: .translation)
         }
     }

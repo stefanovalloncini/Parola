@@ -9,7 +9,7 @@ struct RecordMeetingsPane: View {
         return VStack(alignment: .leading, spacing: 12) {
             SettingsSection {
                 SettingRow("Auto-detect meeting apps",
-                           description: "Offer to record system audio when Zoom, Teams, Webex, or Meet launches.",
+                           description: "Offers to record system audio when a meeting app like Zoom, Teams, or Webex launches. Meetings in a browser aren't detected.",
                            isFirst: true) {
                     Toggle("", isOn: $detector.isEnabled).labelsHidden()
                         .axLeaf("RecordMeetings.Toggle.Enabled")

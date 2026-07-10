@@ -36,7 +36,7 @@ struct ShortcutsPane: View {
                     }
                 }
             }
-            SettingHelper(text: "Menu equivalents are fixed. Dictation needs Input Monitoring permission.")
+            SettingHelper(text: "Menu equivalents are fixed. Global hotkeys need Input Monitoring permission.")
             ResetPaneButton(scope: .shortcuts)
         }
     }

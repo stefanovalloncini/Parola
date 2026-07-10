@@ -65,7 +65,7 @@ struct MicrophonePane: View {
                     }
                 }
                 SettingRow("Count-in",
-                           description: "Shows a 3-2-1 countdown before recording starts. Press Esc to cancel.") {
+                           description: "Counts down in the main window before recording starts. Press Esc to cancel.") {
                     Picker("", selection: $model.recordingCountInSeconds) {
                         Text("Off").tag(0)
                         Text("3 seconds").tag(3)

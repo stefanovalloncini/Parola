@@ -9,7 +9,7 @@ struct IntegrationsPane: View {
             SettingsSection {
                 ToolStatusRow(
                     name: "yt-dlp",
-                    description: "Required to transcribe YouTube URLs. Audio downloads locally; no upload happens.",
+                    description: "Required to transcribe YouTube and other video links. Audio downloads locally; no upload happens.",
                     available: model.ytDlpAvailable,
                     installing: model.ytDlpInstalling,
                     error: model.ytDlpInstallError,

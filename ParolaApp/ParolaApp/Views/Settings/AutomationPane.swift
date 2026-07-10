@@ -147,6 +147,8 @@ struct AutomationPane: View {
                     }
                     .transition(.opacity)
                 }
+
+                ResetPaneButton(scope: .automation)
             }
             .padding(20)
         }
@@ -158,7 +160,7 @@ struct AutomationPane: View {
                 .fill(model.automationBridgeRunning ? Color.green : Color.secondary.opacity(0.5))
                 .frame(width: 10, height: 10)
             if model.automationBridgeRunning, let port = model.automationBridgePort {
-                Text("Listening on 127.0.0.1:\(port)")
+                Text("Listening on 127.0.0.1:\(String(port))")
                     .font(.subheadline)
             } else if model.automationBridgeRunning {
                 Text("Starting…")

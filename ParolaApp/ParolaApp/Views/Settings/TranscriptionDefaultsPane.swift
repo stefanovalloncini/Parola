@@ -9,7 +9,7 @@ struct TranscriptionDefaultsPane: View {
         return VStack(alignment: .leading, spacing: 12) {
             SettingsSection {
                 SettingRow("Default model",
-                           description: "Used when you start a transcription without picking one in the toolbar.",
+                           description: "Applies to every new transcription. The toolbar model picker edits this same setting.",
                            isFirst: true) {
                     Picker("", selection: $model.selectedModel) {
                         ForEach(model.availableModels, id: \.name) { info in
@@ -22,7 +22,7 @@ struct TranscriptionDefaultsPane: View {
                     .axLeaf("TranscriptionDefaults.Picker.Model")
                 }
                 SettingRow("Default language",
-                           description: "Auto picks the language from the audio. Override when the audio is in a known language.") {
+                           description: "Auto detects the language from the audio with Whisper models. Pick one when the audio language is known.") {
                     Picker("", selection: languageBinding) {
                         Text("Auto").tag(String?.none)
                         ForEach(LanguageOptions.options, id: \.code) { option in
@@ -35,7 +35,7 @@ struct TranscriptionDefaultsPane: View {
                     .axLeaf("TranscriptionDefaults.Picker.Language")
                 }
                 SettingRow("Word timestamps",
-                           description: "Captures the start and end time of each word. Required for karaoke highlight.") {
+                           description: "Captures the start and end time of each word. Karaoke estimates timings without it.") {
                     Toggle("", isOn: $model.wordTimestamps).labelsHidden()
                         .axLeaf("TranscriptionDefaults.Toggle.WordTimestamps")
                 }
@@ -52,7 +52,7 @@ struct TranscriptionDefaultsPane: View {
                     .padding(.top, 2)
                     .axLeaf("TranscriptionDefaults.Label.LanguageWarning")
             }
-            SettingHelper(text: "The main-window toolbar overrides these per transcript.")
+            SettingHelper(text: "The main-window toolbar shows these same settings; a change in either place persists.")
 
             SettingsSection("Playback") {
                 SettingRow("Pause when app is hidden",
