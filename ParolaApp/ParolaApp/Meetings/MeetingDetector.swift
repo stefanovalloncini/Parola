@@ -25,6 +25,7 @@ final class MeetingDetector {
     @ObservationIgnored private let clock: @MainActor () -> Date
     @ObservationIgnored private var lastFiredApp: String?
     @ObservationIgnored private var lastFiredAt: Date?
+    @ObservationIgnored private var snoozedApps: Set<String> = []
     @ObservationIgnored private var observerTokens: [NSObjectProtocol] = []
 
     private static let defaultsKey = "meetingDetectorEnabled"
@@ -48,6 +49,7 @@ final class MeetingDetector {
     private func startObserving() {
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didActivateApplicationNotification] {
+            let isLaunch = name == NSWorkspace.didLaunchApplicationNotification
             let token = center.addObserver(
                 forName: name,
                 object: nil,
@@ -56,6 +58,7 @@ final class MeetingDetector {
                 let bundleID = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier
                 guard let bundleID, let display = MeetingDetector.knownMeetingApps[bundleID] else { return }
                 Task { @MainActor [weak self] in
+                    if isLaunch { self?.snoozedApps.remove(display) }
                     self?.fire(appName: display)
                 }
             }
@@ -71,7 +74,7 @@ final class MeetingDetector {
     }
 
     func fire(appName: String) {
-        guard isEnabled else { return }
+        guard isEnabled, !snoozedApps.contains(appName) else { return }
         let now = clock()
         if appName == lastFiredApp,
            let last = lastFiredAt,
@@ -80,5 +83,10 @@ final class MeetingDetector {
         lastFiredAt = now
         detectedAppName = appName
         onDetected(appName)
+    }
+
+    /// Declining the prompt mutes that app until it launches again.
+    func snooze(appName: String) {
+        snoozedApps.insert(appName)
     }
 }

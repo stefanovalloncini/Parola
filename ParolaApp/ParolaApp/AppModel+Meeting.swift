@@ -11,6 +11,9 @@ extension AppModel {
     }
 
     func dismissMeetingPrompt() {
+        if let app = meetingDetectedApp {
+            meetingDetector.snooze(appName: app)
+        }
         meetingDetectedApp = nil
     }
 }
