@@ -75,7 +75,7 @@ struct DictationPane: View {
                     }
                 }
                 SettingRow("Cleanup style",
-                           description: "How the dictated text should land.") {
+                           description: "Voice inserts the transcript as spoken; the other styles rewrite it with the on-device model.") {
                     DictationModeRow(selectedID: $model.dictationCleanupPromptID)
                 }
                 SettingRow("Strip self-corrections",
@@ -116,7 +116,7 @@ struct DictationPane: View {
                         .axLeaf("Dictation.Toggle.ContextScreen")
                 }
             }
-            SettingHelper(text: "Context is used only for proper nouns and technical terms — the model never echoes or responds to it. All three are off by default.")
+            SettingHelper(text: "Context reaches the cleanup model only when a style other than Voice runs, to help spell proper nouns and technical terms. All three are off by default.")
 
             SettingsSection("Per-app workflows") {
                 let seeds = AppModel.dictationOverrideApps
@@ -149,7 +149,7 @@ struct DictationPane: View {
     }
 
     private var modeDescription: String {
-        model.dictationMode.description
+        model.dictationMode.description + " " + String(localized: "While enabled, a mic icon in the menu bar starts and stops dictation.")
     }
 
     private var pasteDelayBinding: Binding<Double> {

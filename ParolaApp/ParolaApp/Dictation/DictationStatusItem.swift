@@ -5,36 +5,58 @@ import ParolaDictation
 @MainActor
 final class DictationStatusItem {
     private let model: AppModel
-    private let statusItem: NSStatusItem
+    private var statusItem: NSStatusItem?
+    private var lastVisibility = false
 
     init(model: AppModel) {
         self.model = model
-        self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        configureButton()
+        applyVisibility(model.dictationEnabled)
+        lastVisibility = model.dictationEnabled
         observeState()
     }
 
     private func observeState() {
         withObservationTracking {
             _ = model.dictationState
+            _ = model.dictationEnabled
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
-                self.apply(state: self.model.dictationState)
+                self.refresh()
                 self.observeState()
             }
         }
         apply(state: model.dictationState)
     }
 
+    private func refresh() {
+        if model.dictationEnabled != lastVisibility {
+            applyVisibility(model.dictationEnabled)
+            lastVisibility = model.dictationEnabled
+        }
+        apply(state: model.dictationState)
+    }
+
+    private func applyVisibility(_ visible: Bool) {
+        if visible {
+            guard statusItem == nil else { return }
+            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            statusItem = item
+            configureButton()
+        } else if let item = statusItem {
+            NSStatusBar.system.removeStatusItem(item)
+            statusItem = nil
+        }
+    }
+
     private func configureButton() {
-        guard let button = statusItem.button else { return }
+        guard let button = statusItem?.button else { return }
         button.target = self
         button.action = #selector(handleClick)
     }
 
     private func apply(state: DictationCoordinator.State) {
-        guard let button = statusItem.button else { return }
+        guard let button = statusItem?.button else { return }
         let label = tooltip(for: state)
         let image = NSImage(systemSymbolName: symbolName(for: state), accessibilityDescription: label)
         image?.isTemplate = true
@@ -65,9 +87,6 @@ final class DictationStatusItem {
         case .listening:
             model.stopDictationFromIntent()
         case .idle, .transcribing, .failed:
-            if !model.dictationEnabled {
-                model.dictationEnabled = true
-            }
             model.startDictationFromIntent()
         }
     }
