@@ -242,7 +242,7 @@ struct ModelsSettingsPane: View {
                             isActive: isActive,
                             actualSizeBytes: model.modelSizes[variant.id],
                             isDeleting: model.modelsBeingDeleted.contains(variant.id),
-                            onActivate: { model.selectedModel = variant.id },
+                            onActivate: { model.activateModel(variant.id) },
                             onRequestDelete: (isActive || variant.engineID == .appleSpeech) ? nil : {
                                 pendingDeletion = PendingDeletion(
                                     id: variant.id,

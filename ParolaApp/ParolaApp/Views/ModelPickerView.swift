@@ -147,14 +147,7 @@ struct ModelPickerView: View {
         if !isInstalled(variant) {
             model.downloadModel(variant.id)
         }
-        model.selectedModel = variant.id
-        applyDefaultLanguageIfNeeded(for: variant)
-    }
-
-    private func applyDefaultLanguageIfNeeded(for variant: ModelVariant) {
-        if case .some(.only(let codes)) = variant.languageScope, codes == ["en"] {
-            model.selectedLanguage = "en"
-        }
+        model.activateModel(variant.id)
     }
 
     private var currentLabel: String {
