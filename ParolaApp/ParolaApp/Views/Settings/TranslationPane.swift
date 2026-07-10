@@ -15,6 +15,12 @@ struct TranslationPane: View {
                         .axLeaf("Translation.Toggle.TranslateByDefault")
                 }
             }
+            if let warning = model.translateMismatchWarning {
+                Label(warning, systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .axLeaf("Translation.Label.TranslateWarning")
+            }
             SettingHelper(text: "Whisper translates from the detected source language into English. Only multilingual Whisper models can translate.")
             ResetPaneButton(scope: .translation)
         }

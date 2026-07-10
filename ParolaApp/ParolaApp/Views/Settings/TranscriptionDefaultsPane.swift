@@ -52,6 +52,13 @@ struct TranscriptionDefaultsPane: View {
                     .padding(.top, 2)
                     .axLeaf("TranscriptionDefaults.Label.LanguageWarning")
             }
+            if let warning = model.diarizeMismatchWarning {
+                Label(warning, systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .padding(.top, 2)
+                    .axLeaf("TranscriptionDefaults.Label.DiarizeWarning")
+            }
             SettingHelper(text: "The main-window toolbar shows these same settings; a change in either place persists.")
 
             SettingsSection("Playback") {
