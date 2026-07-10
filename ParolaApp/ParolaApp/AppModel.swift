@@ -349,7 +349,17 @@ final class AppModel {
     // MARK: - Watched folders
 
     @ObservationIgnored lazy var watchedFolders: WatchedFoldersStore = WatchedFoldersStore { [weak self] url in
-        self?.transcribe(fileURL: url)
+        self?.handleWatchedArrival(url)
+    }
+
+    // A user opening a file replaces the current run, but folder arrivals must not: two files
+    // landing together would cancel each other and only the last one would be transcribed.
+    func handleWatchedArrival(_ url: URL) {
+        if fileTranscribeTask != nil || phaseDefersArrivals || batchIsRunning {
+            deferredArrivals.append(url)
+            return
+        }
+        transcribe(fileURL: url)
     }
 
     // MARK: - Live captions
@@ -1334,7 +1344,10 @@ final class AppModel {
                 fileTranscribeStage = nil
                 if !Task.isCancelled { applyTranscriptionError(error) }
             }
-            if !Task.isCancelled { self.fileTranscribeTask = nil }
+            if !Task.isCancelled {
+                self.fileTranscribeTask = nil
+                self.drainDeferredArrivals()
+            }
         }
     }
 
@@ -1632,8 +1645,12 @@ final class AppModel {
     /// The streaming mic path drives WhisperKit off the live mic and never consults
     /// MockAudioSourceRegistry. With a mic fixture installed (test-mode) we must avoid it and take the
     /// file-capture path instead, so the fixture transcribes the same way system audio does.
+    /// Non-WhisperKit engines can't stream either — those record the take first, then transcribe.
     func shouldUseStreamingMic() async -> Bool {
         guard useStreaming else { return false }
+        if let engine = ModelCatalog.variant(id: selectedModel)?.engineID, engine != .whisperKit {
+            return false
+        }
         return await MockAudioSourceRegistry.shared.resolve(for: .mic) == nil
     }
 

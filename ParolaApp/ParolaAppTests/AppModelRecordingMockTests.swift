@@ -55,6 +55,16 @@ struct AppModelRecordingMockTests {
         await MockAudioSourceRegistry.shared.clear()
     }
 
+    @Test("a non-WhisperKit model takes the capture path instead of failing to stream")
+    func captureWhenEngineCannotStream() async {
+        await MockAudioSourceRegistry.shared.clear()
+        let model = makeModel()
+        model.useStreaming = true
+        model.selectedModel = "nvidia_parakeet-tdt-0.6b-v2"
+
+        #expect(await model.shouldUseStreamingMic() == false)
+    }
+
     @Test("streaming off always takes the capture path regardless of mocks")
     func captureWhenStreamingOff() async {
         await MockAudioSourceRegistry.shared.clear()

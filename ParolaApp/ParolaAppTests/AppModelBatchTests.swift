@@ -616,6 +616,19 @@ struct AppModelBatchTests {
         #expect(model.batchJobs.isEmpty)
     }
 
+    @Test("watched-folder arrivals defer while a file transcription is running")
+    func watchedArrivalDefersDuringFileTranscription() {
+        let model = makeModel()
+        model.fileTranscribeTask = Task {}
+        let url = URL(fileURLWithPath: "/tmp/watched.wav")
+
+        model.handleWatchedArrival(url)
+
+        #expect(model.deferredArrivals == [url])
+        model.fileTranscribeTask?.cancel()
+        model.fileTranscribeTask = nil
+    }
+
     @Test("arrivals during a subtitle burn defer instead of racing the export")
     func exportingDefersArrivals() {
         let model = makeModel()
