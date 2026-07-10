@@ -60,13 +60,11 @@ struct AdvancedPane: View {
             titleVisibility: .visible
         ) {
             Button("Reset", role: .destructive) {
-                // reloadSettings applies the reset live; it prompts for a relaunch on its own
-                // when watched folders changed, so no unconditional prompt here.
                 SettingsResetService.resetAll()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Every Settings pane returns to its defaults. Library entries, models, and dictation prompts are kept.")
+            Text("Every Settings pane returns to its defaults, including your correction, find & replace, ignored-segment, snippet, and auto-export rules. Library entries, models, and custom prompts are kept.")
         }
     }
 }

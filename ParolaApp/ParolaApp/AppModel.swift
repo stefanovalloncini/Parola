@@ -238,7 +238,15 @@ final class AppModel {
         inputDeviceUID.isEmpty ? nil : inputDeviceUID
     }
 
-    var selectedModel: String = "openai_whisper-tiny" { didSet { defaults.set(selectedModel, forKey: "selectedModel"); if !isReloadingSettings { restartDictation() } } }
+    var selectedModel: String = "openai_whisper-tiny" {
+        didSet {
+            defaults.set(selectedModel, forKey: "selectedModel")
+            if !isReloadingSettings {
+                restartDictation()
+                applyLiveCaptionsTranslateChange()
+            }
+        }
+    }
     private var selectedLanguageRaw: String = "" { didSet { defaults.set(selectedLanguageRaw, forKey: "selectedLanguageRaw"); if !isReloadingSettings { restartDictation() } } }
     var translate: Bool = false { didSet { defaults.set(translate, forKey: "translate") } }
 
@@ -344,7 +352,7 @@ final class AppModel {
 
     // MARK: - Prompt library
 
-    @ObservationIgnored let promptLibrary = PromptLibrary()
+    @ObservationIgnored let promptLibrary: PromptLibrary
     var promptOutput: PromptOutput?
     var isRunningPrompt: Bool = false
     var actionItems: [ActionItem] = []
@@ -470,11 +478,10 @@ final class AppModel {
 
     /// Re-reads every persisted setting into its observed property after a Reset or Import, suppressing the
     /// side-effecting didSets during the bulk read, then re-applying the side effects once. Avoids a relaunch.
-    func reloadSettings() {
-        let themeBefore = themeKeySnapshot()
-        let watchedFoldersBefore = defaults.data(forKey: "watchedFolders")
-
-        isReloadingSettings = true
+    /// The one place persisted settings are read into their observed properties.
+    /// Both init and reloadSettings call this inside an isReloadingSettings bracket,
+    /// so a key added here is automatically covered by Reset and Import.
+    private func readPersistedSettings() {
         self.dictationEnabled = defaults.bool(forKey: "dictationEnabled")
         self.dictationModeRaw = defaults.string(forKey: "dictationModeRaw") ?? DictationMode.pushToTalk.rawValue
         self.dictationKeyCode = defaults.object(forKey: "dictationKeyCode") == nil ? 96 : defaults.integer(forKey: "dictationKeyCode")
@@ -539,6 +546,13 @@ final class AppModel {
         self.sparkleChannelRaw = defaults.string(forKey: "sparkleChannel") ?? SparkleChannel.stable.rawValue
         self.sparkleAutomatic = readBool("sparkleAutomatic", default: true)
         self.liveCaptionsTranslate = defaults.bool(forKey: "liveCaptionsTranslate")
+    }
+
+    func reloadSettings() {
+        let themeBefore = themeKeySnapshot()
+
+        isReloadingSettings = true
+        readPersistedSettings()
         loadAutoExportRules()
         loadIgnoredSegmentRules()
         loadFindReplaceRules()
@@ -563,7 +577,7 @@ final class AppModel {
             applyLiveCaptionsTranslateChange()
         }
         if activeSideEffects.contains(.meetingDetector) {
-            meetingDetector.isEnabled = (defaults.object(forKey: "meetingDetectorEnabled") as? Bool) ?? true
+            meetingDetector.reloadFromDefaults()
         }
         switch AppModel.bridgeReloadAction(
             sideEffects: activeSideEffects,
@@ -575,9 +589,8 @@ final class AppModel {
         case .stop: stopAutomationBridge()
         case .keep: break
         }
-        if activeSideEffects.contains(.watchedFolders), mode != .test,
-           defaults.data(forKey: "watchedFolders") != watchedFoldersBefore {
-            SettingsRelaunch.promptToApply("Quit and relaunch Parola to apply watched-folder changes.")
+        if activeSideEffects.contains(.watchedFolders) {
+            watchedFolders.reloadFromDefaults()
         }
     }
     var appAccentRaw: String = AppAccent.terracotta.rawValue { didSet { defaults.set(appAccentRaw, forKey: AppAccent.storageKey) } }
@@ -628,6 +641,16 @@ final class AppModel {
         themeIsCustom = false
         applyTheme()
         themeRevision &+= 1
+    }
+
+    /// Re-enables custom colors with the saved palette. Returns false when nothing
+    /// saved decodes, so the caller can seed a fresh palette instead.
+    func resumeCustomPalette() -> Bool {
+        guard decodedCustomPalette() != nil else { return false }
+        themeIsCustom = true
+        applyTheme()
+        themeRevision &+= 1
+        return true
     }
 
     /// Live edit of the custom palette from the color editor. Updates DS.theme and persists, but
@@ -908,7 +931,9 @@ final class AppModel {
     }
 
     private func applyLiveCaptionsTranslateChange() {
-        let enabled = liveCaptionsTranslate
+        // Same capability gate as makeOptions: engines that can't translate would
+        // otherwise get .translate re-instated by the captions controller.
+        let enabled = liveCaptionsTranslate && selectedModelCapabilities.supportsTranslate
         Task { await liveCaptions?.setTranslate(enabled) }
     }
 
@@ -961,74 +986,15 @@ final class AppModel {
             storageURL: bootstrap.library.map { $0.appendingPathComponent("People.json") }
                 ?? PeopleStore.defaultStorageURL
         )
+        self.promptLibrary = PromptLibrary(
+            storageURL: bootstrap.library.map { $0.appendingPathComponent("Prompts.json") }
+                ?? PromptLibrary.defaultStorageURL
+        )
         // Suppress the settings didSets during the bulk read: side effects (notably startDictation)
         // must wait until after wireDictationController + the gated side-effect block below, or the
         // dictation coordinator is built before appModel is wired.
         isReloadingSettings = true
-        self.dictationEnabled = defaults.bool(forKey: "dictationEnabled")
-        self.dictationModeRaw = defaults.string(forKey: "dictationModeRaw") ?? DictationMode.pushToTalk.rawValue
-        self.dictationKeyCode = defaults.object(forKey: "dictationKeyCode") == nil ? 96 : defaults.integer(forKey: "dictationKeyCode")
-        self.dictationKeyModifiers = defaults.object(forKey: "dictationKeyModifiers") == nil ? 0 : defaults.integer(forKey: "dictationKeyModifiers")
-        self.dictationIndicatorStyleRaw = defaults.string(forKey: "dictationIndicatorStyleRaw") ?? DictationIndicatorStyle.overlay.rawValue
-        self.dictationCleanupPromptID = defaults.string(forKey: "dictationCleanupPromptID") ?? ""
-        self.dictationPerAppOverridesJSON = defaults.string(forKey: "dictationPerAppOverridesJSON") ?? "{}"
-        self.transcriptDisplayModeRaw = defaults.string(forKey: "transcriptDisplayMode") ?? TranscriptDisplayMode.transcript.rawValue
-        self.useStreaming = readBool("useStreaming", default: true)
-        self.wordTimestamps = defaults.bool(forKey: "wordTimestamps")
-        self.karaokeHighlight = readBool("karaokeHighlight", default: true)
-        self.initialPrompt = defaults.string(forKey: "initialPrompt") ?? ""
-        self.diarize = defaults.bool(forKey: "diarize")
-        self.expectedSpeakersRaw = defaults.integer(forKey: "expectedSpeakersRaw")
-        self.autoTitleEntries = defaults.bool(forKey: "autoTitleEntries")
-        self.subtitleFPS = readDouble("subtitleFPS", default: 30)
-        self.subtitleCaptionLengthRaw = defaults.string(forKey: "subtitleCaptionLength") ?? CaptionLength.none.rawValue
-        self.transcriptCompact = defaults.bool(forKey: "transcriptCompact")
-        self.showSubtitleQC = defaults.bool(forKey: "showSubtitleQC")
-        self.skipSilences = defaults.bool(forKey: "skipSilences")
-        self.pausePlayerOnAppHidden = defaults.bool(forKey: "pausePlayerOnAppHidden")
-        self.markdownTimestamps = defaults.bool(forKey: "markdownTimestamps")
-        self.txtExportTimestamps = defaults.bool(forKey: "txtExportTimestamps")
-        self.burnFontSizeRaw = defaults.string(forKey: "burnFontSize") ?? BurnFontSize.medium.rawValue
-        self.burnTextColorRaw = defaults.string(forKey: "burnTextColor") ?? BurnTextColor.white.rawValue
-        self.burnOutline = readBool("burnOutline", default: true)
-        self.htmlExportThemeRaw = defaults.string(forKey: "htmlExportTheme") ?? HtmlExportTheme.light.rawValue
-        self.dictationHudOpacity = readDouble("dictationHudOpacity", default: 1.0)
-        self.lastFindQuery = defaults.string(forKey: "lastFindQuery") ?? ""
-        self.userPrivacyMode = defaults.bool(forKey: "parola.userPrivacyMode")
-        self.pinnedModel = defaults.string(forKey: "pinnedModel") ?? ""
-        self.mainWindowAlwaysOnTop = defaults.bool(forKey: "mainWindowAlwaysOnTop")
-        self.recentFilesRaw = defaults.string(forKey: "recentFiles") ?? "[]"
-        self.micHotkeyKeyCode = readInt("micHotkeyKeyCode", default: 15)
-        self.micHotkeyModifiers = readInt("micHotkeyModifiers", default: 786721)
-        self.micHotkeyEnabled = defaults.bool(forKey: "micHotkeyEnabled")
-        self.dictationStripSelfCorrections = defaults.bool(forKey: "dictationStripSelfCorrections")
-        self.dictationPasteDelayMs = defaults.integer(forKey: "dictationPasteDelayMs")
-        self.dictationContextSelection = defaults.bool(forKey: "dictationContextSelection")
-        self.dictationContextClipboard = defaults.bool(forKey: "dictationContextClipboard")
-        self.dictationContextScreen = defaults.bool(forKey: "dictationContextScreen")
-        self.recordingMaxMinutes = defaults.integer(forKey: "recordingMaxMinutes")
-        self.showMenuBarExtra = defaults.bool(forKey: "showMenuBarExtra")
-        self.recordingCountInSeconds = defaults.integer(forKey: "recordingCountInSeconds")
-        self.autoMuteWhileRecording = defaults.bool(forKey: "autoMuteWhileRecording")
-        self.autoPauseMediaWhileRecording = defaults.bool(forKey: "autoPauseMediaWhileRecording")
-        self.batchExportFormatsRaw = defaults.string(forKey: "batchExportFormats") ?? "txt,srt"
-        self.batchExportToSourceFolder = readBool("batchExportToSourceFolder", default: true)
-        self.batchExportIncludeTimestamps = defaults.bool(forKey: "batchExportIncludeTimestamps")
-        self.batchExportFormatOptionsJSON = defaults.string(forKey: "batchExportFormatOptions") ?? "{}"
-        self.inputDeviceUID = defaults.string(forKey: "inputDeviceUID") ?? ""
-        self.selectedModel = defaults.string(forKey: "selectedModel") ?? "openai_whisper-tiny"
-        self.selectedLanguageRaw = defaults.string(forKey: "selectedLanguageRaw") ?? ""
-        self.translate = defaults.bool(forKey: "translate")
-        self.appTheme = defaults.string(forKey: "appTheme") ?? "system"
-        self.monospacedTimestamps = readBool("monospacedTimestamps", default: true)
-        self.sidebarDensity = defaults.string(forKey: "sidebarDensity") ?? "comfortable"
-        self.appAccentRaw = defaults.string(forKey: AppAccent.storageKey) ?? AppAccent.terracotta.rawValue
-        self.themeIsCustom = defaults.bool(forKey: "themeIsCustom")
-        self.themeCustomPaletteJSON = defaults.string(forKey: "themeCustomPaletteJSON") ?? ""
-        self.automationBridgeEnabled = readBool("automationBridgeEnabled", default: AppModel.defaultBridgeEnabled)
-        self.sparkleChannelRaw = defaults.string(forKey: "sparkleChannel") ?? SparkleChannel.stable.rawValue
-        self.sparkleAutomatic = readBool("sparkleAutomatic", default: true)
-        self.liveCaptionsTranslate = defaults.bool(forKey: "liveCaptionsTranslate")
+        readPersistedSettings()
         isReloadingSettings = false
         applyTheme()
         loadAutoExportRules()
@@ -1135,6 +1101,20 @@ final class AppModel {
 
     var modelSizes: [String: Int64] = [:]
     var modelsBeingDeleted: Set<String> = []
+    /// Last model download/delete failure, surfaced as a banner in the Models pane —
+    /// the shared phase error renders in the main window, invisible behind Settings.
+    var modelActionError: String?
+
+    /// Count and bytes of models with an actual disk footprint, measured when available.
+    /// Apple Speech reports installed but owns no files, so it's excluded. Both the
+    /// Models pane and About read this — the two stats must never disagree.
+    var modelsOnDiskSummary: (count: Int, bytes: Int64) {
+        let onDisk = availableModels.filter { $0.isInstalled && $0.installedURL != nil }
+        let bytes = onDisk.reduce(Int64(0)) { total, info in
+            total + (modelSizes[info.name] ?? info.approximateSizeBytes.map(Int64.init) ?? 0)
+        }
+        return (onDisk.count, bytes)
+    }
 
     func refreshModelList() {
         let curated = store.catalog()
@@ -1184,7 +1164,9 @@ final class AppModel {
                 case .success:
                     self.refreshModelList()
                 case .failure(let error):
-                    self.phase = .failed(message: "Could not delete \(name): \(error.localizedDescription)")
+                    let message = "Could not delete \(name): \(error.localizedDescription)"
+                    self.phase = .failed(message: message)
+                    self.modelActionError = message
                 }
             }
         }
@@ -1199,8 +1181,8 @@ final class AppModel {
     }
 
     func downloadModel(_ name: String) {
+        guard downloadTask == nil else { return }
         let progress = makeDownloadProgressHandler(for: name)
-        downloadTask?.cancel()
         downloadTask = Task {
             do {
                 phase = .downloadingModel(name: name, progress: 0)
@@ -1208,10 +1190,21 @@ final class AppModel {
                 phase = .idle
                 refreshModelList()
             } catch {
-                if !Task.isCancelled { phase = .failed(message: "Download failed: \(error.localizedDescription)") }
+                if !Task.isCancelled {
+                    let message = "Download failed: \(error.localizedDescription)"
+                    phase = .failed(message: message)
+                    modelActionError = message
+                }
             }
             if !Task.isCancelled { downloadTask = nil }
         }
+    }
+
+    func cancelModelDownload() {
+        downloadTask?.cancel()
+        downloadTask = nil
+        if case .downloadingModel = phase { phase = .idle }
+        refreshModelList()
     }
 
     // MARK: - File transcription
@@ -1236,14 +1229,31 @@ final class AppModel {
     }
 
     func handleIncomingFiles(_ urls: [URL]) {
-        let subtitles = urls.filter(Self.isSubtitleImport)
-        let media = urls.filter { !Self.isSubtitleImport($0) }
+        let expanded = urls.flatMap(Self.expandingDroppedFolder)
+        let subtitles = expanded.filter(Self.isSubtitleImport)
+        let media = expanded.filter { !Self.isSubtitleImport($0) }
         for url in subtitles { importSubtitle(fileURL: url) }
         if media.count == 1 {
             transcribe(fileURL: media[0])
         } else if !media.isEmpty {
             startBatch(urls: media)
         }
+    }
+
+    /// Batch Export promises "drop a folder of files to start a batch" — a dropped
+    /// directory expands to its media files (one level, sorted for a stable queue order).
+    nonisolated static func expandingDroppedFolder(_ url: URL) -> [URL] {
+        guard (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else {
+            return [url]
+        }
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: url,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        return contents
+            .filter { FolderWatcher.isMediaFile($0) || isSubtitleImport($0) }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
     }
 
     // MARK: - Subtitle import
@@ -1462,6 +1472,7 @@ final class AppModel {
 
     func refreshYtDlpAvailability() {
         ytDlpAvailable = YtDlpInstaller.locate() != nil
+        if ytDlpAvailable { ytDlpInstallError = nil }
     }
 
     func installYtDlpViaBrew() {
@@ -1639,7 +1650,10 @@ final class AppModel {
     func startRecording(source: RecordSource) {
         guard applyPreRecordingDiskCheck() else { return }
         let countIn = max(0, recordingCountInSeconds)
-        if countIn > 0 {
+        // The countdown overlay renders only in the main window; with no window visible
+        // (global hotkey, menu bar) it would delay the take invisibly and uncancellably.
+        let overlayVisible = mode == .test || NSApp.windows.contains { $0.isVisible && $0.canBecomeMain }
+        if countIn > 0, overlayVisible {
             beginCountIn(seconds: countIn) { [weak self] in
                 self?.beginRecordingNow(source: source)
             }

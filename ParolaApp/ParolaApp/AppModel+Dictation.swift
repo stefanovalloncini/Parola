@@ -79,7 +79,25 @@ extension AppModel {
     func setDictationOverrideInsertion(_ mode: DictationInsertionMode, for bundleID: String) {
         var workflow = defaultDictationWorkflow(for: bundleID)
         workflow.insertion = (mode == .paste) ? nil : mode
+        // A custom-added app lives in storage only through its explicit .paste pin
+        // (registerDictationOverrideApp); an all-nil workflow would drop its row.
+        if workflow.isEmpty, !AppModel.dictationOverrideApps.contains(where: { $0.bundleID == bundleID }) {
+            workflow.insertion = .paste
+        }
         setDefaultDictationWorkflow(workflow, for: bundleID)
+    }
+
+    /// Display name of the dictation cleanup mode for a stored prompt-ID string —
+    /// shared by the Dictation pane preview and the live HUD so they can't drift.
+    static func dictationCleanupModeName(for id: String) -> String? {
+        if id.isEmpty {
+            return DictationModePreset.builtIns.first { $0.promptID == nil }?.name
+        }
+        guard let uuid = UUID(uuidString: id) else { return nil }
+        if let preset = DictationModePreset.builtIns.first(where: { $0.promptID == uuid }) {
+            return preset.name
+        }
+        return Prompt.builtIns.first(where: { $0.id == uuid })?.name
     }
 
     func removeDictationOverride(for bundleID: String) {

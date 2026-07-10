@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 enum SettingsPaneScope: String, CaseIterable, Identifiable {
     case general
@@ -84,28 +83,28 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     /// Search keywords surfaced by the sidebar search beyond the label match.
     var searchKeywords: [String] {
         switch self {
-        case .general: return ["karaoke", "highlight", "word timestamps", "streaming", "diarize", "speakers", "vocabulary", "prompt", "menu bar", "login", "title"]
+        case .general: return ["karaoke", "highlight", "word timestamps", "streaming", "diarize", "speakers", "vocabulary", "prompt", "menu bar", "login", "launch", "startup", "title"]
         case .customization: return ["appearance", "theme", "light", "dark", "density", "sidebar", "monospaced", "accent", "color", "terracotta", "custom colors", "palette"]
         case .watchedFolders: return ["watch", "folder", "auto", "drop"]
-        case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect"]
-        case .shortcuts: return ["hotkey", "key combo", "mic recording", "dictation key", "global"]
-        case .microphone: return ["mic", "input device", "vu", "level", "preview", "count-in", "mute", "pause media", "auto-stop"]
+        case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect", "system audio"]
+        case .shortcuts: return ["hotkey", "key combo", "mic recording", "dictation key", "global", "keyboard"]
+        case .microphone: return ["mic", "input device", "vu", "level", "preview", "count-in", "mute", "pause media", "music", "spotify", "auto-stop"]
         case .liveCaptions: return ["captions", "translate", "live"]
-        case .dictation: return ["hotkey", "f5", "push to talk", "toggle", "indicator", "notch", "overlay", "cleanup", "workflows", "per-app", "hud", "opacity", "context", "clipboard", "paste delay", "self-corrections", "url rule"]
-        case .snippets: return ["snippet", "expand", "abbreviation"]
+        case .dictation: return ["hotkey", "f5", "push to talk", "toggle", "indicator", "notch", "overlay", "cleanup", "workflows", "per-app", "hud", "opacity", "context", "clipboard", "screen", "ocr", "paste delay", "self-corrections", "url rule"]
+        case .snippets: return ["snippet", "expand", "abbreviation", "trigger", "placeholder", "date", "time"]
         case .corrections: return ["correction", "fix", "replace", "dictation", "vocabulary"]
         case .translation: return ["translate", "english"]
-        case .transcriptionDefaults: return ["default", "model", "language", "engine", "whisper", "privacy", "speakers", "diarize", "word timestamps", "apple speech", "playback"]
+        case .transcriptionDefaults: return ["default", "model", "language", "engine", "whisper", "privacy", "cloud", "llm", "speakers", "diarize", "word timestamps", "apple speech", "playback"]
         case .ignoredSegments: return ["filler", "uh", "um", "ignore", "skip"]
         case .findReplace: return ["regex", "replace", "term pack", "substitution", "rule"]
         case .exportFormats: return ["txt", "srt", "vtt", "csv", "tsv", "docx", "pdf", "markdown", "html", "json", "jsonl", "fcpxml", "final cut", "lrc", "lyrics", "subtitles"]
-        case .batchExport: return ["batch", "multiple files", "drag drop"]
+        case .batchExport: return ["batch", "multiple files", "drag drop", "queue", "sidecar", "folder"]
         case .autoExport: return ["auto export", "rule", "line length", "qc", "timestamps", "html theme"]
-        case .integrations: return ["yt-dlp", "youtube", "homebrew"]
-        case .prompts: return ["prompt", "cleanup", "translate", "bullet", "action"]
+        case .integrations: return ["yt-dlp", "youtube", "homebrew", "install"]
+        case .prompts: return ["prompt", "cleanup", "translate", "bullet", "action", "trigger words", "assistant", "rewrite"]
         case .automation: return ["mcp", "bridge", "claude code", "codex", "loopback"]
         case .updates: return ["sparkle", "appcast", "channel", "auto-update"]
-        case .advanced: return ["model storage", "cache", "reveal", "reset", "export settings", "import settings"]
+        case .advanced: return ["model storage", "cache", "reveal", "reset", "backup", "restore", "export settings", "import settings"]
         }
     }
 
@@ -126,7 +125,12 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .recordMeetings:
             return ["meetingDetectorEnabled"]
         case .shortcuts:
-            return ["micHotkeyEnabled", "micHotkeyKeyCode", "micHotkeyModifiers"]
+            // The dictation hotkey keys also live in the .dictation scope; both panes
+            // show the recorder, and removeObject is idempotent across scopes.
+            return [
+                "micHotkeyEnabled", "micHotkeyKeyCode", "micHotkeyModifiers",
+                "dictationKeyCode", "dictationKeyModifiers"
+            ]
         case .microphone:
             return [
                 "inputDeviceUID",
@@ -158,7 +162,13 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .translation:
             return ["translate"]
         case .transcriptionDefaults:
-            return ["selectedModel", "selectedLanguageRaw", "expectedSpeakersRaw", "pausePlayerOnAppHidden", "parola.userPrivacyMode"]
+            // wordTimestamps and diarize are shared with the .general scope: both panes
+            // show the toggles, and each pane's reset must cover what it shows.
+            return [
+                "selectedModel", "selectedLanguageRaw", "expectedSpeakersRaw",
+                "pausePlayerOnAppHidden", "parola.userPrivacyMode",
+                "wordTimestamps", "diarize"
+            ]
         case .ignoredSegments:
             return ["ignoredSegmentRules"]
         case .findReplace:
@@ -213,7 +223,7 @@ struct ResetPaneButton: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Clears the saved settings on this pane. Other panes are unaffected.")
+                Text("Clears the saved settings on this pane, including any of them shown on another pane too.")
             }
         }
     }
@@ -241,55 +251,7 @@ enum SettingsResetService {
     }
 }
 
-// Reset/Import apply live via AppModel.reloadSettings(); this narrowed prompt remains only for the few
-// changes that genuinely need a relaunch (re-arming watched folders' security-scoped bookmarks).
-enum SettingsRelaunch {
-    @MainActor
-    static func promptToApply(_ informativeText: String) {
-        DispatchQueue.main.async {
-            let alert = NSAlert()
-            alert.messageText = "Relaunch to apply"
-            alert.informativeText = informativeText
-            alert.addButton(withTitle: "Quit Parola")
-            alert.addButton(withTitle: "Later")
-            if alert.runModal() == .alertFirstButtonReturn {
-                NSApp.terminate(nil)
-            }
-        }
-    }
-}
-
 extension Notification.Name {
     static let parolaSettingsReset = Notification.Name("ParolaSettingsResetNotification")
 }
 
-struct ResetAllSettingsButton: View {
-    @State private var confirming = false
-
-    var body: some View {
-        HStack {
-            Spacer()
-            Button(role: .destructive) {
-                confirming = true
-            } label: {
-                Text("Reset all Parola settings")
-            }
-            .controlSize(.small)
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .axLeaf("Settings.Button.ResetAll")
-        }
-        .confirmationDialog(
-            "Reset every Parola setting?",
-            isPresented: $confirming,
-            titleVisibility: .visible
-        ) {
-            Button("Reset all", role: .destructive) {
-                SettingsResetService.resetAll()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Every Settings pane returns to its defaults. Library entries, models, and dictation prompts are kept.")
-        }
-    }
-}

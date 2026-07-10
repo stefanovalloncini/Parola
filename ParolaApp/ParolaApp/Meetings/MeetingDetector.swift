@@ -30,6 +30,11 @@ final class MeetingDetector {
 
     private static let defaultsKey = "meetingDetectorEnabled"
 
+    /// Re-reads the enabled flag after a settings reset or import.
+    func reloadFromDefaults() {
+        isEnabled = (DefaultsStore.current.object(forKey: Self.defaultsKey) as? Bool) ?? true
+    }
+
     init(
         onDetected: @escaping @MainActor (String) -> Void,
         clock: @escaping @MainActor () -> Date = { Date() }

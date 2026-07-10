@@ -42,6 +42,10 @@ final class WatchedFoldersStore {
         panel.allowsMultipleSelection = false
         panel.message = "Choose a folder to watch for new audio and video files."
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard !folders.contains(where: { $0.displayPath == url.path }) else {
+            lastError = "Already watching \(url.path)."
+            return
+        }
 
         do {
             let bookmark = try url.bookmarkData(
@@ -105,6 +109,26 @@ final class WatchedFoldersStore {
 
     func isStale(_ id: UUID) -> Bool {
         staleFolderIDs.contains(id)
+    }
+
+    /// Applies an external change to the "watchedFolders" defaults key (settings reset or import)
+    /// without a relaunch: stops every watcher, releases scoped URLs, re-reads defaults, restarts.
+    func reloadFromDefaults() {
+        for (id, watcher) in watchers {
+            let scopedURL = scopedURLs.removeValue(forKey: id)
+            Task { @MainActor in
+                await watcher.stop()
+                scopedURL?.stopAccessingSecurityScopedResource()
+            }
+        }
+        watchers.removeAll()
+        scopedURLs.removeAll()
+        staleFolderIDs.removeAll()
+        folders = []
+        load()
+        for folder in folders {
+            startWatcher(for: folder)
+        }
     }
 
     private func startWatcher(for folder: WatchedFolder) {
