@@ -90,10 +90,10 @@ final class AppModel {
     /// 0–1 fraction of the media transcribed so far, or nil while indeterminate (duration unknown, or the engine reports no progress).
     var fileTranscribeFraction: Double?
     var fileTranscribeStage: TranscribeStage?
-    var useStreaming: Bool = true { didSet { defaults.set(useStreaming, forKey: "useStreaming") } }
+    var useStreaming: Bool = true { didSet { defaults.set(useStreaming, forKey: "useStreaming"); if !isReloadingSettings { restartDictation() } } }
     var wordTimestamps: Bool = false { didSet { defaults.set(wordTimestamps, forKey: "wordTimestamps") } }
     var karaokeHighlight: Bool = true { didSet { defaults.set(karaokeHighlight, forKey: "karaokeHighlight") } }
-    var initialPrompt: String = "" { didSet { defaults.set(initialPrompt, forKey: "initialPrompt") } }
+    var initialPrompt: String = "" { didSet { defaults.set(initialPrompt, forKey: "initialPrompt"); if !isReloadingSettings { restartDictation() } } }
     var diarize: Bool = false { didSet { defaults.set(diarize, forKey: "diarize") } }
     /// Diarizer speaker-count hint; 0 means auto-detect and threads nil into the options.
     var expectedSpeakersRaw: Int = 0 { didSet { defaults.set(expectedSpeakersRaw, forKey: "expectedSpeakersRaw") } }
@@ -232,14 +232,14 @@ final class AppModel {
     var currentMatchIndex: Int = 0
     @ObservationIgnored var matchesDebounce: Task<Void, Never>?
 
-    var inputDeviceUID: String = "" { didSet { defaults.set(inputDeviceUID, forKey: "inputDeviceUID") } }
+    var inputDeviceUID: String = "" { didSet { defaults.set(inputDeviceUID, forKey: "inputDeviceUID"); if !isReloadingSettings { restartDictation() } } }
 
     var preferredInputDeviceUID: String? {
         inputDeviceUID.isEmpty ? nil : inputDeviceUID
     }
 
-    var selectedModel: String = "openai_whisper-tiny" { didSet { defaults.set(selectedModel, forKey: "selectedModel") } }
-    private var selectedLanguageRaw: String = "" { didSet { defaults.set(selectedLanguageRaw, forKey: "selectedLanguageRaw") } }
+    var selectedModel: String = "openai_whisper-tiny" { didSet { defaults.set(selectedModel, forKey: "selectedModel"); if !isReloadingSettings { restartDictation() } } }
+    private var selectedLanguageRaw: String = "" { didSet { defaults.set(selectedLanguageRaw, forKey: "selectedLanguageRaw"); if !isReloadingSettings { restartDictation() } } }
     var translate: Bool = false { didSet { defaults.set(translate, forKey: "translate") } }
 
     @ObservationIgnored private var cachedSelectedModel: String = ""
@@ -273,9 +273,28 @@ final class AppModel {
         return "\(AppModel.modelLabel(selectedModel)) is English-only. Pick a multilingual model (like Whisper) to transcribe other languages."
     }
 
+    var diarizeMismatchWarning: String? {
+        guard diarize, !selectedModelCapabilities.supportsDiarization else { return nil }
+        return "\(AppModel.modelLabel(selectedModel)) can't identify speakers, so Diarize is skipped."
+    }
+
+    var translateMismatchWarning: String? {
+        guard translate, !selectedModelCapabilities.supportsTranslate else { return nil }
+        return "\(AppModel.modelLabel(selectedModel)) can't translate, so transcriptions stay in the source language."
+    }
+
     var selectedLanguage: String? {
         get { selectedLanguageRaw.isEmpty ? nil : selectedLanguageRaw }
         set { selectedLanguageRaw = newValue ?? "" }
+    }
+
+    /// Selects a model and pins the language to English for English-only engines,
+    /// so activation from any surface behaves like the toolbar picker.
+    func activateModel(_ id: String) {
+        selectedModel = id
+        if case .some(.only(let codes)) = ModelCatalog.variant(id: id)?.languageScope, codes == ["en"] {
+            selectedLanguage = "en"
+        }
     }
 
     var availableModels: [ModelInfo] = []
@@ -368,7 +387,8 @@ final class AppModel {
 
     func toggleLiveCaptions() {
         guard let liveCaptions else { return }
-        Task { await liveCaptions.toggle(options: makeOptions(task: .transcribe)) }
+        let device = inputDeviceUID.isEmpty ? nil : inputDeviceUID
+        Task { await liveCaptions.toggle(options: makeOptions(task: .transcribe), deviceUID: device) }
     }
 
     // MARK: - Dictation
@@ -710,7 +730,12 @@ final class AppModel {
     var meetingDetectedApp: String?
     @ObservationIgnored var pendingRecordingCategory: EntryCategory = .transcription
     @ObservationIgnored lazy var meetingDetector: MeetingDetector = MeetingDetector { [weak self] appName in
-        self?.meetingDetectedApp = appName
+        guard let self else { return }
+        // Never prompt over in-flight work: accepting would stomp a live recording.
+        switch self.phase {
+        case .idle, .ready, .failed: self.meetingDetectedApp = appName
+        default: break
+        }
     }
 
     // MARK: - Library
@@ -1373,13 +1398,16 @@ final class AppModel {
     }
 
     private func makeOptions(task: TranscriptionTask) -> TranscriptionOptions {
-        TranscriptionOptions(
+        // Drop the flags the selected engine can't honor instead of letting the session's
+        // validation fail the whole run; the settings panes show a matching advisory.
+        let caps = selectedModelCapabilities
+        return TranscriptionOptions(
             model: selectedModel,
             language: selectedLanguage,
-            task: task,
-            wordTimestamps: wordTimestamps,
-            initialPrompt: initialPrompt.isEmpty ? nil : initialPrompt,
-            diarize: diarize,
+            task: (task == .translate && !caps.supportsTranslate) ? .transcribe : task,
+            wordTimestamps: wordTimestamps && caps.supportsWordTimestamps,
+            initialPrompt: (initialPrompt.isEmpty || !caps.supportsInitialPrompt) ? nil : initialPrompt,
+            diarize: diarize && caps.supportsDiarization,
             expectedSpeakers: expectedSpeakersRaw > 0 ? expectedSpeakersRaw : nil
         )
     }
