@@ -84,7 +84,7 @@ final class SparkleUpdater: NSObject {
 }
 
 private final class ChannelAwareDriver: NSObject, SPUUpdaterDelegate {
-    var channel: SparkleChannel = SparkleChannel(rawValue: UserDefaults.standard.string(forKey: "sparkleChannel") ?? "") ?? .stable
+    var channel: SparkleChannel = SparkleChannel(rawValue: DefaultsStore.current.string(forKey: "sparkleChannel") ?? "") ?? .stable
     weak var controller: SPUStandardUpdaterController?
 
     func attach(controller: SPUStandardUpdaterController) {

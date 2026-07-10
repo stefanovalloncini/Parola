@@ -134,7 +134,7 @@ final class WatchedFoldersStore {
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: "watchedFolders") else { return }
+        guard let data = DefaultsStore.current.data(forKey: "watchedFolders") else { return }
         if let stored = try? JSONDecoder().decode([WatchedFolder].self, from: data) {
             folders = stored
         }
@@ -142,7 +142,7 @@ final class WatchedFoldersStore {
 
     private func save() {
         if let data = try? JSONEncoder().encode(folders) {
-            UserDefaults.standard.set(data, forKey: "watchedFolders")
+            DefaultsStore.current.set(data, forKey: "watchedFolders")
         }
     }
 

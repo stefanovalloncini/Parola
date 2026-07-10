@@ -8,6 +8,7 @@ final class MeetingDetector {
         "us.zoom.xos": "Zoom",
         "com.microsoft.teams2": "Microsoft Teams",
         "com.microsoft.teams": "Microsoft Teams",
+        "Cisco-Systems.Spark": "Webex",
         "com.cisco.webexmeetingsapp": "Webex",
         "com.cisco.webex.meetings": "Webex",
         "com.google.Meet": "Google Meet",
@@ -17,7 +18,7 @@ final class MeetingDetector {
 
     var detectedAppName: String?
     var isEnabled: Bool {
-        didSet { UserDefaults.standard.set(isEnabled, forKey: Self.defaultsKey) }
+        didSet { DefaultsStore.current.set(isEnabled, forKey: Self.defaultsKey) }
     }
 
     @ObservationIgnored private let onDetected: @MainActor (String) -> Void
@@ -34,7 +35,7 @@ final class MeetingDetector {
     ) {
         self.onDetected = onDetected
         self.clock = clock
-        self.isEnabled = (UserDefaults.standard.object(forKey: Self.defaultsKey) as? Bool) ?? true
+        self.isEnabled = (DefaultsStore.current.object(forKey: Self.defaultsKey) as? Bool) ?? true
         startObserving()
     }
 
