@@ -5,6 +5,7 @@ import SwiftUI
 import AVFoundation
 import Observation
 import UniformTypeIdentifiers
+import os
 import ParolaCore
 import ParolaDictation
 
@@ -202,6 +203,7 @@ final class AppModel {
     @ObservationIgnored var activeRecoveryGeneration: Int?
     @ObservationIgnored var recordingRecoveryStartedAt: Date?
     @ObservationIgnored var recordingWatchTask: Task<Void, Never>?
+    @ObservationIgnored var pendingRecoveryWrite: Task<Void, Never>?
 
     var recordingDiskSpaceLow: Bool = false
     @ObservationIgnored var freeDiskSpaceProvider: () -> Int64? = { AppModel.systemFreeDiskSpace() }
@@ -1422,23 +1424,29 @@ final class AppModel {
         )
     }
 
-    @MainActor private final class DownloadProgressThrottle {
-        var lastPercent = -1
-        var didRefresh = false
+    private final class DownloadProgressThrottle: Sendable {
+        private let lastPercent = OSAllocatedUnfairLock(initialState: -1)
+
+        func shouldEmit(_ percent: Int) -> Bool {
+            lastPercent.withLock { last in
+                guard percent != last else { return false }
+                last = percent
+                return true
+            }
+        }
     }
 
     private func makeDownloadProgressHandler(for modelName: String) -> @Sendable (Double) -> Void {
         let throttle = DownloadProgressThrottle()
         return { [weak self] frac in
+            // Dedupe on the URLSession callback thread: spawning a main-actor task per received
+            // chunk floods the main queue during multi-GB model downloads.
             let percent = Int(frac * 100)
+            guard throttle.shouldEmit(percent) else { return }
             Task { @MainActor [weak self] in
-                guard let self, percent != throttle.lastPercent else { return }
-                throttle.lastPercent = percent
+                guard let self else { return }
                 self.phase = .downloadingModel(name: modelName, progress: frac)
-                if percent >= 100, !throttle.didRefresh {
-                    throttle.didRefresh = true
-                    self.refreshModelList()
-                }
+                if percent >= 100 { self.refreshModelList() }
             }
         }
     }

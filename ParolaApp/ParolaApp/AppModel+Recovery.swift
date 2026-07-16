@@ -87,8 +87,17 @@ extension AppModel {
     }
 
     private func writeRecoveryFile(_ checkpoint: RecoveryCheckpoint) {
-        guard let data = try? JSONEncoder().encode(checkpoint) else { return }
-        try? data.write(to: recoveryFileURL, options: .atomic)
+        let url = recoveryFileURL
+        let generation = activeRecoveryGeneration
+        pendingRecoveryWrite = Task.detached(priority: .utility) {
+            guard let data = try? JSONEncoder().encode(checkpoint) else { return }
+            await MainActor.run { [weak self] in
+                // Re-check after the encode: the recording may have ended meanwhile, and a late
+                // write would resurrect a stale recovery prompt on the next launch.
+                guard let self, self.activeRecoveryGeneration == generation else { return }
+                try? data.write(to: url, options: .atomic)
+            }
+        }
     }
 
     // MARK: - Recording watch

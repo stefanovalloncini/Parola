@@ -62,7 +62,12 @@ struct CrashRecoveryTests {
         ]
     }
 
-    private func decodeRecoveryFile(_ model: AppModel) throws -> RecoveryCheckpoint {
+    private func flushRecoveryWrites(_ model: AppModel) async {
+        await model.pendingRecoveryWrite?.value
+    }
+
+    private func decodeRecoveryFile(_ model: AppModel) async throws -> RecoveryCheckpoint {
+        await flushRecoveryWrites(model)
         let data = try Data(contentsOf: model.recoveryFileURL)
         return try JSONDecoder().decode(RecoveryCheckpoint.self, from: data)
     }
@@ -101,7 +106,7 @@ struct CrashRecoveryTests {
 
         model.transcribe(fileURL: wav)
 
-        let checkpoint = try decodeRecoveryFile(model)
+        let checkpoint = try await decodeRecoveryFile(model)
         #expect(checkpoint.kind == .fileTranscription)
         #expect(checkpoint.sourceURL == wav)
         #expect(checkpoint.modelName == model.selectedModel)
@@ -113,7 +118,9 @@ struct CrashRecoveryTests {
 
     @Test("a failed transcription deletes the recovery file")
     func fileTranscribeClearsOnFailure() async throws {
+        // The delay keeps the failure from landing before the checkpoint write we assert on.
         await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+            delayMs: 500,
             failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
         ))
         defer { Task { await MockTranscriberRegistry.shared.clear() } }
@@ -122,6 +129,7 @@ struct CrashRecoveryTests {
         defer { try? FileManager.default.removeItem(at: wav) }
 
         model.transcribe(fileURL: wav)
+        await flushRecoveryWrites(model)
         #expect(recoveryFileExists(model))
 
         let failed = await waitUntil {
@@ -144,6 +152,7 @@ struct CrashRecoveryTests {
         defer { try? FileManager.default.removeItem(at: wav) }
 
         model.transcribe(fileURL: wav)
+        await flushRecoveryWrites(model)
         #expect(recoveryFileExists(model))
 
         model.cancelCurrentWork()
@@ -152,7 +161,7 @@ struct CrashRecoveryTests {
     }
 
     @Test("a superseding transcription's recovery file survives the old task's exit")
-    func supersededExitKeepsNewerRecoveryFile() throws {
+    func supersededExitKeepsNewerRecoveryFile() async throws {
         let model = makeModel()
         let a = URL(fileURLWithPath: "/tmp/recovery-a.wav")
         let b = URL(fileURLWithPath: "/tmp/recovery-b.wav")
@@ -161,8 +170,9 @@ struct CrashRecoveryTests {
         let second = model.beginFileTranscribeRecovery(sourceURL: b)
 
         model.endRecovery(first)
+        await flushRecoveryWrites(model)
         #expect(recoveryFileExists(model))
-        #expect(try decodeRecoveryFile(model).sourceURL == b)
+        #expect(try await decodeRecoveryFile(model).sourceURL == b)
 
         model.endRecovery(second)
         #expect(!recoveryFileExists(model))
@@ -171,7 +181,7 @@ struct CrashRecoveryTests {
     // MARK: - Recording checkpoints
 
     @Test("writeRecordingCheckpoint snapshots the confirmed segments")
-    func recordingCheckpointSnapshotsSegments() throws {
+    func recordingCheckpointSnapshotsSegments() async throws {
         let model = makeModel()
         model.selectedLanguage = "it"
         model.beginRecordingRecovery()
@@ -179,7 +189,7 @@ struct CrashRecoveryTests {
 
         model.writeRecordingCheckpoint()
 
-        let checkpoint = try decodeRecoveryFile(model)
+        let checkpoint = try await decodeRecoveryFile(model)
         #expect(checkpoint.kind == .recording)
         #expect(checkpoint.segments == Self.makeSegments())
         #expect(checkpoint.language == "it")
@@ -222,6 +232,7 @@ struct CrashRecoveryTests {
         model.liveSegments = Self.makeSegments()
         model.writeRecordingCheckpoint()
         model.startRecordingWatch(checkpoints: true)
+        await flushRecoveryWrites(model)
         #expect(recoveryFileExists(model))
 
         let final = Transcript(segments: Self.makeSegments(), language: "en", modelName: "m")
@@ -237,6 +248,7 @@ struct CrashRecoveryTests {
         model.beginRecordingRecovery()
         model.liveSegments = Self.makeSegments()
         model.writeRecordingCheckpoint()
+        await flushRecoveryWrites(model)
         #expect(recoveryFileExists(model))
 
         await model.handleStreamingEvent(.failed("boom"))
@@ -245,11 +257,12 @@ struct CrashRecoveryTests {
     }
 
     @Test("cancelling a recording clears the recovery file")
-    func cancelClearsRecordingRecovery() {
+    func cancelClearsRecordingRecovery() async {
         let model = makeModel()
         model.beginRecordingRecovery()
         model.liveSegments = Self.makeSegments()
         model.writeRecordingCheckpoint()
+        await flushRecoveryWrites(model)
         #expect(recoveryFileExists(model))
 
         model.cancelCurrentWork()

@@ -25,6 +25,7 @@ final class WatchedFoldersStore {
     private(set) var staleFolderIDs: Set<UUID> = []
     @ObservationIgnored private var watchers: [UUID: FolderWatcher] = [:]
     @ObservationIgnored private var scopedURLs: [UUID: URL] = [:]
+    @ObservationIgnored private var watchEpoch = 0
     @ObservationIgnored private let onNewMediaFile: @MainActor (URL) -> Void
 
     init(onNewMediaFile: @escaping @MainActor (URL) -> Void) {
@@ -114,6 +115,7 @@ final class WatchedFoldersStore {
     /// Applies an external change to the "watchedFolders" defaults key (settings reset or import)
     /// without a relaunch: stops every watcher, releases scoped URLs, re-reads defaults, restarts.
     func reloadFromDefaults() {
+        watchEpoch += 1
         for (id, watcher) in watchers {
             let scopedURL = scopedURLs.removeValue(forKey: id)
             Task { @MainActor in
@@ -132,29 +134,37 @@ final class WatchedFoldersStore {
     }
 
     private func startWatcher(for folder: WatchedFolder) {
-        var isStale = false
-        guard let url = try? URL(
-            resolvingBookmarkData: folder.bookmark,
-            options: .withSecurityScope,
-            relativeTo: nil,
-            bookmarkDataIsStale: &isStale
-        ) else {
-            staleFolderIDs.insert(folder.id)
-            return
-        }
-        guard !isStale, url.startAccessingSecurityScopedResource() else {
-            staleFolderIDs.insert(folder.id)
-            return
-        }
-        staleFolderIDs.remove(folder.id)
-        scopedURLs[folder.id] = url
+        let epoch = watchEpoch
+        let bookmark = folder.bookmark
+        Task { [weak self] in
+            // Detached: resolving a security-scoped bookmark can block on mounting its volume,
+            // which would hang launch for a watched folder on a disconnected drive.
+            let resolved = await Task.detached(priority: .userInitiated) { () -> (url: URL, isStale: Bool)? in
+                var isStale = false
+                guard let url = try? URL(
+                    resolvingBookmarkData: bookmark,
+                    options: .withSecurityScope,
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                ) else { return nil }
+                return (url, isStale)
+            }.value
+            guard let self else { return }
+            guard epoch == self.watchEpoch, self.folders.contains(where: { $0.id == folder.id }) else { return }
+            guard let resolved, !resolved.isStale, resolved.url.startAccessingSecurityScopedResource() else {
+                self.staleFolderIDs.insert(folder.id)
+                return
+            }
+            self.staleFolderIDs.remove(folder.id)
+            self.scopedURLs[folder.id] = resolved.url
 
-        let handler = onNewMediaFile
-        let watcher = FolderWatcher(folderURL: url) { newURL in
-            Task { @MainActor in handler(newURL) }
+            let handler = self.onNewMediaFile
+            let watcher = FolderWatcher(folderURL: resolved.url) { newURL in
+                Task { @MainActor in handler(newURL) }
+            }
+            self.watchers[folder.id] = watcher
+            Task { await watcher.start() }
         }
-        watchers[folder.id] = watcher
-        Task { await watcher.start() }
     }
 
     private func load() {
