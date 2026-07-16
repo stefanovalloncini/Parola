@@ -20,6 +20,8 @@ public actor TranscriptionSession {
     private var diarizerIdleTask: Task<Void, Never>?
     private var idleEpoch: Int = 0
     private var pressureSource: (any DispatchSourceMemoryPressure)?
+    private var transcribeRunning = false
+    private var transcribeWaiters: [CheckedContinuation<Void, Never>] = []
 
     public init(
         modelStore: ModelStore = .shared,
@@ -42,6 +44,12 @@ public actor TranscriptionSession {
         progressHandler: (@Sendable (Double) -> Void)? = nil,
         stageHandler: (@Sendable (TranscribeStage) -> Void)? = nil
     ) async throws -> Transcript {
+        // Whole runs are serialized: interleaved calls would swap each other's transcriber out
+        // via ensureTranscriber's unload and cross-wire the partial/progress callbacks.
+        await acquireTranscribeSlot()
+        defer { releaseTranscribeSlot() }
+        try Task.checkCancellation()
+
         installPressureSourceIfNeeded()
         await ensureBootstrap()
         let modelName = options.model ?? defaultModelName()
@@ -57,19 +65,28 @@ public actor TranscriptionSession {
         }
         try Task.checkCancellation()
         cancelIdleTimer()
+        // Rearm on every exit: a throw below (incl. cancellation) would otherwise leave the
+        // loaded model resident with no idle timer until the next successful run.
+        defer { scheduleIdleUnload() }
         let activeTranscriber = try await ensureTranscriber(for: engineID)
         try await activeTranscriber.load(model: modelName)
         try Task.checkCancellation()
 
         let audioURL = try await source.prepare()
         try Task.checkCancellation()
-        var transcript = try await activeTranscriber.transcribe(
-            url: audioURL,
-            options: options,
-            partialHandler: partialHandler,
-            progressHandler: progressHandler,
-            stageHandler: stageHandler
-        )
+        // Abort engine work when the caller cancels: a hung engine (e.g. a stalled finalize)
+        // would otherwise hold the transcribe slot and block every queued run until relaunch.
+        var transcript = try await withTaskCancellationHandler {
+            try await activeTranscriber.transcribe(
+                url: audioURL,
+                options: options,
+                partialHandler: partialHandler,
+                progressHandler: progressHandler,
+                stageHandler: stageHandler
+            )
+        } onCancel: {
+            Task { await self.cancelInFlight() }
+        }
         if options.diarize {
             try Task.checkCancellation()
             transcript = try await diarizer.diarize(
@@ -78,8 +95,21 @@ public actor TranscriptionSession {
                 numberOfSpeakers: options.expectedSpeakers
             )
         }
-        scheduleIdleUnload()
         return transcript
+    }
+
+    private func acquireTranscribeSlot() async {
+        while transcribeRunning {
+            await withCheckedContinuation { transcribeWaiters.append($0) }
+        }
+        transcribeRunning = true
+    }
+
+    private func releaseTranscribeSlot() {
+        transcribeRunning = false
+        let waiters = transcribeWaiters
+        transcribeWaiters = []
+        for waiter in waiters { waiter.resume() }
     }
 
     /// Best-effort warm-up: bootstraps the engine and loads the requested model if it's installed.
@@ -87,13 +117,13 @@ public actor TranscriptionSession {
     public func prewarm(modelName: String) async {
         installPressureSourceIfNeeded()
         await ensureBootstrap()
-        guard modelStore.isInstalled(modelName) else { return }
+        guard modelStore.isInstalled(modelName), !transcribeRunning else { return }
         let engineID = ModelCatalog.variant(id: modelName)?.engineID ?? .whisperKit
         do {
             cancelIdleTimer()
+            defer { scheduleIdleUnload() }
             let active = try await ensureTranscriber(for: engineID)
             try await active.load(model: modelName)
-            scheduleIdleUnload()
         } catch {
         }
     }

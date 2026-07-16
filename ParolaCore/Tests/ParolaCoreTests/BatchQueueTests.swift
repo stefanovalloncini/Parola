@@ -81,18 +81,18 @@ struct BatchQueueTests {
         let setup = try await makeQueue(behavior: .hang)
         let job = BatchJob(url: setup.audioURL)
 
-        let started = ObservedFirstStart()
         let consumer = Task {
             let events = await setup.queue.process(
                 jobs: [job],
                 options: TranscriptionOptions(model: "openai_whisper-tiny")
             )
-            for await event in events {
-                if case .started = event { await started.fire() }
-            }
+            for await _ in events {}
         }
+        // Wait until the stub is actually parked in-flight, not just for the .started event:
+        // a cancel that lands before the hang unwinds the job at a cancellation checkpoint,
+        // and there is legitimately nothing left for cancelInFlight to tear down.
         for _ in 0..<200 {
-            if await started.didFire { break }
+            if await setup.factory.hangEntered { break }
             try? await Task.sleep(for: .milliseconds(50))
         }
         consumer.cancel()
@@ -233,15 +233,12 @@ struct BatchQueueTests {
     }
 }
 
-actor ObservedFirstStart {
-    private(set) var didFire = false
-    func fire() { didFire = true }
-}
-
 actor StubFactory {
     var cancelledCount = 0
+    var hangEntered = false
     init(behavior: StubTranscriber.Behavior) {}
     func recordCancellation() { cancelledCount += 1 }
+    func recordHangEntered() { hangEntered = true }
 }
 
 actor StubTranscriber: Transcriber {
@@ -286,6 +283,7 @@ actor StubTranscriber: Transcriber {
                 throw CancellationError()
             }
             inFlight = task
+            await factory.recordHangEntered()
             return try await task.value
         }
     }
