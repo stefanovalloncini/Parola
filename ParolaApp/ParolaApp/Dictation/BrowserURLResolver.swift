@@ -23,7 +23,7 @@ final class BrowserURLResolver {
     private let cacheLifetime: TimeInterval = 0.5
     private var cache: [String: CacheEntry] = [:]
 
-    func currentURL(for bundleID: String) -> URL? {
+    func currentURL(for bundleID: String) async -> URL? {
         guard let script = Self.scriptSource(for: bundleID) else { return nil }
         if let cached = cache[bundleID], cached.expires > Date() {
             return cached.url
@@ -32,7 +32,7 @@ final class BrowserURLResolver {
             cache[bundleID] = CacheEntry(url: nil, expires: Date().addingTimeInterval(cacheLifetime))
             return nil
         }
-        let raw = Self.runAppleScript(script)
+        let raw = await Self.runAppleScript(script)
         let url = raw.flatMap { URL(string: $0) }
         cache[bundleID] = CacheEntry(url: url, expires: Date().addingTimeInterval(cacheLifetime))
         return url
@@ -72,13 +72,26 @@ final class BrowserURLResolver {
         }
     }
 
-    private static func runAppleScript(_ source: String) -> String? {
-        var errorInfo: NSDictionary?
-        guard let script = NSAppleScript(source: source) else { return nil }
-        let descriptor = script.executeAndReturnError(&errorInfo)
-        if errorInfo != nil { return nil }
-        let trimmed = descriptor.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let trimmed, !trimmed.isEmpty else { return nil }
-        return trimmed
+    // Serial queue: NSAppleScript isn't thread-safe, but confining each script to one background
+    // queue is fine and keeps the cross-process Apple Events round-trip off the main thread.
+    private static let scriptQueue = DispatchQueue(label: "com.parola.browser-url", qos: .userInitiated)
+
+    private static func runAppleScript(_ source: String) async -> String? {
+        await withCheckedContinuation { continuation in
+            scriptQueue.async {
+                var errorInfo: NSDictionary?
+                guard let script = NSAppleScript(source: source) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let descriptor = script.executeAndReturnError(&errorInfo)
+                if errorInfo != nil {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let trimmed = descriptor.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+                continuation.resume(returning: (trimmed?.isEmpty ?? true) ? nil : trimmed)
+            }
+        }
     }
 }

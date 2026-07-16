@@ -328,7 +328,7 @@ final class DictationController {
     static func resolveWorkflow(in workflows: [String: [DictationWorkflow]]) async -> DictationWorkflow? {
         let bundleID = await MainActor.run { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
         guard let bundleID else { return nil }
-        let url = await MainActor.run { BrowserURLResolver.shared.currentURL(for: bundleID) }
+        let url = await BrowserURLResolver.shared.currentURL(for: bundleID)
         return DictationWorkflowMap.select(in: workflows, for: bundleID, url: url)
     }
 }

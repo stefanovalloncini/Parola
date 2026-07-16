@@ -15,7 +15,7 @@ struct PromptDictationProcessor: TextPostProcessor {
     let contextProvider: DictationContextProvider?
     let contextConfig: DictationContextConfig
     let language: String?
-    let urlResolver: (@Sendable @MainActor (String) -> URL?)?
+    let urlResolver: (@Sendable @MainActor (String) async -> URL?)?
 
     init(
         defaultPrompt: Prompt?,
@@ -24,7 +24,7 @@ struct PromptDictationProcessor: TextPostProcessor {
         contextProvider: DictationContextProvider? = nil,
         contextConfig: DictationContextConfig = DictationContextConfig(),
         language: String? = nil,
-        urlResolver: (@Sendable @MainActor (String) -> URL?)? = nil
+        urlResolver: (@Sendable @MainActor (String) async -> URL?)? = nil
     ) {
         self.defaultPrompt = defaultPrompt
         self.overrides = overrides
@@ -32,7 +32,7 @@ struct PromptDictationProcessor: TextPostProcessor {
         self.contextProvider = contextProvider
         self.contextConfig = contextConfig
         self.language = language
-        self.urlResolver = urlResolver ?? { bundleID in BrowserURLResolver.shared.currentURL(for: bundleID) }
+        self.urlResolver = urlResolver ?? { bundleID in await BrowserURLResolver.shared.currentURL(for: bundleID) }
     }
 
     func process(_ text: String) async -> String {
@@ -75,7 +75,7 @@ struct PromptDictationProcessor: TextPostProcessor {
 
     @MainActor
     private func resolveURL(bundleID: String) async -> URL? {
-        urlResolver?(bundleID)
+        await urlResolver?(bundleID)
     }
 
     private func matches(pattern: String, url: URL) -> Bool {
