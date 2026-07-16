@@ -30,7 +30,11 @@ actor DiarizationService {
 
         let audioArray: [Float]
         do {
-            audioArray = try AudioProcessor.loadAudioAsFloatArray(fromPath: audioURL.path)
+            // Detached: the synchronous decode would otherwise pin a cooperative-pool thread for the whole file.
+            let path = audioURL.path
+            audioArray = try await Task.detached(priority: .userInitiated) {
+                try AudioProcessor.loadAudioAsFloatArray(fromPath: path)
+            }.value
         } catch {
             throw ParolaError.audioLoadFailed(audioURL, underlying: error.localizedDescription)
         }
