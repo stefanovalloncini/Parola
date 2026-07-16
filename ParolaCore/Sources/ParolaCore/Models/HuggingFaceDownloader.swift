@@ -145,12 +145,10 @@ enum HuggingFaceDownloader {
         repo: String,
         path: String?,
         revision: String,
-        urlSession: URLSession = .shared,
-        prefixToStrip: String? = nil
+        urlSession: URLSession = .shared
     ) async throws -> [ListedFile] {
         try Task.checkCancellation()
         let basePath = path.map { $0.hasSuffix("/") ? String($0.dropLast()) : $0 } ?? ""
-        let strip = prefixToStrip ?? basePath
         let endpoint = makeTreeURL(repo: repo, path: basePath, revision: revision)
 
         var request = URLRequest(url: endpoint)
@@ -162,38 +160,25 @@ enum HuggingFaceDownloader {
         }
         let entries = try JSONDecoder().decode([TreeEntry].self, from: data)
 
-        var result: [ListedFile] = []
-        for entry in entries {
-            switch entry.type {
-            case "file":
-                let relative = entry.path
-                    .deletingPathPrefix(strip.isEmpty ? "" : strip + "/")
-                result.append(ListedFile(
+        // The tree request is recursive=true, so nested files are already in this listing;
+        // recursing into "directory" entries would double-count every nested file.
+        return entries
+            .filter { $0.type == "file" }
+            .map { entry in
+                ListedFile(
                     path: entry.path,
-                    relativeName: relative,
+                    relativeName: entry.path.deletingPathPrefix(basePath.isEmpty ? "" : basePath + "/"),
                     size: entry.size,
                     expectedSHA256: entry.lfs.flatMap(extractSHA256)
-                ))
-            case "directory":
-                let sub = try await listFiles(
-                    repo: repo,
-                    path: entry.path,
-                    revision: revision,
-                    urlSession: urlSession,
-                    prefixToStrip: strip
                 )
-                result.append(contentsOf: sub)
-            default:
-                continue
             }
-        }
-        return result
     }
 
+    // The tree API serves `oid` as bare hex; older payloads carried a "sha256:" prefix.
     private static func extractSHA256(from lfs: LFSMeta) -> String? {
-        let prefix = "sha256:"
-        guard lfs.oid.hasPrefix(prefix) else { return nil }
-        return String(lfs.oid.dropFirst(prefix.count))
+        let oid = lfs.oid.hasPrefix("sha256:") ? String(lfs.oid.dropFirst("sha256:".count)) : lfs.oid
+        guard oid.count == 64, oid.allSatisfy(\.isHexDigit) else { return nil }
+        return oid
     }
 
     private static func makeTreeURL(repo: String, path: String, revision: String) -> URL {

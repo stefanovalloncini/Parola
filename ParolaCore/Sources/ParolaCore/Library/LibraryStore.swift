@@ -159,14 +159,19 @@ public actor LibraryStore {
         let sourceDoc = try ParolaDocument.read(at: url)
         let name = uniqueEntryName(at: Date())
         let target = libraryURL.appendingPathComponent("\(name).parola")
+        // Stage under a .tmp name: the copy runs off the actor, so a concurrent list scan
+        // would otherwise see (and cache) the half-copied bundle.
+        let staging = target.appendingPathExtension("tmp")
         let fm = FileManager.default
-        if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
+        if fm.fileExists(atPath: staging.path) { try fm.removeItem(at: staging) }
         do {
             // Detached: bundle copies can be multi-GB and would stall every other library call.
             try await Task.detached(priority: .userInitiated) {
-                try FileManager.default.copyItem(at: url, to: target)
+                try FileManager.default.copyItem(at: url, to: staging)
+                try FileManager.default.moveItem(at: staging, to: target)
             }.value
         } catch {
+            try? fm.removeItem(at: staging)
             try? fm.removeItem(at: target)
             throw error
         }

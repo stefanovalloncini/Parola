@@ -293,6 +293,9 @@ struct LibraryStoreTests {
         #expect(entry.bundleURL.pathExtension == "parola")
         let entries = await store.list()
         #expect(entries.count == 1)
+        let staging = try FileManager.default.contentsOfDirectory(atPath: tmp.path)
+            .filter { $0.hasSuffix(".tmp") }
+        #expect(staging.isEmpty)
     }
 
     @Test("default add stores transcription category and nil deletedAt")
