@@ -33,7 +33,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     nonisolated let deviceUID: String?
 
     private var whisperKit: WhisperKit?
-    private var captureProcessor: AudioProcessor?
+    private var persister: StreamingAudioPersister?
     private var loop: StreamingRealtimeLoop?
     private var continuation: AsyncStream<StreamingEvent>.Continuation?
     private var segmentContinuation: AsyncStream<ConfirmedAudioBatch>.Continuation?
@@ -116,7 +116,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             textDecoder: kit.textDecoder,
             tokenizer: tokenizer
         )
-        let keepCapturedAudio = persistAudio
+        let persister = persistAudio ? StreamingAudioPersister(sampleRate: Double(WhisperKit.sampleRate)) : nil
         let inputDeviceID = Self.resolveInputDeviceID(uid: deviceUID)
 
         let loop = StreamingRealtimeLoop(
@@ -127,8 +127,9 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
                 startCapture: { ingest in
                     try processor.startRecordingLive(inputDeviceID: inputDeviceID) { buffer in
                         ingest(buffer)
+                        persister?.append(buffer)
                         // Runs on the tap thread, serialized with processBuffer's appends, so this purge can't race them.
-                        if !keepCapturedAudio { processor.purgeAudioSamples(keepingLast: 0) }
+                        processor.purgeAudioSamples(keepingLast: 0)
                     }
                 },
                 stopCapture: { processor.stopRecording() },
@@ -143,7 +144,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         )
 
         self.whisperKit = kit
-        self.captureProcessor = processor
+        self.persister = persister
         self.loadedModel = modelName
         self.optionsForRun = options
         self.loop = loop
@@ -185,7 +186,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             segments: allConfirmed,
             language: optionsForRun?.language ?? "auto",
             modelName: loadedModel ?? "unknown",
-            sourceURL: persistAudio ? writeCapturedAudio() : nil,
+            sourceURL: await persister?.finish(),
             durationSeconds: allConfirmed.last?.end
         )
         continuation?.yield(.finished(finalTranscript))
@@ -195,52 +196,13 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
     public func currentModel() -> String? { loadedModel }
 
-    /// Persists the samples WhisperKit accumulated during the live stream to a 16 kHz mono WAV.
-    private func writeCapturedAudio() -> URL? {
-        guard let processor = captureProcessor else { return nil }
-        let samples = processor.audioSamples
-        guard !samples.isEmpty,
-              let format = AVAudioFormat(
-                commonFormat: .pcmFormatFloat32,
-                sampleRate: Double(WhisperKit.sampleRate),
-                channels: 1,
-                interleaved: false
-              )
-        else { return nil }
-
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-recording-\(UUID().uuidString).wav")
-        do {
-            let file = try AVAudioFile(
-                forWriting: url,
-                settings: format.settings,
-                commonFormat: .pcmFormatFloat32,
-                interleaved: false
-            )
-            let chunkSize = 16_384
-            var offset = 0
-            while offset < samples.count {
-                let count = min(chunkSize, samples.count - offset)
-                guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(count)) else { break }
-                buffer.frameLength = AVAudioFrameCount(count)
-                samples.withUnsafeBufferPointer { src in
-                    buffer.floatChannelData![0].update(from: src.baseAddress!.advanced(by: offset), count: count)
-                }
-                try file.write(from: buffer)
-                offset += count
-            }
-            return url
-        } catch {
-            return nil
-        }
-    }
-
     private func handleStreamerFailure(_ error: Error) async {
         guard loop != nil else { return }
         continuation?.yield(.failed(error.localizedDescription))
         segmentContinuation?.finish()
         await consumerTask?.value
         continuation?.finish()
+        await persister?.discard()
         teardown()
     }
 
@@ -251,6 +213,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         segmentContinuation?.finish()
         await consumerTask?.value
         continuation?.finish()
+        await persister?.discard()
         teardown()
     }
 
@@ -261,7 +224,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         streamerTask = nil
         loop = nil
         whisperKit = nil
-        captureProcessor = nil
+        persister = nil
         speakerLabeler = nil
     }
 
