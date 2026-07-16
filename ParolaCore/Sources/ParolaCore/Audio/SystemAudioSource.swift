@@ -31,6 +31,7 @@ public actor SystemAudioSource: LiveAudioSource {
     }
 
     public func start() async throws {
+        guard stream == nil else { return }
         let content: SCShareableContent
         do {
             content = try await SCShareableContent.excludingDesktopWindows(
@@ -184,19 +185,11 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
             return
         }
 
-        let ratio = outputFormat.sampleRate / copied.format.sampleRate
-        let outCapacity = AVAudioFrameCount(Double(copied.frameLength) * ratio + 1024)
-        guard let outBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: outCapacity) else { return }
-
-        var error: NSError?
-        let box = AudioBufferBox(buffer: copied)
-        let convStatus = converter.convert(to: outBuffer, error: &error) { _, outStatus in
-            if box.consumed { outStatus.pointee = .endOfStream; return nil }
-            box.consumed = true
-            outStatus.pointee = .haveData
-            return box.buffer
-        }
-        if convStatus == .error || outBuffer.frameLength == 0 { return }
+        guard let outBuffer = StreamChunkConverter.convert(
+            chunk: copied,
+            with: converter,
+            to: outputFormat
+        ) else { return }
         try? writeFile.write(from: outBuffer)
         onLevel(AudioLevel.normalised(of: copied))
     }
@@ -252,10 +245,4 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
     }
 }
 
-/// Unchecked Sendable: the box is touched synchronously inside the single convert call that creates it.
-private final class AudioBufferBox: @unchecked Sendable {
-    let buffer: AVAudioPCMBuffer
-    var consumed = false
-    init(buffer: AVAudioPCMBuffer) { self.buffer = buffer }
-}
 #endif

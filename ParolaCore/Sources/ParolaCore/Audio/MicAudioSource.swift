@@ -132,21 +132,11 @@ public actor MicAudioSource: LiveAudioSource {
         emitLevel(AudioLevel.normalised(of: box.buffer))
 
         guard let current = session, let file = current.writeFile else { return }
-        let ratio = current.outputFormat.sampleRate / box.buffer.format.sampleRate
-        let outCap = AVAudioFrameCount(Double(box.buffer.frameLength) * ratio + 1024)
-        guard let outBuffer = AVAudioPCMBuffer(pcmFormat: current.outputFormat, frameCapacity: outCap) else { return }
-
-        var error: NSError?
-        let status = current.converter.convert(to: outBuffer, error: &error) { _, outStatus in
-            if box.consumed {
-                outStatus.pointee = .endOfStream
-                return nil
-            }
-            box.consumed = true
-            outStatus.pointee = .haveData
-            return box.buffer
-        }
-        if status == .error || outBuffer.frameLength == 0 { return }
+        guard let outBuffer = StreamChunkConverter.convert(
+            chunk: box.buffer,
+            with: current.converter,
+            to: current.outputFormat
+        ) else { return }
         try? file.write(from: outBuffer)
     }
 
@@ -182,7 +172,6 @@ public actor MicAudioSource: LiveAudioSource {
 /// Unchecked Sendable: each box owns a freshly-copied PCM buffer, handed off once to a single consumer.
 private final class BufferBox: @unchecked Sendable {
     let buffer: AVAudioPCMBuffer
-    var consumed = false
     init(buffer: AVAudioPCMBuffer) { self.buffer = buffer }
 }
 
