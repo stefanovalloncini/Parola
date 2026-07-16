@@ -93,6 +93,16 @@ struct VttImporterTests {
         #expect(SubtitleMarkup.stripInlineTags("<i>tag</i> then x < 5") == "tag then x < 5")
     }
 
+    @Test("keeps spaced comparisons intact but still strips real tags")
+    func comparisonNotEatenAsTag() {
+        // A closed but non-tag `< … >` must not be eaten along with the text between.
+        #expect(SubtitleMarkup.stripInlineTags("x < 5 and y > 3") == "x < 5 and y > 3")
+        #expect(SubtitleMarkup.stripInlineTags("temp < 5 > 3") == "temp < 5 > 3")
+        // Real tags (letter, closing slash, and VTT timestamp tags starting with a digit) still strip.
+        #expect(SubtitleMarkup.stripInlineTags("<c.yellow>hi</c>") == "hi")
+        #expect(SubtitleMarkup.stripInlineTags("so<00:00:01.500> late") == "so late")
+    }
+
     @Test("accepts MM:SS.mmm without an hour field")
     func shortTimestamp() {
         let ts = VttImporter.parseTimestamp("01:30.500")

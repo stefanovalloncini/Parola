@@ -10,6 +10,7 @@ public enum SrtImporter {
 
     public static func parse(_ raw: String) -> Transcript {
         let lines = raw
+            .replacingOccurrences(of: "\u{FEFF}", with: "")
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
             .components(separatedBy: "\n")

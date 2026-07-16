@@ -73,9 +73,14 @@ public enum YouTubeSubsFetcher {
             throw ParolaError.captureUnavailable("no subtitles available for this video; transcribe with Whisper")
         }
 
+        let isAuto = chosen.lastPathComponent.contains(".auto.")
         var transcript = try VttImporter.parse(contentsOf: chosen)
-        transcript = dedupeRollingCaptions(transcript)
-        transcript.modelName = chosen.lastPathComponent.contains(".auto.") ? "youtube-auto-subs" : "youtube-subs"
+        // Only auto-generated captions roll; running the overlap dedupe on a manual/uploader
+        // track drops legitimate short cues and strips words that only coincidentally repeat.
+        if isAuto {
+            transcript = dedupeRollingCaptions(transcript)
+        }
+        transcript.modelName = isAuto ? "youtube-auto-subs" : "youtube-subs"
         transcript.sourceURL = url
         return YouTubeSubsResult(transcript: transcript, videoTitle: videoTitle)
     }

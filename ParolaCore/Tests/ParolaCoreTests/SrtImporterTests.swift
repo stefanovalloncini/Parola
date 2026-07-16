@@ -67,6 +67,15 @@ struct SrtImporterTests {
         #expect(t.segments.first?.text == "Hi")
     }
 
+    @Test("a leading BOM doesn't drop the first cue of a number-less SRT")
+    func leadingBOM() {
+        let srt = "\u{FEFF}00:00:00,000 --> 00:00:01,500\nHello world.\n\n00:00:01,500 --> 00:00:03,000\nGoodbye."
+        let t = SrtImporter.parse(srt)
+        #expect(t.segments.count == 2)
+        #expect(t.segments.first?.text == "Hello world.")
+        #expect(t.segments.first?.start == 0.0)
+    }
+
     @Test("CR-only (classic Mac) endings are handled")
     func crOnly() {
         let srt = "1\r00:00:00,000 --> 00:00:01,000\rHi\r"
