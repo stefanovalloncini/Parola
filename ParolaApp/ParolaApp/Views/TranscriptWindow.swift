@@ -50,7 +50,7 @@ struct TranscriptWindowView: View {
             header
             Divider()
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                LazyVStack(alignment: .leading, spacing: 14) {
                     ForEach(transcript.segments) { segment in
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 8) {
