@@ -243,7 +243,7 @@ struct SegmentCard: View {
         }.joined(separator: "\n")
     }
 
-    static func speakerLabel(for speaker: String?) -> String? {
+    nonisolated static func speakerLabel(for speaker: String?) -> String? {
         guard let speaker else { return nil }
         let flattened = speaker
             .split(whereSeparator: \.isNewline)

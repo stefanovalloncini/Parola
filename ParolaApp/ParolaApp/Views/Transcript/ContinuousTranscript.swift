@@ -30,8 +30,8 @@ struct ContinuousChunks: View {
         let runs: [TranscriptSegment.ID: SegmentRun]
     }
 
-    static let softSegmentCap = 40
-    static let hardSegmentCap = 48
+    nonisolated static let softSegmentCap = 40
+    nonisolated static let hardSegmentCap = 48
 
     let scrollProxy: ScrollViewProxy
 
@@ -39,6 +39,8 @@ struct ContinuousChunks: View {
     @State private var chunks: [Chunk] = []
     @State private var chunkIndexBySegment: [TranscriptSegment.ID: Int] = [:]
     @State private var highlightedSegmentID: TranscriptSegment.ID?
+    @State private var builtSignature: Int?
+    @State private var buildTask: Task<Void, Never>?
     @ScaledMetric(relativeTo: .body) private var compactSize: CGFloat = 14
     @ScaledMetric(relativeTo: .body) private var comfortableSize: CGFloat = 18
 
@@ -69,20 +71,54 @@ struct ContinuousChunks: View {
         }
     }
 
+    static let synchronousBuildCap = 200
+
     private func rebuildChunks() {
         guard let transcript = model.transcript else {
+            buildTask?.cancel()
+            builtSignature = nil
             chunks = []
             chunkIndexBySegment = [:]
             highlightedSegmentID = nil
             return
         }
-        chunks = Self.build(
-            segments: transcript.segments,
-            useSpeakerColor: model.transcriptSpeakers.count >= 2
-        )
-        chunkIndexBySegment = Self.chunkIndexBySegment(for: chunks)
+        let useSpeakerColor = model.transcriptSpeakers.count >= 2
+        let segments = transcript.segments
+        // transcriptVersion also bumps for mutations that can't change the rendered text
+        // (timing nudges, duration backfill); skip the expensive rebuild for those.
+        let signature = Self.contentSignature(segments: segments, useSpeakerColor: useSpeakerColor)
+        guard signature != builtSignature else { return }
+        builtSignature = signature
+        buildTask?.cancel()
+        if segments.count <= Self.synchronousBuildCap {
+            apply(Self.build(segments: segments, useSpeakerColor: useSpeakerColor))
+        } else {
+            buildTask = Task {
+                let built = await Task.detached(priority: .userInitiated) {
+                    Self.build(segments: segments, useSpeakerColor: useSpeakerColor)
+                }.value
+                guard !Task.isCancelled else { return }
+                apply(built)
+            }
+        }
+    }
+
+    private func apply(_ built: [Chunk]) {
+        chunks = built
+        chunkIndexBySegment = Self.chunkIndexBySegment(for: built)
         highlightedSegmentID = nil
         applyHighlight()
+    }
+
+    nonisolated static func contentSignature(segments: [TranscriptSegment], useSpeakerColor: Bool) -> Int {
+        var hasher = Hasher()
+        hasher.combine(useSpeakerColor)
+        for seg in segments {
+            hasher.combine(seg.id)
+            hasher.combine(seg.text)
+            hasher.combine(seg.speaker)
+        }
+        return hasher.finalize()
     }
 
     private func applyHighlight() {
@@ -107,7 +143,7 @@ struct ContinuousChunks: View {
         }
     }
 
-    static func build(
+    nonisolated static func build(
         segments: [TranscriptSegment],
         useSpeakerColor: Bool,
         softCap: Int = ContinuousChunks.softSegmentCap,
@@ -163,7 +199,7 @@ struct ContinuousChunks: View {
         return chunks
     }
 
-    static func chunkIndexBySegment(for chunks: [Chunk]) -> [TranscriptSegment.ID: Int] {
+    nonisolated static func chunkIndexBySegment(for chunks: [Chunk]) -> [TranscriptSegment.ID: Int] {
         var index: [TranscriptSegment.ID: Int] = [:]
         for chunk in chunks {
             for id in chunk.runs.keys { index[id] = chunk.id }
@@ -197,7 +233,7 @@ struct ContinuousChunks: View {
         text[lo..<hi].foregroundColor = color
     }
 
-    private static func endsSentence(_ body: String) -> Bool {
+    nonisolated private static func endsSentence(_ body: String) -> Bool {
         guard let terminal = body.last(where: { !"\"')]»”’".contains($0) }) else { return false }
         return ".!?…。！？".contains(terminal)
     }
