@@ -43,6 +43,11 @@ final class WatchedFoldersStore {
         panel.allowsMultipleSelection = false
         panel.message = "Choose a folder to watch for new audio and video files."
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        // The panel can still hand back a file via the go-to-folder field despite canChooseFiles=false.
+        guard url.hasDirectoryPath else {
+            lastError = "\(url.lastPathComponent) isn't a folder."
+            return
+        }
         guard !folders.contains(where: { $0.displayPath == url.path }) else {
             lastError = "Already watching \(url.path)."
             return
@@ -137,21 +142,11 @@ final class WatchedFoldersStore {
         let epoch = watchEpoch
         let bookmark = folder.bookmark
         Task { [weak self] in
-            // Detached: resolving a security-scoped bookmark can block on mounting its volume,
-            // which would hang launch for a watched folder on a disconnected drive.
-            let resolved = await Task.detached(priority: .userInitiated) { () -> (url: URL, isStale: Bool)? in
-                var isStale = false
-                guard let url = try? URL(
-                    resolvingBookmarkData: bookmark,
-                    options: .withSecurityScope,
-                    relativeTo: nil,
-                    bookmarkDataIsStale: &isStale
-                ) else { return nil }
-                return (url, isStale)
-            }.value
+            let resolved = await Self.resolveBookmark(bookmark)
             guard let self else { return }
             guard epoch == self.watchEpoch, self.folders.contains(where: { $0.id == folder.id }) else { return }
-            guard let resolved, !resolved.isStale, resolved.url.startAccessingSecurityScopedResource() else {
+            guard let resolved, !resolved.isStale, resolved.isDirectory,
+                  resolved.url.startAccessingSecurityScopedResource() else {
                 self.staleFolderIDs.insert(folder.id)
                 return
             }
@@ -164,6 +159,27 @@ final class WatchedFoldersStore {
             }
             self.watchers[folder.id] = watcher
             Task { await watcher.start() }
+        }
+    }
+
+    // Off the main thread: resolving a security-scoped bookmark can block on mounting its volume,
+    // which would hang launch for a watched folder on a disconnected drive.
+    private nonisolated static func resolveBookmark(_ bookmark: Data) async -> (url: URL, isStale: Bool, isDirectory: Bool)? {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                var isStale = false
+                guard let url = try? URL(
+                    resolvingBookmarkData: bookmark,
+                    options: .withSecurityScope,
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                ) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+                continuation.resume(returning: (url, isStale, isDirectory))
+            }
         }
     }
 
