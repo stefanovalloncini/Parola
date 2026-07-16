@@ -94,7 +94,7 @@ final class AppModel {
     var useStreaming: Bool = true { didSet { defaults.set(useStreaming, forKey: "useStreaming"); if !isReloadingSettings { restartDictation() } } }
     var wordTimestamps: Bool = false { didSet { defaults.set(wordTimestamps, forKey: "wordTimestamps") } }
     var karaokeHighlight: Bool = true { didSet { defaults.set(karaokeHighlight, forKey: "karaokeHighlight") } }
-    var initialPrompt: String = "" { didSet { defaults.set(initialPrompt, forKey: "initialPrompt"); if !isReloadingSettings { restartDictation() } } }
+    var initialPrompt: String = "" { didSet { defaults.set(initialPrompt, forKey: "initialPrompt"); if !isReloadingSettings { scheduleDictationRestart() } } }
     var diarize: Bool = false { didSet { defaults.set(diarize, forKey: "diarize") } }
     /// Diarizer speaker-count hint; 0 means auto-detect and threads nil into the options.
     var expectedSpeakersRaw: Int = 0 { didSet { defaults.set(expectedSpeakersRaw, forKey: "expectedSpeakersRaw") } }
@@ -129,7 +129,7 @@ final class AppModel {
     var dictationPasteDelayMs: Int = 0 {
         didSet {
             defaults.set(dictationPasteDelayMs, forKey: "dictationPasteDelayMs")
-            if !isReloadingSettings { restartDictation() }
+            if !isReloadingSettings { scheduleDictationRestart() }
         }
     }
     var dictationContextSelection: Bool = false {
@@ -204,6 +204,7 @@ final class AppModel {
     @ObservationIgnored var recordingRecoveryStartedAt: Date?
     @ObservationIgnored var recordingWatchTask: Task<Void, Never>?
     @ObservationIgnored var pendingRecoveryWrite: Task<Void, Never>?
+    @ObservationIgnored var pendingDictationRestart: Task<Void, Never>?
 
     var recordingDiskSpaceLow: Bool = false
     @ObservationIgnored var freeDiskSpaceProvider: () -> Int64? = { AppModel.systemFreeDiskSpace() }

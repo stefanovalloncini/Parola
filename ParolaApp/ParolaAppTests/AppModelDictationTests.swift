@@ -328,13 +328,15 @@ struct AppModelDictationTests {
     }
 
     @Test("changing the paste delay re-applies to a running session")
-    func pasteDelayChangeReappliesToRunningSession() {
+    func pasteDelayChangeReappliesToRunningSession() async {
         let model = makeModel()
         model.dictationEnabled = true
         #expect(model.dictationController.isRunning)
         #expect(model.dictationController.configuration?.pasteDelayMs == 0)
 
         model.dictationPasteDelayMs = 250
+        // The restart is debounced so per-keystroke edits don't thrash the coordinator; flush it.
+        await model.pendingDictationRestart?.value
 
         #expect(model.dictationController.isRunning)
         #expect(model.dictationController.configuration?.pasteDelayMs == 250)

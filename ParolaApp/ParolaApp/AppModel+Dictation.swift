@@ -205,6 +205,23 @@ extension AppModel {
         startDictation()
     }
 
+    /// Debounced restart for the two settings bound to a live control — the custom-vocabulary
+    /// field and the paste-delay slider. Restarting the hotkey coordinator per keystroke/tick
+    /// would thrash it and spawn a prewarm task each time; coalesce to one restart once editing settles.
+    func scheduleDictationRestart() {
+        pendingDictationRestart?.cancel()
+        guard dictationEnabled, dictationController.isRunning else {
+            pendingDictationRestart = nil
+            return
+        }
+        let clock = clock
+        pendingDictationRestart = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(400), clock: clock)
+            guard !Task.isCancelled else { return }
+            self?.restartDictation()
+        }
+    }
+
     func applyDictationEnabledChange() {
         if dictationEnabled {
             startDictation()
@@ -347,6 +364,8 @@ extension AppModel {
     }
 
     func stopDictation() {
+        pendingDictationRestart?.cancel()
+        pendingDictationRestart = nil
         dictationController.stop()
     }
 
