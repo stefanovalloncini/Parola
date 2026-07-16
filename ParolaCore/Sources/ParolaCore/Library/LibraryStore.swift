@@ -138,13 +138,17 @@ public actor LibraryStore {
     ) async throws -> LibraryEntry {
         let name = uniqueEntryName(at: Date())
         let bundleURL = libraryURL.appendingPathComponent(name)
-        try ParolaDocument.write(
-            transcript: transcript,
-            audioURL: audioSource,
-            to: bundleURL,
-            category: category,
-            titleOverride: title
-        )
+        // Detached: writing the bundle copies the source media, which can take seconds for long
+        // recordings and would stall every other library call on this actor.
+        try await Task.detached(priority: .userInitiated) {
+            _ = try ParolaDocument.write(
+                transcript: transcript,
+                audioURL: audioSource,
+                to: bundleURL,
+                category: category,
+                titleOverride: title
+            )
+        }.value
         invalidateListCaches()
         let entry = try makeEntry(bundleURL: bundleURL.appendingPathExtension("parola"))
         await indexEntry(entry, transcript: transcript)
@@ -158,7 +162,10 @@ public actor LibraryStore {
         let fm = FileManager.default
         if fm.fileExists(atPath: target.path) { try fm.removeItem(at: target) }
         do {
-            try fm.copyItem(at: url, to: target)
+            // Detached: bundle copies can be multi-GB and would stall every other library call.
+            try await Task.detached(priority: .userInitiated) {
+                try FileManager.default.copyItem(at: url, to: target)
+            }.value
         } catch {
             try? fm.removeItem(at: target)
             throw error
@@ -325,8 +332,17 @@ public actor LibraryStore {
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
             manifest.lastOpenedAt = now
         }
-        invalidateListCaches()
-        if cachedLoaded?.id == id { cachedLoaded = nil }
+        // lastOpenedAt changes no list membership or ordering; patch caches in place so opening
+        // an entry doesn't force a full rescan and a disk reload of the document it just cached.
+        patchCaches(with: try makeEntry(bundleURL: bundleURL))
+    }
+
+    private func patchCaches(with entry: LibraryEntry) {
+        if let i = cachedActive?.firstIndex(where: { $0.id == entry.id }) { cachedActive?[i] = entry }
+        if let i = cachedDeleted?.firstIndex(where: { $0.id == entry.id }) { cachedDeleted?[i] = entry }
+        if let cached = cachedLoaded, cached.id == entry.id {
+            cachedLoaded = (entry.id, LoadedEntry(entry: entry, document: cached.value.document))
+        }
     }
 
     /// Soft-deletes by stamping `deletedAt`. The bundle stays on disk so it can be restored.

@@ -73,6 +73,7 @@ public actor LibrarySearchIndex {
 
     private var entries: [String: IndexedEntry] = [:]
     private var inverted: [String: Set<String>] = [:]
+    private var sortedTokens: [String]?
     private var isLoaded = false
     private var staleSnapshotDiscarded = false
     private let loadTask: Task<LoadOutcome, Never>
@@ -113,10 +114,15 @@ public actor LibrarySearchIndex {
         guard !queryTokens.isEmpty else { return [] }
         await ensureLoaded()
 
+        if sortedTokens == nil { sortedTokens = inverted.keys.sorted() }
+        let tokens = sortedTokens ?? []
         var scores: [String: Int] = [:]
         for queryToken in Set(queryTokens) {
-            for (indexToken, ids) in inverted where indexToken.hasPrefix(queryToken) {
-                for id in ids { scores[id, default: 0] += 1 }
+            // Prefix matches sort contiguously; binary-search the range instead of scanning the whole vocabulary.
+            let lower = Self.firstIndex(in: tokens, atLeast: queryToken)
+            let upper = Self.firstIndex(in: tokens, atLeast: queryToken + "\u{10FFFF}")
+            for indexToken in tokens[lower..<upper] where indexToken.hasPrefix(queryToken) {
+                for id in inverted[indexToken] ?? [] { scores[id, default: 0] += 1 }
             }
         }
 
@@ -170,6 +176,7 @@ public actor LibrarySearchIndex {
         case .loaded(let state):
             entries = state.entries
             inverted = state.inverted
+            sortedTokens = nil
         case .staleDiscarded:
             staleSnapshotDiscarded = true
         case .missing:
@@ -206,6 +213,7 @@ public actor LibrarySearchIndex {
         for token in tokens {
             inverted[token, default: []].insert(id)
         }
+        sortedTokens = nil
     }
 
     private func removeFromIndex(_ id: String) {
@@ -219,6 +227,17 @@ public actor LibrarySearchIndex {
                 inverted[token] = ids
             }
         }
+        sortedTokens = nil
+    }
+
+    private static func firstIndex(in sorted: [String], atLeast key: String) -> Int {
+        var low = 0
+        var high = sorted.count
+        while low < high {
+            let mid = (low + high) / 2
+            if sorted[mid] < key { low = mid + 1 } else { high = mid }
+        }
+        return low
     }
 
     private static func tokenize(_ text: String) -> [String] {
