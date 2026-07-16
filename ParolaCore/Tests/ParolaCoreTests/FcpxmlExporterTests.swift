@@ -148,6 +148,18 @@ struct FcpxmlExporterTests {
         #expect(gap.attribute(forName: "duration")?.stringValue == "75000/30000s")
     }
 
+    @Test("a zero-duration segment still emits a caption of at least one frame")
+    func zeroDurationCaptionSurvives() throws {
+        let degenerate = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 5, end: 5, text: "Blip.")],
+            language: "en",
+            modelName: "x"
+        )
+        let doc = try parse(degenerate)
+        let caption = try #require(try doc.nodes(forXPath: "//caption").first as? XMLElement)
+        #expect(caption.attribute(forName: "duration")?.stringValue == "1000/30000s")
+    }
+
     @Test("registered in Exporters with the fcpxml extension")
     func registration() {
         #expect(Exporters.exporter(for: .fcpxml).format == .fcpxml)

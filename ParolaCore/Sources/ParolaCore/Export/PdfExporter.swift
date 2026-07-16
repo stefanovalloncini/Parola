@@ -85,7 +85,7 @@ struct PdfExporter: TranscriptExporter {
                 let seg = transcript.segments[index]
                 let text = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty else { continue }
-                if let speaker = seg.speaker, !speaker.isEmpty {
+                if let speaker = Format.presentationSpeakerLabel(seg.speaker) {
                     chunk.append(NSAttributedString(string: "\(speaker): ", attributes: [fontKey: fonts.speaker]))
                 }
                 chunk.append(NSAttributedString(string: "\(text)\n\n", attributes: [fontKey: fonts.body]))
