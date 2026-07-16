@@ -272,11 +272,16 @@ extension AppModel {
     }
 
     func loadEntry(_ id: LibraryEntry.ID) {
+        loadEntryGeneration &+= 1
+        let generation = loadEntryGeneration
         Task { [weak self] in
             guard let self else { return }
             await flushPendingTranscriptSave()
             do {
                 let loaded = try await library.load(id)
+                // Two quick clicks race across the load await; the slower load would otherwise
+                // finish last and install the entry the user already navigated away from.
+                guard generation == loadEntryGeneration else { return }
                 clearDerivedArtifacts()
                 transcript = loaded.document.transcript
                 sourceFileURL = loaded.document.audioURL
@@ -293,6 +298,7 @@ extension AppModel {
                 try? await library.markOpened(id: id)
                 refreshLibrary()
             } catch {
+                guard generation == loadEntryGeneration else { return }
                 phase = .failed(message: error.localizedDescription)
             }
         }

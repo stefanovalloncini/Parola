@@ -30,14 +30,19 @@ extension AppModel {
         guard !isRunningPrompt else { return }
         isRunningPrompt = true
         promptOutput = nil
+        let generation = derivedArtifactsGeneration
         Task { [weak self] in
             guard let self else { return }
             do {
                 let model = try await LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
                 let result = try await PromptRunner.run(prompt, on: transcript.text, model: model)
-                promptOutput = PromptOutput(promptName: prompt.name, text: result)
+                if generation == derivedArtifactsGeneration {
+                    promptOutput = PromptOutput(promptName: prompt.name, text: result)
+                }
             } catch {
-                phase = .failed(message: Self.promptFailureMessage(.prompt, error: error))
+                if generation == derivedArtifactsGeneration {
+                    phase = .failed(message: Self.promptFailureMessage(.prompt, error: error))
+                }
             }
             isRunningPrompt = false
         }
@@ -48,14 +53,19 @@ extension AppModel {
         guard !isExtractingActionItems else { return }
         guard let prompt = Prompt.builtIns.first(where: { $0.name == "Action items" }) else { return }
         isExtractingActionItems = true
+        let generation = derivedArtifactsGeneration
         Task { [weak self] in
             guard let self else { return }
             do {
                 let model = try await LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
                 let result = try await PromptRunner.run(prompt, on: transcript.text, model: model)
-                actionItems = ActionItemParser.parse(result)
+                if generation == derivedArtifactsGeneration {
+                    actionItems = ActionItemParser.parse(result)
+                }
             } catch {
-                phase = .failed(message: Self.promptFailureMessage(.actionItems, error: error))
+                if generation == derivedArtifactsGeneration {
+                    phase = .failed(message: Self.promptFailureMessage(.actionItems, error: error))
+                }
             }
             isExtractingActionItems = false
         }
@@ -69,6 +79,7 @@ extension AppModel {
     func clearDerivedArtifacts() {
         // Whole stack, not just our target: field-editor typing undo shares the window's manager and is stale context too.
         undoManager?.removeAllActions()
+        derivedArtifactsGeneration &+= 1
         if promptOutput != nil { promptOutput = nil }
         if !actionItems.isEmpty { actionItems = [] }
         if !smartChapters.isEmpty { smartChapters = [] }
@@ -78,14 +89,19 @@ extension AppModel {
         guard let transcript = self.transcript else { return }
         guard !isExtractingChapters else { return }
         isExtractingChapters = true
+        let generation = derivedArtifactsGeneration
         Task { [weak self] in
             guard let self else { return }
             do {
                 let model = try await LanguageModelFactory.makeOnDevice()
                 let chapters = try await SmartChapters.generate(for: transcript, model: model)
-                smartChapters = chapters
+                if generation == derivedArtifactsGeneration {
+                    smartChapters = chapters
+                }
             } catch {
-                phase = .failed(message: Self.promptFailureMessage(.chapterExtraction, error: error))
+                if generation == derivedArtifactsGeneration {
+                    phase = .failed(message: Self.promptFailureMessage(.chapterExtraction, error: error))
+                }
             }
             isExtractingChapters = false
         }
@@ -129,14 +145,19 @@ extension AppModel {
         guard !isRunningPrompt else { return }
         isRunningPrompt = true
         promptOutput = nil
+        let generation = derivedArtifactsGeneration
         Task { [weak self] in
             guard let self else { return }
             do {
                 let model = try await LanguageModelFactory.makeOnDevice()
                 let result = try await YouTubeChapters.generate(for: transcript, model: model)
-                promptOutput = PromptOutput(promptName: "YouTube Chapters", text: result)
+                if generation == derivedArtifactsGeneration {
+                    promptOutput = PromptOutput(promptName: "YouTube Chapters", text: result)
+                }
             } catch {
-                phase = .failed(message: Self.promptFailureMessage(.chapterGeneration, error: error))
+                if generation == derivedArtifactsGeneration {
+                    phase = .failed(message: Self.promptFailureMessage(.chapterGeneration, error: error))
+                }
             }
             isRunningPrompt = false
         }

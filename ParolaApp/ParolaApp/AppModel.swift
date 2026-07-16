@@ -384,7 +384,7 @@ final class AppModel {
     // A user opening a file replaces the current run, but folder arrivals must not: two files
     // landing together would cancel each other and only the last one would be transcribed.
     func handleWatchedArrival(_ url: URL) {
-        if fileTranscribeTask != nil || phaseDefersArrivals || batchIsRunning {
+        if transcribeTaskRunning || phaseDefersArrivals || batchIsRunning {
             deferredArrivals.append(url)
             return
         }
@@ -823,6 +823,25 @@ final class AppModel {
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeSubsTask: Task<Void, Never>?
+    @ObservationIgnored private var recordingStartInFlight = false
+    @ObservationIgnored var derivedArtifactsGeneration = 0
+    @ObservationIgnored var loadEntryGeneration = 0
+
+    var transcribeTaskRunning: Bool {
+        fileTranscribeTask != nil || youtubeTranscribeTask != nil || youtubeSubsTask != nil
+    }
+
+    /// A user-initiated start (file open, YouTube, recording) replaces whichever of these runs
+    /// is in flight; letting the old one finish would stomp the new run's transcript later.
+    private func cancelTranscriptionRuns() {
+        fileTranscribeTask?.cancel()
+        fileTranscribeTask = nil
+        youtubeTranscribeTask?.cancel()
+        youtubeTranscribeTask = nil
+        youtubeSubsTask?.cancel()
+        youtubeSubsTask = nil
+    }
+
     var canCancel: Bool {
         if batchTask != nil { return true }
         if streamingConsumer != nil { return true }
@@ -1332,9 +1351,16 @@ final class AppModel {
         noteRecentFile(fileURL)
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
+        // Continuation + GCD, not Task.detached: a detached job resuming a main-actor task
+        // around AVFoundation's NSURL bridging has crashed with EXC_ARM_DA_ALIGN before
+        // (same class as the watched-folder bookmark fix).
         let probeSource = FileAudioSource(url: fileURL)
         Task { [weak self] in
-            let duration = await Task.detached { probeSource.synchronousDuration() }.value
+            let duration = await withCheckedContinuation { continuation in
+                DispatchQueue.global(qos: .utility).async {
+                    continuation.resume(returning: probeSource.synchronousDuration())
+                }
+            }
             guard let self, let duration, self.sourceFileURL == fileURL else { return }
             if self.pendingMediaDuration == nil { self.pendingMediaDuration = duration }
         }
@@ -1345,7 +1371,7 @@ final class AppModel {
         let task: TranscriptionTask = (translateOverride ?? translate) ? .translate : .transcribe
         let recoveryToken = beginFileTranscribeRecovery(sourceURL: fileURL)
 
-        fileTranscribeTask?.cancel()
+        cancelTranscriptionRuns()
         fileTranscribeTask = Task { [weak self] in
             guard let self else { return }
             do {
@@ -1474,6 +1500,7 @@ final class AppModel {
     // MARK: - YouTube URL
 
     var youtubeSheetOpen: Bool = false
+    var youtubeURLError: String?
     var ytDlpAvailable: Bool = false
     var ytDlpInstalling: Bool = false
     var ytDlpInstallError: String?
@@ -1510,7 +1537,7 @@ final class AppModel {
     func transcribeYouTube(urlString: String) {
         guard let url = makeYouTubeURL(urlString) else { return }
 
-        youtubeTranscribeTask?.cancel()
+        cancelTranscriptionRuns()
         youtubeTranscribeTask = Task { [weak self] in
             guard let self else { return }
             do {
@@ -1538,14 +1565,17 @@ final class AppModel {
             } catch {
                 if !Task.isCancelled { applyTranscriptionError(error) }
             }
-            if !Task.isCancelled { self.youtubeTranscribeTask = nil }
+            if !Task.isCancelled {
+                self.youtubeTranscribeTask = nil
+                self.drainDeferredArrivals()
+            }
         }
     }
 
     func fetchYouTubeSubs(urlString: String) {
         guard let url = makeYouTubeURL(urlString) else { return }
 
-        youtubeSubsTask?.cancel()
+        cancelTranscriptionRuns()
         youtubeSubsTask = Task { [weak self] in
             guard let self else { return }
             do {
@@ -1562,15 +1592,24 @@ final class AppModel {
             } catch {
                 if !Task.isCancelled { applyTranscriptionError(error) }
             }
-            if !Task.isCancelled { self.youtubeSubsTask = nil }
+            if !Task.isCancelled {
+                self.youtubeSubsTask = nil
+                self.drainDeferredArrivals()
+            }
         }
     }
 
     private func makeYouTubeURL(_ urlString: String) -> URL? {
         guard let url = URL(string: urlString), url.isYtDlpSupported else {
-            phase = .failed(message: Self.unsupportedURLMessage())
+            // While the sheet is up, a phase failure would render behind the modal; show it inline.
+            if youtubeSheetOpen {
+                youtubeURLError = Self.unsupportedURLMessage()
+            } else {
+                phase = .failed(message: Self.unsupportedURLMessage())
+            }
             return nil
         }
+        youtubeURLError = nil
         youtubeSheetOpen = false
         return url
     }
@@ -1656,6 +1695,7 @@ final class AppModel {
     // MARK: - Recording
 
     func startRecording(source: RecordSource) {
+        guard !recordingActive else { return }
         guard applyPreRecordingDiskCheck() else { return }
         let countIn = max(0, recordingCountInSeconds)
         // The countdown overlay renders only in the main window; with no window visible
@@ -1704,9 +1744,24 @@ final class AppModel {
         return await MockAudioSourceRegistry.shared.resolve(for: .mic) == nil
     }
 
+    /// True from the moment a take is requested until its capture is torn down; the guard in
+    /// `startRecording` uses it so a second trigger (menu bar, intent, meeting banner) can't
+    /// silently discard the running take and leak its capture.
+    var recordingActive: Bool {
+        if recordingStartInFlight || liveSource != nil || streamingSession != nil { return true }
+        if recordingCountdown != nil { return true }
+        if case .recording = phase { return true }
+        return false
+    }
+
     private func beginRecordingNow(source: RecordSource) {
         let config = mediaSessionConfig(allowMute: source == .microphone)
+        // A recording replaces any transcription in flight, like a user file-open does;
+        // otherwise the old run would finish later and stomp the new take's transcript.
+        cancelTranscriptionRuns()
+        recordingStartInFlight = true
         Task {
+            defer { recordingStartInFlight = false }
             if source == .microphone, mode == .normal, await AVCaptureDevice.requestAccess(for: .audio) == false {
                 phase = .failed(message: Self.microphoneAccessOffMessage())
                 return
@@ -1929,6 +1984,7 @@ final class AppModel {
         // Hand off synchronously so a racing auto-stop or second click can't start a duplicate run.
         liveSource = nil
         stopRecordingWatch()
+        fileTranscribeTask?.cancel()
         fileTranscribeTask = Task {
             await mediaSession.exitRecording()
             do {
@@ -1949,13 +2005,15 @@ final class AppModel {
                 phase = .ready
                 persistToLibrary(processed, audioSource: url)
                 resolveRecordingOutcome(.success(processed.text))
-                drainDeferredArrivals()
             } catch {
                 stopRecordingLevelObserver()
                 let message = Self.transcriptionFailureMessage(for: error)
                 phase = .failed(message: message)
                 resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
-                drainDeferredArrivals()
+            }
+            if !Task.isCancelled {
+                self.fileTranscribeTask = nil
+                self.drainDeferredArrivals()
             }
         }
     }
@@ -2423,7 +2481,9 @@ final class AppModel {
             guard let self else { return }
             guard let url = await self.filePicker.chooseSaveDestination(
                 suggestedName: "transcript.\(format.fileExtension)",
-                allowedTypes: [.plainText]
+                // Unconstrained: most export formats (docx, pdf, csv, srt, ...) don't conform to
+                // .plainText, and a constrained panel rewrites their extension to .txt.
+                allowedTypes: []
             ) else { return }
             let exporter = self.makeExporter(for: format)
             do {

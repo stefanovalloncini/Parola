@@ -85,6 +85,9 @@ extension AppModel {
         case .completed(let id, let transcript):
             guard !isCancelled(id) else { return }
             let processed = await postProcessDetached(transcript)
+            // Re-check: a cancel that lands during the post-process await must not be
+            // overwritten to .done, and its exports must not run.
+            guard !isCancelled(id) else { return }
             mutateBatchJob(id) { $0.status = .done; $0.transcript = processed; $0.progress = 1 }
             if id == selectedBatchJobID {
                 clearDerivedArtifacts()

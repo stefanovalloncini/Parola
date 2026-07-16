@@ -46,7 +46,7 @@ extension AppModel {
     func transcribeFileFromIntent(_ url: URL) async throws -> String {
         if case .recording = phase { throw IntentActionError.recordingInProgress }
         if batchIsRunning { throw IntentActionError.batchInProgress }
-        if fileTranscribeTask != nil { throw IntentActionError.transcriptionInProgress }
+        if transcribeTaskRunning { throw IntentActionError.transcriptionInProgress }
         guard url.pathExtension.lowercased() != "parola", !Self.isSubtitleImport(url) else {
             throw IntentActionError.notMedia
         }
