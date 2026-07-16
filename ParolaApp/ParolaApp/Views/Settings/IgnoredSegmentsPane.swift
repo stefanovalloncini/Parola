@@ -25,20 +25,18 @@ struct IgnoredSegmentsPane: View {
                         Spacer()
                     }
                     .padding(16)
-                } else if displayedIndices.isEmpty {
+                } else if displayedRules.isEmpty {
                     HStack {
                         Text("No matches").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
                 } else {
-                    ForEach(Array(displayedIndices.enumerated()), id: \.element) { position, idx in
-                        IgnoredRuleRow(
-                            rule: $model.ignoredSegmentRules[idx],
-                            isFirst: position == 0
-                        ) {
-                            let id = model.ignoredSegmentRules[idx].id
-                            model.ignoredSegmentRules.removeAll { $0.id == id }
+                    ForEach(Array(displayedRules.enumerated()), id: \.element.id) { position, rule in
+                        if let binding = binding(for: rule.id) {
+                            IgnoredRuleRow(rule: binding, isFirst: position == 0) {
+                                model.ignoredSegmentRules.removeAll { $0.id == rule.id }
+                            }
                         }
                     }
                 }
@@ -58,7 +56,7 @@ struct IgnoredSegmentsPane: View {
         }
     }
 
-    private var displayedIndices: [Int] {
+    private var displayedRules: [IgnoredSegmentRule] {
         let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
         var indices = model.ignoredSegmentRules.indices.filter { idx in
             let rule = model.ignoredSegmentRules[idx]
@@ -78,7 +76,20 @@ struct IgnoredSegmentsPane: View {
         case .disabledFirst:
             indices.sort { enabledFirstOrder(lhs: $0, rhs: $1, preferEnabled: false) }
         }
-        return indices
+        return indices.map { model.ignoredSegmentRules[$0] }
+    }
+
+    // Resolved by id on every access: an index captured at render time can go stale
+    // when a row is deleted before a pending write lands.
+    private func binding(for id: IgnoredSegmentRule.ID) -> Binding<IgnoredSegmentRule>? {
+        guard let current = model.ignoredSegmentRules.first(where: { $0.id == id }) else { return nil }
+        return Binding(
+            get: { model.ignoredSegmentRules.first(where: { $0.id == id }) ?? current },
+            set: { newValue in
+                guard let idx = model.ignoredSegmentRules.firstIndex(where: { $0.id == id }) else { return }
+                model.ignoredSegmentRules[idx] = newValue
+            }
+        )
     }
 
     private func pattern(at index: Int) -> String {

@@ -132,9 +132,10 @@ struct QueueView: View {
         }
         switch sortOption {
         case .newestFirst:
-            return filtered
-        case .oldestFirst:
+            // Jobs append oldest-first, so insertion order is oldest-first.
             return filtered.reversed()
+        case .oldestFirst:
+            return filtered
         case .nameAscending:
             return filtered.sorted {
                 $0.url.lastPathComponent.localizedCaseInsensitiveCompare($1.url.lastPathComponent) == .orderedAscending

@@ -31,7 +31,7 @@ class ParolaPreviewProvider: QLPreviewProvider, QLPreviewingController {
         let html = """
         <html><head><meta charset="utf-8"><title>Parola</title>
         <style>body{font-family:-apple-system,sans-serif;padding:2rem;color:#888}</style>
-        </head><body><p>\(message)</p></body></html>
+        </head><body><p>\(Format.escapeHTML(message))</p></body></html>
         """
         return QLPreviewReply(
             dataOfContentType: .html,

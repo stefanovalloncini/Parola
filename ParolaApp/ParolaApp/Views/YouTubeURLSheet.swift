@@ -17,6 +17,7 @@ struct YouTubeURLSheet: View {
             footer: { footerBody }
         )
         .onAppear {
+            model.youtubeURLError = nil
             model.refreshYtDlpAvailability()
             if urlDraft.isEmpty,
                let clipboard = NSPasteboard.general.string(forType: .string),
@@ -40,7 +41,16 @@ struct YouTubeURLSheet: View {
                     .textFieldStyle(.roundedBorder)
                     .focused($fieldFocused)
                     .onSubmit { submit(prefersExistingSubs: false) }
+                    .onChange(of: urlDraft) { _, _ in model.youtubeURLError = nil }
                     .axLeaf("YouTube.TextField.URL")
+
+                if let error = model.youtubeURLError {
+                    Text(error)
+                        .font(DS.Font.caption)
+                        .foregroundStyle(DS.Color.danger)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .axLeaf("YouTube.Text.URLError")
+                }
 
                 if !model.ytDlpAvailable {
                     YtDlpBanner()

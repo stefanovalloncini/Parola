@@ -23,6 +23,7 @@ actor MicDictationRecorder: DictationRecorder {
     private var streamingConsumer: Task<Void, Never>?
     private var streamingSegments: [TranscriptSegment] = []
     private var streamingPartial: String = ""
+    private var streamingFailure: String?
 
     init(
         model: String?,
@@ -72,7 +73,7 @@ actor MicDictationRecorder: DictationRecorder {
     func stopAndTranscribe() async throws -> String {
         await resolveLanguageOverride()
         if streamingSession != nil {
-            return await stopStreaming()
+            return try await stopStreaming()
         }
         return try await stopFallback()
     }
@@ -119,6 +120,7 @@ actor MicDictationRecorder: DictationRecorder {
         let session = StreamingTranscriberFactory.make(clock: clock, deviceUID: deviceUID)
         streamingSegments = []
         streamingPartial = ""
+        streamingFailure = nil
 
         let events = try await session.start(options: transcriptionOptions(), speakerLabeler: nil, downloadProgress: downloadProgress)
         streamingSession = session
@@ -130,14 +132,21 @@ actor MicDictationRecorder: DictationRecorder {
         }
     }
 
-    private func stopStreaming() async -> String {
+    private func stopStreaming() async throws -> String {
         guard let session = streamingSession else { return "" }
         await session.stop()
         await streamingConsumer?.value
         streamingConsumer = nil
         streamingSession = nil
         broadcastLevel(0)
-        return combinedText().trimmingCharacters(in: .whitespacesAndNewlines)
+        let failure = streamingFailure
+        streamingFailure = nil
+        let text = combinedText().trimmingCharacters(in: .whitespacesAndNewlines)
+        // Keep whatever was confirmed before a mid-stream failure; throw only when it ate everything.
+        if let failure, text.isEmpty {
+            throw ParolaError.transcriptionFailed(failure)
+        }
+        return text
     }
 
     private func handleStreaming(_ event: StreamingEvent) async {
@@ -151,7 +160,10 @@ actor MicDictationRecorder: DictationRecorder {
             broadcastPartial(combinedText())
         case .voiceActivity(let active):
             broadcastLevel(active ? 0.5 : 0.0)
-        case .warning, .failed, .finished:
+        case .failed(let message):
+            streamingFailure = message
+            broadcastLevel(0)
+        case .warning, .finished:
             break
         }
     }

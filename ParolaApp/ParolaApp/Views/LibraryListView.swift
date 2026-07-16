@@ -112,6 +112,11 @@ struct LibraryListView: View {
                 }
                 .listStyle(.inset)
                 .tint(DS.Color.accent)
+                .onKeyPress(.return) {
+                    guard selection.count == 1, let id = selection.first else { return .ignored }
+                    model.loadEntry(id)
+                    return .handled
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -127,6 +132,10 @@ struct LibraryListView: View {
         .onChange(of: labelFilter) { _, _ in recomputeEntries() }
         .onChange(of: languageFilter) { _, _ in recomputeEntries() }
         .onChange(of: dateRangeFilter) { _, _ in recomputeEntries() }
+        .onChange(of: searchResults) { _, _ in
+            let newEntries = recomputeEntries()
+            selection = selection.intersection(Set(newEntries.map(\.id)))
+        }
         .onChange(of: category) { _, _ in
             let newEntries = recomputeEntries()
             recomputeFilterOptions()

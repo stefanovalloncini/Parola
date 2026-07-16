@@ -5,6 +5,7 @@ struct BatchJobList: View {
     @Environment(AppModel.self) private var model
     @State private var searchText = ""
     @State private var sortOrder: BatchSortOrder = .addedFirst
+    @State private var fileSizes: [URL: Int] = [:]
     @FocusState private var focusedJob: BatchJob.ID?
 
     var body: some View {
@@ -68,6 +69,20 @@ struct BatchJobList: View {
             .padding(.horizontal, DS.Spacing.large)
             .padding(.bottom, DS.Spacing.regular)
         }
+        .onAppear { refreshFileSizes() }
+        .onChange(of: model.batchJobs.count) { _, _ in refreshFileSizes() }
+    }
+
+    // Cached once per queue change: statting every file inside the sort would hit the disk
+    // for the whole queue on every per-job progress tick.
+    private func refreshFileSizes() {
+        let urls = Set(model.batchJobs.map(\.url))
+        guard urls != Set(fileSizes.keys) else { return }
+        var sizes: [URL: Int] = [:]
+        for url in urls {
+            sizes[url] = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        }
+        fileSizes = sizes
     }
 
     @ViewBuilder
@@ -176,11 +191,9 @@ struct BatchJobList: View {
                 $0.url.lastPathComponent.localizedCaseInsensitiveCompare($1.url.lastPathComponent) == .orderedDescending
             }
         case .largestFirst:
-            let sizes = jobs.reduce(into: [BatchJob.ID: Int]()) { $0[$1.id] = fileSize($1.url) }
-            return jobs.sorted { (sizes[$0.id] ?? 0) > (sizes[$1.id] ?? 0) }
+            return jobs.sorted { (fileSizes[$0.url] ?? 0) > (fileSizes[$1.url] ?? 0) }
         case .smallestFirst:
-            let sizes = jobs.reduce(into: [BatchJob.ID: Int]()) { $0[$1.id] = fileSize($1.url) }
-            return jobs.sorted { (sizes[$0.id] ?? 0) < (sizes[$1.id] ?? 0) }
+            return jobs.sorted { (fileSizes[$0.url] ?? 0) < (fileSizes[$1.url] ?? 0) }
         }
     }
 
@@ -193,9 +206,6 @@ struct BatchJobList: View {
         }
     }
 
-    private func fileSize(_ url: URL) -> Int {
-        (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-    }
 }
 
 private struct PendingBatchJobReorder: ViewModifier {

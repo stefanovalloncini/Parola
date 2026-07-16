@@ -35,8 +35,8 @@ enum InspectorMode: String, CaseIterable, Identifiable {
 
 struct TranscriptPane: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("inspectorVisible") private var inspectorVisible: Bool = true
-    @AppStorage("inspectorMode") private var inspectorModeRaw: String = InspectorMode.format.rawValue
+    @AppStorage("inspectorVisible", store: DefaultsStore.current) private var inspectorVisible: Bool = true
+    @AppStorage("inspectorMode", store: DefaultsStore.current) private var inspectorModeRaw: String = InspectorMode.format.rawValue
     @State private var summarySheetOpen = false
     @State private var chatSheetOpen = false
 

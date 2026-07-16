@@ -25,23 +25,21 @@ struct AutoExportPane: View {
                         Spacer()
                     }
                     .padding(16)
-                } else if displayedIndices.isEmpty {
+                } else if displayedRules.isEmpty {
                     HStack {
                         Text("No matches").foregroundStyle(.secondary).font(.body)
                         Spacer()
                     }
                     .padding(16)
                 } else {
-                    ForEach(Array(displayedIndices.enumerated()), id: \.element) { position, idx in
-                        AutoExportRuleRow(
-                            rule: $model.autoExportRules[idx],
-                            isFirst: position == 0
-                        ) {
-                            let id = model.autoExportRules[idx].id
-                            model.autoExportRules.removeAll { $0.id == id }
+                    ForEach(Array(displayedRules.enumerated()), id: \.element.id) { position, rule in
+                        if let binding = binding(for: rule.id) {
+                            AutoExportRuleRow(rule: binding, isFirst: position == 0) {
+                                model.autoExportRules.removeAll { $0.id == rule.id }
+                            }
+                            // Row state (the extensions draft) must follow the rule, not the slot index.
+                            .id(rule.id)
                         }
-                        // Row state (the extensions draft) must follow the rule, not the slot index.
-                        .id(model.autoExportRules[idx].id)
                     }
                 }
             }
@@ -102,7 +100,7 @@ struct AutoExportPane: View {
         }
     }
 
-    private var displayedIndices: [Int] {
+    private var displayedRules: [AutoExportRule] {
         let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
         var indices = model.autoExportRules.indices.filter { idx in
             let rule = model.autoExportRules[idx]
@@ -124,7 +122,20 @@ struct AutoExportPane: View {
         case .disabledFirst:
             indices.sort { enabledFirstOrder(lhs: $0, rhs: $1, preferEnabled: false) }
         }
-        return indices
+        return indices.map { model.autoExportRules[$0] }
+    }
+
+    // Resolved by id on every access: an index captured at render time can go stale
+    // when a row is deleted before a pending write lands.
+    private func binding(for id: AutoExportRule.ID) -> Binding<AutoExportRule>? {
+        guard let current = model.autoExportRules.first(where: { $0.id == id }) else { return nil }
+        return Binding(
+            get: { model.autoExportRules.first(where: { $0.id == id }) ?? current },
+            set: { newValue in
+                guard let idx = model.autoExportRules.firstIndex(where: { $0.id == id }) else { return }
+                model.autoExportRules[idx] = newValue
+            }
+        )
     }
 
     private func sourceKey(at index: Int) -> String {
