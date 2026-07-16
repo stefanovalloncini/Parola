@@ -171,18 +171,25 @@ public enum SubtitleBurner {
 
         let horizontalInset: CGFloat = 40
         let maxWidth = renderSize.width - horizontalInset * 2
-        let height = max(style.fontSize * 3, 80)
+        let maxHeight = max(style.fontSize * 3, 80)
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let font = Format.cascadingFont(name: style.fontName, size: style.fontSize, language: language)
+
+        // Rasterize only the measured text bounds: every layer stays alive for the whole export,
+        // and full-width bitmaps add up to gigabytes on hour-long transcripts.
+        let measured = measureCaption(trimmed, font: font, maxWidth: maxWidth)
+        let width = min(maxWidth, measured.width + 4)
+        let height = min(maxHeight, measured.height + 2)
         layer.frame = CGRect(
-            x: horizontalInset,
-            y: style.bottomInset,
-            width: maxWidth,
+            x: horizontalInset + ((maxWidth - width) / 2).rounded(),
+            y: style.bottomInset + ((maxHeight - height) / 2).rounded(),
+            width: width,
             height: height
         )
 
         // CATextLayer draws no glyphs inside AVVideoCompositionCoreAnimationTool's export; rasterize via Core Text and composite as contents.
-        let font = Format.cascadingFont(name: style.fontName, size: style.fontSize, language: language)
         if let image = renderTextImage(
-            text: text.trimmingCharacters(in: .whitespacesAndNewlines),
+            text: trimmed,
             font: font,
             color: style.textColor,
             size: layer.bounds.size,
@@ -199,9 +206,18 @@ public enum SubtitleBurner {
         return layer
     }
 
-    static func renderTextImage(text: String, font: CTFont, color: CGColor, size: CGSize, scale: CGFloat) -> CGImage? {
-        guard !text.isEmpty, size.width > 0, size.height > 0 else { return nil }
+    static func measureCaption(_ text: String, font: CTFont, maxWidth: CGFloat) -> CGSize {
+        guard !text.isEmpty, maxWidth > 0 else { return .zero }
+        let attributed = captionText(text, font: font, color: CGColor(gray: 1, alpha: 1))
+        let framesetter = CTFramesetterCreateWithAttributedString(attributed)
+        let suggested = CTFramesetterSuggestFrameSizeWithConstraints(
+            framesetter, CFRangeMake(0, attributed.length), nil,
+            CGSize(width: maxWidth, height: .greatestFiniteMagnitude), nil
+        )
+        return CGSize(width: suggested.width.rounded(.up), height: suggested.height.rounded(.up))
+    }
 
+    private static func captionText(_ text: String, font: CTFont, color: CGColor) -> NSAttributedString {
         var alignment = CTTextAlignment.center
         let paragraphStyle = withUnsafeBytes(of: &alignment) { raw -> CTParagraphStyle in
             var setting = CTParagraphStyleSetting(
@@ -211,11 +227,17 @@ public enum SubtitleBurner {
             )
             return CTParagraphStyleCreate(&setting, 1)
         }
-        let attributed = NSAttributedString(string: text, attributes: [
+        return NSAttributedString(string: text, attributes: [
             .init(kCTFontAttributeName as String): font,
             .init(kCTForegroundColorAttributeName as String): color,
             .init(kCTParagraphStyleAttributeName as String): paragraphStyle,
         ])
+    }
+
+    static func renderTextImage(text: String, font: CTFont, color: CGColor, size: CGSize, scale: CGFloat) -> CGImage? {
+        guard !text.isEmpty, size.width > 0, size.height > 0 else { return nil }
+
+        let attributed = captionText(text, font: font, color: color)
 
         let pixelWidth = Int((size.width * scale).rounded())
         let pixelHeight = Int((size.height * scale).rounded())
