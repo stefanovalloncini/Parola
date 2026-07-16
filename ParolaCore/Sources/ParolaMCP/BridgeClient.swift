@@ -33,7 +33,9 @@ public struct BridgeClient: BridgeProtocol {
         let port = try readPort()
         let token = readToken() ?? ""
         let payload = encodeRequest(cmd: cmd, argsJSON: argsJSON, token: token)
-        let timeout = self.timeout
+        // Long-poll commands (waitForPhase, waitForBatchJob, ...) legally exceed the default
+        // socket timeout; honor the command's own timeoutMs plus slack.
+        let timeout = max(self.timeout, Self.requestedTimeout(argsJSON: argsJSON) + 5)
 
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
@@ -51,6 +53,13 @@ public struct BridgeClient: BridgeProtocol {
                 }
             }
         }
+    }
+
+    private static func requestedTimeout(argsJSON: Data) -> TimeInterval {
+        guard !argsJSON.isEmpty,
+              let object = try? JSONSerialization.jsonObject(with: argsJSON) as? [String: Any],
+              let ms = object["timeoutMs"] as? Int, ms > 0 else { return 0 }
+        return TimeInterval(ms) / 1000
     }
 
     private func readPort() throws -> Int {
@@ -100,6 +109,9 @@ public struct BridgeClient: BridgeProtocol {
 
         var tv = timeval(tv_sec: Int(timeout), tv_usec: 0)
         _ = setsockopt(socketFD, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        // Without this, a peer reset between connect and send raises SIGPIPE and kills the process.
+        var noSigpipe: Int32 = 1
+        _ = setsockopt(socketFD, SOL_SOCKET, SO_NOSIGPIPE, &noSigpipe, socklen_t(MemoryLayout<Int32>.size))
 
         try request.withUnsafeBytes { rawBuf in
             guard let base = rawBuf.bindMemory(to: UInt8.self).baseAddress else {
@@ -120,10 +132,18 @@ public struct BridgeClient: BridgeProtocol {
                 guard let base = ptr.baseAddress else { return 0 }
                 return recv(socketFD, base, ptr.count, 0)
             }
-            if n <= 0 { break }
-            let received = chunk.prefix(n)
-            buffer.append(contentsOf: received)
-            if received.contains(0x0A) { break }
+            if n > 0 {
+                let received = chunk.prefix(n)
+                buffer.append(contentsOf: received)
+                if received.contains(0x0A) { break }
+                continue
+            }
+            if n < 0, errno == EAGAIN || errno == EWOULDBLOCK {
+                // A recv timeout is not a peer close; say so, or a long-running command
+                // in the app reads as a crashed bridge.
+                throw BridgeFailure(message: "bridge did not respond within \(Int(timeout))s (the command may still be running in the app)")
+            }
+            break
         }
         return buffer
     }

@@ -20,7 +20,7 @@ public actor DictationCoordinator {
     private var mediaSession: MediaSession?
     private var mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)?
     private var eventTask: Task<Void, Never>?
-    private var eventContinuation: AsyncStream<HotkeyEvent>.Continuation?
+    private var eventContinuation: AsyncStream<(HotkeyEvent, Date)>.Continuation?
 
     private var pressStartedAt: Date?
     private var hybridLocked: Bool = false
@@ -36,6 +36,7 @@ public actor DictationCoordinator {
     /// real, so `.listening` never reports a session that can't yet be stopped-and-transcribed.
     private var startInFlight = false
     private var releaseDuringStart = false
+    private var releaseDuringStartAt: Date?
 
     public init(
         hotkey: any HotkeyMonitor,
@@ -99,15 +100,17 @@ public actor DictationCoordinator {
         await hotkey.stop()
         eventTask?.cancel()
         eventContinuation?.finish()
-        let (stream, continuation) = AsyncStream.makeStream(of: HotkeyEvent.self)
+        let (stream, continuation) = AsyncStream.makeStream(of: (HotkeyEvent, Date).self)
         eventContinuation = continuation
         eventTask = Task { [weak self] in
-            for await event in stream {
-                await self?.handle(event)
+            for await (event, capturedAt) in stream {
+                await self?.handle(event, capturedAt: capturedAt)
             }
         }
+        // Stamp at capture: events are handled serially behind recorder start/stop awaits,
+        // so handling time is not press/release time.
         await hotkey.start { event in
-            continuation.yield(event)
+            continuation.yield((event, Date()))
         }
     }
 
@@ -154,9 +157,14 @@ public actor DictationCoordinator {
         await recorder.partials()
     }
 
-    func handle(_ event: HotkeyEvent) async {
-        if startInFlight, case .release = event {
-            releaseDuringStart = true
+    func handle(_ event: HotkeyEvent, capturedAt: Date = Date()) async {
+        if startInFlight {
+            if case .release = event {
+                releaseDuringStart = true
+                releaseDuringStartAt = capturedAt
+            }
+            // A press while the start is in flight would pass the .idle guard and
+            // double-start the recorder, orphaning the first session.
             return
         }
         switch mode {
@@ -165,7 +173,7 @@ public actor DictationCoordinator {
         case .toggle:
             await handleToggle(event)
         case .hybrid:
-            await handleHybrid(event)
+            await handleHybrid(event, capturedAt: capturedAt)
         }
     }
 
@@ -190,16 +198,16 @@ public actor DictationCoordinator {
         }
     }
 
-    private func handleHybrid(_ event: HotkeyEvent) async {
+    private func handleHybrid(_ event: HotkeyEvent, capturedAt: Date) async {
         switch event {
         case .press:
-            pressStartedAt = Date()
+            pressStartedAt = capturedAt
             if state == .listening && hybridLocked { return }
             hybridLocked = false
             await beginListening()
         case .release:
             guard state == .listening else { return }
-            let held = pressStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+            let held = pressStartedAt.map { capturedAt.timeIntervalSince($0) } ?? 0
             pressStartedAt = nil
             if hybridLocked {
                 hybridLocked = false
@@ -246,7 +254,9 @@ public actor DictationCoordinator {
         await setState(.listening)
         if releaseDuringStart {
             releaseDuringStart = false
-            await handle(.release)
+            let releasedAt = releaseDuringStartAt ?? Date()
+            releaseDuringStartAt = nil
+            await handle(.release, capturedAt: releasedAt)
         }
     }
 

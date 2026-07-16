@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 #if canImport(AppKit)
 import AppKit
@@ -9,11 +10,16 @@ public enum AppLauncher {
         let portFile = portFileURL()
 
         if FileManager.default.fileExists(atPath: portFile.path) {
-            return BridgeJSON.string([
-                "launched": false,
-                "bridgeReady": true,
-                "portFile": portFile.path,
-            ] as [String: Any])
+            if bridgeListening(portFile: portFile) {
+                return BridgeJSON.string([
+                    "launched": false,
+                    "bridgeReady": true,
+                    "portFile": portFile.path,
+                ] as [String: Any])
+            }
+            // A crash or force-quit leaves the port file behind; a stale file must not
+            // short-circuit the launch this tool exists to perform.
+            try? FileManager.default.removeItem(at: portFile)
         }
 
         #if canImport(AppKit)
@@ -54,6 +60,24 @@ public enum AppLauncher {
         )
     }
     #endif
+
+    private static func bridgeListening(portFile: URL) -> Bool {
+        guard let raw = try? String(contentsOf: portFile, encoding: .utf8),
+              let port = Int(raw.trimmingCharacters(in: .whitespacesAndNewlines)) else { return false }
+        let fd = socket(AF_INET, SOCK_STREAM, 0)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = in_port_t(port).bigEndian
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1")
+        let result = withUnsafePointer(to: &addr) { ptr in
+            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
+                connect(fd, sockPtr, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        return result == 0
+    }
 
     public static func portFileURL() -> URL {
         cacheDirectory().appendingPathComponent("bridge.port")

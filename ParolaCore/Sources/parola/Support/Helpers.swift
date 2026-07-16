@@ -65,8 +65,10 @@ func awaitStop(seconds: Double?) async {
 final class AsyncSignalStream: @unchecked Sendable {
     private let semaphore = DispatchSemaphore(value: 0)
     private let source: DispatchSourceSignal
+    private let sig: Int32
 
     init(signal sig: Int32) {
+        self.sig = sig
         signal(sig, SIG_IGN)
         let source = DispatchSource.makeSignalSource(signal: sig, queue: .global())
         self.source = source
@@ -89,5 +91,8 @@ final class AsyncSignalStream: @unchecked Sendable {
 
     deinit {
         source.cancel()
+        // Restore default handling: leaving SIG_IGN would make the process ignore
+        // Ctrl-C for the whole transcription that follows the recording.
+        signal(sig, SIG_DFL)
     }
 }

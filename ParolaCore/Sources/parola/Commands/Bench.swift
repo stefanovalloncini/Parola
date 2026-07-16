@@ -151,7 +151,7 @@ struct Bench: AsyncParsableCommand {
             url = dir.appendingPathComponent("\(stamp).json")
         }
         let data = try JSONEncoder.pretty.encode(rows)
-        try data.write(to: url)
+        try data.write(to: url, options: .atomic)
         stderr("Wrote snapshot to \(url.path)")
     }
 
