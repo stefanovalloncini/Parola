@@ -12,6 +12,9 @@ struct TranscriptHeaderBar: View {
     @State private var outlineOpen = false
     @State private var jumpOpen = false
     @State private var jumpDraft = ""
+    // Cached so `transcript.text` (a full-segment join) isn't rebuilt on every header re-render;
+    // only recomputed when the transcript actually changes or the title changes.
+    @State private var shareItem: TranscriptShareFile?
 
     var body: some View {
         HStack(spacing: DS.Spacing.small) {
@@ -72,11 +75,8 @@ struct TranscriptHeaderBar: View {
             .modifier(CompactHelpModifier(isCompact: model.transcriptCompact))
             .axLeaf("HeaderBar.Button.ToggleCompact")
 
-            if let transcript = model.transcript {
-                ShareLink(
-                    item: TranscriptShareFile(title: title, text: transcript.text),
-                    preview: SharePreview(title)
-                ) {
+            if let shareItem {
+                ShareLink(item: shareItem, preview: SharePreview(title)) {
                     Image(systemName: "square.and.arrow.up")
                 }
                 .buttonStyle(.borderless)
@@ -117,6 +117,14 @@ struct TranscriptHeaderBar: View {
         }
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.small)
+        .onAppear { rebuildShareItem() }
+        .onChange(of: model.transcriptVersion) { _, _ in rebuildShareItem() }
+        .onChange(of: title) { _, _ in rebuildShareItem() }
+    }
+
+    private func rebuildShareItem() {
+        guard let transcript = model.transcript else { shareItem = nil; return }
+        shareItem = TranscriptShareFile(title: title, text: transcript.text)
     }
 
     private func toggleSpeak() {
