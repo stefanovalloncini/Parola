@@ -31,6 +31,7 @@ public actor FolderWatcher {
     private let folderURL: URL
     private let onNewMediaFile: @Sendable (URL) -> Void
     private let options: Options
+    private let eventQueue = DispatchQueue(label: "com.parola.folder-watch.\(UUID().uuidString)")
     private var fileDescriptor: Int32 = -1
     private var source: DispatchSourceFileSystemObject?
     // A vnode source only fires for the directory it watches, so recursive mode
@@ -72,7 +73,8 @@ public actor FolderWatcher {
         // and closed our fd — don't resurrect a source on a closed descriptor.
         guard fileDescriptor == fd else { return }
 
-        let (stream, continuation) = AsyncStream.makeStream(of: Void.self)
+        // bufferingNewest(1): events that land while a rescan is running collapse into one trailing rescan.
+        let (stream, continuation) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
         scanContinuation = continuation
         scanTask = Task { [weak self] in
             for await _ in stream {
@@ -80,15 +82,15 @@ public actor FolderWatcher {
             }
         }
 
-        source = Self.makeSource(fd: fd, continuation: continuation)
+        source = Self.makeSource(fd: fd, continuation: continuation, queue: eventQueue)
         syncSubdirWatchers(scan.directories)
     }
 
     private static func makeSource(
         fd: Int32,
-        continuation: AsyncStream<Void>.Continuation
+        continuation: AsyncStream<Void>.Continuation,
+        queue: DispatchQueue
     ) -> DispatchSourceFileSystemObject {
-        let queue = DispatchQueue(label: "com.parola.folder-watch.\(UUID().uuidString)")
         let src = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
             eventMask: .write,
@@ -113,7 +115,7 @@ public actor FolderWatcher {
         for path in directories where subdirSources[path] == nil {
             let fd = path.withCString { open($0, O_EVTONLY) }
             guard fd >= 0 else { continue }
-            subdirSources[path] = Self.makeSource(fd: fd, continuation: continuation)
+            subdirSources[path] = Self.makeSource(fd: fd, continuation: continuation, queue: eventQueue)
         }
     }
 
