@@ -4,6 +4,22 @@ func stderr(_ line: String) {
     FileHandle.standardError.write(Data((line + "\n").utf8))
 }
 
+/// Runs `body` with the process's stdout (fd 1) pointed at stderr, then restores it. FluidAudio's
+/// Parakeet models make the CoreML runtime print `E5RT …` shape-inference chatter straight to fd 1
+/// on the first inference; without this the noise lands in the transcript we print to stdout and
+/// breaks machine-readable output (`parola transcribe -f json | jq` chokes on the leading text).
+func withStdoutRedirectedToStderr<T>(_ body: () async throws -> T) async rethrows -> T {
+    fflush(stdout)
+    let savedStdout = dup(STDOUT_FILENO)
+    dup2(STDERR_FILENO, STDOUT_FILENO)
+    defer {
+        fflush(stdout)
+        dup2(savedStdout, STDOUT_FILENO)
+        close(savedStdout)
+    }
+    return try await body()
+}
+
 func humanBytes(_ bytes: Int) -> String {
     Measurement(value: Double(bytes), unit: UnitInformationStorage.bytes)
         .formatted(.byteCount(style: .file))

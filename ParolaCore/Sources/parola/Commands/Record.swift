@@ -81,11 +81,13 @@ struct Record: AsyncParsableCommand {
         )
 
         let progress = ProgressReporter(label: "downloading \(model)")
-        let transcript = try await session.transcribe(
-            source: audioSource,
-            options: opts,
-            downloadProgress: { p in progress.update(p) }
-        )
+        let transcript = try await withStdoutRedirectedToStderr {
+            try await session.transcribe(
+                source: audioSource,
+                options: opts,
+                downloadProgress: { p in progress.update(p) }
+            )
+        }
         progress.finish()
 
         let exporter = Exporters.exporter(for: format)

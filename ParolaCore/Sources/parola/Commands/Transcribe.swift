@@ -136,14 +136,16 @@ struct Transcribe: AsyncParsableCommand {
         }
 
         emitter.progress(.transcribing, detail: sourceURL.lastPathComponent)
-        var transcript = try await session.transcribe(
-            source: source,
-            options: options,
-            downloadProgress: { p in
-                progress.update(p)
-                emitter.progress(.downloading, fraction: p, detail: model)
-            }
-        )
+        var transcript = try await withStdoutRedirectedToStderr {
+            try await session.transcribe(
+                source: source,
+                options: options,
+                downloadProgress: { p in
+                    progress.update(p)
+                    emitter.progress(.downloading, fraction: p, detail: model)
+                }
+            )
+        }
         progress.finish()
         transcript = orthographyCorrected(transcript)
 

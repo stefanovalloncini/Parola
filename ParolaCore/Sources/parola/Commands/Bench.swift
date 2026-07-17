@@ -94,10 +94,12 @@ struct Bench: AsyncParsableCommand {
         for file in audioFiles {
             let source = FileAudioSource(url: file)
             let started = Date()
-            let transcript = try await session.transcribe(
-                source: source,
-                options: TranscriptionOptions(model: modelID, language: effectiveLanguage)
-            )
+            let transcript = try await withStdoutRedirectedToStderr {
+                try await session.transcribe(
+                    source: source,
+                    options: TranscriptionOptions(model: modelID, language: effectiveLanguage)
+                )
+            }
             let elapsed = Date().timeIntervalSince(started)
             totalWallSeconds += elapsed
             totalAudioSeconds += transcript.durationSeconds ?? estimateDuration(file)
