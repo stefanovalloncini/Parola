@@ -135,7 +135,7 @@ extension ParolaAutomationServer {
                 summary: "Resolves when the dictation controller reports the named state.",
                 kind: .waiter,
                 args: [
-                    .init(name: "state", kind: .string(enum: ["idle", "listening", "transcribing", "stopped"]), required: true, summary: "Target dictation state"),
+                    .init(name: "state", kind: .string(enum: ["idle", "listening", "transcribing", "failed", "stopped"]), required: true, summary: "Target dictation state"),
                     .init(name: "timeoutMs", kind: .integer, required: false, summary: "Timeout in ms", defaultValue: .int(10_000)),
                 ],
                 handler: { args, ctx in
@@ -156,6 +156,9 @@ extension ParolaAutomationServer {
                             case "listening": return ctx.model.dictationState == .listening
                             case "transcribing": return ctx.model.dictationState == .transcribing
                             case "idle": return ctx.model.dictationState == .idle
+                            case "failed":
+                                if case .failed = ctx.model.dictationState { return true }
+                                return false
                             case "stopped": return !ctx.model.dictationController.isRunning
                             default: return false
                             }

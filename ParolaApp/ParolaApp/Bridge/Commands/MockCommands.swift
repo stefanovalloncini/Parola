@@ -34,10 +34,11 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "installMockStreamingTranscriber",
                 area: .test,
-                summary: "Installs a canned streaming-transcriber response (segments, partials, delayMs). Test-mode only.",
+                summary: "Installs a canned streaming-transcriber response (segments, partials, delayMs) or canned failure. Test-mode only.",
                 kind: .mutating,
                 args: [
                     .init(name: "response", kind: .object, required: false, summary: "Canned transcript JSON"),
+                    .init(name: "failure", kind: .object, required: false, summary: "Canned failure JSON"),
                 ],
                 handler: { args, ctx in
                     try requireTestMode(ctx)
