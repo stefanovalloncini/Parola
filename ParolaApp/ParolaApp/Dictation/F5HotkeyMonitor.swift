@@ -17,6 +17,12 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
         self.modifierMask = modifiers.intersection(.deviceIndependentFlagsMask)
     }
 
+    // Backstop for a released-while-armed monitor: an NSEvent registration with no owner
+    // fires its closure on every keystroke for the rest of the process.
+    isolated deinit {
+        removeMonitor()
+    }
+
     nonisolated func start(handler: @escaping @Sendable (HotkeyEvent) -> Void) async {
         await MainActor.run { self.installMonitor(handler: handler) }
     }
@@ -44,24 +50,40 @@ final class GlobalHotkeyMonitor: HotkeyMonitor {
         }
     }
 
-    private func process(event: NSEvent, handler: @Sendable (HotkeyEvent) -> Void) {
-        let needed = self.modifierMask
-        if !needed.isEmpty {
-            let pressed = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            guard pressed.contains(needed) else { return }
-        }
-        switch event.type {
+    /// Modifiers gate only the press: a keyUp of the watched key must always release,
+    /// or letting go of the modifier first leaves push-to-talk stuck listening.
+    nonisolated static func transition(
+        type: NSEvent.EventType,
+        flags: NSEvent.ModifierFlags,
+        required: NSEvent.ModifierFlags,
+        isPressed: Bool
+    ) -> (event: HotkeyEvent?, isPressed: Bool) {
+        switch type {
         case .keyDown:
-            if !self.isPressed {
-                self.isPressed = true
-                handler(.press)
+            if !required.isEmpty {
+                let pressed = flags.intersection(.deviceIndependentFlagsMask)
+                guard pressed.contains(required) else { return (nil, isPressed) }
             }
+            guard !isPressed else { return (nil, isPressed) }
+            return (.press, true)
         case .keyUp:
-            if self.isPressed {
-                self.isPressed = false
-                handler(.release)
-            }
-        default: break
+            guard isPressed else { return (nil, isPressed) }
+            return (.release, false)
+        default:
+            return (nil, isPressed)
+        }
+    }
+
+    private func process(event: NSEvent, handler: @Sendable (HotkeyEvent) -> Void) {
+        let out = Self.transition(
+            type: event.type,
+            flags: event.modifierFlags,
+            required: modifierMask,
+            isPressed: isPressed
+        )
+        isPressed = out.isPressed
+        if let hotkeyEvent = out.event {
+            handler(hotkeyEvent)
         }
     }
 
