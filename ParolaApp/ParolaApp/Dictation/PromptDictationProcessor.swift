@@ -35,20 +35,25 @@ struct PromptDictationProcessor: TextPostProcessor {
         self.urlResolver = urlResolver ?? { bundleID in await BrowserURLResolver.shared.currentURL(for: bundleID) }
     }
 
+    /// Spoken-punctuation and capitalization cleanup that feeds the LLM. Never applied on
+    /// the promptless "Voice" path, which inserts the transcript exactly as spoken.
+    static func rewritten(_ text: String, language: String?) -> String {
+        SentenceCapitalizer.applyTo(PronounCapitalizer.applyTo(VoiceCommands.applyTo(text, language: language), language: language))
+    }
+
     func process(_ text: String) async -> String {
-        let preprocessed = SentenceCapitalizer.applyTo(PronounCapitalizer.applyTo(VoiceCommands.applyTo(text), language: language))
         let frontmost = await frontmostAppContext()
         let basePrompt: Prompt? = await selectOverridePrompt(bundleID: frontmost.bundleID) ?? defaultPrompt
 
         let detector = TriggerWordDetector()
-        let triggered = detector.detect(preprocessed, against: triggerPrompts)
+        let triggered = detector.detect(text, against: triggerPrompts)
         let triggerMatch = triggered.flatMap { match in
             triggerPrompts.first(where: { $0.id == match.promptID }).map { (prompt: $0, cleaned: match.cleanedText) }
         }
 
         let prompt: Prompt? = triggerMatch?.prompt ?? basePrompt
-        let input = triggerMatch?.cleaned ?? preprocessed
-        guard let prompt else { return input }
+        guard let prompt else { return text }
+        let input = Self.rewritten(triggerMatch?.cleaned ?? text, language: language)
         let context = await gatheredContext()
         do {
             let situated = contextualizing(prompt, with: frontmost.name, context: context)
@@ -63,7 +68,8 @@ struct PromptDictationProcessor: TextPostProcessor {
 
     func selectOverridePrompt(bundleID: String?) async -> Prompt? {
         guard let bundleID, let entries = overrides[bundleID], !entries.isEmpty else { return nil }
-        let url: URL? = await resolveURL(bundleID: bundleID)
+        let hasURLRule = entries.contains { !($0.urlPattern ?? "").isEmpty }
+        let url: URL? = hasURLRule ? await resolveURL(bundleID: bundleID) : nil
         if let url, let match = entries.first(where: { entry in
             guard let pattern = entry.urlPattern, !pattern.isEmpty else { return false }
             return matches(pattern: pattern, url: url)

@@ -69,4 +69,15 @@ struct SentenceCapitalizerTests {
     func numberLedClause() {
         #expect(SentenceCapitalizer.applyTo("weighs. 5.5 mg total") == "Weighs. 5.5 mg total")
     }
+
+    @Test("an intra-word period is not a sentence break")
+    func dottedTokensPreserved() {
+        #expect(SentenceCapitalizer.applyTo("check example.com please") == "Check example.com please")
+        #expect(SentenceCapitalizer.applyTo("open readme.md now") == "Open readme.md now")
+    }
+
+    @Test("a trailing period still ends the input cleanly")
+    func trailingPeriod() {
+        #expect(SentenceCapitalizer.applyTo("all done.") == "All done.")
+    }
 }

@@ -10,22 +10,21 @@ struct PromptDictationProcessorTests {
         PromptDictationProcessor(defaultPrompt: nil, overrides: [:], language: language)
     }
 
-    @Test("Italian dictation keeps the lone article i lowercase")
-    func italianKeepsArticleI() async {
-        let out = await makeProcessor(language: "it").process("compra i libri")
-        #expect(out == "Compra i libri")
+    @Test("voice mode returns the transcript verbatim")
+    func voiceModeVerbatim() async {
+        let out = await makeProcessor(language: "it").process("compra i libri punto")
+        #expect(out == "compra i libri punto")
+        let en = await makeProcessor(language: "en").process("check example.com and i said period")
+        #expect(en == "check example.com and i said period")
+        let auto = await makeProcessor(language: nil).process("il punto \u{00E8} questo")
+        #expect(auto == "il punto \u{00E8} questo")
     }
 
-    @Test("English dictation capitalizes the lone pronoun i")
-    func englishCapitalizesPronounI() async {
-        let out = await makeProcessor(language: "en").process("compra i libri")
-        #expect(out == "Compra I libri")
-    }
-
-    @Test("Unknown language defaults to English capitalization")
-    func unknownLanguageDefaultsToEnglish() async {
-        let out = await makeProcessor(language: nil).process("compra i libri")
-        #expect(out == "Compra I libri")
+    @Test("the rewrite step gates commands and pronouns by language")
+    func rewriteStepLanguageGating() {
+        #expect(PromptDictationProcessor.rewritten("compra i libri", language: "it") == "Compra i libri")
+        #expect(PromptDictationProcessor.rewritten("i said period", language: "en") == "I said.")
+        #expect(PromptDictationProcessor.rewritten("hello period", language: nil) == "Hello period")
     }
 
     private func makeProcessor(
@@ -37,6 +36,28 @@ struct PromptDictationProcessorTests {
             overrides: overrides,
             urlResolver: { _ in url }
         )
+    }
+
+    private actor ResolverSpy {
+        private(set) var called = false
+        func mark() { called = true }
+    }
+
+    @Test("selectOverridePrompt skips URL resolution when no rule has a pattern")
+    func selectSkipsResolverWithoutURLRules() async {
+        let spy = ResolverSpy()
+        let mail = Prompt(name: "Mail", instructions: "m")
+        let proc = PromptDictationProcessor(
+            defaultPrompt: nil,
+            overrides: ["com.apple.mail": [DictationOverrideEntry(prompt: mail, urlPattern: nil)]],
+            urlResolver: { _ in
+                await spy.mark()
+                return nil
+            }
+        )
+        let chosen = await proc.selectOverridePrompt(bundleID: "com.apple.mail")
+        #expect(chosen?.id == mail.id)
+        #expect(await spy.called == false, "no URL rule for the bundle, so the browser must not be queried")
     }
 
     @Test("selectOverridePrompt returns nil when the bundle has no override")

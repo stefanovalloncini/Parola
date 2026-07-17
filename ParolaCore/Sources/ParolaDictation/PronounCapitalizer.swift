@@ -5,10 +5,10 @@ import Foundation
 /// inflected forms inside other words alone (e.g. "kim", "icon", "ipad").
 ///
 /// English-only: lone "i" is a word in other languages ("i" is the Italian plural
-/// article), so a non-English `language` skips the rule. A nil/unknown language keeps
-/// the English behaviour.
+/// article), so the rule runs only for an explicit English `language`. Nil means
+/// auto-detect — the text could be any language, so the rule is skipped.
 public enum PronounCapitalizer {
-    public static func applyTo(_ text: String, language: String? = nil) -> String {
+    public static func applyTo(_ text: String, language: String?) -> String {
         guard appliesToEnglish(language) else { return text }
         return Self.regex.stringByReplacingMatches(
             in: text,
@@ -18,7 +18,7 @@ public enum PronounCapitalizer {
     }
 
     private static func appliesToEnglish(_ language: String?) -> Bool {
-        guard let language, !language.isEmpty else { return true }
+        guard let language, !language.isEmpty else { return false }
         return language.lowercased().hasPrefix("en")
     }
 
