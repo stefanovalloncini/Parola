@@ -74,15 +74,28 @@ struct FocusedFieldLocator: FieldAnchorProviding {
         return intersection.width * intersection.height
     }
 
+    /// These lookups run on the main actor every second while the pill is visible; the
+    /// default AX messaging timeout is 6 s per call, so a beachballing frontmost app
+    /// would freeze Parola's UI without the tight per-element timeout.
+    private static let messagingTimeout: Float = 0.25
+
+    private static let systemWide: AXUIElement = {
+        let element = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(element, messagingTimeout)
+        return element
+    }()
+
     private static func focusedElement() -> AXUIElement? {
         var ref: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(
-            AXUIElementCreateSystemWide(),
+            systemWide,
             kAXFocusedUIElementAttribute as CFString,
             &ref
         )
         guard result == .success, let value = ref, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
-        return (value as! AXUIElement)
+        let element = value as! AXUIElement
+        AXUIElementSetMessagingTimeout(element, messagingTimeout)
+        return element
     }
 
     private static func caretRect(of element: AXUIElement) -> CGRect? {
