@@ -36,7 +36,7 @@ public struct FcpxmlExporter: TranscriptExporter {
             let offset = Self.rationalTime(seg.start)
             // FCP drops a zero-length caption (same intolerance as the zero-length gap); give
             // a degenerate or inverted segment at least one frame so the cue survives import.
-            let duration = Self.rationalTime(max(seg.end - seg.start, Self.minCaptionSeconds))
+            let duration = Self.rationalTime(max(seg.end - seg.start, Format.minCaptionSeconds))
             out += """
                                         <caption lane="1" offset="\(offset)" start="0s" duration="\(duration)" role="\(role)">
                                             <text placement="bottom"><text-style ref="ts\(styleNumber)">\(body)</text-style></text>
@@ -60,8 +60,6 @@ public struct FcpxmlExporter: TranscriptExporter {
         return utf8(out)
     }
 
-    // One frame at the 30fps sequence format (frameDuration 100/3000s).
-    static let minCaptionSeconds = 1.0 / 30.0
 
     static func rationalTime(_ seconds: Double) -> String {
         let n = Int(exactly: (max(0, seconds) * 30000).rounded()) ?? .max

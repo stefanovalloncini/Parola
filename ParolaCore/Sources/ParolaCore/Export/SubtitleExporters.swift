@@ -34,8 +34,9 @@ public struct SrtExporter: TranscriptExporter {
         for seg in transcript.segments {
             let body = CaptionWrapper.wrap(seg.text, length: options.captionLength)
             guard !body.isEmpty else { continue }
+            let end = max(seg.end, seg.start + Format.minCaptionSeconds)
             out += "\(cueNumber)\n"
-            out += "\(Self.srtTimestamp(seg.start)) --> \(Self.srtTimestamp(seg.end))\n"
+            out += "\(Self.srtTimestamp(seg.start)) --> \(Self.srtTimestamp(end))\n"
             if options.includeSpeakers, let speaker = Format.presentationSpeakerLabel(seg.speaker) {
                 out += "\(speaker): \(body)\n\n"
             } else {
@@ -64,7 +65,8 @@ public struct VttExporter: TranscriptExporter {
         for seg in transcript.segments {
             let body = Format.escapeWebVTT(CaptionWrapper.wrap(seg.text, length: options.captionLength))
             guard !body.isEmpty else { continue }
-            out += "\(Self.vttTimestamp(seg.start)) --> \(Self.vttTimestamp(seg.end))\n"
+            let end = max(seg.end, seg.start + Format.minCaptionSeconds)
+            out += "\(Self.vttTimestamp(seg.start)) --> \(Self.vttTimestamp(end))\n"
             if options.includeSpeakers, let speaker = Format.presentationSpeakerLabel(seg.speaker) {
                 out += "<v \(Format.escapeWebVTT(speaker))>\(body)</v>\n\n"
             } else {

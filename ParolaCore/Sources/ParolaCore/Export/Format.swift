@@ -2,6 +2,10 @@ import CoreText
 import Foundation
 
 public enum Format {
+    /// Zero-length and inverted cues never display (and strict parsers reject them);
+    /// every caption exporter floors a cue to at least one frame.
+    public static let minCaptionSeconds = 1.0 / 30.0
+
     public static func timestampHHMMSS(_ seconds: Double) -> String {
         let total = Int(exactly: max(0, seconds).rounded(.towardZero)) ?? .max
         let h = total / 3600
