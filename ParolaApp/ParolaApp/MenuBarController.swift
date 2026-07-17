@@ -1,4 +1,5 @@
 import AppKit
+import ParolaDictation
 
 @MainActor
 final class MenuBarController {
@@ -20,6 +21,7 @@ final class MenuBarController {
             _ = model.showMenuBarExtra
             _ = model.libraryVersion
             _ = model.dictationEnabled
+            _ = model.dictationState
             _ = model.libraryEntries
         } onChange: { [weak self] in
             Task { @MainActor in self?.scheduleRefresh() }
@@ -43,7 +45,8 @@ final class MenuBarController {
             lastVisibility = model.showMenuBarExtra
         }
         guard model.showMenuBarExtra else { return }
-        let key = "\(model.libraryVersion)|\(model.dictationEnabled ? "1" : "0")"
+        let dictate = Self.dictationMenuItem(for: model.dictationState)
+        let key = "\(model.libraryVersion)|\(model.dictationEnabled ? "1" : "0")|\(dictate.stops ? "L" : "-")"
         guard key != lastSnapshotKey else { return }
         lastSnapshotKey = key
         rebuildMenu()
@@ -70,7 +73,7 @@ final class MenuBarController {
         menu.addItem(.separator())
         menu.addItem(menuItem(title: "Record from Microphone", action: #selector(recordMic), target: self))
         menu.addItem(menuItem(title: "Open File…", action: #selector(openFile), target: self))
-        let dictateTitle = model.dictationEnabled ? "Stop Dictation" : "Start Dictation"
+        let dictateTitle = Self.dictationMenuItem(for: model.dictationState).title
         menu.addItem(menuItem(title: dictateTitle, action: #selector(toggleDictation), target: self))
         menu.addItem(.separator())
 
@@ -137,9 +140,18 @@ final class MenuBarController {
         model?.presentOpenPanel()
     }
 
+    /// Keyed to the session, not the enabled flag: "Stop" on an enabled-but-idle
+    /// dictation was a dead item that could never actually stop anything.
+    static func dictationMenuItem(for state: DictationCoordinator.State) -> (title: String, stops: Bool) {
+        if case .listening = state {
+            return (String(localized: "Stop Dictation"), true)
+        }
+        return (String(localized: "Start Dictation"), false)
+    }
+
     @objc private func toggleDictation() {
         guard let model else { return }
-        if model.dictationEnabled {
+        if Self.dictationMenuItem(for: model.dictationState).stops {
             model.stopDictationFromIntent()
         } else {
             model.startDictationFromIntent()
