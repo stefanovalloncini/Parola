@@ -67,6 +67,63 @@ struct TranscriptionCoordinatorTests {
         #expect(coord.livePartialText == "")
     }
 
+    @Test("a failed streaming event releases the recording session so Record works again")
+    func failedEventReleasesSession() throws {
+        let (coord, _) = try makeCoordinator()
+        coord.startRecording()
+        #expect(coord.isRecordingSessionActive)
+
+        coord.handleStreamingEvent(.failed("engine died"))
+
+        #expect(coord.phase == .failed(message: "engine died"))
+        #expect(
+            !coord.isRecordingSessionActive,
+            "a leaked session leaves the Record button silently dead"
+        )
+        coord.cancelRecording()
+    }
+
+    @Test("a completed model download hands the phase back to the active flow")
+    func downloadCompletionRestoresPhase() async throws {
+        let (coord, _) = try makeCoordinator()
+        let handler = coord.makeDownloadProgressHandler(resumingTo: { .recording })
+
+        handler(0.4)
+        var settled = false
+        for _ in 0..<100 {
+            if case .downloadingModel = coord.phase { settled = true; break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(settled, "mid-download progress should surface as the downloading phase")
+
+        handler(1.0)
+        var restored = false
+        for _ in 0..<100 {
+            if coord.phase == .recording { restored = true; break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(restored, "finishing the download must not leave the phase stuck at downloading")
+    }
+
+    @Test("streaming events restore the recording phase after a download stall")
+    func streamingEventRestoresRecordingPhase() async throws {
+        let (coord, _) = try makeCoordinator()
+        let handler = coord.makeDownloadProgressHandler(resumingTo: { .recording })
+        handler(0.4)
+        var downloading = false
+        for _ in 0..<100 {
+            if case .downloadingModel = coord.phase { downloading = true; break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(downloading)
+
+        coord.handleStreamingEvent(.partial(text: "speech arrived"))
+        #expect(
+            coord.phase == .recording,
+            "live speech means the mic is up; the sheet must show Finish, not a spinner"
+        )
+    }
+
     @Test("finished event after cancelRecording does not persist")
     func cancelRecordingDiscards() async throws {
         let (coord, library) = try makeCoordinator()

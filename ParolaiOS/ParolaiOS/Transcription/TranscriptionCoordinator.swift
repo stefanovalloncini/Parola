@@ -80,7 +80,7 @@ final class TranscriptionCoordinator {
                 let result = try await session.transcribe(
                     source: FileAudioSource(url: audio),
                     options: currentOptions,
-                    downloadProgress: makeDownloadProgressHandler()
+                    downloadProgress: makeDownloadProgressHandler(resumingTo: { .transcribing(file: audio) })
                 )
                 try Task.checkCancellation()
                 let processed = postProcessor?(result) ?? result
@@ -119,7 +119,7 @@ final class TranscriptionCoordinator {
             do {
                 let events = try await session.start(
                     options: currentOptions,
-                    downloadProgress: makeDownloadProgressHandler()
+                    downloadProgress: makeDownloadProgressHandler(resumingTo: { .recording })
                 )
                 for await event in events {
                     handleStreamingEvent(event, generation: generation)
@@ -130,6 +130,8 @@ final class TranscriptionCoordinator {
             }
         }
     }
+
+    var isRecordingSessionActive: Bool { streamingSession != nil }
 
     func stopRecording() {
         guard let session = streamingSession else { return }
@@ -161,15 +163,21 @@ final class TranscriptionCoordinator {
     func handleStreamingEvent(_ event: StreamingEvent, generation: Int = 0) {
         switch event {
         case .partial(let text):
+            restoreRecordingPhaseIfDownloadStuck()
             if livePartialText != text { livePartialText = text }
         case .confirmed(let segment):
+            restoreRecordingPhaseIfDownloadStuck()
             liveSegments.append(segment)
             if !livePartialText.isEmpty { livePartialText = "" }
         case .voiceActivity:
-            break
+            restoreRecordingPhaseIfDownloadStuck()
         case .warning:
             break
         case .failed(let msg):
+            // The session tore itself down before emitting .failed; keeping the reference
+            // would leave startRecording's guard tripped and the Record button dead.
+            streamingSession = nil
+            streamingTask = nil
             phase = .failed(message: msg)
         case .finished(let final):
             livePartialText = ""
@@ -208,12 +216,22 @@ final class TranscriptionCoordinator {
         )
     }
 
-    private func makeDownloadProgressHandler() -> @Sendable (Double) -> Void {
+    // A live streaming event means the mic is up even if the download never reported 1.0.
+    private func restoreRecordingPhaseIfDownloadStuck() {
+        if case .downloadingModel = phase { phase = .recording }
+    }
+
+    func makeDownloadProgressHandler(resumingTo resume: @escaping @MainActor () -> Phase) -> @Sendable (Double) -> Void {
         let modelName = settings.modelName
         return { [weak self] frac in
             let percent = Int(frac * 100)
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                if frac >= 1 {
+                    self.lastProgressPercent = -1
+                    if case .downloadingModel = self.phase { self.phase = resume() }
+                    return
+                }
                 guard percent != self.lastProgressPercent else { return }
                 self.lastProgressPercent = percent
                 self.phase = .downloadingModel(name: modelName, progress: frac)
