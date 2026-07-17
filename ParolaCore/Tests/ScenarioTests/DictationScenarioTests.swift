@@ -148,5 +148,55 @@ extension ScenarioSuite {
             _ = try await client.send("setSetting", ["key": "dictationIndicatorStyleRaw", "value": "overlay"])
             _ = try await client.send("clearMocks", ["scope": "all"])
         }
+
+        @Test("a streaming failure surfaces the failed state and recovers", .enabled(if: ScenarioSuite.backend == "mock"))
+        func failureSurfacesAndRecovers() async throws {
+            let client = try ScenarioBridgeClient()
+            try await client.connect()
+            defer { Task { await client.close() } }
+
+            _ = try await client.send("resetTestState")
+            _ = try await client.send("selectModel", ["name": "openai_whisper-tiny"])
+            _ = try await client.send("installMockStreamingTranscriber", ["failure": [
+                "code": "transcriptionFailed",
+                "message": "canned failure",
+            ]])
+
+            _ = try await client.send("startDictation")
+            let listening = try await client.send("waitForDictationState", ["state": "listening", "timeoutMs": 5000])
+            #expect(listening["matched"]?.boolValue == true)
+            try await Task.sleep(for: .milliseconds(300))
+            _ = try await client.send("stopDictation")
+
+            let failed = try await client.send("waitForDictationState", ["state": "failed", "timeoutMs": 5000])
+            #expect(failed["matched"]?.boolValue == true)
+            let inserted = try await client.send("getLastInsertedText")
+            #expect(inserted["lastText"]?.stringValue == nil)
+
+            // .failed is a resting state: the next press must recover into a working session.
+            _ = try await client.send("installMockStreamingTranscriber", ["response": [
+                "partials": ["recovered"],
+                "segments": [["start": 0, "end": 1, "text": "recovered"]],
+                "delayMs": 200,
+            ]])
+            _ = try await client.send("startDictation")
+            let relistening = try await client.send("waitForDictationState", ["state": "listening", "timeoutMs": 5000])
+            #expect(relistening["matched"]?.boolValue == true)
+            try await Task.sleep(for: .milliseconds(500))
+            _ = try await client.send("stopDictation")
+
+            var recovered: String?
+            for _ in 0..<50 {
+                let result = try await client.send("getLastInsertedText")
+                if let text = result["lastText"]?.stringValue, !text.isEmpty {
+                    recovered = text
+                    break
+                }
+                try await Task.sleep(for: .milliseconds(100))
+            }
+            #expect(recovered == "Recovered")
+
+            _ = try await client.send("clearMocks", ["scope": "all"])
+        }
     }
 }
