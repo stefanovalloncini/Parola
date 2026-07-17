@@ -350,8 +350,9 @@ public actor LibraryStore {
         }
     }
 
-    /// Soft-deletes by stamping `deletedAt`. The bundle stays on disk so it can be restored.
-    public func delete(_ id: LibraryEntry.ID, at now: Date = Date()) throws {
+    /// Soft-deletes by stamping `deletedAt`. The bundle stays on disk so it can be restored,
+    /// but the entry leaves search and Spotlight immediately.
+    public func delete(_ id: LibraryEntry.ID, at now: Date = Date()) async throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
@@ -361,10 +362,11 @@ public actor LibraryStore {
         }
         invalidateListCaches()
         if cachedLoaded?.id == id { cachedLoaded = nil }
+        await deindexEntry(id: id)
     }
 
-    /// Reverses a soft-delete by clearing `deletedAt`.
-    public func restore(_ id: LibraryEntry.ID) throws {
+    /// Reverses a soft-delete by clearing `deletedAt` and re-indexing the entry.
+    public func restore(_ id: LibraryEntry.ID) async throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
@@ -374,6 +376,10 @@ public actor LibraryStore {
         }
         invalidateListCaches()
         if cachedLoaded?.id == id { cachedLoaded = nil }
+        if let entry = try? makeEntry(bundleURL: bundleURL),
+           let doc = try? ParolaDocument.read(at: bundleURL) {
+            await indexEntry(entry, transcript: doc.transcript)
+        }
     }
 
     /// Permanently removes a bundle from disk.
