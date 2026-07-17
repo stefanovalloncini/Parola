@@ -213,21 +213,45 @@ public final class ModelStore: Sendable {
             return installedURL(for: variant)
         }
         guard let entry = ModelCatalog.variant(id: variant) else {
-            if let downloader = await registry.downloader(for: .whisperKit) {
-                return try await downloader(variant, self, progress)
-            }
-            return try await downloadViaHuggingFace(
-                source: ModelDownloadSource(
-                    huggingFaceRepo: "argmaxinc/whisperkit-coreml",
-                    subpath: variant
-                ),
-                progress: progress
+            let fallbackSource = ModelDownloadSource(
+                huggingFaceRepo: "argmaxinc/whisperkit-coreml",
+                subpath: variant
             )
+            if let downloader = await registry.downloader(for: .whisperKit) {
+                return try await downloadViaRegistry(
+                    downloader, variant: variant, source: fallbackSource, progress: progress
+                )
+            }
+            return try await downloadViaHuggingFace(source: fallbackSource, progress: progress)
         }
         if let downloader = await registry.downloader(for: entry.engineID) {
-            return try await downloader(variant, self, progress)
+            return try await downloadViaRegistry(
+                downloader, variant: variant, source: entry.downloadSource, progress: progress
+            )
         }
         return try await downloadViaHuggingFace(source: entry.downloadSource, progress: progress)
+    }
+
+    /// Wraps an engine-supplied downloader in the same sidecar protocol the HuggingFace path
+    /// uses, so an interrupted fetch is never mistaken for an installed model.
+    private func downloadViaRegistry(
+        _ downloader: EngineRegistry.Downloader,
+        variant: String,
+        source: ModelDownloadSource,
+        progress: (@Sendable (Double) -> Void)?
+    ) async throws -> URL {
+        let destination = installedURL(for: source)
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        let sidecar = destination.appendingPathComponent(HuggingFaceDownloader.sidecarFilename)
+        if !FileManager.default.fileExists(atPath: sidecar.path) {
+            let placeholder = DownloadSidecar(repo: source.huggingFaceRepo, revision: "main", files: [:])
+            try? placeholder.write(to: sidecar)
+        }
+        let result = try await downloader(variant, self, progress)
+        // WhisperKit's HubApi returns success when cancelled between files; keep the sidecar then.
+        try Task.checkCancellation()
+        try? FileManager.default.removeItem(at: sidecar)
+        return result
     }
 
     private func downloadViaHuggingFace(
