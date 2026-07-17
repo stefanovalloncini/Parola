@@ -111,5 +111,42 @@ extension ScenarioSuite {
 
             _ = try await client.send("clearMocks", ["scope": "all"])
         }
+
+        @Test("near-field indicator style still inserts", .enabled(if: ScenarioSuite.backend == "mock"))
+        func nearFieldStyleInserts() async throws {
+            let client = try ScenarioBridgeClient()
+            try await client.connect()
+            defer { Task { await client.close() } }
+
+            _ = try await client.send("resetTestState")
+            _ = try await client.send("selectModel", ["name": "openai_whisper-tiny"])
+            _ = try await client.send("setSetting", ["key": "dictationIndicatorStyleRaw", "value": "nearField"])
+            _ = try await client.send("installMockStreamingTranscriber", ["response": [
+                "partials": ["hello", "hello from"],
+                "segments": [["start": 0, "end": 1, "text": "hello from the field"]],
+                "delayMs": 300,
+            ]])
+
+            _ = try await client.send("startDictation")
+            let listening = try await client.send("waitForDictationState", ["state": "listening", "timeoutMs": 5000])
+            #expect(listening["matched"]?.boolValue == true)
+
+            try await Task.sleep(for: .seconds(1))
+            _ = try await client.send("stopDictation")
+
+            var inserted: String?
+            for _ in 0..<50 {
+                let result = try await client.send("getLastInsertedText")
+                if let text = result["lastText"]?.stringValue, !text.isEmpty {
+                    inserted = text
+                    break
+                }
+                try await Task.sleep(for: .milliseconds(100))
+            }
+            #expect(inserted == "Hello from the field")
+
+            _ = try await client.send("setSetting", ["key": "dictationIndicatorStyleRaw", "value": "overlay"])
+            _ = try await client.send("clearMocks", ["scope": "all"])
+        }
     }
 }
