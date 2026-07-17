@@ -22,9 +22,33 @@ struct DictationHUDPreview: View {
     @ViewBuilder
     private var hudMock: some View {
         switch style {
+        case .nearField: nearFieldMock
         case .overlay: overlayMock
         case .notch:   notchMock
         case .minimal: minimalMock
+        }
+    }
+
+    private var nearFieldMock: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(Color.primary.opacity(0.25), lineWidth: 1)
+                .frame(width: 180, height: 22)
+                .overlay(alignment: .leading) {
+                    Text("Type here…")
+                        .font(DS.Font.caption2Medium)
+                        .foregroundStyle(.tertiary)
+                        .padding(.leading, 6)
+                }
+            HStack(spacing: 6) {
+                bars
+                Text("Listening")
+                    .font(DS.Font.caption2Medium)
+                    .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.black.opacity(0.88)))
         }
     }
 

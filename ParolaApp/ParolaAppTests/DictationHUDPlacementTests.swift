@@ -72,4 +72,61 @@ struct DictationHUDPlacementTests {
         let frame = DictationHUDPlacement.frame(c)
         #expect(frame == NSRect(x: 0, y: 0, width: 336, height: 64))
     }
+
+    private var fieldAnchor: FieldAnchor {
+        FieldAnchor(
+            rect: NSRect(x: 400, y: 500, width: 220, height: 24),
+            source: .field,
+            screenFrame: screenFrame,
+            screenVisibleFrame: visibleFrame
+        )
+    }
+
+    @Test("near field sits below the anchor")
+    func nearFieldBelow() {
+        let frame = DictationHUDPlacement.frame(context(style: .nearField, anchor: fieldAnchor))
+        #expect(frame == NSRect(x: 400, y: 500 - 8 - 44, width: 200, height: 44))
+    }
+
+    @Test("near field flips above when the screen bottom would clip it")
+    func nearFieldFlipsAbove() {
+        var anchor = fieldAnchor
+        anchor.rect = NSRect(x: 400, y: 30, width: 220, height: 24)
+        let frame = DictationHUDPlacement.frame(context(style: .nearField, anchor: anchor))
+        // #expect misreads a bare multi-term integer sum as Int and fails the CGFloat comparison; the cast pins its type.
+        #expect(frame.origin.y == CGFloat(30 + 24 + 8))
+    }
+
+    @Test("near field clamps into the anchor's screen")
+    func nearFieldClampsRight() {
+        var anchor = fieldAnchor
+        anchor.rect = NSRect(x: 1400, y: 500, width: 100, height: 24)
+        let frame = DictationHUDPlacement.frame(context(style: .nearField, anchor: anchor))
+        #expect(frame.origin.x == CGFloat(1512 - 200 - 8))
+    }
+
+    @Test("near field grows for partial text and failure messages")
+    func nearFieldExpanded() {
+        let partial = DictationHUDPlacement.frame(context(style: .nearField, hasPartial: true, anchor: fieldAnchor))
+        #expect(partial.size == NSSize(width: 360, height: 96))
+        let failed = DictationHUDPlacement.frame(context(style: .nearField, failedMessageVisible: true, anchor: fieldAnchor))
+        #expect(failed.size == NSSize(width: 360, height: 96))
+    }
+
+    @Test("near field without an anchor falls back to the overlay spot")
+    func nearFieldFallback() {
+        let frame = DictationHUDPlacement.frame(context(style: .nearField))
+        #expect(frame == NSRect(x: 756 - 100, y: 100, width: 200, height: 44))
+    }
+
+    @Test("near field on a second display clamps to that display")
+    func nearFieldSecondDisplay() {
+        var anchor = fieldAnchor
+        anchor.rect = NSRect(x: 3300, y: 500, width: 100, height: 24)
+        anchor.screenFrame = NSRect(x: 1512, y: 0, width: 1920, height: 1080)
+        anchor.screenVisibleFrame = NSRect(x: 1512, y: 0, width: 1920, height: 1055)
+        let frame = DictationHUDPlacement.frame(context(style: .nearField, anchor: anchor))
+        #expect(frame.origin.x == CGFloat(1512 + 1920 - 200 - 8))
+        #expect(frame.origin.y == CGFloat(500 - 8 - 44))
+    }
 }

@@ -437,7 +437,7 @@ final class AppModel {
             .intersection(.deviceIndependentFlagsMask)
     }
 
-    var dictationIndicatorStyleRaw: String = DictationIndicatorStyle.overlay.rawValue {
+    var dictationIndicatorStyleRaw: String = DictationIndicatorStyle.nearField.rawValue {
         didSet {
             defaults.set(dictationIndicatorStyleRaw, forKey: "dictationIndicatorStyleRaw")
             if !isReloadingSettings { applyIndicatorStyleChange() }
@@ -449,7 +449,7 @@ final class AppModel {
     }
 
     var dictationIndicatorStyle: DictationIndicatorStyle {
-        DictationIndicatorStyle(rawValue: dictationIndicatorStyleRaw) ?? .overlay
+        DictationIndicatorStyle(rawValue: dictationIndicatorStyleRaw) ?? .nearField
     }
 
     // MARK: - Customization
@@ -489,7 +489,7 @@ final class AppModel {
         self.dictationModeRaw = defaults.string(forKey: "dictationModeRaw") ?? DictationMode.pushToTalk.rawValue
         self.dictationKeyCode = defaults.object(forKey: "dictationKeyCode") == nil ? 96 : defaults.integer(forKey: "dictationKeyCode")
         self.dictationKeyModifiers = defaults.object(forKey: "dictationKeyModifiers") == nil ? 0 : defaults.integer(forKey: "dictationKeyModifiers")
-        self.dictationIndicatorStyleRaw = defaults.string(forKey: "dictationIndicatorStyleRaw") ?? DictationIndicatorStyle.overlay.rawValue
+        self.dictationIndicatorStyleRaw = defaults.string(forKey: "dictationIndicatorStyleRaw") ?? DictationIndicatorStyle.nearField.rawValue
         self.dictationCleanupPromptID = defaults.string(forKey: "dictationCleanupPromptID") ?? ""
         self.dictationPerAppOverridesJSON = defaults.string(forKey: "dictationPerAppOverridesJSON") ?? "{}"
         self.transcriptDisplayModeRaw = defaults.string(forKey: "transcriptDisplayMode") ?? TranscriptDisplayMode.transcript.rawValue

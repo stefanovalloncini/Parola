@@ -31,6 +31,19 @@ enum DictationHUDPlacement {
         let visible = context.screenVisibleFrame
         let origin: NSPoint
         switch context.style {
+        case .nearField:
+            guard let anchor = context.anchor else {
+                origin = NSPoint(x: visible.midX - size.width / 2, y: visible.minY + 100)
+                break
+            }
+            let anchorVisible = anchor.screenVisibleFrame
+            var y = anchor.rect.minY - 8 - size.height
+            if y < anchorVisible.minY {
+                y = anchor.rect.maxY + 8
+            }
+            y = min(y, anchorVisible.maxY - size.height - 8)
+            let x = min(max(anchor.rect.minX, anchorVisible.minX + 8), anchorVisible.maxX - size.width - 8)
+            origin = NSPoint(x: x, y: y)
         case .overlay:
             origin = NSPoint(x: visible.midX - size.width / 2, y: visible.minY + 100)
         case .notch:
@@ -46,6 +59,9 @@ enum DictationHUDPlacement {
 
     private static func size(for context: Context) -> NSSize {
         switch context.style {
+        case .nearField:
+            let expanded = context.hasPartial || context.failedMessageVisible
+            return NSSize(width: expanded ? 360 : 200, height: expanded ? 96 : 44)
         case .overlay:
             let compactWidth: CGFloat = context.listeningCompact ? 336 : 268
             return NSSize(width: context.hasPartial ? 380 : compactWidth, height: context.hasPartial ? 156 : 64)

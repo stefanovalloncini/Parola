@@ -36,12 +36,17 @@ final class DictationController {
         return "…" + tail[tail.index(after: wordStart)...]
     }
 
-    var indicatorStyle: DictationIndicatorStyle = .overlay {
+    var indicatorStyle: DictationIndicatorStyle = .nearField {
         didSet {
             guard oldValue != indicatorStyle, let panel = hud else { return }
+            refreshAnchor()
             panel.setFrame(preferredHUDFrame(), display: true, animate: true)
+            if panel.isVisible { startRepositionLoop() }
         }
     }
+
+    @ObservationIgnored var anchorProvider: any FieldAnchorProviding = FocusedFieldLocator()
+    private(set) var currentAnchor: FieldAnchor?
 
     var configuration: Configuration?
     weak var appModel: AppModel?
@@ -67,11 +72,13 @@ final class DictationController {
     private var levelTask: Task<Void, Never>?
     private var partialTask: Task<Void, Never>?
     private var failedHideTask: Task<Void, Never>?
+    private var repositionTask: Task<Void, Never>?
 
     isolated deinit {
         levelTask?.cancel()
         partialTask?.cancel()
         failedHideTask?.cancel()
+        repositionTask?.cancel()
     }
 
     func start(configuration: Configuration) {
@@ -275,8 +282,39 @@ final class DictationController {
             }
         }
         guard let panel = hud else { return }
+        refreshAnchor()
         panel.setFrame(preferredHUDFrame(), display: true, animate: false)
         panel.orderFrontRegardless()
+        startRepositionLoop()
+    }
+
+    @discardableResult
+    func refreshAnchor() -> Bool {
+        let anchor = indicatorStyle == .nearField ? anchorProvider.currentAnchor() : nil
+        guard anchor != currentAnchor else { return false }
+        currentAnchor = anchor
+        return true
+    }
+
+    private func startRepositionLoop() {
+        repositionTask?.cancel()
+        guard indicatorStyle == .nearField else {
+            repositionTask = nil
+            return
+        }
+        repositionTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                if Task.isCancelled { return }
+                guard let self else { return }
+                guard let panel = self.hud, panel.isVisible else { continue }
+                guard self.refreshAnchor() else { continue }
+                let target = self.preferredHUDFrame()
+                if panel.frame != target {
+                    panel.setFrame(target, display: true, animate: false)
+                }
+            }
+        }
     }
 
     private func resizeHUDForPartial() {
@@ -297,7 +335,7 @@ final class DictationController {
             hasPartial: !partialText.isEmpty,
             failedMessageVisible: failedMessageVisible,
             listeningCompact: listeningCompact,
-            anchor: nil,
+            anchor: currentAnchor,
             screenFrame: screen?.frame ?? .zero,
             screenVisibleFrame: screen?.visibleFrame ?? .zero
         ))
@@ -305,6 +343,9 @@ final class DictationController {
 
     private func hideHUD() {
         stopLevelStream()
+        repositionTask?.cancel()
+        repositionTask = nil
+        currentAnchor = nil
         hud?.orderOut(nil)
     }
 

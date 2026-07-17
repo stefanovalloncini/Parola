@@ -15,6 +15,7 @@ struct DictationView: View {
     var body: some View {
         Group {
             switch model.dictationIndicatorStyle {
+            case .nearField: nearFieldBody
             case .overlay: overlayBody
             case .notch:   notchBody
             case .minimal: minimalBody
@@ -143,6 +144,50 @@ struct DictationView: View {
                 .scaleEffect(0.85)
         }
         .frame(width: 36, height: 36)
+    }
+
+    private var isFailed: Bool {
+        if case .failed = state { return true }
+        return false
+    }
+
+    private var nearFieldLabel: String {
+        if case .failed(let message) = state, !message.isEmpty { return message }
+        return label
+    }
+
+    private var nearFieldBody: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                indicator
+                    .frame(width: 24, height: 16)
+                Text(nearFieldLabel)
+                    .font(DS.Font.caption2Medium)
+                    .foregroundStyle(.white.opacity(0.9))
+                    .lineLimit(isFailed ? 2 : 1)
+                Spacer(minLength: 0)
+                stopButton
+            }
+            if hasPartial {
+                Text(controller.recentDictation)
+                    .font(DS.Font.caption2Medium)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(2)
+                    .truncationMode(.head)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(width: hasPartial || isFailed ? 352 : 192, height: hasPartial || isFailed ? 88 : 36, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.black.opacity(0.88))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(.white.opacity(0.08), lineWidth: 1)
+        )
     }
 
     private var notchLabel: String {
