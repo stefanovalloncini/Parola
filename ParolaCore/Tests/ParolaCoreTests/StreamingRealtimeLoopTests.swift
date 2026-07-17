@@ -280,7 +280,7 @@ struct StreamingRealtimeLoopTests {
         _ = await runTask.value
     }
 
-    @Test("stop ends the loop and freezes all outputs")
+    @Test("stop promotes the unconfirmed tail and freezes further input")
     func stopEndsLoop() async throws {
         let (loop, capture, script, recorder) = makeLoop(responses: [
             [segment(0, 4, "a"), segment(4, 8, "b"), segment(8, 9, "c")],
@@ -299,11 +299,60 @@ struct StreamingRealtimeLoopTests {
             return
         }
         #expect(capture.stopped)
+        #expect(recorder.batches.count == 2, "the unconfirmed tail is promoted at stop")
+        #expect(recorder.batches.last?.segments.map(\.text) == ["b", "c"])
 
         capture.push(seconds: 6, value: 0.5)
         try await Task.sleep(nanoseconds: 50_000_000)
         #expect(await script.callCount == 1)
-        #expect(recorder.batches.count == 1)
+        #expect(recorder.batches.count == 2)
+    }
+
+    @Test("stop decodes audio that arrived after the last iteration")
+    func stopFlushesTrailingAudio() async throws {
+        let (loop, capture, script, recorder) = makeLoop(responses: [
+            [segment(0, 1, "a"), segment(1, 2, "b"), segment(2, 3, "c")],
+            [segment(1, 2, "b"), segment(2, 3, "c"), segment(3, 3.5, "tail")],
+        ])
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        capture.push(seconds: 3, value: 0.5)
+        #expect(await eventually { await script.callCount == 1 })
+        #expect(await eventually { recorder.batches.count == 1 })
+
+        capture.push(seconds: 0.5, value: 0.5)
+        await loop.stop()
+        _ = await runTask.value
+
+        #expect(await script.callCount == 2, "the sub-second tail is decoded at stop")
+        let flushCall = try #require(await script.calls.last)
+        #expect(flushCall.sampleCount == Int(3.5 * Double(sampleRate)))
+        #expect(recorder.batches.count == 2)
+        #expect(recorder.batches.last?.segments.map(\.text) == ["b", "c", "tail"], "the flush confirms everything it decodes")
+    }
+
+    @Test("stop after a silent tail skips the flush decode but keeps the last hypothesis")
+    func stopSkipsFlushForSilence() async throws {
+        let (loop, capture, script, recorder) = makeLoop(
+            responses: [[segment(0, 1, "a"), segment(1, 2, "b"), segment(2, 3, "c")]],
+            useVAD: true
+        )
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        capture.pushBuffers(count: 10, secondsEach: 0.1, value: 0)
+        capture.pushBuffers(count: 30, secondsEach: 0.1, value: 0.5)
+        #expect(await eventually { await script.callCount == 1 })
+        #expect(await eventually { recorder.batches.count == 1 })
+
+        capture.pushBuffers(count: 20, secondsEach: 0.1, value: 0)
+        await loop.stop()
+        _ = await runTask.value
+
+        #expect(await script.callCount == 1, "a silence-only tail is not decoded")
+        #expect(recorder.batches.count == 2)
+        #expect(recorder.batches.last?.segments.map(\.text) == ["b", "c"])
     }
 
     @Test("denied permission ends the run before capture starts")

@@ -95,7 +95,42 @@ actor StreamingRealtimeLoop {
                 return .failed(error)
             }
         }
+        // Runs on this task, never from stop(): a flush entering the actor mid-iterate
+        // would race the in-flight decode on the shared TranscribeTask.
+        await finalFlush()
         return .stopped
+    }
+
+    /// Decodes audio that arrived after the last iteration — the 1-second cadence gate
+    /// would otherwise drop the user's final word at stop — and promotes whatever ends
+    /// up unconfirmed: with no further audio coming, the last hypothesis is final.
+    private func finalFlush() async {
+        drainInbox()
+        enforceWindowCap()
+        let totalSamples = windowStartSample + window.count
+        let newSeconds = Float(totalSamples - lastTranscribedTotal) / Float(config.sampleRate)
+        if newSeconds > 0.05, voiceDetectedInTail(newSeconds) {
+            lastTranscribedTotal = totalSamples
+            try? await transcribeWindow(confirmAll: true)
+        }
+        guard !unconfirmedSegments.isEmpty else { return }
+        if let last = unconfirmedSegments.last, last.end > lastConfirmedEndSeconds {
+            lastConfirmedEndSeconds = last.end
+        }
+        onConfirmed(makeBatch(unconfirmedSegments))
+        unconfirmedSegments = []
+    }
+
+    // Mirrors iterate()'s gate so a silent tail (VAD held it back all along) isn't
+    // suddenly decoded at stop — Whisper hallucinates on long silence.
+    private func voiceDetectedInTail(_ newSeconds: Float) -> Bool {
+        guard config.useVAD else { return true }
+        let energies = inbox.withLock { $0.energies.map(\.rel) }
+        return AudioProcessor.isVoiceDetected(
+            in: energies,
+            nextBufferInSeconds: newSeconds,
+            silenceThreshold: config.silenceThreshold
+        )
     }
 
     func stop() {
@@ -166,7 +201,7 @@ actor StreamingRealtimeLoop {
         lastTranscribedTotal = max(lastTranscribedTotal, windowStartSample)
     }
 
-    private func transcribeWindow() async throws {
+    private func transcribeWindow(confirmAll: Bool = false) async throws {
         let offsetSeconds = Double(windowStartSample) / Double(config.sampleRate)
         var options = baseDecodingOptions
         // clipTimestamps is window-relative; everything emitted from here back out must be absolute.
@@ -198,7 +233,15 @@ actor StreamingRealtimeLoop {
             }
             return shifted
         }
-        if segments.count > config.requiredSegmentsForConfirmation {
+        if confirmAll {
+            if let last = segments.last, last.end > lastConfirmedEndSeconds {
+                lastConfirmedEndSeconds = last.end
+            }
+            if !segments.isEmpty {
+                onConfirmed(makeBatch(segments))
+            }
+            unconfirmedSegments = []
+        } else if segments.count > config.requiredSegmentsForConfirmation {
             let confirmable = Array(segments.prefix(segments.count - config.requiredSegmentsForConfirmation))
             if let last = confirmable.last, last.end > lastConfirmedEndSeconds {
                 lastConfirmedEndSeconds = last.end

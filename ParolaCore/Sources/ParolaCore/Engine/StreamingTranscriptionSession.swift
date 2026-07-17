@@ -177,10 +177,12 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         guard let loop else { return }
         self.loop = nil
         await loop.stop()
+        // The run task performs the final tail flush after its loop exits; cancelling
+        // it here would kill that decode. Confirmed batches from the flush must drain
+        // through the consumer before the stream finishes.
+        await streamerTask?.value
         segmentContinuation?.finish()
         await consumerTask?.value
-        streamerTask?.cancel()
-        await streamerTask?.value
 
         let finalTranscript = Transcript(
             segments: allConfirmed,
