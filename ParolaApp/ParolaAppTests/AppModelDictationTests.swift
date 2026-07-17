@@ -442,4 +442,41 @@ struct AppModelDictationTests {
 
         #expect(controller.modelDownloadProgress == nil)
     }
+
+    @Test("rewriting the same hotkey values neither persists nor restarts")
+    func sameHotkeyWriteIsIgnored() {
+        let defaults = makeIsolatedDefaults()
+        let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("dictation-hotkey"))
+        defaults.removeObject(forKey: "dictationKeyCode")
+        defaults.removeObject(forKey: "dictationKeyModifiers")
+
+        model.dictationKeyCode = model.dictationKeyCode
+        model.dictationKeyModifiers = model.dictationKeyModifiers
+
+        #expect(defaults.object(forKey: "dictationKeyCode") == nil)
+        #expect(defaults.object(forKey: "dictationKeyModifiers") == nil)
+
+        model.dictationKeyCode = 105
+        #expect(defaults.integer(forKey: "dictationKeyCode") == 105)
+    }
+
+    @Test("startDictationFromIntent restarts a stopped controller when already enabled")
+    func intentStartsStoppedController() {
+        let model = makeModel()
+        model.dictationController.recorderFactory = { _ in IntentStubRecorder() }
+        model.dictationEnabled = true
+        #expect(model.dictationController.isRunning)
+        model.stopDictation()
+        #expect(model.dictationController.isRunning == false)
+
+        model.startDictationFromIntent()
+
+        #expect(model.dictationController.isRunning)
+        model.abortDictation()
+    }
+}
+
+private struct IntentStubRecorder: DictationRecorder {
+    func start() async throws {}
+    func stopAndTranscribe() async throws -> String { "" }
 }

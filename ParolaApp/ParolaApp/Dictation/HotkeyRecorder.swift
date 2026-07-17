@@ -4,6 +4,7 @@ import SwiftUI
 struct HotkeyRecorder: View {
     @Binding var keyCode: Int
     @Binding var modifierRawValue: Int
+    var onRecordingChanged: ((Bool) -> Void)? = nil
     @State private var recording = false
     @State private var monitor: Any?
 
@@ -48,6 +49,7 @@ struct HotkeyRecorder: View {
 
     private func start() {
         recording = true
+        onRecordingChanged?(true)
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             if event.type == .flagsChanged { return event }
             guard event.type == .keyDown else { return event }
@@ -64,6 +66,8 @@ struct HotkeyRecorder: View {
             NSEvent.removeMonitor(monitor)
             self.monitor = nil
         }
+        guard recording else { return }
         recording = false
+        onRecordingChanged?(false)
     }
 }

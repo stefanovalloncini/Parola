@@ -420,6 +420,7 @@ final class AppModel {
 
     var dictationKeyCode: Int = 96 {
         didSet {
+            guard oldValue != dictationKeyCode else { return }
             defaults.set(dictationKeyCode, forKey: "dictationKeyCode")
             if !isReloadingSettings { restartDictation() }
         }
@@ -427,6 +428,7 @@ final class AppModel {
 
     var dictationKeyModifiers: Int = 0 {
         didSet {
+            guard oldValue != dictationKeyModifiers else { return }
             defaults.set(dictationKeyModifiers, forKey: "dictationKeyModifiers")
             if !isReloadingSettings { restartDictation() }
         }

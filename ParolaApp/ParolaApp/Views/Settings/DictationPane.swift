@@ -63,9 +63,18 @@ struct DictationPane: View {
                 }
                 SettingRow("Activation key",
                            descriptionVerbatim: activationDescription) {
+                    // Paused while recording: the armed dictation monitor sees the recorded
+                    // keystroke first and would start a session the rebind then tears down mid-flight.
                     HotkeyRecorder(
                         keyCode: $model.dictationKeyCode,
-                        modifierRawValue: $model.dictationKeyModifiers
+                        modifierRawValue: $model.dictationKeyModifiers,
+                        onRecordingChanged: { recording in
+                            if recording {
+                                model.abortDictation()
+                            } else if model.dictationEnabled {
+                                model.startDictation()
+                            }
+                        }
                     )
                 }
                 SettingRow("Indicator style",
