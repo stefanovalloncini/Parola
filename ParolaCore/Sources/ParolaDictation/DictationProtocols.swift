@@ -5,7 +5,7 @@ public enum HotkeyEvent: Sendable {
     case release
 }
 
-public protocol HotkeyMonitor: Sendable {
+public protocol HotkeyMonitor: AnyObject, Sendable {
     /// Begins listening for the configured hotkey. Replaces any previously installed handler.
     /// Implementations must release the prior closure to avoid leaks when `start` is called
     /// repeatedly (e.g. on settings changes).
