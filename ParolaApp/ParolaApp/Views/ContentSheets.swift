@@ -58,12 +58,6 @@ struct ContentSheetsModifier: ViewModifier {
                     model.selectedEntryID = id
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .parolaStartDictation)) { _ in
-                model.startDictationFromIntent()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .parolaStopDictation)) { _ in
-                model.stopDictationFromIntent()
-            }
             .onReceive(NotificationCenter.default.publisher(for: .parolaStartRecording)) { _ in
                 model.startRecording(source: .microphone)
             }

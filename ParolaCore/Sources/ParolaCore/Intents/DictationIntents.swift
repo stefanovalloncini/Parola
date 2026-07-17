@@ -90,10 +90,9 @@ public struct StartDictationIntent: AppIntent {
     public init() {}
 
     public func perform() async throws -> some IntentResult {
+        // Darwin only: the app's AppDelegate subscription covers in- and out-of-process
+        // callers; a NotificationCenter post here double-fired the running app.
         DictationSignal.start()
-        await MainActor.run {
-            NotificationCenter.default.post(name: .parolaStartDictation, object: nil)
-        }
         return .result()
     }
 }
@@ -107,9 +106,6 @@ public struct StopDictationIntent: AppIntent {
 
     public func perform() async throws -> some IntentResult {
         DictationSignal.stop()
-        await MainActor.run {
-            NotificationCenter.default.post(name: .parolaStopDictation, object: nil)
-        }
         return .result()
     }
 }

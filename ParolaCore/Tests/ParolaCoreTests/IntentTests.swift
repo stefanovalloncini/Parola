@@ -150,16 +150,49 @@ struct IntentTests {
         }
     }
 
-    @Test("StartDictationIntent posts the start-dictation notification")
-    func startDictationIntentPostsNotification() async throws {
-        try await confirmIntentPosts(.parolaStartDictation) {
+    private func confirmDictationIntentSignalsOnce(
+        signal signalName: String,
+        notification: Notification.Name,
+        when action: () async throws -> Void
+    ) async throws {
+        let signalled = OSAllocatedUnfairLock(initialState: false)
+        let notificationPosts = OSAllocatedUnfairLock(initialState: 0)
+        let subscription = DictationSignal.subscribe { name in
+            if name == signalName { signalled.withLock { $0 = true } }
+        }
+        let token = NotificationCenter.default.addObserver(
+            forName: notification, object: nil, queue: nil
+        ) { _ in notificationPosts.withLock { $0 += 1 } }
+        defer {
+            subscription.cancel()
+            NotificationCenter.default.removeObserver(token)
+        }
+        try await action()
+        var spins = 0
+        while !signalled.withLock({ $0 }), spins < 300 {
+            try? await Task.sleep(for: .milliseconds(10))
+            spins += 1
+        }
+        #expect(signalled.withLock { $0 }, "the Darwin signal is the one delivery channel")
+        #expect(notificationPosts.withLock { $0 } == 0, "a NotificationCenter post would double-fire the in-process subscriber")
+    }
+
+    @Test("StartDictationIntent signals once, over Darwin only")
+    func startDictationIntentSignalsOnce() async throws {
+        try await confirmDictationIntentSignalsOnce(
+            signal: DictationSignal.startName,
+            notification: .parolaStartDictation
+        ) {
             _ = try await StartDictationIntent().perform()
         }
     }
 
-    @Test("StopDictationIntent posts the stop-dictation notification")
-    func stopDictationIntentPostsNotification() async throws {
-        try await confirmIntentPosts(.parolaStopDictation) {
+    @Test("StopDictationIntent signals once, over Darwin only")
+    func stopDictationIntentSignalsOnce() async throws {
+        try await confirmDictationIntentSignalsOnce(
+            signal: DictationSignal.stopName,
+            notification: .parolaStopDictation
+        ) {
             _ = try await StopDictationIntent().perform()
         }
     }
