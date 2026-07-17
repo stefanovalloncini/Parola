@@ -19,7 +19,7 @@ struct ClipboardPasteInserter: TextInserter {
         }
         try await MainActor.run {
             let pasteboard = NSPasteboard.general
-            let priorContents = pasteboard.string(forType: .string)
+            let prior = PasteboardSnapshot.capture(from: pasteboard)
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
             guard trustCheck() else { throw TextInsertionError.accessibilityDenied }
@@ -27,10 +27,9 @@ struct ClipboardPasteInserter: TextInserter {
             postCmdV()
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(Self.restoreDelayMs))
-                guard let priorContents else { return }
+                guard !prior.isEmpty else { return }
                 guard pasteboard.changeCount == changeCountAfterWrite else { return }
-                pasteboard.clearContents()
-                pasteboard.setString(priorContents, forType: .string)
+                prior.restore(to: pasteboard)
             }
         }
     }
