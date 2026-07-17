@@ -64,7 +64,9 @@ extension ScenarioSuite {
                     }
                     try await Task.sleep(for: .milliseconds(100))
                 }
-                #expect(inserted == "Buy milk and eggs")
+                // The "Voice" preset inserts the transcript exactly as spoken, so the mocked
+                // lowercase text lands verbatim — no sentence capitalization.
+                #expect(inserted == "buy milk and eggs")
 
                 _ = try await client.send("clearMocks", ["scope": "all"])
             }
@@ -143,7 +145,7 @@ extension ScenarioSuite {
                 }
                 try await Task.sleep(for: .milliseconds(100))
             }
-            #expect(inserted == "Hello from the field")
+            #expect(inserted == "hello from the field")
 
             _ = try await client.send("setSetting", ["key": "dictationIndicatorStyleRaw", "value": "overlay"])
             _ = try await client.send("clearMocks", ["scope": "all"])
@@ -194,7 +196,7 @@ extension ScenarioSuite {
                 }
                 try await Task.sleep(for: .milliseconds(100))
             }
-            #expect(recovered == "Recovered")
+            #expect(recovered == "recovered")
 
             _ = try await client.send("clearMocks", ["scope": "all"])
         }

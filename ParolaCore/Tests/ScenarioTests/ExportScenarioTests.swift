@@ -47,7 +47,11 @@ extension ScenarioSuite {
                 }
                 #expect(wrote, "export never wrote \(format) to \(out.path)")
 
+                // md/html embed a title derived from the source filename; the fixture name is a
+                // random UUID, so fold it back to the snapshot's placeholder before the byte-match.
+                let sourceTitle = audioURL.deletingPathExtension().lastPathComponent
                 let written = try String(contentsOf: out, encoding: .utf8)
+                    .replacingOccurrences(of: sourceTitle, with: "Transcript")
                 let golden = try String(
                     contentsOf: goldenDir.appendingPathComponent("snapshot.\(format)"),
                     encoding: .utf8
