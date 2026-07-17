@@ -171,4 +171,13 @@ struct DictationWorkflowURLTests {
         let nonempty = DictationWorkflow(urlPattern: "gmail.com")
         #expect(nonempty.isEmpty == false)
     }
+
+    @Test("hasURLRules is true only when an entry carries a pattern")
+    func hasURLRulesDetection() {
+        let none: [String: [DictationWorkflow]] = ["b": [DictationWorkflow(insertion: .paste)]]
+        #expect(DictationWorkflowMap.hasURLRules(in: none, for: "b") == false)
+        #expect(DictationWorkflowMap.hasURLRules(in: none, for: "missing") == false)
+        let some: [String: [DictationWorkflow]] = ["b": [DictationWorkflow(urlPattern: "gmail.com")]]
+        #expect(DictationWorkflowMap.hasURLRules(in: some, for: "b"))
+    }
 }

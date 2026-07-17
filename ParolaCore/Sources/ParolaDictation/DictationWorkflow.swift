@@ -107,6 +107,15 @@ public enum DictationWorkflowMap {
         (map[bundleID] ?? []).filter { !($0.urlPattern ?? "").isEmpty }
     }
 
+    /// True when resolving the browser URL could change the outcome of ``select(in:for:url:)``.
+    /// Callers use it to skip the AppleScript round-trip when no rule needs a URL.
+    public static func hasURLRules(
+        in map: [String: [DictationWorkflow]],
+        for bundleID: String
+    ) -> Bool {
+        !urlRules(in: map, for: bundleID).isEmpty
+    }
+
     private static func cleaned(_ map: [String: [DictationWorkflow]]) -> [String: [DictationWorkflow]] {
         var out: [String: [DictationWorkflow]] = [:]
         for (bundleID, workflows) in map {

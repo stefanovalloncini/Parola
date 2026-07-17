@@ -54,9 +54,13 @@ struct KeystrokeTextInserter: TextInserter {
         var buffer = units
         let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
         down?.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: &buffer)
+        // Events inherit the live modifier state: a still-held hotkey modifier would turn
+        // an inserted "w" into ⌘W in the target app.
+        down?.flags = []
         down?.post(tap: .cghidEventTap)
         let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
         up?.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: &buffer)
+        up?.flags = []
         up?.post(tap: .cghidEventTap)
     }
 }

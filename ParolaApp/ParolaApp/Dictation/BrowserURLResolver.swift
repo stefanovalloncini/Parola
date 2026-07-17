@@ -47,19 +47,23 @@ final class BrowserURLResolver {
     }
 
     private static func scriptSource(for bundleID: String) -> String? {
+        let body: String?
         switch bundleID {
         case "com.apple.Safari":
-            return #"tell application "Safari" to get URL of current tab of front window"#
+            body = #"tell application "Safari" to get URL of current tab of front window"#
         case "com.google.Chrome", "com.google.Chrome.canary", "com.brave.Browser", "com.microsoft.edgemac":
             let appName = chromiumAppName(for: bundleID)
-            return "tell application \"\(appName)\" to get URL of active tab of front window"
+            body = "tell application \"\(appName)\" to get URL of active tab of front window"
         case "company.thebrowser.Browser":
-            return #"tell application "Arc" to get URL of active tab of front window"#
+            body = #"tell application "Arc" to get URL of active tab of front window"#
         case "org.mozilla.firefox":
-            return #"tell application "Firefox" to get «class URL» of front window"#
+            body = #"tell application "Firefox" to get «class URL» of front window"#
         default:
-            return nil
+            body = nil
         }
+        // A busy browser otherwise holds the Apple Event for its ~2 minute default; the
+        // lookup sits inside the dictation start/stop path, so fail fast instead.
+        return body.map { "with timeout of 3 seconds\n\($0)\nend timeout" }
     }
 
     private static func chromiumAppName(for bundleID: String) -> String {
