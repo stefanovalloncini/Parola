@@ -38,18 +38,28 @@ public actor TranscriptChatSession {
             return try await self.performAsk(message)
         }
         inFlight = Task { _ = try? await work.value }
-        return try await work.value
+        // The unstructured serial task does not inherit the caller's cancellation; forward it,
+        // or an abandoned generation runs to completion and pollutes history.
+        return try await withTaskCancellationHandler {
+            try await work.value
+        } onCancel: {
+            work.cancel()
+        }
     }
 
     private func performAsk(_ message: String) async throws -> ChatMessage {
+        try Task.checkCancellation()
         let user = ChatMessage(role: .user, text: message)
         let turns = (history + [user]).map(ChatTurn.init)
         let raw: String
         do {
             raw = try await model.respond(history: turns)
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw FailureReason.modelError(error.localizedDescription)
         }
+        try Task.checkCancellation()
         let assistant = ChatMessage(
             role: .assistant,
             text: raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -82,7 +92,12 @@ public actor TranscriptChatSession {
             await self.runStreamBody(message: message, continuation: continuation)
         }
         inFlight = current
-        await current.value
+        // Same forwarding as ask(): the serial task won't see the stream's termination otherwise.
+        await withTaskCancellationHandler {
+            await current.value
+        } onCancel: {
+            current.cancel()
+        }
     }
 
     private func runStreamBody(
@@ -99,6 +114,8 @@ public actor TranscriptChatSession {
                 collected += delta
                 continuation.yield(.delta(delta))
             }
+            // A cancelled model stream can end without throwing; don't record the partial turn.
+            try Task.checkCancellation()
             let assistant = ChatMessage(
                 role: .assistant,
                 text: collected.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -107,6 +124,8 @@ public actor TranscriptChatSession {
             history.append(assistant)
             continuation.yield(.completed(assistant))
             continuation.finish()
+        } catch is CancellationError {
+            continuation.finish(throwing: CancellationError())
         } catch {
             continuation.finish(throwing: FailureReason.modelError(error.localizedDescription))
         }
