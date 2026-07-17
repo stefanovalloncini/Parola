@@ -102,8 +102,10 @@ struct TranscriptDetailView: View {
                     recomputeFiltered()
                 }
                 .sheet(isPresented: $showingChat) {
-                    ChatSheet(entry: loaded.entry, transcript: loaded.document.transcript)
-                        .environment(model)
+                    ChatSheet(entry: loaded.entry, transcript: loaded.document.transcript) { updated in
+                        self.loaded = LoadedEntry(entry: loaded.entry, document: ParolaDocument(transcript: updated, audioURL: loaded.document.audioURL, manifest: loaded.document.manifest))
+                    }
+                    .environment(model)
                 }
                 .sheet(item: $model.promptOutput) { output in
                     PromptOutputSheet(output: output)

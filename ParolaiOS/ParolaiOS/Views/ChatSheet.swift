@@ -23,6 +23,7 @@ struct ChatSheet: View {
 
     let entry: LibraryEntry
     let transcript: Transcript
+    var onSave: ((Transcript) -> Void)? = nil
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var session: TranscriptChatSession?
@@ -176,6 +177,9 @@ struct ChatSheet: View {
                 saved.chatHistory = updated
                 do {
                     try await model.library.updateTranscript(saved, for: entry.id)
+                    // The detail view holds a pre-chat snapshot; without this refresh, its
+                    // next save (reopened chat, speaker rename) erases this history on disk.
+                    onSave?(saved)
                 } catch {
                     model.lastError = error.localizedDescription
                 }
