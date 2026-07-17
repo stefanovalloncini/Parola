@@ -6,6 +6,7 @@ import Testing
 @Suite("Dictation permissions")
 @MainActor
 struct DictationPermissionsTests {
+    // @unchecked: only mutated from @MainActor test bodies and the permissions object's MainActor callbacks.
     private final class Box: @unchecked Sendable {
         var trusted = false
         var mic: AVAuthorizationStatus = .notDetermined

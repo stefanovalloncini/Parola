@@ -20,7 +20,7 @@ struct DictationPane: View {
             SettingsSection("Permissions") {
                 PermissionRow(
                     title: String(localized: "Accessibility"),
-                    detail: String(localized: "Watches the hotkey outside Parola, inserts the text, and positions the indicator."),
+                    detail: String(localized: "Lets Parola watch the hotkey outside the app and insert text. The near-field indicator also uses it to find your text field."),
                     granted: model.dictationPermissions.accessibilityGranted,
                     isFirst: true,
                     axID: "Dictation.Button.GrantAccessibility",
@@ -114,7 +114,7 @@ struct DictationPane: View {
                     }
                 }
             }
-            SettingHelper(text: "Needs Accessibility to watch the hotkey outside Parola, insert text, and position the indicator near the field. The HUD shows a live waveform while you speak.")
+            SettingHelper(text: "Dictation needs Accessibility for the global hotkey and text insertion. The HUD shows a live waveform while you speak.")
 
             SettingsSection("Context (optional)") {
                 SettingRow("Include selected text",
@@ -171,9 +171,15 @@ struct DictationPane: View {
         model.dictationMode.description + " " + String(localized: "While enabled, a mic icon in the menu bar starts and stops dictation.")
     }
 
+    private var isBareFunctionKey: Bool {
+        guard model.dictationModifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty else { return false }
+        let name = HotkeyDisplay.keyName(forKeyCode: model.dictationKeyCode)
+        return name.count >= 2 && name.first == "F" && name.dropFirst().allSatisfy(\.isNumber)
+    }
+
     private var activationDescription: String {
         var text = String(localized: "Click to record any key combination.")
-        if model.dictationModifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty {
+        if isBareFunctionKey {
             text += " " + String(localized: "Bare F-keys reach Parola only when pressed with Fn, unless \"Use F1, F2… as standard function keys\" is on.")
         }
         return text

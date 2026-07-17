@@ -146,8 +146,8 @@ struct DictationView: View {
         .frame(width: 36, height: 36)
     }
 
-    private var isFailed: Bool {
-        if case .failed = state { return true }
+    private var hasFailureMessage: Bool {
+        if case .failed(let message) = state { return !message.isEmpty }
         return false
     }
 
@@ -164,7 +164,7 @@ struct DictationView: View {
                 Text(nearFieldLabel)
                     .font(DS.Font.caption2Medium)
                     .foregroundStyle(.white.opacity(0.9))
-                    .lineLimit(isFailed ? 2 : 1)
+                    .lineLimit(hasFailureMessage ? 2 : 1)
                 Spacer(minLength: 0)
                 stopButton
             }
@@ -179,7 +179,7 @@ struct DictationView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .frame(width: hasPartial || isFailed ? 352 : 192, height: hasPartial || isFailed ? 88 : 36, alignment: .leading)
+        .frame(width: hasPartial || hasFailureMessage ? 352 : 192, height: hasPartial || hasFailureMessage ? 88 : 36, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color.black.opacity(0.88))
