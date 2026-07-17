@@ -111,4 +111,21 @@ struct StreamingModelCacheTests {
 
         #expect(await counter.count == 2)
     }
+
+    @Test("borrowing a different model evicts the previous one")
+    func borrowEvictsOtherModels() async throws {
+        let counter = LoadCounter()
+        let cache = Self.makeCache(counting: counter)
+        let store = Self.makeStore()
+
+        _ = try await cache.borrow("openai_whisper-tiny", store: store)
+        _ = try await cache.borrow("openai_whisper-tiny", store: store)
+        #expect(await counter.count == 1)
+
+        _ = try await cache.borrow("openai_whisper-small", store: store)
+        #expect(await counter.count == 2)
+
+        _ = try await cache.borrow("openai_whisper-tiny", store: store)
+        #expect(await counter.count == 3, "switching back reloads: the switch away must have freed the old instance")
+    }
 }

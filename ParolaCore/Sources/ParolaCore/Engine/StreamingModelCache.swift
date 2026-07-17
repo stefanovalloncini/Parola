@@ -30,6 +30,9 @@ actor StreamingModelCache {
         installPressureSourceIfNeeded()
         if let shared = loaded[modelName] { return shared }
         if let pending = inFlight[modelName] { return try await pending.value }
+        // A model switch is the only path that borrows a new name; dropping the old
+        // entries frees their multi-GB kits once running sessions release theirs.
+        loaded = loaded.filter { $0.key == modelName }
 
         let loader = loader
         let task = Task { try await loader(modelName, store) }
