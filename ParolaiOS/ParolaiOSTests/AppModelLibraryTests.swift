@@ -106,13 +106,12 @@ struct AppModelLibraryTests {
     func purgeRemovesPermanently() async throws {
         let (model, _) = try makeModel()
         let target = try await model.library.add(transcript: transcript("gone"), audioSource: nil)
-        try await model.library.delete(target.id)
+        model.deleteEntry(target.id)
+        try await pollUntil { model.deletedEntries.map(\.id) == [target.id] }
 
         model.purgeEntry(target.id)
+        try await pollUntil { model.libraryEntries.isEmpty && model.deletedEntries.isEmpty }
 
-        try await pollUntil {
-            model.libraryEntries.isEmpty && model.deletedEntries.isEmpty
-        }
         #expect(model.libraryEntries.isEmpty)
         #expect(model.deletedEntries.isEmpty)
         let stillOnDisk = FileManager.default.fileExists(atPath: target.bundleURL.path)
