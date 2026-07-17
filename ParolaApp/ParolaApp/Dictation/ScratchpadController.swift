@@ -35,6 +35,9 @@ final class ScratchpadController {
             defer: false
         )
         p.title = "Scratchpad"
+        // NSPanel defaults isReleasedWhenClosed to true; with the strong `panel` var
+        // a user-clicked close would over-release it.
+        p.isReleasedWhenClosed = false
         p.isFloatingPanel = true
         p.becomesKeyOnlyIfNeeded = true
         p.collectionBehavior = [.canJoinAllSpaces, .stationary]
