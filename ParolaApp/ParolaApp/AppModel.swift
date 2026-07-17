@@ -709,6 +709,7 @@ final class AppModel {
     ]
 
     @ObservationIgnored let dictationController = DictationController()
+    @ObservationIgnored let dictationPermissions = DictationPermissions()
 
     var dictationState: DictationCoordinator.State = .idle
     @ObservationIgnored let recordingAudioLevel = CurrentValueSubject<Float, Never>(0)

@@ -197,6 +197,10 @@ extension AppModel {
     func wireDictationController() {
         dictationController.appModel = self
         dictationController.indicatorStyle = dictationIndicatorStyle
+        dictationPermissions.onAccessibilityGranted = { [weak self] in
+            guard let self, self.dictationEnabled, self.dictationController.isRunning else { return }
+            self.restartDictation()
+        }
     }
 
     func restartDictation() {
@@ -224,6 +228,11 @@ extension AppModel {
 
     func applyDictationEnabledChange() {
         if dictationEnabled {
+            dictationPermissions.refresh()
+            // Gated to real launches, like prewarmDictationModel(): an ungated prompt is a modal system dialog that hangs xcodebuild test.
+            if !dictationPermissions.accessibilityGranted, activeSideEffects.contains(.dictationHotkey) {
+                dictationPermissions.promptForAccessibility()
+            }
             startDictation()
         } else {
             stopDictation()

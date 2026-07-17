@@ -17,6 +17,32 @@ struct DictationPane: View {
                 style: model.dictationIndicatorStyle,
                 modeName: currentModeName
             )
+            SettingsSection("Permissions") {
+                PermissionRow(
+                    title: String(localized: "Accessibility"),
+                    detail: String(localized: "Watches the hotkey outside Parola, inserts the text, and positions the indicator."),
+                    granted: model.dictationPermissions.accessibilityGranted,
+                    isFirst: true,
+                    axID: "Dictation.Button.GrantAccessibility",
+                    action: { model.dictationPermissions.openAccessibilitySettings() },
+                    actionLabel: String(localized: "Open System Settings…")
+                )
+                PermissionRow(
+                    title: String(localized: "Microphone"),
+                    detail: String(localized: "Captures your voice while dictating."),
+                    granted: model.dictationPermissions.microphoneAuthorized,
+                    isFirst: false,
+                    axID: "Dictation.Button.GrantMicrophone",
+                    action: {
+                        if model.dictationPermissions.microphoneUndetermined {
+                            model.dictationPermissions.requestMicrophone()
+                        } else {
+                            model.dictationPermissions.openMicrophoneSettings()
+                        }
+                    },
+                    actionLabel: String(localized: "Allow…")
+                )
+            }
             SettingsSection {
                 SettingRow("Enable dictation",
                            descriptionVerbatim: modeDescription,
@@ -36,7 +62,7 @@ struct DictationPane: View {
                     .axLeaf("Dictation.Picker.Mode")
                 }
                 SettingRow("Activation key",
-                           description: "Click to record any key combination.") {
+                           descriptionVerbatim: activationDescription) {
                     HotkeyRecorder(
                         keyCode: $model.dictationKeyCode,
                         modifierRawValue: $model.dictationKeyModifiers
@@ -88,7 +114,7 @@ struct DictationPane: View {
                     }
                 }
             }
-            SettingHelper(text: "Needs Input Monitoring to watch the hotkey and Accessibility to insert text. The HUD shows a live waveform while you speak.")
+            SettingHelper(text: "Needs Accessibility to watch the hotkey outside Parola, insert text, and position the indicator near the field. The HUD shows a live waveform while you speak.")
 
             SettingsSection("Context (optional)") {
                 SettingRow("Include selected text",
@@ -134,6 +160,7 @@ struct DictationPane: View {
         }
         .onAppear {
             customApps = model.customDictationOverrideApps()
+            model.dictationPermissions.refresh()
         }
         .onChange(of: model.dictationPerAppOverridesJSON) { _, _ in
             customApps = model.customDictationOverrideApps()
@@ -144,10 +171,45 @@ struct DictationPane: View {
         model.dictationMode.description + " " + String(localized: "While enabled, a mic icon in the menu bar starts and stops dictation.")
     }
 
+    private var activationDescription: String {
+        var text = String(localized: "Click to record any key combination.")
+        if model.dictationModifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty {
+            text += " " + String(localized: "Bare F-keys reach Parola only when pressed with Fn, unless \"Use F1, F2… as standard function keys\" is on.")
+        }
+        return text
+    }
+
     private var pasteDelayBinding: Binding<Double> {
         Binding(
             get: { Double(model.dictationPasteDelayMs) },
             set: { model.dictationPasteDelayMs = Int($0) }
         )
+    }
+}
+
+private struct PermissionRow: View {
+    let title: String
+    let detail: String
+    let granted: Bool
+    let isFirst: Bool
+    let axID: String
+    let action: () -> Void
+    let actionLabel: String
+
+    var body: some View {
+        SettingRow(titleVerbatim: title, descriptionVerbatim: detail, isFirst: isFirst) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(granted ? Color.green : Color.orange)
+                    .frame(width: 8, height: 8)
+                Text(granted ? String(localized: "Granted") : String(localized: "Not granted"))
+                    .font(DS.Font.caption2Medium)
+                    .foregroundStyle(.secondary)
+                if !granted {
+                    Button(actionLabel, action: action)
+                        .axLeaf(axID)
+                }
+            }
+        }
     }
 }
