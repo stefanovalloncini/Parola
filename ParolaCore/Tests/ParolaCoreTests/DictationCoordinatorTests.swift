@@ -522,4 +522,63 @@ struct DictationCoordinatorTests {
         let inserted = await inserter.inserted
         #expect(inserted == ["deferred"], "the deferred release must transcribe-and-insert once the recorder finishes starting")
     }
+
+    @Test("events after teardown never start the recorder")
+    func eventsAfterTeardownIgnored() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .text("orphan"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(hotkey: hotkey, recorder: recorder, inserter: inserter)
+        await coord.startMonitoring()
+        await coord.stopMonitoring()
+        await coord.handle(.press)
+        let starts = await recorder.startCalls
+        #expect(starts == 0, "a press landing after teardown must not revive the mic")
+        await #expect(coord.state == .idle)
+    }
+
+    @Test("toggle mode: an explicit stop request finishes the session")
+    func stopRequestFinishesToggleSession() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .text("toggled off"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(hotkey: hotkey, recorder: recorder, inserter: inserter, mode: .toggle)
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await coord.handle(.release)
+        await #expect(coord.state == .listening)
+        await coord.stopListening()
+        await #expect(coord.state == .idle)
+        let inserted = await inserter.inserted
+        #expect(inserted == ["toggled off"])
+    }
+
+    @Test("a stop request during recorder startup is deferred, then finishes")
+    func stopRequestDuringStartupIsDeferred() async throws {
+        let hotkey = MockHotkey()
+        let recorder = GatedRecorder(text: "deferred stop")
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(hotkey: hotkey, recorder: recorder, inserter: inserter, mode: .toggle)
+        await coord.startMonitoring()
+
+        let press = Task { await coord.simulatePress() }
+        var spins = 0
+        while await recorder.gateArmed == false {
+            await Task.yield()
+            spins += 1
+            if spins > 100_000 { break }
+        }
+
+        await coord.stopListening()
+        await #expect(coord.state != .listening)
+        let insertedDuringStart = await inserter.inserted
+        #expect(insertedDuringStart.isEmpty)
+
+        await recorder.openGate()
+        await press.value
+
+        await #expect(coord.state == .idle)
+        let inserted = await inserter.inserted
+        #expect(inserted == ["deferred stop"], "a stop requested mid-startup must finish the session once the recorder is up")
+    }
 }

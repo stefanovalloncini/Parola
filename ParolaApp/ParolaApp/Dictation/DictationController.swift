@@ -203,6 +203,13 @@ final class DictationController {
         Task { await coord.simulateRelease() }
     }
 
+    /// Finishes the active session in every mode; a simulated `.release` would be
+    /// ignored by toggle mode, leaving the HUD stop button and intents dead there.
+    func requestStop() {
+        guard let coord = coordinator else { return }
+        Task { await coord.stopListening() }
+    }
+
     var isRunning: Bool { coordinator != nil }
 
     /// A first-ever dictation press downloads the model while the coordinator is still `.idle`
@@ -367,7 +374,12 @@ final class DictationController {
     static func resolveWorkflow(in workflows: [String: [DictationWorkflow]]) async -> DictationWorkflow? {
         let bundleID = await MainActor.run { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
         guard let bundleID else { return nil }
-        let url = await BrowserURLResolver.shared.currentURL(for: bundleID)
+        let url: URL?
+        if DictationWorkflowMap.hasURLRules(in: workflows, for: bundleID) {
+            url = await BrowserURLResolver.shared.currentURL(for: bundleID)
+        } else {
+            url = nil
+        }
         return DictationWorkflowMap.select(in: workflows, for: bundleID, url: url)
     }
 }

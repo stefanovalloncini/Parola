@@ -277,6 +277,43 @@ extension AppModel {
         }
     }
 
+    /// Non-blocking advisories for the Dictation pane: dictation follows the toolbar's
+    /// model, and some choices degrade it (English-only, no streaming, not installed).
+    nonisolated static func dictationModelWarnings(
+        model: String,
+        useStreaming: Bool,
+        language: String?,
+        isInstalled: Bool
+    ) -> [String] {
+        var warnings: [String] = []
+        let label = modelLabel(model)
+        let variant = ModelCatalog.variant(id: model)
+        if let language,
+           let caps = ModelCatalog.staticCapabilities(forID: model),
+           !caps.supportedLanguages.allows(language) {
+            warnings.append(String(localized: "\(label) is English-only. Dictation in other languages won't work."))
+        }
+        if variant?.engineID != .whisperKit {
+            warnings.append(String(localized: "\(label) doesn't stream: no live preview, and the text arrives only after processing."))
+        } else if !useStreaming {
+            warnings.append(String(localized: "Streaming is off in General settings, so dictation shows no live preview."))
+        }
+        if let variant, !isInstalled {
+            warnings.append(String(localized: "\(label) isn't installed. The first dictation press downloads \(DS.formatBytes(Int(variant.sizeBytes)))."))
+        }
+        return warnings
+    }
+
+    var dictationModelWarnings: [String] {
+        let installed = availableModels.first(where: { $0.name == selectedModel })?.isInstalled ?? false
+        return AppModel.dictationModelWarnings(
+            model: selectedModel,
+            useStreaming: useStreaming,
+            language: selectedLanguage,
+            isInstalled: installed
+        )
+    }
+
     static func streamingPrewarmCandidate(
         model: String,
         useStreaming: Bool,
@@ -373,7 +410,7 @@ extension AppModel {
     }
 
     func stopDictationFromIntent() {
-        dictationController.simulateRelease()
+        dictationController.requestStop()
     }
 
     func stopDictation() {

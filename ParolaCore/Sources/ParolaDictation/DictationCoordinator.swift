@@ -37,6 +37,12 @@ public actor DictationCoordinator {
     private var startInFlight = false
     private var releaseDuringStart = false
     private var releaseDuringStartAt: Date?
+    private var stopRequestedDuringStart = false
+
+    /// Set before the teardown awaits: an event that enters `handle` while stop/abort is
+    /// suspended would otherwise pass the state guard, bump the generation itself, and
+    /// revive a live recorder nobody owns anymore (hot mic, stuck HUD).
+    private var shutDown = false
 
     public init(
         hotkey: any HotkeyMonitor,
@@ -97,6 +103,7 @@ public actor DictationCoordinator {
     }
 
     public func startMonitoring() async {
+        shutDown = false
         await hotkey.stop()
         eventTask?.cancel()
         eventContinuation?.finish()
@@ -118,6 +125,7 @@ public actor DictationCoordinator {
     /// so the user's last utterance isn't dropped. Use ``abortMonitoring()`` for "give up"
     /// semantics that discard pending audio.
     public func stopMonitoring() async {
+        shutDown = true
         generation &+= 1
         await teardownMonitor()
         if case .listening = state {
@@ -129,6 +137,7 @@ public actor DictationCoordinator {
 
     /// Stops listening and discards any in-flight recording without inserting text.
     public func abortMonitoring() async {
+        shutDown = true
         generation &+= 1
         await teardownMonitor()
         if case .listening = state {
@@ -149,6 +158,19 @@ public actor DictationCoordinator {
     public func simulatePress() async { await handle(.press) }
     public func simulateRelease() async { await handle(.release) }
 
+    /// Explicit stop for UI affordances (HUD button, menu bar, intents): finishes the
+    /// session in every mode, unlike a `.release` event, which toggle mode ignores.
+    public func stopListening() async {
+        guard !shutDown else { return }
+        if startInFlight {
+            stopRequestedDuringStart = true
+            return
+        }
+        if case .listening = state {
+            await finishListening()
+        }
+    }
+
     public func levels() async -> AsyncStream<Float> {
         await recorder.levels()
     }
@@ -158,6 +180,7 @@ public actor DictationCoordinator {
     }
 
     func handle(_ event: HotkeyEvent, capturedAt: Date = Date()) async {
+        guard !shutDown else { return }
         if startInFlight {
             if case .release = event {
                 releaseDuringStart = true
@@ -232,6 +255,7 @@ public actor DictationCoordinator {
         let myGeneration = generation
         startInFlight = true
         releaseDuringStart = false
+        stopRequestedDuringStart = false
         if let session = mediaSession {
             let config = await mediaConfigProvider?() ?? .none
             await session.enterRecording(config: config)
@@ -252,6 +276,13 @@ public actor DictationCoordinator {
             return
         }
         await setState(.listening)
+        if stopRequestedDuringStart {
+            stopRequestedDuringStart = false
+            releaseDuringStart = false
+            releaseDuringStartAt = nil
+            await finishListening()
+            return
+        }
         if releaseDuringStart {
             releaseDuringStart = false
             let releasedAt = releaseDuringStartAt ?? Date()
