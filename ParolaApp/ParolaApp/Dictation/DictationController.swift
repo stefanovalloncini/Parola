@@ -46,6 +46,8 @@ final class DictationController {
     }
 
     @ObservationIgnored var anchorProvider: any FieldAnchorProviding = FocusedFieldLocator()
+    @ObservationIgnored var hotkeyFactory: ((Int, NSEvent.ModifierFlags) -> any HotkeyMonitor)?
+    @ObservationIgnored var recorderFactory: ((Configuration) -> any DictationRecorder)?
     private(set) var currentAnchor: FieldAnchor?
 
     var configuration: Configuration?
@@ -73,6 +75,18 @@ final class DictationController {
     private var partialTask: Task<Void, Never>?
     private var failedHideTask: Task<Void, Never>?
     private var repositionTask: Task<Void, Never>?
+    @ObservationIgnored private(set) var monitorWork: Task<Void, Never>?
+
+    /// The coordinator actor is reentrant, so an unordered stop can complete while a
+    /// startMonitoring is still mid-install and orphan live NSEvent monitors. Chaining
+    /// every monitor operation behind the previous one keeps teardown and install ordered.
+    private func enqueueMonitorWork(_ op: @escaping @Sendable () async -> Void) {
+        let previous = monitorWork
+        monitorWork = Task {
+            await previous?.value
+            await op()
+        }
+    }
 
     isolated deinit {
         levelTask?.cancel()
@@ -84,9 +98,10 @@ final class DictationController {
     func start(configuration: Configuration) {
         guard coordinator == nil else { return }
         self.configuration = configuration
-        let hotkey = GlobalHotkeyMonitor(keyCode: configuration.hotkeyKeyCode, modifiers: configuration.hotkeyModifiers)
+        let hotkey = hotkeyFactory?(configuration.hotkeyKeyCode, configuration.hotkeyModifiers)
+            ?? GlobalHotkeyMonitor(keyCode: configuration.hotkeyKeyCode, modifiers: configuration.hotkeyModifiers)
         let workflows = configuration.workflows
-        let recorder = MicDictationRecorder(
+        let recorder = recorderFactory?(configuration) ?? MicDictationRecorder(
             model: configuration.modelName,
             language: configuration.language,
             initialPrompt: configuration.initialPrompt,
@@ -123,7 +138,7 @@ final class DictationController {
             await MainActor.run { self?.handleStateChange(state) }
         }
         coordinator = coord
-        Task { await coord.startMonitoring() }
+        enqueueMonitorWork { await coord.startMonitoring() }
     }
 
     func stop() {
@@ -136,7 +151,7 @@ final class DictationController {
         coordinator = nil
         failedHideTask?.cancel()
         failedHideTask = nil
-        Task { await coord.stopMonitoring() }
+        enqueueMonitorWork { await coord.stopMonitoring() }
         stopPartialStream()
         modelDownloadProgress = nil
         hideHUD()
@@ -158,7 +173,7 @@ final class DictationController {
         coordinator = nil
         failedHideTask?.cancel()
         failedHideTask = nil
-        Task { await coord.abortMonitoring() }
+        enqueueMonitorWork { await coord.abortMonitoring() }
         stopPartialStream()
         modelDownloadProgress = nil
         hideHUD()
