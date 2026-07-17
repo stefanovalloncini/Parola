@@ -287,37 +287,20 @@ final class DictationController {
     }
 
     private func preferredHUDFrame() -> NSRect {
-        let style = indicatorStyle
-        let hasPartial = !partialText.isEmpty
-        let size: NSSize
-        switch style {
-        case .overlay:
-            let listeningCompact: Bool
-            if case .listening = state { listeningCompact = true } else { listeningCompact = modelDownloadProgress != nil }
-            let compactWidth: CGFloat = listeningCompact ? 336 : 268
-            size = NSSize(width: hasPartial ? 380 : compactWidth, height: hasPartial ? 156 : 64)
-        case .notch:
-            size = NSSize(width: hasPartial ? 372 : 252, height: 36)
-        case .minimal:
-            size = NSSize(width: 44, height: 44)
-        }
-        guard let screen = NSScreen.main else {
-            return NSRect(x: 0, y: 0, width: size.width, height: size.height)
-        }
-        let frame = screen.visibleFrame
-        let origin: NSPoint
-        switch style {
-        case .overlay:
-            origin = NSPoint(x: frame.midX - size.width / 2, y: frame.minY + 100)
-        case .notch:
-            let topY = screen.frame.maxY - screen.visibleFrame.maxY > 30
-                ? screen.frame.maxY - size.height - 4
-                : screen.visibleFrame.maxY - size.height - 8
-            origin = NSPoint(x: frame.midX - size.width / 2, y: topY)
-        case .minimal:
-            origin = NSPoint(x: frame.maxX - size.width - 24, y: frame.minY + 24)
-        }
-        return NSRect(origin: origin, size: size)
+        let listeningCompact: Bool
+        if case .listening = state { listeningCompact = true } else { listeningCompact = modelDownloadProgress != nil }
+        let failedMessageVisible: Bool
+        if case .failed(let message) = state { failedMessageVisible = !message.isEmpty } else { failedMessageVisible = false }
+        let screen = NSScreen.main
+        return DictationHUDPlacement.frame(DictationHUDPlacement.Context(
+            style: indicatorStyle,
+            hasPartial: !partialText.isEmpty,
+            failedMessageVisible: failedMessageVisible,
+            listeningCompact: listeningCompact,
+            anchor: nil,
+            screenFrame: screen?.frame ?? .zero,
+            screenVisibleFrame: screen?.visibleFrame ?? .zero
+        ))
     }
 
     private func hideHUD() {

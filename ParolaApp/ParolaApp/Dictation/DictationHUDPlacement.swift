@@ -1,0 +1,58 @@
+import AppKit
+
+struct FieldAnchor: Equatable {
+    enum Source: Equatable {
+        case caret
+        case field
+    }
+
+    var rect: NSRect
+    var source: Source
+    var screenFrame: NSRect
+    var screenVisibleFrame: NSRect
+}
+
+enum DictationHUDPlacement {
+    struct Context {
+        var style: DictationIndicatorStyle
+        var hasPartial: Bool
+        var failedMessageVisible: Bool
+        var listeningCompact: Bool
+        var anchor: FieldAnchor?
+        var screenFrame: NSRect
+        var screenVisibleFrame: NSRect
+    }
+
+    static func frame(_ context: Context) -> NSRect {
+        let size = size(for: context)
+        guard context.screenFrame != .zero else {
+            return NSRect(origin: .zero, size: size)
+        }
+        let visible = context.screenVisibleFrame
+        let origin: NSPoint
+        switch context.style {
+        case .overlay:
+            origin = NSPoint(x: visible.midX - size.width / 2, y: visible.minY + 100)
+        case .notch:
+            let topY = context.screenFrame.maxY - visible.maxY > 30
+                ? context.screenFrame.maxY - size.height - 4
+                : visible.maxY - size.height - 8
+            origin = NSPoint(x: visible.midX - size.width / 2, y: topY)
+        case .minimal:
+            origin = NSPoint(x: visible.maxX - size.width - 24, y: visible.minY + 24)
+        }
+        return NSRect(origin: origin, size: size)
+    }
+
+    private static func size(for context: Context) -> NSSize {
+        switch context.style {
+        case .overlay:
+            let compactWidth: CGFloat = context.listeningCompact ? 336 : 268
+            return NSSize(width: context.hasPartial ? 380 : compactWidth, height: context.hasPartial ? 156 : 64)
+        case .notch:
+            return NSSize(width: context.hasPartial ? 372 : 252, height: 36)
+        case .minimal:
+            return NSSize(width: 44, height: 44)
+        }
+    }
+}
