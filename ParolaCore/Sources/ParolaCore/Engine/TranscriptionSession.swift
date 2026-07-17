@@ -46,9 +46,8 @@ public actor TranscriptionSession {
     ) async throws -> Transcript {
         // Whole runs are serialized: interleaved calls would swap each other's transcriber out
         // via ensureTranscriber's unload and cross-wire the partial/progress callbacks.
-        await acquireTranscribeSlot()
+        try await acquireTranscribeSlot()
         defer { releaseTranscribeSlot() }
-        try Task.checkCancellation()
 
         installPressureSourceIfNeeded()
         await ensureBootstrap()
@@ -98,26 +97,46 @@ public actor TranscriptionSession {
         return transcript
     }
 
-    private func acquireTranscribeSlot() async {
+    private func acquireTranscribeSlot() async throws {
         while transcribeRunning {
-            await withCheckedContinuation { transcribeWaiters.append($0) }
+            try Task.checkCancellation()
+            // On cancel, wake every waiter: the cancelled one re-loops into the check above
+            // and throws; the rest re-queue.
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { transcribeWaiters.append($0) }
+            } onCancel: {
+                Task { await self.wakeTranscribeWaiters() }
+            }
         }
         transcribeRunning = true
     }
 
+    private func tryAcquireTranscribeSlot() -> Bool {
+        guard !transcribeRunning, transcribeWaiters.isEmpty else { return false }
+        transcribeRunning = true
+        return true
+    }
+
     private func releaseTranscribeSlot() {
         transcribeRunning = false
+        wakeTranscribeWaiters()
+    }
+
+    private func wakeTranscribeWaiters() {
         let waiters = transcribeWaiters
         transcribeWaiters = []
         for waiter in waiters { waiter.resume() }
     }
 
     /// Best-effort warm-up: bootstraps the engine and loads the requested model if it's installed.
-    /// Silently no-ops if the model isn't downloaded or load fails — pre-warming is opportunistic.
+    /// Silently no-ops if the model isn't downloaded, a run is active or queued, or load fails.
     public func prewarm(modelName: String) async {
         installPressureSourceIfNeeded()
         await ensureBootstrap()
-        guard modelStore.isInstalled(modelName), !transcribeRunning else { return }
+        // Holds the transcribe slot: an overlapping prewarm would re-arm the idle timers
+        // mid-run and swap the active transcriber out from under the run.
+        guard modelStore.isInstalled(modelName), tryAcquireTranscribeSlot() else { return }
+        defer { releaseTranscribeSlot() }
         let engineID = ModelCatalog.variant(id: modelName)?.engineID ?? .whisperKit
         do {
             cancelIdleTimer()
