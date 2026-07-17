@@ -61,6 +61,22 @@ struct DictationPane: View {
                     .frame(width: 200)
                     .axLeaf("Dictation.Picker.Mode")
                 }
+                SettingRow("Model",
+                           description: "Dictation uses the model picked in the main toolbar.") {
+                    Text(AppModel.modelLabel(model.selectedModel))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .axLeaf("Dictation.Label.Model")
+                }
+                ForEach(model.dictationModelWarnings, id: \.self) { warning in
+                    Label(warning, systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .axLeaf("Dictation.Label.ModelWarning")
+                }
                 SettingRow("Activation key",
                            descriptionVerbatim: activationDescription) {
                     // Paused while recording: the armed dictation monitor sees the recorded

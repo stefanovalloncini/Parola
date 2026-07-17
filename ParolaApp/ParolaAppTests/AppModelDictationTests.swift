@@ -35,6 +35,33 @@ struct AppModelDictationTests {
         #expect(model.dictationController.isRunning == false)
     }
 
+    @Test("dictation model warnings flag unsuitable configurations")
+    func dictationModelWarningsCases() {
+        let clean = AppModel.dictationModelWarnings(
+            model: "openai_whisper-tiny", useStreaming: true, language: "en", isInstalled: true)
+        #expect(clean.isEmpty)
+
+        let parakeetItalian = AppModel.dictationModelWarnings(
+            model: "nvidia_parakeet-tdt-0.6b-v2", useStreaming: true, language: "it", isInstalled: true)
+        #expect(parakeetItalian.contains { $0.contains("English-only") })
+        #expect(parakeetItalian.contains { $0.contains("live preview") })
+
+        let streamingOff = AppModel.dictationModelWarnings(
+            model: "openai_whisper-tiny", useStreaming: false, language: nil, isInstalled: true)
+        #expect(streamingOff.count == 1)
+        #expect(streamingOff.first?.contains("Streaming is off") == true)
+
+        let notInstalled = AppModel.dictationModelWarnings(
+            model: "openai_whisper-large-v3_turbo", useStreaming: true, language: nil, isInstalled: false)
+        #expect(notInstalled.count == 1)
+        #expect(notInstalled.first?.contains("downloads") == true)
+
+        let unknown = AppModel.dictationModelWarnings(
+            model: "custom-model", useStreaming: true, language: "it", isInstalled: false)
+        #expect(unknown.count == 1, "no capability or size claims for models outside the catalog")
+        #expect(unknown.first?.contains("live preview") == true)
+    }
+
     @Test("dictationWorkflows decodes from the per-app overrides JSON")
     func decodeWorkflows() {
         let model = makeModel()
@@ -266,7 +293,7 @@ struct AppModelDictationTests {
 
         let processor = model.dictationController.configuration?.postProcessor
         let out = await processor?.process("scratch that, hello world")
-        #expect(out == "Hello world")
+        #expect(out == "hello world", "the strip proves the refresh; Voice mode no longer rewrites case")
 
         model.stopDictation()
     }
