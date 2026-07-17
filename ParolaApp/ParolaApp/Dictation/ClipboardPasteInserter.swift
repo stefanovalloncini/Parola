@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import Carbon.HIToolbox
 import Foundation
 import ParolaCore
@@ -6,20 +7,22 @@ import ParolaDictation
 
 struct ClipboardPasteInserter: TextInserter {
     var preDelayMs: Int = 0
+    var trustCheck: @Sendable () -> Bool = { AXIsProcessTrusted() }
 
     /// Leaves the dictated text on the pasteboard this long before restoring the prior contents;
     /// must outlast the target app's read of the pasteboard or the insertion is lost.
     private static let restoreDelayMs = 300
 
-    func insert(_ text: String) async {
+    func insert(_ text: String) async throws {
         if preDelayMs > 0 {
             try? await Task.sleep(for: .milliseconds(preDelayMs))
         }
-        await MainActor.run {
+        try await MainActor.run {
             let pasteboard = NSPasteboard.general
             let priorContents = pasteboard.string(forType: .string)
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
+            guard trustCheck() else { throw TextInsertionError.accessibilityDenied }
             let changeCountAfterWrite = pasteboard.changeCount
             postCmdV()
             Task { @MainActor in

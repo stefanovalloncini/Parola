@@ -55,6 +55,26 @@ struct DictationCoordinatorTests {
         }
     }
 
+    private struct BlockedInserter: TextInserter {
+        struct Blocked: LocalizedError {
+            var errorDescription: String? { "insert blocked" }
+        }
+        func insert(_ text: String) async throws {
+            throw Blocked()
+        }
+    }
+
+    @Test("a throwing inserter surfaces as the failed state")
+    func insertFailureBecomesFailedState() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .text("hello"))
+        let coord = DictationCoordinator(hotkey: hotkey, recorder: recorder, inserter: BlockedInserter())
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await coord.handle(.release)
+        await #expect(coord.state == .failed("insert blocked"))
+    }
+
     @Test("press starts recording and transitions to listening")
     func pressStartsRecording() async throws {
         let hotkey = MockHotkey()

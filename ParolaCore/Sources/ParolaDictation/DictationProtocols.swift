@@ -15,7 +15,10 @@ public protocol HotkeyMonitor: Sendable {
 }
 
 public protocol TextInserter: Sendable {
-    func insert(_ text: String) async
+    /// Inserts text into the frontmost app's focused control. Implementations that
+    /// cannot reach the target should leave the text on the general pasteboard,
+    /// then throw an error whose description tells the user how to recover.
+    func insert(_ text: String) async throws
 }
 
 public protocol DictationRecorder: Sendable {
