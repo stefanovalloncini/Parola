@@ -35,4 +35,29 @@ struct MockStreamingTranscriberTests {
         #expect(confirmed == ["hello world"])
         #expect(finished?.segments.first?.text == "hello world")
     }
+
+    @Test("a canned failure emits a failed event and no confirmed segments")
+    func cannedFailureEmitsFailedEvent() async throws {
+        let response = MockTranscriberResponse(
+            failure: MockTranscriberFailure(code: .transcriptionFailed, message: "canned boom")
+        )
+        let mock = MockStreamingTranscriber(response: response, clock: ContinuousClock())
+        let stream = try await mock.start(options: TranscriptionOptions(model: "mock"),
+                                          speakerLabeler: nil, downloadProgress: nil)
+        let collector = Task { () -> ([String], [String]) in
+            var failures: [String] = []; var confirmed: [String] = []
+            for await event in stream {
+                switch event {
+                case .failed(let message): failures.append(message)
+                case .confirmed(let segment): confirmed.append(segment.text)
+                default: break
+                }
+            }
+            return (failures, confirmed)
+        }
+        await mock.stop()
+        let (failures, confirmed) = await collector.value
+        #expect(failures == ["canned boom"])
+        #expect(confirmed.isEmpty)
+    }
 }

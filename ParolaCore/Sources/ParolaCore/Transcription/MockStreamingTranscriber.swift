@@ -28,6 +28,10 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
                 cont.yield(.partial(text: partial))
                 if perStep > 0 { await sleeper(perStep) }
             }
+            if let failure = response.failure {
+                cont.yield(.failed(failure.message))
+                return
+            }
             var nextID = 0
             for seed in response.segments {
                 if Task.isCancelled { return }
