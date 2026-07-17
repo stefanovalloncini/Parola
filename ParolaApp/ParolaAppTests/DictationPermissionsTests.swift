@@ -58,4 +58,43 @@ struct DictationPermissionsTests {
         #expect(permissions.microphoneAuthorized == false)
         #expect(permissions.microphoneUndetermined == true)
     }
+
+    @Test("polling notices a grant made while the app stays background")
+    func pollingNoticesBackgroundGrant() async {
+        let box = Box()
+        let permissions = DictationPermissions(
+            trustCheck: { box.trusted },
+            microphoneStatus: { box.mic },
+            grantPollInterval: .milliseconds(10)
+        )
+        permissions.onAccessibilityGranted = { box.grantedFired += 1 }
+
+        permissions.beginWatchingForGrant()
+        box.trusted = true
+
+        var spins = 0
+        while box.grantedFired == 0, spins < 500 {
+            try? await Task.sleep(for: .milliseconds(5))
+            spins += 1
+        }
+        #expect(box.grantedFired == 1, "the poll must notice the grant without a didBecomeActive")
+        #expect(permissions.accessibilityGranted)
+    }
+
+    @Test("ending the watch stops the poll")
+    func endWatchingStopsPoll() async {
+        let box = Box()
+        let permissions = DictationPermissions(
+            trustCheck: { box.trusted },
+            microphoneStatus: { box.mic },
+            grantPollInterval: .milliseconds(10)
+        )
+        permissions.onAccessibilityGranted = { box.grantedFired += 1 }
+
+        permissions.beginWatchingForGrant()
+        permissions.endWatchingForGrant()
+        box.trusted = true
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(box.grantedFired == 0)
+    }
 }

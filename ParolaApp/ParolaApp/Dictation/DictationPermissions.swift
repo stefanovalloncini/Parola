@@ -14,14 +14,18 @@ final class DictationPermissions {
 
     @ObservationIgnored private let trustCheck: () -> Bool
     @ObservationIgnored private let microphoneStatus: () -> AVAuthorizationStatus
+    @ObservationIgnored private let grantPollInterval: Duration
     @ObservationIgnored private var activationObserver: NSObjectProtocol?
+    @ObservationIgnored private var grantPollTask: Task<Void, Never>?
 
     init(
         trustCheck: @escaping () -> Bool = { AXIsProcessTrusted() },
-        microphoneStatus: @escaping () -> AVAuthorizationStatus = { AVCaptureDevice.authorizationStatus(for: .audio) }
+        microphoneStatus: @escaping () -> AVAuthorizationStatus = { AVCaptureDevice.authorizationStatus(for: .audio) },
+        grantPollInterval: Duration = .seconds(2)
     ) {
         self.trustCheck = trustCheck
         self.microphoneStatus = microphoneStatus
+        self.grantPollInterval = grantPollInterval
         accessibilityGranted = trustCheck()
         let mic = microphoneStatus()
         microphoneAuthorized = mic == .authorized
@@ -39,6 +43,32 @@ final class DictationPermissions {
         if let activationObserver {
             NotificationCenter.default.removeObserver(activationObserver)
         }
+        grantPollTask?.cancel()
+    }
+
+    /// The didBecomeActive refresh never fires when the user grants Accessibility in
+    /// System Settings without ever clicking a Parola window; polling closes that gap
+    /// so the armed-but-dead hotkey comes alive without an app activation.
+    func beginWatchingForGrant() {
+        guard grantPollTask == nil, !accessibilityGranted else { return }
+        let interval = grantPollInterval
+        grantPollTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: interval)
+                if Task.isCancelled { return }
+                guard let self else { return }
+                self.refresh()
+                if self.accessibilityGranted {
+                    self.grantPollTask = nil
+                    return
+                }
+            }
+        }
+    }
+
+    func endWatchingForGrant() {
+        grantPollTask?.cancel()
+        grantPollTask = nil
     }
 
     func refresh() {

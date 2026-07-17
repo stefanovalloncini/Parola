@@ -232,9 +232,11 @@ extension AppModel {
             // Gated to real launches, like prewarmDictationModel(): an ungated prompt is a modal system dialog that hangs xcodebuild test.
             if !dictationPermissions.accessibilityGranted, activeSideEffects.contains(.dictationHotkey) {
                 dictationPermissions.promptForAccessibility()
+                dictationPermissions.beginWatchingForGrant()
             }
             startDictation()
         } else {
+            dictationPermissions.endWatchingForGrant()
             stopDictation()
         }
     }
