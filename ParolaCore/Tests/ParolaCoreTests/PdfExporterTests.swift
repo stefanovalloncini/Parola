@@ -43,4 +43,23 @@ struct PdfExporterTests {
         // Flattened to "Alice Smith", not split across lines mid-label.
         #expect(extracted.contains("Alice Smith:"))
     }
+
+    @Test("crossing the internal chunk boundary does not force a page break")
+    func chunkBoundaryDoesNotBreakPage() throws {
+        func segments(_ count: Int) -> [TranscriptSegment] {
+            (0..<count).map {
+                TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "Segment \($0 + 1) line.")
+            }
+        }
+        let upToBoundary = try render(segments(64))
+        let pastBoundary = try render(segments(65))
+        let pagesAtBoundary = PDFDocument(data: upToBoundary)?.pageCount ?? 0
+        let pagesPastBoundary = PDFDocument(data: pastBoundary)?.pageCount ?? 0
+        #expect(pagesAtBoundary > 0)
+        #expect(
+            pagesPastBoundary == pagesAtBoundary,
+            "segment 65 must continue on the partially filled page, not open a new one"
+        )
+        #expect(text(of: pastBoundary).contains("Segment 65 line."))
+    }
 }

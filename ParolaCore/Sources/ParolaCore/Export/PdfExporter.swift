@@ -10,6 +10,7 @@ struct PdfExporter: TranscriptExporter {
     private static let pageHeight: CGFloat = 792
     private static let margin: CGFloat = 54        // 0.75 inch
     private static let segmentsPerChunk: Int = 64
+    private static let minRemainderHeight: CGFloat = 24
 
     func render(_ transcript: Transcript) throws -> Data {
         var mediaBox = CGRect(x: 0, y: 0, width: Self.pageWidth, height: Self.pageHeight)
@@ -22,8 +23,12 @@ struct PdfExporter: TranscriptExporter {
         }
 
         let textRect = mediaBox.insetBy(dx: Self.margin, dy: Self.margin)
-        let path = CGPath(rect: textRect, transform: nil)
         let fonts = Fonts.make(language: transcript.language)
+
+        // Chunks bound framesetter memory, not pagination: each chunk continues in the
+        // remaining region of the current page instead of forcing a page break.
+        var pageOpen = false
+        var currentTop = textRect.maxY
 
         var iterator = ChunkIterator(transcript: transcript, fonts: fonts, chunkSize: Self.segmentsPerChunk)
         while let chunk = iterator.next() {
@@ -31,16 +36,51 @@ struct PdfExporter: TranscriptExporter {
             let framesetter = CTFramesetterCreateWithAttributedString(chunk)
             var startIndex = 0
             while startIndex < chunk.length {
-                context.beginPDFPage(nil)
+                if !pageOpen {
+                    context.beginPDFPage(nil)
+                    pageOpen = true
+                    currentTop = textRect.maxY
+                }
+                let available = CGRect(
+                    x: textRect.minX,
+                    y: textRect.minY,
+                    width: textRect.width,
+                    height: currentTop - textRect.minY
+                )
+                if available.height < Self.minRemainderHeight {
+                    context.endPDFPage()
+                    pageOpen = false
+                    continue
+                }
+                let path = CGPath(rect: available, transform: nil)
                 let frame = CTFramesetterCreateFrame(framesetter, CFRangeMake(startIndex, 0), path, nil)
                 CTFrameDraw(frame, context)
                 let visible = CTFrameGetVisibleStringRange(frame)
-                context.endPDFPage()
-                guard visible.length > 0 else { break }
+                if visible.length == 0 {
+                    context.endPDFPage()
+                    pageOpen = false
+                    if available.height >= textRect.height { break }
+                    continue
+                }
                 startIndex += visible.length
+                if startIndex < chunk.length {
+                    context.endPDFPage()
+                    pageOpen = false
+                } else {
+                    var fit = CFRange()
+                    let used = CTFramesetterSuggestFrameSizeWithConstraints(
+                        framesetter,
+                        visible,
+                        nil,
+                        CGSize(width: available.width, height: available.height),
+                        &fit
+                    )
+                    currentTop -= ceil(used.height)
+                }
             }
         }
 
+        if pageOpen { context.endPDFPage() }
         context.closePDF()
         return pdfData as Data
     }
