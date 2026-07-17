@@ -16,6 +16,8 @@ struct PromptDictationProcessor: TextPostProcessor {
     let contextConfig: DictationContextConfig
     let language: String?
     let urlResolver: (@Sendable @MainActor (String) async -> URL?)?
+    let cleanupTimeout: Duration
+    let cleanupRunner: @Sendable (Prompt, String) async -> String?
 
     init(
         defaultPrompt: Prompt?,
@@ -24,7 +26,9 @@ struct PromptDictationProcessor: TextPostProcessor {
         contextProvider: DictationContextProvider? = nil,
         contextConfig: DictationContextConfig = DictationContextConfig(),
         language: String? = nil,
-        urlResolver: (@Sendable @MainActor (String) async -> URL?)? = nil
+        urlResolver: (@Sendable @MainActor (String) async -> URL?)? = nil,
+        cleanupTimeout: Duration = .seconds(20),
+        cleanupRunner: (@Sendable (Prompt, String) async -> String?)? = nil
     ) {
         self.defaultPrompt = defaultPrompt
         self.overrides = overrides
@@ -33,6 +37,13 @@ struct PromptDictationProcessor: TextPostProcessor {
         self.contextConfig = contextConfig
         self.language = language
         self.urlResolver = urlResolver ?? { bundleID in await BrowserURLResolver.shared.currentURL(for: bundleID) }
+        self.cleanupTimeout = cleanupTimeout
+        self.cleanupRunner = cleanupRunner ?? Self.onDeviceCleanup
+    }
+
+    private static let onDeviceCleanup: @Sendable (Prompt, String) async -> String? = { prompt, input in
+        guard let model = try? await LanguageModelFactory.makeOnDevice(instructions: prompt.instructions) else { return nil }
+        return try? await PromptRunner.run(prompt, on: input, model: model)
     }
 
     /// Spoken-punctuation and capitalization cleanup that feeds the LLM. Never applied on
@@ -53,17 +64,22 @@ struct PromptDictationProcessor: TextPostProcessor {
 
         let prompt: Prompt? = triggerMatch?.prompt ?? basePrompt
         guard let prompt else { return text }
+        // Just the trigger word and nothing else: there is no content to clean up, and
+        // an LLM handed empty input replies with chatter that would get inserted.
+        if let match = triggerMatch,
+           match.cleaned.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return ""
+        }
         let input = Self.rewritten(triggerMatch?.cleaned ?? text, language: language)
         let context = await gatheredContext()
-        do {
-            let situated = contextualizing(prompt, with: frontmost.name, context: context)
-            let model = try await LanguageModelFactory.makeOnDevice(instructions: situated.instructions)
-            let result = try await PromptRunner.run(situated, on: input, model: model)
-            let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? input : trimmed
-        } catch {
-            return input
+        let situated = contextualizing(prompt, with: frontmost.name, context: context)
+        let runner = cleanupRunner
+        let result = await AsyncTimeout.run(cleanupTimeout) { await runner(situated, input) }
+        if let cleaned = result ?? nil {
+            let trimmed = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
         }
+        return input
     }
 
     func selectOverridePrompt(bundleID: String?) async -> Prompt? {

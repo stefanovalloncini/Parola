@@ -38,6 +38,41 @@ struct PromptDictationProcessorTests {
         )
     }
 
+    @Test("a trigger-word-only utterance inserts nothing")
+    func triggerOnlyUtteranceInsertsNothing() async {
+        var assistant = Prompt(name: "Assistant", instructions: "rewrite")
+        assistant.triggerWords = ["ehi parola"]
+        let proc = PromptDictationProcessor(
+            defaultPrompt: nil,
+            overrides: [:],
+            triggerPrompts: [assistant],
+            language: "it",
+            cleanupRunner: { _, _ in "CHATTER" }
+        )
+        let out = await proc.process("ehi parola")
+        #expect(out == "", "no content after the trigger word means nothing to clean up or insert")
+    }
+
+    @Test("a wedged cleanup model can't hold the utterance past the timeout")
+    func cleanupTimeoutFallsBackToInput() async {
+        let proc = PromptDictationProcessor(
+            defaultPrompt: Prompt(name: "Cleanup", instructions: "c"),
+            overrides: [:],
+            language: "en",
+            cleanupTimeout: .milliseconds(50),
+            cleanupRunner: { _, _ in
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+                        continuation.resume(returning: ())
+                    }
+                }
+                return "LATE"
+            }
+        )
+        let out = await proc.process("hello there")
+        #expect(out == "Hello there", "the rewritten input wins when the model misses the deadline")
+    }
+
     private actor ResolverSpy {
         private(set) var called = false
         func mark() { called = true }

@@ -96,17 +96,9 @@ public actor DictationContextProvider {
 
     public func gather(_ config: DictationContextConfig, timeout: Duration) async -> DictationContext {
         guard !config.isAllDisabled else { return .empty }
-        let clock = clock
-        return await withTaskGroup(of: DictationContext?.self) { group in
-            group.addTask { await self.gather(config) }
-            group.addTask {
-                try? await Task.sleep(for: timeout, clock: clock)
-                return DictationContext.empty
-            }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            return first ?? .empty
-        }
+        // AsyncTimeout, not a task-group race: the group would await its cancelled child,
+        // so a hung AX read would hold the dictation pipeline past the deadline anyway.
+        return await AsyncTimeout.run(timeout, clock: clock) { await self.gather(config) } ?? .empty
     }
 
     private func trimmed(_ value: String?, cap: Int) -> String? {

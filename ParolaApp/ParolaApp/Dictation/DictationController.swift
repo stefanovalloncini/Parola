@@ -101,13 +101,16 @@ final class DictationController {
         let hotkey = hotkeyFactory?(configuration.hotkeyKeyCode, configuration.hotkeyModifiers)
             ?? GlobalHotkeyMonitor(keyCode: configuration.hotkeyKeyCode, modifiers: configuration.hotkeyModifiers)
         let workflows = configuration.workflows
+        // Own session, not appModel.session: the shared one serializes whole transcribe
+        // runs, so a fallback dictation stop would queue for minutes behind a long
+        // file/YouTube job. Costs a second loaded model only while both run at once.
         let recorder = recorderFactory?(configuration) ?? MicDictationRecorder(
             model: configuration.modelName,
             language: configuration.language,
             initialPrompt: configuration.initialPrompt,
             deviceUID: configuration.deviceUID,
             streamingEnabled: configuration.streamingEnabled,
-            session: appModel?.session,
+            session: nil,
             workflowResolver: { @Sendable in
                 await Self.resolveWorkflow(in: workflows)
             },
