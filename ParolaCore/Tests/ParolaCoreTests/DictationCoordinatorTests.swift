@@ -29,6 +29,7 @@ struct DictationCoordinatorTests {
 
         var startCalls = 0
         var stopCalls = 0
+        var discardCalls = 0
         var outcome: Outcome
 
         init(outcome: Outcome) { self.outcome = outcome }
@@ -45,6 +46,10 @@ struct DictationCoordinatorTests {
                 struct E: Error, LocalizedError { let msg: String; var errorDescription: String? { msg } }
                 throw E(msg: msg)
             }
+        }
+
+        func stopAndDiscard() async {
+            discardCalls += 1
         }
     }
 
@@ -463,6 +468,13 @@ struct DictationCoordinatorTests {
             running = false
             return text
         }
+
+        func stopAndDiscard() async {
+            discardCalls += 1
+            running = false
+        }
+
+        private(set) var discardCalls = 0
     }
 
     @Test("aborting while a press is mid-startup never leaves the recorder running")
@@ -521,6 +533,53 @@ struct DictationCoordinatorTests {
         await #expect(coord.state == .idle)
         let inserted = await inserter.inserted
         #expect(inserted == ["deferred"], "the deferred release must transcribe-and-insert once the recorder finishes starting")
+    }
+
+    @Test("abortMonitoring discards the recording without transcribing")
+    func abortDiscardsWithoutTranscribing() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .text("discard me"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(hotkey: hotkey, recorder: recorder, inserter: inserter)
+        await coord.startMonitoring()
+        await coord.handle(.press)
+        await #expect(coord.state == .listening)
+
+        await coord.abortMonitoring()
+
+        await #expect(coord.state == .idle)
+        let discards = await recorder.discardCalls
+        let stops = await recorder.stopCalls
+        #expect(discards == 1, "abort must release the mic via the discard path")
+        #expect(stops == 0, "abort must not run a transcription of audio it is throwing away")
+        let inserted = await inserter.inserted
+        #expect(inserted.isEmpty)
+    }
+
+    @Test("a start that loses its generation discards, not transcribes")
+    func rolledBackStartDiscards() async throws {
+        let hotkey = MockHotkey()
+        let recorder = GatedRecorder(text: "rolled back")
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(hotkey: hotkey, recorder: recorder, inserter: inserter)
+        await coord.startMonitoring()
+
+        let press = Task { await coord.simulatePress() }
+        var spins = 0
+        while await recorder.gateArmed == false {
+            await Task.yield()
+            spins += 1
+            if spins > 100_000 { break }
+        }
+
+        await coord.abortMonitoring()
+        await recorder.openGate()
+        await press.value
+
+        let discards = await recorder.discardCalls
+        let stops = await recorder.stopCalls
+        #expect(discards == 1, "the rolled-back start must release the mic via the discard path")
+        #expect(stops == 0, "the rolled-back start must not transcribe audio nobody wants")
     }
 
     @Test("events after teardown never start the recorder")

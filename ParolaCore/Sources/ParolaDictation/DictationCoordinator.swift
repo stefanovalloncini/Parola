@@ -142,7 +142,7 @@ public actor DictationCoordinator {
         await teardownMonitor()
         if case .listening = state {
             await mediaSession?.exitRecording()
-            _ = try? await recorder.stopAndTranscribe()
+            await recorder.stopAndDiscard()
         }
         await setState(.idle)
     }
@@ -272,7 +272,7 @@ public actor DictationCoordinator {
         startInFlight = false
         guard myGeneration == generation else {
             await mediaSession?.exitRecording()
-            _ = try? await recorder.stopAndTranscribe()
+            await recorder.stopAndDiscard()
             return
         }
         await setState(.listening)
