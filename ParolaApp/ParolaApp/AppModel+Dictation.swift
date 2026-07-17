@@ -364,7 +364,11 @@ extension AppModel {
     }
 
     func startDictationFromIntent() {
-        if !dictationEnabled { dictationEnabled = true }
+        if !dictationEnabled {
+            dictationEnabled = true
+        } else if !dictationController.isRunning {
+            startDictation()
+        }
         dictationController.simulatePress()
     }
 
