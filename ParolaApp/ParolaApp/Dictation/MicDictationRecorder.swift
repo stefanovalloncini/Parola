@@ -78,6 +78,30 @@ actor MicDictationRecorder: DictationRecorder {
         return try await stopFallback()
     }
 
+    func stopAndDiscard() async {
+        if let session = streamingSession {
+            await session.stop()
+            await streamingConsumer?.value
+            streamingConsumer = nil
+            streamingSession = nil
+            streamingSegments = []
+            streamingPartial = ""
+            streamingFailure = nil
+            broadcastLevel(0)
+            return
+        }
+        guard let source = fallbackSource else { return }
+        fallbackSource = nil
+        fallbackForwardingTask?.cancel()
+        fallbackForwardingTask = nil
+        broadcastLevel(0)
+        // prepare() is the only way to stop capture; the finalized take is thrown away
+        // unread, so no model load or transcription happens on this path.
+        if let url = try? await source.prepare() {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
     func levels() -> AsyncStream<Float> {
         AsyncStream { continuation in
             let id = UUID()

@@ -444,7 +444,10 @@ struct AppModelDictationTests {
 
     @Test("model download progress updates once per whole percent and clears at completion")
     func downloadProgressThrottlesAndClears() {
-        let controller = DictationController()
+        let model = makeModel()
+        model.dictationController.recorderFactory = { _ in IntentStubRecorder() }
+        model.dictationEnabled = true
+        let controller = model.dictationController
 
         controller.noteModelDownloadProgress(0.421)
         #expect(controller.modelDownloadProgress == 0.421)
@@ -457,11 +460,15 @@ struct AppModelDictationTests {
 
         controller.noteModelDownloadProgress(1.0)
         #expect(controller.modelDownloadProgress == nil)
+        model.abortDictation()
     }
 
     @Test("stopping dictation clears a stale download progress")
     func stopClearsDownloadProgress() {
-        let controller = DictationController()
+        let model = makeModel()
+        model.dictationController.recorderFactory = { _ in IntentStubRecorder() }
+        model.dictationEnabled = true
+        let controller = model.dictationController
         controller.noteModelDownloadProgress(0.5)
         #expect(controller.modelDownloadProgress == 0.5)
 

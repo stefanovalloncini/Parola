@@ -70,6 +70,9 @@ final class DictationController {
     }
 
     private var coordinator: DictationCoordinator?
+    /// Bumped whenever the live coordinator is replaced or dropped, so a replaced
+    /// coordinator's trailing state callbacks can't overwrite the live session's state.
+    @ObservationIgnored private var coordinatorGeneration = 0
     private var hud: NSPanel?
     private var levelTask: Task<Void, Never>?
     private var partialTask: Task<Void, Never>?
@@ -129,6 +132,8 @@ final class DictationController {
                 return workflow?.insertion ?? .paste
             }
         }
+        coordinatorGeneration += 1
+        let generation = coordinatorGeneration
         let coord = DictationCoordinator(
             hotkey: hotkey,
             recorder: recorder,
@@ -138,13 +143,14 @@ final class DictationController {
             mediaSession: configuration.mediaSession,
             mediaConfigProvider: configuration.mediaConfigProvider
         ) { [weak self] state in
-            await MainActor.run { self?.handleStateChange(state) }
+            await MainActor.run { self?.handleStateChange(state, generation: generation) }
         }
         coordinator = coord
         enqueueMonitorWork { await coord.startMonitoring() }
     }
 
     func stop() {
+        coordinatorGeneration += 1
         guard let coord = coordinator else {
             state = .idle
             modelDownloadProgress = nil
@@ -166,6 +172,7 @@ final class DictationController {
     /// teardown for a hard reset, so a leaked listening session can't bleed — coordinator,
     /// HUD, and state — into the next test.
     func abort() {
+        coordinatorGeneration += 1
         guard let coord = coordinator else {
             state = .idle
             appModel?.dictationState = .idle
@@ -218,6 +225,7 @@ final class DictationController {
     /// A first-ever dictation press downloads the model while the coordinator is still `.idle`
     /// and the HUD hidden; showing it here is the only feedback the user gets during that wait.
     func noteModelDownloadProgress(_ fraction: Double) {
+        guard isRunning else { return }
         if fraction >= 1 {
             modelDownloadProgress = nil
             return
@@ -228,7 +236,8 @@ final class DictationController {
         showHUD()
     }
 
-    private func handleStateChange(_ state: DictationCoordinator.State) {
+    private func handleStateChange(_ state: DictationCoordinator.State, generation: Int) {
+        guard generation == coordinatorGeneration else { return }
         self.state = state
         appModel?.dictationState = state
         modelDownloadProgress = nil
