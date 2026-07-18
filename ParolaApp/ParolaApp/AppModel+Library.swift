@@ -257,10 +257,10 @@ extension AppModel {
                     }
                     usedNames.insert(name)
                     let url = folder.appendingPathComponent("\(name).\(format.fileExtension)")
-                    try await Task.detached {
+                    try await AppModel.offMainIO {
                         let data = try exporter.render(transcript)
                         try data.write(to: url, options: .atomic)
-                    }.value
+                    }
                 } catch {
                     await MainActor.run { [weak self] in
                         self?.phase = .failed(message: "Export of \(entry.title) failed: \(error.localizedDescription)")

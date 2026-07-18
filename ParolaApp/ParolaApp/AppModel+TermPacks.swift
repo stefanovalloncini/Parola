@@ -20,10 +20,10 @@ extension AppModel {
 
     func importTermPack(from url: URL) async {
         do {
-            let pack = try await Task.detached {
+            let pack = try await Self.offMainIO {
                 let data = try Data(contentsOf: url)
                 return try TermPackIO.decode(data)
-            }.value
+            }
             findReplaceRules = TermPackIO.merge(pack: pack, into: findReplaceRules)
         } catch {
             phase = .failed(message: "Couldn't import term pack: \(error.localizedDescription)")

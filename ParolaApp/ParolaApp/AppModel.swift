@@ -1099,6 +1099,7 @@ final class AppModel {
     func persistToLibrary(_ result: Transcript, audioSource: URL?, title: String? = nil) {
         let category = pendingRecordingCategory
         pendingRecordingCategory = .transcription
+        let navigationGeneration = loadEntryGeneration
         Task { [weak self] in
             guard let self else { return }
             do {
@@ -1109,7 +1110,11 @@ final class AppModel {
                     title: title
                 )
                 refreshLibrary()
-                selectedEntryID = entry.id
+                // library.add copies media for seconds; if the user navigated meanwhile,
+                // taking the selection would repoint their next edits at this new entry.
+                if loadEntryGeneration == navigationGeneration, selectedEntryID == nil {
+                    selectedEntryID = entry.id
+                }
                 if autoTitleEntries {
                     autoTitleEntry(entry.id, transcript: result)
                 }
@@ -2189,10 +2194,31 @@ final class AppModel {
 
     // MARK: - Project document
 
+    /// Continuation + GCD, not Task.detached: a detached job resuming a main-actor task
+    /// around NSURL-bridging Foundation calls has crashed with EXC_ARM_DA_ALIGN before
+    /// (same class as the watched-folder bookmark and duration-probe fixes).
+    nonisolated static func offMainIO<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(with: Result { try work() })
+            }
+        }
+    }
+
     func openProjectDocument(at url: URL) async {
         do {
-            let doc = try await Task.detached { try ParolaDocument.read(at: url) }.value
+            let doc = try await Self.offMainIO { try ParolaDocument.read(at: url) }
+            // Like every other transcript-install path: drop the library selection first, or
+            // the debounced save pairs the stale entry id with this document's transcript.
+            loadEntryGeneration &+= 1
+            let pending = cancelAndDrainPendingTranscriptSave()
+            if let pending {
+                Task { [library] in
+                    try? await library.updateTranscript(pending.transcript, for: pending.id)
+                }
+            }
             clearDerivedArtifacts()
+            selectedEntryID = nil
             sourceFileURL = doc.audioURL
             transcript = doc.transcript
             if let audio = doc.audioURL {
@@ -2214,7 +2240,7 @@ final class AppModel {
             guard let self else { return }
             guard let dest = await self.filePicker.chooseSaveDestination(suggestedName: suggested, allowedTypes: []) else { return }
             do {
-                try await Task.detached { _ = try ParolaDocument.write(transcript: transcript, audioURL: sourceFileURL, to: dest) }.value
+                try await AppModel.offMainIO { _ = try ParolaDocument.write(transcript: transcript, audioURL: sourceFileURL, to: dest) }
             } catch {
                 self.phase = .failed(message: "Save failed: \(error.localizedDescription)")
             }
@@ -2491,10 +2517,10 @@ final class AppModel {
             ) else { return }
             let exporter = self.makeExporter(for: format)
             do {
-                try await Task.detached {
+                try await AppModel.offMainIO {
                     let data = try exporter.render(transcript)
                     try data.write(to: url, options: .atomic)
-                }.value
+                }
             } catch {
                 self.phase = .failed(message: Self.exportFailureMessage(for: error))
             }

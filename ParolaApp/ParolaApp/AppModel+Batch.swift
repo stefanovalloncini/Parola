@@ -81,7 +81,11 @@ extension AppModel {
         case .started(let id):
             guard !isCancelled(id) else { return }
             mutateBatchJob(id) { $0.status = .transcribing }
-            phase = .transcribing(file: batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/"))
+            // A live recording owns the phase: every stop affordance is keyed on .recording,
+            // so a batch overwrite would leave a hot mic nothing can reach.
+            if !recordingActive {
+                phase = .transcribing(file: batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/"))
+            }
         case .completed(let id, let transcript):
             guard !isCancelled(id) else { return }
             let processed = await postProcessDetached(transcript)
@@ -105,7 +109,9 @@ extension AppModel {
         case .cancelled(let id):
             mutateBatchJob(id) { $0.status = .cancelled }
         case .finished:
-            phase = .ready
+            if !recordingActive {
+                phase = .ready
+            }
             refreshLibrary()
             let pending = batchJobs.filter { $0.status == .pending }
             if !pending.isEmpty {
@@ -304,6 +310,7 @@ extension AppModel {
     func selectBatchJob(_ id: BatchJob.ID) {
         selectedBatchJobID = id
         if let job = batchJobs.first(where: { $0.id == id }), let t = job.transcript {
+            loadEntryGeneration &+= 1
             let pending = cancelAndDrainPendingTranscriptSave()
             clearDerivedArtifacts()
             selectedEntryID = nil
@@ -355,6 +362,7 @@ extension AppModel {
     func openBatchJobTranscript(_ id: BatchJob.ID) {
         guard let job = batchJobs.first(where: { $0.id == id }), let t = job.transcript else { return }
         selectedBatchJobID = id
+        loadEntryGeneration &+= 1
         clearDerivedArtifacts()
         selectedEntryID = nil
         transcript = t
