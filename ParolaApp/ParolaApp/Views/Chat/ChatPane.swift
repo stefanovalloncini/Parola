@@ -196,6 +196,19 @@ struct ChatPane: View {
         input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending
     }
 
+    /// Updates the in-flight assistant bubble by id; positional indexing crashed when the
+    /// history was cleared mid-stream.
+    static func updatedHistory(_ history: [ChatMessage], liveID: UUID, text: String) -> [ChatMessage] {
+        var history = history
+        let live = ChatMessage(id: liveID, role: .assistant, text: text)
+        if let index = history.lastIndex(where: { $0.id == liveID }) {
+            history[index] = live
+        } else {
+            history.append(live)
+        }
+        return history
+    }
+
     private var sessionKey: ChatSessionKey {
         ChatSessionKey(entryID: model.selectedEntryID, hasTranscript: model.transcript != nil)
     }
@@ -235,6 +248,10 @@ struct ChatPane: View {
 
     private func resetConversation() {
         guard let session else { return }
+        // Clearing while a reply streams: the next delta would index into the emptied history.
+        sendTask?.cancel()
+        sendTask = nil
+        isSending = false
         let entryID = model.selectedEntryID
         Task {
             await session.clearHistory()
@@ -285,17 +302,11 @@ struct ChatPane: View {
                     switch event {
                     case .delta(let delta):
                         collected += delta
-                        if started {
-                            displayedHistory[displayedHistory.count - 1] = ChatMessage(
-                                id: liveID,
-                                role: .assistant,
-                                text: collected
-                            )
-                        } else {
+                        if !started {
                             started = true
                             isSending = false
-                            displayedHistory.append(ChatMessage(id: liveID, role: .assistant, text: collected))
                         }
+                        displayedHistory = Self.updatedHistory(displayedHistory, liveID: liveID, text: collected)
                     case .completed:
                         let updated = await session.history
                         displayedHistory = updated
