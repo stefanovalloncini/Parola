@@ -25,6 +25,18 @@ struct AppModelMeetingTests {
         #expect(model.meetingDetectedApp == "Acme Conference")
     }
 
+    @Test("a second detection while the prompt is up keeps the first app")
+    func secondDetectionKeepsFirstPrompt() {
+        let model = makeModel()
+        model.meetingDetector.isEnabled = true
+        model.meetingDetectedApp = nil
+
+        model.meetingDetector.fire(appName: "Zoom")
+        model.meetingDetector.fire(appName: "Microsoft Teams")
+
+        #expect(model.meetingDetectedApp == "Zoom")
+    }
+
     @Test("dismissing the prompt clears the detected app")
     func dismissClearsDetectedApp() {
         let model = makeModel()
@@ -53,6 +65,18 @@ struct AppModelMeetingTests {
 
         model.cancelCurrentWork()
         #expect(model.pendingRecordingCategory == .transcription)
+    }
+
+    @Test("live takes get a category-and-date title instead of the temp filename")
+    func liveRecordingTitleUsesCategoryAndDate() {
+        let date = Date(timeIntervalSince1970: 1_784_452_000)
+        let meeting = AppModel.liveRecordingTitle(category: .meeting, endedAt: date)
+        let plain = AppModel.liveRecordingTitle(category: .transcription, endedAt: date)
+
+        #expect(meeting.hasPrefix("Meeting "))
+        #expect(plain.hasPrefix("Recording "))
+        #expect(!meeting.contains("parola-"))
+        #expect(meeting.contains(date.formatted(date: .abbreviated, time: .shortened)))
     }
 
     private func makeSilentMeetingWAV() throws -> URL {

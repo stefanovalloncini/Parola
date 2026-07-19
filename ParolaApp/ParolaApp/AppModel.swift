@@ -762,7 +762,10 @@ final class AppModel {
         guard let self else { return }
         // Never prompt over in-flight work: accepting would stomp a live recording.
         switch self.phase {
-        case .idle, .ready, .failed: self.meetingDetectedApp = appName
+        case .idle, .ready, .failed:
+            // A presented alert's title never updates, so keep the first prompt — accept
+            // and decline must act on the app name the user is actually reading.
+            if self.meetingDetectedApp == nil { self.meetingDetectedApp = appName }
         default: break
         }
     }
@@ -1661,6 +1664,13 @@ final class AppModel {
         return transcriptionFailureMessage(for: error, bundle: bundle)
     }
 
+    /// Live takes capture to a temp file whose UUID name would otherwise leak into the
+    /// library title when auto-titling is unavailable.
+    nonisolated static func liveRecordingTitle(category: EntryCategory, endedAt: Date) -> String {
+        let stamp = endedAt.formatted(date: .abbreviated, time: .shortened)
+        return category == .meeting ? "Meeting \(stamp)" : "Recording \(stamp)"
+    }
+
     nonisolated static func microphoneAccessOffMessage(bundle: Bundle = .main) -> String {
         String(
             localized: "Microphone access is off. Turn it on in System Settings → Privacy & Security → Microphone, then start recording again.",
@@ -1963,7 +1973,11 @@ final class AppModel {
                 sourceFileURL = audioURL
                 installPlayer(for: audioURL)
             }
-            persistToLibrary(processed, audioSource: processed.sourceURL)
+            persistToLibrary(
+                processed,
+                audioSource: processed.sourceURL,
+                title: Self.liveRecordingTitle(category: pendingRecordingCategory, endedAt: Date())
+            )
             resolveRecordingOutcome(.success(processed.text))
             drainDeferredArrivals()
         }
@@ -2012,7 +2026,11 @@ final class AppModel {
                 selectedEntryID = nil
                 transcript = processed
                 phase = .ready
-                persistToLibrary(processed, audioSource: url)
+                persistToLibrary(
+                    processed,
+                    audioSource: url,
+                    title: Self.liveRecordingTitle(category: pendingRecordingCategory, endedAt: Date())
+                )
                 resolveRecordingOutcome(.success(processed.text))
             } catch {
                 stopRecordingLevelObserver()
