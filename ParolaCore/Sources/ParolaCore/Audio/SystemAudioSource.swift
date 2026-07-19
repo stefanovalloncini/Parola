@@ -181,7 +181,11 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
         guard let srcFormat = maybeSrcFormat else { return }
 
         let frameCount = AVAudioFrameCount(sampleBuffer.numSamples)
-        guard let copied = Self.copy(sampleBuffer: sampleBuffer, srcFormat: srcFormat, frameCount: frameCount) else {
+        guard let copied = SystemAudioSampleCopy.copy(
+            sampleBuffer: sampleBuffer,
+            srcFormat: srcFormat,
+            frameCount: frameCount
+        ) else {
             return
         }
 
@@ -194,54 +198,37 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
         onLevel(AudioLevel.normalised(of: copied))
     }
 
-    /// Allocates a fresh PCM buffer and copies samples out of the sample buffer. The original
-    /// `CMBlockBuffer` may be returned to ScreenCaptureKit's pool the moment this method
-    /// returns — copying decouples our buffer's lifetime from theirs.
-    private static func copy(
-        sampleBuffer: CMSampleBuffer,
-        srcFormat: AVAudioFormat,
-        frameCount: AVAudioFrameCount
-    ) -> AVAudioPCMBuffer? {
-        var blockBufferOut: CMBlockBuffer?
-        var abl = AudioBufferList()
-        let status = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
-            sampleBuffer,
-            bufferListSizeNeededOut: nil,
-            bufferListOut: &abl,
-            bufferListSize: MemoryLayout<AudioBufferList>.size,
-            blockBufferAllocator: kCFAllocatorDefault,
-            blockBufferMemoryAllocator: kCFAllocatorDefault,
-            flags: 0,
-            blockBufferOut: &blockBufferOut
-        )
-        guard status == noErr else { return nil }
-
-        guard let inBuffer = AVAudioPCMBuffer(pcmFormat: srcFormat, bufferListNoCopy: &abl) else {
-            return nil
-        }
-        inBuffer.frameLength = frameCount
-
-        guard
-            let copy = AVAudioPCMBuffer(pcmFormat: srcFormat, frameCapacity: frameCount),
-            let srcChannels = inBuffer.floatChannelData,
-            let dstChannels = copy.floatChannelData
-        else { return nil }
-        copy.frameLength = frameCount
-
-        let bytesPerChannel = Int(frameCount) * MemoryLayout<Float>.size
-        for ch in 0..<Int(srcFormat.channelCount) {
-            memcpy(dstChannels[ch], srcChannels[ch], bytesPerChannel)
-        }
-        _ = blockBufferOut
-        return copy
-    }
-
     /// Awaits a no-op block on the sample-handler queue. Any in-flight callback finishes
     /// before this returns.
     func drain() async {
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             queue.async { cont.resume() }
         }
+    }
+}
+
+/// Copies samples out of a capture callback's sample buffer into a fresh PCM buffer. The
+/// original `CMBlockBuffer` may be returned to ScreenCaptureKit's pool the moment the
+/// callback returns — copying decouples our buffer's lifetime from theirs.
+@available(macOS 13.0, *)
+enum SystemAudioSampleCopy {
+    static func copy(
+        sampleBuffer: CMSampleBuffer,
+        srcFormat: AVAudioFormat,
+        frameCount: AVAudioFrameCount
+    ) -> AVAudioPCMBuffer? {
+        guard let copy = AVAudioPCMBuffer(pcmFormat: srcFormat, frameCapacity: frameCount) else {
+            return nil
+        }
+        copy.frameLength = frameCount
+        let status = CMSampleBufferCopyPCMDataIntoAudioBufferList(
+            sampleBuffer,
+            at: 0,
+            frameCount: Int32(frameCount),
+            into: copy.mutableAudioBufferList
+        )
+        guard status == noErr else { return nil }
+        return copy
     }
 }
 
