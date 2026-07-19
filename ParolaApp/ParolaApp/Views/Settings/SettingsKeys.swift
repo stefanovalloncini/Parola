@@ -86,7 +86,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .general: return ["karaoke", "highlight", "word timestamps", "streaming", "diarize", "speakers", "vocabulary", "prompt", "menu bar", "login", "launch", "startup", "title"]
         case .customization: return ["appearance", "theme", "light", "dark", "density", "sidebar", "monospaced", "accent", "color", "terracotta", "custom colors", "palette"]
         case .watchedFolders: return ["watch", "folder", "auto", "drop"]
-        case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect", "system audio"]
+        case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect", "system audio", "permission", "screen recording", "consent"]
         case .shortcuts: return ["hotkey", "key combo", "mic recording", "dictation key", "global", "keyboard"]
         case .microphone: return ["mic", "input device", "vu", "level", "preview", "count-in", "mute", "pause media", "music", "spotify", "auto-stop"]
         case .liveCaptions: return ["captions", "translate", "live"]
