@@ -77,16 +77,26 @@ struct RecordingMediaSessionConfigTests {
         #expect(model.mediaSessionConfig(allowMute: false).muteSystemAudio == false)
     }
 
-    @Test("auto-pause-media drives pausePlayback regardless of source")
-    func pauseIndependentOfSource() {
+    @Test("auto-pause-media drives pausePlayback in mic-style configs")
+    func pauseFollowsToggle() {
         let model = makeModel()
         model.autoPauseMediaWhileRecording = true
 
         #expect(model.mediaSessionConfig(allowMute: true).pausePlayback == true)
-        #expect(model.mediaSessionConfig(allowMute: false).pausePlayback == true)
 
         model.autoPauseMediaWhileRecording = false
         #expect(model.mediaSessionConfig(allowMute: true).pausePlayback == false)
+    }
+
+    @Test("system-audio recordings never pause or mute the media they capture")
+    func systemAudioLeavesMediaAlone() {
+        let model = makeModel()
+        model.autoPauseMediaWhileRecording = true
+        model.autoMuteWhileRecording = true
+
+        #expect(model.recordingMediaConfig(for: .systemAudio) == .none)
+        #expect(model.recordingMediaConfig(for: .microphone).pausePlayback == true)
+        #expect(model.recordingMediaConfig(for: .microphone).muteSystemAudio == true)
     }
 
     @Test("both toggles off yields an inert config")

@@ -95,7 +95,7 @@ struct MicrophonePane: View {
                         .axLeaf("Microphone.Toggle.AutoMute")
                 }
                 SettingRow("Pause Music, Spotify, YouTube",
-                           description: "Sends a pause command to whatever app is playing media when recording starts, and resumes when it stops.") {
+                           description: "Sends a pause command to whatever app is playing media when a mic recording starts, and resumes when it stops. System-audio recordings never pause media.") {
                     Toggle("", isOn: $model.autoPauseMediaWhileRecording).labelsHidden()
                         .axLeaf("Microphone.Toggle.AutoPauseMedia")
                 }

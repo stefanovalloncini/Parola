@@ -825,6 +825,12 @@ final class AppModel {
         )
     }
 
+    /// System-audio takes get an inert config: pausing or muting media would silence
+    /// the very audio being recorded.
+    func recordingMediaConfig(for source: RecordSource) -> MediaSessionConfig {
+        source == .microphone ? mediaSessionConfig(allowMute: true) : .none
+    }
+
     @ObservationIgnored var liveSource: AudioSource?
     @ObservationIgnored var deferredArrivals: [URL] = []
     @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
@@ -1778,7 +1784,7 @@ final class AppModel {
     }
 
     private func beginRecordingNow(source: RecordSource) {
-        let config = mediaSessionConfig(allowMute: source == .microphone)
+        let config = recordingMediaConfig(for: source)
         // A recording replaces any transcription in flight, like a user file-open does;
         // otherwise the old run would finish later and stomp the new take's transcript.
         cancelTranscriptionRuns()
