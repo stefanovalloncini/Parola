@@ -4,48 +4,43 @@ import Foundation
 /// Drives an `MCPServer` from line-delimited JSON-RPC over stdin/stdout.
 public enum StdioRunner {
     public static func run(server: MCPServer = MCPServer()) async {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.withoutEscapingSlashes]
         let decoder = JSONDecoder()
 
         log("parola-mcp listening on stdio")
 
         installSignalHandlers()
 
-        while !Task.isCancelled, await !server.shouldExit {
-            guard let line = readLine(strippingNewline: true) else { break }
-            if line.isEmpty { continue }
-            guard let data = line.data(using: .utf8) else { continue }
+        // Closing stdin unblocks the reader after a shutdown response is written from a spawned
+        // task; the same trick the signal handlers use ends the line sequence and exits the loop.
+        let dispatcher = RequestDispatcher(
+            server: server,
+            output: Self.write,
+            onShutdown: { close(fileno(stdin)) }
+        )
 
-            let request: JSONRPCRequest
-            do {
-                request = try decoder.decode(JSONRPCRequest.self, from: data)
-            } catch {
-                let envelopeID = Self.recoverRequestID(from: data)
-                let resp = JSONRPCResponse.failure(
-                    id: envelopeID,
-                    code: RPCErrorCode.parseError,
-                    message: "Parse error: \(error.localizedDescription)"
-                )
-                Self.write(resp, encoder: encoder)
-                continue
-            }
+        do {
+            for try await line in FileHandle.standardInput.bytes.lines {
+                guard !Task.isCancelled, await !server.shouldExit else { break }
+                if line.isEmpty { continue }
+                guard let data = line.data(using: .utf8) else { continue }
 
-            do {
-                if let response = try await server.handle(request) {
-                    Self.write(response, encoder: encoder)
+                do {
+                    let request = try decoder.decode(JSONRPCRequest.self, from: data)
+                    await dispatcher.dispatch(request)
+                } catch {
+                    let envelopeID = Self.recoverRequestID(from: data)
+                    await dispatcher.emit(JSONRPCResponse.failure(
+                        id: envelopeID,
+                        code: RPCErrorCode.parseError,
+                        message: "Parse error: \(error.localizedDescription)"
+                    ))
                 }
-            } catch is CancellationError {
-                break
-            } catch {
-                let resp = JSONRPCResponse.failure(
-                    id: request.id,
-                    code: RPCErrorCode.internalError,
-                    message: error.localizedDescription
-                )
-                Self.write(resp, encoder: encoder)
             }
+        } catch {
+            // The line iterator throws EBADF once the signal handler closes stdin; treat as EOF.
         }
+
+        await dispatcher.cancelAll()
     }
 
     /// Second-pass parse so a malformed body still surfaces the envelope id, letting the client correlate the error.
@@ -56,7 +51,9 @@ public enum StdioRunner {
         return try? JSONDecoder().decode(Envelope.self, from: data).id
     }
 
-    private static func write(_ response: JSONRPCResponse, encoder: JSONEncoder) {
+    private static func write(_ response: JSONRPCResponse) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.withoutEscapingSlashes]
         do {
             var data = try encoder.encode(response)
             data.append(0x0A)
@@ -70,7 +67,7 @@ public enum StdioRunner {
         FileHandle.standardError.write(Data((message + "\n").utf8))
     }
 
-    /// Closes stdin on SIGINT/SIGTERM so `readLine` returns `nil` and the loop exits cleanly instead of aborting mid-write.
+    /// Closes stdin on SIGINT/SIGTERM so the line sequence ends and the loop exits cleanly instead of aborting mid-write.
     private static func installSignalHandlers() {
         let handler: @convention(c) (Int32) -> Void = { _ in
             close(fileno(stdin))
