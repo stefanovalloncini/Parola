@@ -123,7 +123,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .watchedFolders:
             return ["watchedFolders"]
         case .recordMeetings:
-            return ["meetingDetectorEnabled"]
+            return ["meetingDetectorEnabled", "meetingCaptureAppOnly"]
         case .shortcuts:
             // The dictation hotkey keys also live in the .dictation scope; both panes
             // show the recorder, and removeObject is idempotent across scopes.

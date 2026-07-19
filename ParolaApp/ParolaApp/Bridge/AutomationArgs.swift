@@ -92,6 +92,12 @@ struct AutomationArgs: Sendable {
         }
     }
 
+    func optionalStringArray(_ key: String) throws -> [String]? {
+        guard let v = values[key] else { return nil }
+        if case .null = v { return nil }
+        return try stringArray(key)
+    }
+
     func stringArray(_ key: String) throws -> [String] {
         guard let v = values[key] else {
             throw AutomationError.invalidArgs(field: key, reason: "missing required string array")

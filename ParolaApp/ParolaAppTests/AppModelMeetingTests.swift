@@ -67,6 +67,49 @@ struct AppModelMeetingTests {
         #expect(model.pendingRecordingCategory == .transcription)
     }
 
+    @Test("app-only capture stashes the detected vendor's bundle IDs")
+    func appOnlyCaptureStashesBundleIDs() async {
+        let fixture = try? makeSilentMeetingWAV()
+        guard let fixture else { Issue.record("could not write fixture"); return }
+        defer { try? FileManager.default.removeItem(at: fixture) }
+        await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
+        defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+
+        let model = makeModel()
+        model.meetingCaptureAppOnly = true
+        model.meetingDetectedApp = "Microsoft Teams"
+
+        model.startMeetingRecording()
+
+        #expect(model.pendingCaptureBundleIDs == ["com.microsoft.teams", "com.microsoft.teams2"])
+        model.cancelCurrentWork()
+    }
+
+    @Test("full-mix capture leaves no bundle ID stash")
+    func fullMixCaptureLeavesNoStash() async {
+        let fixture = try? makeSilentMeetingWAV()
+        guard let fixture else { Issue.record("could not write fixture"); return }
+        defer { try? FileManager.default.removeItem(at: fixture) }
+        await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
+        defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+
+        let model = makeModel()
+        model.meetingCaptureAppOnly = false
+        model.meetingDetectedApp = "Zoom"
+
+        model.startMeetingRecording()
+
+        #expect(model.pendingCaptureBundleIDs == nil)
+        model.cancelCurrentWork()
+    }
+
+    @Test("vendor display names map back to every known bundle ID")
+    func bundleIDsForAppName() {
+        #expect(MeetingDetector.bundleIDs(forAppName: "Zoom") == ["us.zoom.xos"])
+        #expect(MeetingDetector.bundleIDs(forAppName: "Webex").count == 3)
+        #expect(MeetingDetector.bundleIDs(forAppName: "Nonexistent").isEmpty)
+    }
+
     @Test("live takes get a category-and-date title instead of the temp filename")
     func liveRecordingTitleUsesCategoryAndDate() {
         let date = Date(timeIntervalSince1970: 1_784_452_000)

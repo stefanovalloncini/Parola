@@ -16,6 +16,10 @@ final class MeetingDetector {
 
     static let dedupWindow: TimeInterval = 5
 
+    nonisolated static func bundleIDs(forAppName name: String) -> Set<String> {
+        Set(knownMeetingApps.filter { $0.value == name }.keys)
+    }
+
     var detectedAppName: String?
     var isEnabled: Bool {
         didSet { DefaultsStore.current.set(isEnabled, forKey: Self.defaultsKey) }

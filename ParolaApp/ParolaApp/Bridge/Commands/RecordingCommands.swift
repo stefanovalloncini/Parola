@@ -24,13 +24,21 @@ extension ParolaAutomationServer {
                         summary: "EntryCategory rawValue for the resulting library entry",
                         defaultValue: .string(EntryCategory.transcription.rawValue)
                     ),
+                    .init(
+                        name: "targetBundleIDs",
+                        kind: .stringArray,
+                        required: false,
+                        summary: "Capture only these apps' audio (systemAudio source only)"
+                    ),
                 ],
                 handler: { args, ctx in
                     let source = (try args.optionalString("source")) ?? "microphone"
                     let recordSource: AppModel.RecordSource = (source == "systemAudio") ? .systemAudio : .microphone
                     let categoryRaw = (try args.optionalString("category")) ?? ""
                     let category = EntryCategory(rawValue: categoryRaw) ?? .transcription
+                    let targets = try args.optionalStringArray("targetBundleIDs") ?? []
                     ctx.model.pendingRecordingCategory = category
+                    if !targets.isEmpty { ctx.model.pendingCaptureBundleIDs = Set(targets) }
                     ctx.model.startRecording(source: recordSource)
                     return .object([
                         "started": .bool(true),

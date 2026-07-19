@@ -502,6 +502,7 @@ final class AppModel {
         self.diarize = defaults.bool(forKey: "diarize")
         self.expectedSpeakersRaw = defaults.integer(forKey: "expectedSpeakersRaw")
         self.autoTitleEntries = defaults.bool(forKey: "autoTitleEntries")
+        self.meetingCaptureAppOnly = defaults.bool(forKey: "meetingCaptureAppOnly")
         self.subtitleFPS = readDouble("subtitleFPS", default: 30)
         self.subtitleCaptionLengthRaw = defaults.string(forKey: "subtitleCaptionLength") ?? CaptionLength.none.rawValue
         self.transcriptCompact = defaults.bool(forKey: "transcriptCompact")
@@ -757,7 +758,9 @@ final class AppModel {
     // MARK: - Meeting detection
 
     var meetingDetectedApp: String?
+    var meetingCaptureAppOnly: Bool = false { didSet { defaults.set(meetingCaptureAppOnly, forKey: "meetingCaptureAppOnly") } }
     @ObservationIgnored var pendingRecordingCategory: EntryCategory = .transcription
+    @ObservationIgnored var pendingCaptureBundleIDs: Set<String>?
     @ObservationIgnored lazy var meetingDetector: MeetingDetector = MeetingDetector { [weak self] appName in
         guard let self else { return }
         // Never prompt over in-flight work: accepting would stomp a live recording.
@@ -1781,6 +1784,8 @@ final class AppModel {
         recordingStartInFlight = true
         Task {
             defer { recordingStartInFlight = false }
+            let captureTargets = pendingCaptureBundleIDs ?? []
+            pendingCaptureBundleIDs = nil
             if source == .microphone, mode == .normal, await AVCaptureDevice.requestAccess(for: .audio) == false {
                 phase = .failed(message: Self.microphoneAccessOffMessage())
                 return
@@ -1802,8 +1807,23 @@ final class AppModel {
                     liveSource = mic
                     observeRecordingLevels(from: mic)
                 case .systemAudio:
-                    let sys = await LiveAudioSourceFactory.makeSystem(clock: clock)
-                    try await sys.start()
+                    let sys = await LiveAudioSourceFactory.makeSystem(targetBundleIDs: captureTargets, clock: clock)
+                    // Tap setup blocks indefinitely while macOS waits for the System Audio
+                    // Recording consent; abandon it after 20s so Stop never goes dead.
+                    let started: Result<Void, any Error>? = await AsyncTimeout.run(.seconds(20)) {
+                        do { try await sys.start(); return .success(()) } catch { return .failure(error) }
+                    }
+                    switch started {
+                    case .success:
+                        break
+                    case .failure(let error):
+                        throw error
+                    case nil:
+                        Task { await sys.cancel() }
+                        throw ParolaError.captureUnavailable(
+                            "system audio capture did not start. Allow System Audio Recording for Parola in System Settings → Privacy & Security, then try again."
+                        )
+                    }
                     liveSource = sys
                     observeRecordingLevels(from: sys)
                 }
