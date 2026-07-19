@@ -47,7 +47,7 @@ let sizes: [(name: String, pixels: Int)] = [
     ("icon_512x512@2x.png", 1024),
 ]
 
-let backgroundColor = NSColor(srgbRed: 0.78, green: 0.42, blue: 0.25, alpha: 1)
+let backgroundColor = NSColor(srgbRed: 0.42, green: 0.54, blue: 0.42, alpha: 1)
 let foregroundColor = NSColor(srgbRed: 0.99, green: 0.95, blue: 0.90, alpha: 1)
 
 func drawIcon(into context: CGContext, size: CGFloat) {
