@@ -24,6 +24,7 @@ public actor LibraryStore {
     private var cachedLoaded: (id: LibraryEntry.ID, value: LoadedEntry)?
     private var listCacheEpoch = 0
     private var indexReadyTask: Task<Void, Never>?
+    private nonisolated let extraIndexerJobs: AsyncStream<@Sendable () async -> Void>.Continuation?
 
     public init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
         self.init(libraryURL: libraryURL, extraIndexer: SpotlightIndexer())
@@ -32,10 +33,27 @@ public actor LibraryStore {
     public init(libraryURL: URL, extraIndexer: LibraryIndexer?) {
         self.libraryURL = libraryURL
         self.extraIndexer = extraIndexer
+        // Extra-indexer calls drain FIFO on one background worker: CoreSpotlight's XPC can
+        // stall indefinitely (observed on ad-hoc dev builds), and a best-effort mirror index
+        // must never block the library write path.
+        if extraIndexer != nil {
+            var continuation: AsyncStream<@Sendable () async -> Void>.Continuation?
+            let jobs = AsyncStream<@Sendable () async -> Void> { continuation = $0 }
+            self.extraIndexerJobs = continuation
+            Task.detached(priority: .utility) {
+                for await job in jobs { await job() }
+            }
+        } else {
+            self.extraIndexerJobs = nil
+        }
         try? FileManager.default.createDirectory(at: libraryURL, withIntermediateDirectories: true)
         let indexURL = libraryURL.appendingPathComponent(".search-index.json")
         self.searchIndex = LibrarySearchIndex(indexURL: indexURL)
         Task { await self.ensureSearchIndexReady() }
+    }
+
+    deinit {
+        extraIndexerJobs?.finish()
     }
 
     public func list() async -> [LibraryEntry] {
@@ -192,7 +210,24 @@ public actor LibraryStore {
             createdAt: entry.createdAt
         )
         guard let extraIndexer else { return }
-        await extraIndexer.index(id: entry.id, title: entry.title, text: text, createdAt: entry.createdAt)
+        let title = entry.title
+        enqueueExtraIndexerWork { [id = entry.id, createdAt = entry.createdAt] in
+            await extraIndexer.index(id: id, title: title, text: text, createdAt: createdAt)
+        }
+    }
+
+    /// Extra-indexer calls run FIFO on a background chain: CoreSpotlight's XPC can stall
+    /// indefinitely (observed on ad-hoc dev builds), and a best-effort mirror index must
+    /// never block the library write path.
+    private func enqueueExtraIndexerWork(_ work: @escaping @Sendable () async -> Void) {
+        extraIndexerJobs?.yield(work)
+    }
+
+    func waitForExtraIndexer() async {
+        guard let extraIndexerJobs else { return }
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            extraIndexerJobs.yield { cont.resume() }
+        }
     }
 
     static func searchAuxiliaryText(notes: [String: String], transcript: Transcript) -> String {
@@ -207,7 +242,9 @@ public actor LibraryStore {
         await ensureSearchIndexReady()
         await searchIndex.remove(id)
         guard let extraIndexer else { return }
-        await extraIndexer.deindex(id: id)
+        enqueueExtraIndexerWork {
+            await extraIndexer.deindex(id: id)
+        }
     }
 
     /// Overwrites the transcript.json inside an existing bundle, bumps the manifest `updatedAt`,

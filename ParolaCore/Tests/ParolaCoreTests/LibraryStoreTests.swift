@@ -33,6 +33,37 @@ struct LibraryStoreTests {
         #expect(entries.isEmpty)
     }
 
+    private struct HangingIndexer: LibraryIndexer {
+        func index(id: String, title: String, text: String, createdAt: Date) async {
+            try? await Task.sleep(for: .seconds(3600))
+        }
+        func deindex(id: String) async {
+            try? await Task.sleep(for: .seconds(3600))
+        }
+    }
+
+    @Test("a stalled extra indexer never blocks add")
+    func addSurvivesHangingExtraIndexer() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-library-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        let store = LibraryStore(libraryURL: tmp, extraIndexer: HangingIndexer())
+        let audio = try makeFakeAudio()
+        let transcript = makeTranscript()
+
+        let added: LibraryEntry? = try await withThrowingTaskGroup(of: LibraryEntry?.self) { group in
+            group.addTask { try await store.add(transcript: transcript, audioSource: audio) }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(5))
+                return nil
+            }
+            let first = try await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
+        #expect(added != nil, "add() must return even when the extra indexer stalls")
+    }
+
     @Test("add writes a .parola bundle and list returns it")
     func addAndList() async throws {
         let (store, _) = try makeTempLibrary()

@@ -41,9 +41,11 @@ struct LibraryStoreSpotlightTests {
         let indexer = RecordingIndexer()
         let store = try makeStore(indexer: indexer)
         let entry = try await addEntry(to: store)
+        await store.waitForExtraIndexer()
         #expect(await indexer.indexed == [entry.id])
 
         try await store.delete(entry.id)
+        await store.waitForExtraIndexer()
         #expect(
             await indexer.deindexed == [entry.id],
             "a trashed transcript must leave Spotlight immediately, not after the 30-day purge"
@@ -58,6 +60,7 @@ struct LibraryStoreSpotlightTests {
         try await store.delete(entry.id)
 
         try await store.restore(entry.id)
+        await store.waitForExtraIndexer()
         #expect(
             await indexer.indexed == [entry.id, entry.id],
             "a restored entry must be searchable again"
