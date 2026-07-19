@@ -90,6 +90,11 @@ struct ToolRegistryTests {
         #expect(ToolRegistry.allToolNames().contains("parola_open_app"))
     }
 
+    @Test("default bundle id matches the app target's bundle id")
+    func defaultBundleIDMatchesAppTarget() {
+        #expect(AppLauncher.defaultBundleID == "app.parola.ParolaApp")
+    }
+
     @Test("Dictation app tools forward to startDictation / stopDictation")
     func dictationToolsForwardCorrectly() async throws {
         let start = try #require(AppTools.byName["parola_app_dictate"])

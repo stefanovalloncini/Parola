@@ -1,15 +1,17 @@
 # Test bridge
 
-Debug-only IPC that lets the `parola-mcp` server drive a running Parola.app. Built so Claude (or any MCP client) can change models, paste URLs, start recordings, and read state without anyone touching the GUI.
+A setting-gated local IPC that lets the `parola-mcp` server drive a running Parola.app. Built so Claude (or any MCP client) can change models, paste URLs, start recordings, and read state without anyone touching the GUI.
 
 ## What ships
 
 | Piece | Path | Build configuration |
 |---|---|---|
-| In-app listener | `ParolaApp/ParolaApp/Bridge/ParolaTestBridge.swift` | `#if DEBUG`, stripped from Release |
-| MCP client | `ParolaCore/Sources/parola-mcp/BridgeClient.swift` | always |
-| MCP tool surface | `ParolaCore/Sources/parola-mcp/Tools.swift` (`parola_app_*`) | always |
+| In-app listener | `ParolaApp/ParolaApp/Bridge/ParolaAutomationServer.swift` | Ships in Debug and Release, gated by the `automationBridgeEnabled` setting (default on in Debug, off in Release) |
+| MCP client | `ParolaCore/Sources/ParolaMCP/BridgeClient.swift` | always |
+| MCP tool surface | `ParolaCore/Sources/ParolaMCP/` (`TypedToolRegistry.swift` + `AppTool.swift`) | always |
 | Discovery file | `~/Library/Caches/Parola/bridge.port` | written at app launch |
+| Auth token | `~/Library/Caches/Parola/bridge.token` | written at app launch, `0600` |
+| Discovery record | `~/Library/Caches/Parola/bridge.json` | port, token, pid, startedAt, serverVersion |
 | Wire-up | `.mcp.json` at repo root | committed |
 
 ## How it talks
@@ -21,22 +23,24 @@ The bridge listens on TCP loopback. On startup it asks the kernel for any free p
 Request:
 
 ```json
-{"id": "uuid", "cmd": "selectModel", "args": {"name": "openai_whisper-tiny"}}
+{"id": "uuid", "version": 2, "cmd": "selectModel", "auth": "<token from bridge.token>", "args": {"name": "openai_whisper-tiny"}}
 ```
 
 Response (success):
 
 ```json
-{"id": "uuid", "ok": true, "result": {...}}
+{"id": "uuid", "ok": true, "command": "selectModel", "result": {...}, "serverVersion": 2, "elapsedMs": 12}
 ```
 
 Response (failure):
 
 ```json
-{"id": "uuid", "ok": false, "error": "missing 'name'"}
+{"id": "uuid", "ok": false, "command": "selectModel", "error": {"code": "INVALID_ARGS", "message": "missing 'name'", "details": {}}, "serverVersion": 2, "elapsedMs": 3}
 ```
 
 Every dispatch hops to `@MainActor` before touching `AppModel`, so the bridge is safe to call from any queue.
+
+The tools advertised over MCP are the typed `parola_*` set plus `parola_app_dispatch`. The `parola_app_*` names below stay callable but are no longer listed in `tools/list` — new integrations should reach for the typed tools or the `parola_app_dispatch` fallback.
 
 ## Tool reference
 
@@ -68,7 +72,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_delete_model` | **name** | Delete a downloaded model. |
 | `parola_app_export_transcript` | **format** | txt / md / html / docx / pdf / csv / srt / vtt / json. The app's save panel handles the destination. |
 | `parola_app_dismiss_error` | — | Clear a failed phase (equivalent to clicking "Try again"). |
-| `parola_app_screenshot` | path | Capture the main window to PNG. SwiftUI custom views aren't fully captured by `dataWithPDF`; only NSTextField-shaped content shows up reliably. |
+| `parola_app_screenshot` | path | Capture the main window to PNG via ScreenCaptureKit (needs Screen Recording permission). `path` is a bare filename stored under `Caches/Parola/Screenshots`. |
 | `parola_app_list_windows` | — | Visible NSWindows: title, size, key/main flags. |
 
 ### Settings + library
@@ -102,27 +106,27 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 
 ## Workflow
 
-1. Run a Debug build of Parola.app (Xcode → Run, or `open` the binary in `~/Library/Developer/Xcode/DerivedData/.../Parola.app`). Look for `[ParolaTestBridge] listening on 127.0.0.1:<port>` in stderr.
+1. Run a Debug build of Parola.app (Xcode → Run, or `open` the binary in `~/Library/Developer/Xcode/DerivedData/.../Parola.app`). Look for `[ParolaAutomationServer] listening on 127.0.0.1:<port>` in stderr.
 2. Claude Code picks up the server from `.mcp.json` on the next session. For ad-hoc testing, run `parola-mcp` directly over stdio.
-3. Call `parola_app_ping` first. If it returns `pong`, the rest works.
+3. Call `parola_app_dispatch` with `{ "command": "ping" }` first. If it returns `pong`, the rest works.
 
 End-to-end example. Transcribe a YouTube URL and read the result back:
 
 ```text
-parola_app_select_model        { "name": "openai_whisper-large-v3_turbo" }
-parola_app_set_language        { "code": "" }                # auto-detect
-parola_app_transcribe_youtube  { "url": "https://www.youtube.com/watch?v=..." }
-parola_app_wait_for_phase      { "phase": "ready", "timeoutMs": 120000 }
-parola_app_get_transcript      {}
+parola_select_model       { "name": "openai_whisper-large-v3_turbo" }
+parola_app_dispatch       { "command": "setLanguage", "args": { "code": "" } }   # auto-detect
+parola_transcribe_youtube { "url": "https://www.youtube.com/watch?v=..." }
+parola_wait_for_phase     { "phase": "ready", "timeoutMs": 120000 }
+parola_app_dispatch       { "command": "getTranscript" }
 ```
 
 ## Adding a new command
 
-1. Add a `case "myThing":` block to `dispatch(cmd:args:)` in `ParolaTestBridge.swift`. Parse args, call into `AppModel`, return a `[String: Any]`.
-2. Add a `MCPTool(name: "parola_app_my_thing", ...)` entry to `Tools.all()`.
-3. Add a `case "parola_app_my_thing":` to `MCPServer.callTool`, listing which arg keys to forward.
+1. Add an `AutomationCommand` to the matching list in `ParolaApp/ParolaApp/Bridge/Commands/` (name, area, `kind` — `.mutating` bumps the revision counter — declared args, handler). Declared args are validated before the handler runs.
+2. That's enough: the command is callable through `parola_app_dispatch` and shows up in `_handshake`.
+3. If it's common enough to deserve a listed schema, promote it with a `TypedTool` entry in `TypedToolRegistry.swift`.
 
-That's the whole loop. The wire format has no versioning or schema validation on purpose. If the dispatch can't find a required arg it throws, and the MCP client surfaces the error text as an `isError` content block.
+If validation or the handler throws, the MCP client surfaces the structured error as an `isError` content block.
 
 ## Why not Accessibility or XCUITest
 
@@ -134,7 +138,7 @@ For CI-friendly regression coverage, XCUITest is the right layer. For "Claude, t
 
 ## Caveats
 
-Release builds have no bridge. The `#if DEBUG` strip is deliberate so notarised binaries can't be remote-controlled.
+The bridge ships in Release too, but stays off unless `automationBridgeEnabled` is set — it defaults on in Debug and off in Release, so notarised binaries aren't remote-controlled out of the box.
 
 TCP loopback is bound with `acceptLocalOnly = true`. Anyone on this machine could connect to it. If you don't trust your local user, don't run Debug builds with the bridge.
 

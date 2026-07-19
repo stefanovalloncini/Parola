@@ -85,16 +85,6 @@ public enum TypedToolRegistry {
             required: ["id"]
         ),
         TypedTool(
-            name: "parola_search_library",
-            bridgeCmd: "search",
-            description: "Full-text search the library. Returns matching entries with id, title, category.",
-            properties: [
-                .string("query", description: "Query string."),
-                .int("limit", description: "Max entries to return (default 20)."),
-            ],
-            required: ["query"]
-        ),
-        TypedTool(
             name: "parola_start_batch",
             bridgeCmd: "startBatch",
             description: "Submit multiple files for batch transcription. Routes the app to the Batch view.",
@@ -111,7 +101,7 @@ public enum TypedToolRegistry {
         TypedTool(
             name: "parola_run_prompt",
             bridgeCmd: "runPrompt",
-            description: "Run a prompt against the currently loaded transcript. Pass the prompt's id (or name).",
+            description: "Run a prompt against the currently loaded transcript. List prompts via parola_app_dispatch {command: 'listPrompts'}; pass the prompt's id or name.",
             properties: [
                 .string("promptID", description: "Prompt id from parola_app_list_prompts."),
                 .string("name", description: "Alternative: prompt display name."),
@@ -140,7 +130,7 @@ public enum TypedToolRegistry {
             bridgeCmd: "getAccessibilityTree",
             description: "Dump the main window's accessibility tree as JSON. Strictly observational — to act, always go through bridge commands.",
             properties: [
-                .string("windowID", description: "Window id from parola_app_list_windows. Defaults to 'main'."),
+                .string("windowID", description: "Window id from parola_app_dispatch {command: 'listWindows'}. Defaults to the main window."),
                 .string("filter", enum: ["actionable", "all"], description: "Filter mode. 'actionable' keeps interactive nodes only."),
             ],
             required: []
@@ -148,10 +138,9 @@ public enum TypedToolRegistry {
         TypedTool(
             name: "parola_screenshot",
             bridgeCmd: "screenshot",
-            description: "Capture the main window's contents. Returns base64 (<1MB) or a tempPath.",
+            description: "Capture the app's main window to a PNG via ScreenCaptureKit. Returns JSON {path, width, height, bytes, windowTitle}. Needs Screen Recording permission; on denial the error includes the windowNumber for a `screencapture -l` fallback.",
             properties: [
-                .string("windowID", description: "Window id from parola_app_list_windows. Defaults to 'main'."),
-                .string("format", enum: ["png", "jpeg"], description: "Image format. Defaults to png."),
+                .string("path", description: "Bare filename for the PNG, stored under Caches/Parola/Screenshots. Defaults to a timestamped name."),
             ],
             required: []
         ),
@@ -160,7 +149,7 @@ public enum TypedToolRegistry {
             bridgeCmd: "waitForPhase",
             description: "Poll until the app's phase matches 'phase' or the timeout fires.",
             properties: [
-                .string("phase", enum: ["idle", "downloadingModel", "loadingModel", "transcribing", "recording", "ready", "failed"], description: "Phase to wait for."),
+                .string("phase", enum: ["idle", "downloadingModel", "loadingModel", "transcribing", "recording", "exporting", "ready", "failed"], description: "Phase to wait for."),
                 .int("timeoutMs", description: "Max ms to wait. Defaults to 10000."),
             ],
             required: ["phase"]

@@ -71,6 +71,64 @@ struct MCPServerTests {
         #expect(result["protocolVersion"] as? String == MCPServer.preferredProtocolVersion)
     }
 
+    @Test("initialize echoes the latest supported protocol version when requested")
+    func initializeEchoesLatest() async throws {
+        let server = makeServer()
+        let request = JSONRPCRequest(
+            jsonrpc: "2.0",
+            id: .int(1),
+            method: "initialize",
+            params: AnyDecodable(["protocolVersion": "2025-06-18"])
+        )
+        let response = try await server.handle(request)
+        let json = try encode(response)
+        let result = try #require(json["result"] as? [String: Any])
+        #expect(result["protocolVersion"] as? String == "2025-06-18")
+    }
+
+    @Test("initialize result carries a non-empty instructions string")
+    func initializeCarriesInstructions() async throws {
+        let server = makeServer()
+        let request = JSONRPCRequest(
+            jsonrpc: "2.0",
+            id: .int(1),
+            method: "initialize",
+            params: AnyDecodable(["protocolVersion": "2025-06-18"])
+        )
+        let response = try await server.handle(request)
+        let json = try encode(response)
+        let result = try #require(json["result"] as? [String: Any])
+        let instructions = try #require(result["instructions"] as? String)
+        #expect(!instructions.isEmpty)
+    }
+
+    @Test("ping returns an empty object result and no error")
+    func pingReturnsEmptyResult() async throws {
+        let server = makeServer()
+        let request = JSONRPCRequest(
+            jsonrpc: "2.0",
+            id: .int(9),
+            method: "ping",
+            params: nil
+        )
+        let response = try await server.handle(request)
+        let json = try encode(response)
+        let result = try #require(json["result"] as? [String: Any])
+        #expect(result.isEmpty)
+        #expect(json["error"] == nil)
+    }
+
+    @Test("a tool-internal CancellationError is contained as isError, not thrown")
+    func toolInternalCancellationContained() async throws {
+        let server = MCPServer(bridge: CancellingBridge())
+        let response = try await server.handle(
+            toolCall(name: "parola_select_model", arguments: ["name": "openai_whisper-tiny"], id: 200)
+        )
+        let json = try encode(response)
+        let result = try #require(json["result"] as? [String: Any])
+        #expect(result["isError"] as? Bool == true)
+    }
+
     @Test("notifications/initialized returns no response")
     func notificationsInitializedHasNoResponse() async throws {
         let server = makeServer()
@@ -361,5 +419,11 @@ private actor EchoBridge: BridgeProtocol {
 private struct NullBridge: BridgeProtocol {
     func call(_ cmd: String, argsJSON: Data) async throws -> String {
         "{}"
+    }
+}
+
+private struct CancellingBridge: BridgeProtocol {
+    func call(_ cmd: String, argsJSON: Data) async throws -> String {
+        throw CancellationError()
     }
 }

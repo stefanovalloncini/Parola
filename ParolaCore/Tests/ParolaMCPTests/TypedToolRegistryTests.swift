@@ -9,7 +9,6 @@ struct TypedToolRegistryTests {
         ("parola_transcribe_file",         "transcribeFile"),
         ("parola_transcribe_youtube",      "transcribeYouTube"),
         ("parola_load_entry",              "loadEntry"),
-        ("parola_search_library",          "search"),
         ("parola_start_batch",             "startBatch"),
         ("parola_add_batch_files",         "addBatchFiles"),
         ("parola_run_prompt",              "runPrompt"),
@@ -27,9 +26,9 @@ struct TypedToolRegistryTests {
         ("parola_reset_test_state",        "resetTestState"),
     ]
 
-    @Test("All 20 typed tools from the v7-C spec are registered with the right bridge command")
-    func twentyTypedToolsRegistered() {
-        #expect(TypedToolRegistry.all.count == 20)
+    @Test("All 19 typed tools from the v7-C spec are registered with the right bridge command")
+    func typedToolsRegistered() {
+        #expect(TypedToolRegistry.all.count == 19)
         for (toolName, bridgeCmd) in Self.expectedTypedTools {
             let tool = TypedToolRegistry.byName[toolName]
             #expect(tool != nil, "typed tool \(toolName) missing")
@@ -72,17 +71,31 @@ struct TypedToolRegistryTests {
         #expect(schema?["required"] as? [String] == ["name"])
     }
 
-    @Test("parola_screenshot allows windowID and format as optional enums")
+    @Test("parola_screenshot declares only an optional path string")
     func screenshotSchema() throws {
         let tool = try #require(TypedToolRegistry.byName["parola_screenshot"])
         let data = try JSONEncoder().encode(tool.mcpTool)
         let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         let schema = parsed?["inputSchema"] as? [String: Any]
-        let props = schema?["properties"] as? [String: Any]
-        let format = props?["format"] as? [String: Any]
-        #expect(format?["enum"] as? [String] == ["png", "jpeg"])
+        let props = try #require(schema?["properties"] as? [String: Any])
+        #expect(Set(props.keys) == ["path"])
+        #expect((props["path"] as? [String: Any])?["type"] as? String == "string")
+        #expect(props["windowID"] == nil)
+        #expect(props["format"] == nil)
         let required = schema?["required"] as? [String]
         #expect(required == nil || required?.isEmpty == true)
+    }
+
+    @Test("parola_wait_for_phase enum includes the exporting phase")
+    func waitForPhaseIncludesExporting() throws {
+        let tool = try #require(TypedToolRegistry.byName["parola_wait_for_phase"])
+        let data = try JSONEncoder().encode(tool.mcpTool)
+        let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let schema = parsed?["inputSchema"] as? [String: Any]
+        let props = schema?["properties"] as? [String: Any]
+        let phase = props?["phase"] as? [String: Any]
+        let values = try #require(phase?["enum"] as? [String])
+        #expect(values.contains("exporting"))
     }
 
     @Test("parola_app_dispatch is registered with an opaque command + args schema")

@@ -6,6 +6,8 @@ import AppKit
 
 /// Launches Parola.app and polls for the bridge port file. Backs the `parola_open_app` tool.
 public enum AppLauncher {
+    public static let defaultBundleID = "app.parola.ParolaApp"
+
     public static func launch(bundleID: String, timeoutMs: Int) async throws -> String {
         let portFile = portFileURL()
 

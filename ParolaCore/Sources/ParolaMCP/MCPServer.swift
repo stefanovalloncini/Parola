@@ -3,18 +3,14 @@ import ParolaCore
 
 /// JSON-RPC handler for the Parola MCP server. Owns the engine session and proxies app-bridge calls.
 public actor MCPServer {
-    public static let supportedProtocolVersions: Set<String> = ["2024-11-05", "2025-03-26"]
-    public static let preferredProtocolVersion: String = "2024-11-05"
+    public static let supportedProtocolVersions: Set<String> = ["2024-11-05", "2025-03-26", "2025-06-18"]
+    public static let preferredProtocolVersion: String = "2025-06-18"
 
     private let session: TranscriptionSession
     private let modelStore: ModelStore
     private let libraryStore: LibraryStore
     private let bridge: any BridgeProtocol
     private(set) var shouldExit: Bool = false
-
-    public func requestExit() {
-        shouldExit = true
-    }
 
     public init(
         session: TranscriptionSession = TranscriptionSession(),
@@ -38,6 +34,8 @@ public actor MCPServer {
             return JSONRPCResponse.success(id: request.id, result: MCPListToolsResult(tools: ToolRegistry.allTools()))
         case "tools/call":
             return try await callTool(request)
+        case "ping":
+            return JSONRPCResponse.success(id: request.id, result: AnyEncodable([String: String]()))
         case "shutdown":
             shouldExit = true
             return JSONRPCResponse.success(id: request.id, result: AnyEncodable([String: String]()))
@@ -59,7 +57,8 @@ public actor MCPServer {
         return MCPInitializeResult(
             protocolVersion: negotiated,
             capabilities: .init(tools: .init(listChanged: false)),
-            serverInfo: .init(name: "parola", version: Parola.version)
+            serverInfo: .init(name: "parola", version: Parola.version),
+            instructions: "Engine tools (transcribe, list_models, summarize) run standalone. The other tools drive a running Parola.app over a local bridge: if they report the bridge is unreachable, call parola_open_app first. The full bridge command catalog is available via parola_app_dispatch with command '_handshake'."
         )
     }
 
@@ -91,8 +90,14 @@ public actor MCPServer {
                 )
             }
             return JSONRPCResponse.success(id: request.id, result: result)
-        } catch let error as CancellationError {
-            throw error
+        } catch is CancellationError {
+            // Only a real task cancellation may propagate and stop the server; a CancellationError
+            // thrown inside a tool must stay contained or one tool kills the whole session.
+            if Task.isCancelled { throw CancellationError() }
+            return JSONRPCResponse.success(
+                id: request.id,
+                result: MCPToolCallResult(text: "Cancelled: \(name)", isError: true)
+            )
         } catch {
             return JSONRPCResponse.success(
                 id: request.id,
@@ -208,7 +213,7 @@ public actor MCPServer {
 
     private func openApp(args: [String: Any]) async throws -> MCPToolCallResult {
         let timeoutMs = args["timeoutMs"] as? Int ?? 10_000
-        let bundleID = args["bundleID"] as? String ?? "com.parola.Parola"
+        let bundleID = args["bundleID"] as? String ?? AppLauncher.defaultBundleID
         let report = try await AppLauncher.launch(bundleID: bundleID, timeoutMs: timeoutMs)
         return MCPToolCallResult(text: report)
     }

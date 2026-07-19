@@ -76,12 +76,12 @@ public enum EngineTool: String, CaseIterable, Sendable {
         case .openApp:
             return MCPTool(
                 name: rawValue,
-                description: "Launch Parola.app if it isn't running and wait until the app bridge is reachable. Call this first when other parola_app_* tools report the bridge is down.",
+                description: "Launch Parola.app if it isn't running and wait until the app bridge is reachable. Call this first when the parola_* app tools report the bridge is down.",
                 inputSchema: AnyEncodable([
                     "type": "object",
                     "properties": [
                         "timeoutMs": ["type": "integer", "description": "Max ms to wait for the bridge after launch. Defaults to 10000."],
-                        "bundleID": ["type": "string", "description": "Override the bundle id. Defaults to com.parola.Parola."],
+                        "bundleID": ["type": "string", "description": "Override the bundle id. Defaults to app.parola.ParolaApp."],
                     ],
                 ] as [String: Any])
             )

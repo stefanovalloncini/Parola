@@ -60,9 +60,9 @@ public enum StdioRunner {
         do {
             var data = try encoder.encode(response)
             data.append(0x0A)
-            FileHandle.standardOutput.write(data)
+            try FileHandle.standardOutput.write(contentsOf: data)
         } catch {
-            log("encode error: \(error)")
+            log("write error: \(error)")
         }
     }
 
@@ -77,5 +77,7 @@ public enum StdioRunner {
         }
         signal(SIGINT, handler)
         signal(SIGTERM, handler)
+        // A dead client closes stdout; writing to it raises SIGPIPE, which would crash instead of exit.
+        signal(SIGPIPE, SIG_IGN)
     }
 }

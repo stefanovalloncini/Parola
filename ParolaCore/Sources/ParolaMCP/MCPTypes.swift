@@ -120,6 +120,7 @@ public struct MCPInitializeResult: Encodable, Sendable {
     public let protocolVersion: String
     public let capabilities: Capabilities
     public let serverInfo: ServerInfo
+    public let instructions: String?
 
     public struct Capabilities: Encodable, Sendable {
         public let tools: ToolsCapability
@@ -138,10 +139,11 @@ public struct MCPInitializeResult: Encodable, Sendable {
         }
     }
 
-    public init(protocolVersion: String, capabilities: Capabilities, serverInfo: ServerInfo) {
+    public init(protocolVersion: String, capabilities: Capabilities, serverInfo: ServerInfo, instructions: String? = nil) {
         self.protocolVersion = protocolVersion
         self.capabilities = capabilities
         self.serverInfo = serverInfo
+        self.instructions = instructions
     }
 }
 

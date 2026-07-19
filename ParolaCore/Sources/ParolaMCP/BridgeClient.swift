@@ -23,7 +23,7 @@ public struct BridgeClient: BridgeProtocol {
     /// Bumped when the wire format breaks. The bridge echoes its own version so the client can detect skew.
     public static let clientVersion: Int = 2
 
-    public init(timeout: TimeInterval = 30) {
+    public init(timeout: TimeInterval = 35) {
         self.portFileURL = AppLauncher.portFileURL()
         self.tokenFileURL = AppLauncher.tokenFileURL()
         self.timeout = timeout
