@@ -6,8 +6,12 @@ import Foundation
 /// sends a line, reads a line, closes.
 public struct BridgeClient: BridgeProtocol {
     public struct BridgeNotRunning: LocalizedError {
+        public let detail: String?
+        public init(detail: String? = nil) { self.detail = detail }
         public var errorDescription: String? {
-            "Parola.app's test bridge is not reachable. Launch a Debug build of Parola.app and try again."
+            let base = "Parola.app's test bridge is not reachable."
+            let hint = detail ?? "Launch a Debug build of Parola.app and try again."
+            return "\(base) \(hint)"
         }
     }
 
@@ -18,18 +22,37 @@ public struct BridgeClient: BridgeProtocol {
 
     private let portFileURL: URL
     private let tokenFileURL: URL
+    private let discoveryFileURL: URL
     private let timeout: TimeInterval
 
     /// Bumped when the wire format breaks. The bridge echoes its own version so the client can detect skew.
     public static let clientVersion: Int = 2
 
     public init(timeout: TimeInterval = 35) {
-        self.portFileURL = AppLauncher.portFileURL()
-        self.tokenFileURL = AppLauncher.tokenFileURL()
+        self.init(
+            portFileURL: AppLauncher.portFileURL(),
+            tokenFileURL: AppLauncher.tokenFileURL(),
+            discoveryFileURL: AppLauncher.discoveryFileURL(),
+            timeout: timeout
+        )
+    }
+
+    init(portFileURL: URL, tokenFileURL: URL, discoveryFileURL: URL, timeout: TimeInterval) {
+        self.portFileURL = portFileURL
+        self.tokenFileURL = tokenFileURL
+        self.discoveryFileURL = discoveryFileURL
         self.timeout = timeout
     }
 
     public func call(_ cmd: String, argsJSON: Data) async throws -> String {
+        do {
+            return try await performCall(cmd, argsJSON: argsJSON)
+        } catch is BridgeNotRunning {
+            throw BridgeNotRunning(detail: Self.staleDiscoveryHint(discoveryFileURL: discoveryFileURL))
+        }
+    }
+
+    private func performCall(_ cmd: String, argsJSON: Data) async throws -> String {
         let port = try readPort()
         let token = readToken() ?? ""
         let payload = encodeRequest(cmd: cmd, argsJSON: argsJSON, token: token)
@@ -53,6 +76,22 @@ public struct BridgeClient: BridgeProtocol {
                 }
             }
         }
+    }
+
+    static func staleDiscoveryHint(discoveryFileURL: URL) -> String? {
+        guard let data = try? Data(contentsOf: discoveryFileURL),
+              let record = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let pid = record["pid"] as? Int, pid > 0 else { return nil }
+        if processAlive(pid: pid) {
+            return "Parola.app (pid \(pid)) wrote the bridge files but isn't accepting on the recorded port — "
+                + "another instance may have overwritten them. Relaunch the app or toggle the bridge in Settings → Automation."
+        }
+        return "The bridge files in Caches/Parola were left by a dead instance (pid \(pid)). "
+            + "Relaunch Parola.app or toggle the bridge in Settings → Automation to rewrite them."
+    }
+
+    private static func processAlive(pid: Int) -> Bool {
+        kill(pid_t(pid), 0) == 0 || errno == EPERM
     }
 
     private static func requestedTimeout(argsJSON: Data) -> TimeInterval {

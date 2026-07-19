@@ -89,6 +89,10 @@ public enum AppLauncher {
         cacheDirectory().appendingPathComponent("bridge.token")
     }
 
+    public static func discoveryFileURL() -> URL {
+        cacheDirectory().appendingPathComponent("bridge.json")
+    }
+
     private static func cacheDirectory() -> URL {
         let caches = (try? FileManager.default.url(
             for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: false
