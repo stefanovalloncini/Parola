@@ -61,6 +61,19 @@ struct SystemAudioSampleCopyTests {
         return buffer
     }
 
+    @Test("target matching covers the app and its helper bundles, nothing else")
+    @available(macOS 14.2, *)
+    func targetBundleMatching() {
+        let targets: Set<String> = ["com.microsoft.teams2", "us.zoom.xos"]
+
+        #expect(ProcessTapAudioSource.matchesTarget(bundleID: "com.microsoft.teams2", targets: targets))
+        #expect(ProcessTapAudioSource.matchesTarget(bundleID: "com.microsoft.teams2.helper.renderer", targets: targets))
+        #expect(ProcessTapAudioSource.matchesTarget(bundleID: "us.zoom.xos", targets: targets))
+        #expect(!ProcessTapAudioSource.matchesTarget(bundleID: "com.microsoft.teams22", targets: targets))
+        #expect(!ProcessTapAudioSource.matchesTarget(bundleID: "com.apple.Safari", targets: targets))
+        #expect(!ProcessTapAudioSource.matchesTarget(bundleID: "com.microsoft.teams2", targets: []))
+    }
+
     private static func makeSampleBuffer(from pcm: AVAudioPCMBuffer) throws -> CMSampleBuffer {
         var asbd = pcm.format.streamDescription.pointee
         var formatDesc: CMAudioFormatDescription?

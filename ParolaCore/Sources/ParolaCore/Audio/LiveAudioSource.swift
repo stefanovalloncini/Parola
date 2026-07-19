@@ -26,10 +26,19 @@ public enum LiveAudioSourceFactory {
     #if os(macOS)
     @available(macOS 13.0, *)
     public static func makeSystem(
+        targetBundleIDs: Set<String> = [],
         clock: any Clock<Duration> = ContinuousClock()
     ) async -> any LiveAudioSource {
         if let fixtureURL = await MockAudioSourceRegistry.shared.resolve(for: .system) {
             return FixtureAudioSource.make(fixtureURL: fixtureURL, clock: clock)
+        }
+        // Targets with no audio-producing process fall back to the full mix rather
+        // than recording silence.
+        if #available(macOS 14.2, *), !targetBundleIDs.isEmpty {
+            let objects = ProcessTapAudioSource.audioProcessObjects(matching: targetBundleIDs)
+            if !objects.isEmpty {
+                return ProcessTapAudioSource(processObjects: objects)
+            }
         }
         return SystemAudioSource()
     }
