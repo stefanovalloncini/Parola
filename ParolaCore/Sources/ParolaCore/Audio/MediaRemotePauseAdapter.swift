@@ -2,6 +2,7 @@ import Foundation
 import os
 
 #if canImport(Darwin) && os(macOS)
+import CoreAudio
 import Darwin
 #endif
 
@@ -20,13 +21,36 @@ struct MediaRemotePauseAdapter: MediaPlaybackToggler {
         #endif
     }
 
+    /// MediaRemote's now-playing query answers false to unentitled GUI apps on modern
+    /// macOS even while media plays (send still works), so an audibly rendering output
+    /// device also counts as playing.
     func isPlaying() async -> Bool {
         #if canImport(Darwin) && os(macOS)
-        return await MediaRemoteBridge.shared.isPlaying()
+        if await MediaRemoteBridge.shared.isPlaying() { return true }
+        return Self.defaultOutputDeviceRunningSomewhere()
         #else
         return true
         #endif
     }
+
+    #if canImport(Darwin) && os(macOS)
+    private static func defaultOutputDeviceRunningSomewhere() -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var device = AudioObjectID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device) == noErr,
+              device != kAudioObjectUnknown else { return false }
+        address.mSelector = kAudioDevicePropertyDeviceIsRunningSomewhere
+        var running: UInt32 = 0
+        size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &running) == noErr else { return false }
+        return running != 0
+    }
+    #endif
 }
 
 #if canImport(Darwin) && os(macOS)
