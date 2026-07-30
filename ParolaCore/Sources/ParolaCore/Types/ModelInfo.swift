@@ -3,7 +3,7 @@ import Foundation
 public struct ModelInfo: Codable, Hashable, Sendable, Identifiable {
     public var id: String { name }
 
-    /// WhisperKit variant identifier, e.g. "openai_whisper-tiny".
+    /// Catalog variant identifier, e.g. "openai_whisper-tiny" or "nvidia_parakeet-tdt-0.6b-v2".
     public var name: String
 
     /// Human-readable label, e.g. "Whisper Tiny".

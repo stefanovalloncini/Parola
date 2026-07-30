@@ -64,7 +64,7 @@ enum HuggingFaceDownloader {
             let (tmp, response): (URL, URLResponse)
             do {
                 (tmp, response) = try await urlSession.download(from: fileURL, delegate: delegate)
-            } catch is CancellationError {
+            } catch let error where isCancellation(error) {
                 try? sidecar.write(to: sidecarURL)
                 throw CancellationError()
             }

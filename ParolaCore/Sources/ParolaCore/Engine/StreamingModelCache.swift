@@ -19,6 +19,7 @@ actor StreamingModelCache {
     private let loader: Loader
     private var loaded: [String: SharedWhisperKit] = [:]
     private var inFlight: [String: Task<SharedWhisperKit, Error>] = [:]
+    private var currentModelName: String?
     private var evictionEpoch = 0
     private var pressureSource: (any DispatchSourceMemoryPressure)?
 
@@ -28,11 +29,12 @@ actor StreamingModelCache {
 
     func borrow(_ modelName: String, store: ModelStore) async throws -> SharedWhisperKit {
         installPressureSourceIfNeeded()
+        // Borrowing a new name is a model switch: dropping the other entries frees their
+        // multi-GB kits once running sessions release theirs.
+        currentModelName = modelName
+        loaded = loaded.filter { $0.key == modelName }
         if let shared = loaded[modelName] { return shared }
         if let pending = inFlight[modelName] { return try await pending.value }
-        // A model switch is the only path that borrows a new name; dropping the old
-        // entries frees their multi-GB kits once running sessions release theirs.
-        loaded = loaded.filter { $0.key == modelName }
 
         let loader = loader
         let task = Task { try await loader(modelName, store) }
@@ -41,8 +43,12 @@ actor StreamingModelCache {
         do {
             let shared = try await task.value
             if evictionEpoch == myEpoch {
-                loaded[modelName] = shared
                 inFlight[modelName] = nil
+                // Cache only the latest requested name: a switch may have superseded this load
+                // while it ran, and caching both would leave two multi-GB kits resident.
+                if currentModelName == modelName {
+                    loaded[modelName] = shared
+                }
             }
             return shared
         } catch {

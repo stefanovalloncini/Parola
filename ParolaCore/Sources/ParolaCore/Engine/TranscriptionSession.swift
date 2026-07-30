@@ -11,6 +11,7 @@ public actor TranscriptionSession {
     public var idleTimeout: TimeInterval
 
     private let registry: EngineRegistry
+    private let managedConfiguration: ManagedConfiguration
     let diarizer = DiarizationService()
     private let diarizerIdleTimeout: TimeInterval = 60
     private let clock: any Clock<Duration>
@@ -27,12 +28,14 @@ public actor TranscriptionSession {
         modelStore: ModelStore = .shared,
         registry: EngineRegistry = .shared,
         idleTimeout: TimeInterval = 600,
-        clock: any Clock<Duration> = ContinuousClock()
+        clock: any Clock<Duration> = ContinuousClock(),
+        managedConfiguration: ManagedConfiguration = .shared
     ) {
         self.modelStore = modelStore
         self.registry = registry
         self.idleTimeout = idleTimeout
         self.clock = clock
+        self.managedConfiguration = managedConfiguration
     }
 
     /// Transcribes from an AudioSource. Downloads the requested model on demand.
@@ -51,6 +54,10 @@ public actor TranscriptionSession {
 
         installPressureSourceIfNeeded()
         await ensureBootstrap()
+        var options = options
+        if managedConfiguration.requireEnglishOnly, options.language == nil {
+            options.language = "en"
+        }
         let modelName = options.model ?? defaultModelName()
         try Task.checkCancellation()
 
@@ -171,6 +178,17 @@ public actor TranscriptionSession {
         engineID: EngineID,
         variant: ModelVariant?
     ) async throws {
+        if let allowed = managedConfiguration.allowedEngines, !allowed.contains(engineID) {
+            throw ParolaError.policyRestricted(
+                "The \(engineID.displayName) engine is disabled by a managed policy."
+            )
+        }
+        if managedConfiguration.requireEnglishOnly,
+           let language = options.language, language.lowercased() != "en" {
+            throw ParolaError.policyRestricted(
+                "Transcription is restricted to English by a managed policy."
+            )
+        }
         guard let baseCaps = await registry.capabilities(for: engineID) else {
             throw ParolaError.engineNotRegistered(engineID.rawValue)
         }
@@ -209,14 +227,7 @@ public actor TranscriptionSession {
     }
 
     private func defaultModelName() -> String {
-        if let managed = ManagedConfiguration.shared.defaultModel,
-           ModelCatalog.variant(id: managed) != nil {
-            return managed
-        }
-        if let recommended = ModelCatalog.all.first(where: { $0.category == .recommended }) {
-            return recommended.id
-        }
-        return "openai_whisper-tiny"
+        ModelCatalog.defaultModelID(configuration: managedConfiguration)
     }
 
     private func scheduleIdleUnload() {

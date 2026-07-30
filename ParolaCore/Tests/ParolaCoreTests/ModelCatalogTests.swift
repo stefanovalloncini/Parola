@@ -101,3 +101,61 @@ struct ModelCatalogTests {
         #expect(caps?.supportedLanguages.isEnglishOnly == true)
     }
 }
+
+@Suite("Model catalog lookup")
+struct ModelCatalogLookupTests {
+    private func makeConfig(_ managed: [String: Any]) -> ManagedConfiguration {
+        let storage = UserDefaults(suiteName: "parola-catalog-test-\(UUID().uuidString)")!
+        storage.set(managed, forKey: "com.apple.configuration.managed")
+        return ManagedConfiguration(storage: storage)
+    }
+
+    @Test("closestMatch resolves the bare Parakeet alias")
+    func closestMatchParakeetAlias() {
+        #expect(ModelCatalog.closestMatch(for: "parakeet-tdt-0.6b-v2")?.id == "nvidia_parakeet-tdt-0.6b-v2")
+    }
+
+    @Test("closestMatch resolves a missing openai_ prefix")
+    func closestMatchMissingPrefix() {
+        #expect(ModelCatalog.closestMatch(for: "whisper-tiny")?.id == "openai_whisper-tiny")
+    }
+
+    @Test("closestMatch prefers the suffix match over a containing id")
+    func closestMatchPrefersSuffix() {
+        #expect(ModelCatalog.closestMatch(for: "whisper-large-v3")?.id == "openai_whisper-large-v3")
+    }
+
+    @Test("closestMatch stays quiet for plausible out-of-catalog variants")
+    func closestMatchOutOfCatalog() {
+        #expect(ModelCatalog.closestMatch(for: "openai_whisper-medium") == nil)
+        #expect(ModelCatalog.closestMatch(for: "xyz") == nil)
+    }
+
+    @Test("defaultModelID honors a valid managed default")
+    func defaultHonorsManaged() {
+        let config = makeConfig(["defaultModel": "openai_whisper-large-v3"])
+        #expect(ModelCatalog.defaultModelID(configuration: config) == "openai_whisper-large-v3")
+    }
+
+    @Test("defaultModelID ignores an unknown managed default")
+    func defaultIgnoresUnknownManaged() {
+        let config = makeConfig(["defaultModel": "not-a-model"])
+        let id = ModelCatalog.defaultModelID(configuration: config)
+        #expect(ModelCatalog.variant(id: id)?.category == .recommended)
+    }
+
+    @Test("defaultModelID respects the engine allowlist")
+    func defaultRespectsAllowlist() {
+        let config = makeConfig(["allowedEngines": ["whisperkit"]])
+        let id = ModelCatalog.defaultModelID(configuration: config)
+        #expect(id == "openai_whisper-large-v3_turbo")
+    }
+
+    @Test("groupedForPicker filters by the engine allowlist")
+    func groupedForPickerFilters() {
+        let config = makeConfig(["allowedEngines": ["parakeet"]])
+        let groups = ModelCatalog.groupedForPicker(configuration: config)
+        let ids = groups.flatMap { $0.1.map(\.id) }
+        #expect(ids == ["nvidia_parakeet-tdt-0.6b-v2"])
+    }
+}

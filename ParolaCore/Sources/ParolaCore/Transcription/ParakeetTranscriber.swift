@@ -118,9 +118,8 @@ actor ParakeetTranscriber: Transcriber {
                     progress?(snapshot.fractionCompleted)
                 }
             )
-        } catch is CancellationError {
-            throw CancellationError()
         } catch {
+            if isCancellation(error) { throw CancellationError() }
             throw ParolaError.modelDownloadFailed(model, underlying: String(describing: error))
         }
     }

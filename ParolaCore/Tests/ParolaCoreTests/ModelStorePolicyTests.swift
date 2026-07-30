@@ -1,0 +1,176 @@
+import Foundation
+import Testing
+@testable import ParolaCore
+
+@Suite("Model store policy and download coordination")
+struct ModelStorePolicyTests {
+    private func makeConfig(_ managed: [String: Any]) -> ManagedConfiguration {
+        let storage = UserDefaults(suiteName: "parola-store-policy-\(UUID().uuidString)")!
+        storage.set(managed, forKey: "com.apple.configuration.managed")
+        return ManagedConfiguration(storage: storage)
+    }
+
+    private func makeStore(_ managed: [String: Any] = [:]) -> ModelStore {
+        ModelStore(
+            modelsDirectory: FileManager.default.temporaryDirectory
+                .appendingPathComponent("store-policy-tests-\(UUID().uuidString)"),
+            managedConfiguration: makeConfig(managed)
+        )
+    }
+
+    @Test("download throws when downloads are disabled by policy")
+    func downloadBlockedByPolicy() async {
+        let store = makeStore(["disableModelDownloads": true])
+        await #expect(throws: ParolaError.self) {
+            _ = try await store.download(variant: "openai_whisper-tiny")
+        }
+    }
+
+    @Test("an installed model is returned even when downloads are disabled")
+    func installedModelSurvivesPolicy() async throws {
+        let store = makeStore(["disableModelDownloads": true])
+        try FileManager.default.createDirectory(
+            at: store.installedURL(for: "openai_whisper-tiny"),
+            withIntermediateDirectories: true
+        )
+        let url = try await store.download(variant: "openai_whisper-tiny")
+        #expect(url == store.installedURL(for: "openai_whisper-tiny"))
+    }
+
+    @Test("download throws for an engine outside the allowlist")
+    func downloadBlockedByAllowlist() async {
+        let store = makeStore(["allowedEngines": ["whisperkit"]])
+        do {
+            _ = try await store.download(variant: "nvidia_parakeet-tdt-0.6b-v2")
+            Issue.record("expected policyRestricted")
+        } catch let error as ParolaError {
+            guard case .policyRestricted = error else {
+                Issue.record("expected policyRestricted, got \(error)")
+                return
+            }
+        } catch {
+            Issue.record("expected ParolaError, got \(error)")
+        }
+    }
+
+    @Test("download rejects a near-miss model id with a suggestion before touching the network")
+    func downloadSuggestsForTypo() async {
+        let store = makeStore()
+        do {
+            _ = try await store.download(variant: "parakeet-tdt-0.6b-v2")
+            Issue.record("expected unknownModel")
+        } catch let error as ParolaError {
+            guard case .unknownModel(let name, let suggestion) = error else {
+                Issue.record("expected unknownModel, got \(error)")
+                return
+            }
+            #expect(name == "parakeet-tdt-0.6b-v2")
+            #expect(suggestion == "nvidia_parakeet-tdt-0.6b-v2")
+        } catch {
+            Issue.record("expected ParolaError, got \(error)")
+        }
+    }
+
+    private actor ConcurrencyGauge {
+        private(set) var current = 0
+        private(set) var peak = 0
+        private(set) var invocations = 0
+
+        func enter() {
+            current += 1
+            invocations += 1
+            peak = max(peak, current)
+        }
+
+        func exit() { current -= 1 }
+    }
+
+    @Test("concurrent downloads of the same variant are serialized and coalesced")
+    func concurrentDownloadsSerialized() async throws {
+        let store = makeStore()
+        let gauge = ConcurrencyGauge()
+        let registry = EngineRegistry()
+        await registry.register(
+            engineID: .whisperKit,
+            capabilities: .whisperKitDefaults,
+            factory: { store in WhisperKitTranscriber(modelStore: store) },
+            downloader: { variant, store, _ in
+                await gauge.enter()
+                try await Task.sleep(for: .milliseconds(50))
+                await gauge.exit()
+                return store.installedURL(for: variant)
+            }
+        )
+
+        try await withThrowingTaskGroup(of: URL.self) { group in
+            for _ in 0..<3 {
+                group.addTask {
+                    try await store.download(variant: "openai_whisper-tiny", registry: registry)
+                }
+            }
+            for try await _ in group {}
+        }
+
+        #expect(await gauge.peak == 1)
+        #expect(await gauge.invocations == 1, "later callers should hit the installed fast path")
+        #expect(store.isInstalled("openai_whisper-tiny"))
+    }
+}
+
+@Suite("Transcription session policy")
+struct TranscriptionSessionPolicyTests {
+    private func makeConfig(_ managed: [String: Any]) -> ManagedConfiguration {
+        let storage = UserDefaults(suiteName: "parola-session-policy-\(UUID().uuidString)")!
+        storage.set(managed, forKey: "com.apple.configuration.managed")
+        return ManagedConfiguration(storage: storage)
+    }
+
+    private func makeSession(_ managed: [String: Any]) -> TranscriptionSession {
+        TranscriptionSession(
+            modelStore: ModelStore(
+                modelsDirectory: FileManager.default.temporaryDirectory
+                    .appendingPathComponent("session-policy-tests-\(UUID().uuidString)")
+            ),
+            registry: EngineRegistry(),
+            managedConfiguration: makeConfig(managed)
+        )
+    }
+
+    private func expectPolicyRestricted(
+        _ session: TranscriptionSession,
+        options: TranscriptionOptions
+    ) async {
+        do {
+            _ = try await session.transcribe(
+                source: FileAudioSource(url: URL(fileURLWithPath: "/nonexistent.wav")),
+                options: options
+            )
+            Issue.record("expected policyRestricted")
+        } catch let error as ParolaError {
+            guard case .policyRestricted = error else {
+                Issue.record("expected policyRestricted, got \(error)")
+                return
+            }
+        } catch {
+            Issue.record("expected ParolaError, got \(error)")
+        }
+    }
+
+    @Test("a non-English language is rejected when policy requires English")
+    func englishOnlyRejectsOtherLanguages() async {
+        let session = makeSession(["requireEnglishOnly": true])
+        await expectPolicyRestricted(
+            session,
+            options: TranscriptionOptions(model: "openai_whisper-tiny", language: "it")
+        )
+    }
+
+    @Test("a model whose engine is outside the allowlist is rejected")
+    func allowlistRejectsOtherEngines() async {
+        let session = makeSession(["allowedEngines": ["parakeet"]])
+        await expectPolicyRestricted(
+            session,
+            options: TranscriptionOptions(model: "openai_whisper-tiny")
+        )
+    }
+}

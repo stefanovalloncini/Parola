@@ -112,6 +112,50 @@ struct StreamingModelCacheTests {
         #expect(await counter.count == 2)
     }
 
+    private actor LoadGate {
+        private var waiters: [String: CheckedContinuation<Void, Never>] = [:]
+        private var opened: Set<String> = []
+
+        func wait(_ name: String) async {
+            if opened.contains(name) { return }
+            await withCheckedContinuation { waiters[name] = $0 }
+        }
+
+        func open(_ name: String) {
+            opened.insert(name)
+            waiters.removeValue(forKey: name)?.resume()
+        }
+    }
+
+    @Test("a load superseded by a switch to another model is not cached")
+    func supersededLoadNotCached() async throws {
+        let counter = LoadCounter()
+        let gate = LoadGate()
+        let cache = StreamingModelCache { name, _ in
+            await counter.increment()
+            await gate.wait(name)
+            return try await Self.makeUnloadedKit()
+        }
+        let store = Self.makeStore()
+
+        async let tiny = cache.borrow("openai_whisper-tiny", store: store)
+        while await counter.count < 1 { try await Task.sleep(for: .milliseconds(1)) }
+        async let small = cache.borrow("openai_whisper-small", store: store)
+        while await counter.count < 2 { try await Task.sleep(for: .milliseconds(1)) }
+
+        // The superseded tiny load lands after small was requested; only small may stay cached.
+        await gate.open("openai_whisper-tiny")
+        _ = try await tiny
+        await gate.open("openai_whisper-small")
+        _ = try await small
+
+        _ = try await cache.borrow("openai_whisper-small", store: store)
+        #expect(await counter.count == 2, "the latest borrow stays cached")
+
+        _ = try await cache.borrow("openai_whisper-tiny", store: store)
+        #expect(await counter.count == 3, "the superseded load must not have been cached")
+    }
+
     @Test("borrowing a different model evicts the previous one")
     func borrowEvictsOtherModels() async throws {
         let counter = LoadCounter()

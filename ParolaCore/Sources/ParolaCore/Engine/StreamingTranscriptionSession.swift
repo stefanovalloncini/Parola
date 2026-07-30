@@ -74,8 +74,16 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             throw ParolaError.transcriptionFailed("session already started")
         }
 
-        let modelName = options.model ?? "openai_whisper-tiny"
+        let modelName = options.model ?? ModelCatalog.fallbackModelID
+        if let variant = ModelCatalog.variant(id: modelName), variant.engineID != .whisperKit {
+            throw ParolaError.unsupportedForEngine(
+                "Live transcription runs on Whisper models; \(variant.displayName) can't stream. Pick a Whisper model and try again."
+            )
+        }
         if !modelStore.isInstalled(modelName) {
+            if await EngineRegistry.shared.registeredEngines().isEmpty {
+                await ParolaCoreBootstrap.registerBuiltInEngines()
+            }
             _ = try await modelStore.download(variant: modelName, progress: downloadProgress)
         }
 

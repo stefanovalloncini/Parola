@@ -133,8 +133,37 @@ public enum ModelCatalog {
         ModelDownloadSource(huggingFaceRepo: "argmaxinc/whisperkit-coreml", subpath: id)
     }
 
+    /// Last-resort model when nothing better is known: smallest multilingual Whisper.
+    public static let fallbackModelID = "openai_whisper-tiny"
+
+    /// The model to use when the caller doesn't name one: the managed default if set,
+    /// else the first allowed recommended variant, else the first allowed variant at all.
+    public static func defaultModelID(configuration: ManagedConfiguration = .shared) -> String {
+        if let managed = configuration.defaultModel, variant(id: managed) != nil {
+            return managed
+        }
+        let allowed = configuration.filterAllowed(all)
+        if let recommended = allowed.first(where: { $0.category == .recommended }) {
+            return recommended.id
+        }
+        return allowed.first?.id ?? fallbackModelID
+    }
+
     public static func variant(id: String) -> ModelVariant? {
         all.first { $0.id == id }
+    }
+
+    /// Best-effort suggestion for a mistyped or partial model id, e.g. the bare
+    /// "parakeet-tdt-0.6b-v2" alias → "nvidia_parakeet-tdt-0.6b-v2". Nil when nothing is close,
+    /// so ids for repos outside the catalog can still pass through untouched.
+    public static func closestMatch(for id: String) -> ModelVariant? {
+        let needle = id.lowercased()
+        guard needle.count >= 4 else { return nil }
+        let candidates = all.filter { $0.id.lowercased() != needle }
+        if let suffix = candidates.first(where: { $0.id.lowercased().hasSuffix(needle) }) {
+            return suffix
+        }
+        return candidates.first { $0.id.lowercased().contains(needle) }
     }
 
     public static func variants(for engineID: EngineID) -> [ModelVariant] {
@@ -167,8 +196,10 @@ public enum ModelCatalog {
         variant(id: id).flatMap(staticCapabilities(for:))
     }
 
-    public static func groupedForPicker() -> [(ModelCategory, [ModelVariant])] {
-        let grouped = Dictionary(grouping: all) { $0.category }
+    public static func groupedForPicker(
+        configuration: ManagedConfiguration = .shared
+    ) -> [(ModelCategory, [ModelVariant])] {
+        let grouped = Dictionary(grouping: configuration.filterAllowed(all)) { $0.category }
         return ModelCategory.allCases
             .compactMap { category in
                 guard let variants = grouped[category], !variants.isEmpty else { return nil }

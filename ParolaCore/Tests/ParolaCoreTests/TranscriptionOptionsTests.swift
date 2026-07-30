@@ -43,8 +43,6 @@ struct TranscriptionOptionsTests {
         #expect(options.initialPrompt == nil)
         #expect(options.diarize == false)
         #expect(options.expectedSpeakers == nil)
-        #expect(options.chunkingStrategy == nil)
-        #expect(options.computeUnits == nil)
     }
 
     @Test("default static value matches a fresh init")

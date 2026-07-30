@@ -10,6 +10,8 @@ public final class ModelStore: Sendable {
     public static let shared = ModelStore()
 
     private let modelsDirectory: URL
+    private let managedConfiguration: ManagedConfiguration
+    private let downloadGate = DownloadGate()
 
     public static let storageOverrideKey = "parola.modelsStoragePath"
 
@@ -34,7 +36,12 @@ public final class ModelStore: Sendable {
         }
     }
 
-    public init(modelsDirectory: URL? = nil, defaults: UserDefaults = .standard) {
+    public init(
+        modelsDirectory: URL? = nil,
+        defaults: UserDefaults = .standard,
+        managedConfiguration: ManagedConfiguration = .shared
+    ) {
+        self.managedConfiguration = managedConfiguration
         if let modelsDirectory {
             self.modelsDirectory = modelsDirectory
         } else if let raw = defaults.string(forKey: Self.storageOverrideKey),
@@ -81,7 +88,7 @@ public final class ModelStore: Sendable {
     /// Returns the curated catalog merged with what's actually on disk.
     /// Filters by the managed-config engine allowlist if one is set.
     public func catalog() -> [ModelInfo] {
-        ManagedConfiguration.shared.filterAllowed(ModelCatalog.all).map { variant in
+        managedConfiguration.filterAllowed(ModelCatalog.all).map { variant in
             if variant.engineID == .appleSpeech {
                 return modelInfo(for: variant, url: nil, isInstalled: true)
             }
@@ -119,7 +126,7 @@ public final class ModelStore: Sendable {
         let fm = FileManager.default
         var seen: [String: ModelInfo] = [:]
 
-        for variant in ModelCatalog.all {
+        for variant in managedConfiguration.filterAllowed(ModelCatalog.all) {
             let url = installedURL(for: variant.downloadSource)
             if isFullyDownloaded(at: url) {
                 seen[variant.id] = modelInfo(for: variant, url: url, isInstalled: true)
@@ -202,6 +209,7 @@ public final class ModelStore: Sendable {
     }
 
     /// Downloads a model variant into our cache directory. If already present, returns immediately.
+    /// Concurrent calls for the same variant are serialized; the loser returns the winner's result.
     /// - Parameter progress: 0.0–1.0 progress callback (best-effort).
     public func download(
         variant: String,
@@ -212,24 +220,49 @@ public final class ModelStore: Sendable {
             progress?(1.0)
             return installedURL(for: variant)
         }
-        guard let entry = ModelCatalog.variant(id: variant) else {
-            let fallbackSource = ModelDownloadSource(
-                huggingFaceRepo: "argmaxinc/whisperkit-coreml",
-                subpath: variant
-            )
-            if let downloader = await registry.downloader(for: .whisperKit) {
-                return try await downloadViaRegistry(
-                    downloader, variant: variant, source: fallbackSource, progress: progress
-                )
-            }
-            return try await downloadViaHuggingFace(source: fallbackSource, progress: progress)
+        try checkDownloadPolicy(variant: variant)
+        if ModelCatalog.variant(id: variant) == nil,
+           let suggestion = ModelCatalog.closestMatch(for: variant) {
+            throw ParolaError.unknownModel(variant, suggestion: suggestion.id)
         }
-        if let downloader = await registry.downloader(for: entry.engineID) {
+        return try await downloadGate.serialized(variant) {
+            try await self.downloadNow(variant: variant, progress: progress, registry: registry)
+        }
+    }
+
+    private func checkDownloadPolicy(variant: String) throws {
+        if managedConfiguration.disableModelDownloads {
+            throw ParolaError.policyRestricted("Model downloads are disabled by a managed policy.")
+        }
+        if let entry = ModelCatalog.variant(id: variant),
+           let allowed = managedConfiguration.allowedEngines,
+           !allowed.contains(entry.engineID) {
+            throw ParolaError.policyRestricted(
+                "The \(entry.engineID.displayName) engine is disabled by a managed policy."
+            )
+        }
+    }
+
+    private func downloadNow(
+        variant: String,
+        progress: (@Sendable (Double) -> Void)?,
+        registry: EngineRegistry
+    ) async throws -> URL {
+        if isInstalled(variant) {
+            progress?(1.0)
+            return installedURL(for: variant)
+        }
+        let source = ModelCatalog.variant(id: variant)?.downloadSource ?? ModelDownloadSource(
+            huggingFaceRepo: "argmaxinc/whisperkit-coreml",
+            subpath: variant
+        )
+        let engineID = ModelCatalog.variant(id: variant)?.engineID ?? .whisperKit
+        if let downloader = await registry.downloader(for: engineID) {
             return try await downloadViaRegistry(
-                downloader, variant: variant, source: entry.downloadSource, progress: progress
+                downloader, variant: variant, source: source, progress: progress
             )
         }
-        return try await downloadViaHuggingFace(source: entry.downloadSource, progress: progress)
+        return try await downloadViaHuggingFace(source: source, progress: progress)
     }
 
     /// Wraps an engine-supplied downloader in the same sidecar protocol the HuggingFace path
@@ -274,9 +307,8 @@ public final class ModelStore: Sendable {
             )
             progress?(1.0)
             return destination
-        } catch is CancellationError {
-            throw CancellationError()
         } catch {
+            if isCancellation(error) { throw CancellationError() }
             throw ParolaError.modelDownloadFailed(source.huggingFaceRepo, underlying: String(describing: error))
         }
     }
@@ -311,5 +343,39 @@ public final class ModelStore: Sendable {
             }
         }
         return total
+    }
+}
+
+/// Serializes downloads per model id so two callers (say, the Settings download button and a
+/// transcribe-triggered auto-download) never write the same model directory at once.
+actor DownloadGate {
+    private var busy: Set<String> = []
+    private var waiters: [String: [CheckedContinuation<Void, Never>]] = [:]
+
+    func serialized<T: Sendable>(
+        _ key: String,
+        _ body: @Sendable () async throws -> T
+    ) async throws -> T {
+        while busy.contains(key) {
+            try Task.checkCancellation()
+            // On cancel, wake every waiter for this key: the cancelled one re-loops into the
+            // check above and throws; the rest re-queue.
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { waiters[key, default: []].append($0) }
+            } onCancel: {
+                Task { await self.wakeWaiters(for: key) }
+            }
+        }
+        busy.insert(key)
+        defer {
+            busy.remove(key)
+            wakeWaiters(for: key)
+        }
+        return try await body()
+    }
+
+    private func wakeWaiters(for key: String) {
+        let queue = waiters.removeValue(forKey: key) ?? []
+        for waiter in queue { waiter.resume() }
     }
 }

@@ -1,5 +1,4 @@
 import Foundation
-import CoreML
 @preconcurrency import WhisperKit
 import os
 
@@ -10,7 +9,6 @@ actor WhisperKitTranscriber: Transcriber {
 
     private var whisperKit: WhisperKit?
     private var loadedModel: String?
-    private var loadedComputeUnits: MLComputeUnits?
     private let modelStore: ModelStore
     private let signposter = OSSignposter(subsystem: "app.parola.core", category: "engine.whisperkit")
 
@@ -19,11 +17,7 @@ actor WhisperKitTranscriber: Transcriber {
     }
 
     func load(model: String) async throws {
-        try await load(model: model, computeUnits: nil)
-    }
-
-    func load(model: String, computeUnits: MLComputeUnits?) async throws {
-        if loadedModel == model, loadedComputeUnits == computeUnits, whisperKit != nil { return }
+        if loadedModel == model, whisperKit != nil { return }
         let interval = signposter.beginInterval("load", "model=\(model, privacy: .public)")
         defer { signposter.endInterval("load", interval) }
         do {
@@ -32,7 +26,6 @@ actor WhisperKitTranscriber: Transcriber {
                 model: model,
                 downloadBase: modelStore.directory,
                 modelFolder: folder,
-                computeOptions: computeUnits.map { ModelComputeOptions(audioEncoderCompute: $0, textDecoderCompute: $0) },
                 verbose: false,
                 logLevel: .none,
                 prewarm: false,
@@ -41,7 +34,6 @@ actor WhisperKitTranscriber: Transcriber {
             )
             self.whisperKit = kit
             self.loadedModel = model
-            self.loadedComputeUnits = computeUnits
         } catch {
             throw ParolaError.transcriptionFailed("model load failed: \(error.localizedDescription)")
         }
@@ -52,7 +44,6 @@ actor WhisperKitTranscriber: Transcriber {
         defer { signposter.endInterval("unload", interval) }
         whisperKit = nil
         loadedModel = nil
-        loadedComputeUnits = nil
     }
 
     func loadedModelName() -> String? { loadedModel }
@@ -70,6 +61,7 @@ actor WhisperKitTranscriber: Transcriber {
                 progressCallback: { p in progress?(p.fractionCompleted) }
             )
         } catch {
+            if isCancellation(error) { throw CancellationError() }
             throw ParolaError.modelDownloadFailed(variant, underlying: String(describing: error))
         }
     }
@@ -111,14 +103,6 @@ actor WhisperKitTranscriber: Transcriber {
         progressHandler: (@Sendable (Double) -> Void)?,
         stageHandler: (@Sendable (TranscribeStage) -> Void)?
     ) async throws -> Transcript {
-        if let requested = options.computeUnits, requested != loadedComputeUnits, let current = loadedModel {
-            do {
-                try await load(model: current, computeUnits: requested)
-            } catch {
-                unload()
-                throw error
-            }
-        }
         guard let kit = whisperKit, let modelName = loadedModel else {
             throw ParolaError.transcriptionFailed("model not loaded")
         }
@@ -131,7 +115,7 @@ actor WhisperKitTranscriber: Transcriber {
             detectLanguage: options.language == nil,
             skipSpecialTokens: true,
             wordTimestamps: options.wordTimestamps,
-            chunkingStrategy: options.chunkingStrategy ?? .vad
+            chunkingStrategy: .vad
         )
         if let tokens = promptTokens(options.initialPrompt, tokenizer: kit.tokenizer) {
             decoding.promptTokens = tokens

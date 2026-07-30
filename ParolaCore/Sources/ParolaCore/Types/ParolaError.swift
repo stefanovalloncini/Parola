@@ -2,6 +2,8 @@ import Foundation
 
 public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
     case modelNotFound(String)
+    case unknownModel(String, suggestion: String?)
+    case policyRestricted(String)
     case modelDownloadFailed(String, underlying: String)
     case modelChecksumMismatch(file: String, expected: String, got: String)
     case audioLoadFailed(URL, underlying: String)
@@ -17,6 +19,14 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
         switch self {
         case .modelNotFound(let name):
             return "Model not found: \(name). Run `parola models download \(name)` first."
+        case .unknownModel(let name, let suggestion):
+            var text = "Unknown model \"\(name)\"."
+            if let suggestion {
+                text += " Did you mean \"\(suggestion)\"?"
+            }
+            return text
+        case .policyRestricted(let detail):
+            return detail
         case .modelDownloadFailed(let name, let underlying):
             return "Failed to download model \(name): \(underlying)"
         case .modelChecksumMismatch(let file, let expected, let got):
@@ -41,4 +51,11 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
     }
 
     public var errorDescription: String? { description }
+}
+
+/// URLSession surfaces a cancelled Swift task as `URLError(.cancelled)`, not `CancellationError`,
+/// so download paths need both checks to report a user cancel as a cancel instead of a failure.
+func isCancellation(_ error: any Error) -> Bool {
+    if error is CancellationError { return true }
+    return (error as? URLError)?.code == .cancelled
 }
