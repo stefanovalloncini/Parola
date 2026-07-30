@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var recordingTickTask: Task<Void, Never>?
     private var recordingStartedAt: Date?
     private let playbackKeys = PlaybackKeyMonitor()
+    private var appearanceObservation: NSKeyValueObservation?
 
     func bind(model: AppModel) {
         self.model = model
@@ -32,6 +33,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     default: break
                     }
                 }
+            }
+        }
+        // Covers both the Appearance setting (which assigns NSApp.appearance) and system dark-mode
+        // flips, either of which can change which variant a dynamic accent resolves to.
+        if appearanceObservation == nil {
+            appearanceObservation = NSApp.observe(\.effectiveAppearance) { _, _ in
+                Task { @MainActor in DockIcon.refresh() }
             }
         }
         if settingsResetSubscription == nil {

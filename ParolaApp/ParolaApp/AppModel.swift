@@ -624,6 +624,7 @@ final class AppModel {
     func applyTheme() -> ThemePalette {
         let palette = themeSelection.palette
         DS.theme = palette
+        DockIcon.refresh()
         return palette
     }
 
@@ -668,6 +669,7 @@ final class AppModel {
         themeCustomPaletteJSON = json
         themeIsCustom = true
         DS.theme = palette
+        DockIcon.refresh()
     }
 
     private func decodedCustomPalette() -> ThemePalette? {
