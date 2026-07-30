@@ -6,14 +6,14 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "selectModel",
                 area: .model,
-                summary: "Selects the active WhisperKit model.",
+                summary: "Selects the active transcription model, with the same side effects as the toolbar picker.",
                 kind: .mutating,
                 args: [
                     .init(name: "name", kind: .string(), required: true, summary: "Model name (e.g. openai_whisper-tiny)"),
                 ],
                 handler: { args, ctx in
                     let name = try args.string("name")
-                    ctx.model.selectedModel = name
+                    ctx.model.activateModel(name)
                     return .object(["selectedModel": .string(name)])
                 }
             ),
@@ -43,6 +43,9 @@ extension ParolaAutomationServer {
                 ],
                 handler: { args, ctx in
                     let name = try args.string("name")
+                    guard name != ctx.model.selectedModel else {
+                        throw AutomationError.precondition("can't delete the active model; select another model first")
+                    }
                     ctx.model.deleteModel(name)
                     return .object(["deleted": .string(name)])
                 }

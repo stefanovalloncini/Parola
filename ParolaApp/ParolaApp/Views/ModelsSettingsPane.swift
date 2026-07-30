@@ -323,15 +323,19 @@ struct ModelsSettingsPane: View {
         Set(model.availableModels.filter(\.isInstalled).map(\.name))
     }
 
+    private var allowedCatalog: [ModelVariant] {
+        ManagedConfiguration.shared.filterAllowed(ModelCatalog.all)
+    }
+
     private var filteredInstalledVariants: [ModelVariant] {
         guard installFilter != .available else { return [] }
-        let base = ModelCatalog.all.filter { installedIDs.contains($0.id) }
+        let base = allowedCatalog.filter { installedIDs.contains($0.id) }
         return sorted(matching(base))
     }
 
     private var filteredRecommendedVariants: [ModelVariant] {
         guard installFilter != .installed else { return [] }
-        let base = ModelCatalog.all.filter { !installedIDs.contains($0.id) }
+        let base = allowedCatalog.filter { !installedIDs.contains($0.id) }
         return sorted(matching(base))
     }
 

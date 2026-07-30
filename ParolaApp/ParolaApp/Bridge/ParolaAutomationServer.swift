@@ -441,7 +441,7 @@ final class ParolaAutomationServer {
     func snapshotState() -> AutomationValue {
         guard let model else { return .null }
         let defaults = model.defaults
-        let selectedModel = defaults.string(forKey: "selectedModel") ?? "openai_whisper-tiny"
+        let selectedModel = defaults.string(forKey: "selectedModel") ?? ModelCatalog.fallbackModelID
         let language = defaults.string(forKey: "selectedLanguageRaw") ?? ""
         let appTheme = defaults.string(forKey: "appTheme") ?? "system"
         let themePreset = defaults.string(forKey: "appAccentColor") ?? "terracotta"

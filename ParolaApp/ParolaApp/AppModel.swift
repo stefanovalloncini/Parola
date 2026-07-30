@@ -241,7 +241,7 @@ final class AppModel {
         inputDeviceUID.isEmpty ? nil : inputDeviceUID
     }
 
-    var selectedModel: String = "openai_whisper-tiny" {
+    var selectedModel: String = ModelCatalog.fallbackModelID {
         didSet {
             defaults.set(selectedModel, forKey: "selectedModel")
             if !isReloadingSettings {
@@ -539,7 +539,7 @@ final class AppModel {
         self.batchExportIncludeTimestamps = defaults.bool(forKey: "batchExportIncludeTimestamps")
         self.batchExportFormatOptionsJSON = defaults.string(forKey: "batchExportFormatOptions") ?? "{}"
         self.inputDeviceUID = defaults.string(forKey: "inputDeviceUID") ?? ""
-        self.selectedModel = defaults.string(forKey: "selectedModel") ?? "openai_whisper-tiny"
+        self.selectedModel = defaults.string(forKey: "selectedModel") ?? ModelCatalog.fallbackModelID
         self.selectedLanguageRaw = defaults.string(forKey: "selectedLanguageRaw") ?? ""
         self.translate = defaults.bool(forKey: "translate")
         self.appTheme = defaults.string(forKey: "appTheme") ?? "system"
@@ -1167,7 +1167,7 @@ final class AppModel {
         availableModels = curated + extra
 
         if !availableModels.contains(where: { $0.name == selectedModel }) {
-            selectedModel = availableModels.first?.name ?? "openai_whisper-tiny"
+            selectedModel = availableModels.first?.name ?? ModelCatalog.fallbackModelID
         }
         refreshModelSizes()
     }
@@ -1229,6 +1229,9 @@ final class AppModel {
         downloadTask = Task {
             do {
                 phase = .downloadingModel(name: name, progress: 0)
+                // Cold launch reaches here before any transcribe has registered the engines,
+                // and an empty registry silently swaps in the generic HuggingFace downloader.
+                await ParolaCoreBootstrap.registerBuiltInEngines()
                 _ = try await store.download(variant: name, progress: progress)
                 phase = .idle
                 refreshModelList()
@@ -1397,19 +1400,16 @@ final class AppModel {
         fileTranscribeTask = Task { [weak self] in
             guard let self else { return }
             do {
-                phase = .loadingModel(name: selectedModel)
-                if !store.isInstalled(selectedModel) {
-                    phase = .downloadingModel(name: selectedModel, progress: 0)
-                }
-
-                phase = .transcribing(file: fileURL)
+                phase = store.isInstalled(selectedModel)
+                    ? .loadingModel(name: selectedModel)
+                    : .downloadingModel(name: selectedModel, progress: 0)
                 let result = try await session.transcribe(
                     source: FileAudioSource(url: fileURL),
                     options: makeOptions(task: task),
                     downloadProgress: makeDownloadProgressHandler(for: selectedModel),
                     partialHandler: makeFilePartialHandler(),
                     progressHandler: makeFileProgressHandler(),
-                    stageHandler: makeFileStageHandler()
+                    stageHandler: makeFileStageHandler(fileURL: fileURL)
                 )
                 try Task.checkCancellation()
                 let processed = await postProcessDetached(result)
@@ -1445,10 +1445,19 @@ final class AppModel {
         }
     }
 
-    private func makeFileStageHandler() -> @Sendable (TranscribeStage) -> Void {
+    private func makeFileStageHandler(fileURL: URL) -> @Sendable (TranscribeStage) -> Void {
         return { [weak self] stage in
             Task { @MainActor in
-                self?.fileTranscribeStage = stage
+                guard let self else { return }
+                self.fileTranscribeStage = stage
+                // First stage event means the model finished loading/downloading; until then the
+                // phase keeps showing that wait instead of jumping straight to "transcribing".
+                switch self.phase {
+                case .loadingModel, .downloadingModel:
+                    self.phase = .transcribing(file: fileURL)
+                default:
+                    break
+                }
             }
         }
     }

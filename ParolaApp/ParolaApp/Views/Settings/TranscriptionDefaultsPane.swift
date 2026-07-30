@@ -11,7 +11,10 @@ struct TranscriptionDefaultsPane: View {
                 SettingRow("Default model",
                            description: "Applies to every new transcription and to dictation. The toolbar model picker edits this same setting.",
                            isFirst: true) {
-                    Picker("", selection: $model.selectedModel) {
+                    Picker("", selection: Binding(
+                        get: { model.selectedModel },
+                        set: { model.activateModel($0) }
+                    )) {
                         ForEach(model.availableModels, id: \.name) { info in
                             Text(info.label).tag(info.name)
                         }

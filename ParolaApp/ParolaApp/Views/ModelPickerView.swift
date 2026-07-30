@@ -163,7 +163,6 @@ struct ModelPickerView: View {
             "Whisper Large v3": "Whisper Large",
             "Whisper Tiny (English)": "Whisper Tiny EN",
             "Parakeet TDT 0.6B v2": "Parakeet v2",
-            "Parakeet TDT 0.6B v3": "Parakeet v3",
             "Distil Whisper Large v3": "Distil Large",
         ]
         return replacements[displayName] ?? displayName

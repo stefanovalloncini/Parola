@@ -58,8 +58,7 @@ struct AppModelDictationTests {
 
         let unknown = AppModel.dictationModelWarnings(
             model: "custom-model", useStreaming: true, language: "it", isInstalled: false)
-        #expect(unknown.count == 1, "no capability or size claims for models outside the catalog")
-        #expect(unknown.first?.contains("live preview") == true)
+        #expect(unknown.isEmpty, "ids outside the catalog are legacy WhisperKit dirs: they stream, and no capability or size claims apply")
     }
 
     @Test("dictationWorkflows decodes from the per-app overrides JSON")
@@ -439,7 +438,11 @@ struct AppModelDictationTests {
         #expect(AppModel.streamingPrewarmCandidate(model: whisper, useStreaming: false, isInstalled: { _ in true }) == nil)
         #expect(AppModel.streamingPrewarmCandidate(model: whisper, useStreaming: true, isInstalled: { _ in false }) == nil)
         #expect(AppModel.streamingPrewarmCandidate(model: parakeet, useStreaming: true, isInstalled: { _ in true }) == nil)
-        #expect(AppModel.streamingPrewarmCandidate(model: "not-a-model", useStreaming: true, isInstalled: { _ in true }) == nil)
+        #expect(
+            AppModel.streamingPrewarmCandidate(model: "legacy-dir", useStreaming: true, isInstalled: { _ in true }) == "legacy-dir",
+            "installed ids outside the catalog are legacy WhisperKit dirs and stream"
+        )
+        #expect(AppModel.streamingPrewarmCandidate(model: "legacy-dir", useStreaming: true, isInstalled: { _ in false }) == nil)
     }
 
     @Test("model download progress updates once per whole percent and clears at completion")
