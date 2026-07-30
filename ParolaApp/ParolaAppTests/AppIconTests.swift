@@ -14,8 +14,7 @@ struct AppIconTests {
         return (light, dark)
     }
 
-    private func pixel(_ image: CGImage, xFraction: Double, yFraction: Double) -> RGBA {
-        let rep = NSBitmapImageRep(cgImage: image)
+    private func sample(_ rep: NSBitmapImageRep, xFraction: Double, yFraction: Double) -> RGBA {
         let x = Int(Double(rep.pixelsWide) * xFraction)
         let y = Int(Double(rep.pixelsHigh) * yFraction)
         guard let color = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else {
@@ -28,6 +27,20 @@ struct AppIconTests {
             Double(color.blueComponent),
             Double(color.alphaComponent)
         )
+    }
+
+    private func pixel(_ image: CGImage, xFraction: Double, yFraction: Double) -> RGBA {
+        sample(NSBitmapImageRep(cgImage: image), xFraction: xFraction, yFraction: yFraction)
+    }
+
+    /// The `applicationIconImage` getter hands back an image whose representations aren't
+    /// `NSBitmapImageRep`, so sampling has to go through a rasterization rather than the reps.
+    private func pixel(_ image: NSImage, xFraction: Double, yFraction: Double) -> RGBA {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            Issue.record("icon could not be rasterized")
+            return RGBA(0, 0, 0)
+        }
+        return sample(NSBitmapImageRep(cgImage: cgImage), xFraction: xFraction, yFraction: yFraction)
     }
 
     private func rgba(_ color: NSColor) -> RGBA {
@@ -95,6 +108,51 @@ struct AppIconTests {
         expectClose(rgba(AppIconArtwork.brandForeground), RGBA(0.99, 0.95, 0.90), "cream foreground")
         #expect(AppIconArtwork.sizes.count == 10)
         #expect(AppIconArtwork.sizes.contains { $0.pixels == 1024 })
+    }
+
+    private func distance(_ a: RGBA, _ b: RGBA) -> Double {
+        ((a.r - b.r) * (a.r - b.r) + (a.g - b.g) * (a.g - b.g) + (a.b - b.b) * (a.b - b.b)).squareRoot()
+    }
+
+    private func nearestPreset(to sampled: RGBA) -> ThemePreset? {
+        ThemePreset.allCases.min { lhs, rhs in
+            distance(sampled, variants(lhs.accent).light) < distance(sampled, variants(rhs.accent).light)
+        }
+    }
+
+    /// End-to-end through the real assignment. `applicationIconImage` round-trips through AppKit's
+    /// own color handling, which shifts components by up to ~0.15 — so this classifies the sampled
+    /// color against the preset palette rather than asserting exact sRGB.
+    @Test("refreshing hands the running application an icon tinted to the current accent")
+    @MainActor
+    func refreshAssignsTintedIcon() throws {
+        let app = try #require(NSApp, "this suite needs the app test host")
+        let previousTheme = DS.theme
+        defer {
+            DS.theme = previousTheme
+            DockIcon.refresh()
+        }
+
+        var backgrounds: [ThemePreset: RGBA] = [:]
+        for preset in [ThemePreset.blue, .yellow, .pink] {
+            DS.theme = preset.palette
+            DockIcon.refresh()
+            let icon = try #require(app.applicationIconImage, "no icon assigned for \(preset.rawValue)")
+            let background = pixel(icon, xFraction: 0.15, yFraction: 0.5)
+            backgrounds[preset] = background
+            #expect(nearestPreset(to: background) == preset,
+                    "\(preset.rawValue) icon sampled \(background.hex), nearest \(nearestPreset(to: background)?.rawValue ?? "none")")
+
+            let bar = pixel(icon, xFraction: 0.5, yFraction: 0.5)
+            let expectedBar = preset == .yellow ? DockIcon.ink : DockIcon.cream
+            let otherBar = preset == .yellow ? DockIcon.cream : DockIcon.ink
+            #expect(distance(bar, expectedBar) < distance(bar, otherBar),
+                    "\(preset.rawValue) bars sampled \(bar.hex)")
+        }
+
+        // A stuck icon would sample identically for every accent.
+        #expect(distance(backgrounds[.blue]!, backgrounds[.yellow]!) > 0.2)
+        #expect(distance(backgrounds[.blue]!, backgrounds[.pink]!) > 0.2)
     }
 
     @Test("the rendered icon carries a full ladder of representations")
