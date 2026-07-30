@@ -25,7 +25,7 @@ struct Engines: AsyncParsableCommand {
         var format: Format = .text
 
         func run() async throws {
-            let rows = engineRows()
+            let rows = await engineRows()
             switch format {
             case .text: printText(rows)
             case .markdown: printMarkdown(rows)
@@ -33,12 +33,15 @@ struct Engines: AsyncParsableCommand {
             }
         }
 
-        private func engineRows() -> [EngineRow] {
-            [
-                EngineRow(id: .whisperKit, capabilities: .whisperKitDefaults),
-                EngineRow(id: .parakeet, capabilities: .parakeetDefaults),
-                EngineRow(id: .appleSpeech, capabilities: .appleSpeechDefaults),
-            ]
+        private func engineRows() async -> [EngineRow] {
+            let registry = EngineRegistry.shared
+            await ParolaCoreBootstrap.registerBuiltInEngines(registry: registry)
+            var rows: [EngineRow] = []
+            for id in await registry.registeredEngines() {
+                guard let capabilities = await registry.capabilities(for: id) else { continue }
+                rows.append(EngineRow(id: id, capabilities: capabilities))
+            }
+            return rows
         }
 
         private static let header = ["Engine", "Languages", "Translate", "Prompt", "Word-ts", "Diarize"]

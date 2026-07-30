@@ -101,6 +101,9 @@ struct Models: AsyncParsableCommand {
                 print("Already installed: \(path)")
                 return
             }
+            // Without this the registry is empty and every model takes the generic
+            // HuggingFace path instead of its engine's own downloader.
+            await ParolaCoreBootstrap.registerBuiltInEngines()
             stderr("Downloading \(name)…")
             let progress = ProgressReporter(label: name)
             defer { progress.finish() }
@@ -115,12 +118,12 @@ struct Models: AsyncParsableCommand {
             abstract: "Delete a downloaded model."
         )
 
-        @Argument(help: "Model variant name.")
+        @Argument(help: "Model variant name, or a directory name from the OTHER INSTALLED list.")
         var name: String
 
         func run() async throws {
             let store = ModelStore.shared
-            try store.delete(variant: name)
+            try store.deleteAny(idOrPath: name)
             print("Removed \(name).")
         }
     }

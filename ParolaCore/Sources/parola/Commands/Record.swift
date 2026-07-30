@@ -20,7 +20,7 @@ struct Record: AsyncParsableCommand {
     var seconds: Double?
 
     @Option(name: .shortAndLong, help: "Model variant.")
-    var model: String = "openai_whisper-tiny"
+    var model: String = ModelCatalog.fallbackModelID
 
     @Option(name: .shortAndLong, help: "Language code; omit to auto-detect.")
     var language: String?

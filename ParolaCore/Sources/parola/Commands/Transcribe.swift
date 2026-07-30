@@ -12,7 +12,7 @@ struct Transcribe: AsyncParsableCommand {
     var inputs: [String]
 
     @Option(name: .shortAndLong, help: "Model variant (e.g. openai_whisper-tiny, openai_whisper-large-v3_turbo).")
-    var model: String = "openai_whisper-tiny"
+    var model: String = ModelCatalog.fallbackModelID
 
     @Option(name: .shortAndLong, help: "Language code (e.g. en, it, fr). Omit to auto-detect.")
     var language: String?

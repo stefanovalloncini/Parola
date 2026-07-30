@@ -42,7 +42,14 @@ struct Bench: AsyncParsableCommand {
 
     private func resolveModels() throws -> [String] {
         if let models {
-            return models.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+            let ids = models.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+            // Catch typos before the run, not minutes into it.
+            for id in ids where ModelCatalog.variant(id: id) == nil && !ModelStore.shared.isInstalled(id) {
+                if let suggestion = ModelCatalog.closestMatch(for: id) {
+                    throw ValidationError("Unknown model \"\(id)\". Did you mean \"\(suggestion.id)\"?")
+                }
+            }
+            return ids
         }
         let store = ModelStore.shared
         let installed = store.catalog().filter { $0.isInstalled }.map { $0.name }
