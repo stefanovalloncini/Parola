@@ -61,13 +61,6 @@ struct TranscriptHeaderBar: View {
             }
             .axLeaf("HeaderBar.Button.JumpToTime")
 
-            Button { toggleSpeak() } label: {
-                Image(systemName: speaker.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
-            }
-            .buttonStyle(.borderless)
-            .modifier(SpeakHelpModifier(isSpeaking: speaker.isSpeaking))
-            .axLeaf("HeaderBar.Button.Speak")
-
             Button { model.transcriptCompact.toggle() } label: {
                 Image(systemName: model.transcriptCompact ? "arrow.up.left.and.arrow.down.right" : "arrow.down.right.and.arrow.up.left")
             }
@@ -75,15 +68,7 @@ struct TranscriptHeaderBar: View {
             .modifier(CompactHelpModifier(isCompact: model.transcriptCompact))
             .axLeaf("HeaderBar.Button.ToggleCompact")
 
-            if let shareItem {
-                ShareLink(item: shareItem, preview: SharePreview(title)) {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .buttonStyle(.borderless)
-                .help("Share transcript")
-                .accessibilityLabel("Share transcript")
-                .axLeaf("HeaderBar.Button.Share")
-            }
+            groupDivider
 
             Button(action: onOpenSummary) {
                 Image(systemName: "sparkles")
@@ -106,6 +91,25 @@ struct TranscriptHeaderBar: View {
                 .fixedSize()
                 .disabled(model.isRunningPrompt)
 
+            groupDivider
+
+            Button { toggleSpeak() } label: {
+                Image(systemName: speaker.isSpeaking ? "speaker.wave.2.fill" : "speaker.wave.2")
+            }
+            .buttonStyle(.borderless)
+            .modifier(SpeakHelpModifier(isSpeaking: speaker.isSpeaking))
+            .axLeaf("HeaderBar.Button.Speak")
+
+            if let shareItem {
+                ShareLink(item: shareItem, preview: SharePreview(title)) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .buttonStyle(.borderless)
+                .help("Share transcript")
+                .accessibilityLabel("Share transcript")
+                .axLeaf("HeaderBar.Button.Share")
+            }
+
             Button(action: onAdvance) {
                 Image(systemName: "chevron.right.2")
                     .font(DS.Font.heading)
@@ -125,6 +129,12 @@ struct TranscriptHeaderBar: View {
         .onAppear { rebuildShareItem() }
         .onChange(of: model.transcriptVersion) { _, _ in rebuildShareItem() }
         .onChange(of: title) { _, _ in rebuildShareItem() }
+    }
+
+    private var groupDivider: some View {
+        Divider()
+            .frame(height: 14)
+            .padding(.horizontal, 2)
     }
 
     private func rebuildShareItem() {
