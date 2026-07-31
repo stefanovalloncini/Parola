@@ -17,41 +17,53 @@ struct EmptyDropZone: View {
                         action: { model.presentOpenPanel() }
                     )
                     .axLeaf("Empty.Button.OpenFile")
-                    ActionCard(
-                        title: "Record Microphone",
-                        systemImage: "mic.fill",
-                        action: { model.startRecording(source: .microphone) }
-                    )
-                    .axLeaf("Empty.Button.RecordMic")
-                    ActionCard(
-                        title: "Record System Audio",
-                        systemImage: "waveform.circle.fill",
-                        action: { model.startRecording(source: .systemAudio) }
-                    )
-                    .axLeaf("Empty.Button.RecordSystemAudio")
-                    ActionCard(
-                        title: "YouTube URL",
-                        systemImage: "play.rectangle.fill",
-                        action: { model.youtubeSheetOpen = true }
-                    )
-                    .axLeaf("Empty.Button.YouTube")
+                    if model.features.isEnabled(.micRecording) {
+                        ActionCard(
+                            title: "Record Microphone",
+                            systemImage: "mic.fill",
+                            action: { model.startRecording(source: .microphone) }
+                        )
+                        .axLeaf("Empty.Button.RecordMic")
+                    }
+                    if model.features.isEnabled(.meetings) {
+                        ActionCard(
+                            title: "Record System Audio",
+                            systemImage: "waveform.circle.fill",
+                            action: { model.startRecording(source: .systemAudio) }
+                        )
+                        .axLeaf("Empty.Button.RecordSystemAudio")
+                    }
+                    if model.features.isEnabled(.youtube) {
+                        ActionCard(
+                            title: "YouTube URL",
+                            systemImage: "play.rectangle.fill",
+                            action: { model.youtubeSheetOpen = true }
+                        )
+                        .axLeaf("Empty.Button.YouTube")
+                    }
                 }
 
-                HStack(spacing: DS.Spacing.small) {
-                    ModeButton(
-                        title: "Live Captions",
-                        systemImage: "captions.bubble.fill",
-                        action: { model.toggleLiveCaptions() }
-                    )
-                    .disabled(model.liveCaptionsUnavailableReason != nil)
-                    .help(model.liveCaptionsUnavailableReason ?? "")
-                    .axLeaf("Empty.Button.LiveCaptions")
-                    ModeButton(
-                        title: "Dictation",
-                        systemImage: "text.cursor",
-                        action: { model.startDictationFromIntent() }
-                    )
-                    .axLeaf("Empty.Button.Dictation")
+                if model.features.isEnabled(.liveCaptions) || model.features.isEnabled(.dictation) {
+                    HStack(spacing: DS.Spacing.small) {
+                        if model.features.isEnabled(.liveCaptions) {
+                            ModeButton(
+                                title: "Live Captions",
+                                systemImage: "captions.bubble.fill",
+                                action: { model.toggleLiveCaptions() }
+                            )
+                            .disabled(model.liveCaptionsUnavailableReason != nil)
+                            .help(model.liveCaptionsUnavailableReason ?? "")
+                            .axLeaf("Empty.Button.LiveCaptions")
+                        }
+                        if model.features.isEnabled(.dictation) {
+                            ModeButton(
+                                title: "Dictation",
+                                systemImage: "text.cursor",
+                                action: { model.startDictationFromIntent() }
+                            )
+                            .axLeaf("Empty.Button.Dictation")
+                        }
+                    }
                 }
 
                 if !model.libraryEntries.isEmpty {

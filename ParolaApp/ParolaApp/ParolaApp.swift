@@ -106,7 +106,7 @@ struct ParolaApp: App {
                     applyAlwaysOnTop(on)
                 }
                 .onOpenURL { url in handleParolaOpen(url, model: model) }
-                .sheet(isPresented: $shortcutSheetOpen) { ShortcutCheatSheet() }
+                .sheet(isPresented: $shortcutSheetOpen) { ShortcutCheatSheet().environment(model) }
                 .sheet(isPresented: $aboutSheetOpen) { AboutSheet().environment(model) }
         }
         .windowStyle(.hiddenTitleBar)
@@ -184,25 +184,31 @@ struct ParolaApp: App {
                 Button("Skip Forward 5 Seconds") { model.skip(by: 5) }
                     .disabled(model.player == nil)
             }
-            CommandMenu("Captions") {
-                Button(scratchpad.isOpen ? "Hide Scratchpad" : "Show Scratchpad") {
-                    scratchpad.toggle()
+            if model.features.isEnabled(.dictation) || model.features.isEnabled(.liveCaptions) {
+                CommandMenu("Captions") {
+                    if model.features.isEnabled(.dictation) {
+                        Button(scratchpad.isOpen ? "Hide Scratchpad" : "Show Scratchpad") {
+                            scratchpad.toggle()
+                        }
+                        .keyboardShortcut("k", modifiers: [.command, .shift])
+                    }
+                    if model.features.isEnabled(.liveCaptions) {
+                        Divider()
+                        Button(liveCaptions.isActive ? "Stop Live Captions" : "Start Live Captions") {
+                            model.toggleLiveCaptions()
+                        }
+                        .keyboardShortcut("l", modifiers: [.command, .shift])
+                        .disabled(!liveCaptions.isActive && model.liveCaptionsUnavailableReason != nil)
+                        Toggle("Translate to English", isOn: translateCaptionsBinding)
+                        Divider()
+                        Button(liveCaptions.isPresenterOpen ? "Exit Presenter" : "Enter Presenter Mode") {
+                            liveCaptions.togglePresenter()
+                        }
+                        .keyboardShortcut("p", modifiers: [.command, .shift])
+                        Button("Save Captions…") { liveCaptions.saveCaptionsHistory() }
+                            .disabled(!liveCaptions.hasHistory)
+                    }
                 }
-                .keyboardShortcut("k", modifiers: [.command, .shift])
-                Divider()
-                Button(liveCaptions.isActive ? "Stop Live Captions" : "Start Live Captions") {
-                    model.toggleLiveCaptions()
-                }
-                .keyboardShortcut("l", modifiers: [.command, .shift])
-                .disabled(!liveCaptions.isActive && model.liveCaptionsUnavailableReason != nil)
-                Toggle("Translate to English", isOn: translateCaptionsBinding)
-                Divider()
-                Button(liveCaptions.isPresenterOpen ? "Exit Presenter" : "Enter Presenter Mode") {
-                    liveCaptions.togglePresenter()
-                }
-                .keyboardShortcut("p", modifiers: [.command, .shift])
-                Button("Save Captions…") { liveCaptions.saveCaptionsHistory() }
-                    .disabled(!liveCaptions.hasHistory)
             }
             CommandMenu("Transcript") {
                 Button("Copy Plain Text") { model.copyTranscriptToPasteboard(withTimestamps: false) }

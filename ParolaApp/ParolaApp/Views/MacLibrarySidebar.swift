@@ -16,11 +16,18 @@ struct MacLibrarySidebar: View {
         }
     }
 
-    private let categories: [(title: LocalizedStringKey, id: String, systemImage: String, category: EntryCategory)] = [
-        ("Transcriptions", "transcriptions", "text.alignleft", .transcription),
-        ("Meetings", "meetings", "person.2", .meeting),
-        ("Dictations", "dictations", "text.cursor", .dictation),
-    ]
+    private var categories: [(title: LocalizedStringKey, id: String, systemImage: String, category: EntryCategory)] {
+        var rows: [(LocalizedStringKey, String, String, EntryCategory)] = [
+            ("Transcriptions", "transcriptions", "text.alignleft", .transcription)
+        ]
+        if model.features.isEnabled(.meetings) {
+            rows.append(("Meetings", "meetings", "person.2", .meeting))
+        }
+        if model.features.isEnabled(.dictation) {
+            rows.append(("Dictations", "dictations", "text.cursor", .dictation))
+        }
+        return rows.map { (title: $0.0, id: $0.1, systemImage: $0.2, category: $0.3) }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -73,33 +80,35 @@ struct MacLibrarySidebar: View {
                         .axLeaf("Sidebar.Button.Filter\(item.id.capitalized)")
                     }
 
-                    SectionLabel("Activity")
-                        .padding(.top, 14)
+                    if model.features.isEnabled(.batch) {
+                        SectionLabel("Activity")
+                            .padding(.top, 14)
 
-                    SidebarRow(
-                        title: "Queue",
-                        systemImage: "list.bullet.indent",
-                        isSelected: selectedRoute == .queue,
-                        badge: activeQueueBadge
-                    ) {
-                        model.libraryFilter = nil
-                        model.libraryBrowsingAll = false
-                        model.route = .queue
-                    }
-                    .accessibilityIdentifier("library.queue")
-                    .axLeaf("Sidebar.Button.Queue")
+                        SidebarRow(
+                            title: "Queue",
+                            systemImage: "list.bullet.indent",
+                            isSelected: selectedRoute == .queue,
+                            badge: activeQueueBadge
+                        ) {
+                            model.libraryFilter = nil
+                            model.libraryBrowsingAll = false
+                            model.route = .queue
+                        }
+                        .accessibilityIdentifier("library.queue")
+                        .axLeaf("Sidebar.Button.Queue")
 
-                    SidebarRow(
-                        title: "Batch",
-                        systemImage: "square.stack.3d.up",
-                        isSelected: selectedRoute == .batch
-                    ) {
-                        model.libraryFilter = nil
-                        model.libraryBrowsingAll = false
-                        model.route = .batch
+                        SidebarRow(
+                            title: "Batch",
+                            systemImage: "square.stack.3d.up",
+                            isSelected: selectedRoute == .batch
+                        ) {
+                            model.libraryFilter = nil
+                            model.libraryBrowsingAll = false
+                            model.route = .batch
+                        }
+                        .accessibilityIdentifier("library.batch")
+                        .axLeaf("Sidebar.Button.Batch")
                     }
-                    .accessibilityIdentifier("library.batch")
-                    .axLeaf("Sidebar.Button.Batch")
                 }
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)

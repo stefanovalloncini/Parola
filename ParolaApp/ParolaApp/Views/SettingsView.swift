@@ -7,14 +7,17 @@ struct SettingsView: View {
 
     private var route: Binding<SettingsRoute> {
         Binding(
-            get: { SettingsRoute(rawValue: model.settingsPane) ?? .general },
+            get: {
+                let stored = SettingsRoute(rawValue: model.settingsPane) ?? .general
+                return stored.isVisible(features: model.features) ? stored : .general
+            },
             set: { model.settingsPane = $0.rawValue }
         )
     }
 
     var body: some View {
         HStack(spacing: 0) {
-            SettingsSidebar(route: route, search: $search)
+            SettingsSidebar(route: route, search: $search, features: model.features)
                 .frame(width: 220)
             Divider()
             SettingsDetail(route: route.wrappedValue)
@@ -46,6 +49,23 @@ enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     var localizedLabelKey: LocalizedStringKey { LocalizedStringKey(meta.titleKey) }
     var symbol: String { meta.symbol }
     var paneScope: SettingsPaneScope? { meta.scope }
+
+    func isVisible(features: FeatureSet) -> Bool {
+        switch self {
+        case .dictation, .snippets, .corrections:
+            return features.isEnabled(.dictation)
+        case .recordMeetings: return features.isEnabled(.meetings)
+        case .liveCaptions: return features.isEnabled(.liveCaptions)
+        case .batchExport: return features.isEnabled(.batch)
+        case .prompts: return features.isEnabled(.ai)
+        case .automation: return features.isEnabled(.automation)
+        case .watchedFolders: return features.isEnabled(.watchedFolders)
+        case .microphone:
+            return features.isEnabled(.micRecording) || features.isEnabled(.dictation)
+                || features.isEnabled(.liveCaptions)
+        default: return true
+        }
+    }
 
     /// Search terms for routes without a pane scope; scoped routes get theirs from the scope.
     var extraSearchKeywords: [String] {
@@ -114,6 +134,7 @@ private var sidebarGroups: [SidebarGroup] {
 private struct SettingsSidebar: View {
     @Binding var route: SettingsRoute
     @Binding var search: String
+    let features: FeatureSet
 
     var body: some View {
         VStack(spacing: 0) {
@@ -155,9 +176,13 @@ private struct SettingsSidebar: View {
     }
 
     private var filteredGroups: [SidebarGroup] {
+        let visible = sidebarGroups.compactMap { group -> SidebarGroup? in
+            let routes = group.routes.filter { $0.isVisible(features: features) }
+            return routes.isEmpty ? nil : SidebarGroup(title: group.title, routes: routes)
+        }
         let trimmed = search.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !trimmed.isEmpty else { return sidebarGroups }
-        return sidebarGroups.compactMap { group in
+        guard !trimmed.isEmpty else { return visible }
+        return visible.compactMap { group in
             let hits = group.routes.filter { matches(route: $0, query: trimmed) }
             return hits.isEmpty ? nil : SidebarGroup(title: group.title, routes: hits)
         }

@@ -68,28 +68,30 @@ struct TranscriptHeaderBar: View {
             .modifier(CompactHelpModifier(isCompact: model.transcriptCompact))
             .axLeaf("HeaderBar.Button.ToggleCompact")
 
-            groupDivider
+            if model.features.isEnabled(.ai) {
+                groupDivider
 
-            Button(action: onOpenSummary) {
-                Image(systemName: "sparkles")
+                Button(action: onOpenSummary) {
+                    Image(systemName: "sparkles")
+                }
+                .buttonStyle(.borderless)
+                .help("Summary")
+                .accessibilityLabel("Summary")
+                .axLeaf("HeaderBar.Button.OpenSummary")
+
+                Button(action: onOpenChat) {
+                    Image(systemName: "bubble.left.and.text.bubble.right")
+                }
+                .buttonStyle(.borderless)
+                .help("Chat with this transcript")
+                .accessibilityLabel("Chat with this transcript")
+                .axLeaf("HeaderBar.Button.OpenChat")
+
+                PromptsMenu()
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .disabled(model.isRunningPrompt)
             }
-            .buttonStyle(.borderless)
-            .help("Summary")
-            .accessibilityLabel("Summary")
-            .axLeaf("HeaderBar.Button.OpenSummary")
-
-            Button(action: onOpenChat) {
-                Image(systemName: "bubble.left.and.text.bubble.right")
-            }
-            .buttonStyle(.borderless)
-            .help("Chat with this transcript")
-            .accessibilityLabel("Chat with this transcript")
-            .axLeaf("HeaderBar.Button.OpenChat")
-
-            PromptsMenu()
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                .disabled(model.isRunningPrompt)
 
             groupDivider
 

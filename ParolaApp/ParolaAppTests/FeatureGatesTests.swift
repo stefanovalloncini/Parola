@@ -115,4 +115,54 @@ struct FeatureGatesTests {
         model.startBatch(urls: [URL(fileURLWithPath: "/tmp/a.wav")])
         #expect(model.batchJobs.count == 1)
     }
+
+    @Test func settingsRoutesHideWithTheirFeature() {
+        let lean = FeatureSet(enabled: [.batch])
+        #expect(!SettingsRoute.dictation.isVisible(features: lean))
+        #expect(!SettingsRoute.snippets.isVisible(features: lean))
+        #expect(!SettingsRoute.corrections.isVisible(features: lean))
+        #expect(!SettingsRoute.recordMeetings.isVisible(features: lean))
+        #expect(!SettingsRoute.liveCaptions.isVisible(features: lean))
+        #expect(SettingsRoute.batchExport.isVisible(features: lean))
+        #expect(!SettingsRoute.prompts.isVisible(features: lean))
+        #expect(!SettingsRoute.automation.isVisible(features: lean))
+        #expect(!SettingsRoute.watchedFolders.isVisible(features: lean))
+        #expect(!SettingsRoute.microphone.isVisible(features: lean))
+        #expect(SettingsRoute.general.isVisible(features: lean))
+        #expect(SettingsRoute.exportFormats.isVisible(features: lean))
+    }
+
+    @Test func microphonePaneStaysWhenAnyMicFeatureIsOn() {
+        #expect(SettingsRoute.microphone.isVisible(features: FeatureSet(enabled: [.liveCaptions])))
+        #expect(SettingsRoute.microphone.isVisible(features: FeatureSet(enabled: [.dictation])))
+        #expect(SettingsRoute.microphone.isVisible(features: FeatureSet(enabled: [.micRecording])))
+    }
+
+    @Test func cheatSheetDropsGatedShortcuts() {
+        let sections = ShortcutCatalog.sections(features: FeatureSet(enabled: [.batch]))
+        let labels = sections.flatMap(\.entries).map(\.label)
+        #expect(!labels.contains { $0.contains("Live Captions") })
+        #expect(!labels.contains { $0.contains("Scratchpad") })
+        #expect(!labels.contains { $0.contains("Presenter") })
+        #expect(!labels.contains { $0.contains("Chat") })
+        #expect(labels.contains { $0.contains("Find") })
+    }
+
+    @Test func cheatSheetKeepsEverythingWhenAllOn() {
+        let sections = ShortcutCatalog.sections(features: .all)
+        let labels = sections.flatMap(\.entries).map(\.label)
+        #expect(labels.contains { $0.contains("Live Captions") })
+        #expect(labels.contains { $0.contains("Chat") })
+    }
+
+    @Test func menuBarFallsBackWhenDictationGated() {
+        let gatedAway = MenuBarController.Mode(
+            showExtra: false, dictationEnabled: true, features: FeatureSet(enabled: [])
+        )
+        #expect(gatedAway == .hidden)
+        let stillFull = MenuBarController.Mode(
+            showExtra: true, dictationEnabled: true, features: FeatureSet(enabled: [])
+        )
+        #expect(stillFull == .full)
+    }
 }

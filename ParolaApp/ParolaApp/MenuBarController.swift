@@ -1,4 +1,5 @@
 import AppKit
+import ParolaCore
 import ParolaDictation
 
 @MainActor
@@ -8,10 +9,10 @@ final class MenuBarController {
         case full
         case dictationOnly
 
-        init(showExtra: Bool, dictationEnabled: Bool) {
+        init(showExtra: Bool, dictationEnabled: Bool, features: FeatureSet) {
             if showExtra {
                 self = .full
-            } else if dictationEnabled {
+            } else if dictationEnabled, features.isEnabled(.dictation) {
                 self = .dictationOnly
             } else {
                 self = .hidden
@@ -55,7 +56,7 @@ final class MenuBarController {
 
     private func refresh() {
         guard let model else { return }
-        let mode = Mode(showExtra: model.showMenuBarExtra, dictationEnabled: model.dictationEnabled)
+        let mode = Mode(showExtra: model.showMenuBarExtra, dictationEnabled: model.dictationEnabled, features: model.features)
         if mode != lastMode {
             applyVisibility(mode != .hidden)
             lastMode = mode
@@ -94,7 +95,10 @@ final class MenuBarController {
 
     private func applyIcon() {
         guard let model, let button = statusItem?.button else { return }
-        let symbol = Self.symbolName(dictationEnabled: model.dictationEnabled, state: model.dictationState)
+        let symbol = Self.symbolName(
+            dictationEnabled: model.dictationEnabled && model.features.isEnabled(.dictation),
+            state: model.dictationState
+        )
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Parola")
         image?.isTemplate = true
         button.image = image
@@ -116,9 +120,13 @@ final class MenuBarController {
 
         menu.addItem(menuItem(title: "Open Parola", action: #selector(openParola), target: self))
         menu.addItem(.separator())
-        menu.addItem(menuItem(title: "Record from Microphone", action: #selector(recordMic), target: self))
+        if model.features.isEnabled(.micRecording) {
+            menu.addItem(menuItem(title: "Record from Microphone", action: #selector(recordMic), target: self))
+        }
         menu.addItem(menuItem(title: "Open File…", action: #selector(openFile), target: self))
-        menu.addItem(menuItem(title: dictateTitle, action: #selector(toggleDictation), target: self))
+        if model.features.isEnabled(.dictation) {
+            menu.addItem(menuItem(title: dictateTitle, action: #selector(toggleDictation), target: self))
+        }
         menu.addItem(.separator())
 
         let pinned = model.libraryEntries.filter { $0.pinned }.prefix(5)

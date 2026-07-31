@@ -100,17 +100,25 @@ struct ContentToolbar: ToolbarContent {
             Button("Open File…") { model.presentOpenPanel() }
                 .accessibilityIdentifier("toolbar.openFile")
                 .axLeaf("Toolbar.MenuItem.NewOpenFile")
-            Divider()
-            Button("Record Microphone") { model.startRecording(source: .microphone) }
-                .accessibilityIdentifier("toolbar.record.microphone")
-                .axLeaf("Toolbar.MenuItem.NewRecordMicrophone")
-            Button("Record System Audio") { model.startRecording(source: .systemAudio) }
-                .accessibilityIdentifier("toolbar.record.system")
-                .axLeaf("Toolbar.MenuItem.NewRecordSystem")
-            Divider()
-            Button("YouTube URL…") { model.youtubeSheetOpen = true }
-                .accessibilityIdentifier("toolbar.youtube")
-                .axLeaf("Toolbar.MenuItem.NewYouTube")
+            if model.features.isEnabled(.micRecording) || model.features.isEnabled(.meetings) {
+                Divider()
+                if model.features.isEnabled(.micRecording) {
+                    Button("Record Microphone") { model.startRecording(source: .microphone) }
+                        .accessibilityIdentifier("toolbar.record.microphone")
+                        .axLeaf("Toolbar.MenuItem.NewRecordMicrophone")
+                }
+                if model.features.isEnabled(.meetings) {
+                    Button("Record System Audio") { model.startRecording(source: .systemAudio) }
+                        .accessibilityIdentifier("toolbar.record.system")
+                        .axLeaf("Toolbar.MenuItem.NewRecordSystem")
+                }
+            }
+            if model.features.isEnabled(.youtube) {
+                Divider()
+                Button("YouTube URL…") { model.youtubeSheetOpen = true }
+                    .accessibilityIdentifier("toolbar.youtube")
+                    .axLeaf("Toolbar.MenuItem.NewYouTube")
+            }
         } label: {
             Label("New", systemImage: "plus")
         }

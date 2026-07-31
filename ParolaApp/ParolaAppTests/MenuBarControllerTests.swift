@@ -36,7 +36,7 @@ struct MenuBarModeTests {
         (false, true, .dictationOnly),
     ] as [(Bool, Bool, MenuBarController.Mode)])
     func modeMatrix(showExtra: Bool, dictationEnabled: Bool, expected: MenuBarController.Mode) {
-        #expect(MenuBarController.Mode(showExtra: showExtra, dictationEnabled: dictationEnabled) == expected)
+        #expect(MenuBarController.Mode(showExtra: showExtra, dictationEnabled: dictationEnabled, features: .all) == expected)
     }
 
     @Test("icon reflects dictation state only while dictation is enabled")

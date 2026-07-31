@@ -1,10 +1,18 @@
 import SwiftUI
+import ParolaCore
 
 struct ShortcutCatalog {
     struct Entry: Hashable, Identifiable {
         let id = UUID()
         let label: String
         let keys: String
+        var requires: ParolaFeature?
+
+        init(label: String, keys: String, requires: ParolaFeature? = nil) {
+            self.label = label
+            self.keys = keys
+            self.requires = requires
+        }
     }
 
     struct Section: Hashable, Identifiable {
@@ -13,17 +21,26 @@ struct ShortcutCatalog {
         let entries: [Entry]
     }
 
-    static let sections: [Section] = [
+    static func sections(features: FeatureSet) -> [Section] {
+        allSections.compactMap { section in
+            let entries = section.entries.filter { entry in
+                entry.requires.map(features.isEnabled) ?? true
+            }
+            return entries.isEmpty ? nil : Section(title: section.title, entries: entries)
+        }
+    }
+
+    private static let allSections: [Section] = [
         Section(title: "Capture", entries: [
-            Entry(label: "Toggle Live Captions",   keys: "⌘ ⇧ L"),
-            Entry(label: "Enter Presenter Mode",   keys: "⌘ ⇧ P"),
-            Entry(label: "Show Scratchpad",        keys: "⌘ ⇧ K"),
+            Entry(label: "Toggle Live Captions",   keys: "⌘ ⇧ L", requires: .liveCaptions),
+            Entry(label: "Enter Presenter Mode",   keys: "⌘ ⇧ P", requires: .liveCaptions),
+            Entry(label: "Show Scratchpad",        keys: "⌘ ⇧ K", requires: .dictation),
         ]),
         Section(title: "Transcript", entries: [
             Entry(label: "Find",                   keys: "⌘ F"),
             Entry(label: "Export as TXT",          keys: "⌘ E"),
             Entry(label: "Print Transcript",       keys: "⌘ P"),
-            Entry(label: "Focus Chat Composer",    keys: "⌘ L"),
+            Entry(label: "Focus Chat Composer",    keys: "⌘ L", requires: .ai),
             Entry(label: "Toggle Inspector",       keys: "⌘ ⇧ I"),
         ]),
         Section(title: "Playback", entries: [
@@ -44,12 +61,13 @@ struct ShortcutCatalog {
 
 struct ShortcutCheatSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppModel.self) private var model
 
     var body: some View {
         SheetFrame(icon: "command", title: "Keyboard Shortcuts", onClose: { dismiss() }) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 18) {
-                    ForEach(ShortcutCatalog.sections) { section in
+                    ForEach(ShortcutCatalog.sections(features: model.features)) { section in
                         sectionView(section)
                     }
                 }
