@@ -28,7 +28,11 @@ extension ParolaAutomationServer {
                 ],
                 handler: { args, ctx in
                     let name = try args.string("name")
-                    ctx.model.downloadModel(name)
+                    guard ctx.model.downloadModel(name) else {
+                        throw AutomationError.precondition(
+                            ctx.model.modelActionError ?? "download not started"
+                        )
+                    }
                     return .object(["started": .bool(true), "name": .string(name)])
                 }
             ),

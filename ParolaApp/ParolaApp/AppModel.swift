@@ -1233,8 +1233,29 @@ final class AppModel {
         }
     }
 
-    func downloadModel(_ name: String) {
-        guard downloadTask == nil else { return }
+    /// Non-nil when a download would take over UI that another job is using. Downloads render
+    /// through the shared phase, so starting one mid-take replaces the recording controls —
+    /// Stop included — and hands the phase back as `.idle` when it finishes.
+    var downloadBlockedReason: String? {
+        if recordingActive { return "Stop the recording before downloading a model." }
+        switch phase {
+        case .transcribing, .exporting, .loadingModel:
+            return "Wait for the current job to finish before downloading a model."
+        default:
+            return nil
+        }
+    }
+
+    @discardableResult
+    func downloadModel(_ name: String) -> Bool {
+        guard downloadTask == nil else {
+            modelActionError = "Another download is already running. Wait for it to finish."
+            return false
+        }
+        if let reason = downloadBlockedReason {
+            modelActionError = reason
+            return false
+        }
         let progress = makeDownloadProgressHandler(for: name)
         downloadTask = Task {
             do {
@@ -1254,6 +1275,7 @@ final class AppModel {
             }
             if !Task.isCancelled { downloadTask = nil }
         }
+        return true
     }
 
     func cancelModelDownload() {
@@ -1493,12 +1515,20 @@ final class AppModel {
 
     private final class DownloadProgressThrottle: Sendable {
         private let lastPercent = OSAllocatedUnfairLock(initialState: -1)
+        private let highWaterMark = OSAllocatedUnfairLock(initialState: 0.0)
 
         func shouldEmit(_ percent: Int) -> Bool {
             lastPercent.withLock { last in
                 guard percent != last else { return false }
                 last = percent
                 return true
+            }
+        }
+
+        func monotonic(_ fraction: Double) -> Double {
+            highWaterMark.withLock { highest in
+                highest = max(highest, fraction)
+                return highest
             }
         }
     }
@@ -1508,11 +1538,14 @@ final class AppModel {
         return { [weak self] frac in
             // Dedupe on the URLSession callback thread: spawning a main-actor task per received
             // chunk floods the main queue during multi-GB model downloads.
-            let percent = Int(frac * 100)
+            // Engine downloaders report per-file fractions that restart at 0 for each file, so the
+            // bar takes the high-water mark rather than letting it jump backwards.
+            let clamped = throttle.monotonic(min(max(frac, 0), 1))
+            let percent = Int(clamped * 100)
             guard throttle.shouldEmit(percent) else { return }
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.phase = .downloadingModel(name: modelName, progress: frac)
+                self.phase = .downloadingModel(name: modelName, progress: clamped)
                 if percent >= 100 { self.refreshModelList() }
             }
         }

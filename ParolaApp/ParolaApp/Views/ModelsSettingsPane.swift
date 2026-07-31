@@ -287,7 +287,7 @@ struct ModelsSettingsPane: View {
 
     private var downloadInFlight: Bool {
         if case .downloadingModel = model.phase { return true }
-        return false
+        return model.downloadBlockedReason != nil
     }
 
     private func modelErrorBanner(_ message: String) -> some View {
