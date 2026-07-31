@@ -236,6 +236,8 @@ private final class TapHandler: @unchecked Sendable {
     private let outputFormat: AVAudioFormat
     private let srcFormat: AVAudioFormat
     private let onLevel: @Sendable (Float) -> Void
+    private var sampleScratch: AVAudioPCMBuffer?
+    private var outputScratch: AVAudioPCMBuffer?
 
     var failure: String? { writer.failure }
 
@@ -254,12 +256,41 @@ private final class TapHandler: @unchecked Sendable {
     }
 
     func process(bufferList: UnsafePointer<AudioBufferList>) {
-        let firstBuffer = bufferList.pointee.mBuffers
+        guard let copy = ProcessTapSampleCopy.copy(
+            bufferList: bufferList,
+            srcFormat: srcFormat,
+            reusing: &sampleScratch
+        ) else { return }
+
+        guard let outBuffer = StreamChunkConverter.convert(
+            chunk: copy,
+            with: converter,
+            to: outputFormat,
+            reusing: &outputScratch
+        ) else { return }
+        writer.write(outBuffer)
+        onLevel(AudioLevel.normalised(of: copy))
+    }
+}
+
+/// Copies samples out of an IO proc's buffer list into a PCM buffer. The list belongs to
+/// Core Audio for the length of the callback only.
+enum ProcessTapSampleCopy {
+    /// Copies into `scratch`, growing it when a callback delivers more frames. The returned buffer
+    /// is the scratch itself, so the caller must be done with it before the next callback.
+    static func copy(
+        bufferList: UnsafePointer<AudioBufferList>,
+        srcFormat: AVAudioFormat,
+        reusing scratch: inout AVAudioPCMBuffer?
+    ) -> AVAudioPCMBuffer? {
         let bytesPerFrame = srcFormat.streamDescription.pointee.mBytesPerFrame
-        guard bytesPerFrame > 0 else { return }
-        let frameCount = firstBuffer.mDataByteSize / bytesPerFrame
-        guard frameCount > 0,
-              let copy = AVAudioPCMBuffer(pcmFormat: srcFormat, frameCapacity: frameCount) else { return }
+        guard bytesPerFrame > 0 else { return nil }
+        let frameCount = bufferList.pointee.mBuffers.mDataByteSize / bytesPerFrame
+        guard frameCount > 0 else { return nil }
+        if (scratch?.frameCapacity ?? 0) < frameCount || scratch?.format != srcFormat {
+            scratch = AVAudioPCMBuffer(pcmFormat: srcFormat, frameCapacity: frameCount)
+        }
+        guard let copy = scratch else { return nil }
         copy.frameLength = frameCount
 
         let src = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: bufferList))
@@ -269,14 +300,7 @@ private final class TapHandler: @unchecked Sendable {
             let bytes = min(buffer.mDataByteSize, dst[index].mDataByteSize)
             memcpy(to, from, Int(bytes))
         }
-
-        guard let outBuffer = StreamChunkConverter.convert(
-            chunk: copy,
-            with: converter,
-            to: outputFormat
-        ) else { return }
-        writer.write(outBuffer)
-        onLevel(AudioLevel.normalised(of: copy))
+        return copy
     }
 }
 

@@ -30,6 +30,65 @@ struct StreamChunkConverterTests {
         #expect(total > 12_000)
     }
 
+    @Test("a reused output buffer yields the same frames as a fresh one")
+    func reusedOutputMatchesFreshOutput() throws {
+        let src = try #require(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+        let dst = try #require(AVAudioFormat(
+            commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false
+        ))
+        let fresh = try #require(AVAudioConverter(from: src, to: dst))
+        let reusing = try #require(AVAudioConverter(from: src, to: dst))
+        var scratch: AVAudioPCMBuffer?
+
+        for i in 0..<8 {
+            let chunk = try Self.tone(format: src, frames: 4096, phase: i * 4096)
+            let a = try #require(StreamChunkConverter.convert(chunk: chunk, with: fresh, to: dst))
+            let b = try #require(StreamChunkConverter.convert(
+                chunk: chunk, with: reusing, to: dst, reusing: &scratch
+            ))
+            #expect(a.frameLength == b.frameLength)
+            let left = try #require(a.floatChannelData)
+            let right = try #require(b.floatChannelData)
+            for f in 0..<Int(a.frameLength) {
+                #expect(left[0][f] == right[0][f])
+            }
+        }
+    }
+
+    @Test("the scratch buffer is kept for equal chunks and grown for larger ones")
+    func scratchGrowsOnlyWhenNeeded() throws {
+        let src = try #require(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+        let dst = try #require(AVAudioFormat(
+            commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false
+        ))
+        let converter = try #require(AVAudioConverter(from: src, to: dst))
+        var scratch: AVAudioPCMBuffer?
+
+        let first = try #require(StreamChunkConverter.convert(
+            chunk: try Self.tone(format: src, frames: 4096, phase: 0), with: converter, to: dst, reusing: &scratch
+        ))
+        let second = try #require(StreamChunkConverter.convert(
+            chunk: try Self.tone(format: src, frames: 4096, phase: 4096), with: converter, to: dst, reusing: &scratch
+        ))
+        #expect(first === second)
+
+        let grown = try #require(StreamChunkConverter.convert(
+            chunk: try Self.tone(format: src, frames: 32_768, phase: 0), with: converter, to: dst, reusing: &scratch
+        ))
+        #expect(grown !== first)
+        #expect(grown.frameCapacity > first.frameCapacity)
+    }
+
+    private static func tone(format: AVAudioFormat, frames: AVAudioFrameCount, phase: Int) throws -> AVAudioPCMBuffer {
+        let chunk = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames))
+        chunk.frameLength = frames
+        for ch in 0..<Int(format.channelCount) {
+            let samples = chunk.floatChannelData![ch]
+            for f in 0..<Int(frames) { samples[f] = sinf(Float(phase + f) * 0.01) }
+        }
+        return chunk
+    }
+
     @Test("a single chunk converts without loss")
     func singleChunkConverts() throws {
         let src = try #require(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))

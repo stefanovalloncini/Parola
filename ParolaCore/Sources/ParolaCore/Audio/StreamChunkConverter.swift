@@ -11,11 +11,25 @@ enum StreamChunkConverter {
         with converter: AVAudioConverter,
         to outputFormat: AVAudioFormat
     ) -> AVAudioPCMBuffer? {
+        var scratch: AVAudioPCMBuffer?
+        return convert(chunk: chunk, with: converter, to: outputFormat, reusing: &scratch)
+    }
+
+    /// Converts into `scratch`, growing it when a chunk needs more room. The returned buffer is
+    /// the scratch itself, so the caller must be done with it before converting the next chunk.
+    static func convert(
+        chunk: AVAudioPCMBuffer,
+        with converter: AVAudioConverter,
+        to outputFormat: AVAudioFormat,
+        reusing scratch: inout AVAudioPCMBuffer?
+    ) -> AVAudioPCMBuffer? {
         let ratio = outputFormat.sampleRate / chunk.format.sampleRate
         let capacity = AVAudioFrameCount(Double(chunk.frameLength) * ratio + 1024)
-        guard let outBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else {
-            return nil
+        if (scratch?.frameCapacity ?? 0) < capacity || scratch?.format != outputFormat {
+            scratch = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity)
         }
+        guard let outBuffer = scratch else { return nil }
+        outBuffer.frameLength = 0
 
         var consumed = false
         var error: NSError?

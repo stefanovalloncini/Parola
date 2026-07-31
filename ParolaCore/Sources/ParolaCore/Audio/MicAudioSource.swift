@@ -15,6 +15,7 @@ public actor MicAudioSource: LiveAudioSource {
     private let engine = AVAudioEngine()
     private let preferredDeviceUID: String?
     private var session: Session?
+    private var outputScratch: AVAudioPCMBuffer?
     private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
 
     private struct Session {
@@ -142,7 +143,8 @@ public actor MicAudioSource: LiveAudioSource {
         guard let outBuffer = StreamChunkConverter.convert(
             chunk: box.buffer,
             with: current.converter,
-            to: current.outputFormat
+            to: current.outputFormat,
+            reusing: &outputScratch
         ) else { return }
         current.writer.write(outBuffer)
     }
@@ -175,6 +177,7 @@ public actor MicAudioSource: LiveAudioSource {
         current.bufferContinuation.finish()
         await current.consumerTask.value
         session = nil
+        outputScratch = nil
         for continuation in levelContinuations.values {
             continuation.finish()
         }

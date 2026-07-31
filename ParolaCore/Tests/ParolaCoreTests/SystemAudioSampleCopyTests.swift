@@ -45,6 +45,70 @@ struct SystemAudioSampleCopyTests {
         #expect(abs(channels[0][42] - 0.75) < 0.0001)
     }
 
+    @Test("a reused buffer copies a shorter sample buffer after a longer one")
+    func reuseAcrossFrameCounts() throws {
+        let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+        var scratch: AVAudioPCMBuffer?
+
+        let long = try Self.makeSampleBuffer(
+            from: Self.makeBuffer(format: format, frames: 960, channelValues: [0.5, -0.25])
+        )
+        let first = try #require(SystemAudioSampleCopy.copy(
+            sampleBuffer: long, srcFormat: format, frameCount: 960, reusing: &scratch
+        ))
+        #expect(first.frameLength == 960)
+        #expect(abs(try #require(first.floatChannelData)[1][100] + 0.25) < 0.0001)
+
+        // The callback rebuilds the format from each sample buffer, so reuse has to survive a fresh equal one.
+        let sameFormat = try #require(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+        let short = try Self.makeSampleBuffer(
+            from: Self.makeBuffer(format: sameFormat, frames: 480, channelValues: [0.125, -0.75])
+        )
+        let second = try #require(SystemAudioSampleCopy.copy(
+            sampleBuffer: short, srcFormat: sameFormat, frameCount: 480, reusing: &scratch
+        ))
+        #expect(second === first)
+        #expect(second.frameLength == 480)
+        let channels = try #require(second.floatChannelData)
+        #expect(abs(channels[0][42] - 0.125) < 0.0001)
+        #expect(abs(channels[1][42] + 0.75) < 0.0001)
+    }
+
+    @Test("a reused tap buffer copies a shorter callback after a longer one")
+    func processTapReuseAcrossFrameCounts() throws {
+        let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+        var scratch: AVAudioPCMBuffer?
+
+        let long = try Self.makeBuffer(format: format, frames: 960, channelValues: [0.5, -0.25])
+        let first = try #require(ProcessTapSampleCopy.copy(
+            bufferList: long.audioBufferList, srcFormat: format, reusing: &scratch
+        ))
+        #expect(first.frameLength == 960)
+        #expect(abs(try #require(first.floatChannelData)[1][100] + 0.25) < 0.0001)
+
+        let short = try Self.makeBuffer(format: format, frames: 480, channelValues: [0.125, -0.75])
+        let second = try #require(ProcessTapSampleCopy.copy(
+            bufferList: short.audioBufferList, srcFormat: format, reusing: &scratch
+        ))
+        #expect(second === first)
+        #expect(second.frameLength == 480)
+        let channels = try #require(second.floatChannelData)
+        #expect(abs(channels[0][42] - 0.125) < 0.0001)
+        #expect(abs(channels[1][42] + 0.75) < 0.0001)
+    }
+
+    @Test("an empty tap callback copies nothing")
+    func processTapEmptyCallback() throws {
+        let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+        var scratch: AVAudioPCMBuffer?
+        let empty = try Self.makeBuffer(format: format, frames: 960, channelValues: [0, 0])
+        empty.frameLength = 0
+
+        #expect(ProcessTapSampleCopy.copy(
+            bufferList: empty.audioBufferList, srcFormat: format, reusing: &scratch
+        ) == nil)
+    }
+
     private static func makeBuffer(
         format: AVAudioFormat,
         frames: AVAudioFrameCount,

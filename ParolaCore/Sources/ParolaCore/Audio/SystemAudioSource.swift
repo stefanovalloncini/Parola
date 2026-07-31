@@ -159,6 +159,8 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
     private let outputFormat: AVAudioFormat
     private let queue: DispatchQueue
     private let onLevel: @Sendable (Float) -> Void
+    private var sampleScratch: AVAudioPCMBuffer?
+    private var outputScratch: AVAudioPCMBuffer?
 
     var failure: String? { writer.failure }
 
@@ -192,7 +194,8 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
         guard let copied = SystemAudioSampleCopy.copy(
             sampleBuffer: sampleBuffer,
             srcFormat: srcFormat,
-            frameCount: frameCount
+            frameCount: frameCount,
+            reusing: &sampleScratch
         ) else {
             return
         }
@@ -200,7 +203,8 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
         guard let outBuffer = StreamChunkConverter.convert(
             chunk: copied,
             with: converter,
-            to: outputFormat
+            to: outputFormat,
+            reusing: &outputScratch
         ) else { return }
         writer.write(outBuffer)
         onLevel(AudioLevel.normalised(of: copied))
@@ -221,9 +225,22 @@ enum SystemAudioSampleCopy {
         srcFormat: AVAudioFormat,
         frameCount: AVAudioFrameCount
     ) -> AVAudioPCMBuffer? {
-        guard let copy = AVAudioPCMBuffer(pcmFormat: srcFormat, frameCapacity: frameCount) else {
-            return nil
+        var scratch: AVAudioPCMBuffer?
+        return copy(sampleBuffer: sampleBuffer, srcFormat: srcFormat, frameCount: frameCount, reusing: &scratch)
+    }
+
+    /// Copies into `scratch`, growing it when a callback delivers more frames. The returned buffer
+    /// is the scratch itself, so the caller must be done with it before the next callback.
+    static func copy(
+        sampleBuffer: CMSampleBuffer,
+        srcFormat: AVAudioFormat,
+        frameCount: AVAudioFrameCount,
+        reusing scratch: inout AVAudioPCMBuffer?
+    ) -> AVAudioPCMBuffer? {
+        if (scratch?.frameCapacity ?? 0) < frameCount || scratch?.format != srcFormat {
+            scratch = AVAudioPCMBuffer(pcmFormat: srcFormat, frameCapacity: frameCount)
         }
+        guard let copy = scratch else { return nil }
         copy.frameLength = frameCount
         let status = CMSampleBufferCopyPCMDataIntoAudioBufferList(
             sampleBuffer,
