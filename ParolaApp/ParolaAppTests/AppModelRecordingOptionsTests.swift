@@ -162,75 +162,77 @@ struct RecordingCountInTests {
     }
 }
 
-@MainActor
-@Suite("Recording auto-stop", .serialized)
-struct RecordingAutoStopTests {
-    private func waitUntil(timeoutMs: Int = 3000, _ condition: @MainActor () -> Bool) async -> Bool {
-        var elapsed = 0
-        while elapsed < timeoutMs {
-            if condition() { return true }
-            try? await Task.sleep(for: .milliseconds(15))
-            elapsed += 15
-        }
-        return condition()
-    }
-
-    private func isRecording(_ model: AppModel) -> Bool {
-        if case .recording = model.phase { return true }
-        return false
-    }
-
-    @Test("a positive max-minutes auto-stops the recording on its own")
-    func autoStopFires() async throws {
-        let fixture = try makeSilentWAV()
-        await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
-        // A failing mock routes the auto-stop's stop→transcribe into the catch (.failed) so the
-        // run never persists to the library (CoreSpotlight indexing hangs the xctest host).
-        await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-            failure: MockTranscriberFailure(code: .transcriptionFailed, message: "auto-stop fired")
-        ))
-        defer {
-            Task {
-                await MockAudioSourceRegistry.shared.clear()
-                await MockTranscriberRegistry.shared.clear()
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("Recording auto-stop", .serialized)
+    struct RecordingAutoStopTests {
+        private func waitUntil(timeoutMs: Int = 3000, _ condition: @MainActor () -> Bool) async -> Bool {
+            var elapsed = 0
+            while elapsed < timeoutMs {
+                if condition() { return true }
+                try? await Task.sleep(for: .milliseconds(15))
+                elapsed += 15
             }
+            return condition()
         }
 
-        let model = makeRecordingModel(clock: ImmediateClock())
-        model.useStreaming = false
-        model.selectedModel = "openai_whisper-tiny"
-        model.recordingCountInSeconds = 0
-        model.recordingMaxMinutes = 1
-
-        model.startRecording(source: .microphone)
-
-        let stopped = await waitUntil {
-            if case .failed = model.phase { return true }
+        private func isRecording(_ model: AppModel) -> Bool {
+            if case .recording = model.phase { return true }
             return false
         }
-        #expect(stopped)
-        #expect(!isRecording(model))
-    }
 
-    @Test("a zero max-minutes leaves the recording running")
-    func zeroMaxMinutesNeverStops() async throws {
-        let fixture = try makeSilentWAV()
-        await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
-        defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+        @Test("a positive max-minutes auto-stops the recording on its own")
+        func autoStopFires() async throws {
+            let fixture = try makeSilentWAV()
+            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+            // A failing mock routes the auto-stop's stop→transcribe into the catch (.failed) so the
+            // run never persists to the library (CoreSpotlight indexing hangs the xctest host).
+            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                failure: MockTranscriberFailure(code: .transcriptionFailed, message: "auto-stop fired")
+            ))
+            defer {
+                Task {
+                    await MockAudioSourceRegistry.shared.clear()
+                    await MockTranscriberRegistry.shared.clear()
+                }
+            }
 
-        let model = makeRecordingModel(clock: ImmediateClock())
-        model.useStreaming = false
-        model.recordingCountInSeconds = 0
-        model.recordingMaxMinutes = 0
+            let model = makeRecordingModel(clock: ImmediateClock())
+            model.useStreaming = false
+            model.selectedModel = "openai_whisper-tiny"
+            model.recordingCountInSeconds = 0
+            model.recordingMaxMinutes = 1
 
-        model.startRecording(source: .microphone)
+            model.startRecording(source: .microphone)
 
-        let started = await waitUntil { self.isRecording(model) }
-        #expect(started)
+            let stopped = await waitUntil {
+                if case .failed = model.phase { return true }
+                return false
+            }
+            #expect(stopped)
+            #expect(!isRecording(model))
+        }
 
-        try? await Task.sleep(for: .milliseconds(300))
-        #expect(isRecording(model))
+        @Test("a zero max-minutes leaves the recording running")
+        func zeroMaxMinutesNeverStops() async throws {
+            let fixture = try makeSilentWAV()
+            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+            defer { Task { await MockAudioSourceRegistry.shared.clear() } }
 
-        model.cancelCurrentWork()
+            let model = makeRecordingModel(clock: ImmediateClock())
+            model.useStreaming = false
+            model.recordingCountInSeconds = 0
+            model.recordingMaxMinutes = 0
+
+            model.startRecording(source: .microphone)
+
+            let started = await waitUntil { self.isRecording(model) }
+            #expect(started)
+
+            try? await Task.sleep(for: .milliseconds(300))
+            #expect(isRecording(model))
+
+            model.cancelCurrentWork()
+        }
     }
 }
