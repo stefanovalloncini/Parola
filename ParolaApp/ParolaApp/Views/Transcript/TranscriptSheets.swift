@@ -5,29 +5,23 @@ struct SummarySheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Summary").font(DS.Font.heading)
-                Spacer()
-                if let text = summaryText {
-                    Button {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(text, forType: .string)
-                    } label: {
-                        Label("Copy", systemImage: "doc.on.doc")
-                    }
-                    .keyboardShortcut("c", modifiers: [.command, .shift])
-                    .axLeaf("SummarySheet.Button.Copy")
-                }
-                Button("Done") { dismiss() }
-                    .keyboardShortcut(.escape, modifiers: [])
-                    .axLeaf("SummarySheet.Button.Done")
-            }
-            .padding(DS.Spacing.regular)
-            Divider()
+        SheetFrame(icon: "sparkles", title: "Summary", onClose: { dismiss() }) {
             SummaryPane()
         }
-        .frame(minWidth: 520, minHeight: 480)
+        .sheetSize(width: 560, minHeight: 480, maxHeight: 700)
+        .closeLeaf("SummarySheet.Button.Done")
+        .headerAccessory {
+            if let text = summaryText {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text, forType: .string)
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc")
+                }
+                .keyboardShortcut("c", modifiers: [.command, .shift])
+                .axLeaf("SummarySheet.Button.Copy")
+            }
+        }
     }
 
     private var summaryText: String? {
@@ -40,18 +34,10 @@ struct ChatSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Chat").font(DS.Font.heading)
-                Spacer()
-                Button("Done") { dismiss() }
-                    .keyboardShortcut(.escape, modifiers: [])
-                    .axLeaf("ChatSheet.Button.Done")
-            }
-            .padding(DS.Spacing.regular)
-            Divider()
+        SheetFrame(icon: "bubble.left.and.text.bubble.right", title: "Chat", onClose: { dismiss() }) {
             ChatPane()
         }
-        .frame(minWidth: 520, minHeight: 480)
+        .sheetSize(width: 560, minHeight: 480, maxHeight: 700)
+        .closeLeaf("ChatSheet.Button.Done")
     }
 }

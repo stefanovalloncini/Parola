@@ -92,18 +92,12 @@ struct AboutSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 18) {
+        SheetFrame(icon: "waveform", title: "About Parola", onClose: { dismiss() }) {
             AboutInfoView()
-            Spacer(minLength: 0)
-            HStack {
-                Spacer()
-                Button("Close") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                    .axLeaf("About.Button.Close")
-            }
+                .padding(20)
         }
-        .padding(20)
-        .frame(width: 380, height: 360)
+        .sheetSize(width: 380, minHeight: 340, maxHeight: 420)
+        .closeLeaf("About.Button.Close")
         .axBranch("About")
     }
 }

@@ -46,23 +46,7 @@ struct ShortcutCheatSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Keyboard Shortcuts")
-                    .font(.title3.weight(.semibold))
-                Spacer()
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(DS.Font.title2Regular)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.cancelAction)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 12)
-            Divider()
+        SheetFrame(icon: "command", title: "Keyboard Shortcuts", onClose: { dismiss() }) {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 18) {
                     ForEach(ShortcutCatalog.sections) { section in
@@ -72,27 +56,27 @@ struct ShortcutCheatSheet: View {
                 .padding(20)
             }
         }
-        .frame(width: 420, height: 480)
+        .sheetSize(width: 420, minHeight: 480, maxHeight: 560)
     }
 
     private func sectionView(_ section: ShortcutCatalog.Section) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(section.title.uppercased())
-                .font(.caption.weight(.semibold))
+                .font(DS.Font.captionEmphasized)
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(section.entries) { entry in
                     HStack {
                         Text(entry.label)
-                            .font(.body)
+                            .font(DS.Font.body)
                         Spacer()
                         Text(entry.keys)
-                            .font(.system(.body, design: .monospaced))
+                            .font(DS.Font.bodyMono)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
                             .background(
-                                RoundedRectangle(cornerRadius: 5)
-                                    .fill(Color.primary.opacity(0.08))
+                                RoundedRectangle(cornerRadius: DS.Radius.small)
+                                    .fill(DS.Palette.subtleFill)
                             )
                     }
                 }

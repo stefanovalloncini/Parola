@@ -7,6 +7,31 @@ struct SheetFrame<Content: View, Footer: View>: View {
     let onClose: () -> Void
     let content: Content
     let footer: Footer?
+    private var width: CGFloat = 480
+    private var minHeight: CGFloat = 220
+    private var maxHeight: CGFloat = 640
+    private var closeAXLeaf = "Sheet.Button.Close"
+    private var accessory: AnyView?
+
+    func sheetSize(width: CGFloat, minHeight: CGFloat = 220, maxHeight: CGFloat = 640) -> SheetFrame {
+        var copy = self
+        copy.width = width
+        copy.minHeight = minHeight
+        copy.maxHeight = maxHeight
+        return copy
+    }
+
+    func closeLeaf(_ id: String) -> SheetFrame {
+        var copy = self
+        copy.closeAXLeaf = id
+        return copy
+    }
+
+    func headerAccessory<A: View>(@ViewBuilder _ build: () -> A) -> SheetFrame {
+        var copy = self
+        copy.accessory = AnyView(build())
+        return copy
+    }
 
     init(
         icon: String,
@@ -53,8 +78,8 @@ struct SheetFrame<Content: View, Footer: View>: View {
                     .padding(.vertical, 12)
             }
         }
-        .frame(width: 480)
-        .frame(minHeight: 220, maxHeight: 640)
+        .frame(width: width)
+        .frame(minHeight: minHeight, maxHeight: maxHeight)
         .background(DS.Color.surface)
     }
 
@@ -65,13 +90,17 @@ struct SheetFrame<Content: View, Footer: View>: View {
                 .foregroundStyle(iconTint)
                 .frame(width: 28, height: 28)
                 .background(iconTint.opacity(0.16))
-                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
 
             titleText
-                .font(.title3.weight(.semibold))
+                .font(DS.Font.title3)
                 .lineLimit(1)
 
             Spacer(minLength: DS.Spacing.small)
+
+            if let accessory {
+                accessory
+            }
 
             Button(action: onClose) {
                 Image(systemName: "xmark")
@@ -84,7 +113,7 @@ struct SheetFrame<Content: View, Footer: View>: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.cancelAction)
             .accessibilityLabel("Close")
-            .axLeaf("Sheet.Button.Close")
+            .axLeaf(closeAXLeaf)
         }
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, 12)
