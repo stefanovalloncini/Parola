@@ -58,7 +58,7 @@ public actor TranscriptionSession {
         if managedConfiguration.requireEnglishOnly, options.language == nil {
             options.language = "en"
         }
-        let modelName = options.model ?? defaultModelName()
+        let modelName = options.model ?? defaultModelName(for: options)
         try Task.checkCancellation()
 
         let variant = ModelCatalog.variant(id: modelName)
@@ -228,8 +228,8 @@ public actor TranscriptionSession {
         return fresh
     }
 
-    private func defaultModelName() -> String {
-        ModelCatalog.defaultModelID(configuration: managedConfiguration)
+    private func defaultModelName(for options: TranscriptionOptions) -> String {
+        ModelCatalog.defaultModelID(for: options, configuration: managedConfiguration)
     }
 
     private func scheduleIdleUnload() {

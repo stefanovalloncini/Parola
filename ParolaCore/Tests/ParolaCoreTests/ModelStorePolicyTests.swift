@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import Clocks
 @testable import ParolaCore
 
 @Suite("Model store policy and download coordination")
@@ -172,5 +173,44 @@ struct TranscriptionSessionPolicyTests {
             session,
             options: TranscriptionOptions(model: "openai_whisper-tiny")
         )
+    }
+
+    @Test("nil model with a translate request resolves to a Whisper default")
+    func translateDefaultFallsBackToWhisper() async throws {
+        guard ModelCatalog.variant(id: "apple-speech-analyzer") != nil else { return }
+        let registry = EngineRegistry()
+        let response = MockTranscriberResponse(
+            segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "ok")],
+            language: "en",
+            modelName: "mock-whisper"
+        )
+        await registry.register(
+            engineID: .whisperKit,
+            capabilities: .whisperKitDefaults
+        ) { _ in MockTranscriber.make(response: response, clock: ImmediateClock()) }
+
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-default-fallback-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let store = ModelStore(modelsDirectory: dir)
+        try FileManager.default.createDirectory(
+            at: store.installedURL(for: ModelCatalog.fallbackModelID),
+            withIntermediateDirectories: true
+        )
+        let audioURL = dir.appendingPathComponent("input.wav")
+        try Data("RIFFstub".utf8).write(to: audioURL)
+
+        let session = TranscriptionSession(
+            modelStore: store,
+            registry: registry,
+            managedConfiguration: makeConfig(["defaultModel": "apple-speech-analyzer"])
+        )
+        let transcript = try await session.transcribe(
+            source: FileAudioSource(url: audioURL),
+            options: TranscriptionOptions(task: .translate)
+        )
+        await session.unloadModel()
+
+        #expect(transcript.modelName == "mock-whisper")
     }
 }

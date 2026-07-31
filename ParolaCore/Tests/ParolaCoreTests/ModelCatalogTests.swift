@@ -151,6 +151,21 @@ struct ModelCatalogLookupTests {
         #expect(id == "openai_whisper-large-v3_turbo")
     }
 
+    @Test("defaultModelID(for:) falls back to Whisper when the default can't honor the request")
+    func optionsAwareDefaultFallsBack() {
+        guard ModelCatalog.variant(id: "apple-speech-analyzer") != nil else { return }
+        let config = makeConfig(["defaultModel": "apple-speech-analyzer"])
+        #expect(ModelCatalog.defaultModelID(
+            for: TranscriptionOptions(task: .translate), configuration: config
+        ) == ModelCatalog.fallbackModelID)
+        #expect(ModelCatalog.defaultModelID(
+            for: TranscriptionOptions(diarize: true), configuration: config
+        ) == ModelCatalog.fallbackModelID)
+        #expect(ModelCatalog.defaultModelID(
+            for: TranscriptionOptions(), configuration: config
+        ) == "apple-speech-analyzer")
+    }
+
     @Test("groupedForPicker filters by the engine allowlist")
     func groupedForPickerFilters() {
         let config = makeConfig(["allowedEngines": ["parakeet"]])

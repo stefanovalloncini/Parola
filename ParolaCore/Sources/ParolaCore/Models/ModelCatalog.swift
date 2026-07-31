@@ -149,6 +149,19 @@ public enum ModelCatalog {
         return allowed.first?.id ?? fallbackModelID
     }
 
+    /// The default adjusted for a specific request: when the plain default can't honor
+    /// diarization or translation (Apple Speech can't do either), falls back to the Whisper that can.
+    public static func defaultModelID(
+        for options: TranscriptionOptions,
+        configuration: ManagedConfiguration = .shared
+    ) -> String {
+        let id = defaultModelID(configuration: configuration)
+        guard let caps = staticCapabilities(forID: id) else { return id }
+        if options.diarize && !caps.supportsDiarization { return fallbackModelID }
+        if options.task == .translate && !caps.supportsTranslate { return fallbackModelID }
+        return id
+    }
+
     public static func variant(id: String) -> ModelVariant? {
         all.first { $0.id == id }
     }

@@ -19,8 +19,8 @@ struct Record: AsyncParsableCommand {
     @Option(name: [.customShort("d"), .long], help: "Duration in seconds. Omit to record until Ctrl-C.")
     var seconds: Double?
 
-    @Option(name: .shortAndLong, help: "Model variant.")
-    var model: String = ModelCatalog.fallbackModelID
+    @Option(name: .shortAndLong, help: "Model variant. Defaults to the recommended model; --stream uses \(ModelCatalog.fallbackModelID).")
+    var model: String?
 
     @Option(name: .shortAndLong, help: "Language code; omit to auto-detect.")
     var language: String?
@@ -72,15 +72,16 @@ struct Record: AsyncParsableCommand {
         await awaitStop(seconds: seconds)
 
         let session = TranscriptionSession()
-        let opts = TranscriptionOptions(
+        var opts = TranscriptionOptions(
             model: model,
             language: language,
             task: translate ? .translate : .transcribe,
             verbose: verbose,
             initialPrompt: prompt
         )
+        opts.model = model ?? ModelCatalog.defaultModelID(for: opts)
 
-        let progress = ProgressReporter(label: "downloading \(model)")
+        let progress = ProgressReporter(label: "downloading \(opts.model ?? "model")")
         let transcript = try await withStdoutRedirectedToStderr {
             try await session.transcribe(
                 source: audioSource,
@@ -100,8 +101,9 @@ struct Record: AsyncParsableCommand {
 
     private func runStreaming() async throws {
         let session = StreamingTranscriberFactory.make()
+        let streamModel = model ?? ModelCatalog.fallbackModelID
         let opts = TranscriptionOptions(
-            model: model,
+            model: streamModel,
             language: language,
             task: translate ? .translate : .transcribe,
             verbose: verbose,
@@ -110,7 +112,7 @@ struct Record: AsyncParsableCommand {
 
         stderr("Streaming from mic. Press Ctrl-C to stop." + (seconds.map { " (or wait \($0)s)" } ?? ""))
 
-        let progress = ProgressReporter(label: "downloading \(model)")
+        let progress = ProgressReporter(label: "downloading \(streamModel)")
         let events = try await session.start(
             options: opts,
             speakerLabeler: nil,

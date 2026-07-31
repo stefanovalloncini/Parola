@@ -11,8 +11,8 @@ struct Transcribe: AsyncParsableCommand {
     @Argument(help: "Path to one or more audio/video files, or a single YouTube URL. Multiple paths require --output-dir.")
     var inputs: [String]
 
-    @Option(name: .shortAndLong, help: "Model variant (e.g. openai_whisper-tiny, openai_whisper-large-v3_turbo).")
-    var model: String = ModelCatalog.fallbackModelID
+    @Option(name: .shortAndLong, help: "Model variant (e.g. openai_whisper-large-v3_turbo). Defaults to the recommended model — Apple Speech on macOS 26, no download.")
+    var model: String?
 
     @Option(name: .shortAndLong, help: "Language code (e.g. en, it, fr). Omit to auto-detect.")
     var language: String?
@@ -66,7 +66,7 @@ struct Transcribe: AsyncParsableCommand {
             throw ValidationError("Batch mode doesn't support URLs. Pass URLs one at a time.")
         }
 
-        let opts = TranscriptionOptions(
+        var opts = TranscriptionOptions(
             model: model,
             language: language,
             task: translate ? .translate : .transcribe,
@@ -76,6 +76,7 @@ struct Transcribe: AsyncParsableCommand {
             diarize: diarize,
             expectedSpeakers: speakers
         )
+        opts.model = model ?? ModelCatalog.defaultModelID(for: opts)
 
         if resolved.count == 1 {
             try await transcribeSingle(input: resolved[0], options: opts)
@@ -117,9 +118,10 @@ struct Transcribe: AsyncParsableCommand {
         }
 
         let session = TranscriptionSession()
-        let progress = ProgressReporter(label: "downloading \(model)")
-        if verbose { stderr("Loading model \(model)…") }
-        emitter.progress(.loading, detail: model)
+        let modelName = options.model ?? "model"
+        let progress = ProgressReporter(label: "downloading \(modelName)")
+        if verbose { stderr("Loading model \(modelName)…") }
+        emitter.progress(.loading, detail: modelName)
 
         let source: any AudioSource
         let sourceURL: URL
@@ -142,7 +144,7 @@ struct Transcribe: AsyncParsableCommand {
                 options: options,
                 downloadProgress: { p in
                     progress.update(p)
-                    emitter.progress(.downloading, fraction: p, detail: model)
+                    emitter.progress(.downloading, fraction: p, detail: modelName)
                 }
             )
         }
