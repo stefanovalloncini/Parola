@@ -138,6 +138,18 @@ struct FeatureGatesTests {
         #expect(SettingsRoute.microphone.isVisible(features: FeatureSet(enabled: [.micRecording])))
     }
 
+    @Test func integrationsPaneRequiresYouTube() {
+        #expect(!SettingsRoute.integrations.isVisible(features: FeatureSet(enabled: [.batch])))
+        #expect(SettingsRoute.integrations.isVisible(features: FeatureSet(enabled: [.youtube])))
+    }
+
+    @Test func generalPaneHidesStreamRowWithoutMicFeatures() {
+        #expect(!GeneralPane.showsStreamMicrophoneRow(features: FeatureSet(enabled: [.batch, .youtube])))
+        #expect(GeneralPane.showsStreamMicrophoneRow(features: FeatureSet(enabled: [.micRecording])))
+        #expect(GeneralPane.showsStreamMicrophoneRow(features: FeatureSet(enabled: [.dictation])))
+        #expect(GeneralPane.showsStreamMicrophoneRow(features: FeatureSet(enabled: [.liveCaptions])))
+    }
+
     @Test func cheatSheetDropsGatedShortcuts() {
         let sections = ShortcutCatalog.sections(features: FeatureSet(enabled: [.batch]))
         let labels = sections.flatMap(\.entries).map(\.label)

@@ -6,6 +6,10 @@ struct GeneralPane: View {
     @State private var launchAtLogin: Bool = LaunchAtLogin.isEnabled
     @State private var launchAtLoginError: String?
 
+    static func showsStreamMicrophoneRow(features: FeatureSet) -> Bool {
+        features.isEnabled(.micRecording) || features.isEnabled(.dictation) || features.isEnabled(.liveCaptions)
+    }
+
     var body: some View {
         @Bindable var model = model
         return VStack(alignment: .leading, spacing: 16) {
@@ -50,10 +54,12 @@ struct GeneralPane: View {
                         .labelsHidden()
                         .axLeaf("General.Toggle.WordTimestamps")
                 }
-                SettingRow("Stream microphone in real time",
-                           description: "Transcript appears as you speak — Whisper models only; other engines record the take first. Off always records first, then transcribes.") {
-                    Toggle("", isOn: $model.useStreaming).labelsHidden()
-                        .axLeaf("General.Toggle.UseStreaming")
+                if Self.showsStreamMicrophoneRow(features: model.features) {
+                    SettingRow("Stream microphone in real time",
+                               description: "Transcript appears as you speak — Whisper models only; other engines record the take first. Off always records first, then transcribes.") {
+                        Toggle("", isOn: $model.useStreaming).labelsHidden()
+                            .axLeaf("General.Toggle.UseStreaming")
+                    }
                 }
                 SettingRow("Diarize speakers",
                            description: "Tags each segment with Speaker 1, Speaker 2, etc. Loads a second model on first use.") {

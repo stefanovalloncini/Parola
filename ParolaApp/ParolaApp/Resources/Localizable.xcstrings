@@ -442,17 +442,6 @@
         }
       }
     },
-    "AUDIO & VIDEO": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AUDIO E VIDEO"
-          }
-        }
-      }
-    },
     "AUTOMATION": {
       "extractionState": "manual",
       "localizations": {
@@ -1236,6 +1225,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Incolla sottotitoli nel video…"
+          }
+        }
+      }
+    },
+    "CAPTURE": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ACQUISIZIONE"
           }
         }
       }
@@ -2028,6 +2028,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Personalizzazione"
+          }
+        }
+      }
+    },
+    "DICTATION": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DETTATURA"
           }
         }
       }
@@ -6440,6 +6451,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esecuzione prompt…"
+          }
+        }
+      }
+    },
+    "SOURCES": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SORGENTI"
           }
         }
       }

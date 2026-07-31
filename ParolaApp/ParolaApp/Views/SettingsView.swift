@@ -63,6 +63,8 @@ enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .microphone:
             return features.isEnabled(.micRecording) || features.isEnabled(.dictation)
                 || features.isEnabled(.liveCaptions)
+        // The pane only hosts the yt-dlp installer today.
+        case .integrations: return features.isEnabled(.youtube)
         default: return true
         }
     }
@@ -119,12 +121,14 @@ private struct SidebarGroup: Identifiable {
 @MainActor
 private var sidebarGroups: [SidebarGroup] {
     [
-        SidebarGroup(title: nil, routes: [.general, .customization, .watchedFolders, .recordMeetings, .shortcuts]),
-        SidebarGroup(title: "AUDIO & VIDEO", routes: [.microphone, .liveCaptions, .dictation, .snippets, .corrections]),
+        SidebarGroup(title: nil, routes: [.general, .customization, .shortcuts, .updates]),
+        SidebarGroup(title: "CAPTURE", routes: [.microphone, .recordMeetings, .liveCaptions]),
+        SidebarGroup(title: "DICTATION", routes: [.dictation, .snippets, .corrections]),
+        SidebarGroup(title: "SOURCES", routes: [.watchedFolders, .integrations]),
         SidebarGroup(title: "TRANSCRIPTION", routes: [.localModels, .transcriptionDefaults, .translation, .ignoredSegments, .findReplace]),
-        SidebarGroup(title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport, .integrations]),
+        SidebarGroup(title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport]),
         SidebarGroup(title: "AI", routes: [.prompts]),
-        SidebarGroup(title: "AUTOMATION", routes: [.automation, .updates]),
+        SidebarGroup(title: "AUTOMATION", routes: [.automation]),
         SidebarGroup(title: nil, routes: [.advanced, .about])
     ]
 }
