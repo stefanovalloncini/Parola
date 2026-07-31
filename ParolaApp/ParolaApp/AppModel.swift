@@ -1009,6 +1009,9 @@ final class AppModel {
 
     func startAutomationBridge() {
         guard testBridge == nil else { return }
+        // A unit-test host must not serve the bridge: it would overwrite the discovery files
+        // and expose the tests' AppModels to whatever harness connects mid-run.
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         guard let bridge = try? ParolaAutomationServer(model: self, auditLog: AutomationAuditLog()) else { return }
         bridge.start { [weak self] port in
             self?.automationBridgePort = port
