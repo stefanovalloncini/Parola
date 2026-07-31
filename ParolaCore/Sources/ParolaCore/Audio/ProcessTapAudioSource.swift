@@ -20,6 +20,7 @@ public actor ProcessTapAudioSource: LiveAudioSource {
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var ioProcID: AudioDeviceIOProcID?
     private var handler: TapHandler?
+    private var captureFailure: String?
 
     /// Audio process objects whose bundle ID matches a target (or a helper under it).
     /// Only processes currently registered with the audio system appear; an app that
@@ -136,7 +137,7 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         }
         let handler = TapHandler(
             converter: converter,
-            writeFile: writeFile,
+            writer: CaptureFileWriter(file: writeFile),
             outputFormat: outputFormat,
             srcFormat: srcFormat,
             onLevel: levelSink
@@ -160,6 +161,10 @@ public actor ProcessTapAudioSource: LiveAudioSource {
 
     public func prepare() async throws -> URL {
         stop()
+        if let captureFailure {
+            try? FileManager.default.removeItem(at: outputURL)
+            throw ParolaError.captureUnavailable(captureFailure)
+        }
         return outputURL
     }
 
@@ -198,6 +203,7 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         ioProcID = nil
         teardownAll()
         callbackQueue.sync {}
+        captureFailure = handler?.failure
         handler = nil
         for continuation in levelContinuations.values {
             continuation.finish()
@@ -226,20 +232,22 @@ public actor ProcessTapAudioSource: LiveAudioSource {
 @available(macOS 14.2, *)
 private final class TapHandler: @unchecked Sendable {
     private let converter: AVAudioConverter
-    private let writeFile: AVAudioFile
+    private let writer: CaptureFileWriter
     private let outputFormat: AVAudioFormat
     private let srcFormat: AVAudioFormat
     private let onLevel: @Sendable (Float) -> Void
 
+    var failure: String? { writer.failure }
+
     init(
         converter: AVAudioConverter,
-        writeFile: AVAudioFile,
+        writer: CaptureFileWriter,
         outputFormat: AVAudioFormat,
         srcFormat: AVAudioFormat,
         onLevel: @escaping @Sendable (Float) -> Void
     ) {
         self.converter = converter
-        self.writeFile = writeFile
+        self.writer = writer
         self.outputFormat = outputFormat
         self.srcFormat = srcFormat
         self.onLevel = onLevel
@@ -267,7 +275,7 @@ private final class TapHandler: @unchecked Sendable {
             with: converter,
             to: outputFormat
         ) else { return }
-        try? writeFile.write(from: outBuffer)
+        writer.write(outBuffer)
         onLevel(AudioLevel.normalised(of: copy))
     }
 }

@@ -19,7 +19,7 @@ public actor MicAudioSource: LiveAudioSource {
         var outputURL: URL
         var converter: AVAudioConverter
         var outputFormat: AVAudioFormat
-        var writeFile: AVAudioFile?
+        var writer: CaptureFileWriter
         var bufferContinuation: AsyncStream<BufferBox>.Continuation
         var consumerTask: Task<Void, Never>
     }
@@ -82,6 +82,7 @@ public actor MicAudioSource: LiveAudioSource {
             commonFormat: .pcmFormatFloat32,
             interleaved: false
         )
+        let writer = CaptureFileWriter(file: file)
 
         let (stream, cont) = AsyncStream<BufferBox>.makeStream(bufferingPolicy: .unbounded)
         let consumer = Task { [weak self] in
@@ -93,7 +94,7 @@ public actor MicAudioSource: LiveAudioSource {
             outputURL: url,
             converter: conv,
             outputFormat: outFormat,
-            writeFile: file,
+            writer: writer,
             bufferContinuation: cont,
             consumerTask: consumer
         )
@@ -131,20 +132,26 @@ public actor MicAudioSource: LiveAudioSource {
     private func write(box: BufferBox) {
         emitLevel(AudioLevel.normalised(of: box.buffer))
 
-        guard let current = session, let file = current.writeFile else { return }
+        guard let current = session else { return }
         guard let outBuffer = StreamChunkConverter.convert(
             chunk: box.buffer,
             with: current.converter,
             to: current.outputFormat
         ) else { return }
-        try? file.write(from: outBuffer)
+        current.writer.write(outBuffer)
     }
 
     public func prepare() async throws -> URL {
-        guard let url = session?.outputURL else {
+        guard let current = session else {
             throw ParolaError.captureUnavailable("recording was not started")
         }
+        let url = current.outputURL
+        let writer = current.writer
         await stop()
+        if let failure = writer.failure {
+            try? FileManager.default.removeItem(at: url)
+            throw ParolaError.captureUnavailable(failure)
+        }
         return url
     }
 

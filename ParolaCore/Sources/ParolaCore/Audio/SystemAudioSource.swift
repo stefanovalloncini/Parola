@@ -15,6 +15,7 @@ public actor SystemAudioSource: LiveAudioSource {
     private let outputFormat: AVAudioFormat
     private let callbackQueue = DispatchQueue(label: "com.parola.system-audio")
     private var levelContinuations: [UUID: AsyncStream<Float>.Continuation] = [:]
+    private var captureFailure: String?
 
     public init() {
         self.outputURL = FileManager.default.temporaryDirectory
@@ -77,7 +78,7 @@ public actor SystemAudioSource: LiveAudioSource {
         }
         let handler = SampleHandler(
             converter: converter,
-            writeFile: writeFile,
+            writer: CaptureFileWriter(file: writeFile),
             outputFormat: outputFormat,
             queue: callbackQueue,
             onLevel: levelSink
@@ -97,6 +98,10 @@ public actor SystemAudioSource: LiveAudioSource {
 
     public func prepare() async throws -> URL {
         try await stop()
+        if let captureFailure {
+            try? FileManager.default.removeItem(at: outputURL)
+            throw ParolaError.captureUnavailable(captureFailure)
+        }
         return outputURL
     }
 
@@ -134,6 +139,7 @@ public actor SystemAudioSource: LiveAudioSource {
         }
         if let handler {
             await handler.drain()
+            captureFailure = handler.failure
         }
         handler = nil
         for continuation in levelContinuations.values {
@@ -149,20 +155,22 @@ public actor SystemAudioSource: LiveAudioSource {
 @available(macOS 13.0, *)
 private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @unchecked Sendable {
     private let converter: AVAudioConverter
-    private let writeFile: AVAudioFile
+    private let writer: CaptureFileWriter
     private let outputFormat: AVAudioFormat
     private let queue: DispatchQueue
     private let onLevel: @Sendable (Float) -> Void
 
+    var failure: String? { writer.failure }
+
     init(
         converter: AVAudioConverter,
-        writeFile: AVAudioFile,
+        writer: CaptureFileWriter,
         outputFormat: AVAudioFormat,
         queue: DispatchQueue,
         onLevel: @escaping @Sendable (Float) -> Void
     ) {
         self.converter = converter
-        self.writeFile = writeFile
+        self.writer = writer
         self.outputFormat = outputFormat
         self.queue = queue
         self.onLevel = onLevel
@@ -194,7 +202,7 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
             with: converter,
             to: outputFormat
         ) else { return }
-        try? writeFile.write(from: outBuffer)
+        writer.write(outBuffer)
         onLevel(AudioLevel.normalised(of: copied))
     }
 
