@@ -1,6 +1,17 @@
 import AppKit
 import Foundation
 
+struct SettingsTransferFailure: Identifiable {
+    enum Operation {
+        case export
+        case restore
+    }
+
+    let id = UUID()
+    let operation: Operation
+    let message: String
+}
+
 enum SettingsExportService {
     private static let exportedKeys: [String] = {
         var keys: Set<String> = []
@@ -13,37 +24,39 @@ enum SettingsExportService {
     }()
 
     @MainActor
-    static func presentExportPanel() {
+    static func presentExportPanel() -> SettingsTransferFailure? {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "parola.parola-settings"
         panel.allowedContentTypes = []
         panel.message = "Save Parola settings"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
         let payload = exportPayload()
         do {
             let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
             try data.write(to: url, options: .atomic)
+            return nil
         } catch {
-            NSAlert(error: error).runModal()
+            return SettingsTransferFailure(operation: .export, message: error.localizedDescription)
         }
     }
 
     @MainActor
-    static func presentImportPanel() {
+    static func presentImportPanel() -> SettingsTransferFailure? {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.message = "Pick a .parola-settings file"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
         do {
             let data = try Data(contentsOf: url)
             guard let payload = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                throw NSError(domain: "ParolaSettings", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not a valid settings file."])
+                throw NSError(domain: "ParolaSettings", code: -1, userInfo: [NSLocalizedDescriptionKey: String(localized: "Not a valid settings file.")])
             }
             apply(payload)
+            return nil
         } catch {
-            NSAlert(error: error).runModal()
+            return SettingsTransferFailure(operation: .restore, message: error.localizedDescription)
         }
     }
 

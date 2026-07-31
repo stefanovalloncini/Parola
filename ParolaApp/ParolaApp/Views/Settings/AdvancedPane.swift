@@ -4,6 +4,7 @@ import ParolaCore
 struct AdvancedPane: View {
     @Environment(AppModel.self) private var model
     @State private var resetAllConfirming = false
+    @State private var transferFailure: SettingsTransferFailure?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -23,17 +24,29 @@ struct AdvancedPane: View {
             SettingsSection("Backup & restore") {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Save the settings from every pane to a `.parola-settings` file, or restore one. Downloaded models and the prompt library are not included.")
-                        .font(.caption)
+                        .font(DS.Font.caption)
                         .foregroundStyle(.secondary)
                     HStack(spacing: 8) {
                         Button("Export settings…") {
-                            SettingsExportService.presentExportPanel()
+                            transferFailure = SettingsExportService.presentExportPanel()
                         }
                         .axLeaf("Advanced.Button.ExportSettings")
                         Button("Import settings…") {
-                            SettingsExportService.presentImportPanel()
+                            transferFailure = SettingsExportService.presentImportPanel()
                         }
                         .axLeaf("Advanced.Button.ImportSettings")
+                    }
+                    .alert(
+                        transferFailure?.operation == .export ? Text("Couldn't export settings") : Text("Couldn't import settings"),
+                        isPresented: Binding(
+                            get: { transferFailure != nil },
+                            set: { if !$0 { transferFailure = nil } }
+                        ),
+                        presenting: transferFailure
+                    ) { _ in
+                        Button("OK") {}
+                    } message: { failure in
+                        Text(failure.message)
                     }
                 }
                 .padding(16)
@@ -42,7 +55,7 @@ struct AdvancedPane: View {
             SettingsSection("Reset") {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Returns every Settings pane to its defaults. Models on disk are untouched.")
-                        .font(.caption)
+                        .font(DS.Font.caption)
                         .foregroundStyle(.secondary)
                     Button(role: .destructive) {
                         resetAllConfirming = true

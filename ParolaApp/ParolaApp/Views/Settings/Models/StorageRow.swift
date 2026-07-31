@@ -4,6 +4,7 @@ import AppKit
 
 struct StorageRow: View {
     @State private var overridePath: String? = Self.currentOverride()
+    @State private var showingRestartAlert = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -32,6 +33,11 @@ struct StorageRow: View {
                 .fill(Color.primary.opacity(0.04))
         )
         .onAppear { overridePath = Self.currentOverride() }
+        .alert("Restart required", isPresented: $showingRestartAlert) {
+            Button("OK") {}
+        } message: {
+            Text("Quit and relaunch Parola for the new models folder to take effect. Models already downloaded stay in the old folder.")
+        }
     }
 
     // ModelStore reads this key from UserDefaults.standard itself, so this row matches it
@@ -59,22 +65,13 @@ struct StorageRow: View {
         UserDefaults.standard.set(url.path, forKey: ModelStore.storageOverrideKey)
         ModelStore.writeSharedOverride(url.path)
         overridePath = Self.currentOverride()
-        showRestartAlert()
+        showingRestartAlert = true
     }
 
     private func resetStorage() {
         UserDefaults.standard.removeObject(forKey: ModelStore.storageOverrideKey)
         ModelStore.writeSharedOverride(nil)
         overridePath = Self.currentOverride()
-        showRestartAlert()
-    }
-
-    private func showRestartAlert() {
-        let alert = NSAlert()
-        alert.messageText = "Restart required"
-        alert.informativeText = "Quit and relaunch Parola for the new models folder to take effect. Models already downloaded stay in the old folder."
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
+        showingRestartAlert = true
     }
 }

@@ -1905,6 +1905,17 @@
         }
       }
     },
+    "Couldn't export settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esportazione impostazioni non riuscita"
+          }
+        }
+      }
+    },
     "Couldn't generate a summary": {
       "extractionState": "manual",
       "localizations": {
@@ -1912,6 +1923,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile generare un riepilogo"
+          }
+        }
+      }
+    },
+    "Couldn't import settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importazione impostazioni non riuscita"
           }
         }
       }
@@ -4792,6 +4814,17 @@
         }
       }
     },
+    "Not a valid settings file.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è un file di impostazioni valido."
+          }
+        }
+      }
+    },
     "Not installed": {
       "extractionState": "manual",
       "localizations": {
@@ -5708,6 +5741,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esci e riapri Parola perché la nuova cartella dei modelli abbia effetto."
+          }
+        }
+      }
+    },
+    "Quit and relaunch Parola for the new models folder to take effect. Models already downloaded stay in the old folder.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esci e riapri Parola per usare la nuova cartella dei modelli. I modelli già scaricati restano nella vecchia cartella."
           }
         }
       }
