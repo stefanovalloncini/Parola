@@ -9,6 +9,7 @@ extension ParolaAutomationServer {
                 summary: "Starts the dictation flow (App Intents path).",
                 kind: .mutating,
                 handler: { _, ctx in
+                    try ctx.require(.dictation)
                     ctx.model.startDictationFromIntent()
                     return .object(["started": .bool(true)])
                 }
@@ -20,6 +21,7 @@ extension ParolaAutomationServer {
                 summary: "Stops the active dictation session.",
                 kind: .mutating,
                 handler: { _, ctx in
+                    try ctx.require(.dictation)
                     ctx.model.stopDictationFromIntent()
                     return .object(["stopped": .bool(true)])
                 }

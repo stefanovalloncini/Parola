@@ -151,6 +151,7 @@ extension ParolaAutomationServer {
                 summary: "Runs the summarise prompt on the most recent library entry.",
                 kind: .mutating,
                 handler: { _, ctx in
+                    try ctx.require(.ai)
                     ctx.model.summarizeLatestEntry()
                     return .object(["started": .bool(true)])
                 }

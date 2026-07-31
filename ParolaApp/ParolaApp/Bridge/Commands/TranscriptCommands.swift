@@ -36,6 +36,7 @@ extension ParolaAutomationServer {
                 ],
                 followsWith: ["waitForPhase"],
                 handler: { args, ctx in
+                    try ctx.require(.youtube)
                     let url = try args.string("url")
                     ctx.model.transcribeYouTube(urlString: url)
                     return .object(["started": .bool(true)])

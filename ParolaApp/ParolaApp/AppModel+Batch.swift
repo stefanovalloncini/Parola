@@ -65,6 +65,10 @@ extension AppModel {
     }
 
     func startBatch(urls: [URL]) {
+        guard features.isEnabled(.batch) else {
+            phase = .failed(message: ParolaError.featureDisabled(.batch).description)
+            return
+        }
         if phaseDefersArrivals {
             deferredArrivals.append(contentsOf: urls)
             return
@@ -139,7 +143,7 @@ extension AppModel {
 
     private func runBatchTask(jobs: [BatchJob]) {
         batchTask?.cancel()
-        let queue = BatchQueue(session: session)
+        let queue = BatchQueue(session: session, features: features)
         let opts = currentOptions
         batchTask = Task { @MainActor [weak self] in
             let events = await queue.process(jobs: jobs, options: opts)
@@ -199,6 +203,10 @@ extension AppModel {
     }
 
     func addBatchFiles(_ urls: [URL]) {
+        guard features.isEnabled(.batch) else {
+            phase = .failed(message: ParolaError.featureDisabled(.batch).description)
+            return
+        }
         guard !urls.isEmpty else { return }
         if batchIsRunning {
             batchJobs.append(contentsOf: urls.map { BatchJob(url: $0) })
@@ -250,6 +258,7 @@ extension AppModel {
 
     /// Rebuilds a queue that a quit interrupted: jobs come back pending and wait for Resume.
     func restoreBatchQueue() {
+        guard features.isEnabled(.batch) else { return }
         guard batchJobs.isEmpty,
               let data = try? Data(contentsOf: batchQueueFileURL),
               let urls = try? Self.batchOptionsDecoder.decode([URL].self, from: data),

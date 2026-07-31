@@ -12,6 +12,7 @@ extension ParolaAutomationServer {
                     .init(name: "paths", kind: .stringArray, required: true, summary: "Absolute paths to input files"),
                 ],
                 handler: { args, ctx in
+                    try ctx.require(.batch)
                     let urls = try resolveExistingPaths(args)
                     ctx.model.startBatch(urls: urls)
                     return .object(["started": .bool(true), "count": .int(urls.count)])
@@ -27,6 +28,7 @@ extension ParolaAutomationServer {
                     .init(name: "paths", kind: .stringArray, required: true, summary: "Absolute paths to input files"),
                 ],
                 handler: { args, ctx in
+                    try ctx.require(.batch)
                     let urls = try resolveExistingPaths(args)
                     ctx.model.addBatchFiles(urls)
                     return .object(["added": .int(urls.count)])

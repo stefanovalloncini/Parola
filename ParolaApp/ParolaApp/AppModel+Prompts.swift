@@ -26,6 +26,7 @@ extension AppModel {
     }
 
     func runPrompt(_ prompt: Prompt) {
+        guard features.isEnabled(.ai) else { return }
         guard let transcript = self.transcript else { return }
         guard !isRunningPrompt else { return }
         isRunningPrompt = true
@@ -35,7 +36,7 @@ extension AppModel {
             guard let self else { return }
             do {
                 let model = try await LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
-                let result = try await PromptRunner.run(prompt, on: transcript.text, model: model)
+                let result = try await PromptRunner.run(prompt, on: transcript.text, model: model, features: features)
                 if generation == derivedArtifactsGeneration {
                     promptOutput = PromptOutput(promptName: prompt.name, text: result)
                 }
@@ -49,6 +50,7 @@ extension AppModel {
     }
 
     func extractActionItems() {
+        guard features.isEnabled(.ai) else { return }
         guard let transcript = self.transcript else { return }
         guard !isExtractingActionItems else { return }
         guard let prompt = Prompt.builtIns.first(where: { $0.name == "Action items" }) else { return }
@@ -58,7 +60,7 @@ extension AppModel {
             guard let self else { return }
             do {
                 let model = try await LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
-                let result = try await PromptRunner.run(prompt, on: transcript.text, model: model)
+                let result = try await PromptRunner.run(prompt, on: transcript.text, model: model, features: features)
                 if generation == derivedArtifactsGeneration {
                     actionItems = ActionItemParser.parse(result)
                 }
@@ -86,6 +88,7 @@ extension AppModel {
     }
 
     func extractSmartChapters() {
+        guard features.isEnabled(.ai) else { return }
         guard let transcript = self.transcript else { return }
         guard !isExtractingChapters else { return }
         isExtractingChapters = true
@@ -114,6 +117,7 @@ extension AppModel {
     /// Replaces a freshly-saved entry's filename-derived title with a short LLM-written one.
     /// Best-effort: any failure leaves the original title untouched.
     func autoTitleEntry(_ id: LibraryEntry.ID, transcript: Transcript) {
+        guard features.isEnabled(.ai) else { return }
         let text = transcript.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard text.count >= 40 else { return }
         let excerpt = String(text.prefix(2000))
@@ -141,6 +145,7 @@ extension AppModel {
     }
 
     func generateYouTubeChapters() {
+        guard features.isEnabled(.ai) else { return }
         guard let transcript = self.transcript else { return }
         guard !isRunningPrompt else { return }
         isRunningPrompt = true

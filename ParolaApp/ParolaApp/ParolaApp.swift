@@ -39,8 +39,10 @@ func handleParolaOpen(_ url: URL, model: AppModel) {
             model.transcribe(fileURL: URL(fileURLWithPath: (path as NSString).expandingTildeInPath))
         }
     case "dictate":
+        guard model.features.isEnabled(.dictation) else { return }
         model.startDictationFromIntent()
     case "stop":
+        guard model.features.isEnabled(.dictation) else { return }
         model.stopDictationFromIntent()
     case "open":
         if let entryID = query["entry"] {

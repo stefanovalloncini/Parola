@@ -34,6 +34,7 @@ extension ParolaAutomationServer {
                 handler: { args, ctx in
                     let source = (try args.optionalString("source")) ?? "microphone"
                     let recordSource: AppModel.RecordSource = (source == "systemAudio") ? .systemAudio : .microphone
+                    try ctx.require(recordSource == .microphone ? .micRecording : .meetings)
                     let categoryRaw = (try args.optionalString("category")) ?? ""
                     let category = EntryCategory(rawValue: categoryRaw) ?? .transcription
                     let targets = try args.optionalStringArray("targetBundleIDs") ?? []
@@ -65,6 +66,7 @@ extension ParolaAutomationServer {
                 summary: "Toggles live captions; waits up to 1s for the flip.",
                 kind: .async,
                 handler: { _, ctx in
+                    try ctx.require(.liveCaptions)
                     let before = ctx.model.liveCaptions?.isActive ?? false
                     ctx.model.toggleLiveCaptions()
                     let clock = ctx.model.clock

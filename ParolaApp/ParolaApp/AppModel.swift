@@ -405,6 +405,7 @@ final class AppModel {
     }
 
     func toggleLiveCaptions() {
+        guard features.isEnabled(.liveCaptions) else { return }
         guard let liveCaptions else { return }
         if !liveCaptions.isActive, let reason = liveCaptionsUnavailableReason {
             switch phase {
@@ -493,6 +494,7 @@ final class AppModel {
 
     @ObservationIgnored private var isReloadingSettings = false
     @ObservationIgnored private(set) var activeSideEffects: Set<BootstrapSideEffect> = []
+    @ObservationIgnored let features: FeatureSet
 
     private func themeKeySnapshot() -> [String] {
         [appTheme, appAccentRaw, String(themeIsCustom), themeCustomPaletteJSON]
@@ -1037,6 +1039,8 @@ final class AppModel {
     init(bootstrap: AppBootstrap) {
         let defaults = bootstrap.defaults
         self.defaults = defaults
+        self.features = bootstrap.enabledFeaturesOverride.map(FeatureSet.init(enabled:))
+            ?? FeatureSet.resolve(managed: ManagedConfiguration(storage: defaults))
         self.filePicker = bootstrap.filePicker
         self.mode = bootstrap.mode
         self.clock = bootstrap.clock
@@ -1066,9 +1070,11 @@ final class AppModel {
         refreshLibrary()
         restoreBatchQueue()
         loadPendingRecovery()
-        wireDictationController()
+        if features.isEnabled(.dictation) {
+            wireDictationController()
+        }
 
-        let sideEffects = bootstrap.sideEffects
+        let sideEffects = bootstrap.sideEffects.subtracting(features.excludedSideEffects(mode: bootstrap.mode))
         self.activeSideEffects = sideEffects
         if sideEffects.contains(.refreshYtDlp) {
             refreshYtDlpAvailability()
@@ -1116,7 +1122,8 @@ final class AppModel {
         skipBootstrap: Bool = false,
         defaults: UserDefaults = .standard,
         filePicker: FilePicker = SystemFilePicker(),
-        libraryURL: URL? = nil
+        libraryURL: URL? = nil,
+        features: Set<ParolaFeature>? = nil
     ) {
         let sideEffects: Set<BootstrapSideEffect> = skipBootstrap ? [] : BootstrapSideEffect.all
         let bootstrap = AppBootstrap(
@@ -1124,7 +1131,8 @@ final class AppModel {
             library: libraryURL,
             defaultsOverride: defaults,
             sideEffects: sideEffects,
-            filePicker: filePicker
+            filePicker: filePicker,
+            enabledFeaturesOverride: features
         )
         self.init(bootstrap: bootstrap)
     }
@@ -1629,6 +1637,10 @@ final class AppModel {
     }
 
     func transcribeYouTube(urlString: String) {
+        guard features.isEnabled(.youtube) else {
+            phase = .failed(message: ParolaError.featureDisabled(.youtube).description)
+            return
+        }
         guard let url = makeYouTubeURL(urlString) else { return }
 
         cancelTranscriptionRuns()
@@ -1796,6 +1808,11 @@ final class AppModel {
     // MARK: - Recording
 
     func startRecording(source: RecordSource) {
+        let needed: ParolaFeature = source == .microphone ? .micRecording : .meetings
+        guard features.isEnabled(needed) else {
+            phase = .failed(message: ParolaError.featureDisabled(needed).description)
+            return
+        }
         guard !recordingActive else { return }
         guard applyPreRecordingDiskCheck() else { return }
         let countIn = max(0, recordingCountInSeconds)
@@ -2373,6 +2390,7 @@ final class AppModel {
     @ObservationIgnored var summariseOperation: (@Sendable (Transcript) async throws -> Summary)?
 
     func summariseTranscript() {
+        guard features.isEnabled(.ai) else { return }
         guard let transcript, !isSummarising else { return }
         isSummarising = true
         summaryError = nil
@@ -2380,7 +2398,7 @@ final class AppModel {
         let generation = summaryGeneration
         let snapshot = transcript
         let entryID = selectedEntryID
-        let summarise = summariseOperation ?? { try await SummaryService().summarise($0) }
+        let summarise = summariseOperation ?? { [features] in try await SummaryService(features: features).summarise($0) }
         Task { [weak self] in
             do {
                 let summary = try await summarise(snapshot)

@@ -237,7 +237,8 @@ struct ChatPane: View {
         do {
             let s = try TranscriptChat.makeSession(
                 transcript: transcript,
-                history: transcript.chatHistory ?? []
+                history: transcript.chatHistory ?? [],
+                features: model.features
             )
             session = s
             displayedHistory = await s.history

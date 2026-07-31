@@ -31,6 +31,7 @@ extension ParolaAutomationServer {
                     .init(name: "id", kind: .string(), required: false, summary: "Prompt UUID (alternative to name)"),
                 ],
                 handler: { args, ctx in
+                    try ctx.require(.ai)
                     let nameArg = try args.optionalString("name")
                     let idArg = try args.optionalString("id")
                     let identifier = nameArg ?? idArg

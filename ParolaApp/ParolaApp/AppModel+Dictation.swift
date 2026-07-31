@@ -227,6 +227,7 @@ extension AppModel {
     }
 
     func applyDictationEnabledChange() {
+        guard features.isEnabled(.dictation) else { return }
         if dictationEnabled {
             dictationPermissions.refresh()
             // Gated to real launches, like prewarmDictationModel(): an ungated prompt is a modal system dialog that hangs xcodebuild test.
@@ -242,6 +243,7 @@ extension AppModel {
     }
 
     func startDictation() {
+        guard features.isEnabled(.dictation) else { return }
         guard !dictationController.isRunning else { return }
         let configuration = DictationController.Configuration(
             modelName: selectedModel,
@@ -404,6 +406,7 @@ extension AppModel {
     }
 
     func startDictationFromIntent() {
+        guard features.isEnabled(.dictation) else { return }
         if !dictationEnabled {
             dictationEnabled = true
         } else if !dictationController.isRunning {

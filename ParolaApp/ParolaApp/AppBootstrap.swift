@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 
 struct AppBootstrap: @unchecked Sendable {
     enum Mode: Sendable { case normal, test }
@@ -15,6 +16,7 @@ struct AppBootstrap: @unchecked Sendable {
     let filePicker: FilePicker
     let clock: any Clock<Duration>  // `any Clock<Duration>` isn't Sendable-marked, but the clocks we hand out (ContinuousClock, TestClock, ImmediateClock) are all immutable, safe-to-share instances.
     let headless: Bool
+    let enabledFeaturesOverride: Set<ParolaFeature>?
 
     init(
         mode: Mode,
@@ -28,7 +30,8 @@ struct AppBootstrap: @unchecked Sendable {
         sideEffects: Set<BootstrapSideEffect>,
         filePicker: FilePicker,
         clock: any Clock<Duration> = ContinuousClock(),
-        headless: Bool = false
+        headless: Bool = false,
+        enabledFeaturesOverride: Set<ParolaFeature>? = nil
     ) {
         self.mode = mode
         self.library = library
@@ -42,6 +45,7 @@ struct AppBootstrap: @unchecked Sendable {
         self.filePicker = filePicker
         self.clock = clock
         self.headless = headless
+        self.enabledFeaturesOverride = enabledFeaturesOverride
     }
 
     static let normal: AppBootstrap = AppBootstrap(
@@ -65,7 +69,10 @@ struct AppBootstrap: @unchecked Sendable {
             sideEffects: BootstrapSideEffect.testing,
             filePicker: TestFilePicker(),
             clock: ContinuousClock(),
-            headless: args.contains("--headless")
+            headless: args.contains("--headless"),
+            enabledFeaturesOverride: map["--enabled-features"].map { raw in
+                Set(raw.split(separator: ",").compactMap { ParolaFeature(rawValue: String($0)) })
+            }
         )
     }
 
