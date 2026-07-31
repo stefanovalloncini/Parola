@@ -222,12 +222,7 @@ final class AppModel {
     var batchExportFormatOptionsJSON: String = "{}" { didSet { defaults.set(batchExportFormatOptionsJSON, forKey: "batchExportFormatOptions") } }
 
     var findIsOpen: Bool = false
-    var findQuery: String = "" {
-        didSet {
-            if !findQuery.isEmpty { lastFindQuery = findQuery }
-            scheduleRecomputeMatches()
-        }
-    }
+    var findQuery: String = "" { didSet { scheduleRecomputeMatches() } }
     var findCaseSensitive: Bool = false { didSet { scheduleRecomputeMatches() } }
     var findReplacement: String = ""
     var matches: [TranscriptMatch] = [] { didSet { rebuildMatchesIndex() } }

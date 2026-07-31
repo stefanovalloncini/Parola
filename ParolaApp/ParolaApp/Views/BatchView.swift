@@ -5,7 +5,7 @@ import ParolaCore
 struct BatchView: View {
     @Environment(AppModel.self) private var model
     @State private var isDropping: Bool = false
-    @AppStorage("batch.exportPaneVisible") private var exportPaneVisible: Bool = true
+    @AppStorage("batch.exportPaneVisible", store: DefaultsStore.current) private var exportPaneVisible: Bool = true
 
     var body: some View {
         VStack(spacing: 0) {

@@ -164,7 +164,7 @@ private struct LiveRecordingWaveform: View {
             idleHeight: 3,
             fill: DS.Color.accent
         )
-        .onReceive(levelSubject) { level = $0 }
+        .onReceive(levelSubject.throttle(for: .milliseconds(45), scheduler: DispatchQueue.main, latest: true)) { level = $0 }
     }
 }
 

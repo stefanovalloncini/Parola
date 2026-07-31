@@ -3,7 +3,7 @@ import AVKit
 
 struct MediaBar: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("playbackRate") private var playbackRate: Double = 1.0
+    @AppStorage("playbackRate", store: DefaultsStore.current) private var playbackRate: Double = 1.0
 
     private let speeds: [Double] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
 

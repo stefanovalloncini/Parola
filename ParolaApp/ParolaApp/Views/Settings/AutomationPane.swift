@@ -7,14 +7,17 @@ struct AutomationPane: View {
     @State private var copyConfirmation: String?
     @State private var confirmationTask: Task<Void, Never>?
 
-    private var bundledBinaryPath: String? {
+    // Probed once per launch; the fallback copy below tells you to relaunch after building parola-mcp.
+    private static let resolvedBinaryPath: String? = bundledBinaryPath() ?? developmentBinaryPath()
+
+    private static func bundledBinaryPath() -> String? {
         guard let bundled = Bundle.main.executableURL?
             .deletingLastPathComponent()
             .appendingPathComponent("parola-mcp").path else { return nil }
         return FileManager.default.isExecutableFile(atPath: bundled) ? bundled : nil
     }
 
-    private var developmentBinaryPath: String? {
+    private static func developmentBinaryPath() -> String? {
         #if DEBUG
         let workspace = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -30,13 +33,8 @@ struct AutomationPane: View {
         #endif
     }
 
-    private var resolvedBinaryPath: String? {
-        bundledBinaryPath ?? developmentBinaryPath
-    }
-
-    private var mcpJSONSnippet: String? {
-        guard let path = resolvedBinaryPath else { return nil }
-        return """
+    private static let mcpJSONSnippet: String? = resolvedBinaryPath.map { path in
+        """
         {
           "mcpServers": {
             "parola": {
@@ -85,7 +83,7 @@ struct AutomationPane: View {
 
                 SettingsSection("parola-mcp binary") {
                     VStack(alignment: .leading, spacing: 8) {
-                        if let path = resolvedBinaryPath {
+                        if let path = Self.resolvedBinaryPath {
                             Text(path)
                                 .font(.system(.caption, design: .monospaced))
                                 .lineLimit(1)
@@ -118,7 +116,7 @@ struct AutomationPane: View {
                     .padding(16)
                 }
 
-                if let snippet = mcpJSONSnippet {
+                if let snippet = Self.mcpJSONSnippet {
                     SettingsSection("MCP client snippet") {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Drop this into your MCP client's config (Claude Code .mcp.json, Codex, etc.)")

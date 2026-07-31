@@ -16,6 +16,7 @@ extension AppModel {
         matchesDebounce = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(150), clock: clock)
             guard !Task.isCancelled else { return }
+            if !query.isEmpty { self?.lastFindQuery = query }
             let result = await Task.detached {
                 transcript.findMatches(query, caseSensitive: caseSensitive)
             }.value

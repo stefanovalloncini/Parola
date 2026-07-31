@@ -3,9 +3,9 @@ import ParolaCore
 
 struct LiveCaptionsView: View {
     @Bindable var controller: LiveCaptionsController
-    @AppStorage("liveCaptions.opacity") private var opacity: Double = 1.0
+    @AppStorage("liveCaptions.opacity", store: DefaultsStore.current) private var opacity: Double = 1.0
     // Fixed pt by design: the caption overlay has its own user size control (context menu → Caption size).
-    @AppStorage("liveCaptions.fontSize") private var fontSize: Double = 22
+    @AppStorage("liveCaptions.fontSize", store: DefaultsStore.current) private var fontSize: Double = 22
 
     var body: some View {
         content

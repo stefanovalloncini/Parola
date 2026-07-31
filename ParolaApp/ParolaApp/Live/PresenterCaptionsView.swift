@@ -4,7 +4,7 @@ struct PresenterCaptionsView: View {
     @Bindable var controller: LiveCaptionsController
     let onClose: () -> Void
 
-    @AppStorage("presenter.fontSize") private var fontSize: Double = 96
+    @AppStorage("presenter.fontSize", store: DefaultsStore.current) private var fontSize: Double = 96
     @State private var hovering = false
 
     private var caption: String {
