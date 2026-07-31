@@ -49,17 +49,27 @@ public enum BatchEvent: Sendable {
 /// warm beats lighting up two copies in parallel.
 public actor BatchQueue {
     private let session: TranscriptionSession
+    private let features: FeatureSet
     private var jobInFlight = false
 
-    public init(session: TranscriptionSession = TranscriptionSession()) {
+    public init(session: TranscriptionSession = TranscriptionSession(), features: FeatureSet = .resolve()) {
         self.session = session
+        self.features = features
     }
 
     public func process(
         jobs: [BatchJob],
         options: TranscriptionOptions
     ) -> AsyncStream<BatchEvent> {
-        AsyncStream { continuation in
+        guard features.isEnabled(.batch) else {
+            return AsyncStream { continuation in
+                let reason = ParolaError.featureDisabled(.batch).description
+                for job in jobs { continuation.yield(.failed(jobID: job.id, reason: reason)) }
+                continuation.yield(.finished)
+                continuation.finish()
+            }
+        }
+        return AsyncStream { continuation in
             let processingTask = Task {
                 await self.run(jobs: jobs, options: options, continuation: continuation)
             }

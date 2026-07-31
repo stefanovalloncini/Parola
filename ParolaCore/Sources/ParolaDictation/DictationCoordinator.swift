@@ -44,6 +44,8 @@ public actor DictationCoordinator {
     /// revive a live recorder nobody owns anymore (hot mic, stuck HUD).
     private var shutDown = false
 
+    private let features: FeatureSet
+
     public init(
         hotkey: any HotkeyMonitor,
         recorder: any DictationRecorder,
@@ -52,6 +54,7 @@ public actor DictationCoordinator {
         mode: DictationMode = .pushToTalk,
         mediaSession: MediaSession? = nil,
         mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)? = nil,
+        features: FeatureSet = .resolve(),
         onStateChange: @escaping @Sendable (State) async -> Void
     ) {
         self.hotkey = hotkey
@@ -61,6 +64,7 @@ public actor DictationCoordinator {
         self.mode = mode
         self.mediaSession = mediaSession
         self.mediaConfigProvider = mediaConfigProvider
+        self.features = features
         self.onStateChange = onStateChange
     }
 
@@ -71,7 +75,8 @@ public actor DictationCoordinator {
         postProcessor: (any TextPostProcessor)? = nil,
         mode: DictationMode = .pushToTalk,
         mediaSession: MediaSession? = nil,
-        mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)? = nil
+        mediaConfigProvider: (@Sendable () async -> MediaSessionConfig)? = nil,
+        features: FeatureSet = .resolve()
     ) {
         self.hotkey = hotkey
         self.recorder = recorder
@@ -80,6 +85,7 @@ public actor DictationCoordinator {
         self.mode = mode
         self.mediaSession = mediaSession
         self.mediaConfigProvider = mediaConfigProvider
+        self.features = features
         self.onStateChange = { _ in }
     }
 
@@ -103,6 +109,7 @@ public actor DictationCoordinator {
     }
 
     public func startMonitoring() async {
+        guard features.isEnabled(.dictation) else { return }
         shutDown = false
         await hotkey.stop()
         eventTask?.cancel()

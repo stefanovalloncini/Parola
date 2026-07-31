@@ -22,14 +22,17 @@ public actor SummaryService {
     public static let defaultBudgetTokens = 3500
 
     private let budgetTokens: Int
+    private let features: FeatureSet
 
     /// The budget is the prompt-token ceiling (chars/4 estimate); transcripts over it are
     /// summarised per time-window and reduced. The default fits Apple's 4096-token context.
-    public init(budgetTokens: Int = SummaryService.defaultBudgetTokens) {
+    public init(budgetTokens: Int = SummaryService.defaultBudgetTokens, features: FeatureSet = .resolve()) {
         self.budgetTokens = budgetTokens
+        self.features = features
     }
 
     public func summarise(_ transcript: Transcript) async throws -> Summary {
+        try features.require(.ai)
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
             return try await summariseStructured(transcript)
@@ -39,7 +42,8 @@ public actor SummaryService {
     }
 
     public func summarise(_ transcript: Transcript, model: any LanguageModel) async throws -> Summary {
-        try await summarise(transcript) { prompt in
+        try features.require(.ai)
+        return try await summarise(transcript) { prompt in
             do {
                 return SummaryService.parse(try await model.respond(to: prompt))
             } catch {

@@ -47,7 +47,8 @@ public actor YouTubeAudioSource: AudioSource {
     private var downloadedURL: URL?
     private var runningProcess: Process?
 
-    public init(url: URL, timeoutSeconds: Int = 120) throws {
+    public init(url: URL, timeoutSeconds: Int = 120, features: FeatureSet = .resolve()) throws {
+        try features.require(.youtube)
         guard url.isYtDlpSupported else {
             throw ParolaError.captureUnavailable("URL not supported by yt-dlp: \(url.absoluteString)")
         }

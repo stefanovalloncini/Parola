@@ -15,8 +15,10 @@ public enum TranscriptChat {
     public static func makeSession(
         transcript: Transcript,
         history: [ChatMessage] = [],
-        budgetTokens: Int? = nil
+        budgetTokens: Int? = nil,
+        features: FeatureSet = .resolve()
     ) throws -> TranscriptChatSession {
+        try features.require(.ai)
         let budget = budgetTokens ?? defaultBudgetTokens
         let model: any LanguageModel
         if usesCondensedContext(for: transcript, budgetTokens: budget) {
@@ -40,11 +42,13 @@ public enum TranscriptChat {
         provider: TranscriptChatProvider,
         keyStore: APIKeyStore = KeychainAPIKeyStore.shared,
         managed: ManagedConfiguration = .shared,
-        budgetTokens: Int? = nil
+        budgetTokens: Int? = nil,
+        features: FeatureSet = .resolve()
     ) async throws -> TranscriptChatSession {
+        try features.require(.ai)
         switch provider {
         case .onDevice:
-            return try makeSession(transcript: transcript, history: history, budgetTokens: budgetTokens)
+            return try makeSession(transcript: transcript, history: history, budgetTokens: budgetTokens, features: features)
         case .cloud(let id):
             let budget = budgetTokens ?? cloudBudgetTokens(for: id)
             let makeCloudModel: @Sendable (String) async throws -> any LanguageModel = { instructions in
