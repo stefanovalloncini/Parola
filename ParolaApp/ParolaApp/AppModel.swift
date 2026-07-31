@@ -2423,15 +2423,19 @@ final class AppModel {
         let generation = summaryGeneration
         let snapshot = transcript
         let entryID = selectedEntryID
+        let artifacts = derivedArtifactsGeneration
         let summarise = summariseOperation ?? { [features] in try await SummaryService(features: features).summarise($0) }
         Task { [weak self] in
             do {
                 let summary = try await summarise(snapshot)
                 guard let self, generation == summaryGeneration else { return }
-                guard self.selectedEntryID == entryID else { isSummarising = false; return }
+                // A nil entry id means the transcript wasn't in the library yet: persistToLibrary
+                // selects it moments later, and that late selection owns this summary.
+                guard self.derivedArtifactsGeneration == artifacts,
+                      entryID == nil || self.selectedEntryID == entryID else { isSummarising = false; return }
                 self.transcript?.summary = summary
                 isSummarising = false
-                if let entryID, let updated = self.transcript {
+                if let entryID = self.selectedEntryID, let updated = self.transcript {
                     Task { [library] in
                         try? await library.updateTranscript(updated, for: entryID, reindex: false)
                     }

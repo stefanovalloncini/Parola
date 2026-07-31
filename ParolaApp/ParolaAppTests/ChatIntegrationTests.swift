@@ -207,6 +207,59 @@ struct ChatIntegrationTests {
         #expect(model.isSummarising == false)
     }
 
+    @Test("a summary asked for right after a recording follows the transcript into its new entry")
+    func summariseSurvivesTheLibrarySaveThatSelectsIt() async throws {
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
+        let transcript = makeTranscript()
+        model.transcript = transcript
+        let gate = SummariseGate()
+        model.summariseOperation = { _ in
+            await gate.wait()
+            return Summary(text: "fresh take summary", chapters: [])
+        }
+
+        model.persistToLibrary(transcript, audioSource: nil)
+        model.summariseTranscript()
+        #expect(model.selectedEntryID == nil, "library.add is still running when the user hits Summarise")
+        #expect(model.isSummarising)
+
+        try await waitUntil { model.selectedEntryID != nil }
+        gate.open()
+        try await waitUntil { !model.isSummarising }
+
+        #expect(model.transcript?.summary?.text == "fresh take summary")
+        let entryID = try #require(model.selectedEntryID)
+        var stored: Summary?
+        let deadline = ContinuousClock().now.advanced(by: .seconds(2))
+        while stored == nil, ContinuousClock().now < deadline {
+            stored = try await model.library.load(entryID).document.transcript.summary
+            if stored == nil { try await Task.sleep(for: .milliseconds(10)) }
+        }
+        #expect(stored?.text == "fresh take summary")
+    }
+
+    @Test("a summary of an unsaved transcript is dropped when the user opens another entry")
+    func summariseDropsWhenNavigatingAwayFromAnUnsavedTranscript() async throws {
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(transcript: makeTranscript(), audioSource: nil, category: .transcription)
+        model.transcript = makeTranscript()
+        let gate = SummariseGate()
+        model.summariseOperation = { _ in
+            await gate.wait()
+            return Summary(text: "orphan summary", chapters: [])
+        }
+
+        model.summariseTranscript()
+        model.loadEntry(seeded.id)
+        try await waitUntil { model.selectedEntryID == seeded.id }
+
+        gate.open()
+        try await waitUntil { !model.isSummarising }
+
+        #expect(model.transcript?.summary == nil)
+    }
+
     @Test("summariseTranscript writes the summary into the open library entry")
     func summarisePersistsToLibraryEntry() async throws {
         let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("chat"))
