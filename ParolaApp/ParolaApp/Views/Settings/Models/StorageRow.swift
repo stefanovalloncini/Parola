@@ -57,12 +57,14 @@ struct StorageRow: View {
         panel.title = "Choose models folder"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         UserDefaults.standard.set(url.path, forKey: ModelStore.storageOverrideKey)
+        ModelStore.writeSharedOverride(url.path)
         overridePath = Self.currentOverride()
         showRestartAlert()
     }
 
     private func resetStorage() {
         UserDefaults.standard.removeObject(forKey: ModelStore.storageOverrideKey)
+        ModelStore.writeSharedOverride(nil)
         overridePath = Self.currentOverride()
         showRestartAlert()
     }

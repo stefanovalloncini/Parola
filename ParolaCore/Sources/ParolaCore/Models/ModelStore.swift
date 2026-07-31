@@ -39,6 +39,7 @@ public final class ModelStore: Sendable {
     public init(
         modelsDirectory: URL? = nil,
         defaults: UserDefaults = .standard,
+        sharedOverrideFile: URL = ModelStore.sharedOverrideFileURL,
         managedConfiguration: ManagedConfiguration = .shared
     ) {
         self.managedConfiguration = managedConfiguration
@@ -47,10 +48,42 @@ public final class ModelStore: Sendable {
         } else if let raw = defaults.string(forKey: Self.storageOverrideKey),
                   !raw.trimmingCharacters(in: .whitespaces).isEmpty {
             self.modelsDirectory = URL(fileURLWithPath: (raw as NSString).expandingTildeInPath, isDirectory: true)
+        } else if let shared = Self.sharedOverridePath(at: sharedOverrideFile) {
+            self.modelsDirectory = URL(fileURLWithPath: (shared as NSString).expandingTildeInPath, isDirectory: true)
         } else {
             self.modelsDirectory = Self.defaultDirectory
         }
         try? FileManager.default.createDirectory(at: self.modelsDirectory, withIntermediateDirectories: true)
+    }
+
+    /// Cross-process home of the storage override. The app writes it whenever the setting
+    /// changes, so the `parola` CLI — a separate defaults domain — resolves the same folder.
+    public static var sharedOverrideFileURL: URL {
+        FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first!
+            .appendingPathComponent("Parola", isDirectory: true)
+            .appendingPathComponent("models-path.txt", isDirectory: false)
+    }
+
+    /// Writes the storage override to the shared file, or removes the file for nil/blank.
+    public static func writeSharedOverride(_ path: String?, to file: URL = sharedOverrideFileURL) {
+        let trimmed = path?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !trimmed.isEmpty else {
+            try? FileManager.default.removeItem(at: file)
+            return
+        }
+        try? FileManager.default.createDirectory(
+            at: file.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try? trimmed.write(to: file, atomically: true, encoding: .utf8)
+    }
+
+    private static func sharedOverridePath(at file: URL) -> String? {
+        guard let raw = try? String(contentsOf: file, encoding: .utf8) else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     public static var defaultDirectory: URL {

@@ -5,14 +5,14 @@ import Testing
 @Suite("Bootstrap side-effect sets + launch flag parsing")
 struct BootstrapSideEffectTests {
 
-    @Test(".all contains all 12 cases")
-    func allHasTwelveCases() {
-        #expect(BootstrapSideEffect.all.count == 12)
+    @Test(".all contains all 13 cases")
+    func allHasThirteenCases() {
+        #expect(BootstrapSideEffect.all.count == 13)
         let expected: Set<BootstrapSideEffect> = [
             .sparkle, .launchAtLogin, .menuBarExtra, .dockIconRegistration, .appIntentsDonation,
             .meetingDetector, .watchedFolders, .dictationHotkey,
             .libraryPurgeOnLaunch, .refreshYtDlp, .liveCaptionsTranslateRestore,
-            .automationBridge,
+            .automationBridge, .modelsPathSync,
         ]
         #expect(BootstrapSideEffect.all == expected)
     }

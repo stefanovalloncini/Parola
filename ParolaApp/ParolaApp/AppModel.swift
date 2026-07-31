@@ -1079,6 +1079,14 @@ final class AppModel {
                 self?.refreshLibrary()
             }
         }
+        if sideEffects.contains(.modelsPathSync),
+           let override = UserDefaults.standard.string(forKey: ModelStore.storageOverrideKey),
+           !override.trimmingCharacters(in: .whitespaces).isEmpty,
+           !FileManager.default.fileExists(atPath: ModelStore.sharedOverrideFileURL.path) {
+            // A custom models folder chosen before the shared file existed only lives in this
+            // process's defaults; mirror it once so the CLI resolves the same folder.
+            ModelStore.writeSharedOverride(override)
+        }
         Task { [weak self] in
             await self?.refreshDictationTriggerPrompts()
         }
