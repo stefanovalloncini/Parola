@@ -16,21 +16,22 @@ struct MacLibrarySidebar: View {
         }
     }
 
+    private let categories: [(title: LocalizedStringKey, id: String, systemImage: String, category: EntryCategory)] = [
+        ("Transcriptions", "transcriptions", "text.alignleft", .transcription),
+        ("Meetings", "meetings", "person.2", .meeting),
+        ("Dictations", "dictations", "text.cursor", .dictation),
+    ]
+
     var body: some View {
         VStack(spacing: 0) {
             SearchPill(text: $searchText, placeholder: "Search history…")
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
-                .padding(.bottom, 8)
-
-            filterRow
-                .padding(.horizontal, 12)
                 .padding(.bottom, 10)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
                     SidebarRow(
-                        id: "library.home",
                         title: "Home",
                         systemImage: "house.fill",
                         isSelected: selectedRoute == .home,
@@ -40,10 +41,42 @@ struct MacLibrarySidebar: View {
                         model.libraryBrowsingAll = false
                         model.route = .transcript
                     }
+                    .accessibilityIdentifier("library.home")
                     .axLeaf("Sidebar.Button.Home")
 
+                    librarySectionHeader
+                        .padding(.top, 14)
+
                     SidebarRow(
-                        id: "library.queue",
+                        title: "All",
+                        systemImage: "tray.full",
+                        isSelected: selectedRoute == .all
+                    ) {
+                        model.libraryFilter = nil
+                        model.libraryBrowsingAll = true
+                        model.route = .transcript
+                    }
+                    .accessibilityIdentifier("library.filter.all")
+                    .axLeaf("Sidebar.Button.FilterAll")
+
+                    ForEach(categories, id: \.id) { item in
+                        SidebarRow(
+                            title: item.title,
+                            systemImage: item.systemImage,
+                            isSelected: selectedRoute == .category(item.category)
+                        ) {
+                            model.libraryFilter = item.category
+                            model.libraryBrowsingAll = false
+                            model.route = .transcript
+                        }
+                        .accessibilityIdentifier("library.filter.\(item.id)")
+                        .axLeaf("Sidebar.Button.Filter\(item.id.capitalized)")
+                    }
+
+                    SectionLabel("Activity")
+                        .padding(.top, 14)
+
+                    SidebarRow(
                         title: "Queue",
                         systemImage: "list.bullet.indent",
                         isSelected: selectedRoute == .queue,
@@ -53,32 +86,20 @@ struct MacLibrarySidebar: View {
                         model.libraryBrowsingAll = false
                         model.route = .queue
                     }
+                    .accessibilityIdentifier("library.queue")
                     .axLeaf("Sidebar.Button.Queue")
 
                     SidebarRow(
-                        id: "library.recentlyDeleted",
-                        title: "Recently Deleted",
-                        systemImage: "trash",
-                        isSelected: model.showingTrash
+                        title: "Batch",
+                        systemImage: "square.stack.3d.up",
+                        isSelected: selectedRoute == .batch
                     ) {
-                        model.showingTrash = true
+                        model.libraryFilter = nil
+                        model.libraryBrowsingAll = false
+                        model.route = .batch
                     }
-                    .axLeaf("Sidebar.Button.RecentlyDeleted")
-
-                    SectionLabel("People").padding(.top, 14)
-
-                    SidebarRow(
-                        id: "library.addPeople",
-                        title: "Add People",
-                        systemImage: "person.fill.badge.plus",
-                        isSelected: model.showingSpeakersSheet
-                    ) {
-                        if model.transcript != nil {
-                            model.showingSpeakersSheet = true
-                        }
-                    }
-                    .disabled(model.transcript == nil)
-                    .axLeaf("Sidebar.Button.AddPeople")
+                    .accessibilityIdentifier("library.batch")
+                    .axLeaf("Sidebar.Button.Batch")
                 }
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
@@ -104,26 +125,18 @@ struct MacLibrarySidebar: View {
         return n > 0 ? n : nil
     }
 
-    private var filterRow: some View {
-        HStack(spacing: 6) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
-                    Chip(title: "All", isSelected: model.libraryBrowsingAll, size: .regular, style: .subtle, selectedFill: DS.Color.accent.opacity(0.85), bordered: false, identifier: "library.filter.all") {
-                        model.libraryFilter = nil
-                        model.libraryBrowsingAll = true
-                        model.route = .transcript
-                    }
-                    ForEach([(title: "Transcriptions", category: EntryCategory.transcription), ("Meetings", .meeting), ("Dictations", .dictation)], id: \.title) { item in
-                        Chip(title: LocalizedStringKey(item.title), isSelected: model.libraryFilter == item.category, size: .regular, style: .subtle, selectedFill: DS.Color.accent.opacity(0.85), bordered: false, identifier: "library.filter.\(item.title.lowercased())") {
-                            model.libraryFilter = item.category
-                            model.libraryBrowsingAll = false
-                            model.route = .transcript
-                        }
-                    }
-                }
-            }
+    private var deletedBadge: Int? {
+        let n = model.deletedEntries.count
+        return n > 0 ? n : nil
+    }
+
+    private var librarySectionHeader: some View {
+        HStack(spacing: 0) {
+            SectionLabel("Library")
+            Spacer(minLength: 0)
             sortMenu
         }
+        .padding(.trailing, 4)
     }
 
     private var sortMenu: some View {
@@ -140,7 +153,7 @@ struct MacLibrarySidebar: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 22, height: 22)
                 .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                         .fill(DS.Color.surfaceElevated)
                 )
         }
@@ -152,12 +165,23 @@ struct MacLibrarySidebar: View {
     }
 
     private var bottomPills: some View {
-        SettingsLink {
-            PillRowContent(title: "Settings", systemImage: "gearshape.fill")
+        VStack(spacing: 6) {
+            Button {
+                model.showingTrash = true
+            } label: {
+                PillRowContent(title: "Recently Deleted", systemImage: "trash", badge: deletedBadge)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("library.recentlyDeleted")
+            .axLeaf("Sidebar.Button.RecentlyDeleted")
+
+            SettingsLink {
+                PillRowContent(title: "Settings", systemImage: "gearshape.fill")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("library.settings")
+            .axLeaf("Sidebar.Button.Settings")
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("library.settings")
-        .axLeaf("Sidebar.Button.Settings")
     }
 }
 
@@ -167,65 +191,6 @@ private enum SidebarRoute: Hashable {
     case queue
     case batch
     case category(EntryCategory)
-}
-
-private struct SidebarRow: View {
-    let id: String
-    let title: LocalizedStringKey
-    let systemImage: String
-    let isSelected: Bool
-    var badge: Int? = nil
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: systemImage)
-                    .font(DS.Font.bodyMedium)
-                    .frame(width: 18, alignment: .center)
-                Text(title)
-                    .font(.subheadline)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                if let badge {
-                    Text("\(badge)")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(isSelected ? Color.white.opacity(0.9) : .secondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .background(
-                            Capsule().fill(
-                                isSelected
-                                    ? Color.white.opacity(0.18)
-                                    : Color.primary.opacity(0.10)
-                            )
-                        )
-                }
-            }
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
-            .padding(.horizontal, 10)
-            .frame(height: 32)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(rowBackground)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
-        .accessibilityIdentifier(id)
-    }
-
-    @ViewBuilder
-    private var rowBackground: some View {
-        if isSelected {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(DS.Color.accent.opacity(0.85))
-        } else if isHovering {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
-        }
-    }
 }
 
 private struct SectionLabel: View {
@@ -245,6 +210,7 @@ private struct SectionLabel: View {
 private struct PillRowContent: View {
     let title: LocalizedStringKey
     let systemImage: String
+    var badge: Int? = nil
 
     @State private var isHovering = false
 
@@ -257,14 +223,22 @@ private struct PillRowContent: View {
             Text(title)
                 .font(.subheadline)
             Spacer(minLength: 0)
+            if let badge {
+                Text("\(badge)")
+                    .font(DS.Font.captionMedium)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(Color.primary.opacity(0.10)))
+            }
         }
         .foregroundStyle(.primary)
         .padding(.horizontal, 10)
         .frame(height: 30)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(isHovering ? Color.primary.opacity(0.06) : Color.clear)
+            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                .fill(isHovering ? DS.Palette.surfaceHover : Color.clear)
                 .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
         }
         .contentShape(Rectangle())

@@ -133,9 +133,17 @@ private struct SettingsSidebar: View {
                         }
                         VStack(spacing: 2) {
                             ForEach(group.routes) { r in
-                                SidebarRow(route: r, selected: route == r) {
+                                SidebarRow(
+                                    title: r.localizedLabelKey,
+                                    systemImage: r.symbol,
+                                    isSelected: route == r,
+                                    height: 28
+                                ) {
                                     route = r
                                 }
+                                .axLeaf("Sidebar.Button.\(r.rawValue)")
+                                .accessibilityLabel(r.label)
+                                .padding(.horizontal, 8)
                             }
                         }
                     }
@@ -162,47 +170,6 @@ private struct SettingsSidebar: View {
             return scope.searchKeywords.contains { $0.lowercased().contains(query) }
         }
         return false
-    }
-}
-
-private struct SidebarRow: View {
-    let route: SettingsRoute
-    let selected: Bool
-    let action: () -> Void
-
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: route.symbol)
-                    .font(.subheadline)
-                    .frame(width: 16)
-                    .foregroundStyle(selected ? Color.white : Color.secondary)
-                Text(route.localizedLabelKey)
-                    .font(.subheadline)
-                    .foregroundStyle(selected ? Color.white : Color.primary)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 10)
-            .frame(height: 28)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(background)
-            )
-            .contentShape(Rectangle())
-        }
-        .axLeaf("Sidebar.Button.\(route.rawValue)")
-        .buttonStyle(.plain)
-        .padding(.horizontal, 8)
-        .onHover { hovering = $0 }
-        .accessibilityLabel(route.label)
-    }
-
-    private var background: Color {
-        if selected { return DS.Color.accent }
-        if hovering { return .secondary.opacity(0.12) }
-        return .clear
     }
 }
 
