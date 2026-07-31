@@ -305,6 +305,82 @@ struct LibraryStoreTests {
         #expect(active.isEmpty)
     }
 
+    /// Removes the bundle from disk after the mutation: a patched cache still answers from memory,
+    /// a full rescan would come back empty.
+    private func listAfterMutation(
+        _ mutate: (LibraryStore, LibraryEntry.ID) async throws -> Void
+    ) async throws -> [LibraryEntry] {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        _ = await store.list()
+        try await mutate(store, entry.id)
+        try FileManager.default.removeItem(at: entry.bundleURL)
+        return await store.list()
+    }
+
+    @Test("a manifest edit patches the list cache instead of rescanning every bundle")
+    func manifestEditsPatchTheListCache() async throws {
+        #expect(try await listAfterMutation { try await $0.setPinned(true, for: $1) }.first?.pinned == true)
+        #expect(try await listAfterMutation { try await $0.setCategory(.meeting, for: $1) }.first?.category == .meeting)
+        #expect(try await listAfterMutation { try await $0.setLabels(["work"], for: $1) }.first?.labels == ["work"])
+        #expect(try await listAfterMutation { try await $0.renameEntry($1, to: "Standup") }.first?.title == "Standup")
+        #expect(try await listAfterMutation {
+            try await $0.setSegmentNote("kanban", segmentID: 0, for: $1)
+        }.first?.note(forSegment: 0) == "kanban")
+
+        let when = Date(timeIntervalSince1970: 1_900_000_000)
+        #expect(try await listAfterMutation {
+            var edited = makeTranscript()
+            edited.segments[0].text = "edited"
+            try await $0.updateTranscript(edited, for: $1, at: when)
+        }.first?.updatedAt == when)
+    }
+
+    @Test("delete moves the entry into the cached trash list in deletion order")
+    func deletePatchesBothCaches() async throws {
+        let (store, _) = try makeTempLibrary()
+        let older = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        let newer = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        try await store.delete(newer.id, at: Date(timeIntervalSince1970: 2_000))
+        _ = await store.list()
+        _ = await store.listDeleted()
+
+        try await store.delete(older.id, at: Date(timeIntervalSince1970: 1_000))
+        try FileManager.default.removeItem(at: older.bundleURL)
+
+        #expect(await store.list().isEmpty)
+        #expect(await store.listDeleted().map(\.id) == [newer.id, older.id])
+    }
+
+    @Test("restore returns the entry to its place in the cached list")
+    func restorePatchesBothCaches() async throws {
+        let (store, _) = try makeTempLibrary()
+        let older = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        let newer = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        try await store.delete(older.id, at: Date())
+        _ = await store.list()
+        _ = await store.listDeleted()
+
+        try await store.restore(older.id)
+        try FileManager.default.removeItem(at: newer.bundleURL)
+
+        #expect(await store.list().map(\.id) == [newer.id, older.id])
+        #expect(await store.listDeleted().isEmpty)
+    }
+
+    @Test("purge drops only the purged entry from the cached list")
+    func purgePatchesCaches() async throws {
+        let (store, _) = try makeTempLibrary()
+        let first = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        let second = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        _ = await store.list()
+
+        try await store.purge(first.id)
+        try FileManager.default.removeItem(at: second.bundleURL)
+
+        #expect(await store.list().map(\.id) == [second.id])
+    }
+
     @Test("loading missing entry throws notFound")
     func loadMissingThrows() async throws {
         let (store, _) = try makeTempLibrary()

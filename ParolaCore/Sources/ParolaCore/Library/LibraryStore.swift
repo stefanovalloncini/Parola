@@ -270,13 +270,8 @@ public actor LibraryStore {
             throw LibraryError.notFound(id)
         }
         let transcriptURL = bundleURL.appendingPathComponent("transcript.json")
+        if cachedLoaded?.id == id { cachedLoaded = nil }
         do {
-            // transcript.json lands before the manifest, so a throw in between puts disk ahead of
-            // memory — the caches have to go either way.
-            defer {
-                invalidateListCaches()
-                if cachedLoaded?.id == id { cachedLoaded = nil }
-            }
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
             encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -285,9 +280,13 @@ public actor LibraryStore {
             try ParolaDocument.updateManifest(at: bundleURL) { manifest in
                 manifest.updatedAt = now
             }
+        } catch {
+            // transcript.json lands before the manifest, so a throw in between puts disk ahead of memory.
+            invalidateListCaches()
+            throw error
         }
+        let entry = try recacheEntry(at: bundleURL)
         if reindex {
-            let entry = try makeEntry(bundleURL: bundleURL)
             await indexEntry(entry, transcript: transcript)
         }
     }
@@ -301,8 +300,7 @@ public actor LibraryStore {
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
             manifest.category = category
         }
-        invalidateListCaches()
-        if cachedLoaded?.id == id { cachedLoaded = nil }
+        try recacheEntry(at: bundleURL)
     }
 
     /// Toggles or sets the pinned flag on an entry.
@@ -314,8 +312,7 @@ public actor LibraryStore {
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
             manifest.pinned = pinned
         }
-        invalidateListCaches()
-        if cachedLoaded?.id == id { cachedLoaded = nil }
+        try recacheEntry(at: bundleURL)
     }
 
     /// Renames an entry's display title by storing it in the manifest's `title` field,
@@ -330,9 +327,7 @@ public actor LibraryStore {
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
             manifest.title = trimmed
         }
-        invalidateListCaches()
-        if cachedLoaded?.id == id { cachedLoaded = nil }
-        let entry = try makeEntry(bundleURL: bundleURL)
+        let entry = try recacheEntry(at: bundleURL)
         if let doc = try? ParolaDocument.read(at: bundleURL) {
             await indexEntry(entry, transcript: doc.transcript)
         }
@@ -354,9 +349,7 @@ public actor LibraryStore {
                 manifest.segmentNotes.removeValue(forKey: key)
             }
         }
-        invalidateListCaches()
-        if cachedLoaded?.id == id { cachedLoaded = nil }
-        let entry = try makeEntry(bundleURL: bundleURL)
+        let entry = try recacheEntry(at: bundleURL)
         if let doc = try? ParolaDocument.read(at: bundleURL) {
             await indexEntry(entry, transcript: doc.transcript)
         }
@@ -376,8 +369,7 @@ public actor LibraryStore {
                 return trimmed
             }
         }
-        invalidateListCaches()
-        if cachedLoaded?.id == id { cachedLoaded = nil }
+        try recacheEntry(at: bundleURL)
     }
 
     /// Stamps the entry's `lastOpenedAt` so the library can show when it was last viewed.
@@ -389,17 +381,58 @@ public actor LibraryStore {
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
             manifest.lastOpenedAt = now
         }
-        // lastOpenedAt changes no list membership or ordering; patch caches in place so opening
-        // an entry doesn't force a full rescan and a disk reload of the document it just cached.
-        patchCaches(with: try makeEntry(bundleURL: bundleURL))
+        try recacheEntry(at: bundleURL)
+    }
+
+    /// Re-reads the one manifest a mutation touched and folds it into the caches, so a single-entry
+    /// edit doesn't force the next read to re-decode every bundle in the library.
+    @discardableResult
+    private func recacheEntry(at bundleURL: URL) throws -> LibraryEntry {
+        do {
+            let entry = try makeEntry(bundleURL: bundleURL)
+            patchCaches(with: entry)
+            return entry
+        } catch {
+            invalidateListCaches()
+            cachedLoaded = nil
+            throw error
+        }
     }
 
     private func patchCaches(with entry: LibraryEntry) {
-        if let i = cachedActive?.firstIndex(where: { $0.id == entry.id }) { cachedActive?[i] = entry }
-        if let i = cachedDeleted?.firstIndex(where: { $0.id == entry.id }) { cachedDeleted?[i] = entry }
+        cachedActive = patched(cachedActive, with: entry, belongs: entry.deletedAt == nil) {
+            $0.createdAt > $1.createdAt
+        }
+        cachedDeleted = patched(cachedDeleted, with: entry, belongs: entry.deletedAt != nil) {
+            ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast)
+        }
         if let cached = cachedLoaded, cached.id == entry.id {
             cachedLoaded = (entry.id, LoadedEntry(entry: entry, document: cached.value.document))
         }
+        // A patch is a write like any other: an in-flight primeCaches must re-scan rather than cache
+        // the snapshot it took before this manifest landed.
+        listCacheEpoch &+= 1
+    }
+
+    private func patched(
+        _ cache: [LibraryEntry]?,
+        with entry: LibraryEntry,
+        belongs: Bool,
+        orderedBefore: (LibraryEntry, LibraryEntry) -> Bool
+    ) -> [LibraryEntry]? {
+        guard var list = cache else { return nil }
+        list.removeAll { $0.id == entry.id }
+        guard belongs else { return list }
+        let index = list.firstIndex { orderedBefore(entry, $0) } ?? list.count
+        list.insert(entry, at: index)
+        return list
+    }
+
+    private func removeFromCaches(id: LibraryEntry.ID) {
+        cachedActive?.removeAll { $0.id == id }
+        cachedDeleted?.removeAll { $0.id == id }
+        if cachedLoaded?.id == id { cachedLoaded = nil }
+        listCacheEpoch &+= 1
     }
 
     /// Soft-deletes by stamping `deletedAt`. The bundle stays on disk so it can be restored,
@@ -412,8 +445,7 @@ public actor LibraryStore {
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
             manifest.deletedAt = now
         }
-        invalidateListCaches()
-        if cachedLoaded?.id == id { cachedLoaded = nil }
+        try recacheEntry(at: bundleURL)
         await deindexEntry(id: id)
     }
 
@@ -426,9 +458,7 @@ public actor LibraryStore {
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
             manifest.deletedAt = nil
         }
-        invalidateListCaches()
-        if cachedLoaded?.id == id { cachedLoaded = nil }
-        if let entry = try? makeEntry(bundleURL: bundleURL),
+        if let entry = try? recacheEntry(at: bundleURL),
            let doc = try? ParolaDocument.read(at: bundleURL) {
             await indexEntry(entry, transcript: doc.transcript)
         }
@@ -441,8 +471,7 @@ public actor LibraryStore {
             throw LibraryError.notFound(id)
         }
         try FileManager.default.removeItem(at: bundleURL)
-        invalidateListCaches()
-        if cachedLoaded?.id == id { cachedLoaded = nil }
+        removeFromCaches(id: id)
         await deindexEntry(id: id)
     }
 
