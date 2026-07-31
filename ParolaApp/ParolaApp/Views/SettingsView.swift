@@ -113,7 +113,7 @@ private struct SettingsRouteMeta {
 }
 
 private struct SidebarGroup: Identifiable {
-    let id = UUID()
+    var id: String { routes.first?.rawValue ?? "empty" }
     let title: LocalizedStringKey?
     let routes: [SettingsRoute]
 }
