@@ -270,16 +270,22 @@ public actor LibraryStore {
             throw LibraryError.notFound(id)
         }
         let transcriptURL = bundleURL.appendingPathComponent("transcript.json")
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        let data = try encoder.encode(transcript)
-        try data.write(to: transcriptURL, options: .atomic)
-        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
-            manifest.updatedAt = now
+        do {
+            // transcript.json lands before the manifest, so a throw in between puts disk ahead of
+            // memory — the caches have to go either way.
+            defer {
+                invalidateListCaches()
+                if cachedLoaded?.id == id { cachedLoaded = nil }
+            }
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+            let data = try encoder.encode(transcript)
+            try data.write(to: transcriptURL, options: .atomic)
+            try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+                manifest.updatedAt = now
+            }
         }
-        invalidateListCaches()
-        if cachedLoaded?.id == id { cachedLoaded = nil }
         if reindex {
             let entry = try makeEntry(bundleURL: bundleURL)
             await indexEntry(entry, transcript: transcript)

@@ -406,6 +406,27 @@ struct LibraryStoreTests {
         #expect(refreshed.updatedAt == when)
     }
 
+    @Test("a failed manifest write leaves no pre-edit document in the cache")
+    func updateTranscriptFailureDropsStaleCache() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        #expect(try await store.load(entry.id).document.transcript.segments.first?.text == "hi")
+
+        let manifestURL = entry.bundleURL.appendingPathComponent("manifest.json")
+        let manifest = try Data(contentsOf: manifestURL)
+        try Data("not json".utf8).write(to: manifestURL)
+
+        var edited = makeTranscript()
+        edited.segments[0].text = "edited"
+        await #expect(throws: (any Error).self) {
+            try await store.updateTranscript(edited, for: entry.id)
+        }
+
+        try manifest.write(to: manifestURL)
+        let reloaded = try await store.load(entry.id)
+        #expect(reloaded.document.transcript.segments.first?.text == "edited")
+    }
+
     @Test("updateTranscript re-indexes so search reflects the edit")
     func updateTranscriptReindexesSearch() async throws {
         let (store, _) = try makeTempLibrary()
