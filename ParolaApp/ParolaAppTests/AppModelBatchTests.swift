@@ -629,6 +629,43 @@ struct AppModelBatchTests {
         model.fileTranscribeTask = nil
     }
 
+    @Test("startBatch defers while a single-file transcription is running")
+    func startBatchDefersDuringFileTranscription() {
+        let model = makeModel()
+        let running = AppModel.Phase.transcribing(file: URL(fileURLWithPath: "/tmp/single.wav"))
+        model.phase = running
+        model.fileTranscribeTask = Task {}
+        let url = URL(fileURLWithPath: "/tmp/queued.wav")
+
+        model.startBatch(urls: [url])
+
+        #expect(model.deferredArrivals == [url])
+        #expect(model.batchJobs.isEmpty)
+        #expect(model.batchTask == nil)
+        #expect(model.phase == running)
+        model.fileTranscribeTask?.cancel()
+        model.fileTranscribeTask = nil
+    }
+
+    @Test("a batch deferred behind a single-file run starts when that run drains")
+    func deferredBatchStartsAfterFileTranscription() {
+        let model = makeModel()
+        model.fileTranscribeTask = Task {}
+        let url = URL(fileURLWithPath: "/tmp/queued.wav")
+        model.startBatch(urls: [url])
+        #expect(model.batchJobs.isEmpty)
+
+        model.fileTranscribeTask?.cancel()
+        model.fileTranscribeTask = nil
+        model.transcript = Self.makeTranscript()
+        model.phase = .ready
+        model.drainDeferredArrivals()
+
+        #expect(model.deferredArrivals.isEmpty)
+        #expect(model.batchJobs.map(\.url) == [url])
+        model.clearBatch()
+    }
+
     @Test("arrivals during a subtitle burn defer instead of racing the export")
     func exportingDefersArrivals() {
         let model = makeModel()

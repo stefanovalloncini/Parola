@@ -69,7 +69,9 @@ extension AppModel {
             phase = .failed(message: ParolaError.featureDisabled(.batch).description)
             return
         }
-        if phaseDefersArrivals {
+        // A single-file or YouTube run owns phase and transcript until it drains; starting here
+        // would let both flows write them and leave whichever finished last on screen.
+        if phaseDefersArrivals || transcribeTaskRunning {
             deferredArrivals.append(contentsOf: urls)
             return
         }
