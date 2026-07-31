@@ -206,12 +206,8 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
         onLevel(AudioLevel.normalised(of: copied))
     }
 
-    /// Awaits a no-op block on the sample-handler queue. Any in-flight callback finishes
-    /// before this returns.
     func drain() async {
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            queue.async { cont.resume() }
-        }
+        await queue.drain()
     }
 }
 

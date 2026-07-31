@@ -160,7 +160,7 @@ public actor ProcessTapAudioSource: LiveAudioSource {
     }
 
     public func prepare() async throws -> URL {
-        stop()
+        await stop()
         if let captureFailure {
             try? FileManager.default.removeItem(at: outputURL)
             throw ParolaError.captureUnavailable(captureFailure)
@@ -169,7 +169,7 @@ public actor ProcessTapAudioSource: LiveAudioSource {
     }
 
     public func cancel() async {
-        stop()
+        await stop()
         try? FileManager.default.removeItem(at: outputURL)
     }
 
@@ -195,14 +195,14 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         }
     }
 
-    private func stop() {
+    private func stop() async {
         if let ioProcID, aggregateID != kAudioObjectUnknown {
             AudioDeviceStop(aggregateID, ioProcID)
             AudioDeviceDestroyIOProcID(aggregateID, ioProcID)
         }
         ioProcID = nil
         teardownAll()
-        callbackQueue.sync {}
+        await callbackQueue.drain()
         captureFailure = handler?.failure
         handler = nil
         for continuation in levelContinuations.values {
