@@ -10,6 +10,8 @@ import CoreAudio
 /// Lifecycle: `start()` to begin, `prepare()` to stop and return the file URL,
 /// or `cancel()` to stop and discard.
 public actor MicAudioSource: LiveAudioSource {
+    private static let tapChunksPerMinuteAt48kHz = 700
+    private static let maxBufferedTapChunks = 3 * tapChunksPerMinuteAt48kHz
     private let engine = AVAudioEngine()
     private let preferredDeviceUID: String?
     private var session: Session?
@@ -84,7 +86,9 @@ public actor MicAudioSource: LiveAudioSource {
         )
         let writer = CaptureFileWriter(file: file)
 
-        let (stream, cont) = AsyncStream<BufferBox>.makeStream(bufferingPolicy: .unbounded)
+        let (stream, cont) = AsyncStream<BufferBox>.makeStream(
+            bufferingPolicy: .bufferingNewest(Self.maxBufferedTapChunks)
+        )
         let consumer = Task { [weak self] in
             for await box in stream {
                 await self?.write(box: box)
@@ -101,7 +105,9 @@ public actor MicAudioSource: LiveAudioSource {
 
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { buffer, _ in
             guard let copy = Self.copy(buffer) else { return }
-            cont.yield(BufferBox(buffer: copy))
+            if case .dropped = cont.yield(BufferBox(buffer: copy)) {
+                writer.fail("the recorder fell behind and dropped captured audio")
+            }
         }
 
         engine.prepare()

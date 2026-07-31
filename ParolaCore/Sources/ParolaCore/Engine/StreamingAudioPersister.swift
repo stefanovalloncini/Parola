@@ -1,12 +1,17 @@
 import AVFoundation
 import Foundation
+import os
 
 /// Appends streamed mono Float32 samples to a temporary WAV file as they arrive,
 /// so a live recording never accumulates in memory.
 final class StreamingAudioPersister: Sendable {
+    private static let chunksPerMinuteAt16kHz = 940
+    private static let maxBufferedChunks = 3 * chunksPerMinuteAt16kHz
+
     let url: URL
     private let continuation: AsyncStream<[Float]>.Continuation
     private let writerTask: Task<URL?, Never>
+    private let droppedAudio = OSAllocatedUnfairLock(initialState: false)
 
     init?(sampleRate: Double) {
         guard let format = AVAudioFormat(
@@ -25,7 +30,10 @@ final class StreamingAudioPersister: Sendable {
         ) else { return nil }
 
         self.url = url
-        let (stream, continuation) = AsyncStream.makeStream(of: [Float].self)
+        let (stream, continuation) = AsyncStream.makeStream(
+            of: [Float].self,
+            bufferingPolicy: .bufferingNewest(Self.maxBufferedChunks)
+        )
         self.continuation = continuation
         let audioFile = file
         writerTask = Task.detached(priority: .utility) {
@@ -48,13 +56,20 @@ final class StreamingAudioPersister: Sendable {
     }
 
     func append(_ samples: [Float]) {
-        continuation.yield(samples)
+        if case .dropped = continuation.yield(samples) {
+            droppedAudio.withLock { $0 = true }
+        }
     }
 
-    /// Finishes the WAV and returns its URL, or nil if nothing was written.
+    /// Finishes the WAV and returns its URL, or nil if nothing was written or samples were dropped.
     func finish() async -> URL? {
         continuation.finish()
-        return await writerTask.value
+        let written = await writerTask.value
+        guard !droppedAudio.withLock({ $0 }) else {
+            if let written { try? FileManager.default.removeItem(at: written) }
+            return nil
+        }
+        return written
     }
 
     /// Finishes and deletes the file; for teardown paths that won't use the recording.
