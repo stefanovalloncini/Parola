@@ -96,6 +96,27 @@ struct LibraryStoreTests {
         await #expect(throws: LibraryStore.LibraryError.self) { try await store.load(entry.id) }
     }
 
+    @Test("a mutation landing during the list scan never empties the list")
+    func mutationDuringScanKeepsListPopulated() async throws {
+        let (store, libraryURL) = try makeTempLibrary()
+        for i in 0..<200 {
+            try ParolaDocument.write(
+                transcript: makeTranscript(),
+                audioURL: nil,
+                to: libraryURL.appendingPathComponent(String(format: "entry-%03d", i))
+            )
+        }
+        let victim = try #require(await store.list().first)
+
+        for _ in 0..<8 {
+            await store.dropCaches()
+            let listing = Task { await store.list() }
+            try await Task.sleep(for: .milliseconds(1))
+            try await store.setPinned(true, for: victim.id)
+            #expect(await listing.value.count == 200)
+        }
+    }
+
     @Test("renaming an entry to a title with a dot keeps the whole title")
     func renamePreservesDottedTitle() async throws {
         let (store, _) = try makeTempLibrary()

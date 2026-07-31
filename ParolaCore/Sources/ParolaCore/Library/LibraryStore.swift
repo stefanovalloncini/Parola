@@ -107,14 +107,23 @@ public actor LibraryStore {
 
     private func primeCaches() async {
         let url = libraryURL
-        let epoch = listCacheEpoch
-        let entries = await Task.detached(priority: .userInitiated) { [self] in
-            scanEntries(at: url)
-        }.value
-        // The scan is an await, so a mutation can invalidate the caches mid-scan. Caching this snapshot
-        // would then resurrect the pre-mutation state for the next reader (e.g. an un-renamed title), so
-        // skip the cache when the epoch moved; the next read re-scans.
-        guard epoch == listCacheEpoch else { return }
+        // The scan is an await, so a mutation can invalidate the caches mid-scan. Caching that snapshot
+        // would resurrect the pre-mutation state for the next reader (e.g. an un-renamed title), so retry
+        // under the new epoch; the on-actor last resort can't be interleaved at all.
+        for _ in 0..<3 {
+            let epoch = listCacheEpoch
+            let entries = await Task.detached(priority: .userInitiated) { [self] in
+                scanEntries(at: url)
+            }.value
+            if epoch == listCacheEpoch {
+                applyScan(entries)
+                return
+            }
+        }
+        applyScan(scanEntries(at: url))
+    }
+
+    private func applyScan(_ entries: [LibraryEntry]) {
         cachedActive = entries
             .filter { $0.deletedAt == nil }
             .sorted { $0.createdAt > $1.createdAt }
