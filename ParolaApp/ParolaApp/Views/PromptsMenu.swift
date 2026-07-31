@@ -38,7 +38,7 @@ struct PromptsMenu: View {
             if model.isRunningPrompt {
                 ProgressView().controlSize(.small)
             } else {
-                Image(systemName: "sparkles")
+                Image(systemName: "wand.and.stars")
             }
         }
         .menuIndicator(.hidden)
