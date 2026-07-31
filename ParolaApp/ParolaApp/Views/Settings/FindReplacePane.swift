@@ -16,13 +16,13 @@ struct FindReplacePane: View {
                 let visible = visibleRules
                 if model.findReplaceRules.isEmpty {
                     HStack {
-                        Text("No rules yet.").foregroundStyle(.secondary).font(.body)
+                        Text("No rules yet.").foregroundStyle(.secondary).font(DS.Font.body)
                         Spacer()
                     }
                     .padding(16)
                 } else if visible.isEmpty {
                     HStack {
-                        Text("No rules match.").foregroundStyle(.secondary).font(.body)
+                        Text("No rules match.").foregroundStyle(.secondary).font(DS.Font.body)
                         Spacer()
                     }
                     .padding(16)
@@ -200,7 +200,7 @@ private struct FindReplaceRuleRow: View {
                     TextField("find", text: $rule.find)
                         .textFieldStyle(.roundedBorder)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                                 .strokeBorder(regexError == nil ? Color.clear : Color.red.opacity(0.8), lineWidth: 1)
                         )
                         .axLeaf("FindReplace.TextField.Find")
@@ -219,7 +219,7 @@ private struct FindReplaceRuleRow: View {
                     Toggle("Regex", isOn: $rule.regex).toggleStyle(.checkbox)
                         .axLeaf("FindReplace.Toggle.Regex")
                 }
-                .font(.caption)
+                .font(DS.Font.caption)
                 if let regexError {
                     HStack(spacing: 4) {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -227,7 +227,7 @@ private struct FindReplaceRuleRow: View {
                         Text(regexError)
                             .foregroundStyle(DS.Color.danger)
                     }
-                    .font(.caption)
+                    .font(DS.Font.caption)
                 }
             }
             .padding(.horizontal, 16)

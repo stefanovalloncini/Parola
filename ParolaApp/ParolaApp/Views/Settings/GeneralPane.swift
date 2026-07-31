@@ -62,8 +62,8 @@ struct GeneralPane: View {
                 }
                 if let warning = model.diarizeMismatchWarning {
                     Label(warning, systemImage: "exclamationmark.triangle.fill")
-                        .font(.callout)
-                        .foregroundStyle(.orange)
+                        .font(DS.Font.callout)
+                        .foregroundStyle(DS.Palette.warning)
                         .padding(.top, 2)
                         .axLeaf("General.Label.DiarizeWarning")
                 }
@@ -82,7 +82,7 @@ struct GeneralPane: View {
                         .textFieldStyle(.roundedBorder)
                         .axLeaf("General.TextField.InitialPrompt")
                     Text("A short list of names or jargon helps Whisper get unusual words right. Other engines ignore it.")
-                        .font(.caption)
+                        .font(DS.Font.caption)
                         .foregroundStyle(.secondary)
                 }
                 .padding(16)

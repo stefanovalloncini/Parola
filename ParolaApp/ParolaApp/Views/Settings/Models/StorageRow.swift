@@ -28,7 +28,7 @@ struct StorageRow: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: DS.Radius.small)
                 .fill(Color.primary.opacity(0.04))
         )
         .onAppear { overridePath = Self.currentOverride() }

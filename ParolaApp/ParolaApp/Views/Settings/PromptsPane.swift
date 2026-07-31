@@ -17,7 +17,7 @@ struct PromptsPane: View {
                 let visible = visiblePrompts
                 if visible.isEmpty {
                     HStack {
-                        Text("No prompts match.").foregroundStyle(.secondary).font(.body)
+                        Text("No prompts match.").foregroundStyle(.secondary).font(DS.Font.body)
                         Spacer()
                     }
                     .padding(16)
@@ -177,7 +177,7 @@ private struct PromptRow: View {
         SettingRow(titleVerbatim: prompt.name, isFirst: isFirst) {
             HStack(spacing: 6) {
                 Text(prompt.isBuiltIn ? "Built-in" : "Custom")
-                    .font(.caption)
+                    .font(DS.Font.caption)
                     .foregroundStyle(.secondary)
                 if !prompt.isBuiltIn {
                     Button {
@@ -238,37 +238,37 @@ private struct PromptEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if draft.isExisting {
-                Text("Edit Prompt").font(.title3.weight(.semibold))
+                Text("Edit Prompt").font(DS.Font.title3)
             } else {
-                Text("New Prompt").font(.title3.weight(.semibold))
+                Text("New Prompt").font(DS.Font.title3)
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Name").font(.caption).foregroundStyle(.secondary)
+                Text("Name").font(DS.Font.caption).foregroundStyle(.secondary)
                 TextField("Name", text: $draft.name)
                     .textFieldStyle(.roundedBorder)
                     .axLeaf("PromptEditor.TextField.Name")
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Instructions").font(.caption).foregroundStyle(.secondary)
+                Text("Instructions").font(DS.Font.caption).foregroundStyle(.secondary)
                 TextEditor(text: $draft.instructions)
-                    .font(.subheadline)
+                    .font(DS.Font.subheadline)
                     .frame(minHeight: 160)
                     .padding(4)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                             .strokeBorder(Color.secondary.opacity(0.3))
                     )
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Trigger words").font(.caption).foregroundStyle(.secondary)
+                Text("Trigger words").font(DS.Font.caption).foregroundStyle(.secondary)
                 TextField("summary, recap", text: $draft.triggerWordsText)
                     .textFieldStyle(.roundedBorder)
                     .axLeaf("PromptEditor.TextField.TriggerWords")
                 Text("Words that switch to this prompt for one dictation. Separate with commas.")
-                    .font(.caption)
+                    .font(DS.Font.caption)
                     .foregroundStyle(.secondary)
             }
 
@@ -276,7 +276,7 @@ private struct PromptEditor: View {
                 Toggle("Assistant mode", isOn: $draft.assistantMode)
                     .axLeaf("PromptEditor.Toggle.AssistantMode")
                 Text("When on, the LLM answers your dictation instead of cleaning it up. Use this for voice Q&A.")
-                    .font(.caption)
+                    .font(DS.Font.caption)
                     .foregroundStyle(.secondary)
             }
 

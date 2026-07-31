@@ -134,8 +134,8 @@ struct ModelsSettingsPane: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 28)
                 .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(Color.primary.opacity(0.06))
+                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                        .fill(DS.Palette.subtleFill)
                 )
         }
         .menuStyle(.borderlessButton)
@@ -206,7 +206,7 @@ struct ModelsSettingsPane: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Other Files on Disk", count: entries.count)
             Text("These directories aren't in the current model catalog — usually leftovers from older app versions. Safe to delete.")
-                .font(.caption)
+                .font(DS.Font.caption)
                 .foregroundStyle(.secondary)
             LazyVStack(spacing: 8) {
                 ForEach(entries) { entry in
@@ -295,7 +295,7 @@ struct ModelsSettingsPane: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(DS.Palette.warning)
             Text(message)
-                .font(.caption)
+                .font(DS.Font.caption)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
@@ -305,7 +305,7 @@ struct ModelsSettingsPane: View {
                 .axLeaf("Models.Button.DismissError")
         }
         .padding(10)
-        .background(DS.Palette.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(DS.Palette.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
     }
 
     // MARK: - Categories
@@ -375,10 +375,10 @@ struct ModelsSettingsPane: View {
     private func sectionHeader(_ title: String, count: Int?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(title)
-                .font(.title3.weight(.semibold))
+                .font(DS.Font.title3)
             if let count, count > 0 {
                 Text("\(count)")
-                    .font(.callout.weight(.medium))
+                    .font(DS.Font.calloutMedium)
                     .foregroundStyle(.secondary)
             }
             Spacer()

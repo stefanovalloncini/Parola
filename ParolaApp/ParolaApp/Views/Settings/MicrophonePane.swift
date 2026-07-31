@@ -152,9 +152,9 @@ struct MicrophonePane: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Microphone access is off")
-                    .font(.callout.weight(.medium))
+                    .font(DS.Font.calloutMedium)
                 Text("Parola needs the microphone to record and dictate.")
-                    .font(.caption)
+                    .font(DS.Font.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -165,7 +165,7 @@ struct MicrophonePane: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                 .fill(DS.Palette.warning.opacity(0.12))
         )
     }
@@ -215,14 +215,14 @@ private struct MicErrorBanner: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(DS.Palette.warning)
                 Text("Couldn't open microphone")
-                    .font(.callout.weight(.medium))
+                    .font(DS.Font.calloutMedium)
             }
             Text(message)
-                .font(.caption)
+                .font(DS.Font.caption)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
             Text(hint)
-                .font(.caption)
+                .font(DS.Font.caption)
                 .foregroundStyle(.secondary)
             if looksLikePermissionError {
                 Button("Open System Settings…") { openMicrophonePrivacySettings() }
@@ -233,7 +233,7 @@ private struct MicErrorBanner: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                 .fill(DS.Palette.warning.opacity(0.10))
         )
     }

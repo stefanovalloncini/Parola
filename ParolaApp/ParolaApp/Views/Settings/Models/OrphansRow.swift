@@ -14,10 +14,10 @@ struct OrphansRow: View {
                 .frame(width: 24, height: 24)
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
-                    .font(.subheadline)
+                    .font(DS.Font.subheadline)
                 if let bytes = displaySize {
                     Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
-                        .font(.caption)
+                        .font(DS.Font.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -25,7 +25,7 @@ struct OrphansRow: View {
             if isDeleting {
                 ProgressView().controlSize(.small)
                 Text("Deleting…")
-                    .font(.caption)
+                    .font(DS.Font.caption)
                     .foregroundStyle(.secondary)
             } else {
                 Button(action: onDelete) {
@@ -40,6 +40,6 @@ struct OrphansRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
     }
 }

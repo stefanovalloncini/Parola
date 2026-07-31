@@ -50,15 +50,15 @@ struct TranscriptionDefaultsPane: View {
             }
             if let warning = model.languageMismatchWarning {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout)
-                    .foregroundStyle(.orange)
+                    .font(DS.Font.callout)
+                    .foregroundStyle(DS.Palette.warning)
                     .padding(.top, 2)
                     .axLeaf("TranscriptionDefaults.Label.LanguageWarning")
             }
             if let warning = model.diarizeMismatchWarning {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout)
-                    .foregroundStyle(.orange)
+                    .font(DS.Font.callout)
+                    .foregroundStyle(DS.Palette.warning)
                     .padding(.top, 2)
                     .axLeaf("TranscriptionDefaults.Label.DiarizeWarning")
             }

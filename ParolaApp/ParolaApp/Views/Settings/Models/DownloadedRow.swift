@@ -31,6 +31,6 @@ struct DownloadedEmpty: View {
             Spacer()
         }
         .padding(14)
-        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
     }
 }

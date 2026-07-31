@@ -46,7 +46,7 @@ struct ModelCategorySection: View {
                 }
             }
         }
-        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
     }
 }
 
@@ -56,15 +56,15 @@ struct ModelCategoryRow: View {
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: category.symbol)
-                .font(.headline)
+                .font(DS.Font.heading)
                 .foregroundStyle(category.tint)
                 .frame(width: 28, height: 28)
-                .background(category.tint.opacity(0.15), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .background(category.tint.opacity(0.15), in: RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(category.title)
-                    .font(.headline)
+                    .font(DS.Font.heading)
                 Text(category.description)
-                    .font(.caption)
+                    .font(DS.Font.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()

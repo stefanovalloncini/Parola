@@ -35,11 +35,11 @@ struct HotkeyRecorder: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                     .fill(.background.tertiary)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                     .strokeBorder(recording ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: recording ? 1.5 : 1)
             )
         }

@@ -133,7 +133,7 @@ struct AutomationPane: View {
                             }
                             .frame(maxHeight: 160)
                             .background(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                                     .fill(Color.primary.opacity(0.05))
                             )
                             Button("Copy snippet") { copy(snippet, label: String(localized: "Snippet copied")) }
@@ -146,7 +146,7 @@ struct AutomationPane: View {
                 if let confirmation = copyConfirmation {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(DS.Palette.success)
                         Text(confirmation)
                             .font(DS.Font.caption)
                             .foregroundStyle(.secondary)
@@ -163,18 +163,18 @@ struct AutomationPane: View {
     private var statusRow: some View {
         HStack(spacing: 10) {
             Circle()
-                .fill(model.automationBridgeRunning ? Color.green : Color.secondary.opacity(0.5))
+                .fill(model.automationBridgeRunning ? DS.Palette.success : Color.secondary.opacity(0.5))
                 .frame(width: 10, height: 10)
             if model.automationBridgeRunning, let port = model.automationBridgePort {
                 Text("Listening on 127.0.0.1:\(String(port))")
-                    .font(.subheadline)
+                    .font(DS.Font.subheadline)
             } else if model.automationBridgeRunning {
                 Text("Starting…")
-                    .font(.subheadline)
+                    .font(DS.Font.subheadline)
                     .foregroundStyle(.secondary)
             } else {
                 Text("Bridge disabled")
-                    .font(.subheadline)
+                    .font(DS.Font.subheadline)
                     .foregroundStyle(.secondary)
             }
             Spacer()
