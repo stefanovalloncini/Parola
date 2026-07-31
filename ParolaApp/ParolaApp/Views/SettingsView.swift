@@ -126,7 +126,7 @@ private struct SettingsSidebar: View {
                     ForEach(filteredGroups) { group in
                         if let title = group.title {
                             Text(title)
-                                .font(.caption.weight(.semibold))
+                                .font(DS.Font.captionEmphasized)
                                 .foregroundStyle(.secondary)
                                 .padding(.horizontal, 16)
                                 .padding(.top, 4)
@@ -151,7 +151,7 @@ private struct SettingsSidebar: View {
                 .padding(.bottom, 16)
             }
         }
-        .background(.background.secondary)
+        .background(DS.Palette.canvas)
     }
 
     private var filteredGroups: [SidebarGroup] {
@@ -183,7 +183,7 @@ private struct SettingsDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 Text(route.localizedLabelKey)
-                    .font(.title3.weight(.semibold))
+                    .font(DS.Font.title3)
                     .padding(.top, 20)
                 content
                 Spacer(minLength: 24)
@@ -191,6 +191,7 @@ private struct SettingsDetail: View {
             .padding(.horizontal, 28)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .background(DS.Palette.surface)
     }
 
     @ViewBuilder
@@ -240,15 +241,15 @@ struct SettingsSection<Content: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             if let title {
                 Text(title)
-                    .font(.headline)
+                    .font(DS.Font.heading)
                     .padding(.bottom, 2)
             }
             VStack(spacing: 0) {
                 content
             }
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(.background.tertiary)
+                RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
+                    .fill(DS.Color.surfaceElevated)
             )
         }
     }
@@ -295,10 +296,10 @@ struct SettingRow<Trailing: View>: View {
             }
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    titleText.font(.subheadline)
+                    titleText.font(DS.Font.subheadline)
                     if let descriptionText {
                         descriptionText
-                            .font(.caption)
+                            .font(DS.Font.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -315,7 +316,7 @@ struct SettingHelper: View {
     let text: LocalizedStringKey
     var body: some View {
         Text(text)
-            .font(.caption)
+            .font(DS.Font.caption)
             .italic()
             .foregroundStyle(.secondary)
             .padding(.horizontal, 4)
