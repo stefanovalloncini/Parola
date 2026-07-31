@@ -92,6 +92,9 @@ extension AppModel {
             if !recordingActive {
                 phase = .transcribing(file: batchJobs.first(where: { $0.id == id })?.url ?? URL(fileURLWithPath: "/"))
             }
+        case .progress(let id, let fraction):
+            guard !isCancelled(id) else { return }
+            mutateBatchJob(id) { $0.progress = max($0.progress, fraction) }
         case .completed(let id, let transcript):
             guard !isCancelled(id) else { return }
             let processed = await postProcessDetached(transcript)

@@ -223,6 +223,8 @@ struct Transcribe: AsyncParsableCommand {
                 if let job = jobByID[id] { stderr("✘ \(job.url.lastPathComponent): \(reason)") }
             case .cancelled(let id):
                 if let job = jobByID[id] { stderr("⨯ \(job.url.lastPathComponent): cancelled") }
+            case .progress:
+                break
             case .finished:
                 if verbose { stderr("Batch done (\(urls.count) files).") }
             }

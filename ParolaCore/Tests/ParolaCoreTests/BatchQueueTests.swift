@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import AVFoundation
 @testable import ParolaCore
 
 @Suite("Batch queue")
@@ -66,7 +67,7 @@ struct BatchQueueTests {
             case .cancelled(let id): cancelledID = id
             case .failed: sawFailed = true
             case .finished: sawFinished = true
-            case .completed: break
+            case .completed, .progress: break
             }
         }
 
@@ -127,6 +128,7 @@ struct BatchQueueTests {
             case .completed: ordered.append("completed")
             case .failed: ordered.append("failed")
             case .cancelled: ordered.append("cancelled")
+            case .progress: ordered.append("progress")
             case .finished: ordered.append("finished")
             }
         }
@@ -164,6 +166,42 @@ struct BatchQueueTests {
             #expect(sawCompleted)
         }
         #expect(setup.transcribersCreated.count == 1)
+    }
+
+    @Test("engine progress reaches the stream as a fraction of the file's duration")
+    func progressEventsCarryFractions() async throws {
+        let setup = try await makeQueue(behavior: .reportProgress([0.5, 1.0, 2.0]))
+        let job = BatchJob(url: setup.audioURL)
+        let events = await setup.queue.process(
+            jobs: [job],
+            options: TranscriptionOptions(model: "openai_whisper-tiny")
+        )
+
+        var percents: [Int] = []
+        for await event in events {
+            if case .progress(let id, let fraction) = event {
+                #expect(id == job.id)
+                percents.append(Int((fraction * 100).rounded()))
+            }
+        }
+        #expect(percents == [25, 50, 100])
+    }
+
+    @Test("progress that repeats a whole percent is dropped instead of flooding the stream")
+    func progressThrottlesToWholePercents() async throws {
+        let setup = try await makeQueue(behavior: .reportProgress([1.0, 1.001, 1.002, 1.5]))
+        let events = await setup.queue.process(
+            jobs: [BatchJob(url: setup.audioURL)],
+            options: TranscriptionOptions(model: "openai_whisper-tiny")
+        )
+
+        var percents: [Int] = []
+        for await event in events {
+            if case .progress(_, let fraction) = event {
+                percents.append(Int((fraction * 100).rounded()))
+            }
+        }
+        #expect(percents == [50, 75])
     }
 
     @Test("started, completed, finished events fire for a single happy-path job")
@@ -224,8 +262,25 @@ struct BatchQueueTests {
         try Data("weights".utf8).write(to: installedDir.appendingPathComponent("model.mlmodelc"))
         let session = TranscriptionSession(modelStore: store, registry: registry, idleTimeout: 5)
         let audioURL = dir.appendingPathComponent("input.wav")
-        try Data("RIFFstub".utf8).write(to: audioURL)
+        try Self.writeSilenceWav(seconds: 2, to: audioURL)
         return SessionSetup(session: session, factory: factory, transcribersCreated: created, audioURL: audioURL)
+    }
+
+    private static func writeSilenceWav(seconds: Double, to url: URL) throws {
+        let sampleRate = 16_000.0
+        guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(sampleRate * seconds))
+        else { throw ParolaError.audioLoadFailed(url, underlying: "format unavailable") }
+        buffer.frameLength = buffer.frameCapacity
+        let file = try AVAudioFile(forWriting: url, settings: [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: sampleRate,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+        ])
+        try file.write(from: buffer)
     }
 
     private func makeQueue(behavior: StubTranscriber.Behavior) async throws -> QueueSetup {
@@ -247,6 +302,7 @@ actor StubTranscriber: Transcriber {
         case succeed
         case cancel
         case hang
+        case reportProgress([Double])
     }
 
     static let engineID = EngineID("stub-engine")
@@ -269,13 +325,10 @@ actor StubTranscriber: Transcriber {
     func transcribe(url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers) async throws -> Transcript {
         switch behavior {
         case .succeed:
-            return Transcript(
-                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "ok")],
-                language: "en",
-                modelName: loaded ?? "?",
-                sourceURL: url,
-                durationSeconds: 1
-            )
+            return result(for: url)
+        case .reportProgress(let seconds):
+            for value in seconds { handlers.onProgress?(value) }
+            return result(for: url)
         case .cancel:
             throw CancellationError()
         case .hang:
@@ -293,5 +346,15 @@ actor StubTranscriber: Transcriber {
         inFlight?.cancel()
         inFlight = nil
         await factory.recordCancellation()
+    }
+
+    private func result(for url: URL) -> Transcript {
+        Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "ok")],
+            language: "en",
+            modelName: loaded ?? "?",
+            sourceURL: url,
+            durationSeconds: 1
+        )
     }
 }

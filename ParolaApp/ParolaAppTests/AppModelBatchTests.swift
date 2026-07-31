@@ -601,6 +601,31 @@ struct AppModelBatchTests {
         Self.expectArtifactsCleared(on: model)
     }
 
+    @Test("progress events move the running job's bar and never walk it backwards")
+    func batchProgressUpdatesJob() async {
+        let model = makeModel()
+        model.batchJobs = [Self.makeJob("a", status: .transcribing), Self.makeJob("b")]
+        let id = model.batchJobs[0].id
+
+        await model.handleBatchEvent(.progress(jobID: id, fraction: 0.4))
+        #expect(model.batchJobs[0].progress == 0.4)
+
+        await model.handleBatchEvent(.progress(jobID: id, fraction: 0.15))
+        #expect(model.batchJobs[0].progress == 0.4)
+
+        #expect(model.batchJobs[1].progress == 0)
+    }
+
+    @Test("progress for a cancelled job is ignored")
+    func batchProgressSkipsCancelledJob() async {
+        let model = makeModel()
+        model.batchJobs = [Self.makeJob("a", status: .cancelled)]
+
+        await model.handleBatchEvent(.progress(jobID: model.batchJobs[0].id, fraction: 0.9))
+
+        #expect(model.batchJobs[0].progress == 0)
+    }
+
     @Test("arrivals during recording defer instead of stomping capture")
     func recordingDefersArrivals() {
         let model = makeModel()

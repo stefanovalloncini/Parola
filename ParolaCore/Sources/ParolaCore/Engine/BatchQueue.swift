@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 public struct BatchJob: Identifiable, Sendable, Hashable, Codable {
     public enum Status: String, Sendable, Codable {
@@ -37,6 +38,7 @@ public struct BatchJob: Identifiable, Sendable, Hashable, Codable {
 
 public enum BatchEvent: Sendable {
     case started(jobID: UUID)
+    case progress(jobID: UUID, fraction: Double)
     case completed(jobID: UUID, transcript: Transcript)
     case failed(jobID: UUID, reason: String)
     case cancelled(jobID: UUID)
@@ -94,9 +96,16 @@ public actor BatchQueue {
             do {
                 jobInFlight = true
                 defer { jobInFlight = false }
+                let source = FileAudioSource(url: job.url)
+                let duration = await source.estimatedDuration()
                 let transcript = try await session.transcribe(
-                    source: FileAudioSource(url: job.url),
-                    options: options
+                    source: source,
+                    options: options,
+                    progressHandler: Self.progressForwarder(
+                        jobID: job.id,
+                        duration: duration,
+                        continuation: continuation
+                    )
                 )
                 continuation.yield(.completed(jobID: job.id, transcript: transcript))
             } catch is CancellationError {
@@ -107,6 +116,29 @@ public actor BatchQueue {
         }
         continuation.yield(.finished)
         continuation.finish()
+    }
+
+    /// Engines report the latest transcribed second; a file whose duration we can't read gets no
+    /// handler at all, and the rest are throttled to whole percents so a per-window callback
+    /// doesn't flood the stream.
+    private static func progressForwarder(
+        jobID: UUID,
+        duration: Double?,
+        continuation: AsyncStream<BatchEvent>.Continuation
+    ) -> (@Sendable (Double) -> Void)? {
+        guard let duration, duration > 0 else { return nil }
+        let lastPercent = OSAllocatedUnfairLock(initialState: -1)
+        return { seconds in
+            let fraction = min(1, max(0, seconds / duration))
+            let percent = Int(fraction * 100)
+            let advanced = lastPercent.withLock { last in
+                guard percent > last else { return false }
+                last = percent
+                return true
+            }
+            guard advanced else { return }
+            continuation.yield(.progress(jobID: jobID, fraction: fraction))
+        }
     }
 
     // The session is shared; a stale termination must not cancel work it now runs for someone else.
