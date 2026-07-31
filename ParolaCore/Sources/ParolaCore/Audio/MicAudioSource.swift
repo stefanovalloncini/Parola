@@ -169,9 +169,9 @@ public actor MicAudioSource: LiveAudioSource {
 
     private func stop() async {
         guard let current = session else { return }
-        // Order: stop engine, remove tap, finish continuation, drain consumer — writes must complete before the file handle is released.
-        engine.stop()
+        // removeTap runs first, while the engine's render cycle still serialises with it: a tap block in flight has yielded its buffer before finish() closes the stream, and the consumer drains it before the file is released.
         engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
         current.bufferContinuation.finish()
         await current.consumerTask.value
         session = nil
