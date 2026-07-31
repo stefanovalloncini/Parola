@@ -91,7 +91,7 @@ public actor LibraryStore {
     private func rebuildSearchIndexIfStale() async {
         guard await searchIndex.needsRebuild() else { return }
         let url = libraryURL
-        let rebuilt = await Task.detached(priority: .utility) { [self] in
+        let rebuilt = await offActorIO(qos: .utility) { [self] in
             scanEntries(at: url).compactMap { entry -> LibrarySearchIndex.RebuildEntry? in
                 guard let doc = try? ParolaDocument.read(at: entry.bundleURL) else { return nil }
                 return .init(
@@ -101,7 +101,7 @@ public actor LibraryStore {
                     auxiliaryText: Self.searchAuxiliaryText(notes: entry.segmentNotes, transcript: doc.transcript)
                 )
             }
-        }.value
+        }
         await searchIndex.rebuild(entries: rebuilt)
     }
 
@@ -112,9 +112,7 @@ public actor LibraryStore {
         // under the new epoch; the on-actor last resort can't be interleaved at all.
         for _ in 0..<3 {
             let epoch = listCacheEpoch
-            let entries = await Task.detached(priority: .userInitiated) { [self] in
-                scanEntries(at: url)
-            }.value
+            let entries = await offActorIO { [self] in scanEntries(at: url) }
             if epoch == listCacheEpoch {
                 applyScan(entries)
                 return
@@ -165,9 +163,9 @@ public actor LibraryStore {
     ) async throws -> LibraryEntry {
         let name = uniqueEntryName(at: Date())
         let bundleURL = libraryURL.appendingPathComponent(name)
-        // Detached: writing the bundle copies the source media, which can take seconds for long
+        // Off the actor: writing the bundle copies the source media, which can take seconds for long
         // recordings and would stall every other library call on this actor.
-        try await Task.detached(priority: .userInitiated) {
+        try await offActorThrowingIO {
             _ = try ParolaDocument.write(
                 transcript: transcript,
                 audioURL: audioSource,
@@ -175,7 +173,7 @@ public actor LibraryStore {
                 category: category,
                 titleOverride: title
             )
-        }.value
+        }
         invalidateListCaches()
         let entry = try makeEntry(bundleURL: bundleURL.appendingPathExtension("parola"))
         await indexEntry(entry, transcript: transcript)
@@ -192,11 +190,11 @@ public actor LibraryStore {
         let fm = FileManager.default
         if fm.fileExists(atPath: staging.path) { try fm.removeItem(at: staging) }
         do {
-            // Detached: bundle copies can be multi-GB and would stall every other library call.
-            try await Task.detached(priority: .userInitiated) {
+            // Off the actor: bundle copies can be multi-GB and would stall every other library call.
+            try await offActorThrowingIO {
                 try FileManager.default.copyItem(at: url, to: staging)
                 try FileManager.default.moveItem(at: staging, to: target)
-            }.value
+            }
         } catch {
             try? fm.removeItem(at: staging)
             try? fm.removeItem(at: target)
@@ -355,13 +353,11 @@ public actor LibraryStore {
         }
     }
 
-    /// The manifest edits above leave transcript.json alone, so the open document is still current;
-    /// only fall back to disk — and off the actor, word timings and all — when it isn't cached.
+    /// A manifest edit leaves transcript.json alone, so an open document is still current; fall back
+    /// to disk — off the actor, word timings and all — only when it isn't cached.
     private func transcriptForReindex(_ id: LibraryEntry.ID, at bundleURL: URL) async -> Transcript? {
         if let cached = cachedLoaded, cached.id == id { return cached.value.document.transcript }
-        return await Task.detached(priority: .userInitiated) {
-            try? ParolaDocument.read(at: bundleURL).transcript
-        }.value
+        return await offActorIO { try? ParolaDocument.read(at: bundleURL).transcript }
     }
 
     /// Replaces the labels on a library entry. Empty array clears them.
@@ -514,9 +510,7 @@ public actor LibraryStore {
     /// Walks every `.parola` bundle in the library and reports half-written or invalid ones.
     public func verify() async -> VerificationReport {
         let url = libraryURL
-        return await Task.detached(priority: .userInitiated) {
-            Self.verifySync(at: url)
-        }.value
+        return await offActorIO { Self.verifySync(at: url) }
     }
 
     nonisolated static func verifySync(at libraryURL: URL) -> VerificationReport {
@@ -616,5 +610,26 @@ public actor LibraryStore {
         f.timeZone = TimeZone(secondsFromGMT: 0)
         f.dateFormat = "yyyyMMdd'T'HHmmss"
         return f.string(from: date)
+    }
+}
+
+/// Continuation + GCD, not `Task.detached`: a detached job resuming actor work around the
+/// NSURL-bridging Foundation calls above has crashed with EXC_ARM_DA_ALIGN before (same class as
+/// the watched-folder bookmark and duration-probe fixes).
+private func offActorIO<T: Sendable>(
+    qos: DispatchQoS.QoSClass = .userInitiated,
+    _ work: @escaping @Sendable () -> T
+) async -> T {
+    await withCheckedContinuation { continuation in
+        DispatchQueue.global(qos: qos).async { continuation.resume(returning: work()) }
+    }
+}
+
+private func offActorThrowingIO<T: Sendable>(
+    qos: DispatchQoS.QoSClass = .userInitiated,
+    _ work: @escaping @Sendable () throws -> T
+) async throws -> T {
+    try await withCheckedThrowingContinuation { continuation in
+        DispatchQueue.global(qos: qos).async { continuation.resume(with: Result { try work() }) }
     }
 }
