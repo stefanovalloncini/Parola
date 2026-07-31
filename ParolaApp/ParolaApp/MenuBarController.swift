@@ -123,6 +123,9 @@ final class MenuBarController {
         if model.features.isEnabled(.micRecording) {
             menu.addItem(menuItem(title: "Record from Microphone", action: #selector(recordMic), target: self))
         }
+        if model.features.isEnabled(.meetings) {
+            menu.addItem(menuItem(title: "Record System Audio", action: #selector(recordSystem), target: self))
+        }
         menu.addItem(menuItem(title: "Open File…", action: #selector(openFile), target: self))
         if model.features.isEnabled(.dictation) {
             menu.addItem(menuItem(title: dictateTitle, action: #selector(toggleDictation), target: self))
@@ -185,6 +188,11 @@ final class MenuBarController {
         // Bring the main window up so the count-in overlay (and cancel) can be seen.
         openParola()
         model?.startRecording(source: .microphone)
+    }
+
+    @objc private func recordSystem() {
+        openParola()
+        model?.startRecording(source: .systemAudio)
     }
 
     @objc private func openFile() {
