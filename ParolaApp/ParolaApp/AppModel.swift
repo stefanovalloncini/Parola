@@ -1470,6 +1470,7 @@ final class AppModel {
                 let processed = await postProcessDetached(result)
                 clearDerivedArtifacts()
                 selectedEntryID = nil
+                restorePlaybackSource(fileURL)
                 transcript = processed
                 filePartialText = ""
                 fileTranscribeFraction = nil
@@ -1660,6 +1661,7 @@ final class AppModel {
                 let processed = await postProcessDetached(result)
                 clearDerivedArtifacts()
                 selectedEntryID = nil
+                restorePlaybackSource(audioURL)
                 transcript = processed
                 phase = .ready
                 persistToLibrary(processed, audioSource: audioURL)
@@ -2135,6 +2137,7 @@ final class AppModel {
                 let processed = await postProcessDetached(result)
                 clearDerivedArtifacts()
                 selectedEntryID = nil
+                restorePlaybackSource(url)
                 transcript = processed
                 phase = .ready
                 persistToLibrary(

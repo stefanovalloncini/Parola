@@ -59,6 +59,13 @@ extension AppModel {
         }
     }
 
+    /// Re-points playback at a finished run's own audio: an entry opened mid-run leaves the player on the entry's file.
+    func restorePlaybackSource(_ url: URL) {
+        guard sourceFileURL != url else { return }
+        sourceFileURL = url
+        installPlayer(for: url)
+    }
+
     func updateCurrentSegment(time: Double) {
         guard let segments = transcript?.segments else { return }
         let matchIndex = cachedOrSearchedIndex(in: segments, coveringTime: time)
