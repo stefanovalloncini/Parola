@@ -20,7 +20,7 @@ public enum ParolaFeature: String, CaseIterable, Sendable, Codable {
         case .liveCaptions: return "Live Captions"
         case .youtube: return "YouTube ingestion"
         case .batch: return "Batch transcription"
-        case .ai: return "AI features"
+        case .ai: return "AI"
         case .automation: return "Automation"
         case .watchedFolders: return "Watched folders"
         }
