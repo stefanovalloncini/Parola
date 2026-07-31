@@ -374,6 +374,32 @@ struct DictationCoordinatorTests {
         #expect(inserted == ["held"])
     }
 
+    @Test("hybrid mode: an intent press during a physical hold leaves the release a release")
+    func hybridIntentPressDuringHold() async throws {
+        let hotkey = MockHotkey()
+        let recorder = MockRecorder(outcome: .text("still held"))
+        let inserter = MockInserter()
+        let coord = DictationCoordinator(
+            hotkey: hotkey,
+            recorder: recorder,
+            inserter: inserter,
+            mode: .hybrid
+        )
+        await coord.startMonitoring()
+        let keyDown = Date()
+        await coord.handle(.press, capturedAt: keyDown)
+        await #expect(coord.state == .listening)
+
+        await coord.handle(.press, capturedAt: keyDown.addingTimeInterval(0.4))
+        await coord.handle(.release, capturedAt: keyDown.addingTimeInterval(0.5))
+
+        await #expect(coord.state == .idle)
+        let startCalls = await recorder.startCalls
+        #expect(startCalls == 1)
+        let inserted = await inserter.inserted
+        #expect(inserted == ["still held"])
+    }
+
     @Test("setMode resets pending hybrid state")
     func setModeResetsHybrid() async throws {
         let hotkey = MockHotkey()

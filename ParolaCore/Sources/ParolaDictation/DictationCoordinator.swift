@@ -231,8 +231,10 @@ public actor DictationCoordinator {
     private func handleHybrid(_ event: HotkeyEvent, capturedAt: Date) async {
         switch event {
         case .press:
+            // Only a press that starts a session may move the hold clock: an intent press
+            // landing mid-hold would otherwise make the real key-up read as a quick tap.
+            guard state != .listening, state != .transcribing else { return }
             pressStartedAt = capturedAt
-            if state == .listening && hybridLocked { return }
             hybridLocked = false
             await beginListening()
         case .release:
