@@ -1240,6 +1240,17 @@
         }
       }
     },
+    "Captures your voice for recordings and dictation.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra la tua voce per registrazioni e dettatura."
+          }
+        }
+      }
+    },
     "Choose a completed file to see its transcript.": {
       "extractionState": "manual",
       "localizations": {
@@ -3356,6 +3367,17 @@
         }
       }
     },
+    "Grant each permission the first time you use its feature.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Concedi ogni permesso al primo utilizzo della funzione."
+          }
+        }
+      }
+    },
     "HTML (.html)": {
       "extractionState": "manual",
       "localizations": {
@@ -5057,6 +5079,17 @@
         }
       }
     },
+    "Open a File…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri un file…"
+          }
+        }
+      }
+    },
     "Open or Drop File": {
       "extractionState": "manual",
       "localizations": {
@@ -5573,6 +5606,17 @@
         }
       }
     },
+    "Powers the dictation hotkey and inserts text where you type.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attiva la scorciatoia di dettatura e inserisce il testo dove scrivi."
+          }
+        }
+      }
+    },
     "Prefix each Markdown paragraph with its start time.": {
       "extractionState": "manual",
       "localizations": {
@@ -6022,6 +6066,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registrazione — %@"
+          }
+        }
+      }
+    },
+    "Records meetings and anything else your Mac plays.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra le riunioni e qualsiasi audio riprodotto dal Mac."
           }
         }
       }
@@ -6864,6 +6919,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Densità sidebar"
+          }
+        }
+      }
+    },
+    "Skip": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salta"
           }
         }
       }
@@ -7836,6 +7902,17 @@
         }
       }
     },
+    "Transcribe files, meetings, and your voice — everything stays on your Mac.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivi file, riunioni e la tua voce — tutto resta sul tuo Mac."
+          }
+        }
+      }
+    },
     "Transcribe from a YouTube URL.": {
       "extractionState": "manual",
       "localizations": {
@@ -8424,6 +8501,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "WebVTT (.vtt)"
+          }
+        }
+      }
+    },
+    "Welcome to Parola": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Benvenuto in Parola"
           }
         }
       }
