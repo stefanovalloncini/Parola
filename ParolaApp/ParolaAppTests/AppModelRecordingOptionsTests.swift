@@ -236,3 +236,72 @@ extension TranscriberMockSuites {
         }
     }
 }
+
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("Recording stop during startup", .serialized)
+    struct RecordingStartupStopTests {
+        private func waitUntil(timeoutMs: Int = 5000, _ condition: @MainActor () -> Bool) async -> Bool {
+            var elapsed = 0
+            while elapsed < timeoutMs {
+                if condition() { return true }
+                try? await Task.sleep(for: .milliseconds(15))
+                elapsed += 15
+            }
+            return condition()
+        }
+
+        private func isRecording(_ model: AppModel) -> Bool {
+            if case .recording = model.phase { return true }
+            return false
+        }
+
+        @Test("a stop that lands while the capture is still starting discards the take")
+        func stopDuringStartupWins() async throws {
+            let fixture = try makeSilentWAV()
+            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+            defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+
+            let model = makeRecordingModel()
+            model.useStreaming = false
+            model.selectedModel = "openai_whisper-tiny"
+            model.recordingCountInSeconds = 0
+
+            model.startRecording(source: .microphone)
+            #expect(model.recordingActive)
+            #expect(model.liveSource == nil, "the capture has not landed yet")
+
+            model.stopRecordingAndTranscribe()
+
+            let settled = await waitUntil { !model.recordingActive }
+            #expect(settled, "the stop must not be swallowed by the startup window")
+            #expect(model.liveSource == nil)
+            #expect(model.phase == .idle)
+            #expect(model.transcript == nil)
+        }
+
+        @Test("a stop during startup leaves the next recording free to start")
+        func stopDuringStartupDoesNotLatch() async throws {
+            let fixture = try makeSilentWAV()
+            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+            defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+
+            let model = makeRecordingModel()
+            model.useStreaming = false
+            model.selectedModel = "openai_whisper-tiny"
+            model.recordingCountInSeconds = 0
+
+            model.startRecording(source: .microphone)
+            model.stopRecordingAndTranscribe()
+            let settled = await waitUntil { !model.recordingActive }
+            #expect(settled)
+            #expect(model.liveSource == nil)
+
+            model.startRecording(source: .microphone)
+            let restarted = await waitUntil { self.isRecording(model) && model.liveSource != nil }
+            #expect(restarted, "the discarded take must not latch the recording state")
+
+            model.cancelCurrentWork()
+        }
+    }
+}

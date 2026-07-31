@@ -857,6 +857,7 @@ final class AppModel {
     @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeSubsTask: Task<Void, Never>?
     @ObservationIgnored private var recordingStartInFlight = false
+    @ObservationIgnored private var stopRequestedDuringStart = false
     @ObservationIgnored var derivedArtifactsGeneration = 0
     @ObservationIgnored var loadEntryGeneration = 0
 
@@ -887,6 +888,7 @@ final class AppModel {
     }
 
     private func teardownActiveCapture() {
+        if recordingStartInFlight, liveSource == nil { stopRequestedDuringStart = true }
         stopSilenceWatch()
         stopRecordingLevelObserver()
         stopRecordingWatch()
@@ -1875,8 +1877,12 @@ final class AppModel {
         // otherwise the old run would finish later and stomp the new take's transcript.
         cancelTranscriptionRuns()
         recordingStartInFlight = true
+        stopRequestedDuringStart = false
         Task {
-            defer { recordingStartInFlight = false }
+            defer {
+                recordingStartInFlight = false
+                stopRequestedDuringStart = false
+            }
             let captureTargets = pendingCaptureBundleIDs ?? []
             pendingCaptureBundleIDs = nil
             if source == .microphone, mode == .normal, await AVCaptureDevice.requestAccess(for: .audio) == false {
@@ -1897,8 +1903,7 @@ final class AppModel {
                         clock: clock
                     )
                     try await mic.start()
-                    liveSource = mic
-                    observeRecordingLevels(from: mic)
+                    guard await adoptLiveSource(mic) else { return }
                 case .systemAudio:
                     let sys = await LiveAudioSourceFactory.makeSystem(targetBundleIDs: captureTargets, clock: clock)
                     // Tap setup blocks indefinitely while macOS waits for the System Audio
@@ -1917,8 +1922,7 @@ final class AppModel {
                             "system audio capture did not start. Allow System Audio Recording for Parola in System Settings → Privacy & Security, then try again."
                         )
                     }
-                    liveSource = sys
-                    observeRecordingLevels(from: sys)
+                    guard await adoptLiveSource(sys) else { return }
                 }
                 scheduleRecordingAutoStop()
                 startRecordingWatch(checkpoints: false)
@@ -1929,6 +1933,26 @@ final class AppModel {
                 drainDeferredArrivals()
             }
         }
+    }
+
+    /// Installs a capture that has just come up, unless Stop was pressed during the startup
+    /// window — a system-audio take can sit there for 20s waiting on consent, and the user's
+    /// Stop has to win over a source that lands after it.
+    private func adoptLiveSource(_ source: any LiveAudioSource) async -> Bool {
+        guard stopRequestedDuringStart else {
+            liveSource = source
+            observeRecordingLevels(from: source)
+            return true
+        }
+        stopRecordingLevelObserver()
+        stopRecordingWatch()
+        await source.cancel()
+        await mediaSession.exitRecording()
+        pendingRecordingCategory = .transcription
+        phase = .idle
+        resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+        drainDeferredArrivals()
+        return false
     }
 
     private func scheduleRecordingAutoStop() {
@@ -2116,7 +2140,10 @@ final class AppModel {
             return
         }
 
-        guard let source = liveSource else { return }
+        guard let source = liveSource else {
+            if recordingStartInFlight { stopRequestedDuringStart = true }
+            return
+        }
         // Hand off synchronously so a racing auto-stop or second click can't start a duplicate run.
         liveSource = nil
         stopRecordingWatch()
