@@ -104,17 +104,41 @@ actor ParakeetTranscriber: Transcriber {
     ) async throws -> URL {
         let version = try modelVersion(for: model)
         try FileManager.default.createDirectory(at: targetDir, withIntermediateDirectories: true)
+        let aggregate = FileProgressAggregator(fileCount: ModelNames.ASR.requiredModels.count)
         do {
             return try await AsrModels.download(
                 to: targetDir,
                 version: version,
                 progressHandler: { snapshot in
-                    progress?(snapshot.fractionCompleted)
+                    progress?(aggregate.overall(snapshot.fractionCompleted))
                 }
             )
         } catch {
             if isCancellation(error) { throw CancellationError() }
             throw ParolaError.modelDownloadFailed(model, underlying: String(describing: error))
+        }
+    }
+
+    /// FluidAudio downloads one file per model spec and restarts its fraction at 0 for each one, so
+    /// forwarding it raw drives the bar to 100% while three files are still to come. Give each file
+    /// its own slice of the range and never let the total go backwards.
+    final class FileProgressAggregator: Sendable {
+        private let fileCount: Int
+        private let state = OSAllocatedUnfairLock(initialState: (finished: 0, previous: 0.0, highest: 0.0))
+
+        init(fileCount: Int) {
+            self.fileCount = max(fileCount, 1)
+        }
+
+        func overall(_ fraction: Double) -> Double {
+            let current = min(max(fraction, 0), 1)
+            return state.withLock { state in
+                if current < state.previous { state.finished = min(state.finished + 1, fileCount - 1) }
+                state.previous = current
+                let total = (Double(state.finished) + current) / Double(fileCount)
+                state.highest = max(state.highest, total)
+                return state.highest
+            }
         }
     }
 
