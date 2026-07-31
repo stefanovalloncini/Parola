@@ -156,6 +156,31 @@ struct StreamingModelCacheTests {
         #expect(await counter.count == 3, "the superseded load must not have been cached")
     }
 
+    @Test("a cancelled borrow returns promptly and the finished load is still cached")
+    func cancelledBorrowKeepsLoadWarm() async throws {
+        let counter = LoadCounter()
+        let gate = LoadGate()
+        let cache = StreamingModelCache { name, _ in
+            await counter.increment()
+            await gate.wait(name)
+            return try await Self.makeUnloadedKit()
+        }
+        let store = Self.makeStore()
+
+        let borrower = Task {
+            try await cache.borrow("openai_whisper-tiny", store: store)
+        }
+        while await counter.count < 1 { try await Task.sleep(for: .milliseconds(1)) }
+        borrower.cancel()
+        // The gate is still closed here: if this wait weren't cancellation-responsive,
+        // awaiting the borrower would hang on the in-flight load.
+        await #expect(throws: CancellationError.self) { _ = try await borrower.value }
+
+        await gate.open("openai_whisper-tiny")
+        _ = try await cache.borrow("openai_whisper-tiny", store: store)
+        #expect(await counter.count == 1, "the load survived the cancelled borrower and was reused")
+    }
+
     @Test("borrowing a different model evicts the previous one")
     func borrowEvictsOtherModels() async throws {
         let counter = LoadCounter()

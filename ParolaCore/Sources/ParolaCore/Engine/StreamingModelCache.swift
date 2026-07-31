@@ -1,4 +1,5 @@
 import Foundation
+import os
 @preconcurrency import WhisperKit
 
 // Safe because borrowers only read model components off the kit; concurrent reads match what
@@ -34,33 +35,67 @@ actor StreamingModelCache {
         currentModelName = modelName
         loaded = loaded.filter { $0.key == modelName }
         if let shared = loaded[modelName] { return shared }
-        if let pending = inFlight[modelName] { return try await pending.value }
+        if let pending = inFlight[modelName] {
+            return try await Self.awaitCancellable(pending)
+        }
 
         let loader = loader
         let task = Task { try await loader(modelName, store) }
         inFlight[modelName] = task
         let myEpoch = evictionEpoch
-        do {
-            let shared = try await task.value
-            if evictionEpoch == myEpoch {
-                inFlight[modelName] = nil
-                // Cache only the latest requested name: a switch may have superseded this load
-                // while it ran, and caching both would leave two multi-GB kits resident.
-                if currentModelName == modelName {
-                    loaded[modelName] = shared
+        // Bookkeeping is detached from the borrower: a cancelled borrow returns early while
+        // the load runs on, and this is what lands the finished kit in the cache.
+        Task { [weak self] in
+            let kit = try? await task.value
+            await self?.finishLoad(modelName, epoch: myEpoch, kit: kit)
+        }
+        return try await Self.awaitCancellable(task)
+    }
+
+    private func finishLoad(_ modelName: String, epoch: Int, kit: SharedWhisperKit?) {
+        guard evictionEpoch == epoch else { return }
+        inFlight[modelName] = nil
+        // Cache only the latest requested name: a switch may have superseded this load
+        // while it ran, and caching both would leave two multi-GB kits resident.
+        if let kit, currentModelName == modelName {
+            loaded[modelName] = kit
+        }
+    }
+
+    /// Awaits the load task but lets the borrower's own cancellation end the wait: releasing
+    /// the dictation key mid-load shouldn't sit out a multi-second (or hung) model load.
+    /// The continuation is taken exactly once, by whichever side gets there first.
+    private static func awaitCancellable(
+        _ task: Task<SharedWhisperKit, Error>
+    ) async throws -> SharedWhisperKit {
+        let pending = OSAllocatedUnfairLock<CheckedContinuation<SharedWhisperKit, Error>?>(initialState: nil)
+        @Sendable func take() -> CheckedContinuation<SharedWhisperKit, Error>? {
+            pending.withLock { held in
+                defer { held = nil }
+                return held
+            }
+        }
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                if Task.isCancelled {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                pending.withLock { $0 = continuation }
+                Task {
+                    let result: Result<SharedWhisperKit, Error>
+                    do { result = .success(try await task.value) } catch { result = .failure(error) }
+                    take()?.resume(with: result)
                 }
             }
-            return shared
-        } catch {
-            if evictionEpoch == myEpoch {
-                inFlight[modelName] = nil
-            }
-            throw error
+        } onCancel: {
+            take()?.resume(throwing: CancellationError())
         }
     }
 
     func unloadAll() {
         evictionEpoch += 1
+        for task in inFlight.values { task.cancel() }
         loaded.removeAll()
         inFlight.removeAll()
     }
