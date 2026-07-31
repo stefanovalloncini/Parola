@@ -46,7 +46,8 @@ struct FormatInspector: View {
     }
 
     private var displayModesSection: some View {
-        InspectorGroup(title: "Display Modes") {
+        @Bindable var model = model
+        return InspectorGroup(title: "Display Modes") {
             HStack(spacing: DS.Spacing.small) {
                 DisplayModeCard(
                     title: "Transcript",
@@ -64,6 +65,15 @@ struct FormatInspector: View {
             Text("Toggle between transcript and segment layouts.")
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.secondaryText)
+
+            if displayMode == .segments {
+                Toggle(isOn: $model.showSubtitleQC) {
+                    Text("Subtitle QC")
+                }
+                .help("Warn about segments that read too fast or fall outside caption limits.")
+                .accessibilityIdentifier("toolbar.subtitleQC")
+                .axLeaf("Inspector.Toggle.SubtitleQC")
+            }
         }
     }
 

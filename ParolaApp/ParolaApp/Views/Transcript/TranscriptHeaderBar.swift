@@ -101,6 +101,11 @@ struct TranscriptHeaderBar: View {
             .accessibilityLabel("Chat with this transcript")
             .axLeaf("HeaderBar.Button.OpenChat")
 
+            PromptsMenu()
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .disabled(model.isRunningPrompt)
+
             Button(action: onAdvance) {
                 Image(systemName: "chevron.right.2")
                     .font(DS.Font.heading)

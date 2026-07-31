@@ -3,9 +3,9 @@ import ParolaCore
 
 struct ContentToolbar: ToolbarContent {
     @Environment(AppModel.self) private var model
+    @State private var optionsOpen = false
 
     var body: some ToolbarContent {
-        @Bindable var model = model
         ToolbarItem(placement: .navigation) {
             HStack(spacing: DS.Spacing.small) {
                 ModelPickerView()
@@ -14,79 +14,10 @@ struct ContentToolbar: ToolbarContent {
                     .modifier(EnglishOnlyHelpModifier(isEnglishOnly: selectedModelIsEnglishOnly))
             }
         }
-        ToolbarItemGroup(placement: .navigation) {
-            if selectedModelSupportsTranslate {
-                Toggle(isOn: $model.translate) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "character.bubble")
-                        Text("Translate")
-                    }
-                }
-                .toggleStyle(.button)
-                .help("Translate to English instead of transcribing in the source language.")
-                .accessibilityIdentifier("toolbar.translate")
-                .axLeaf("Toolbar.Toggle.Translate")
-            }
-            Toggle(isOn: $model.diarize) {
-                HStack(spacing: 4) {
-                    Image(systemName: "person.2.wave.2")
-                    Text("Diarize")
-                }
-            }
-            .toggleStyle(.button)
-            .help("Identify multiple speakers in the audio (slower).")
-            .accessibilityIdentifier("toolbar.diarize")
-            .axLeaf("Toolbar.Toggle.Diarize")
-            if model.diarize {
-                Menu {
-                    Picker("Speakers", selection: $model.expectedSpeakersRaw) {
-                        Text("Auto").tag(0)
-                        ForEach(2...8, id: \.self) { count in
-                            Text("\(count)").tag(count)
-                        }
-                    }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "person.2")
-                        Text(model.expectedSpeakersRaw == 0 ? "Auto" : "\(model.expectedSpeakersRaw)")
-                    }
-                }
-                .help("How many speakers to expect. Auto lets the diarizer decide.")
-                .accessibilityIdentifier("toolbar.expectedSpeakers")
-                .axLeaf("Toolbar.Menu.ExpectedSpeakers")
-            }
+        ToolbarItem(placement: .navigation) {
+            optionsButton
         }
         ToolbarItemGroup(placement: .primaryAction) {
-            if model.route != .batch {
-                Button {
-                    model.route = .batch
-                } label: {
-                    Label("Batch", systemImage: "square.stack.3d.up")
-                }
-                .help("Open the batch transcription page.")
-                .accessibilityIdentifier("toolbar.batch")
-                .axLeaf("Toolbar.Button.Batch")
-            }
-            if !model.deletedEntries.isEmpty {
-                Button { model.showingTrash = true } label: {
-                    Label("Recently Deleted", systemImage: "trash")
-                }
-                .help("Show Recently Deleted")
-                .accessibilityIdentifier("toolbar.recentlyDeleted")
-                .axLeaf("Toolbar.Button.RecentlyDeleted")
-            }
-            Button {
-                model.youtubeSheetOpen = true
-            } label: {
-                Label("YouTube URL", systemImage: "play.rectangle.on.rectangle")
-            }
-            .disabled(isBusy)
-            .help("Transcribe from a YouTube URL.")
-            .accessibilityIdentifier("toolbar.youtube")
-            .axLeaf("Toolbar.Button.YouTube")
-
             if isRecording {
                 Button {
                     model.stopRecordingAndTranscribe()
@@ -98,46 +29,95 @@ struct ContentToolbar: ToolbarContent {
                 .accessibilityIdentifier("toolbar.stopRecording")
                 .axLeaf("Toolbar.Button.StopRecording")
             } else {
-                Menu {
-                    Button("Microphone") { model.startRecording(source: .microphone) }
-                        .accessibilityIdentifier("toolbar.record.microphone")
-                        .axLeaf("Toolbar.MenuItem.RecordMicrophone")
-                    Button("System audio") { model.startRecording(source: .systemAudio) }
-                        .accessibilityIdentifier("toolbar.record.system")
-                        .axLeaf("Toolbar.MenuItem.RecordSystem")
-                } label: {
-                    Label("Record", systemImage: "mic.fill")
-                }
-                .disabled(isBusy)
-                .help("Record from the microphone or system audio.")
-                .accessibilityIdentifier("toolbar.record")
-                .axLeaf("Toolbar.Menu.Record")
+                newMenu
             }
-
-            if model.transcript != nil, model.transcriptDisplayMode == .segments {
-                Toggle(isOn: $model.showSubtitleQC) {
-                    Image(systemName: "exclamationmark.triangle")
-                }
-                .toggleStyle(.button)
-                .help("Warn about segments that read too fast or fall outside caption limits.")
-                .accessibilityLabel("Subtitle QC")
-                .accessibilityIdentifier("toolbar.subtitleQC")
-                .axLeaf("Toolbar.Toggle.SubtitleQC")
-            }
-
-            PromptsMenu()
-                .disabled(model.transcript == nil || model.isRunningPrompt)
-
-            Button {
-                model.presentOpenPanel()
-            } label: {
-                Label("Open File", systemImage: "doc.badge.plus")
-            }
-            .disabled(isBusy)
-            .help("Open an audio or video file.")
-            .accessibilityIdentifier("toolbar.openFile")
-            .axLeaf("Toolbar.Button.OpenFile")
         }
+    }
+
+    private var optionsButton: some View {
+        Button {
+            optionsOpen.toggle()
+        } label: {
+            Image(systemName: "slider.horizontal.3")
+                .overlay(alignment: .topTrailing) {
+                    if optionsActive {
+                        Circle()
+                            .fill(DS.Color.accent)
+                            .frame(width: 6, height: 6)
+                            .offset(x: 3, y: -2)
+                    }
+                }
+        }
+        .help("Transcription options")
+        .accessibilityIdentifier("toolbar.options")
+        .axLeaf("Toolbar.Menu.Options")
+        .popover(isPresented: $optionsOpen, arrowEdge: .bottom) {
+            optionsPopover
+        }
+    }
+
+    private var optionsPopover: some View {
+        @Bindable var model = model
+        return VStack(alignment: .leading, spacing: DS.Spacing.regular) {
+            if selectedModelSupportsTranslate {
+                Toggle(isOn: $model.translate) {
+                    Text("Translate")
+                }
+                .help("Translate to English instead of transcribing in the source language.")
+                .accessibilityIdentifier("toolbar.translate")
+                .axLeaf("Toolbar.Toggle.Translate")
+            }
+            Toggle(isOn: $model.diarize) {
+                Text("Diarize")
+            }
+            .help("Identify multiple speakers in the audio (slower).")
+            .accessibilityIdentifier("toolbar.diarize")
+            .axLeaf("Toolbar.Toggle.Diarize")
+            if model.diarize {
+                Picker("Speakers", selection: $model.expectedSpeakersRaw) {
+                    Text("Auto").tag(0)
+                    ForEach(2...8, id: \.self) { count in
+                        Text("\(count)").tag(count)
+                    }
+                }
+                .help("How many speakers to expect. Auto lets the diarizer decide.")
+                .accessibilityIdentifier("toolbar.expectedSpeakers")
+                .axLeaf("Toolbar.Menu.ExpectedSpeakers")
+            }
+        }
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .padding(DS.Spacing.medium)
+        .frame(width: 240)
+    }
+
+    private var optionsActive: Bool {
+        model.translate || model.diarize
+    }
+
+    private var newMenu: some View {
+        Menu {
+            Button("Open File…") { model.presentOpenPanel() }
+                .accessibilityIdentifier("toolbar.openFile")
+                .axLeaf("Toolbar.MenuItem.NewOpenFile")
+            Divider()
+            Button("Record Microphone") { model.startRecording(source: .microphone) }
+                .accessibilityIdentifier("toolbar.record.microphone")
+                .axLeaf("Toolbar.MenuItem.NewRecordMicrophone")
+            Button("Record System Audio") { model.startRecording(source: .systemAudio) }
+                .accessibilityIdentifier("toolbar.record.system")
+                .axLeaf("Toolbar.MenuItem.NewRecordSystem")
+            Divider()
+            Button("YouTube URL…") { model.youtubeSheetOpen = true }
+                .accessibilityIdentifier("toolbar.youtube")
+                .axLeaf("Toolbar.MenuItem.NewYouTube")
+        } label: {
+            Label("New", systemImage: "plus")
+        }
+        .disabled(isBusy)
+        .help("Start a new transcription.")
+        .accessibilityIdentifier("toolbar.new")
+        .axLeaf("Toolbar.Menu.New")
     }
 
     private var selectedModelIsEnglishOnly: Bool {
