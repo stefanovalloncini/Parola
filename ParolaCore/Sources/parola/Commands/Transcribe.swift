@@ -130,9 +130,10 @@ struct Transcribe: AsyncParsableCommand {
             source = FileAudioSource(url: url)
             sourceURL = url
         case .youtube(let url):
+            try ParolaCLI.features.require(.youtube)
             stderr("Downloading audio from \(url.absoluteString)…")
             emitter.progress(.downloading, detail: url.absoluteString)
-            let yt = try YouTubeAudioSource(url: url)
+            let yt = try YouTubeAudioSource(url: url, features: ParolaCLI.features)
             source = yt
             sourceURL = try await yt.prepare()
         }

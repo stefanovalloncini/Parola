@@ -10,18 +10,21 @@ public actor MCPServer {
     private let modelStore: ModelStore
     private let libraryStore: LibraryStore
     private let bridge: any BridgeProtocol
+    private let features: FeatureSet
     private(set) var shouldExit: Bool = false
 
     public init(
         session: TranscriptionSession = TranscriptionSession(),
         modelStore: ModelStore = .shared,
         libraryStore: LibraryStore = .shared,
-        bridge: any BridgeProtocol = BridgeClient()
+        bridge: any BridgeProtocol = BridgeClient(),
+        features: FeatureSet = .resolveFromAppDomain()
     ) {
         self.session = session
         self.modelStore = modelStore
         self.libraryStore = libraryStore
         self.bridge = bridge
+        self.features = features
     }
 
     public func handle(_ request: JSONRPCRequest) async throws -> JSONRPCResponse? {
@@ -195,6 +198,7 @@ public actor MCPServer {
     }
 
     private func summarize(args: [String: Any]) async throws -> MCPToolCallResult {
+        try features.require(.ai)
         guard let path = args["path"] as? String else {
             throw MCPToolError("Missing required argument: path")
         }

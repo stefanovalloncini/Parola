@@ -44,6 +44,10 @@ struct Record: AsyncParsableCommand {
     var prompt: String?
 
     func run() async throws {
+        switch source {
+        case .mic: try ParolaCLI.features.require(.micRecording)
+        case .system: try ParolaCLI.features.require(.meetings)
+        }
         if stream {
             guard source == .mic else {
                 throw ValidationError("--stream only works with --source mic")

@@ -58,11 +58,16 @@ public struct FeatureSet: Sendable, Equatable {
     }
 
     /// Resolution for auxiliary processes (CLI, MCP server): they read the app's
-    /// defaults domain so one config governs every frontend. `PAROLA_MANAGED_SUITE`
-    /// overrides the domain for tests.
+    /// defaults domain so one config governs every frontend. Two test seams:
+    /// `PAROLA_MANAGED_PLIST` points at a plist file holding the managed dict,
+    /// `PAROLA_MANAGED_SUITE` names an alternate defaults suite.
     public static func resolveFromAppDomain(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> FeatureSet {
+        if let plistPath = environment["PAROLA_MANAGED_PLIST"],
+           let dict = NSDictionary(contentsOfFile: plistPath) as? [String: Any] {
+            return resolve(managed: ManagedConfiguration(plistOverride: dict))
+        }
         let store = environment["PAROLA_MANAGED_SUITE"].flatMap(UserDefaults.init(suiteName:))
             ?? UserDefaults(suiteName: "app.parola.ParolaApp")
             ?? .standard

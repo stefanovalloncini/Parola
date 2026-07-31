@@ -16,6 +16,7 @@ public struct ManagedConfiguration: @unchecked Sendable {
 
     private let storage: UserDefaults
     private let domainKey: String
+    private let dictOverride: [String: Any]?
 
     public init(
         storage: UserDefaults = .standard,
@@ -23,12 +24,22 @@ public struct ManagedConfiguration: @unchecked Sendable {
     ) {
         self.storage = storage
         self.domainKey = domainKey
+        self.dictOverride = nil
+    }
+
+    /// Backs the configuration with a fixed dict instead of defaults. Auxiliary
+    /// processes use this for the `PAROLA_MANAGED_PLIST` file seam, which stays
+    /// testable where cfprefsd won't relay dev-process writes.
+    public init(plistOverride: [String: Any]) {
+        self.storage = .standard
+        self.domainKey = "com.apple.configuration.managed"
+        self.dictOverride = plistOverride
     }
 
     public static let shared = ManagedConfiguration()
 
     private var managedDict: [String: Any]? {
-        storage.dictionary(forKey: domainKey)
+        dictOverride ?? storage.dictionary(forKey: domainKey)
     }
 
     public var defaultModel: String? {
