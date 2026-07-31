@@ -328,8 +328,8 @@ public actor LibraryStore {
             manifest.title = trimmed
         }
         let entry = try recacheEntry(at: bundleURL)
-        if let doc = try? ParolaDocument.read(at: bundleURL) {
-            await indexEntry(entry, transcript: doc.transcript)
+        if let transcript = await transcriptForReindex(id, at: bundleURL) {
+            await indexEntry(entry, transcript: transcript)
         }
     }
 
@@ -350,9 +350,18 @@ public actor LibraryStore {
             }
         }
         let entry = try recacheEntry(at: bundleURL)
-        if let doc = try? ParolaDocument.read(at: bundleURL) {
-            await indexEntry(entry, transcript: doc.transcript)
+        if let transcript = await transcriptForReindex(id, at: bundleURL) {
+            await indexEntry(entry, transcript: transcript)
         }
+    }
+
+    /// The manifest edits above leave transcript.json alone, so the open document is still current;
+    /// only fall back to disk — and off the actor, word timings and all — when it isn't cached.
+    private func transcriptForReindex(_ id: LibraryEntry.ID, at bundleURL: URL) async -> Transcript? {
+        if let cached = cachedLoaded, cached.id == id { return cached.value.document.transcript }
+        return await Task.detached(priority: .userInitiated) {
+            try? ParolaDocument.read(at: bundleURL).transcript
+        }.value
     }
 
     /// Replaces the labels on a library entry. Empty array clears them.
@@ -459,8 +468,8 @@ public actor LibraryStore {
             manifest.deletedAt = nil
         }
         if let entry = try? recacheEntry(at: bundleURL),
-           let doc = try? ParolaDocument.read(at: bundleURL) {
-            await indexEntry(entry, transcript: doc.transcript)
+           let transcript = await transcriptForReindex(id, at: bundleURL) {
+            await indexEntry(entry, transcript: transcript)
         }
     }
 

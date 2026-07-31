@@ -560,6 +560,25 @@ struct LibraryStoreTests {
         #expect(await store.search("kanban").contains(where: { $0.entryID == entry.id }))
     }
 
+    @Test("re-indexing an open entry matches search on title, note, and transcript alike")
+    func reindexFromLoadedDocument() async throws {
+        let (store, _) = try makeTempLibrary()
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "kryptonite meeting notes")],
+            language: "en",
+            modelName: "tiny"
+        )
+        let entry = try await store.add(transcript: transcript, audioSource: nil)
+        _ = try await store.load(entry.id)
+
+        try await store.renameEntry(entry.id, to: "Standup")
+        try await store.setSegmentNote("kanban board", segmentID: 0, for: entry.id)
+
+        #expect(await store.search("standup").contains { $0.entryID == entry.id })
+        #expect(await store.search("kanban").contains { $0.entryID == entry.id })
+        #expect(await store.search("kryptonite").contains { $0.entryID == entry.id })
+    }
+
     @Test("clearing a segment note removes its tokens from search")
     func clearingNoteDeindexesIt() async throws {
         let (store, _) = try makeTempLibrary()
