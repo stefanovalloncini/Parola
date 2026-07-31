@@ -1839,6 +1839,17 @@
         }
       }
     },
+    "Copy link to this segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copia il link al segmento"
+          }
+        }
+      }
+    },
     "Copy path": {
       "extractionState": "manual",
       "localizations": {
@@ -2181,6 +2192,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Elimina prompt"
+          }
+        }
+      }
+    },
+    "Delete segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina segmento"
           }
         }
       }
@@ -4183,6 +4205,17 @@
         }
       }
     },
+    "Merge with next segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unisci al segmento successivo"
+          }
+        }
+      }
+    },
     "Mic": {
       "extractionState": "manual",
       "localizations": {
@@ -4810,6 +4843,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nessun elemento eliminato"
+          }
+        }
+      }
+    },
+    "Nudge timing…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regola i tempi…"
           }
         }
       }
@@ -6991,6 +7035,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Velocità di parola"
+          }
+        }
+      }
+    },
+    "Split segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dividi segmento"
           }
         }
       }

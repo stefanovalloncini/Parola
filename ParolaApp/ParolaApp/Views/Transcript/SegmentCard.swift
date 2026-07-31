@@ -22,14 +22,10 @@ struct SegmentCard: View {
 
     private let radius: CGFloat = 12
 
-    // Hover reserves room for the floating actionStrip (~250pt with every button) so it never covers the first text line.
-    private let actionStripReserve: CGFloat = 250
-
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             content
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.trailing, hovering && !isEditing ? actionStripReserve : 0)
 
             HStack(spacing: DS.Spacing.small) {
                 Button {
@@ -75,10 +71,10 @@ struct SegmentCard: View {
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.regular)
         .background(cardBackground)
-        .overlay(alignment: .topTrailing) {
+        .overlay(alignment: .bottomTrailing) {
             if hovering && !isEditing {
                 actionStrip
-                    .padding(.top, 6)
+                    .padding(.bottom, 6)
                     .padding(.trailing, 6)
                     .transition(.opacity)
             }
@@ -266,38 +262,12 @@ struct SegmentCard: View {
                 }
                 .axLeaf("Card.Button.Play")
             }
-            cardButton(systemName: "clock", help: "Nudge timing") {
-                timingPopoverOpen = true
-            }
-            .popover(isPresented: $timingPopoverOpen, arrowEdge: .top) {
-                SegmentTimingPopover(segment: segment)
-                    .environment(model)
-            }
-            .axLeaf("Card.Button.Timing")
-            cardButton(systemName: "scissors", help: "Split segment") {
-                splitSegment()
-            }
-            .axLeaf("Card.Button.Split")
-            cardButton(systemName: "arrow.triangle.merge", help: "Merge with next segment") {
-                model.mergeSegmentWithNext(id: segment.id)
-            }
-            .disabled(isLastSegment)
-            .opacity(isLastSegment ? 0.35 : 1)
-            .axLeaf("Card.Button.Merge")
             cardButton(systemName: "doc.on.doc", help: "Copy segment with timestamp") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(draggablePayload, forType: .string)
             }
             .axLeaf("Card.Button.Copy")
-            cardButton(systemName: "link", help: "Copy parola:// link to this segment") {
-                copyDeeplink()
-            }
-            .axLeaf("Card.Button.CopyLink")
-            Divider().frame(height: 14).padding(.horizontal, 1)
-            cardButton(systemName: "trash", help: "Delete segment") {
-                model.deleteSegment(id: segment.id)
-            }
-            .axLeaf("Card.Button.Delete")
+            moreMenu
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 4)
@@ -306,6 +276,39 @@ struct SegmentCard: View {
                 .fill(DS.Color.surface)
                 .shadow(color: .black.opacity(0.18), radius: 6, x: 0, y: 2)
         )
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button("Nudge timing…") { timingPopoverOpen = true }
+                .axLeaf("Card.Button.Timing")
+            Button("Split segment") { splitSegment() }
+                .axLeaf("Card.Button.Split")
+            Button("Merge with next segment") { model.mergeSegmentWithNext(id: segment.id) }
+                .disabled(isLastSegment)
+                .axLeaf("Card.Button.Merge")
+            Button("Copy link to this segment") { copyDeeplink() }
+                .axLeaf("Card.Button.CopyLink")
+            Divider()
+            Button("Delete segment", role: .destructive) { model.deleteSegment(id: segment.id) }
+                .axLeaf("Card.Button.Delete")
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(DS.Font.subheadlineEmphasized)
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .foregroundStyle(.secondary)
+        .help("More actions")
+        .accessibilityLabel("More actions")
+        .axLeaf("Card.Menu.More")
+        .popover(isPresented: $timingPopoverOpen, arrowEdge: .top) {
+            SegmentTimingPopover(segment: segment)
+                .environment(model)
+        }
     }
 
     private func cardButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
