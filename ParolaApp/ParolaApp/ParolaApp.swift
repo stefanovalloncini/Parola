@@ -192,6 +192,7 @@ struct ParolaApp: App {
                     model.toggleLiveCaptions()
                 }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
+                .disabled(!liveCaptions.isActive && model.liveCaptionsUnavailableReason != nil)
                 Toggle("Translate to English", isOn: translateCaptionsBinding)
                 Divider()
                 Button(liveCaptions.isPresenterOpen ? "Exit Presenter" : "Enter Presenter Mode") {

@@ -38,6 +38,8 @@ struct EmptyDropZone: View {
                         systemImage: "captions.bubble.fill",
                         action: { model.toggleLiveCaptions() }
                     )
+                    .disabled(model.liveCaptionsUnavailableReason != nil)
+                    .help(model.liveCaptionsUnavailableReason ?? "")
                     .axLeaf("Empty.Button.LiveCaptions")
                     ActionCard(
                         title: "Dictation",

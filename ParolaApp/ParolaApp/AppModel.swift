@@ -396,8 +396,25 @@ final class AppModel {
 
     @ObservationIgnored weak var liveCaptions: LiveCaptionsController?
 
+    /// Nil when the selected model can stream live captions; otherwise the user-facing reason.
+    /// Ids outside the catalog are legacy WhisperKit directories, so they stream.
+    var liveCaptionsUnavailableReason: String? {
+        guard let variant = ModelCatalog.variant(id: selectedModel),
+              variant.engineID != .whisperKit else { return nil }
+        return "\(AppModel.modelLabel(selectedModel)) can't stream Live Captions. Pick a Whisper model first."
+    }
+
     func toggleLiveCaptions() {
         guard let liveCaptions else { return }
+        if !liveCaptions.isActive, let reason = liveCaptionsUnavailableReason {
+            switch phase {
+            case .idle, .ready, .failed:
+                phase = .failed(message: reason)
+            default:
+                break
+            }
+            return
+        }
         let device = inputDeviceUID.isEmpty ? nil : inputDeviceUID
         Task { await liveCaptions.toggle(options: makeOptions(task: .transcribe), deviceUID: device) }
     }
