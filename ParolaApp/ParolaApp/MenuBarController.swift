@@ -112,21 +112,21 @@ final class MenuBarController {
         if mode == .dictationOnly {
             menu.addItem(menuItem(title: dictateTitle, action: #selector(toggleDictation), target: self))
             menu.addItem(.separator())
-            menu.addItem(menuItem(title: "Open Parola", action: #selector(openParola), target: self))
-            menu.addItem(menuItem(title: "Quit Parola", action: #selector(quitApp), target: self, key: "q"))
+            menu.addItem(menuItem(title: String(localized: "Open Parola"), action: #selector(openParola), target: self))
+            menu.addItem(menuItem(title: String(localized: "Quit Parola"), action: #selector(quitApp), target: self, key: "q"))
             statusItem.menu = menu
             return
         }
 
-        menu.addItem(menuItem(title: "Open Parola", action: #selector(openParola), target: self))
+        menu.addItem(menuItem(title: String(localized: "Open Parola"), action: #selector(openParola), target: self))
         menu.addItem(.separator())
         if model.features.isEnabled(.micRecording) {
-            menu.addItem(menuItem(title: "Record from Microphone", action: #selector(recordMic), target: self))
+            menu.addItem(menuItem(title: String(localized: "Record from Microphone"), action: #selector(recordMic), target: self))
         }
         if model.features.isEnabled(.meetings) {
-            menu.addItem(menuItem(title: "Record System Audio", action: #selector(recordSystem), target: self))
+            menu.addItem(menuItem(title: String(localized: "Record System Audio"), action: #selector(recordSystem), target: self))
         }
-        menu.addItem(menuItem(title: "Open File…", action: #selector(openFile), target: self))
+        menu.addItem(menuItem(title: String(localized: "Open File…"), action: #selector(openFile), target: self))
         if model.features.isEnabled(.dictation) {
             menu.addItem(menuItem(title: dictateTitle, action: #selector(toggleDictation), target: self))
         }
@@ -134,7 +134,7 @@ final class MenuBarController {
 
         let pinned = model.libraryEntries.filter { $0.pinned }.prefix(5)
         if !pinned.isEmpty {
-            let header = NSMenuItem(title: "Pinned", action: nil, keyEquivalent: "")
+            let header = NSMenuItem(title: String(localized: "Pinned"), action: nil, keyEquivalent: "")
             header.isEnabled = false
             menu.addItem(header)
             for entry in pinned {
@@ -150,11 +150,11 @@ final class MenuBarController {
             .sorted { $0.createdAt > $1.createdAt }
             .prefix(8)
         if recents.isEmpty {
-            let item = NSMenuItem(title: "No transcripts yet", action: nil, keyEquivalent: "")
+            let item = NSMenuItem(title: String(localized: "No transcripts yet"), action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(item)
         } else {
-            let header = NSMenuItem(title: "Recent", action: nil, keyEquivalent: "")
+            let header = NSMenuItem(title: String(localized: "Recent"), action: nil, keyEquivalent: "")
             header.isEnabled = false
             menu.addItem(header)
             for entry in recents {
@@ -165,7 +165,7 @@ final class MenuBarController {
             }
         }
         menu.addItem(.separator())
-        menu.addItem(menuItem(title: "Quit Parola", action: #selector(quitApp), target: self, key: "q"))
+        menu.addItem(menuItem(title: String(localized: "Quit Parola"), action: #selector(quitApp), target: self, key: "q"))
 
         statusItem.menu = menu
     }

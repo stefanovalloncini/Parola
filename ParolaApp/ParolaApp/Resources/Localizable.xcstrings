@@ -4727,6 +4727,17 @@
         }
       }
     },
+    "No transcripts yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna trascrizione"
+          }
+        }
+      }
+    },
     "No voice detected — check your microphone.": {
       "extractionState": "manual",
       "localizations": {
@@ -4976,6 +4987,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apri ultima trascrizione"
+          }
+        }
+      }
+    },
+    "Open Parola": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri Parola"
           }
         }
       }
@@ -5701,6 +5723,17 @@
         }
       }
     },
+    "Quit Parola": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esci da Parola"
+          }
+        }
+      }
+    },
     "Quit and relaunch Parola for the new models folder to take effect.": {
       "extractionState": "manual",
       "localizations": {
@@ -5918,6 +5951,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registra audio di sistema"
+          }
+        }
+      }
+    },
+    "Record from Microphone": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra dal microfono"
           }
         }
       }
