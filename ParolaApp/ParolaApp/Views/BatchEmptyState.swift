@@ -30,9 +30,7 @@ struct BatchEmptyState: View {
                     .padding(.horizontal, DS.Spacing.large)
                     .padding(.vertical, DS.Spacing.small)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(DS.Color.accent)
-            .controlSize(.large)
+            .buttonStyle(DSPillButtonStyle(kind: .primary))
             .padding(.top, DS.Spacing.small)
             .accessibilityIdentifier("batch.openFiles")
         }

@@ -66,9 +66,7 @@ struct BatchView: View {
                     .labelStyle(.titleAndIcon)
             }
             .menuStyle(.button)
-            .buttonStyle(.borderedProminent)
-            .tint(DS.Color.accent)
-            .controlSize(.regular)
+            .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
             .help("Choose which formats to write next to each transcribed file.")
             .accessibilityIdentifier("batch.addFormat")
             .axLeaf("Header.Menu.AddFormat")

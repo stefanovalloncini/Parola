@@ -253,7 +253,7 @@ struct LibraryListView: View {
                 } label: {
                     Label("Open file…", systemImage: "doc.badge.plus")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(DSPillButtonStyle(kind: .primary))
                 .axLeaf("Empty.Button.OpenFile")
                 Button {
                     model.startRecording(source: .microphone)

@@ -148,14 +148,7 @@ struct MacLibrarySidebar: View {
                 }
             }
         } label: {
-            Image(systemName: "arrow.up.arrow.down")
-                .font(DS.Font.subheadlineEmphasized)
-                .foregroundStyle(.secondary)
-                .frame(width: 22, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                        .fill(DS.Color.surfaceElevated)
-                )
+            DSIconChip(systemImage: "arrow.up.arrow.down")
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)

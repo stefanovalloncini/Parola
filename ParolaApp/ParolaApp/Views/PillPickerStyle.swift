@@ -72,7 +72,7 @@ struct PillToggleButton: View {
                     .font(DS.Font.calloutMedium)
                     .lineLimit(1)
             }
-            .foregroundStyle(isOn ? Color.white : Color.primary)
+            .foregroundStyle(isOn ? DS.Color.onAccent : Color.primary)
             .padding(.horizontal, 11)
             .padding(.vertical, 5)
             .frame(height: 28)

@@ -106,7 +106,7 @@ struct ModelCardRow: View {
                     Button(action: primaryAction) {
                         Text("Activate")
                     }
-                    .buttonStyle(ModelPillButtonStyle())
+                    .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
                     .accessibilityIdentifier("model.\(variant.id).activate")
                     .axLeaf("Card.Button.Activate")
                 }
@@ -117,7 +117,7 @@ struct ModelCardRow: View {
                         Text("Download")
                     }
                 }
-                .buttonStyle(ModelPillButtonStyle())
+                .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
                 .disabled(downloadDisabled)
                 .help(downloadDisabled ? "Another model is downloading. Wait or cancel it first." : "")
                 .accessibilityIdentifier("model.\(variant.id).download")
@@ -221,16 +221,3 @@ struct ModelTagChip: View {
     }
 }
 
-struct ModelPillButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
-            .background(
-                Capsule().fill(DS.Color.accent.opacity(configuration.isPressed ? 0.8 : 1))
-            )
-            .contentShape(Capsule())
-    }
-}

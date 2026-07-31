@@ -164,7 +164,7 @@ struct TranscriptHeaderBar: View {
                     .onSubmit { commitJump() }
                     .axLeaf("HeaderBar.TextField.JumpTime")
                 Button("Go", action: commitJump)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
                     .disabled(Timecode.parse(jumpDraft) == nil)
                     .axLeaf("HeaderBar.Button.JumpGo")
             }

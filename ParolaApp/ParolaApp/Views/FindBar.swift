@@ -121,9 +121,7 @@ struct FindBar: View {
                 .axLeaf("FindBar.Button.Replace")
 
             Button("Replace All") { model.replaceAllMatches() }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .tint(DS.Color.accent)
+                .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
                 .keyboardShortcut("e", modifiers: [.command, .option])
                 .disabled(model.matches.isEmpty)
                 .accessibilityIdentifier("find.replaceAll")

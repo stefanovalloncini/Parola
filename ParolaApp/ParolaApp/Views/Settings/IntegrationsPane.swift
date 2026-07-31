@@ -55,7 +55,7 @@ private struct ToolStatusRow: View {
                                 Label("Install with Homebrew", systemImage: "arrow.down.circle")
                             }
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
                         .disabled(installing)
                         .axLeaf("Integrations.Button.Install.\(name)")
                     }

@@ -67,14 +67,7 @@ struct QueueView: View {
                 }
             }
         } label: {
-            Image(systemName: "arrow.up.arrow.down")
-                .font(DS.Font.calloutEmphasized)
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 26)
-                .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(Color.primary.opacity(0.06))
-                )
+            DSIconChip(systemImage: "arrow.up.arrow.down")
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)

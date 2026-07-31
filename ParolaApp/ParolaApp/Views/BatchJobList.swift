@@ -59,9 +59,7 @@ struct BatchJobList: View {
                     } label: {
                         Label("Resume", systemImage: "play.fill")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(DS.Color.accent)
-                    .controlSize(.regular)
+                    .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
                     .help("Continue transcribing the queued files.")
                     .axLeaf("Queue.Button.Resume")
                 }
