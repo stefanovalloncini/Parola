@@ -118,11 +118,7 @@ struct RecentlyDeletedRow: View {
     }
 
     var categoryTint: Color {
-        switch entry.category {
-        case .transcription: return Color(red: 0.20, green: 0.62, blue: 0.62)
-        case .meeting: return Color(red: 0.34, green: 0.62, blue: 0.36)
-        case .dictation: return Color(red: 0.82, green: 0.50, blue: 0.18)
-        }
+        DS.categoryTint(for: entry.category)
     }
 }
 

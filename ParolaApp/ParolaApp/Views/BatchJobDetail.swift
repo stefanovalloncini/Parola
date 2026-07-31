@@ -71,7 +71,7 @@ struct BatchJobDetail: View {
         switch job.status {
         case .pending: return DS.Color.secondaryText
         case .transcribing: return DS.Color.accent
-        case .done: return Color(red: 0.36, green: 0.66, blue: 0.46)
+        case .done: return DS.Palette.success
         case .failed: return DS.Color.danger
         case .cancelled: return DS.Color.secondaryText
         }

@@ -9,10 +9,7 @@ struct BatchJobRow: View {
     private var kind: BatchMediaKind { BatchMediaKind(url: job.url) }
 
     private var iconBackground: Color {
-        switch kind {
-        case .video: return Color(red: 0.30, green: 0.62, blue: 0.42)
-        case .audio: return Color(red: 0.24, green: 0.62, blue: 0.66)
-        }
+        DS.mediaTint(for: kind)
     }
 
     private var iconSymbol: String {

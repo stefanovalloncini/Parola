@@ -132,6 +132,21 @@ enum DS {
         SwiftUI.Color(red: 0.36, green: 0.50, blue: 0.50),  // teal-grey
     ]
 
+    static func categoryTint(for category: EntryCategory) -> SwiftUI.Color {
+        switch category {
+        case .transcription: return SwiftUI.Color(red: 0.20, green: 0.62, blue: 0.62)
+        case .meeting: return SwiftUI.Color(red: 0.34, green: 0.62, blue: 0.36)
+        case .dictation: return SwiftUI.Color(red: 0.82, green: 0.50, blue: 0.18)
+        }
+    }
+
+    static func mediaTint(for kind: BatchMediaKind) -> SwiftUI.Color {
+        switch kind {
+        case .video: return SwiftUI.Color(red: 0.30, green: 0.62, blue: 0.42)
+        case .audio: return SwiftUI.Color(red: 0.24, green: 0.62, blue: 0.66)
+        }
+    }
+
     static func speakerColor(for label: String) -> SwiftUI.Color {
         let key = label.trimmingCharacters(in: .whitespacesAndNewlines)
         var hash: UInt64 = 0xcbf29ce484222325
