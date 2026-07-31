@@ -5024,6 +5024,17 @@
         }
       }
     },
+    "Open or Drop File": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri o trascina un file"
+          }
+        }
+      }
+    },
     "Parola needs Screen Recording permission to capture system audio. Open System Settings → Privacy & Security → Screen Recording and grant Parola access, then start recording again.": {
       "extractionState": "manual",
       "localizations": {
@@ -5956,6 +5967,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registrazione da %@, %@"
+          }
+        }
+      }
+    },
+    "Recording — %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione — %@"
           }
         }
       }
@@ -8286,6 +8308,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Versione %@ (%@)"
+          }
+        }
+      }
+    },
+    "View all (%lld)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vedi tutte (%lld)"
           }
         }
       }

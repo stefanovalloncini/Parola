@@ -83,7 +83,7 @@ final class MenuBarController {
             header.isEnabled = false
             menu.addItem(header)
             for entry in pinned {
-                let item = NSMenuItem(title: entry.title, action: #selector(loadEntryAction(_:)), keyEquivalent: "")
+                let item = NSMenuItem(title: LibraryEntryDisplay.title(for: entry), action: #selector(loadEntryAction(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = entry.id
                 menu.addItem(item)
@@ -103,7 +103,7 @@ final class MenuBarController {
             header.isEnabled = false
             menu.addItem(header)
             for entry in recents {
-                let item = NSMenuItem(title: entry.title, action: #selector(loadEntryAction(_:)), keyEquivalent: "")
+                let item = NSMenuItem(title: LibraryEntryDisplay.title(for: entry), action: #selector(loadEntryAction(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = entry.id
                 menu.addItem(item)

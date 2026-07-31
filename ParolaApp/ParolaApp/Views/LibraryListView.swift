@@ -307,8 +307,14 @@ private func libraryCategoryName(_ category: EntryCategory) -> LocalizedStringKe
 }
 
 struct LibraryRow: View {
+    enum Style {
+        case library
+        case home
+    }
+
     let entry: LibraryEntry
     let sizeBytes: Int64?
+    var style: Style = .library
 
     @Environment(AppModel.self) private var model
     private var compact: Bool { model.sidebarDensity == "compact" }
@@ -318,7 +324,7 @@ struct LibraryRow: View {
     }
 
     private var tooltip: String {
-        var parts: [String] = [entry.title]
+        var parts: [String] = [LibraryEntryDisplay.title(for: entry)]
         parts.append(entry.createdAt.formatted(date: .long, time: .shortened))
         if !entry.labels.isEmpty {
             parts.append("Labels: \(entry.labels.joined(separator: ", "))")
@@ -338,7 +344,7 @@ struct LibraryRow: View {
                             .font(DS.Font.caption2)
                             .foregroundStyle(DS.Color.accent)
                     }
-                    Text(entry.title)
+                    Text(LibraryEntryDisplay.title(for: entry))
                         .font(DS.Font.body)
                         .foregroundStyle(DS.Color.primaryText)
                         .lineLimit(1)
@@ -369,7 +375,7 @@ struct LibraryRow: View {
                             .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
                         Text(lang)
                     }
-                    if !compact, let opened = entry.lastOpenedAt {
+                    if style == .library, !compact, let opened = entry.lastOpenedAt {
                         Text("·")
                             .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
                         Text("Last opened: \(opened.formatted(.relative(presentation: .named)))")

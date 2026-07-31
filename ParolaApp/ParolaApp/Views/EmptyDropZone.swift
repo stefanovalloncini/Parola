@@ -3,7 +3,6 @@ import ParolaCore
 
 struct EmptyDropZone: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openSettings) private var openSettings
     @ScaledMetric(relativeTo: .largeTitle) private var emptyIconSize: CGFloat = 48
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: DS.Spacing.regular), count: 4)
@@ -11,18 +10,15 @@ struct EmptyDropZone: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.large) {
-                if !model.libraryEntries.isEmpty {
-                    LibraryStatsCard(summary: LibrarySummary(entries: model.libraryEntries))
-                }
                 LazyVGrid(columns: columns, alignment: .leading, spacing: DS.Spacing.regular) {
                     ActionCard(
-                        title: "Open File",
+                        title: "Open or Drop File",
                         systemImage: "folder.fill.badge.plus",
                         action: { model.presentOpenPanel() }
                     )
                     .axLeaf("Empty.Button.OpenFile")
                     ActionCard(
-                        title: "Record Mic",
+                        title: "Record Microphone",
                         systemImage: "mic.fill",
                         action: { model.startRecording(source: .microphone) }
                     )
@@ -34,6 +30,15 @@ struct EmptyDropZone: View {
                     )
                     .axLeaf("Empty.Button.RecordSystemAudio")
                     ActionCard(
+                        title: "YouTube URL",
+                        systemImage: "play.rectangle.fill",
+                        action: { model.youtubeSheetOpen = true }
+                    )
+                    .axLeaf("Empty.Button.YouTube")
+                }
+
+                HStack(spacing: DS.Spacing.small) {
+                    ModeButton(
                         title: "Live Captions",
                         systemImage: "captions.bubble.fill",
                         action: { model.toggleLiveCaptions() }
@@ -41,33 +46,12 @@ struct EmptyDropZone: View {
                     .disabled(model.liveCaptionsUnavailableReason != nil)
                     .help(model.liveCaptionsUnavailableReason ?? "")
                     .axLeaf("Empty.Button.LiveCaptions")
-                    ActionCard(
+                    ModeButton(
                         title: "Dictation",
                         systemImage: "text.cursor",
                         action: { model.startDictationFromIntent() }
                     )
                     .axLeaf("Empty.Button.Dictation")
-                    ActionCard(
-                        title: "Manage Models",
-                        systemImage: "cpu.fill",
-                        action: {
-                            model.settingsPane = "localModels"
-                            openSettings()
-                        }
-                    )
-                    .axLeaf("Empty.Button.ManageModels")
-                    ActionCard(
-                        title: "YouTube URL",
-                        systemImage: "play.rectangle.fill",
-                        action: { model.youtubeSheetOpen = true }
-                    )
-                    .axLeaf("Empty.Button.YouTube")
-                    ActionCard(
-                        title: "Recently Deleted",
-                        systemImage: "trash.fill",
-                        action: { model.showingTrash = true }
-                    )
-                    .axLeaf("Empty.Button.RecentlyDeleted")
                 }
 
                 if !model.libraryEntries.isEmpty {
@@ -97,9 +81,21 @@ struct EmptyDropZone: View {
     private var recentSection: some View {
         let recents = RecentEntries.most(of: model.libraryEntries)
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            Text("Recent")
-                .font(DS.Font.heading)
-                .foregroundStyle(DS.Color.primaryText)
+            HStack(spacing: DS.Spacing.small) {
+                Text("Recent")
+                    .font(DS.Font.heading)
+                    .foregroundStyle(DS.Color.primaryText)
+                Spacer(minLength: 0)
+                Button("View all (\(model.libraryEntries.count))") {
+                    model.libraryFilter = nil
+                    model.libraryBrowsingAll = true
+                    model.route = .transcript
+                }
+                .buttonStyle(.plain)
+                .font(DS.Font.subheadlineMedium)
+                .foregroundStyle(DS.Color.accent)
+                .axLeaf("Empty.Button.ViewAll")
+            }
             VStack(spacing: 0) {
                 ForEach(Array(recents.enumerated()), id: \.element.id) { index, entry in
                     RecentEntryRow(entry: entry)
@@ -110,14 +106,14 @@ struct EmptyDropZone: View {
                 }
             }
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
                     .fill(DS.Color.surfaceElevated)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
                     .strokeBorder(DS.Color.separator.opacity(0.5), lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
         }
     }
 }
@@ -131,11 +127,11 @@ private struct RecentEntryRow: View {
         Button {
             model.loadEntry(entry.id)
         } label: {
-            LibraryRow(entry: entry, sizeBytes: model.libraryBundleSizes[entry.id])
+            LibraryRow(entry: entry, sizeBytes: model.libraryBundleSizes[entry.id], style: .home)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, DS.Spacing.regular)
                 .padding(.vertical, DS.Spacing.tight)
-                .background(SwiftUI.Color.primary.opacity(isHovering ? 0.06 : 0))
+                .background(DS.Palette.surfaceHover.opacity(isHovering ? 1 : 0))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -146,50 +142,30 @@ private struct RecentEntryRow: View {
     }
 }
 
-private struct LibraryStatsCard: View {
-    let summary: LibrarySummary
+private struct ModeButton: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+    let action: () -> Void
+
+    @State private var isHovering = false
 
     var body: some View {
-        HStack(spacing: 0) {
-            stat(label: "Total", value: summary.total)
-            divider
-            stat(label: "Transcriptions", value: summary.transcriptions)
-            divider
-            stat(label: "Meetings", value: summary.meetings)
-            divider
-            stat(label: "Dictations", value: summary.dictations)
-            divider
-            stat(label: "Pinned", value: summary.pinned)
+        Button(action: action) {
+            HStack(spacing: DS.Spacing.small) {
+                Image(systemName: systemImage)
+                    .foregroundStyle(DS.Color.accent)
+                Text(title)
+                    .font(DS.Font.subheadlineMedium)
+                    .foregroundStyle(DS.Color.primaryText)
+            }
+            .pillStyle()
+            .opacity(isHovering ? 1 : 0.88)
         }
-        .padding(.horizontal, DS.Spacing.regular)
-        .padding(.vertical, DS.Spacing.regular)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(DS.Color.surfaceElevated)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(DS.Color.separator.opacity(0.5), lineWidth: 1)
-        )
-    }
-
-    private func stat(label: LocalizedStringKey, value: Int) -> some View {
-        VStack(alignment: .center, spacing: 4) {
-            Text("\(value)")
-                .font(DS.Font.titleRounded)
-                .foregroundStyle(DS.Color.primaryText)
-            Text(label)
-                .font(DS.Font.subheadlineMedium)
-                .foregroundStyle(DS.Color.secondaryText)
-                .textCase(.uppercase)
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering }
         }
-        .frame(maxWidth: .infinity)
-    }
-
-    private var divider: some View {
-        Rectangle()
-            .fill(DS.Color.separator.opacity(0.4))
-            .frame(width: 1, height: 32)
+        .help(title)
     }
 }
 
@@ -222,11 +198,11 @@ struct ActionCard: View {
             .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
             .background(cardBackground)
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
                     .strokeBorder(DS.Color.separator.opacity(isHovering ? 0.9 : 0.5), lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)

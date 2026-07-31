@@ -22,7 +22,7 @@ enum LanguageDisplay {
     private static func realCode(_ code: String?) -> String? {
         guard let raw = code else { return nil }
         let normalized = raw.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !normalized.isEmpty, normalized != "unknown" else { return nil }
+        guard !normalized.isEmpty, normalized != "unknown", normalized != "auto" else { return nil }
         return normalized
     }
 }

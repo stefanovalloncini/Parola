@@ -22,6 +22,13 @@ struct LanguageDisplayTests {
         #expect(LanguageDisplay.name(for: "  unknown  ") == nil)
     }
 
+    @Test("treats the auto sentinel as no language")
+    func autoIsNoLanguage() {
+        #expect(LanguageDisplay.name(for: "auto") == nil)
+        #expect(LanguageDisplay.name(for: "AUTO") == nil)
+        #expect(LanguageDisplay.code(for: "auto") == nil)
+    }
+
     @Test("treats empty, whitespace, and nil as no language")
     func blankIsNoLanguage() {
         #expect(LanguageDisplay.name(for: "") == nil)
