@@ -8,7 +8,7 @@ struct CapabilityGuardTests {
         static let engineID = EngineID.whisperKit
         static let capabilities = EngineCapabilities.whisperKitDefaults
         func load(model: String) async throws {}
-        func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+        func transcribe(url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers) async throws -> Transcript {
             Transcript(segments: [], language: "en", modelName: "stub", sourceURL: url)
         }
         func unload() async {}
@@ -19,7 +19,7 @@ struct CapabilityGuardTests {
         static let engineID = EngineID.parakeet
         static let capabilities = EngineCapabilities.parakeetDefaults
         func load(model: String) async throws {}
-        func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+        func transcribe(url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers) async throws -> Transcript {
             Transcript(segments: [], language: "en", modelName: "stub", sourceURL: url)
         }
         func unload() async {}
@@ -30,7 +30,7 @@ struct CapabilityGuardTests {
         static let engineID = EngineID.appleSpeech
         static let capabilities = EngineCapabilities.appleSpeechDefaults
         func load(model: String) async throws {}
-        func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+        func transcribe(url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers) async throws -> Transcript {
             Transcript(segments: [], language: "en", modelName: "stub", sourceURL: url)
         }
         func unload() async {}

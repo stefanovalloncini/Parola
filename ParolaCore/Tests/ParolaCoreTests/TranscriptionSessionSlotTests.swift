@@ -79,7 +79,7 @@ struct TranscriptionSessionSlotTests {
         func unload() async { loaded = nil }
         func loadedModelName() async -> String? { loaded }
 
-        func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+        func transcribe(url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers) async throws -> Transcript {
             transcribeEntered.set(true)
             if let transcribeGate {
                 await transcribeGate.wait()

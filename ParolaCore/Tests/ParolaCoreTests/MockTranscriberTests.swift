@@ -25,7 +25,7 @@ struct MockTranscriberTests {
         let transcript = try await mock.transcribe(
             url: url,
             options: .default,
-            partialHandler: { text in received.mutate { $0.append(text) } }
+            handlers: TranscribeHandlers(onPartial: { text in received.mutate { $0.append(text) } })
         )
 
         #expect(transcript.segments.count == 2)
@@ -53,8 +53,10 @@ struct MockTranscriberTests {
         _ = try await mock.transcribe(
             url: URL(fileURLWithPath: "/tmp/mock-input.wav"),
             options: .default,
-            partialHandler: { text in partials.mutate { $0.append(text) } },
-            progressHandler: { value in progresses.mutate { $0.append(value) } }
+            handlers: TranscribeHandlers(
+                onPartial: { text in partials.mutate { $0.append(text) } },
+                onProgress: { value in progresses.mutate { $0.append(value) } }
+            )
         )
 
         #expect(partials.value == ["hi", "hi there"])
@@ -74,8 +76,10 @@ struct MockTranscriberTests {
         _ = try await mock.transcribe(
             url: URL(fileURLWithPath: "/tmp/mock-input.wav"),
             options: .default,
-            partialHandler: { text in partials.mutate { $0.append(text) } },
-            progressHandler: { value in progresses.mutate { $0.append(value) } }
+            handlers: TranscribeHandlers(
+                onPartial: { text in partials.mutate { $0.append(text) } },
+                onProgress: { value in progresses.mutate { $0.append(value) } }
+            )
         )
 
         #expect(partials.value == ["a", "b"])

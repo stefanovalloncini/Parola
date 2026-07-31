@@ -29,31 +29,10 @@ actor AppleSpeechTranscriber: Transcriber {
         loadedModel = model
     }
 
-    func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
-        try await transcribe(url: url, options: options, partialHandler: nil, progressHandler: nil)
-    }
-
     func transcribe(
         url: URL,
         options: TranscriptionOptions,
-        partialHandler: (@Sendable (String) -> Void)?,
-        progressHandler: (@Sendable (Double) -> Void)?
-    ) async throws -> Transcript {
-        try await transcribe(
-            url: url,
-            options: options,
-            partialHandler: partialHandler,
-            progressHandler: progressHandler,
-            stageHandler: nil
-        )
-    }
-
-    func transcribe(
-        url: URL,
-        options: TranscriptionOptions,
-        partialHandler: (@Sendable (String) -> Void)?,
-        progressHandler: (@Sendable (Double) -> Void)?,
-        stageHandler: (@Sendable (TranscribeStage) -> Void)?
+        handlers: TranscribeHandlers
     ) async throws -> Transcript {
         guard let modelName = loadedModel else {
             throw ParolaError.transcriptionFailed("Apple Speech engine not loaded")
@@ -87,9 +66,7 @@ actor AppleSpeechTranscriber: Transcriber {
             options: options,
             modelName: modelName,
             cancellation: cancellation,
-            partialHandler: partialHandler,
-            progressHandler: progressHandler,
-            stageHandler: stageHandler
+            handlers: handlers
         )
         #else
         throw ParolaError.unsupportedForEngine("Apple Speech framework not available in this build.")
@@ -115,12 +92,10 @@ actor AppleSpeechTranscriber: Transcriber {
         options: TranscriptionOptions,
         modelName: String,
         cancellation: AnalyzerCancellation,
-        partialHandler: (@Sendable (String) -> Void)?,
-        progressHandler: (@Sendable (Double) -> Void)?,
-        stageHandler: (@Sendable (TranscribeStage) -> Void)?
+        handlers: TranscribeHandlers
     ) async throws -> Transcript {
         #if canImport(Speech)
-        stageHandler?(.preparingAudio)
+        handlers.onStage?(.preparingAudio)
         let locale = Self.pickLocale(language: options.language)
 
         let transcriber = SpeechTranscriber(
@@ -155,14 +130,14 @@ actor AppleSpeechTranscriber: Transcriber {
             for try await result in transcriber.results {
                 if !sawFirstResult {
                     sawFirstResult = true
-                    stageHandler?(.transcribing)
+                    handlers.onStage?(.transcribing)
                 }
                 guard result.isFinal else { continue }
                 let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty else { continue }
                 let start = result.range.start.seconds
                 let end = result.range.end.seconds
-                progressHandler?(end)
+                handlers.onProgress?(end)
                 segments.append(TranscriptSegment(
                     id: nextID,
                     start: start,
@@ -172,7 +147,7 @@ actor AppleSpeechTranscriber: Transcriber {
                 ))
                 nextID += 1
                 assembler.addFinal(text)
-                partialHandler?(assembler.tail())
+                handlers.onPartial?(assembler.tail())
             }
             return segments
         }

@@ -68,40 +68,8 @@ actor WhisperKitTranscriber: Transcriber {
 
     func transcribe(
         url: URL,
-        options: TranscriptionOptions
-    ) async throws -> Transcript {
-        try await transcribe(url: url, options: options, partialHandler: nil)
-    }
-
-    func transcribe(
-        url: URL,
         options: TranscriptionOptions,
-        partialHandler: (@Sendable (String) -> Void)?
-    ) async throws -> Transcript {
-        try await transcribe(url: url, options: options, partialHandler: partialHandler, progressHandler: nil)
-    }
-
-    func transcribe(
-        url: URL,
-        options: TranscriptionOptions,
-        partialHandler: (@Sendable (String) -> Void)?,
-        progressHandler: (@Sendable (Double) -> Void)?
-    ) async throws -> Transcript {
-        try await transcribe(
-            url: url,
-            options: options,
-            partialHandler: partialHandler,
-            progressHandler: progressHandler,
-            stageHandler: nil
-        )
-    }
-
-    func transcribe(
-        url: URL,
-        options: TranscriptionOptions,
-        partialHandler: (@Sendable (String) -> Void)?,
-        progressHandler: (@Sendable (Double) -> Void)?,
-        stageHandler: (@Sendable (TranscribeStage) -> Void)?
+        handlers: TranscribeHandlers
     ) async throws -> Transcript {
         guard let kit = whisperKit, let modelName = loadedModel else {
             throw ParolaError.transcriptionFailed("model not loaded")
@@ -127,31 +95,31 @@ actor WhisperKitTranscriber: Transcriber {
             var sawFirstSegments = false
         }
         let discovery = OSAllocatedUnfairLock(initialState: DiscoveryState())
-        if partialHandler != nil || progressHandler != nil || stageHandler != nil {
+        if !handlers.observesNothing {
             kit.segmentDiscoveryCallback = { @Sendable segments in
                 let (isFirst, text) = discovery.withLock { state -> (Bool, String?) in
                     let isFirst = !state.sawFirstSegments
                     state.sawFirstSegments = true
-                    guard partialHandler != nil else { return (isFirst, nil) }
+                    guard handlers.onPartial != nil else { return (isFirst, nil) }
                     for segment in segments {
                         state.builder.add(seek: segment.seek, text: segment.text)
                     }
                     return (isFirst, state.builder.tail())
                 }
                 if isFirst {
-                    stageHandler?(.transcribing)
+                    handlers.onStage?(.transcribing)
                 }
-                if let partialHandler, let text {
-                    partialHandler(text)
+                if let onPartial = handlers.onPartial, let text {
+                    onPartial(text)
                 }
-                if let progressHandler, let latest = segments.map({ Double($0.end) }).max() {
-                    progressHandler(latest)
+                if let onProgress = handlers.onProgress, let latest = segments.map({ Double($0.end) }).max() {
+                    onProgress(latest)
                 }
             }
         }
         defer { kit.segmentDiscoveryCallback = nil }
 
-        stageHandler?(.preparingAudio)
+        handlers.onStage?(.preparingAudio)
         let results = await kit.transcribe(
             audioPaths: [url.path],
             decodeOptions: decoding,

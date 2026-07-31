@@ -265,7 +265,7 @@ actor StubTranscriber: Transcriber {
     func unload() async { loaded = nil }
     func loadedModelName() async -> String? { loaded }
 
-    func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+    func transcribe(url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers) async throws -> Transcript {
         switch behavior {
         case .succeed:
             return Transcript(

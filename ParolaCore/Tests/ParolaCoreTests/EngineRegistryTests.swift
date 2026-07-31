@@ -15,7 +15,7 @@ struct EngineRegistryTests {
         )
         private var loaded: String?
         func load(model: String) async throws { loaded = model }
-        func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+        func transcribe(url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers) async throws -> Transcript {
             Transcript(segments: [], language: "en", modelName: loaded ?? "?", sourceURL: url, durationSeconds: 0)
         }
         func unload() async { loaded = nil }
@@ -32,7 +32,7 @@ struct EngineRegistryTests {
             supportsDiarization: true
         )
         func load(model: String) async throws {}
-        func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+        func transcribe(url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers) async throws -> Transcript {
             Transcript(segments: [], language: "en", modelName: "?", sourceURL: url, durationSeconds: 0)
         }
         func unload() async {}

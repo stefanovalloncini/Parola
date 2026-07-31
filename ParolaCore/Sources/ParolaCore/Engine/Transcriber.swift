@@ -7,36 +7,35 @@ public enum TranscribeStage: Sendable {
     case transcribing
 }
 
+/// Observation hooks for a transcribe run. Engines call whichever hooks they can honor;
+/// a default-initialized value observes nothing. `onProgress` reports the latest
+/// transcribed second of the source audio.
+public struct TranscribeHandlers: Sendable {
+    public var onPartial: (@Sendable (String) -> Void)?
+    public var onProgress: (@Sendable (Double) -> Void)?
+    public var onStage: (@Sendable (TranscribeStage) -> Void)?
+
+    public init(
+        onPartial: (@Sendable (String) -> Void)? = nil,
+        onProgress: (@Sendable (Double) -> Void)? = nil,
+        onStage: (@Sendable (TranscribeStage) -> Void)? = nil
+    ) {
+        self.onPartial = onPartial
+        self.onProgress = onProgress
+        self.onStage = onStage
+    }
+
+    public var observesNothing: Bool {
+        onPartial == nil && onProgress == nil && onStage == nil
+    }
+}
+
 public protocol Transcriber: Sendable {
     static var engineID: EngineID { get }
     static var capabilities: EngineCapabilities { get }
 
     func load(model: String) async throws
-    func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript
-
-    /// Streaming variant. Default forwards to the non-streaming overload.
-    func transcribe(
-        url: URL,
-        options: TranscriptionOptions,
-        partialHandler: (@Sendable (String) -> Void)?
-    ) async throws -> Transcript
-
-    /// Streaming variant that also reports the latest transcribed second. Default forwards to the partialHandler overload.
-    func transcribe(
-        url: URL,
-        options: TranscriptionOptions,
-        partialHandler: (@Sendable (String) -> Void)?,
-        progressHandler: (@Sendable (Double) -> Void)?
-    ) async throws -> Transcript
-
-    /// Streaming variant that also reports pipeline stages. Default forwards to the progressHandler overload.
-    func transcribe(
-        url: URL,
-        options: TranscriptionOptions,
-        partialHandler: (@Sendable (String) -> Void)?,
-        progressHandler: (@Sendable (Double) -> Void)?,
-        stageHandler: (@Sendable (TranscribeStage) -> Void)?
-    ) async throws -> Transcript
+    func transcribe(url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers) async throws -> Transcript
 
     func unload() async
     func loadedModelName() async -> String?
@@ -50,35 +49,7 @@ public protocol Transcriber: Sendable {
 public extension Transcriber {
     func cancelInFlight() async {}
 
-    func transcribe(
-        url: URL,
-        options: TranscriptionOptions,
-        partialHandler: (@Sendable (String) -> Void)?
-    ) async throws -> Transcript {
-        try await transcribe(url: url, options: options)
-    }
-
-    func transcribe(
-        url: URL,
-        options: TranscriptionOptions,
-        partialHandler: (@Sendable (String) -> Void)?,
-        progressHandler: (@Sendable (Double) -> Void)?
-    ) async throws -> Transcript {
-        try await transcribe(url: url, options: options, partialHandler: partialHandler)
-    }
-
-    func transcribe(
-        url: URL,
-        options: TranscriptionOptions,
-        partialHandler: (@Sendable (String) -> Void)?,
-        progressHandler: (@Sendable (Double) -> Void)?,
-        stageHandler: (@Sendable (TranscribeStage) -> Void)?
-    ) async throws -> Transcript {
-        try await transcribe(
-            url: url,
-            options: options,
-            partialHandler: partialHandler,
-            progressHandler: progressHandler
-        )
+    func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+        try await transcribe(url: url, options: options, handlers: TranscribeHandlers())
     }
 }

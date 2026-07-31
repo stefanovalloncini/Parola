@@ -86,9 +86,11 @@ public actor TranscriptionSession {
             try await activeTranscriber.transcribe(
                 url: audioURL,
                 options: options,
-                partialHandler: partialHandler,
-                progressHandler: progressHandler,
-                stageHandler: stageHandler
+                handlers: TranscribeHandlers(
+                    onPartial: partialHandler,
+                    onProgress: progressHandler,
+                    onStage: stageHandler
+                )
             )
         } onCancel: {
             Task { await self.cancelInFlight() }

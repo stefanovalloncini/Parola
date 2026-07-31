@@ -174,39 +174,10 @@ public actor MockTranscriber: Transcriber {
         loadedModel
     }
 
-    public func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
-        try await transcribe(url: url, options: options, partialHandler: nil, progressHandler: nil)
-    }
-
     public func transcribe(
         url: URL,
         options: TranscriptionOptions,
-        partialHandler: (@Sendable (String) -> Void)?
-    ) async throws -> Transcript {
-        try await transcribe(url: url, options: options, partialHandler: partialHandler, progressHandler: nil)
-    }
-
-    public func transcribe(
-        url: URL,
-        options: TranscriptionOptions,
-        partialHandler: (@Sendable (String) -> Void)?,
-        progressHandler: (@Sendable (Double) -> Void)?
-    ) async throws -> Transcript {
-        try await transcribe(
-            url: url,
-            options: options,
-            partialHandler: partialHandler,
-            progressHandler: progressHandler,
-            stageHandler: nil
-        )
-    }
-
-    public func transcribe(
-        url: URL,
-        options: TranscriptionOptions,
-        partialHandler: (@Sendable (String) -> Void)?,
-        progressHandler: (@Sendable (Double) -> Void)?,
-        stageHandler: (@Sendable (TranscribeStage) -> Void)?
+        handlers: TranscribeHandlers
     ) async throws -> Transcript {
         if let failure = response.failure {
             if response.delayMs > 0 {
@@ -215,7 +186,7 @@ public actor MockTranscriber: Transcriber {
             throw failure.asError()
         }
 
-        stageHandler?(.preparingAudio)
+        handlers.onStage?(.preparingAudio)
         let stepCount = max(response.partials.count, response.progressSeconds.count)
         let perStepMs = stepCount > 0 ? max(0, response.delayMs / stepCount) : response.delayMs
 
@@ -224,13 +195,13 @@ public actor MockTranscriber: Transcriber {
             try Task.checkCancellation()
             if !startedTranscribing {
                 startedTranscribing = true
-                stageHandler?(.transcribing)
+                handlers.onStage?(.transcribing)
             }
             if step < response.partials.count {
-                partialHandler?(response.partials[step])
+                handlers.onPartial?(response.partials[step])
             }
             if step < response.progressSeconds.count {
-                progressHandler?(response.progressSeconds[step])
+                handlers.onProgress?(response.progressSeconds[step])
             }
             if perStepMs > 0 {
                 try? await sleeper(perStepMs)
@@ -241,7 +212,7 @@ public actor MockTranscriber: Transcriber {
             try? await sleeper(response.delayMs)
         }
         if !startedTranscribing {
-            stageHandler?(.transcribing)
+            handlers.onStage?(.transcribing)
         }
 
         try Task.checkCancellation()

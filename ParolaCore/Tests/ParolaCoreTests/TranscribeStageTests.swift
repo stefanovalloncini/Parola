@@ -24,9 +24,10 @@ struct TranscribeStageTests {
         _ = try await mock.transcribe(
             url: URL(fileURLWithPath: "/tmp/stage-input.wav"),
             options: .default,
-            partialHandler: { text in events.append(.partial(text)) },
-            progressHandler: nil,
-            stageHandler: { stage in events.append(.stage(stage)) }
+            handlers: TranscribeHandlers(
+                onPartial: { text in events.append(.partial(text)) },
+                onStage: { stage in events.append(.stage(stage)) }
+            )
         )
 
         #expect(events.value == [
@@ -49,9 +50,7 @@ struct TranscribeStageTests {
         _ = try await mock.transcribe(
             url: URL(fileURLWithPath: "/tmp/stage-input.wav"),
             options: .default,
-            partialHandler: nil,
-            progressHandler: nil,
-            stageHandler: { stage in events.append(.stage(stage)) }
+            handlers: TranscribeHandlers(onStage: { stage in events.append(.stage(stage)) })
         )
 
         #expect(events.value == [.stage(.preparingAudio), .stage(.transcribing)])
@@ -68,9 +67,7 @@ struct TranscribeStageTests {
         let transcript = try await mock.transcribe(
             url: URL(fileURLWithPath: "/tmp/stage-input.wav"),
             options: .default,
-            partialHandler: nil,
-            progressHandler: nil,
-            stageHandler: nil
+            handlers: TranscribeHandlers()
         )
 
         #expect(transcript.segments.map(\.text) == ["quiet"])

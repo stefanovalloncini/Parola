@@ -22,7 +22,7 @@ struct MemoryFootprintTests {
         }
         deinit { counter.decrement() }
         func load(model: String) async throws {}
-        func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+        func transcribe(url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers) async throws -> Transcript {
             Transcript(segments: [], language: "en", modelName: "tracked", sourceURL: url)
         }
         func unload() async {}

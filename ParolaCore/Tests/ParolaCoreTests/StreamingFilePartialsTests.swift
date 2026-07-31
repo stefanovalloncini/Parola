@@ -16,10 +16,12 @@ struct StreamingFilePartialsTests {
         )
 
         let emit: [String]
+        let seconds: [Double]
         let finalText: String
 
-        init(emit: [String], finalText: String) {
+        init(emit: [String] = [], seconds: [Double] = [], finalText: String) {
             self.emit = emit
+            self.seconds = seconds
             self.finalText = finalText
         }
 
@@ -27,29 +29,28 @@ struct StreamingFilePartialsTests {
         func unload() async {}
         func loadedModelName() async -> String? { "partials-stub" }
 
-        func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
-            try await transcribe(url: url, options: options, partialHandler: nil)
-        }
-
         func transcribe(
             url: URL,
             options: TranscriptionOptions,
-            partialHandler: (@Sendable (String) -> Void)?
+            handlers: TranscribeHandlers
         ) async throws -> Transcript {
             for chunk in emit {
-                partialHandler?(chunk)
+                handlers.onPartial?(chunk)
+            }
+            for second in seconds {
+                handlers.onProgress?(second)
             }
             return Transcript(
-                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: finalText)],
+                segments: [TranscriptSegment(id: 0, start: 0, end: seconds.last ?? 1, text: finalText)],
                 language: "en",
                 modelName: "partials-stub",
                 sourceURL: url,
-                durationSeconds: 1
+                durationSeconds: seconds.last ?? 1
             )
         }
     }
 
-    @Test("partial handler receives every emitted chunk in order")
+    @Test("onPartial receives every emitted chunk in order")
     func partialHandlerReceivesChunks() async throws {
         let stub = PartialEmittingTranscriber(
             emit: ["hello", "hello world", "hello world!"],
@@ -61,15 +62,15 @@ struct StreamingFilePartialsTests {
         let transcript = try await stub.transcribe(
             url: url,
             options: TranscriptionOptions(model: "partials-stub"),
-            partialHandler: { text in collected.append(text) }
+            handlers: TranscribeHandlers(onPartial: { text in collected.append(text) })
         )
 
         #expect(collected.values == ["hello", "hello world", "hello world!"])
         #expect(transcript.segments.first?.text == "hello world!")
     }
 
-    @Test("transcribe without a partial handler still completes")
-    func noPartialHandler() async throws {
+    @Test("the no-handlers convenience still completes")
+    func noHandlers() async throws {
         let stub = PartialEmittingTranscriber(emit: ["a", "ab"], finalText: "ab")
         let url = URL(fileURLWithPath: "/tmp/parola-partial-test-nohandler.wav")
         let transcript = try await stub.transcribe(
@@ -79,77 +80,39 @@ struct StreamingFilePartialsTests {
         #expect(transcript.segments.first?.text == "ab")
     }
 
-    actor ProgressEmittingTranscriber: Transcriber {
-        static let engineID = EngineID("progress-stub")
-        static let capabilities = EngineCapabilities(
-            supportedLanguages: .all,
-            supportsTranslate: false,
-            supportsInitialPrompt: false,
-            supportsWordTimestamps: false,
-            supportsDiarization: false
-        )
-
-        let seconds: [Double]
-
-        init(seconds: [Double]) { self.seconds = seconds }
-
-        func load(model: String) async throws {}
-        func unload() async {}
-        func loadedModelName() async -> String? { "progress-stub" }
-
-        func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
-            try await transcribe(url: url, options: options, partialHandler: nil, progressHandler: nil)
-        }
-
-        func transcribe(
-            url: URL,
-            options: TranscriptionOptions,
-            partialHandler: (@Sendable (String) -> Void)?,
-            progressHandler: (@Sendable (Double) -> Void)?
-        ) async throws -> Transcript {
-            for second in seconds {
-                progressHandler?(second)
-            }
-            return Transcript(
-                segments: [TranscriptSegment(id: 0, start: 0, end: seconds.last ?? 1, text: "done")],
-                language: "en",
-                modelName: "progress-stub",
-                sourceURL: url,
-                durationSeconds: seconds.last
-            )
-        }
-    }
-
-    @Test("progress handler receives every reported second in order")
+    @Test("onProgress receives every reported second in order")
     func progressHandlerReceivesSeconds() async throws {
-        let stub = ProgressEmittingTranscriber(seconds: [1.0, 2.5, 5.0])
+        let stub = PartialEmittingTranscriber(seconds: [1.0, 2.5, 5.0], finalText: "done")
         let collected = CollectedDoubles()
         let url = URL(fileURLWithPath: "/tmp/parola-progress-test.wav")
 
         _ = try await stub.transcribe(
             url: url,
-            options: TranscriptionOptions(model: "progress-stub"),
-            partialHandler: nil,
-            progressHandler: { collected.append($0) }
+            options: TranscriptionOptions(model: "partials-stub"),
+            handlers: TranscribeHandlers(onProgress: { collected.append($0) })
         )
 
         #expect(collected.values == [1.0, 2.5, 5.0])
     }
 
-    @Test("a partial-only transcriber still streams partials through the default progress overload")
-    func partialOnlyStubForwardsThroughProgressOverload() async throws {
-        let stub = PartialEmittingTranscriber(emit: ["a", "ab"], finalText: "ab")
+    @Test("partials and progress deliver together from one run")
+    func partialsAndProgressTogether() async throws {
+        let stub = PartialEmittingTranscriber(emit: ["a", "ab"], seconds: [0.5], finalText: "ab")
         let partials = Collected()
+        let seconds = CollectedDoubles()
         let url = URL(fileURLWithPath: "/tmp/parola-progress-default.wav")
 
         let transcript = try await stub.transcribe(
             url: url,
             options: TranscriptionOptions(model: "partials-stub"),
-            partialHandler: { partials.append($0) },
-            progressHandler: { _ in }
+            handlers: TranscribeHandlers(
+                onPartial: { partials.append($0) },
+                onProgress: { seconds.append($0) }
+            )
         )
 
         #expect(partials.values == ["a", "ab"])
+        #expect(seconds.values == [0.5])
         #expect(transcript.segments.first?.text == "ab")
     }
 

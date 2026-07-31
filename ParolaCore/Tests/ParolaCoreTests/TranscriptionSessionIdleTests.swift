@@ -96,7 +96,7 @@ struct TranscriptionSessionIdleTests {
         func unload() async { loaded = nil }
         func loadedModelName() async -> String? { loaded }
 
-        func transcribe(url: URL, options: TranscriptionOptions) async throws -> Transcript {
+        func transcribe(url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers) async throws -> Transcript {
             Transcript(
                 segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "ok")],
                 language: "en",
