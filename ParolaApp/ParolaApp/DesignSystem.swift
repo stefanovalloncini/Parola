@@ -13,7 +13,7 @@ enum DS {
 
     enum Radius {
         static let small: CGFloat = 6
-        static let regular: CGFloat = 10
+        static let regular: CGFloat = 12
         static let large: CGFloat = 14
     }
 
@@ -49,6 +49,8 @@ enum DS {
         static let bodyEmphasized = SwiftUI.Font.system(.body, design: .default, weight: .semibold)
         static let bodyMedium = SwiftUI.Font.system(.body, design: .default, weight: .medium)
         static let transcript = SwiftUI.Font.system(.body, design: .default).weight(.regular)
+
+        static let bodyMono = SwiftUI.Font.system(.body, design: .monospaced)
 
         static let callout = SwiftUI.Font.system(.callout, design: .default)
         static let calloutEmphasized = SwiftUI.Font.system(.callout, design: .default, weight: .semibold)
@@ -103,6 +105,7 @@ enum DS {
         static var surface: SwiftUI.Color { DS.theme.surface.color }
         static var surfaceElevated: SwiftUI.Color { DS.theme.surfaceElevated.color }
         static var surfaceHover: SwiftUI.Color { SwiftUI.Color.primary.opacity(0.06) }
+        static var subtleFill: SwiftUI.Color { SwiftUI.Color.primary.opacity(0.06) }
         static var divider: SwiftUI.Color { DS.theme.divider.color }
         static var pillFill: SwiftUI.Color { SwiftUI.Color.primary.opacity(0.08) }
         static var pillFillHover: SwiftUI.Color { SwiftUI.Color.primary.opacity(0.14) }

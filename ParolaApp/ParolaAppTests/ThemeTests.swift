@@ -154,6 +154,19 @@ struct ThemePaletteTests {
         #expect(selection.isCustom)
     }
 
+    @Test("legible-foreground luminance stays on the right side of the threshold per preset")
+    func onAccentLuminanceThreshold() throws {
+        guard case .dynamic(let amberLight, _) = ThemePreset.yellow.accent,
+              case .dynamic(_, let terracottaDark) = ThemePreset.terracotta.accent,
+              case .dynamic(_, let graphiteDark) = ThemePreset.graphite.accent else {
+            Issue.record("preset accents are expected to be dynamic colors")
+            return
+        }
+        #expect(amberLight.relativeLuminance > 0.55)
+        #expect(terracottaDark.relativeLuminance < 0.55)
+        #expect(graphiteDark.relativeLuminance < 0.55)
+    }
+
     @Test("a palette round-trips through Codable")
     func paletteCodableRoundTrip() throws {
         let palette = ThemePreset.terracotta.palette

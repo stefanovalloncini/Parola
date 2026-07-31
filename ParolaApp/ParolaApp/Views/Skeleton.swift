@@ -4,12 +4,12 @@ struct SkeletonLines: View {
     var count: Int = 4
 
     private static let lines = [
-        "Lorem ipsum dolor sit amet consectetur adipiscing",
-        "elit sed do eiusmod tempor incididunt ut",
-        "labore et dolore magna aliqua ut enim",
-        "ad minim veniam quis nostrud exercitation",
-        "ullamco laboris nisi ut aliquip ex ea commodo",
-        "consequat duis aute irure dolor in reprehenderit",
+        "The meeting opened with a quick agenda review",
+        "before the group walked through the numbers",
+        "and the questions that came up were answered",
+        "one by one until the discussion wound down",
+        "closing with a short summary of the decisions",
+        "and the follow-ups assigned for early next week",
     ]
 
     var body: some View {
