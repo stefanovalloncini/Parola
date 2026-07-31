@@ -107,10 +107,9 @@ struct TranscriptionSessionSlotTests {
             .appendingPathComponent("parola-slot-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let store = ModelStore(modelsDirectory: dir)
-        try FileManager.default.createDirectory(
-            at: store.installedURL(for: "openai_whisper-tiny"),
-            withIntermediateDirectories: true
-        )
+        let installedDir = store.installedURL(for: "openai_whisper-tiny")
+        try FileManager.default.createDirectory(at: installedDir, withIntermediateDirectories: true)
+        try Data("weights".utf8).write(to: installedDir.appendingPathComponent("model.mlmodelc"))
         let session = TranscriptionSession(modelStore: store, registry: registry, clock: clock)
         let audioURL = dir.appendingPathComponent("input.wav")
         try Data("RIFFstub".utf8).write(to: audioURL)

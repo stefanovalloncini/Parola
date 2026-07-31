@@ -30,10 +30,9 @@ struct ModelStorePolicyTests {
     @Test("an installed model is returned even when downloads are disabled")
     func installedModelSurvivesPolicy() async throws {
         let store = makeStore(["disableModelDownloads": true])
-        try FileManager.default.createDirectory(
-            at: store.installedURL(for: "openai_whisper-tiny"),
-            withIntermediateDirectories: true
-        )
+        let installed = store.installedURL(for: "openai_whisper-tiny")
+        try FileManager.default.createDirectory(at: installed, withIntermediateDirectories: true)
+        try Data("weights".utf8).write(to: installed.appendingPathComponent("model.bin"))
         let url = try await store.download(variant: "openai_whisper-tiny")
         #expect(url == store.installedURL(for: "openai_whisper-tiny"))
     }
@@ -99,7 +98,10 @@ struct ModelStorePolicyTests {
                 await gauge.enter()
                 try await Task.sleep(for: .milliseconds(50))
                 await gauge.exit()
-                return store.installedURL(for: variant)
+                let url = store.installedURL(for: variant)
+                try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+                try Data("weights".utf8).write(to: url.appendingPathComponent("model.bin"))
+                return url
             }
         )
 

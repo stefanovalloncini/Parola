@@ -36,6 +36,12 @@ public final class ModelStore: Sendable {
         }
     }
 
+    /// Directories the app fills for a background service rather than for a catalog model. They live
+    /// under the same scan roots but are in use, so the orphan list must not offer them for deletion.
+    private var serviceOwnedDirectories: [URL] {
+        [IncrementalSpeakerLabeler.modelsDirectory(store: self)]
+    }
+
     public init(
         modelsDirectory: URL? = nil,
         defaults: UserDefaults = .standard,
@@ -109,13 +115,9 @@ public final class ModelStore: Sendable {
     }
 
     public func installedURL(for source: ModelDownloadSource) -> URL {
-        var url = modelsDirectory
+        modelsDirectory
             .appendingPathComponent("models", isDirectory: true)
-            .appendingPathComponent(source.huggingFaceRepo, isDirectory: true)
-        if !source.subpath.isEmpty {
-            url = url.appendingPathComponent(source.subpath, isDirectory: true)
-        }
-        return url
+            .appendingPathComponent(source.installDirectory, isDirectory: true)
     }
 
     /// Returns the curated catalog merged with what's actually on disk.
@@ -131,15 +133,40 @@ public final class ModelStore: Sendable {
         }
     }
 
-    /// A model directory counts as installed only when no download sidecar remains.
-    /// HuggingFaceDownloader leaves that sidecar behind while a fetch is incomplete and removes it on success.
+    /// A model directory counts as installed only when no download sidecar remains and the
+    /// directory actually holds weights. HuggingFaceDownloader leaves that sidecar behind while a
+    /// fetch is incomplete and removes it on success; the weights check catches the directories an
+    /// engine downloader creates but fills somewhere else.
     private func isFullyDownloaded(at url: URL) -> Bool {
         guard FileManager.default.fileExists(atPath: url.path) else { return false }
         let sidecar = url.appendingPathComponent(HuggingFaceDownloader.sidecarFilename)
-        return !FileManager.default.fileExists(atPath: sidecar.path)
+        guard !FileManager.default.fileExists(atPath: sidecar.path) else { return false }
+        return containsModelWeights(at: url) && compiledBundlesAreComplete(at: url)
     }
 
-    /// True when an orphan directory holds something other than tokenizer/config metadata —
+    /// A compiled CoreML bundle is usable only once its metadata and weights have both landed. An
+    /// interrupted fetch leaves the `.mlmodelc` behind with an empty `weights` directory, which
+    /// otherwise reads as a finished install and fails at load time with a CoreML parse error.
+    private func compiledBundlesAreComplete(at url: URL) -> Bool {
+        let fm = FileManager.default
+        let entries = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
+        for bundle in entries where bundle.pathExtension == "mlmodelc" {
+            // A compiled bundle is a directory; anything else with that extension isn't one.
+            guard (try? bundle.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
+            guard fm.fileExists(atPath: bundle.appendingPathComponent("coremldata.bin").path) else {
+                return false
+            }
+            let weights = bundle.appendingPathComponent("weights", isDirectory: true)
+            var isDirectory: ObjCBool = false
+            guard fm.fileExists(atPath: weights.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+                continue
+            }
+            if ((try? fm.contentsOfDirectory(atPath: weights.path)) ?? []).isEmpty { return false }
+        }
+        return true
+    }
+
+    /// True when a directory holds something other than tokenizer/config metadata —
     /// i.e. it actually carries model weights. Hidden entries (`.cache`) are ignored.
     private func containsModelWeights(at url: URL) -> Bool {
         guard let entries = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil) else {
@@ -166,13 +193,10 @@ public final class ModelStore: Sendable {
             }
         }
 
-        let catalogPaths: Set<String> = Set(ModelCatalog.all.map {
-            installedURL(for: $0.downloadSource).standardizedFileURL.path
-        })
-        // FluidAudio's cache drops the "-coreml" suffix our catalog repo carries, leaving a de-suffixed twin dir for the same model; match it by name so the twin isn't listed as a stray orphan.
-        let catalogDirNames: Set<String> = Set(ModelCatalog.all.map {
-            installedURL(for: $0.downloadSource).lastPathComponent
-        })
+        let reservedPaths: Set<String> = Set(
+            (ModelCatalog.all.map { installedURL(for: $0.downloadSource) } + serviceOwnedDirectories)
+                .map(\.standardizedFileURL.path)
+        )
 
         for root in orphanScanRoots {
             guard fm.fileExists(atPath: root.path) else { continue }
@@ -181,9 +205,7 @@ public final class ModelStore: Sendable {
                 guard !url.lastPathComponent.hasPrefix("."),
                       (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
                 else { continue }
-                let standardPath = url.standardizedFileURL.path
-                if catalogPaths.contains(standardPath) { continue }
-                if catalogDirNames.contains(url.lastPathComponent + "-coreml") { continue }
+                if reservedPaths.contains(url.standardizedFileURL.path) { continue }
                 let id = url.lastPathComponent
                 if seen[id] != nil { continue }
                 guard containsModelWeights(at: url) else { continue }
@@ -209,8 +231,13 @@ public final class ModelStore: Sendable {
             try delete(variant: name)
             return
         }
+        guard !name.contains("/"), name != ".", name != ".." else {
+            throw ParolaError.modelNotFound(name)
+        }
+        let reservedPaths = Set(serviceOwnedDirectories.map(\.standardizedFileURL.path))
         for root in orphanScanRoots {
             let candidate = root.appendingPathComponent(name, isDirectory: true)
+            guard !reservedPaths.contains(candidate.standardizedFileURL.path) else { continue }
             if FileManager.default.fileExists(atPath: candidate.path) {
                 do {
                     try FileManager.default.removeItem(at: candidate)
@@ -290,10 +317,20 @@ public final class ModelStore: Sendable {
             subpath: variant
         )
         let engineID = ModelCatalog.variant(id: variant)?.engineID ?? .whisperKit
-        if let downloader = await registry.downloader(for: engineID) {
+        var downloader = await registry.downloader(for: engineID)
+        if downloader == nil {
+            await ParolaCoreBootstrap.registerBuiltInEngines(registry: registry)
+            downloader = await registry.downloader(for: engineID)
+        }
+        if let downloader {
             return try await downloadViaRegistry(
                 downloader, variant: variant, source: source, progress: progress
             )
+        }
+        // The generic snapshot only reproduces WhisperKit's repo-per-subpath layout. Taking it for
+        // another engine downloads a directory that engine will never read, so refuse instead.
+        guard engineID == .whisperKit else {
+            throw ParolaError.engineNotRegistered(engineID.rawValue)
         }
         return try await downloadViaHuggingFace(source: source, progress: progress)
     }
@@ -317,6 +354,8 @@ public final class ModelStore: Sendable {
         // WhisperKit's HubApi returns success when cancelled between files; keep the sidecar then.
         try Task.checkCancellation()
         try? FileManager.default.removeItem(at: sidecar)
+        // Engine downloaders report their own coarse fractions and rarely end at 1.0.
+        progress?(1.0)
         return result
     }
 
@@ -325,11 +364,13 @@ public final class ModelStore: Sendable {
         progress: (@Sendable (Double) -> Void)?
     ) async throws -> URL {
         let destination = installedURL(for: source)
-        let alreadyExisted = FileManager.default.fileExists(atPath: destination.path)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-        if !alreadyExisted {
+        // A directory left over from an earlier attempt gets a sidecar too: without one, an
+        // interrupted retry would leave a half-filled directory reporting as installed.
+        let sidecar = destination.appendingPathComponent(HuggingFaceDownloader.sidecarFilename)
+        if !FileManager.default.fileExists(atPath: sidecar.path) {
             let placeholder = DownloadSidecar(repo: source.huggingFaceRepo, revision: "main", files: [:])
-            try? placeholder.write(to: destination.appendingPathComponent(HuggingFaceDownloader.sidecarFilename))
+            try? placeholder.write(to: sidecar)
         }
         do {
             try await HuggingFaceDownloader.snapshot(

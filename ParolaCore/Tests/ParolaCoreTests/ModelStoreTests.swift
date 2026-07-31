@@ -1,4 +1,5 @@
 import Foundation
+import FluidAudio
 import Testing
 @testable import ParolaCore
 
@@ -66,20 +67,117 @@ struct ModelStoreTests {
         #expect(installed.contains { $0.name == "custom-model-v9" })
     }
 
-    @Test("the de-suffixed FluidAudio twin of the catalog Parakeet is not reported as an orphan")
-    func suppressesFluidInferenceTwin() throws {
+    @Test("Parakeet's install path is the directory FluidAudio writes, so install and delete agree")
+    func parakeetInstallPathMatchesFluidAudio() throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmp) }
 
         let store = ModelStore(modelsDirectory: tmp)
-        let twin = tmp.appendingPathComponent("models/FluidInference/parakeet-tdt-0.6b-v2", isDirectory: true)
-        try FileManager.default.createDirectory(at: twin, withIntermediateDirectories: true)
-        try Data("x".utf8).write(to: twin.appendingPathComponent("model.bin"))
+        let installed = store.installedURL(for: "nvidia_parakeet-tdt-0.6b-v2")
+        // AsrModels.download(to:) writes to parent-of-the-passed-directory + Repo.folderName.
+        let fluidAudioTarget = installed
+            .deletingLastPathComponent()
+            .appendingPathComponent(Repo.parakeetV2.folderName, isDirectory: true)
+        #expect(installed.standardizedFileURL == fluidAudioTarget.standardizedFileURL)
 
-        let installed = try store.installedModels()
-        #expect(!installed.contains { $0.name == "parakeet-tdt-0.6b-v2" })
+        try FileManager.default.createDirectory(at: installed, withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: installed.appendingPathComponent("Encoder.mlmodelc"))
+        #expect(store.isInstalled("nvidia_parakeet-tdt-0.6b-v2"))
+
+        try store.delete(variant: "nvidia_parakeet-tdt-0.6b-v2")
+        #expect(!store.isInstalled("nvidia_parakeet-tdt-0.6b-v2"))
+        #expect(!FileManager.default.fileExists(atPath: installed.path))
+    }
+
+    @Test("a directory an engine downloader created but never filled is not reported as installed")
+    func emptyInstallDirectoryIsNotInstalled() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let url = store.installedURL(for: "openai_whisper-large-v3")
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+
+        #expect(store.isInstalled("openai_whisper-large-v3") == false)
+        #expect(store.catalog().first { $0.name == "openai_whisper-large-v3" }?.isInstalled == false)
+    }
+
+    @Test("a model whose CoreML weights never landed is not reported as installed")
+    func truncatedCompiledBundleIsNotInstalled() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let url = store.installedURL(for: "openai_whisper-tiny")
+        let bundle = url.appendingPathComponent("TextDecoder.mlmodelc", isDirectory: true)
+        let weights = bundle.appendingPathComponent("weights", isDirectory: true)
+        try FileManager.default.createDirectory(at: weights, withIntermediateDirectories: true)
+        try Data("meta".utf8).write(to: bundle.appendingPathComponent("coremldata.bin"))
+
+        #expect(store.isInstalled("openai_whisper-tiny") == false)
+
+        try Data("w".utf8).write(to: weights.appendingPathComponent("weight.bin"))
+        #expect(store.isInstalled("openai_whisper-tiny"))
+    }
+
+    @Test("a stale directory from an older layout is listed as an orphan the user can delete")
+    func staleLayoutDirectoryIsListedAsOrphan() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let stale = tmp.appendingPathComponent(
+            "models/FluidInference/parakeet-tdt-0.6b-v2-coreml", isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: stale, withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: stale.appendingPathComponent("Encoder.mlmodelc"))
+
+        #expect(try store.installedModels().contains { $0.name == "parakeet-tdt-0.6b-v2-coreml" })
+        try store.deleteAny(idOrPath: "parakeet-tdt-0.6b-v2-coreml")
+        #expect(!FileManager.default.fileExists(atPath: stale.path))
+    }
+
+    @Test("the diarizer models a service owns are never offered as deletable leftovers")
+    func diarizerDirectoryIsNotAnOrphan() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let diarizer = IncrementalSpeakerLabeler.modelsDirectory(store: store)
+        try FileManager.default.createDirectory(at: diarizer, withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: diarizer.appendingPathComponent(ModelNames.Diarizer.segmentationFile))
+
+        #expect(try store.installedModels().allSatisfy { $0.installedURL?.path != diarizer.path })
+        #expect(throws: ParolaError.self) {
+            try store.deleteAny(idOrPath: diarizer.lastPathComponent)
+        }
+        #expect(FileManager.default.fileExists(atPath: diarizer.path))
+    }
+
+    @Test("deleteAny refuses a name that would climb out of the model store")
+    func deleteAnyRejectsPathTraversal() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let outside = tmp.appendingPathComponent("models/FluidInference", isDirectory: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+
+        #expect(throws: ParolaError.self) { try store.deleteAny(idOrPath: "..") }
+        #expect(throws: ParolaError.self) { try store.deleteAny(idOrPath: "../whisperkit-coreml") }
+        #expect(FileManager.default.fileExists(atPath: outside.path))
     }
 
     @Test("a tokenizer-only directory (no model weights) is not reported as an installed model")

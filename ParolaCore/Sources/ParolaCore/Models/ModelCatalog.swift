@@ -1,4 +1,5 @@
 import Foundation
+import FluidAudio
 
 public enum ModelCatalog {
     public static let all: [ModelVariant] = appleSpeechVariants() + curated
@@ -45,7 +46,8 @@ public enum ModelCatalog {
             sizeBytes: 600_000_000,
             downloadSource: ModelDownloadSource(
                 huggingFaceRepo: "FluidInference/parakeet-tdt-0.6b-v2-coreml",
-                subpath: ""
+                subpath: "",
+                installDirectory: "FluidInference/\(Repo.parakeetV2.folderName)"
             ),
             category: .fastest,
             speedTier: .fastest,

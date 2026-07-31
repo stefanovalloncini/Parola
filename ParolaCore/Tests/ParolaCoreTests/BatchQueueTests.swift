@@ -221,6 +221,7 @@ struct BatchQueueTests {
         let store = ModelStore(modelsDirectory: dir)
         let installedDir = store.installedURL(for: "openai_whisper-tiny")
         try FileManager.default.createDirectory(at: installedDir, withIntermediateDirectories: true)
+        try Data("weights".utf8).write(to: installedDir.appendingPathComponent("model.mlmodelc"))
         let session = TranscriptionSession(modelStore: store, registry: registry, idleTimeout: 5)
         let audioURL = dir.appendingPathComponent("input.wav")
         try Data("RIFFstub".utf8).write(to: audioURL)

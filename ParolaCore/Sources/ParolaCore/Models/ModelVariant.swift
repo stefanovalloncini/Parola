@@ -48,10 +48,15 @@ public enum QualityTier: Int, Sendable, Hashable, Codable, Comparable {
 public struct ModelDownloadSource: Sendable, Hashable, Codable {
     public let huggingFaceRepo: String
     public let subpath: String
+    /// Directory under `<store>/models` that holds the installed files, defaulting to `repo/subpath`.
+    /// FluidAudio-backed engines override it: their downloader writes to a folder name of its own choosing.
+    public let installDirectory: String
 
-    public init(huggingFaceRepo: String, subpath: String) {
+    public init(huggingFaceRepo: String, subpath: String, installDirectory: String? = nil) {
         self.huggingFaceRepo = huggingFaceRepo
         self.subpath = subpath
+        self.installDirectory = installDirectory
+            ?? [huggingFaceRepo, subpath].filter { !$0.isEmpty }.joined(separator: "/")
     }
 }
 
