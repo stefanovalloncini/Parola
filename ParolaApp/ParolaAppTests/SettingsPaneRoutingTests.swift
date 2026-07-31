@@ -7,26 +7,30 @@ import ParolaCore
 @Suite("Settings pane deep-linking")
 struct SettingsPaneRoutingTests {
 
-    private func makeModel(mode: AppBootstrap.Mode) -> AppModel {
+    private func makeModel(mode: AppBootstrap.Mode, features: Set<ParolaFeature>?) -> AppModel {
         let defaults = UserDefaults(suiteName: "test-\(UUID())")!
         let library = makeTempLibraryURL("settingsrouting")
         switch mode {
         case .normal:
-            return AppModel(skipBootstrap: true, defaults: defaults, libraryURL: library)
+            return AppModel(skipBootstrap: true, defaults: defaults, libraryURL: library, features: features)
         case .test:
             let bootstrap = AppBootstrap(
                 mode: .test,
                 library: library,
                 defaultsOverride: defaults,
                 sideEffects: [],
-                filePicker: TestFilePicker()
+                filePicker: TestFilePicker(),
+                enabledFeaturesOverride: features
             )
             return AppModel(bootstrap: bootstrap)
         }
     }
 
-    private func makeRig(mode: AppBootstrap.Mode = .normal) throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
-        let model = makeModel(mode: mode)
+    private func makeRig(
+        mode: AppBootstrap.Mode = .normal,
+        features: Set<ParolaFeature>? = nil
+    ) throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
+        let model = makeModel(mode: mode, features: features)
         let server = try ParolaAutomationServer(model: model)
         let context = AutomationContext(model: model, server: server)
         let commands = Dictionary(uniqueKeysWithValues: server.settingsCommands().map { ($0.name, $0) })
@@ -46,10 +50,33 @@ struct SettingsPaneRoutingTests {
 
         let command = try #require(commands["openSettings"])
         let args = try command.validate(AutomationArgs(["pane": .string("localModels")]))
-        _ = try await command.handler(args, context)
+        let reply = try await command.handler(args, context)
         withExtendedLifetime(server) {}
 
         #expect(model.settingsPane == "localModels")
+        guard case .object(let fields) = reply else {
+            Issue.record("expected an object reply, got \(reply)")
+            return
+        }
+        #expect(fields["visible"] == .bool(true))
+    }
+
+    @Test("openSettings refuses a pane this deployment hides instead of silently landing on General")
+    func openSettingsRefusesGatedPane() async throws {
+        let (model, server, context, commands) = try makeRig(features: [.batch])
+        #expect(!SettingsRoute.dictation.isVisible(features: model.features))
+
+        let command = try #require(commands["openSettings"])
+        let args = try command.validate(AutomationArgs(["pane": .string("dictation")]))
+        let reply = try await command.handler(args, context)
+        withExtendedLifetime(server) {}
+
+        #expect(model.settingsPane == "general")
+        guard case .object(let fields) = reply else {
+            Issue.record("expected an object reply, got \(reply)")
+            return
+        }
+        #expect(fields["visible"] == .bool(false))
     }
 
     @Test("openSettings rejects an unknown pane instead of diverging model state from the UI")

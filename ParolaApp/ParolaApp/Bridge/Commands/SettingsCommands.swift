@@ -40,17 +40,21 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "openSettings",
                 area: .settings,
-                summary: "Opens the Settings window, optionally focusing a pane, and waits ~300ms for it to appear.",
+                summary: "Opens the Settings window, optionally focusing a pane, and waits ~300ms for it to appear. Panes hidden in this deployment are not focused and reply with visible: false.",
                 kind: .async,
                 args: [
                     .init(name: "pane", kind: .string(), required: false, summary: "Settings pane identifier (e.g. 'general', 'dictation', 'localModels')"),
                 ],
                 handler: { args, ctx in
+                    var paneVisible = true
                     if let pane = try args.optionalString("pane"), !pane.isEmpty {
-                        guard SettingsRoute(rawValue: pane) != nil else {
+                        guard let route = SettingsRoute(rawValue: pane) else {
                             throw AutomationError.invalidArgs(field: "pane", reason: "unknown settings pane: \(pane)")
                         }
-                        ctx.model.settingsPane = pane
+                        paneVisible = route.isVisible(features: ctx.model.features)
+                        if paneVisible {
+                            ctx.model.settingsPane = pane
+                        }
                     }
                     NSApp.activate(ignoringOtherApps: true)
                     if #available(macOS 14.0, *) {
@@ -69,6 +73,7 @@ extension ParolaAutomationServer {
 
                     return .object([
                         "opened": .bool(settingsWin != nil),
+                        "visible": .bool(paneVisible),
                         "visibleCount": .int(NSApp.windows.filter { $0.isVisible }.count),
                         "settingsSize": .object([
                             "w": .int(Int(settingsWin?.frame.width ?? 0)),
