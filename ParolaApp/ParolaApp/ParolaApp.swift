@@ -233,33 +233,23 @@ struct ParolaApp: App {
                 Button("Export Segment Notes…") { model.exportSegmentNotesAsMarkdown() }
                     .disabled(model.transcript == nil)
                 Divider()
-                Button("Export as TXT…") { model.exportRequest(.txt) }
-                    .keyboardShortcut("e", modifiers: [.command])
-                    .disabled(model.transcript == nil)
-                Button("Export as Markdown…") { model.exportRequest(.md) }
-                    .disabled(model.transcript == nil)
-                Button("Export as HTML…") { model.exportRequest(.html) }
-                    .disabled(model.transcript == nil)
-                Button("Export as Word (.docx)…") { model.exportRequest(.docx) }
-                    .disabled(model.transcript == nil)
-                Button("Export as PDF…") { model.exportRequest(.pdf) }
-                    .disabled(model.transcript == nil)
-                Button("Export as CSV…") { model.exportRequest(.csv) }
-                    .disabled(model.transcript == nil)
-                Button("Export as SRT…") { model.exportRequest(.srt) }
-                    .disabled(model.transcript == nil)
-                Button("Export as VTT…") { model.exportRequest(.vtt) }
-                    .disabled(model.transcript == nil)
-                Button("Export as JSON…") { model.exportRequest(.json) }
-                    .disabled(model.transcript == nil)
-                Button("Export as JSON Lines…") { model.exportRequest(.jsonl) }
-                    .disabled(model.transcript == nil)
-                Button("Export as TSV…") { model.exportRequest(.tsv) }
-                    .disabled(model.transcript == nil)
-                Button("Export as Final Cut Pro XML…") { model.exportRequest(.fcpxml) }
-                    .disabled(model.transcript == nil)
-                Button("Export as LRC…") { model.exportRequest(.lrc) }
-                    .disabled(model.transcript == nil)
+                Menu("Export As") {
+                    Button("TXT…") { model.exportRequest(.txt) }
+                        .keyboardShortcut("e", modifiers: [.command])
+                    Button("Markdown…") { model.exportRequest(.md) }
+                    Button("HTML…") { model.exportRequest(.html) }
+                    Button("Word (.docx)…") { model.exportRequest(.docx) }
+                    Button("PDF…") { model.exportRequest(.pdf) }
+                    Button("CSV…") { model.exportRequest(.csv) }
+                    Button("SRT…") { model.exportRequest(.srt) }
+                    Button("VTT…") { model.exportRequest(.vtt) }
+                    Button("JSON…") { model.exportRequest(.json) }
+                    Button("JSON Lines…") { model.exportRequest(.jsonl) }
+                    Button("TSV…") { model.exportRequest(.tsv) }
+                    Button("Final Cut Pro XML…") { model.exportRequest(.fcpxml) }
+                    Button("LRC…") { model.exportRequest(.lrc) }
+                }
+                .disabled(model.transcript == nil)
                 Divider()
                 Button("Open in New Window") {
                     if let t = model.transcript {
