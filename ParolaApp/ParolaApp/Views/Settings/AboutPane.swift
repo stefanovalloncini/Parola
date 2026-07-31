@@ -28,6 +28,13 @@ struct AboutPane: View {
             }
             .controlSize(.small)
 
+            if ManagedConfiguration.shared.isActive {
+                Text("Some features are managed by your deployment.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .axLeaf("About.Text.ManagedNote")
+            }
+
             Spacer()
         }
         .frame(maxWidth: .infinity)
