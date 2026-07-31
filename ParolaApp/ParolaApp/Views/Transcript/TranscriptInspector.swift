@@ -55,7 +55,7 @@ struct InspectorModeIcon: View {
                 .font(DS.Font.body)
                 .frame(width: 32, height: 26)
                 .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                         .fill(isOn ? DS.Color.accent.opacity(0.15) : Color.clear)
                 )
                 .foregroundStyle(isOn ? DS.Color.accent : DS.Color.primaryText)

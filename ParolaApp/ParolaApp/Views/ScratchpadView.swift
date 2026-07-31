@@ -22,7 +22,7 @@ struct ScratchpadView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .background(
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: DS.Radius.small)
                         .fill(Color.primary.opacity(0.04))
                 )
                 .padding(.horizontal, 12)

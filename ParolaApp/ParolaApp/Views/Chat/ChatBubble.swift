@@ -10,14 +10,14 @@ struct ChatBubble: View {
                 Spacer(minLength: 40)
                 bubble
                     .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
                             .fill(DS.Color.accent)
                     )
                     .foregroundStyle(DS.Color.onAccent)
             } else {
                 bubble
                     .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
                             .fill(DS.Color.surfaceElevated)
                     )
                     .foregroundStyle(DS.Color.primaryText)

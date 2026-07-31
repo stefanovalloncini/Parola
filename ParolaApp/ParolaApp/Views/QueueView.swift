@@ -40,7 +40,7 @@ struct QueueView: View {
                 model.clearFinishedBatchJobs()
             } label: {
                 Text("Clear Finished")
-                    .font(.callout)
+                    .font(DS.Font.callout)
                     .padding(.horizontal, DS.Spacing.regular)
                     .padding(.vertical, 6)
                     .background(
@@ -150,7 +150,7 @@ struct QueueView: View {
         if !matching.isEmpty {
             VStack(alignment: .leading, spacing: DS.Spacing.small) {
                 Text(title.uppercased())
-                    .font(.caption.weight(.medium))
+                    .font(DS.Font.captionMedium)
                     .tracking(0.6)
                     .foregroundStyle(DS.Color.secondaryText)
                 VStack(spacing: 1) {

@@ -13,9 +13,9 @@ struct FindBar: View {
             if showReplace { replaceRow }
         }
         .padding(8)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
                 .stroke(DS.Color.separator.opacity(0.6), lineWidth: 1)
         )
         .padding(.horizontal, DS.Spacing.regular)
@@ -151,7 +151,7 @@ private struct FindIconButton: View {
                 .foregroundStyle(disabled ? Color.secondary.opacity(0.4) : Color.primary.opacity(0.85))
                 .frame(width: 22, height: 22)
                 .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                         .fill(hovered && !disabled ? DS.Color.surfaceElevated : Color.clear)
                 )
                 .contentShape(Rectangle())
@@ -178,7 +178,7 @@ private struct FindToggleButton: View {
                 .foregroundStyle(isOn ? Color.white : Color.primary.opacity(0.85))
                 .frame(width: 22, height: 22)
                 .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                         .fill(background)
                 )
                 .contentShape(Rectangle())

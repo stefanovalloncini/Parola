@@ -19,7 +19,7 @@ struct ChatSenderChip: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "person.crop.circle")
-                    .font(.caption.weight(.semibold))
+                    .font(DS.Font.captionEmphasized)
                 Text(selection.label)
                     .font(DS.Font.caption)
                 Image(systemName: "chevron.down")
@@ -29,11 +29,11 @@ struct ChatSenderChip: View {
             .frame(height: 28)
             .foregroundStyle(selection == .all ? Color.primary.opacity(0.85) : Color.white)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
                     .fill(selection == .all ? DS.Color.surfaceElevated.opacity(0.85) : DS.Color.accent)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
                     .stroke(DS.Color.separator.opacity(0.4), lineWidth: 0.5)
             )
         }

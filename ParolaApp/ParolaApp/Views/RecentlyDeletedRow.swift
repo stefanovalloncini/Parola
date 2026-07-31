@@ -39,11 +39,11 @@ struct RecentlyDeletedRow: View {
         }
         .padding(DS.Spacing.regular)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
                 .fill(rowFill)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
                 .stroke(rowStroke, lineWidth: isSelected ? 1.5 : 1)
         )
         .overlay(alignment: .topTrailing) {
@@ -82,7 +82,7 @@ struct RecentlyDeletedRow: View {
     }
 
     var categoryBadge: some View {
-        RoundedRectangle(cornerRadius: 6, style: .continuous)
+        RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
             .fill(categoryTint.opacity(0.18))
             .overlay(
                 Image(systemName: categoryIcon)
@@ -99,11 +99,11 @@ struct RecentlyDeletedRow: View {
         }
         .padding(6)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                 .fill(.regularMaterial)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                 .stroke(DS.Color.separator.opacity(0.5), lineWidth: 0.5)
         )
         .padding(DS.Spacing.small)

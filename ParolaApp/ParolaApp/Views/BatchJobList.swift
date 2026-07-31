@@ -155,8 +155,8 @@ struct BatchJobList: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 26, height: 26)
                 .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(Color.primary.opacity(0.06))
+                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                        .fill(DS.Palette.subtleFill)
                 )
         }
         .menuStyle(.borderlessButton)

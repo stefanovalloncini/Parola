@@ -16,18 +16,18 @@ struct SearchPill: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.subheadline.weight(.regular))
+                .font(DS.Font.subheadline)
                 .foregroundStyle(.secondary)
             TextField(placeholder, text: $text, prompt: prompt.map(Text.init))
                 .textFieldStyle(.plain)
-                .font(.subheadline)
+                .font(DS.Font.subheadline)
                 .accessibilityIdentifier(identifier)
             if !text.isEmpty {
                 Button {
                     text = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.subheadline)
+                        .font(DS.Font.subheadline)
                         .foregroundStyle(.secondary)
                         .contentShape(Rectangle())
                 }
@@ -39,8 +39,8 @@ struct SearchPill: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
+            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                .fill(DS.Palette.subtleFill)
         )
     }
 }

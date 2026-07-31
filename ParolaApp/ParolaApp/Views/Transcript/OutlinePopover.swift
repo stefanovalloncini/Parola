@@ -95,7 +95,7 @@ private struct OutlineRow: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(hovering ? Color.primary.opacity(0.06) : Color.clear)
+            .background(hovering ? DS.Palette.surfaceHover : Color.clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

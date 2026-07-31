@@ -17,7 +17,7 @@ struct ChatThinkingIndicator: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
                     .fill(DS.Color.surfaceElevated)
             )
             .frame(maxWidth: .infinity, alignment: .leading)

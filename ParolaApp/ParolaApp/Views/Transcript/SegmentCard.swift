@@ -20,7 +20,7 @@ struct SegmentCard: View {
     @State private var draftNote: String = ""
     @FocusState private var editingFocus: Bool
 
-    private let radius: CGFloat = 12
+    private let radius: CGFloat = DS.Radius.regular
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
@@ -155,7 +155,7 @@ struct SegmentCard: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                 .fill(DS.Color.accent.opacity(0.08))
         )
     }
