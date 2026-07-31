@@ -3,15 +3,30 @@ import ParolaDictation
 
 @MainActor
 final class MenuBarController {
+    enum Mode: Equatable {
+        case hidden
+        case full
+        case dictationOnly
+
+        init(showExtra: Bool, dictationEnabled: Bool) {
+            if showExtra {
+                self = .full
+            } else if dictationEnabled {
+                self = .dictationOnly
+            } else {
+                self = .hidden
+            }
+        }
+    }
+
     private weak var model: AppModel?
     private var statusItem: NSStatusItem?
-    private var lastVisibility: Bool = false
+    private var lastMode: Mode = .hidden
     private var lastSnapshotKey: String = ""
     private var rebuildPending = false
 
     func bind(_ model: AppModel) {
         self.model = model
-        applyVisibility(model.showMenuBarExtra)
         observeAndRefresh()
     }
 
@@ -40,25 +55,26 @@ final class MenuBarController {
 
     private func refresh() {
         guard let model else { return }
-        if model.showMenuBarExtra != lastVisibility {
-            applyVisibility(model.showMenuBarExtra)
-            lastVisibility = model.showMenuBarExtra
+        let mode = Mode(showExtra: model.showMenuBarExtra, dictationEnabled: model.dictationEnabled)
+        if mode != lastMode {
+            applyVisibility(mode != .hidden)
+            lastMode = mode
+            lastSnapshotKey = ""
         }
-        guard model.showMenuBarExtra else { return }
+        guard mode != .hidden else { return }
+        applyIcon()
         let dictate = Self.dictationMenuItem(for: model.dictationState)
-        let key = "\(model.libraryVersion)|\(model.dictationEnabled ? "1" : "0")|\(dictate.stops ? "L" : "-")"
+        let key = "\(mode)|\(model.libraryVersion)|\(dictate.stops ? "L" : "-")"
         guard key != lastSnapshotKey else { return }
         lastSnapshotKey = key
-        rebuildMenu()
+        rebuildMenu(mode: mode)
     }
 
     private func applyVisibility(_ visible: Bool) {
         if visible {
             if statusItem == nil {
-                let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-                item.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Parola")
-                statusItem = item
-                rebuildMenu()
+                statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+                applyIcon()
             }
         } else if let item = statusItem {
             NSStatusBar.system.removeStatusItem(item)
@@ -66,14 +82,42 @@ final class MenuBarController {
         }
     }
 
-    private func rebuildMenu() {
+    static func symbolName(dictationEnabled: Bool, state: DictationCoordinator.State) -> String {
+        guard dictationEnabled else { return "waveform" }
+        switch state {
+        case .idle: return "mic"
+        case .listening: return "mic.fill"
+        case .transcribing: return "waveform"
+        case .failed: return "mic.slash"
+        }
+    }
+
+    private func applyIcon() {
+        guard let model, let button = statusItem?.button else { return }
+        let symbol = Self.symbolName(dictationEnabled: model.dictationEnabled, state: model.dictationState)
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Parola")
+        image?.isTemplate = true
+        button.image = image
+    }
+
+    private func rebuildMenu(mode: Mode) {
         guard let model, let statusItem else { return }
         let menu = NSMenu()
+        let dictateTitle = Self.dictationMenuItem(for: model.dictationState).title
+
+        if mode == .dictationOnly {
+            menu.addItem(menuItem(title: dictateTitle, action: #selector(toggleDictation), target: self))
+            menu.addItem(.separator())
+            menu.addItem(menuItem(title: "Open Parola", action: #selector(openParola), target: self))
+            menu.addItem(menuItem(title: "Quit Parola", action: #selector(quitApp), target: self, key: "q"))
+            statusItem.menu = menu
+            return
+        }
+
         menu.addItem(menuItem(title: "Open Parola", action: #selector(openParola), target: self))
         menu.addItem(.separator())
         menu.addItem(menuItem(title: "Record from Microphone", action: #selector(recordMic), target: self))
         menu.addItem(menuItem(title: "Open File…", action: #selector(openFile), target: self))
-        let dictateTitle = Self.dictationMenuItem(for: model.dictationState).title
         menu.addItem(menuItem(title: dictateTitle, action: #selector(toggleDictation), target: self))
         menu.addItem(.separator())
 

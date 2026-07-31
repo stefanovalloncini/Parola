@@ -25,3 +25,26 @@ struct MenuBarControllerTests {
         #expect(failed.stops == false)
     }
 }
+
+@MainActor
+@Suite("Menu bar mode")
+struct MenuBarModeTests {
+    @Test("visibility mode follows the extra toggle and dictation enablement", arguments: [
+        (false, false, MenuBarController.Mode.hidden),
+        (true, false, .full),
+        (true, true, .full),
+        (false, true, .dictationOnly),
+    ] as [(Bool, Bool, MenuBarController.Mode)])
+    func modeMatrix(showExtra: Bool, dictationEnabled: Bool, expected: MenuBarController.Mode) {
+        #expect(MenuBarController.Mode(showExtra: showExtra, dictationEnabled: dictationEnabled) == expected)
+    }
+
+    @Test("icon reflects dictation state only while dictation is enabled")
+    func iconMapping() {
+        #expect(MenuBarController.symbolName(dictationEnabled: false, state: .listening) == "waveform")
+        #expect(MenuBarController.symbolName(dictationEnabled: true, state: .idle) == "mic")
+        #expect(MenuBarController.symbolName(dictationEnabled: true, state: .listening) == "mic.fill")
+        #expect(MenuBarController.symbolName(dictationEnabled: true, state: .transcribing) == "waveform")
+        #expect(MenuBarController.symbolName(dictationEnabled: true, state: .failed("boom")) == "mic.slash")
+    }
+}

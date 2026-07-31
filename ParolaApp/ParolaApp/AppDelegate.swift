@@ -6,7 +6,6 @@ import ParolaCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private weak var model: AppModel?
     private let provider = ServicesProvider()
-    private var dictationStatusItem: DictationStatusItem?
     private var dictationSubscription: DictationSubscription?
     private var settingsResetSubscription: (any NSObjectProtocol)?
     private let menuBar = MenuBarController()
@@ -18,9 +17,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func bind(model: AppModel) {
         self.model = model
         provider.model = model
-        if dictationStatusItem == nil {
-            dictationStatusItem = DictationStatusItem(model: model)
-        }
         menuBar.bind(model)
         playbackKeys.bind(model)
         if dictationSubscription == nil {
