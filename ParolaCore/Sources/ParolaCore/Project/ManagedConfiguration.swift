@@ -6,6 +6,7 @@ public struct ManagedConfiguration: @unchecked Sendable {
     public enum Key: String, Sendable, CaseIterable {
         case defaultModel
         case allowedEngines
+        case enabledFeatures
         case disableYouTubeIngestion
         case disableDictation
         case disableCloudLLM
@@ -39,6 +40,11 @@ public struct ManagedConfiguration: @unchecked Sendable {
             return nil
         }
         return raw.map { EngineID($0) }
+    }
+
+    /// Feature allowlist for deployments; absent means every feature is enabled.
+    public var enabledFeatures: [String]? {
+        managedDict?[Key.enabledFeatures.rawValue] as? [String]
     }
 
     public var disableYouTubeIngestion: Bool {

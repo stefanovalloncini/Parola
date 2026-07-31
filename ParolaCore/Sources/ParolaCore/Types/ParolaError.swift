@@ -4,6 +4,7 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
     case modelNotFound(String)
     case unknownModel(String, suggestion: String?)
     case policyRestricted(String)
+    case featureDisabled(ParolaFeature)
     case modelDownloadFailed(String, underlying: String)
     case modelChecksumMismatch(file: String, expected: String, got: String)
     case audioLoadFailed(URL, underlying: String)
@@ -27,6 +28,8 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
             return text
         case .policyRestricted(let detail):
             return detail
+        case .featureDisabled(let feature):
+            return "\(feature.displayName) is disabled in this deployment."
         case .modelDownloadFailed(let name, let underlying):
             return "Failed to download model \(name): \(underlying)"
         case .modelChecksumMismatch(let file, let expected, let got):
