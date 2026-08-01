@@ -11,7 +11,7 @@ import os
 public protocol StreamingSpeakerLabeler: Sendable {
     func labelSpeaker(
         for segment: TranscriptSegment,
-        audioWindow: [Float],
+        audioWindow: ArraySlice<Float>,
         windowStartTime: TimeInterval,
         sampleRate: Double
     ) async -> String?
@@ -276,10 +276,9 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         let startIndex = Int((windowStartTime - batchStart) * sampleRate)
         let endIndex = min(batch.audioWindow.count, Int((windowEndTime - batchStart) * sampleRate))
         guard startIndex >= 0, startIndex < endIndex else { return nil }
-        let window = Array(batch.audioWindow[startIndex..<endIndex])
         return await labeler.labelSpeaker(
             for: segment,
-            audioWindow: window,
+            audioWindow: batch.audioWindow[startIndex..<endIndex],
             windowStartTime: windowStartTime,
             sampleRate: sampleRate
         )

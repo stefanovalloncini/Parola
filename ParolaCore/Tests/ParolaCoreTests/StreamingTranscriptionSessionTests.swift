@@ -6,8 +6,7 @@ import os
 
 private final class RecordingLabeler: StreamingSpeakerLabeler {
     struct Call {
-        var sampleCount: Int
-        var firstSample: Float?
+        var samples: [Float]
         var windowStartTime: TimeInterval
         var sampleRate: Double
     }
@@ -21,14 +20,13 @@ private final class RecordingLabeler: StreamingSpeakerLabeler {
 
     func labelSpeaker(
         for segment: TranscriptSegment,
-        audioWindow: [Float],
+        audioWindow: ArraySlice<Float>,
         windowStartTime: TimeInterval,
         sampleRate: Double
     ) async -> String? {
         state.withLock {
             $0.append(Call(
-                sampleCount: audioWindow.count,
-                firstSample: audioWindow.first,
+                samples: Array(audioWindow),
                 windowStartTime: windowStartTime,
                 sampleRate: sampleRate
             ))
@@ -170,11 +168,8 @@ struct StreamingTranscriptionSessionTests {
         let sampleRate = 16_000
         let session = StreamingTranscriptionSession()
         let labeler = RecordingLabeler(result: "Speaker 1")
-        let batch = ConfirmedAudioBatch(
-            segments: [],
-            audioWindow: (0..<(5 * sampleRate)).map { Float($0) },
-            windowStartSeconds: 1.0
-        )
+        let ramp = (0..<(5 * sampleRate)).map { Float($0) }
+        let batch = ConfirmedAudioBatch(segments: [], audioWindow: ramp, windowStartSeconds: 1.0)
         let segment = TranscriptSegment(id: 0, start: 2.0, end: 4.0, text: "hi")
 
         let label = await session.labelSpeaker(for: segment, in: batch, with: labeler)
@@ -182,8 +177,7 @@ struct StreamingTranscriptionSessionTests {
         let call = labeler.calls.first
         #expect(labeler.calls.count == 1)
         #expect(call?.windowStartTime == 1.5)
-        #expect(call?.sampleCount == 3 * sampleRate)
-        #expect(call?.firstSample == Float(sampleRate / 2))
+        #expect(call?.samples == Array(ramp[(sampleRate / 2)..<(7 * sampleRate / 2)]))
         #expect(call?.sampleRate == Double(sampleRate))
     }
 
@@ -192,19 +186,15 @@ struct StreamingTranscriptionSessionTests {
         let sampleRate = 16_000
         let session = StreamingTranscriptionSession()
         let labeler = RecordingLabeler(result: "Speaker 2")
-        let batch = ConfirmedAudioBatch(
-            segments: [],
-            audioWindow: (0..<(2 * sampleRate)).map { Float($0) },
-            windowStartSeconds: 10.0
-        )
+        let ramp = (0..<(2 * sampleRate)).map { Float($0) }
+        let batch = ConfirmedAudioBatch(segments: [], audioWindow: ramp, windowStartSeconds: 10.0)
         let segment = TranscriptSegment(id: 0, start: 9.0, end: 13.0, text: "hi")
 
         let label = await session.labelSpeaker(for: segment, in: batch, with: labeler)
         #expect(label == "Speaker 2")
         let call = labeler.calls.first
         #expect(call?.windowStartTime == 10.0)
-        #expect(call?.sampleCount == 2 * sampleRate)
-        #expect(call?.firstSample == 0)
+        #expect(call?.samples == ramp)
     }
 
     @Test("a batch without audio never reaches the labeler")

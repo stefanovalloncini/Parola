@@ -81,9 +81,9 @@ private final class EmbeddingScript: Sendable {
         state = OSAllocatedUnfairLock(initialState: (embeddings, []))
     }
 
-    func next(for window: [Float]) throws -> [Float] {
+    func next(for window: ArraySlice<Float>) throws -> [Float] {
         try state.withLock { state in
-            state.windows.append(window)
+            state.windows.append(Array(window))
             guard !state.queued.isEmpty else { throw ParolaError.transcriptionFailed("script exhausted") }
             return state.queued.removeFirst()
         }
@@ -103,9 +103,9 @@ struct IncrementalSpeakerLabelerTests {
         let script = EmbeddingScript([[1, 0], [0, 1], [0.95, 0.05]])
         let labeler = IncrementalSpeakerLabeler { try script.next(for: $0) }
         let window = [Float](repeating: 0.1, count: 16_000)
-        #expect(await labeler.labelSpeaker(for: makeSegment(), audioWindow: window, windowStartTime: 0, sampleRate: 16_000) == "Speaker 1")
-        #expect(await labeler.labelSpeaker(for: makeSegment(), audioWindow: window, windowStartTime: 0, sampleRate: 16_000) == "Speaker 2")
-        #expect(await labeler.labelSpeaker(for: makeSegment(), audioWindow: window, windowStartTime: 0, sampleRate: 16_000) == "Speaker 1")
+        #expect(await labeler.labelSpeaker(for: makeSegment(), audioWindow: window[...], windowStartTime: 0, sampleRate: 16_000) == "Speaker 1")
+        #expect(await labeler.labelSpeaker(for: makeSegment(), audioWindow: window[...], windowStartTime: 0, sampleRate: 16_000) == "Speaker 2")
+        #expect(await labeler.labelSpeaker(for: makeSegment(), audioWindow: window[...], windowStartTime: 0, sampleRate: 16_000) == "Speaker 1")
     }
 
     @Test("an unexpected sample rate skips embedding entirely")
@@ -113,7 +113,7 @@ struct IncrementalSpeakerLabelerTests {
         let script = EmbeddingScript([[1, 0]])
         let labeler = IncrementalSpeakerLabeler { try script.next(for: $0) }
         let window = [Float](repeating: 0.1, count: 16_000)
-        let label = await labeler.labelSpeaker(for: makeSegment(), audioWindow: window, windowStartTime: 0, sampleRate: 44_100)
+        let label = await labeler.labelSpeaker(for: makeSegment(), audioWindow: window[...], windowStartTime: 0, sampleRate: 44_100)
         #expect(label == nil)
         #expect(script.windows.isEmpty)
     }
@@ -123,7 +123,7 @@ struct IncrementalSpeakerLabelerTests {
         let script = EmbeddingScript([[1, 0]])
         let labeler = IncrementalSpeakerLabeler { try script.next(for: $0) }
         let window = [Float](repeating: 0.1, count: 4_000)
-        let label = await labeler.labelSpeaker(for: makeSegment(), audioWindow: window, windowStartTime: 0, sampleRate: 16_000)
+        let label = await labeler.labelSpeaker(for: makeSegment(), audioWindow: window[...], windowStartTime: 0, sampleRate: 16_000)
         #expect(label == nil)
         #expect(script.windows.isEmpty)
     }
@@ -133,9 +133,24 @@ struct IncrementalSpeakerLabelerTests {
         let script = EmbeddingScript([[1, 0]])
         let labeler = IncrementalSpeakerLabeler { try script.next(for: $0) }
         let window = [Float](repeating: 0.1, count: 200_000)
-        let label = await labeler.labelSpeaker(for: makeSegment(), audioWindow: window, windowStartTime: 0, sampleRate: 16_000)
+        let label = await labeler.labelSpeaker(for: makeSegment(), audioWindow: window[...], windowStartTime: 0, sampleRate: 16_000)
         #expect(label == "Speaker 1")
         #expect(script.windows.first?.count == 160_000)
+    }
+
+    @Test("a mid-buffer slice reaches the embedder unshifted")
+    func midBufferSliceReachesEmbedder() async {
+        let script = EmbeddingScript([[1, 0]])
+        let labeler = IncrementalSpeakerLabeler { try script.next(for: $0) }
+        let ramp = (0..<40_000).map { Float($0) }
+        let label = await labeler.labelSpeaker(
+            for: makeSegment(),
+            audioWindow: ramp[8_000..<24_000],
+            windowStartTime: 0,
+            sampleRate: 16_000
+        )
+        #expect(label == "Speaker 1")
+        #expect(script.windows.first == Array(ramp[8_000..<24_000]))
     }
 
     @Test("an embedding failure leaves the segment unlabeled")
@@ -143,7 +158,7 @@ struct IncrementalSpeakerLabelerTests {
         let script = EmbeddingScript([])
         let labeler = IncrementalSpeakerLabeler { try script.next(for: $0) }
         let window = [Float](repeating: 0.1, count: 16_000)
-        let label = await labeler.labelSpeaker(for: makeSegment(), audioWindow: window, windowStartTime: 0, sampleRate: 16_000)
+        let label = await labeler.labelSpeaker(for: makeSegment(), audioWindow: window[...], windowStartTime: 0, sampleRate: 16_000)
         #expect(label == nil)
     }
 

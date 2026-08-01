@@ -8,12 +8,12 @@ public actor IncrementalSpeakerLabeler: StreamingSpeakerLabeler {
     static let minWindowSeconds: Double = 0.5
     static let maxWindowSamples = 160_000
 
-    private let embedWindow: ([Float]) throws -> [Float]
+    private let embedWindow: (ArraySlice<Float>) throws -> [Float]
     private var tracker: SpeakerCentroidTracker
 
     init(
         maxAssignmentDistance: Float = SpeakerCentroidTracker.defaultMaxAssignmentDistance,
-        embedWindow: sending @escaping ([Float]) throws -> [Float]
+        embedWindow: sending @escaping (ArraySlice<Float>) throws -> [Float]
     ) {
         self.embedWindow = embedWindow
         self.tracker = SpeakerCentroidTracker(maxAssignmentDistance: maxAssignmentDistance)
@@ -21,16 +21,14 @@ public actor IncrementalSpeakerLabeler: StreamingSpeakerLabeler {
 
     public func labelSpeaker(
         for segment: TranscriptSegment,
-        audioWindow: [Float],
+        audioWindow: ArraySlice<Float>,
         windowStartTime: TimeInterval,
         sampleRate: Double
     ) async -> String? {
         guard sampleRate == 16_000 else { return nil }
         guard Double(audioWindow.count) >= Self.minWindowSeconds * sampleRate else { return nil }
         // FluidAudio's extractor buffer holds 10 s; longer input overruns it (see EmbeddingExtractor.fillWaveformBuffer).
-        let window = audioWindow.count > Self.maxWindowSamples
-            ? Array(audioWindow.prefix(Self.maxWindowSamples))
-            : audioWindow
+        let window = audioWindow.prefix(Self.maxWindowSamples)
         guard let embedding = try? embedWindow(window) else { return nil }
         return tracker.label(for: embedding)
     }
