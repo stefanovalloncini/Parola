@@ -83,34 +83,75 @@ enum DS {
     /// The active palette every element color funnels through. AppModel.applyTheme() sets it on
     /// the main actor; view bodies read it on the main actor. nonisolated(unsafe) is safe because
     /// ThemePalette is a Sendable value and access is main-actor in practice.
-    nonisolated(unsafe) static var theme: ThemePalette = ThemePreset.terracotta.palette
+    static var theme: ThemePalette {
+        get { activeTheme }
+        set {
+            guard newValue != activeTheme else { return }
+            activeTheme = newValue
+            resolved = Resolved(newValue)
+        }
+    }
+
+    nonisolated(unsafe) private static var activeTheme = ThemePreset.terracotta.palette
+    nonisolated(unsafe) private static var resolved = Resolved(ThemePreset.terracotta.palette)
+
+    /// One instance per palette, so repeated reads compare equal and SwiftUI can skip redraws; a dynamic NSColor re-runs its provider per draw, so the cached instance still follows the appearance.
+    private struct Resolved {
+        let accent: SwiftUI.Color
+        let highlight: SwiftUI.Color
+        let primaryText: SwiftUI.Color
+        let secondaryText: SwiftUI.Color
+        let surface: SwiftUI.Color
+        let surfaceElevated: SwiftUI.Color
+        let divider: SwiftUI.Color
+        let danger: SwiftUI.Color
+        let onAccent: SwiftUI.Color
+        let canvas: SwiftUI.Color
+        let success: SwiftUI.Color
+        let warning: SwiftUI.Color
+
+        init(_ palette: ThemePalette) {
+            accent = palette.accent.color
+            highlight = palette.highlight.color
+            primaryText = palette.textPrimary.color
+            secondaryText = palette.textSecondary.color
+            surface = palette.surface.color
+            surfaceElevated = palette.surfaceElevated.color
+            divider = palette.divider.color
+            danger = palette.danger.color
+            onAccent = palette.accent.legibleForeground
+            canvas = palette.canvas.color
+            success = palette.success.color
+            warning = palette.warning.color
+        }
+    }
 
     enum Color {
-        static var accent: SwiftUI.Color { DS.theme.accent.color }
-        static var highlight: SwiftUI.Color { DS.theme.highlight.color }
-        static var primaryText: SwiftUI.Color { DS.theme.textPrimary.color }
-        static var secondaryText: SwiftUI.Color { DS.theme.textSecondary.color }
-        static var surface: SwiftUI.Color { DS.theme.surface.color }
-        static var surfaceElevated: SwiftUI.Color { DS.theme.surfaceElevated.color }
-        static var separator: SwiftUI.Color { DS.theme.divider.color }
-        static var danger: SwiftUI.Color { DS.theme.danger.color }
+        static var accent: SwiftUI.Color { DS.resolved.accent }
+        static var highlight: SwiftUI.Color { DS.resolved.highlight }
+        static var primaryText: SwiftUI.Color { DS.resolved.primaryText }
+        static var secondaryText: SwiftUI.Color { DS.resolved.secondaryText }
+        static var surface: SwiftUI.Color { DS.resolved.surface }
+        static var surfaceElevated: SwiftUI.Color { DS.resolved.surfaceElevated }
+        static var separator: SwiftUI.Color { DS.resolved.divider }
+        static var danger: SwiftUI.Color { DS.resolved.danger }
 
         /// A legible foreground for text/glyphs drawn on top of `accent`: near-black on light
         /// accents (Amber, Mint, custom), white on dark ones. Resolves per appearance.
-        static var onAccent: SwiftUI.Color { DS.theme.accent.legibleForeground }
+        static var onAccent: SwiftUI.Color { DS.resolved.onAccent }
     }
 
     enum Palette {
-        static var canvas: SwiftUI.Color { DS.theme.canvas.color }
-        static var surface: SwiftUI.Color { DS.theme.surface.color }
-        static var surfaceElevated: SwiftUI.Color { DS.theme.surfaceElevated.color }
-        static var surfaceHover: SwiftUI.Color { SwiftUI.Color.primary.opacity(0.06) }
-        static var subtleFill: SwiftUI.Color { SwiftUI.Color.primary.opacity(0.06) }
-        static var divider: SwiftUI.Color { DS.theme.divider.color }
-        static var pillFill: SwiftUI.Color { SwiftUI.Color.primary.opacity(0.08) }
-        static var pillFillHover: SwiftUI.Color { SwiftUI.Color.primary.opacity(0.14) }
-        static var success: SwiftUI.Color { DS.theme.success.color }
-        static var warning: SwiftUI.Color { DS.theme.warning.color }
+        static var canvas: SwiftUI.Color { DS.resolved.canvas }
+        static var surface: SwiftUI.Color { DS.resolved.surface }
+        static var surfaceElevated: SwiftUI.Color { DS.resolved.surfaceElevated }
+        static let surfaceHover = SwiftUI.Color.primary.opacity(0.06)
+        static let subtleFill = SwiftUI.Color.primary.opacity(0.06)
+        static var divider: SwiftUI.Color { DS.resolved.divider }
+        static let pillFill = SwiftUI.Color.primary.opacity(0.08)
+        static let pillFillHover = SwiftUI.Color.primary.opacity(0.14)
+        static var success: SwiftUI.Color { DS.resolved.success }
+        static var warning: SwiftUI.Color { DS.resolved.warning }
     }
 
     /// Traffic-light tint shared by every confidence indicator (segment stripes + the overall dot).

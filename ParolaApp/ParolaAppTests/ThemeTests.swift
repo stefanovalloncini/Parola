@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 import Testing
@@ -202,5 +203,71 @@ private extension ThemeColor {
     var isUniform: Bool {
         if case .dynamic(let light, let dark) = self { return light == dark }
         return false
+    }
+}
+
+/// Main-actor and free of awaits so the shared DS.theme can't be swapped mid-test by another suite.
+@Suite("Themed color cache")
+@MainActor
+struct ThemedColorCacheTests {
+
+    @Test("reading a themed color twice yields the same value")
+    func repeatedReadsAreEqual() {
+        let previous = DS.theme
+        defer { DS.theme = previous }
+
+        DS.theme = ThemePreset.blue.palette
+        #expect(DS.Color.accent == DS.Color.accent)
+        #expect(DS.Color.highlight == DS.Color.highlight)
+        #expect(DS.Color.onAccent == DS.Color.onAccent)
+        #expect(DS.Palette.canvas == DS.Palette.canvas)
+        #expect(DS.Palette.divider == DS.Palette.divider)
+    }
+
+    @Test("a new palette replaces the cached colors")
+    func themeChangeInvalidatesCache() {
+        let previous = DS.theme
+        defer { DS.theme = previous }
+
+        DS.theme = ThemePreset.blue.palette
+        let blueAccent = DS.Color.accent
+        let blueHighlight = DS.Color.highlight
+
+        DS.theme = ThemePreset.pink.palette
+        #expect(DS.Color.accent != blueAccent)
+        #expect(DS.Color.highlight != blueHighlight)
+        #expect(DS.Color.accent == DS.Color.accent)
+    }
+
+    @Test("a cached color still picks its variant from the drawing appearance")
+    func cachedColorStaysDynamic() throws {
+        let previous = DS.theme
+        defer { DS.theme = previous }
+
+        DS.theme = ThemePreset.terracotta.palette
+        let accent = DS.Color.accent
+        let surface = DS.Palette.surface
+
+        let light = try #require(NSAppearance(named: .aqua))
+        let dark = try #require(NSAppearance(named: .darkAqua))
+        var lightAccent = RGBA(0, 0, 0), darkAccent = RGBA(0, 0, 0)
+        var lightSurface = RGBA(0, 0, 0), darkSurface = RGBA(0, 0, 0)
+        light.performAsCurrentDrawingAppearance {
+            lightAccent = RGBA(accent)
+            lightSurface = RGBA(surface)
+        }
+        dark.performAsCurrentDrawingAppearance {
+            darkAccent = RGBA(accent)
+            darkSurface = RGBA(surface)
+        }
+
+        let variants = ThemePreset.terracotta.accent
+        guard case .dynamic(let expectedLight, let expectedDark) = variants else {
+            Issue.record("terracotta's accent is expected to be a dynamic color")
+            return
+        }
+        #expect(lightAccent.hex == expectedLight.hex)
+        #expect(darkAccent.hex == expectedDark.hex)
+        #expect(lightSurface.relativeLuminance > darkSurface.relativeLuminance)
     }
 }
