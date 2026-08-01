@@ -248,6 +248,27 @@ struct ModelStoreTests {
         #expect(warm.catalog().first { $0.name == "openai_whisper-tiny" }?.isInstalled == false)
     }
 
+    @Test("a managed allowlist change invalidates a scan the stamps say is current")
+    func cachedScanFollowsManagedAllowlist() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let storage = try #require(UserDefaults(suiteName: "parola-scan-cache-\(UUID().uuidString)"))
+        let warm = ModelStore(modelsDirectory: tmp, managedConfiguration: ManagedConfiguration(storage: storage))
+        let unrestricted = warm.catalog()
+        #expect(unrestricted.contains { $0.name == "openai_whisper-tiny" })
+        #expect(warm.cachedScan() != nil)
+
+        storage.set(["allowedEngines": ["parakeet"]], forKey: "com.apple.configuration.managed")
+        #expect(warm.cachedScan() == nil)
+        let restricted = warm.catalog()
+        #expect(restricted.contains { $0.name == "openai_whisper-tiny" } == false)
+        #expect(restricted.count < unrestricted.count)
+        #expect(warm.catalog() == restricted)
+    }
+
     @Test("an unrelated FluidInference directory is still reported as installed")
     func keepsUnrelatedFluidInferenceDir() throws {
         let tmp = FileManager.default.temporaryDirectory

@@ -188,8 +188,9 @@ public final class ModelStore: Sendable {
         return scan
     }
 
-    /// The last scan, but only while the scan roots still look the way they did when it ran.
-    /// Callers that must not block — the app's main actor — use it to skip a rescan.
+    /// The last scan, or nil once the scan roots stop looking the way they did when it ran.
+    /// Revalidating re-lists each root, so this is real I/O — a fraction of a millisecond on a local
+    /// disk, unbounded on a network volume — but it skips the per-model walk a full scan does.
     public func cachedScan() -> ModelScan? {
         guard let cached = cachedScanState.withLock({ $0 }) else { return nil }
         return cached.matches(scanRoots()) ? cached.scan : nil
