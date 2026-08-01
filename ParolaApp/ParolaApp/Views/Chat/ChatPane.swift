@@ -268,11 +268,11 @@ struct ChatPane: View {
         guard !readable.isEmpty else { return }
         Task {
             for url in readable {
-                let raw = await Task.detached { () -> String? in
+                let raw = try? await AppModel.offMainIO { () -> String in
                     let needsScope = url.startAccessingSecurityScopedResource()
                     defer { if needsScope { url.stopAccessingSecurityScopedResource() } }
-                    return try? String(contentsOf: url, encoding: .utf8)
-                }.value
+                    return try String(contentsOf: url, encoding: .utf8)
+                }
                 guard let raw else { continue }
                 input = ChatAttachment.attach(input: input, filename: url.lastPathComponent, content: raw)
             }

@@ -22,16 +22,15 @@ extension AppModel {
         panel.nameFieldStringValue = "parola-snippets.json"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let items = snippets
-        Task.detached(priority: .userInitiated) { [weak self] in
+        Task { [weak self] in
             do {
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                let data = try encoder.encode(items)
-                try data.write(to: url, options: .atomic)
-            } catch {
-                await MainActor.run {
-                    self?.phase = .failed(message: AppModel.exportFailureMessage(for: error))
+                try await AppModel.offMainIO {
+                    let encoder = JSONEncoder()
+                    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                    try encoder.encode(items).write(to: url, options: .atomic)
                 }
+            } catch {
+                self?.phase = .failed(message: AppModel.exportFailureMessage(for: error))
             }
         }
     }
@@ -41,19 +40,16 @@ extension AppModel {
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        Task.detached(priority: .userInitiated) { [weak self] in
+        Task { [weak self] in
             do {
-                let data = try Data(contentsOf: url)
-                let imported = try JSONDecoder().decode([Snippet].self, from: data)
-                await MainActor.run {
-                    guard let self else { return }
-                    let existing = Set(self.snippets.map { $0.trigger.lowercased() })
-                    self.snippets += imported.filter { !existing.contains($0.trigger.lowercased()) }
+                let imported = try await AppModel.offMainIO {
+                    try JSONDecoder().decode([Snippet].self, from: Data(contentsOf: url))
                 }
+                guard let self else { return }
+                let existing = Set(self.snippets.map { $0.trigger.lowercased() })
+                self.snippets += imported.filter { !existing.contains($0.trigger.lowercased()) }
             } catch {
-                await MainActor.run {
-                    self?.phase = .failed(message: "Import failed: \(error.localizedDescription)")
-                }
+                self?.phase = .failed(message: "Import failed: \(error.localizedDescription)")
             }
         }
     }

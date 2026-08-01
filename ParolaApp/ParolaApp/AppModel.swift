@@ -1297,16 +1297,17 @@ final class AppModel {
             info.installedURL.map { (info.name, $0) }
         }
         let store = self.store
-        Task.detached(priority: .utility) {
-            var sizes: [String: Int64] = [:]
-            for (name, url) in installed {
-                if let size = store.sizeOnDisk(at: url) {
-                    sizes[name] = Int64(size)
+        Task { [weak self] in
+            guard let sizes = try? await AppModel.offMainIO({
+                var sizes: [String: Int64] = [:]
+                for (name, url) in installed {
+                    if let size = store.sizeOnDisk(at: url) {
+                        sizes[name] = Int64(size)
+                    }
                 }
-            }
-            await MainActor.run { [weak self] in
-                self?.modelSizes = sizes
-            }
+                return sizes
+            }) else { return }
+            self?.modelSizes = sizes
         }
     }
 
@@ -1314,25 +1315,22 @@ final class AppModel {
         guard !modelsBeingDeleted.contains(name) else { return }
         modelsBeingDeleted.insert(name)
         let store = self.store
-        Task.detached(priority: .userInitiated) { [weak self] in
-            let result: Result<Void, Error>
+        Task { [weak self] in
+            let failure: (any Error)?
             do {
-                try store.deleteAny(idOrPath: name)
-                result = .success(())
+                try await AppModel.offMainIO { try store.deleteAny(idOrPath: name) }
+                failure = nil
             } catch {
-                result = .failure(error)
+                failure = error
             }
-            await MainActor.run {
-                guard let self else { return }
-                self.modelsBeingDeleted.remove(name)
-                switch result {
-                case .success:
-                    self.refreshModelList()
-                case .failure(let error):
-                    let message = "Could not delete \(name): \(error.localizedDescription)"
-                    self.phase = .failed(message: message)
-                    self.modelActionError = message
-                }
+            guard let self else { return }
+            self.modelsBeingDeleted.remove(name)
+            if let failure {
+                let message = "Could not delete \(name): \(failure.localizedDescription)"
+                self.phase = .failed(message: message)
+                self.modelActionError = message
+            } else {
+                self.refreshModelList()
             }
         }
     }
@@ -2711,7 +2709,7 @@ final class AppModel {
         guard let transcript else { return }
         let exporter = makeExporter(for: format)
         Task {
-            guard let data = try? await Task.detached(operation: { try exporter.render(transcript) }).value,
+            guard let data = try? await AppModel.offMainIO({ try exporter.render(transcript) }),
                   let text = String(data: data, encoding: .utf8) else {
                 return
             }
