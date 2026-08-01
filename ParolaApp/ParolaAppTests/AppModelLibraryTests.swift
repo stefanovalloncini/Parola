@@ -230,6 +230,17 @@ struct AppModelLibraryTests {
         #expect(model.allKnownLabels.isEmpty)
     }
 
+    @Test("allKnownLabels picks up a relabelled entry")
+    func knownLabelsFollowMutations() {
+        let model = makeModel()
+        model.libraryEntries = [Self.entry(id: "1", title: "x", createdAt: Self.baseDate, labels: ["draft"])]
+        #expect(model.allKnownLabels == ["draft"])
+
+        model.libraryEntries = [Self.entry(id: "1", title: "x", createdAt: Self.baseDate, labels: ["draft", "final"])]
+
+        #expect(model.allKnownLabels == ["draft", "final"])
+    }
+
     @Test("search with an empty query clears searchResults and skips the debounce")
     func searchEmptyQueryClearsResults() {
         let model = makeModel()

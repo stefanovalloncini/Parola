@@ -180,17 +180,6 @@ extension AppModel {
         return entry.note(forSegment: segmentID)
     }
 
-    var allKnownLabels: [String] {
-        var seen = Set<String>()
-        var ordered: [String] = []
-        for entry in libraryEntries {
-            for label in entry.labels {
-                if seen.insert(label).inserted { ordered.append(label) }
-            }
-        }
-        return ordered.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
-    }
-
     func deleteEntry(_ id: LibraryEntry.ID) {
         Task { [weak self] in
             guard let self else { return }

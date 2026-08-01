@@ -830,6 +830,26 @@ final class AppModel {
         _ = libraryVersion
         return libraryEntriesByID[id]
     }
+
+    @ObservationIgnored private var cachedKnownLabels: [String] = []
+    @ObservationIgnored private var cachedKnownLabelsVersion: Int = -1
+
+    /// Scanned and sorted once per library version; the inspector reads it several times per body.
+    var allKnownLabels: [String] {
+        let version = libraryVersion
+        if cachedKnownLabelsVersion == version { return cachedKnownLabels }
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for entry in libraryEntries {
+            for label in entry.labels where seen.insert(label).inserted {
+                ordered.append(label)
+            }
+        }
+        ordered.sort { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        cachedKnownLabels = ordered
+        cachedKnownLabelsVersion = version
+        return ordered
+    }
     var libraryFilter: EntryCategory?
     /// True when the "All" chip is showing the flat all-categories list. Distinguishes All from Home, which both leave libraryFilter nil.
     var libraryBrowsingAll: Bool = false
