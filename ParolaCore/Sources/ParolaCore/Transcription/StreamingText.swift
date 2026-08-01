@@ -21,12 +21,29 @@ public enum StreamingText {
     private static func slideOverlap(shown: String, latest: String) -> Int? {
         let minOverlap = (latest.count + 1) / 2
         guard minOverlap > 0 else { return nil }
-        var k = min(shown.count, latest.count)
-        while k >= minOverlap {
-            if shown.suffix(k) == latest.prefix(k) { return k }
-            k -= 1
+        let overlap = longestSuffixPrefix(shown: shown, latest: latest)
+        return overlap >= minOverlap ? overlap : nil
+    }
+
+    /// Knuth-Morris-Pratt border scan: one pass over `shown` against the prefix table of `latest`,
+    /// so a rewrite that shares nothing costs O(n) instead of a descending suffix comparison.
+    private static func longestSuffixPrefix(shown: String, latest: String) -> Int {
+        let pattern = Array(latest)
+        guard !pattern.isEmpty else { return 0 }
+        var border = [Int](repeating: 0, count: pattern.count)
+        var span = 0
+        for index in 1..<pattern.count {
+            while span > 0, pattern[index] != pattern[span] { span = border[span - 1] }
+            if pattern[index] == pattern[span] { span += 1 }
+            border[index] = span
         }
-        return nil
+        var matched = 0
+        for character in shown {
+            if matched == pattern.count { matched = border[matched - 1] }
+            while matched > 0, character != pattern[matched] { matched = border[matched - 1] }
+            if character == pattern[matched] { matched += 1 }
+        }
+        return matched
     }
 
     /// The trailing `maxChars` of `text`, advanced past a leading half word so the cut never
