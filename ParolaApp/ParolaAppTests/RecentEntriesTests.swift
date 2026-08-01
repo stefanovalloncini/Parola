@@ -47,6 +47,19 @@ struct RecentEntriesTests {
         #expect(RecentEntries.most(of: [entry("a", at: 1)], limit: -3).isEmpty)
     }
 
+    @Test("entries sharing a timestamp keep the order they arrived in")
+    func tiesKeepArrivalOrder() {
+        let entries = [entry("a", at: 100), entry("b", at: 100), entry("c", at: 100)]
+        #expect(RecentEntries.most(of: entries, limit: 10).map(\.id) == ["a", "b", "c"])
+        #expect(RecentEntries.most(of: entries, limit: 2).map(\.id) == ["a", "b"])
+    }
+
+    @Test("a tie at the cut keeps the entry already in the list")
+    func tieAtCutKeepsIncumbent() {
+        let entries = [entry("a", at: 300), entry("b", at: 100), entry("c", at: 100)]
+        #expect(RecentEntries.most(of: entries, limit: 2).map(\.id) == ["a", "b"])
+    }
+
     @Test("matches a full sort over a large shuffled library")
     func matchesFullSort() {
         let entries = (0..<400).map { entry("e\($0)", at: TimeInterval($0)) }.shuffled()

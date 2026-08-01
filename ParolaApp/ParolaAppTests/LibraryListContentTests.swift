@@ -44,12 +44,15 @@ struct LibraryListContentTests {
         )
     }
 
-    private func makeModel() -> AppModel {
-        AppModel(
+    /// AppModel's init kicks off a library refresh; letting it land keeps it from clobbering the seeded entries.
+    private func makeModel() async -> AppModel {
+        let model = AppModel(
             skipBootstrap: true,
             defaults: UserDefaults(suiteName: "test-\(UUID())")!,
             libraryURL: makeTempLibraryURL("listcontent")
         )
+        await model.libraryRefreshTask?.value
+        return model
     }
 
     @Test("keeps the order the model sorted the entries into")
@@ -63,8 +66,8 @@ struct LibraryListContentTests {
     }
 
     @Test("the sidebar sort order drives the rendered list")
-    func sortOrderDrivesList() {
-        let model = makeModel()
+    func sortOrderDrivesList() async {
+        let model = await makeModel()
         model.libraryEntries = [
             entry(id: "a", title: "Banana", offset: 100),
             entry(id: "b", title: "apple", offset: 300),
@@ -82,8 +85,8 @@ struct LibraryListContentTests {
     }
 
     @Test("pinned entries stay on top without reshuffling the rest")
-    func pinnedStayOnTop() {
-        let model = makeModel()
+    func pinnedStayOnTop() async {
+        let model = await makeModel()
         model.libraryEntries = [
             entry(id: "a", title: "Banana", offset: 100),
             entry(id: "b", title: "apple", offset: 300, pinned: true),

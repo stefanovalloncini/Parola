@@ -53,8 +53,7 @@ final class MenuBarController {
             _ = model.dictationState
             _ = model.libraryEntries
         } onChange: { [weak self] in
-            // Re-register before rebuilding: tracking is one-shot, so the next read has to
-            // re-arm it and pick up whatever landed while nothing was watching.
+            // Tracking is one-shot: re-arm before rebuilding so nothing that lands meanwhile is missed.
             Task { @MainActor in self?.observeAndRefresh() }
         }
         refresh()
