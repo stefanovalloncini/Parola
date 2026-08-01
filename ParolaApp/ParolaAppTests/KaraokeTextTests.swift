@@ -85,4 +85,49 @@ struct KaraokeTextTests {
         #expect(inactive?.foregroundColor != nil)
         #expect(active?.foregroundColor != inactive?.foregroundColor)
     }
+
+    // MARK: - Synthetic karaoke
+
+    private func cumulative(_ tokens: [String]) -> [Int] {
+        var running = 0
+        return tokens.map {
+            running += $0.count
+            return running
+        }
+    }
+
+    @Test("tokenizing drops the whitespace between words")
+    func syntheticTokensDropWhitespace() {
+        #expect(SegmentCard.syntheticKaraokeTokens("  ciao \n mondo  ") == ["ciao", "mondo"])
+        #expect(SegmentCard.syntheticKaraokeTokens("   ").isEmpty)
+    }
+
+    @Test("the spoken token walks from the first to the last across the segment")
+    func syntheticIndexWalksTokens() {
+        let counts = cumulative(["uno", "due", "tre"])
+        #expect(SegmentCard.syntheticKaraokeIndex(cumulativeChars: counts, progress: 0) == 0)
+        #expect(SegmentCard.syntheticKaraokeIndex(cumulativeChars: counts, progress: 0.5) == 1)
+        #expect(SegmentCard.syntheticKaraokeIndex(cumulativeChars: counts, progress: 1) == 2)
+    }
+
+    @Test("progress outside 0…1 clamps to the first and last token")
+    func syntheticIndexClamps() {
+        let counts = cumulative(["uno", "due", "tre"])
+        #expect(SegmentCard.syntheticKaraokeIndex(cumulativeChars: counts, progress: -3) == 0)
+        #expect(SegmentCard.syntheticKaraokeIndex(cumulativeChars: counts, progress: 9) == 2)
+    }
+
+    @Test("the rendered line keeps the words spaced with no trailing space")
+    func syntheticTextJoinsWords() {
+        let attr = SegmentCard.syntheticKaraokeText(tokens: ["uno", "due", "tre"], spokenIndex: 1)
+        #expect(String(attr.characters) == "uno due tre")
+    }
+
+    @Test("exactly one token carries the highlight")
+    func syntheticTextHighlightsOneToken() {
+        let attr = SegmentCard.syntheticKaraokeText(tokens: ["uno", "due", "tre"], spokenIndex: 1)
+        let colored = attr.runs.filter { $0.foregroundColor != nil }
+        #expect(colored.count == 1)
+        #expect(colored.first.map { String(attr[$0.range].characters) } == "due ")
+    }
 }

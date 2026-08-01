@@ -204,7 +204,7 @@ struct SegmentCard: View {
                     return .handled
                 })
         } else if isCurrent, model.karaokeHighlight, model.player != nil {
-            syntheticKaraoke
+            SyntheticKaraoke(segment: segment)
                 .font(DS.Font.transcript)
                 .textSelection(.enabled)
         } else {
@@ -378,32 +378,27 @@ struct SegmentCard: View {
         isEditing = false
     }
 
-    private var syntheticKaraoke: Text {
-        let tokens = segment.text
-            .components(separatedBy: .whitespacesAndNewlines)
-            .filter { !$0.isEmpty }
-        guard !tokens.isEmpty else { return Text(segment.text) }
+    nonisolated static func syntheticKaraokeTokens(_ text: String) -> [String] {
+        text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+    }
 
-        let elapsed = max(0, model.currentTimeSeconds - segment.start)
-        let span = max(0.001, segment.end - segment.start)
-        let progress = min(1.0, elapsed / span)
-        let totalChars = tokens.reduce(0) { $0 + $1.count }
-        let target = Int((progress * Double(totalChars)).rounded())
+    nonisolated static func syntheticKaraokeIndex(cumulativeChars: [Int], progress: Double) -> Int {
+        guard let total = cumulativeChars.last, total > 0 else { return cumulativeChars.count - 1 }
+        let target = Int((min(1.0, max(0, progress)) * Double(total)).rounded())
+        return cumulativeChars.firstIndex { $0 >= target } ?? cumulativeChars.count - 1
+    }
 
-        var acc = 0
-        var marked = false
+    static func syntheticKaraokeText(tokens: [String], spokenIndex: Int) -> AttributedString {
         var attr = AttributedString()
-        for (i, token) in tokens.enumerated() {
-            acc += token.count
-            var piece = AttributedString(token + (i == tokens.count - 1 ? "" : " "))
-            if !marked && (acc >= target || i == tokens.count - 1) {
+        for (index, token) in tokens.enumerated() {
+            var piece = AttributedString(token + (index == tokens.count - 1 ? "" : " "))
+            if index == spokenIndex {
                 piece.foregroundColor = DS.Color.highlight
                 piece.font = .body.bold()
-                marked = true
             }
             attr.append(piece)
         }
-        return Text(attr)
+        return attr
     }
 
     private var highlightedText: Text {
@@ -469,5 +464,49 @@ struct SegmentCard: View {
             return "\(stamp)  \(speaker): \(body)"
         }
         return "\(stamp)  \(body)"
+    }
+}
+
+/// Owns the playback tick so the whole card doesn't re-render five times a second while a segment plays.
+private struct SyntheticKaraoke: View {
+    let segment: TranscriptSegment
+
+    @Environment(AppModel.self) private var model
+    private let tokens: [String]
+    private let cumulativeChars: [Int]
+
+    init(segment: TranscriptSegment) {
+        self.segment = segment
+        let tokens = SegmentCard.syntheticKaraokeTokens(segment.text)
+        self.tokens = tokens
+        var running = 0
+        cumulativeChars = tokens.map {
+            running += $0.count
+            return running
+        }
+    }
+
+    var body: some View {
+        if tokens.isEmpty {
+            Text(segment.text)
+        } else {
+            SyntheticKaraokeLine(tokens: tokens, spokenIndex: spokenIndex)
+                .equatable()
+        }
+    }
+
+    private var spokenIndex: Int {
+        let elapsed = max(0, model.currentTimeSeconds - segment.start)
+        let span = max(0.001, segment.end - segment.start)
+        return SegmentCard.syntheticKaraokeIndex(cumulativeChars: cumulativeChars, progress: elapsed / span)
+    }
+}
+
+private struct SyntheticKaraokeLine: View, Equatable {
+    let tokens: [String]
+    let spokenIndex: Int
+
+    var body: some View {
+        Text(SegmentCard.syntheticKaraokeText(tokens: tokens, spokenIndex: spokenIndex))
     }
 }
