@@ -143,7 +143,7 @@ struct ParolaApp: App {
                 }
                 Button("Save As Parola Document…") { model.saveProjectDocument() }
                     .keyboardShortcut("s")
-                    .disabled(model.transcript == nil)
+                    .disabled(!model.hasTranscript)
             }
             CommandGroup(after: .sidebar) {
                 @Bindable var model = model
@@ -154,23 +154,23 @@ struct ParolaApp: App {
                     DefaultsStore.current.set(!visible, forKey: "inspectorVisible")
                 }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
-                .disabled(model.transcript == nil)
+                .disabled(!model.hasTranscript)
                 Toggle("Always on Top", isOn: $model.mainWindowAlwaysOnTop)
                 MiniPlayerCommand()
             }
             CommandGroup(after: .textEditing) {
                 Button("Find…") { model.toggleFind() }
                     .keyboardShortcut("f", modifiers: [.command])
-                    .disabled(model.transcript == nil)
+                    .disabled(!model.hasTranscript)
                 Button("Find Next") { model.goToNextMatch() }
                     .keyboardShortcut("g", modifiers: [.command])
-                    .disabled(!model.findIsOpen || model.matches.isEmpty)
+                    .disabled(!model.findIsOpen || !model.hasMatches)
                 Button("Find Previous") { model.goToPreviousMatch() }
                     .keyboardShortcut("g", modifiers: [.command, .shift])
-                    .disabled(!model.findIsOpen || model.matches.isEmpty)
+                    .disabled(!model.findIsOpen || !model.hasMatches)
                 Button("Replace All") { model.replaceAllMatches() }
                     .keyboardShortcut("e", modifiers: [.command, .option])
-                    .disabled(!model.findIsOpen || model.matches.isEmpty)
+                    .disabled(!model.findIsOpen || !model.hasMatches)
                 Divider()
                 Button("Auto-detect Language") { model.selectedLanguage = nil }
                     .keyboardShortcut("d", modifiers: [.command, .shift])
@@ -213,25 +213,25 @@ struct ParolaApp: App {
             CommandMenu("Transcript") {
                 Button("Copy Plain Text") { model.copyTranscriptToPasteboard(withTimestamps: false) }
                     .keyboardShortcut("c", modifiers: [.command, .shift])
-                    .disabled(model.transcript == nil)
+                    .disabled(!model.hasTranscript)
                 Button("Copy with Timestamps") { model.copyTranscriptToPasteboard(withTimestamps: true) }
                     .keyboardShortcut("c", modifiers: [.command, .option])
-                    .disabled(model.transcript == nil)
+                    .disabled(!model.hasTranscript)
                 Button("Copy as SRT") { model.copyTranscriptAsFormat(.srt) }
-                    .disabled(model.transcript == nil)
+                    .disabled(!model.hasTranscript)
                 Button("Send via Mail…") { model.shareTranscriptViaMail() }
                     .keyboardShortcut("m", modifiers: [.command, .shift])
-                    .disabled(model.transcript == nil)
+                    .disabled(!model.hasTranscript)
                 Button("Share…") { model.shareTranscriptAsTextFile() }
-                    .disabled(model.transcript == nil)
+                    .disabled(!model.hasTranscript)
                 Divider()
                 Button("Jump to Next Speaker") { model.jumpToNextSpeaker() }
                     .keyboardShortcut("j", modifiers: [.command, .shift])
-                    .disabled(model.transcript == nil)
+                    .disabled(!model.hasTranscript)
                 Button("Copy as Markdown") { model.copyTranscriptAsFormat(.md) }
-                    .disabled(model.transcript == nil)
+                    .disabled(!model.hasTranscript)
                 Button("Export Segment Notes…") { model.exportSegmentNotesAsMarkdown() }
-                    .disabled(model.transcript == nil)
+                    .disabled(!model.hasTranscript)
                 Divider()
                 Menu("Export As") {
                     Button("TXT…") { model.exportRequest(.txt) }
@@ -249,7 +249,7 @@ struct ParolaApp: App {
                     Button("Final Cut Pro XML…") { model.exportRequest(.fcpxml) }
                     Button("LRC…") { model.exportRequest(.lrc) }
                 }
-                .disabled(model.transcript == nil)
+                .disabled(!model.hasTranscript)
                 Divider()
                 Button("Open in New Window") {
                     if let t = model.transcript {
@@ -262,14 +262,14 @@ struct ParolaApp: App {
                     }
                 }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
-                .disabled(model.transcript == nil)
+                .disabled(!model.hasTranscript)
                 Divider()
                 Button("Print Transcript…") { model.printTranscript() }
                     .keyboardShortcut("p", modifiers: [.command])
-                    .disabled(model.transcript == nil)
+                    .disabled(!model.hasTranscript)
                 Divider()
                 Button("Burn Subtitles into Video…") { model.requestBurnSubtitles() }
-                    .disabled(model.transcript == nil)
+                    .disabled(!model.hasTranscript)
             }
         }
 

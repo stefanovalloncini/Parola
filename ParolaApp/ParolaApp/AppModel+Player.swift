@@ -40,7 +40,8 @@ extension AppModel {
         timeControlObserver = p.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
             let playing = player.timeControlStatus == .playing
             Task { @MainActor in
-                self?.isPlaying = playing
+                guard let self, self.isPlaying != playing else { return }
+                self.isPlaying = playing
             }
         }
         let asset = AVURLAsset(url: url)

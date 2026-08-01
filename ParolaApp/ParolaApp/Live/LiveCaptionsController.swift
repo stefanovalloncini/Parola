@@ -8,7 +8,16 @@ import SwiftUI
 final class LiveCaptionsController {
     @ObservationIgnored private static let timestampFormatter = ISO8601DateFormatter()
 
-    var state: LiveCaptionsState = LiveCaptionsState()
+    var state: LiveCaptionsState = LiveCaptionsState() {
+        didSet {
+            if isActive != state.isActive { isActive = state.isActive }
+            let history = !(state.confirmedLines.isEmpty && state.partial.isEmpty)
+            if hasHistory != history { hasHistory = history }
+        }
+    }
+    /// Mirrors of `state` the Captions menu reads, so a streaming partial doesn't rebuild the command tree.
+    private(set) var isActive: Bool = false
+    private(set) var hasHistory: Bool = false
     var translateToEnglish: Bool = false
 
     private var panel: NSPanel?
@@ -23,8 +32,6 @@ final class LiveCaptionsController {
     }
 
     var isPresenterOpen: Bool { presenterWindow != nil }
-
-    var isActive: Bool { state.isActive }
 
     func toggle(options: TranscriptionOptions, deviceUID: String? = nil) async {
         if state.isActive {
@@ -135,10 +142,6 @@ final class LiveCaptionsController {
         } else {
             openPresenter()
         }
-    }
-
-    var hasHistory: Bool {
-        !(state.confirmedLines.isEmpty && state.partial.isEmpty)
     }
 
     func saveCaptionsHistory() {

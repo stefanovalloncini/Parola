@@ -67,10 +67,13 @@ final class AppModel {
             cachedTranscriptText = nil
             let speakers = transcript?.uniqueSpeakers ?? []
             if speakers != transcriptSpeakers { transcriptSpeakers = speakers }
+            if hasTranscript != (transcript != nil) { hasTranscript = transcript != nil }
             transcriptVersion &+= 1
             if findIsOpen { scheduleRecomputeMatches() }
         }
     }
+    /// Menu enablement reads this instead of the transcript itself, so a segment edit doesn't rebuild the whole command tree.
+    private(set) var hasTranscript: Bool = false
     private(set) var transcriptSpeakers: [String] = []
     private(set) var transcriptVersion: Int = 0
     @ObservationIgnored private var cachedTranscriptText: String?
@@ -240,7 +243,13 @@ final class AppModel {
     var findQuery: String = "" { didSet { scheduleRecomputeMatches() } }
     var findCaseSensitive: Bool = false { didSet { scheduleRecomputeMatches() } }
     var findReplacement: String = ""
-    var matches: [TranscriptMatch] = [] { didSet { rebuildMatchesIndex() } }
+    var matches: [TranscriptMatch] = [] {
+        didSet {
+            rebuildMatchesIndex()
+            if hasMatches != !matches.isEmpty { hasMatches = !matches.isEmpty }
+        }
+    }
+    private(set) var hasMatches: Bool = false
     @ObservationIgnored var matchesBySegment: [Int: [TranscriptMatch]] = [:]
     var currentMatchIndex: Int = 0
     @ObservationIgnored var matchesDebounce: Task<Void, Never>?
