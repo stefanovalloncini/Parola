@@ -214,7 +214,8 @@ struct AccessibilityTreeWalkerTests {
     }
 }
 
-@Suite("Bridge main-thread hand-off")
+// The deadline test wedges main, so the suite runs one at a time and the wedge stays short enough not to stall the run.
+@Suite("Bridge main-thread hand-off", .serialized)
 struct OnMainThreadTests {
 
     @Test("the work runs on the main thread and its value comes back")
@@ -232,13 +233,16 @@ struct OnMainThreadTests {
         }
     }
 
-    @Test("a wedged main thread fails the call at the deadline")
+    @Test("a wedged main thread fails the call at the deadline with TIMEOUT")
     func deadlineFailsCleanly() async throws {
-        DispatchQueue.main.async { Thread.sleep(forTimeInterval: 0.4) }
+        DispatchQueue.main.async { Thread.sleep(forTimeInterval: 0.2) }
         try? await Task.sleep(for: .milliseconds(20))
 
-        await #expect(throws: AutomationError.self) {
-            try await onMainThread(deadlineSeconds: 0.05) { true }
+        do {
+            _ = try await onMainThread(deadlineSeconds: 0.05) { true }
+            Issue.record("expected the deadline to fire")
+        } catch let error as AutomationError {
+            #expect(error.code == "TIMEOUT")
         }
     }
 }

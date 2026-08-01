@@ -8,6 +8,7 @@ enum AutomationError: Error {
     case notFound(kind: String, id: String)
     case `internal`(String)
     case appDead(String)
+    case timeout(String)
 }
 
 extension AutomationError {
@@ -20,6 +21,7 @@ extension AutomationError {
         case .notFound: return "NOT_FOUND"
         case .internal: return "INTERNAL"
         case .appDead: return "APP_DEAD"
+        case .timeout: return "TIMEOUT"
         }
     }
 
@@ -39,6 +41,8 @@ extension AutomationError {
             return reason
         case .appDead(let reason):
             return reason
+        case .timeout(let reason):
+            return reason
         }
     }
 
@@ -48,7 +52,7 @@ extension AutomationError {
             return ["field": .string(field), "reason": .string(reason)]
         case .unknownCommand(let cmd):
             return ["command": .string(cmd)]
-        case .precondition, .permission, .internal, .appDead:
+        case .precondition, .permission, .internal, .appDead, .timeout:
             return [:]
         case .notFound(let kind, let id):
             return ["kind": .string(kind), "id": .string(id)]

@@ -136,10 +136,8 @@ private func requireAXTrust() throws {
     }
 }
 
-/// AX queries against the app's OWN process are answered inline on the calling thread — HIServices
-/// hands `_AXXMIG*` straight to AppKit instead of messaging — so SwiftUI evaluates its accessibility
-/// nodes right here, and only the main thread is legal. Nothing blocks waiting on main, so this
-/// can't deadlock the way an out-of-process query would; `deadline` only covers a wedged main thread.
+/// Same-process AX is answered inline on the calling thread, so SwiftUI evaluates its nodes here and only main is legal.
+/// A press that opens a modal holds main until the modal closes, so it comes back as `timeout` even though it landed.
 private func onAXThread(_ work: @escaping @MainActor @Sendable () throws -> AutomationValue) async throws -> AutomationValue {
     try await onMainThread(deadlineSeconds: 5, work)
 }
@@ -152,30 +150,41 @@ func onMainThread<T: Sendable>(
 ) async throws -> T {
     try await withCheckedThrowingContinuation { continuation in
         let winner = FirstResume()
+        let watchdog = DispatchWorkItem {
+            if winner.claim() {
+                continuation.resume(throwing: AutomationError.timeout("main thread did not answer within \(deadlineSeconds)s"))
+            }
+        }
+        winner.arm(watchdog)
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
                 let result = Result { try work() }
                 if winner.claim() { continuation.resume(with: result) }
             }
         }
-        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + deadlineSeconds) {
-            if winner.claim() {
-                continuation.resume(throwing: AutomationError.precondition("main thread did not answer within \(deadlineSeconds)s"))
-            }
-        }
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + deadlineSeconds, execute: watchdog)
     }
 }
 
-// @unchecked is safe: the only state is `taken`, guarded by the lock.
+// @unchecked is safe: both fields are guarded by the lock.
 private final class FirstResume: @unchecked Sendable {
     private let lock = NSLock()
     private var taken = false
+    private var watchdog: DispatchWorkItem?
+
+    func arm(_ item: DispatchWorkItem) {
+        lock.lock()
+        defer { lock.unlock() }
+        watchdog = item
+    }
 
     func claim() -> Bool {
         lock.lock()
         defer { lock.unlock() }
         if taken { return false }
         taken = true
+        watchdog?.cancel()
+        watchdog = nil
         return true
     }
 }

@@ -158,4 +158,13 @@ struct AutomationCommandRegistryTests {
         #expect(error.code == "APP_DEAD")
         #expect(error.details.isEmpty)
     }
+
+    @Test("timeout maps to TIMEOUT and stays distinct from PRECONDITION")
+    func timeoutWire() {
+        let error = AutomationError.timeout("main thread did not answer within 5.0s")
+        #expect(error.code == "TIMEOUT")
+        #expect(error.details.isEmpty)
+        #expect(error.message == "main thread did not answer within 5.0s")
+        #expect(error.code != AutomationError.precondition("x").code)
+    }
 }
