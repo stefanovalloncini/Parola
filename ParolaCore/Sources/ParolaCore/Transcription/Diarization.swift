@@ -66,10 +66,11 @@ actor DiarizationService {
         var rebuilt: [TranscriptSegment] = []
         rebuilt.reserveCapacity(out.segments.count)
         var nextID = (out.segments.map(\.id).max() ?? -1) + 1
+        let intervals = SpeakerIntervals(diarization.segments)
         for seg in out.segments {
             let assigned = assignSpeakers(
                 to: seg,
-                diarization: diarization.segments,
+                diarization: intervals,
                 startingID: &nextID
             )
             rebuilt.append(contentsOf: assigned)
@@ -80,12 +81,12 @@ actor DiarizationService {
 
     static func assignSpeakers(
         to segment: TranscriptSegment,
-        diarization: [SpeakerSegment],
+        diarization: SpeakerIntervals,
         startingID: inout Int
     ) -> [TranscriptSegment] {
         guard let words = segment.words, !words.isEmpty else {
             var copy = segment
-            if let speaker = dominantSpeaker(in: diarization, start: segment.start, end: segment.end) {
+            if let speaker = diarization.dominantSpeaker(start: segment.start, end: segment.end) {
                 copy.speaker = label(for: speaker)
             }
             return [copy]
@@ -95,7 +96,7 @@ actor DiarizationService {
         labeledWords.reserveCapacity(words.count)
         for word in words {
             var labeled = word
-            if let speaker = dominantSpeaker(in: diarization, start: word.start, end: word.end) {
+            if let speaker = diarization.dominantSpeaker(start: word.start, end: word.end) {
                 labeled.speaker = label(for: speaker)
             }
             labeledWords.append(labeled)
@@ -106,7 +107,7 @@ actor DiarizationService {
             var copy = segment
             copy.words = labeledWords
             copy.speaker = labeledWords.first(where: { $0.speaker != nil })?.speaker
-                ?? dominantSpeaker(in: diarization, start: segment.start, end: segment.end).map(label(for:))
+                ?? diarization.dominantSpeaker(start: segment.start, end: segment.end).map(label(for:))
             return [copy]
         }
 
@@ -168,13 +169,66 @@ actor DiarizationService {
         return runs
     }
 
-    private static func dominantSpeaker(
-        in segments: [SpeakerSegment],
-        start: Double,
-        end: Double
-    ) -> SpeakerSegment? {
-        let intervals = segments.map { (start: Double($0.startTime), end: Double($0.endTime)) }
-        return bestMatchIndex(start: start, end: end, intervals: intervals).map { segments[$0] }
+    /// The diarizer's intervals, prepared once per merge. SpeakerKit sorts them by start time but
+    /// lets them overlap across speakers, so a running maximum of the end times is what makes a
+    /// lookup a binary search plus a short forward scan. Unsorted input falls back to a linear scan.
+    struct SpeakerIntervals {
+        private let segments: [SpeakerSegment]
+        private let bounds: [(start: Double, end: Double)]
+        private let maxEnd: [Double]
+        private let sortedByStart: Bool
+
+        init(_ segments: [SpeakerSegment]) {
+            let bounds = segments.map { (start: Double($0.startTime), end: Double($0.endTime)) }
+            var running: [Double] = []
+            running.reserveCapacity(bounds.count)
+            var highest = -Double.infinity
+            for interval in bounds {
+                highest = max(highest, interval.end)
+                running.append(highest)
+            }
+            self.segments = segments
+            self.bounds = bounds
+            self.maxEnd = running
+            self.sortedByStart = zip(bounds, bounds.dropFirst()).allSatisfy { $0.start <= $1.start }
+        }
+
+        func dominantSpeaker(start: Double, end: Double) -> SpeakerSegment? {
+            matchIndex(start: start, end: end).map { segments[$0] }
+        }
+
+        func matchIndex(start: Double, end: Double) -> Int? {
+            guard sortedByStart else {
+                return DiarizationService.bestMatchIndex(start: start, end: end, intervals: bounds)
+            }
+            if end <= start {
+                let i = firstIndex(whereMaxEnd: { $0 >= start })
+                guard i < bounds.count, bounds[i].start <= start else { return nil }
+                return i
+            }
+            var best: Int?
+            var bestOverlap: Double = 0
+            var i = firstIndex(whereMaxEnd: { $0 > start })
+            while i < bounds.count, bounds[i].start < end {
+                let overlap = min(bounds[i].end, end) - max(bounds[i].start, start)
+                if overlap > bestOverlap {
+                    bestOverlap = overlap
+                    best = i
+                }
+                i += 1
+            }
+            return best
+        }
+
+        private func firstIndex(whereMaxEnd reaches: (Double) -> Bool) -> Int {
+            var low = 0
+            var high = maxEnd.count
+            while low < high {
+                let mid = low + (high - low) / 2
+                if reaches(maxEnd[mid]) { high = mid } else { low = mid + 1 }
+            }
+            return low
+        }
     }
 
     /// Index of the interval that best matches `[start, end]` by overlap. A zero-duration query
