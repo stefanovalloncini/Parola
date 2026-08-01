@@ -20,8 +20,9 @@ public enum TranscriptChat {
     ) throws -> TranscriptChatSession {
         try features.require(.ai)
         let budget = budgetTokens ?? defaultBudgetTokens
+        let instructions = systemInstructions(for: transcript)
         let model: any LanguageModel
-        if usesCondensedContext(for: transcript, budgetTokens: budget) {
+        if TokenBudget.estimateTokens(instructions) > budget {
             // Probe availability now so an over-budget session fails at creation like the plain path.
             _ = try makeOnDeviceModel(instructions: "")
             model = CondensedChatModel(
@@ -31,7 +32,7 @@ public enum TranscriptChat {
                 makeModel: { try makeOnDeviceModel(instructions: $0) }
             )
         } else {
-            model = try makeOnDeviceModel(instructions: systemInstructions(for: transcript))
+            model = try makeOnDeviceModel(instructions: instructions)
         }
         return TranscriptChatSession(transcript: transcript, history: history, model: model)
     }
@@ -59,8 +60,9 @@ public enum TranscriptChat {
                     managed: managed
                 )
             }
+            let instructions = systemInstructions(for: transcript)
             let model: any LanguageModel
-            if usesCondensedContext(for: transcript, budgetTokens: budget) {
+            if TokenBudget.estimateTokens(instructions) > budget {
                 // Probe key/policy now so an over-budget session fails at creation like the plain path.
                 _ = try await makeCloudModel("")
                 model = CondensedChatModel(
@@ -72,7 +74,7 @@ public enum TranscriptChat {
                     makeModel: makeCloudModel
                 )
             } else {
-                model = try await makeCloudModel(systemInstructions(for: transcript))
+                model = try await makeCloudModel(instructions)
             }
             return TranscriptChatSession(transcript: transcript, history: history, model: model)
         }
