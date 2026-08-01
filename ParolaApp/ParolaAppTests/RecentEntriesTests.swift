@@ -40,4 +40,17 @@ struct RecentEntriesTests {
     func empty() {
         #expect(RecentEntries.most(of: [], limit: 5).isEmpty)
     }
+
+    @Test("a non-positive limit yields empty output")
+    func nonPositiveLimit() {
+        #expect(RecentEntries.most(of: [entry("a", at: 1)], limit: 0).isEmpty)
+        #expect(RecentEntries.most(of: [entry("a", at: 1)], limit: -3).isEmpty)
+    }
+
+    @Test("matches a full sort over a large shuffled library")
+    func matchesFullSort() {
+        let entries = (0..<400).map { entry("e\($0)", at: TimeInterval($0)) }.shuffled()
+        let expected = entries.sorted { $0.createdAt > $1.createdAt }.prefix(5).map(\.id)
+        #expect(RecentEntries.most(of: entries).map(\.id) == Array(expected))
+    }
 }
