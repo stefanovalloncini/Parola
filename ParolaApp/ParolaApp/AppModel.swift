@@ -865,6 +865,11 @@ final class AppModel {
         fileTranscribeTask != nil || youtubeTranscribeTask != nil || youtubeSubsTask != nil
     }
 
+    /// A stop held for the startup window: no transcribe task yet, but the take still resolves an outcome.
+    var stopHeldForStartup: Bool {
+        recordingStartInFlight && stopRequestedDuringStart
+    }
+
     /// A user-initiated start (file open, YouTube, recording) replaces whichever of these runs
     /// is in flight; letting the old one finish would stomp the new run's transcript later.
     private func cancelTranscriptionRuns() {
@@ -1886,10 +1891,20 @@ final class AppModel {
             let captureTargets = pendingCaptureBundleIDs ?? []
             pendingCaptureBundleIDs = nil
             if source == .microphone, mode == .normal, await AVCaptureDevice.requestAccess(for: .audio) == false {
-                phase = .failed(message: Self.microphoneAccessOffMessage())
+                let message = Self.microphoneAccessOffMessage()
+                phase = .failed(message: message)
+                resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
                 return
             }
             if source == .microphone, await shouldUseStreamingMic() {
+                // The streaming path never reaches adoptLiveSource, so it has to honour the stop itself.
+                guard !stopRequestedDuringStart else {
+                    recordingStartInFlight = false
+                    phase = .idle
+                    resolveRecordingOutcome(.failure(IntentActionError.cancelled))
+                    drainDeferredArrivals()
+                    return
+                }
                 startStreamingMic()
                 return
             }
@@ -1929,15 +1944,17 @@ final class AppModel {
             } catch {
                 await mediaSession.exitRecording()
                 stopRecordingWatch()
-                phase = .failed(message: Self.recordingFailureMessage(for: error, source: source))
+                let message = Self.recordingFailureMessage(for: error, source: source)
+                // Startup can take 20s; anything that already moved the phase on owns it now.
+                if case .recording = phase { phase = .failed(message: message) }
+                recordingStartInFlight = false
+                resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
                 drainDeferredArrivals()
             }
         }
     }
 
-    /// Installs a capture that has just come up, unless Stop was pressed during the startup
-    /// window — a system-audio take can sit there for 20s waiting on consent, and the user's
-    /// Stop has to win over a source that lands after it.
+    /// Drops a capture that came up after the user's Stop — a system-audio take waits up to 20s on consent.
     private func adoptLiveSource(_ source: any LiveAudioSource) async -> Bool {
         guard stopRequestedDuringStart else {
             liveSource = source
@@ -1949,7 +1966,9 @@ final class AppModel {
         await source.cancel()
         await mediaSession.exitRecording()
         pendingRecordingCategory = .transcription
-        phase = .idle
+        if case .recording = phase { phase = .idle }
+        // Clear before draining: a drained batch reads recordingActive to decide whether it owns the phase.
+        recordingStartInFlight = false
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
         drainDeferredArrivals()
         return false

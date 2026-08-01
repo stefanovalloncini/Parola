@@ -303,5 +303,49 @@ extension TranscriberMockSuites {
 
             model.cancelCurrentWork()
         }
+
+        @Test("a stop held for startup resolves its waiter as cancelled", .timeLimit(.minutes(1)))
+        func stopHeldForStartupResolvesWaiter() async throws {
+            let fixture = try makeSilentWAV()
+            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+
+            let model = makeRecordingModel()
+            model.useStreaming = false
+            model.selectedModel = "openai_whisper-tiny"
+            model.recordingCountInSeconds = 0
+
+            model.startRecording(source: .microphone)
+            model.stopRecordingAndTranscribe()
+            #expect(model.stopHeldForStartup, "a stop intent has to wait for the take instead of reporting nothing recording")
+
+            await #expect(throws: IntentActionError.cancelled) {
+                _ = try await model.awaitRecordingOutcome()
+            }
+            await MockAudioSourceRegistry.shared.clear()
+        }
+
+        @Test("a stop during startup also discards a streaming take")
+        func stopDuringStartupWinsOnTheStreamingPath() async throws {
+            await MockAudioSourceRegistry.shared.clear()
+            MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(partials: ["never"]))
+            defer { MockStreamingTranscriberRegistry.shared.clear() }
+
+            let model = makeRecordingModel()
+            model.useStreaming = true
+            model.selectedModel = "openai_whisper-tiny"
+            model.recordingCountInSeconds = 0
+            #expect(await model.shouldUseStreamingMic(), "this test only covers the streaming branch")
+
+            model.startRecording(source: .microphone)
+            #expect(model.recordingActive)
+
+            model.stopRecordingAndTranscribe()
+
+            let settled = await waitUntil { !model.recordingActive }
+            #expect(settled, "the stop must not be swallowed by the streaming startup window")
+            #expect(model.streamingConsumer == nil, "the streaming session must never come up after a stop")
+            #expect(model.phase == .idle)
+            #expect(model.transcript == nil)
+        }
     }
 }

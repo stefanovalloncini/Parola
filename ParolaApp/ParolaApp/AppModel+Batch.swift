@@ -217,6 +217,8 @@ extension AppModel {
             batchJobs.append(contentsOf: urls.map { BatchJob(url: $0) })
         } else if batchJobs.isEmpty {
             startBatch(urls: urls)
+        } else if phaseDefersArrivals || transcribeTaskRunning {
+            deferredArrivals.append(contentsOf: urls)
         } else {
             let newJobs = urls.map { BatchJob(url: $0) }
             batchJobs.append(contentsOf: newJobs)

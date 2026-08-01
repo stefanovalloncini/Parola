@@ -691,6 +691,29 @@ struct AppModelBatchTests {
         model.clearBatch()
     }
 
+    @Test("addBatchFiles defers onto a finished queue while a single-file run is in flight")
+    func addBatchFilesDefersDuringFileTranscription() {
+        let model = makeModel()
+        model.batchJobs = [Self.makeJob("finished", status: .done)]
+        model.fileTranscribeTask = Task {}
+        let url = Self.makeURL("late")
+
+        model.addBatchFiles([url])
+
+        #expect(model.deferredArrivals == [url])
+        #expect(model.batchJobs.map(\.url) == [Self.makeURL("finished")])
+        #expect(model.batchTask == nil)
+
+        model.fileTranscribeTask?.cancel()
+        model.fileTranscribeTask = nil
+        model.phase = .ready
+        model.drainDeferredArrivals()
+
+        #expect(model.deferredArrivals.isEmpty)
+        #expect(model.batchJobs.contains { $0.url == url })
+        model.clearBatch()
+    }
+
     @Test("arrivals during a subtitle burn defer instead of racing the export")
     func exportingDefersArrivals() {
         let model = makeModel()
