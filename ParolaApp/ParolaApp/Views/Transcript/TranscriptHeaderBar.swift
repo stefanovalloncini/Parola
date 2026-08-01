@@ -140,15 +140,15 @@ struct TranscriptHeaderBar: View {
     }
 
     private func rebuildShareItem() {
-        guard let transcript = model.transcript else { shareItem = nil; return }
-        shareItem = TranscriptShareFile(title: title, text: transcript.text)
+        guard model.transcript != nil else { shareItem = nil; return }
+        shareItem = TranscriptShareFile(title: title, text: model.transcriptText)
     }
 
     private func toggleSpeak() {
         if speaker.isSpeaking {
             speaker.stop()
-        } else if let text = model.transcript?.text {
-            speaker.speak(text, languageCode: model.transcript?.language)
+        } else if model.transcript != nil {
+            speaker.speak(model.transcriptText, languageCode: model.transcript?.language)
         }
     }
 

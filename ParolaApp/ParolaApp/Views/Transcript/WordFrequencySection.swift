@@ -26,7 +26,7 @@ struct WordFrequencySection: View {
             }
         }
         .task(id: model.transcriptVersion) {
-            let text = model.transcript?.text ?? ""
+            let text = model.transcriptText
             let stopWords = WordFrequency.stopWords(for: model.transcript?.language)
             entries = await Task.detached {
                 WordFrequency.compute(text: text, limit: 12, stopWords: stopWords)

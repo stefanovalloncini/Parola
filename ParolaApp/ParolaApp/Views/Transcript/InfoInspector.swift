@@ -47,7 +47,7 @@ struct InfoInspector: View {
             }
         }
         .task(id: model.transcriptVersion) {
-            let text = model.transcript?.text ?? ""
+            let text = model.transcriptText
             stats = await Task.detached { TranscriptTextStats.compute(text: text) }.value
         }
     }

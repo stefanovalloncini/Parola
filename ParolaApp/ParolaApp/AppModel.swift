@@ -64,6 +64,7 @@ final class AppModel {
             }
             if transcript == nil, promptOutput != nil { promptOutput = nil }
             currentSegmentIndex = nil
+            cachedTranscriptText = nil
             let speakers = transcript?.uniqueSpeakers ?? []
             if speakers != transcriptSpeakers { transcriptSpeakers = speakers }
             transcriptVersion &+= 1
@@ -72,6 +73,15 @@ final class AppModel {
     }
     private(set) var transcriptSpeakers: [String] = []
     private(set) var transcriptVersion: Int = 0
+    @ObservationIgnored private var cachedTranscriptText: String?
+    /// The full joined transcript, built once per transcript version instead of once per reader.
+    var transcriptText: String {
+        guard let transcript else { return "" }
+        if let cachedTranscriptText { return cachedTranscriptText }
+        let text = transcript.text
+        cachedTranscriptText = text
+        return text
+    }
     // Short-circuits rather than building Transcript.text just to test for emptiness on every view update.
     var transcriptIsEmpty: Bool {
         guard let transcript else { return false }
