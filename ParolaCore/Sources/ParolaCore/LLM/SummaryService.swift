@@ -56,14 +56,15 @@ public actor SummaryService {
         _ transcript: Transcript,
         respond: (String) async throws -> Summary
     ) async throws -> Summary {
-        let prompt = SummaryService.buildPrompt(for: transcript)
+        let lines = transcript.segments.map(TranscriptPromptContext.timestampedLine(for:))
+        let prompt = SummaryService.promptHeader + lines.compactMap { $0 }.joined()
         guard TokenBudget.estimateTokens(prompt) > budgetTokens else {
             return try await respond(prompt)
         }
-        let windows = SummaryService.windows(for: transcript, budgetTokens: budgetTokens)
+        let windows = SummaryService.windowPrompts(for: transcript, lines: lines, budgetTokens: budgetTokens)
         var parts: [Summary] = []
         for window in windows {
-            parts.append(try await respond(SummaryService.buildPrompt(for: window)))
+            parts.append(try await respond(window.prompt))
         }
         let reduced = try await respond(SummaryService.buildReducePrompt(parts.map(\.text)))
         return Summary(text: reduced.text, chapters: SummaryService.mergeChapters(parts.flatMap(\.chapters)))
@@ -119,23 +120,44 @@ public actor SummaryService {
     }
 
     static func windows(for transcript: Transcript, budgetTokens: Int) -> [Transcript] {
+        windowPrompts(
+            for: transcript,
+            lines: transcript.segments.map(TranscriptPromptContext.timestampedLine(for:)),
+            budgetTokens: budgetTokens
+        ).map(\.transcript)
+    }
+
+    static func windowPrompts(
+        for transcript: Transcript,
+        lines: [String?],
+        budgetTokens: Int
+    ) -> [(transcript: Transcript, prompt: String)] {
         let lineBudget = max(1, budgetTokens - TokenBudget.estimateTokens(promptHeader))
-        var windows: [[TranscriptSegment]] = []
+        var windows: [(transcript: Transcript, prompt: String)] = []
         var current: [TranscriptSegment] = []
+        var body = ""
         var used = 0
-        for segment in transcript.segments {
-            let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            let cost = body.isEmpty ? 0 : TokenBudget.estimateTokens("\(Timecode.format(segment.start))  \(body)\n")
-            if !current.isEmpty && used + cost > lineBudget {
-                windows.append(current)
-                current = []
-                used = 0
-            }
+
+        func close() {
+            guard !current.isEmpty else { return }
+            windows.append((
+                Transcript(segments: current, language: transcript.language, modelName: transcript.modelName),
+                promptHeader + body
+            ))
+            current = []
+            body = ""
+            used = 0
+        }
+
+        for (segment, line) in zip(transcript.segments, lines) {
+            let cost = line.map(TokenBudget.estimateTokens) ?? 0
+            if !current.isEmpty && used + cost > lineBudget { close() }
             current.append(segment)
+            if let line { body += line }
             used += cost
         }
-        if !current.isEmpty { windows.append(current) }
-        return windows.map { Transcript(segments: $0, language: transcript.language, modelName: transcript.modelName) }
+        close()
+        return windows
     }
 
     static func buildReducePrompt(_ partSummaries: [String]) -> String {

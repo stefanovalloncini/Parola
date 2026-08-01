@@ -100,6 +100,24 @@ struct SummaryWindowingTests {
         }
     }
 
+    @Test("blank segments cost nothing and never open a window of their own")
+    func blankSegmentsAreFree() throws {
+        var segments = (0..<4).map(segment)
+        for i in 0..<4 {
+            segments.insert(TranscriptSegment(id: 100 + i, start: Double(i) * 300 + 250, end: Double(i) * 300 + 260, text: "  \n"), at: i * 2 + 1)
+        }
+        let transcript = Transcript(segments: segments, language: "en", modelName: "tiny")
+        let windows = SummaryService.windows(for: transcript, budgetTokens: 200)
+        #expect(windows.count == 4)
+        #expect(windows.flatMap(\.segments) == transcript.segments)
+        let prompted = SummaryService.windowPrompts(
+            for: transcript,
+            lines: transcript.segments.map(TranscriptPromptContext.timestampedLine(for:)),
+            budgetTokens: 200
+        )
+        #expect(prompted.map(\.prompt) == windows.map { SummaryService.buildPrompt(for: $0) })
+    }
+
     @Test("a failed window propagates and no reduce call happens")
     func windowFailurePropagates() async throws {
         let transcript = longTranscript()
