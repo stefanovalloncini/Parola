@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import os
 @testable import ParolaCore
 
 @Suite("LibrarySearchIndex")
@@ -238,6 +239,145 @@ struct LibrarySearchIndexTests {
         let index = LibrarySearchIndex(indexURL: url)
         #expect(await index.needsRebuild())
         #expect(await index.search("sprint").isEmpty)
+    }
+
+    @Test("a version-3 snapshot is discarded as stale")
+    func v3SnapshotDiscarded() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-search-test-\(UUID().uuidString).json")
+        let v3 = """
+        {"version":3,"entries":{"e1":{"title":"Old","excerpt":"sprint planning","tokens":["planning","sprint"]}}}
+        """
+        try Data(v3.utf8).write(to: url)
+        let index = LibrarySearchIndex(indexURL: url)
+        #expect(await index.needsRebuild())
+        #expect(await index.search("sprint").isEmpty)
+    }
+
+    @Test("an incrementally updated index matches a from-scratch rebuild")
+    func incrementalMatchesRebuild() async throws {
+        let final: [LibrarySearchIndex.RebuildEntry] = [
+            .init(id: "e1", title: "Stand-up", text: "sprint planning and bug triage", auxiliaryText: "Marta"),
+            .init(id: "e2", title: "Retro v2", text: "retro feedback on the release", auxiliaryText: "kanban"),
+            .init(id: "e4", title: "Weekly", text: "alpha sprint review notes", auxiliaryText: "")
+        ]
+
+        let (incremental, url) = makeTempIndex()
+        await incremental.index(id: "e1", title: "Stand-up", text: "sprint planning and bug triage", auxiliaryText: "Marta", createdAt: Date())
+        await incremental.index(id: "e2", title: "Retro v1", text: "old placeholder text", auxiliaryText: "roadmap", createdAt: Date())
+        await incremental.index(id: "e3", title: "Doomed", text: "zzyzxmarker filler", createdAt: Date())
+        await incremental.index(id: "e4", title: "Weekly", text: "alpha sprint review notes", createdAt: Date())
+        await incremental.index(id: "e2", title: "Retro v2", text: "retro feedback on the release", auxiliaryText: "kanban", createdAt: Date())
+        await incremental.remove("e3")
+        await incremental.flush()
+
+        let (scratch, _) = makeTempIndex()
+        await scratch.rebuild(entries: final)
+
+        let reloaded = LibrarySearchIndex(indexURL: url)
+        let queries = ["sprint", "retro", "alpha", "kanban", "marta", "roadmap", "zzyzxmarker", "notes", "spr"]
+        for query in queries {
+            let a = await keyed(incremental.search(query))
+            let b = await keyed(scratch.search(query))
+            let c = await keyed(reloaded.search(query))
+            #expect(a == b, "query \(query)")
+            #expect(a == c, "query \(query)")
+        }
+    }
+
+    private func keyed(_ matches: [LibrarySearchIndex.Match]) -> [String: LibrarySearchIndex.Match] {
+        Dictionary(uniqueKeysWithValues: matches.map { ($0.entryID, $0) })
+    }
+
+    @Test("a save re-encodes only the entries that changed")
+    func saveEncodesOnlyChangedEntries() async throws {
+        let (index, _) = makeTempIndex()
+        for i in 1...3 {
+            await index.index(id: "e\(i)", title: "Entry \(i)", text: "sprint planning \(i)", createdAt: Date())
+        }
+        await index.flush()
+        let afterFirstSave = await index.entriesEncoded
+        #expect(afterFirstSave == 3)
+
+        await index.flush()
+        #expect(await index.entriesEncoded == afterFirstSave)
+
+        await index.index(id: "e2", title: "Entry 2", text: "retro feedback", createdAt: Date())
+        await index.flush()
+        #expect(await index.entriesEncoded == afterFirstSave + 1)
+    }
+
+    @Test("a cold-loaded entry is encoded once and then reused")
+    func coldLoadEncodesEachEntryOnce() async throws {
+        let (index1, url) = makeTempIndex()
+        for i in 1...3 {
+            await index1.index(id: "e\(i)", title: "Entry \(i)", text: "sprint planning \(i)", createdAt: Date())
+        }
+        await index1.flush()
+
+        let index2 = LibrarySearchIndex(indexURL: url)
+        await index2.index(id: "e2", title: "Entry 2", text: "retro feedback", createdAt: Date())
+        await index2.flush()
+        #expect(await index2.entriesEncoded == 3)
+
+        await index2.index(id: "e1", title: "Entry 1", text: "alpha notes", createdAt: Date())
+        await index2.flush()
+        #expect(await index2.entriesEncoded == 4)
+    }
+
+    @Test("flushing an unchanged index writes nothing")
+    func cleanFlushWritesNothing() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-search-test-\(UUID().uuidString).json")
+        let writes = OSAllocatedUnfairLock(initialState: 0)
+        let index = LibrarySearchIndex(indexURL: url, saveDebounce: .seconds(60), clock: ContinuousClock()) { data, target in
+            writes.withLock { $0 += 1 }
+            try? data.write(to: target, options: .atomic)
+        }
+        await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
+        await index.flush()
+        #expect(writes.withLock { $0 } == 1)
+
+        await index.flush()
+        await index.flush()
+        #expect(writes.withLock { $0 } == 1)
+    }
+
+    @Test("a superseded snapshot write never lands")
+    func supersededWriteDropped() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-search-test-\(UUID().uuidString).json")
+        let gate = DispatchSemaphore(value: 0)
+        let written = OSAllocatedUnfairLock(initialState: 0)
+        let index = LibrarySearchIndex(indexURL: url, saveDebounce: .seconds(60), clock: ContinuousClock()) { data, target in
+            let isFirst = written.withLock { count -> Bool in
+                count += 1
+                return count == 1
+            }
+            if isFirst { gate.wait() }
+            try? data.write(to: target, options: .atomic)
+        }
+
+        await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
+        let first = Task { await index.flush() }
+        while written.withLock({ $0 }) == 0 { try await Task.sleep(for: .milliseconds(1)) }
+
+        await index.index(id: "e2", title: "Two", text: "retro feedback", createdAt: Date())
+        let second = Task { await index.flush() }
+        while await index.snapshotGeneration < 2 { try await Task.sleep(for: .milliseconds(1)) }
+        await index.index(id: "e3", title: "Three", text: "alpha review", createdAt: Date())
+        let third = Task { await index.flush() }
+        while await index.snapshotGeneration < 3 { try await Task.sleep(for: .milliseconds(1)) }
+
+        gate.signal()
+        await first.value
+        await second.value
+        await third.value
+
+        #expect(written.withLock { $0 } == 2)
+        let raw = try #require(String(data: Data(contentsOf: url), encoding: .utf8))
+        #expect(raw.contains("\"e2\""))
+        #expect(raw.contains("\"e3\""))
     }
 
     @Test("a missing snapshot asks for a rebuild")

@@ -1,5 +1,6 @@
 import Foundation
 import NaturalLanguage
+import os
 
 public actor LibrarySearchIndex {
     public struct Highlight: Sendable, Equatable {
@@ -43,18 +44,24 @@ public actor LibrarySearchIndex {
     private struct IndexedEntry: Sendable {
         let title: String
         let excerpt: String
-        let tokens: Set<String>
+        let tokens: [String]
     }
 
-    private struct SnapshotEntry: Codable {
+    private struct SnapshotEntry: Codable, Sendable {
+        let id: String
         let title: String
         let excerpt: String
         let tokens: [String]
     }
 
-    private struct Snapshot: Codable {
+    private struct Snapshot: Decodable {
         let version: Int
-        let entries: [String: SnapshotEntry]
+        let entries: [SnapshotEntry]
+    }
+
+    private enum SnapshotPiece: Sendable {
+        case encoded(Data)
+        case pending(SnapshotEntry)
     }
 
     private struct LoadedState: Sendable {
@@ -74,28 +81,50 @@ public actor LibrarySearchIndex {
         case absentSnapshot
     }
 
-    private static let snapshotVersion = 3
+    private static let snapshotVersion = 4
     private static let excerptLength = 200
+    private static let snapshotPrefix = Data(#"{"version":\#(snapshotVersion),"entries":["#.utf8)
+    private static let snapshotSeparator = Data(",".utf8)
+    private static let snapshotSuffix = Data("]}".utf8)
 
     private var entries: [String: IndexedEntry] = [:]
+    private var encodedEntries: [String: Data] = [:]
     private var inverted: [String: Set<String>] = [:]
     private var sortedTokens: [String]?
     private var isLoaded = false
+    private var isDirty = false
     private var rebuildNeed: RebuildNeed = .none
     private let loadTask: Task<LoadOutcome, Never>
     private let indexURL: URL
     private let saveDebounce: Duration
     private let clock: any Clock<Duration>
     private var pendingSaveTask: Task<Void, Never>?
+    private let writeSnapshotData: @Sendable (Data, URL) -> Void
+    private let writeQueue = DispatchQueue(label: "com.parola.search-index-write", qos: .utility)
+    private let latestGeneration = OSAllocatedUnfairLock(initialState: 0)
+    private(set) var snapshotGeneration = 0
+    private(set) var entriesEncoded = 0
 
     public init(
         indexURL: URL,
         saveDebounce: Duration = .milliseconds(250),
         clock: any Clock<Duration> = ContinuousClock()
     ) {
+        self.init(indexURL: indexURL, saveDebounce: saveDebounce, clock: clock) { data, url in
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+
+    init(
+        indexURL: URL,
+        saveDebounce: Duration,
+        clock: any Clock<Duration>,
+        writeSnapshotData: @escaping @Sendable (Data, URL) -> Void
+    ) {
         self.indexURL = indexURL
         self.saveDebounce = saveDebounce
         self.clock = clock
+        self.writeSnapshotData = writeSnapshotData
         self.loadTask = Task.detached(priority: .utility) {
             Self.loadSnapshot(at: indexURL)
         }
@@ -152,7 +181,8 @@ public actor LibrarySearchIndex {
         pendingSaveTask = nil
         task?.cancel()
         guard isLoaded else { return }
-        saveSnapshot()
+        await saveSnapshot()
+        await drainWrites()
     }
 
     func needsRebuild() async -> Bool {
@@ -163,14 +193,17 @@ public actor LibrarySearchIndex {
     func rebuild(entries rebuilt: [RebuildEntry]) async {
         await ensureLoaded()
         entries.removeAll()
+        encodedEntries.removeAll()
         inverted.removeAll()
         for entry in rebuilt {
             addToIndex(id: entry.id, title: entry.title, text: entry.text, auxiliaryText: entry.auxiliaryText)
         }
         rebuildNeed = .none
+        // A library with nothing to index still needs its empty snapshot on disk, or every launch rescans.
+        isDirty = true
         pendingSaveTask?.cancel()
         pendingSaveTask = nil
-        saveSnapshot()
+        await saveSnapshot()
     }
 
     private func ensureLoaded() async {
@@ -199,31 +232,35 @@ public actor LibrarySearchIndex {
         var entries: [String: IndexedEntry] = [:]
         var inverted: [String: Set<String>] = [:]
         entries.reserveCapacity(snapshot.entries.count)
-        for (id, entry) in snapshot.entries {
-            let tokens = Set(entry.tokens)
-            entries[id] = IndexedEntry(title: entry.title, excerpt: entry.excerpt, tokens: tokens)
-            for token in tokens {
-                inverted[token, default: []].insert(id)
+        for entry in snapshot.entries {
+            entries[entry.id] = IndexedEntry(title: entry.title, excerpt: entry.excerpt, tokens: entry.tokens)
+            for token in entry.tokens {
+                inverted[token, default: []].insert(entry.id)
             }
         }
         return .loaded(LoadedState(entries: entries, inverted: inverted))
     }
 
     private func addToIndex(id: String, title: String, text: String, auxiliaryText: String) {
-        let tokens = Set(Self.tokenize(title) + Self.tokenize(text) + Self.tokenize(auxiliaryText))
-        entries[id] = IndexedEntry(
+        let tokens = Set(Self.tokenize(title) + Self.tokenize(text) + Self.tokenize(auxiliaryText)).sorted()
+        let entry = IndexedEntry(
             title: title,
             excerpt: String(text.prefix(Self.excerptLength)),
             tokens: tokens
         )
+        entries[id] = entry
+        encodedEntries[id] = try? JSONEncoder().encode(Self.snapshotEntry(id: id, entry: entry))
+        entriesEncoded &+= 1
         for token in tokens {
             inverted[token, default: []].insert(id)
         }
         sortedTokens = nil
+        isDirty = true
     }
 
     private func removeFromIndex(_ id: String) {
         guard let entry = entries.removeValue(forKey: id) else { return }
+        encodedEntries.removeValue(forKey: id)
         for token in entry.tokens {
             guard var ids = inverted[token] else { continue }
             ids.remove(id)
@@ -234,6 +271,11 @@ public actor LibrarySearchIndex {
             }
         }
         sortedTokens = nil
+        isDirty = true
+    }
+
+    private static func snapshotEntry(id: String, entry: IndexedEntry) -> SnapshotEntry {
+        SnapshotEntry(id: id, title: entry.title, excerpt: entry.excerpt, tokens: entry.tokens)
     }
 
     private static func firstIndex(in sorted: [String], atLeast key: String) -> Int {
@@ -307,7 +349,7 @@ public actor LibrarySearchIndex {
     }
 
     private func scheduleSave() {
-        if pendingSaveTask != nil { return }
+        guard isDirty, pendingSaveTask == nil else { return }
         let debounce = saveDebounce
         let clock = clock
         pendingSaveTask = Task { [weak self] in
@@ -317,9 +359,9 @@ public actor LibrarySearchIndex {
         }
     }
 
-    private func persistAfterDebounce() {
+    private func persistAfterDebounce() async {
         pendingSaveTask = nil
-        saveSnapshot()
+        await saveSnapshot()
     }
 
     // Saving before the rebuild lands would leave a current-version snapshot that a later launch
@@ -332,15 +374,64 @@ public actor LibrarySearchIndex {
         }
     }
 
-    private func saveSnapshot() {
-        guard canPersistSnapshot else { return }
-        let snapshot = Snapshot(
-            version: Self.snapshotVersion,
-            entries: entries.mapValues {
-                SnapshotEntry(title: $0.title, excerpt: $0.excerpt, tokens: $0.tokens.sorted())
+    private func saveSnapshot() async {
+        guard canPersistSnapshot, isDirty else { return }
+        isDirty = false
+        snapshotGeneration &+= 1
+        let generation = snapshotGeneration
+        latestGeneration.withLock { $0 = generation }
+        var pieces: [SnapshotPiece] = []
+        pieces.reserveCapacity(entries.count)
+        for (id, entry) in entries {
+            if let encoded = encodedEntries[id] {
+                pieces.append(.encoded(encoded))
+            } else {
+                pieces.append(.pending(Self.snapshotEntry(id: id, entry: entry)))
             }
-        )
-        guard let data = try? JSONEncoder().encode(snapshot) else { return }
-        try? data.write(to: indexURL, options: .atomic)
+        }
+        let encoded = await assembleAndWrite(pieces: pieces, generation: generation)
+        entriesEncoded &+= encoded.count
+        // Anything mutated during the write already carries a fresh blob, so only fill the gaps.
+        for (id, blob) in encoded where entries[id] != nil && encodedEntries[id] == nil {
+            encodedEntries[id] = blob
+        }
+    }
+
+    private func assembleAndWrite(pieces: [SnapshotPiece], generation: Int) async -> [String: Data] {
+        let url = indexURL
+        let write = writeSnapshotData
+        let latestGeneration = latestGeneration
+        return await withCheckedContinuation { continuation in
+            writeQueue.async {
+                var encoded: [String: Data] = [:]
+                var body = Self.snapshotPrefix
+                var isFirst = true
+                for piece in pieces {
+                    let blob: Data
+                    switch piece {
+                    case .encoded(let data):
+                        blob = data
+                    case .pending(let entry):
+                        guard let data = try? JSONEncoder().encode(entry) else { continue }
+                        encoded[entry.id] = data
+                        blob = data
+                    }
+                    if !isFirst { body.append(Self.snapshotSeparator) }
+                    body.append(blob)
+                    isFirst = false
+                }
+                body.append(Self.snapshotSuffix)
+                // A snapshot that lost the race must not land on top of the newer one it queued behind.
+                if latestGeneration.withLock({ $0 }) == generation { write(body, url) }
+                continuation.resume(returning: encoded)
+            }
+        }
+    }
+
+    private func drainWrites() async {
+        let queue = writeQueue
+        await withCheckedContinuation { continuation in
+            queue.async { continuation.resume() }
+        }
     }
 }
