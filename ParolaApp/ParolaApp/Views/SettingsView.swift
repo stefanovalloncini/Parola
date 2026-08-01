@@ -77,6 +77,15 @@ enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         default: return []
         }
     }
+
+    var searchTerms: [String] {
+        var terms = [label.lowercased()]
+        terms.append(contentsOf: extraSearchKeywords.map { $0.lowercased() })
+        if let paneScope {
+            terms.append(contentsOf: paneScope.searchKeywords.map { $0.lowercased() })
+        }
+        return terms
+    }
 }
 
 private struct SettingsRouteMeta {
@@ -112,25 +121,45 @@ private struct SettingsRouteMeta {
     ]
 }
 
-private struct SidebarGroup: Identifiable {
-    var id: String { routes.first?.rawValue ?? "empty" }
+struct SidebarGroup: Identifiable {
+    let id: String
     let title: LocalizedStringKey?
     let routes: [SettingsRoute]
 }
 
-@MainActor
-private var sidebarGroups: [SidebarGroup] {
-    [
-        SidebarGroup(title: nil, routes: [.general, .customization, .shortcuts, .updates]),
-        SidebarGroup(title: "CAPTURE", routes: [.microphone, .recordMeetings, .liveCaptions]),
-        SidebarGroup(title: "DICTATION", routes: [.dictation, .snippets, .corrections]),
-        SidebarGroup(title: "SOURCES", routes: [.watchedFolders, .integrations]),
-        SidebarGroup(title: "TRANSCRIPTION", routes: [.localModels, .transcriptionDefaults, .translation, .ignoredSegments, .findReplace]),
-        SidebarGroup(title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport]),
-        SidebarGroup(title: "AI", routes: [.prompts]),
-        SidebarGroup(title: "AUTOMATION", routes: [.automation]),
-        SidebarGroup(title: nil, routes: [.advanced, .about])
-    ]
+enum SettingsSidebarCatalog {
+    static var all: [SidebarGroup] {
+        [
+            SidebarGroup(id: "start", title: nil, routes: [.general, .customization, .shortcuts, .updates]),
+            SidebarGroup(id: "capture", title: "CAPTURE", routes: [.microphone, .recordMeetings, .liveCaptions]),
+            SidebarGroup(id: "dictation", title: "DICTATION", routes: [.dictation, .snippets, .corrections]),
+            SidebarGroup(id: "sources", title: "SOURCES", routes: [.watchedFolders, .integrations]),
+            SidebarGroup(id: "transcription", title: "TRANSCRIPTION", routes: [.localModels, .transcriptionDefaults, .translation, .ignoredSegments, .findReplace]),
+            SidebarGroup(id: "export", title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport]),
+            SidebarGroup(id: "ai", title: "AI", routes: [.prompts]),
+            SidebarGroup(id: "automation", title: "AUTOMATION", routes: [.automation]),
+            SidebarGroup(id: "end", title: nil, routes: [.advanced, .about])
+        ]
+    }
+
+    static func visibleGroups(features: FeatureSet, search: String) -> [SidebarGroup] {
+        let query = search.trimmingCharacters(in: .whitespaces).lowercased()
+        return all.compactMap { group in
+            let routes = group.routes.filter { route in
+                route.isVisible(features: features) && (query.isEmpty || matches(route: route, query: query))
+            }
+            return routes.isEmpty ? nil : SidebarGroup(id: group.id, title: group.title, routes: routes)
+        }
+    }
+
+    static func matches(route: SettingsRoute, query: String) -> Bool {
+        searchTerms[route]?.contains { $0.contains(query) } ?? false
+    }
+
+    /// Lowercased once per launch — a macOS app can't change its language without relaunching.
+    private static let searchTerms: [SettingsRoute: [String]] = Dictionary(
+        uniqueKeysWithValues: SettingsRoute.allCases.map { ($0, $0.searchTerms) }
+    )
 }
 
 // MARK: - Sidebar
@@ -180,25 +209,7 @@ private struct SettingsSidebar: View {
     }
 
     private var filteredGroups: [SidebarGroup] {
-        let visible = sidebarGroups.compactMap { group -> SidebarGroup? in
-            let routes = group.routes.filter { $0.isVisible(features: features) }
-            return routes.isEmpty ? nil : SidebarGroup(title: group.title, routes: routes)
-        }
-        let trimmed = search.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !trimmed.isEmpty else { return visible }
-        return visible.compactMap { group in
-            let hits = group.routes.filter { matches(route: $0, query: trimmed) }
-            return hits.isEmpty ? nil : SidebarGroup(title: group.title, routes: hits)
-        }
-    }
-
-    private func matches(route: SettingsRoute, query: String) -> Bool {
-        if route.label.lowercased().contains(query) { return true }
-        if route.extraSearchKeywords.contains(where: { $0.lowercased().contains(query) }) { return true }
-        if let scope = route.paneScope {
-            return scope.searchKeywords.contains { $0.lowercased().contains(query) }
-        }
-        return false
+        SettingsSidebarCatalog.visibleGroups(features: features, search: search)
     }
 }
 
