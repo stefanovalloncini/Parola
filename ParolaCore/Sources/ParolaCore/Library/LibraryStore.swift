@@ -107,10 +107,8 @@ public actor LibraryStore {
 
     private func primeCaches() async {
         let url = libraryURL
-        // The scan is an await, so a mutation can invalidate the caches mid-scan. Caching that snapshot
-        // would resurrect the pre-mutation state for the next reader (e.g. an un-renamed title), so retry
-        // under the new epoch; the on-actor last resort can't be interleaved at all.
-        for _ in 0..<3 {
+        // A mutation landing during the off-actor scan would cache pre-mutation state, so retry under the new epoch; the on-actor last resort stalls every caller and only exists to terminate.
+        for _ in 0..<8 {
             let epoch = listCacheEpoch
             let entries = await offActorIO { [self] in scanEntries(at: url) }
             if epoch == listCacheEpoch {
@@ -559,6 +557,7 @@ public actor LibraryStore {
         for entry in toPurge {
             do {
                 try FileManager.default.removeItem(at: entry.bundleURL)
+                if cachedLoaded?.id == entry.id { cachedLoaded = nil }
                 await deindexEntry(id: entry.id)
             } catch {
                 continue
@@ -613,9 +612,7 @@ public actor LibraryStore {
     }
 }
 
-/// Continuation + GCD, not `Task.detached`: a detached job resuming actor work around the
-/// NSURL-bridging Foundation calls above has crashed with EXC_ARM_DA_ALIGN before (same class as
-/// the watched-folder bookmark and duration-probe fixes).
+/// GCD, not `Task.detached`: a detached job resuming actor work around these NSURL-bridging calls has crashed with EXC_ARM_DA_ALIGN.
 private func offActorIO<T: Sendable>(
     qos: DispatchQoS.QoSClass = .userInitiated,
     _ work: @escaping @Sendable () -> T

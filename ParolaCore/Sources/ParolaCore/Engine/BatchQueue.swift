@@ -94,18 +94,21 @@ public actor BatchQueue {
             }
             continuation.yield(.started(jobID: job.id))
             do {
-                jobInFlight = true
-                defer { jobInFlight = false }
                 let source = FileAudioSource(url: job.url)
                 let duration = await source.estimatedDuration()
+                let forwarder = Self.progressForwarder(
+                    jobID: job.id,
+                    duration: duration,
+                    continuation: continuation
+                )
+                // Only set once the session call is the very next thing: cancelOwnInFlight would
+                // otherwise cancel whatever else the shared session is running.
+                jobInFlight = true
+                defer { jobInFlight = false }
                 let transcript = try await session.transcribe(
                     source: source,
                     options: options,
-                    progressHandler: Self.progressForwarder(
-                        jobID: job.id,
-                        duration: duration,
-                        continuation: continuation
-                    )
+                    progressHandler: forwarder
                 )
                 continuation.yield(.completed(jobID: job.id, transcript: transcript))
             } catch is CancellationError {
@@ -118,9 +121,7 @@ public actor BatchQueue {
         continuation.finish()
     }
 
-    /// Engines report the latest transcribed second; a file whose duration we can't read gets no
-    /// handler at all, and the rest are throttled to whole percents so a per-window callback
-    /// doesn't flood the stream.
+    /// Throttled to whole percents; a file whose duration we can't read gets no handler at all.
     private static func progressForwarder(
         jobID: UUID,
         duration: Double?,
