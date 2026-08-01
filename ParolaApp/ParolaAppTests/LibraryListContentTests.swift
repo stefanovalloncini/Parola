@@ -1,0 +1,126 @@
+import Foundation
+import Testing
+import ParolaCore
+@testable import Parola
+
+@MainActor
+@Suite("Library list content")
+struct LibraryListContentTests {
+    private static let baseDate = Date(timeIntervalSince1970: 1_700_000_000)
+
+    private func entry(
+        id: String,
+        title: String,
+        offset: TimeInterval,
+        pinned: Bool = false,
+        category: EntryCategory = .transcription,
+        labels: [String] = [],
+        language: String = "en"
+    ) -> LibraryEntry {
+        let manifest = ParolaDocument.Manifest(
+            createdAt: Self.baseDate.addingTimeInterval(offset),
+            originalAudioName: "\(title).m4a",
+            title: title,
+            modelName: "stub",
+            language: language,
+            category: category,
+            labels: labels,
+            pinned: pinned
+        )
+        return LibraryEntry(
+            id: id,
+            bundleURL: URL(fileURLWithPath: "/tmp/LibraryListContentTests/\(id).parola"),
+            manifest: manifest
+        )
+    }
+
+    private func rows(_ entries: [LibraryEntry]) -> [LibraryEntry] {
+        LibraryListContent.rows(
+            from: entries,
+            category: nil,
+            labelFilter: nil,
+            languageFilter: nil,
+            dateRange: .all
+        )
+    }
+
+    private func makeModel() -> AppModel {
+        AppModel(
+            skipBootstrap: true,
+            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            libraryURL: makeTempLibraryURL("listcontent")
+        )
+    }
+
+    @Test("keeps the order the model sorted the entries into")
+    func keepsModelOrder() {
+        let sorted = [
+            entry(id: "a", title: "Apple", offset: 100),
+            entry(id: "b", title: "Banana", offset: 300),
+            entry(id: "c", title: "Cherry", offset: 200),
+        ]
+        #expect(rows(sorted).map(\.id) == ["a", "b", "c"])
+    }
+
+    @Test("the sidebar sort order drives the rendered list")
+    func sortOrderDrivesList() {
+        let model = makeModel()
+        model.libraryEntries = [
+            entry(id: "a", title: "Banana", offset: 100),
+            entry(id: "b", title: "apple", offset: 300),
+            entry(id: "c", title: "Cherry", offset: 200),
+        ]
+
+        model.librarySortOrder = .titleAZ
+        #expect(rows(model.libraryEntries).map(\.id) == ["b", "a", "c"])
+
+        model.librarySortOrder = .oldest
+        #expect(rows(model.libraryEntries).map(\.id) == ["a", "c", "b"])
+
+        model.librarySortOrder = .newest
+        #expect(rows(model.libraryEntries).map(\.id) == ["b", "c", "a"])
+    }
+
+    @Test("pinned entries stay on top without reshuffling the rest")
+    func pinnedStayOnTop() {
+        let model = makeModel()
+        model.libraryEntries = [
+            entry(id: "a", title: "Banana", offset: 100),
+            entry(id: "b", title: "apple", offset: 300, pinned: true),
+            entry(id: "c", title: "Cherry", offset: 200),
+            entry(id: "d", title: "Date", offset: 400, pinned: true),
+        ]
+
+        model.librarySortOrder = .titleAZ
+        #expect(rows(model.libraryEntries).map(\.id) == ["b", "d", "a", "c"])
+    }
+
+    @Test("filters by category, label, language and date range")
+    func filters() {
+        let entries = [
+            entry(id: "a", title: "Alpha", offset: 100, labels: ["work"]),
+            entry(id: "b", title: "Beta", offset: 200, category: .meeting, labels: ["Work"]),
+            entry(id: "c", title: "Gamma", offset: 300, language: "it"),
+        ]
+
+        let byCategory = LibraryListContent.rows(
+            from: entries, category: .meeting, labelFilter: nil, languageFilter: nil, dateRange: .all
+        )
+        #expect(byCategory.map(\.id) == ["b"])
+
+        let byLabel = LibraryListContent.rows(
+            from: entries, category: nil, labelFilter: "work", languageFilter: nil, dateRange: .all
+        )
+        #expect(byLabel.map(\.id) == ["a", "b"])
+
+        let byLanguage = LibraryListContent.rows(
+            from: entries, category: nil, labelFilter: nil, languageFilter: "IT", dateRange: .all
+        )
+        #expect(byLanguage.map(\.id) == ["c"])
+
+        let byDate = LibraryListContent.rows(
+            from: entries, category: nil, labelFilter: nil, languageFilter: nil, dateRange: .today
+        )
+        #expect(byDate.isEmpty)
+    }
+}

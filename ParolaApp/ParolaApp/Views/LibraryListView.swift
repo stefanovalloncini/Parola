@@ -1,6 +1,30 @@
 import SwiftUI
 import ParolaCore
 
+enum LibraryListContent {
+    static func rows(
+        from entries: [LibraryEntry],
+        category: EntryCategory?,
+        labelFilter: String?,
+        languageFilter: String?,
+        dateRange: LibraryDateRangeFilter
+    ) -> [LibraryEntry] {
+        let cutoff = dateRange.cutoff
+        let filtered = entries.filter { entry in
+            if let category, entry.category != category { return false }
+            if let labelFilter,
+               !entry.labels.contains(where: { $0.localizedCaseInsensitiveCompare(labelFilter) == .orderedSame }) {
+                return false
+            }
+            if let languageFilter, LanguageDisplay.code(for: entry.language) != languageFilter { return false }
+            if let cutoff, entry.createdAt < cutoff { return false }
+            return true
+        }
+        // The entries arrive in the order the sidebar's sort menu picked; only pinning is layered on top.
+        return filtered.filter(\.pinned) + filtered.filter { !$0.pinned }
+    }
+}
+
 struct LibraryListView: View {
     @Environment(AppModel.self) private var model
     let category: EntryCategory?
@@ -24,24 +48,13 @@ struct LibraryListView: View {
         if let searchResults {
             computed = searchResults
         } else {
-            computed = model.libraryEntries
-                .filter { category == nil || $0.category == category }
-                .filter { entry in
-                    guard let labelFilter else { return true }
-                    return entry.labels.contains { $0.localizedCaseInsensitiveCompare(labelFilter) == .orderedSame }
-                }
-                .filter { entry in
-                    guard let languageFilter else { return true }
-                    return LanguageDisplay.code(for: entry.language) == languageFilter
-                }
-                .filter { entry in
-                    guard let cutoff = dateRangeFilter.cutoff else { return true }
-                    return entry.createdAt >= cutoff
-                }
-                .sorted { lhs, rhs in
-                    if lhs.pinned != rhs.pinned { return lhs.pinned }
-                    return lhs.createdAt > rhs.createdAt
-                }
+            computed = LibraryListContent.rows(
+                from: model.libraryEntries,
+                category: category,
+                labelFilter: labelFilter,
+                languageFilter: languageFilter,
+                dateRange: dateRangeFilter
+            )
         }
         entries = computed
         return computed
