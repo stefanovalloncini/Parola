@@ -190,7 +190,7 @@ struct TranscribingPane: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .textSelection(.enabled)
                                 .contentTransition(.interpolate)
-                                .accessibilityLabel(shown)
+                                .accessibilityLabel(partial)
                         }
                         .transition(.opacity)
                         .id(Self.tailID)
