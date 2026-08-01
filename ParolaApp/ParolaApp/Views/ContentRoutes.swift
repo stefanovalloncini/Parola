@@ -65,7 +65,7 @@ struct ContentRoutes: View {
         case .loadingModel(let name):
             ProgressPane(title: "Loading \(AppModel.modelLabel(name))…", progress: nil)
         case .transcribing(let file):
-            TranscribingPane(file: file, partial: model.filePartialText, progress: model.fileTranscribeFraction, expectsPartials: model.activeEngineStreamsPartials, stage: model.fileTranscribeStage)
+            LiveTranscribingPane(file: file)
         case .recording(let source):
             RecordingPane(source: source)
         case .exporting(let progress):
@@ -145,6 +145,23 @@ struct ContentRoutes: View {
 
     private func handleDroppedURLs(_ urls: [URL]) {
         model.handleIncomingFiles(urls)
+    }
+}
+
+/// Owns the route's only reads of the per-partial properties, which arrive several times a second.
+/// Reading them from `ContentRoutes` instead would invalidate the whole detail column each time.
+private struct LiveTranscribingPane: View {
+    @Environment(AppModel.self) private var model
+    let file: URL
+
+    var body: some View {
+        TranscribingPane(
+            file: file,
+            partial: model.filePartialText,
+            progress: model.fileTranscribeFraction,
+            expectsPartials: model.activeEngineStreamsPartials,
+            stage: model.fileTranscribeStage
+        )
     }
 }
 
