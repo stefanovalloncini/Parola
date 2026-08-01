@@ -402,10 +402,14 @@ struct SegmentCard: View {
     }
 
     private var highlightedText: Text {
+        // Only cards holding a match read currentMatchIndex, so stepping through matches leaves the rest alone.
+        guard !model.matches.isEmpty else { return Text(segment.text) }
+        let segmentMatches = model.match(in: segment.id)
+        guard !segmentMatches.isEmpty else { return Text(segment.text) }
         var attr = AttributedString(segment.text)
         let text = segment.text
         let currentMatchID = model.currentMatch?.id
-        for m in model.match(in: segment.id) {
+        for m in segmentMatches {
             guard
                 let stringLo = text.utf16.index(text.utf16.startIndex, offsetBy: m.range.lowerBound, limitedBy: text.utf16.endIndex),
                 let stringHi = text.utf16.index(text.utf16.startIndex, offsetBy: m.range.upperBound, limitedBy: text.utf16.endIndex),
