@@ -66,7 +66,8 @@ struct Models: AsyncParsableCommand {
                 print("\nOTHER INSTALLED")
                 for m in extra {
                     let name = m.name.padding(toLength: nameWidth, withPad: " ", startingAt: 0)
-                    let size = m.approximateSizeBytes.map(humanBytes) ?? "—"
+                    let bytes = m.approximateSizeBytes ?? m.installedURL.flatMap { store.sizeOnDisk(at: $0) }
+                    let size = bytes.map(humanBytes) ?? "—"
                     print("✓  \(name)\(m.label) — \(size)")
                 }
             }

@@ -1,17 +1,26 @@
 import Foundation
+import os
+
+/// The catalog and installed-model views of one filesystem scan.
+public struct ModelScan: Sendable {
+    public let catalog: [ModelInfo]
+    public let installed: [ModelInfo]
+}
 
 /// Manages the on-disk cache of transcription models.
 ///
 /// Both the macOS app and the CLI use the same cache directory so a model
 /// downloaded by either is visible to the other.
 ///
-/// State is immutable after init, so the type is `Sendable` without actor isolation.
+/// Configuration is immutable after init and the scan cache sits behind a lock, so the type is
+/// `Sendable` without actor isolation.
 public final class ModelStore: Sendable {
     public static let shared = ModelStore()
 
     private let modelsDirectory: URL
     private let managedConfiguration: ManagedConfiguration
     private let downloadGate = DownloadGate()
+    private let cachedScanState = OSAllocatedUnfairLock<CachedScan?>(initialState: nil)
 
     public static let storageOverrideKey = "parola.modelsStoragePath"
 
@@ -123,14 +132,150 @@ public final class ModelStore: Sendable {
     /// Returns the curated catalog merged with what's actually on disk.
     /// Filters by the managed-config engine allowlist if one is set.
     public func catalog() -> [ModelInfo] {
-        managedConfiguration.filterAllowed(ModelCatalog.all).map { variant in
-            if variant.engineID == .appleSpeech {
-                return modelInfo(for: variant, url: nil, isInstalled: true)
-            }
-            let url = installedURL(for: variant.downloadSource)
-            let installed = isFullyDownloaded(at: url)
-            return modelInfo(for: variant, url: installed ? url : nil, isInstalled: installed)
+        scan().catalog
+    }
+
+    /// Returns models present on disk, even if not in the curated catalog. Includes
+    /// orphan directories left by older app versions or by engine wrappers that
+    /// used a different naming convention.
+    public func installedModels() throws -> [ModelInfo] {
+        scan().installed
+    }
+
+    /// One scan root's immediate subdirectories, plus the entry names and modification dates that
+    /// tell a repeat scan whether anything under it moved.
+    private struct RootListing: Sendable {
+        let root: URL
+        let directories: [URL]
+        let stamp: [String: Date]
+    }
+
+    private struct ScanRoots: Sendable {
+        let listings: [RootListing]
+        let allowedVariants: [ModelVariant]
+    }
+
+    private struct CachedScan: Sendable {
+        let stamps: [[String: Date]]
+        let allowedVariants: [ModelVariant]
+        let scan: ModelScan
+
+        func matches(_ roots: ScanRoots) -> Bool {
+            allowedVariants == roots.allowedVariants && stamps == roots.listings.map(\.stamp)
         }
+    }
+
+    /// Reads the model directories once and derives both the catalog and installed-model views.
+    /// A repeat call whose scan roots are unchanged replays the previous result.
+    ///
+    /// The stamp covers each root's entries and their modification dates, so an install, a delete
+    /// or a finished download is picked up. A mutation buried deeper — weights appearing inside an
+    /// existing `.mlmodelc` — is not; that model still reports installed until something at the top
+    /// of its directory changes, and a wrong claim surfaces when the engine fails to load it.
+    public func scan() -> ModelScan {
+        let roots = scanRoots()
+        if let cached = cachedScanState.withLock({ $0 }), cached.matches(roots) {
+            return cached.scan
+        }
+        let scan = performScan(roots)
+        cachedScanState.withLock {
+            $0 = CachedScan(
+                stamps: roots.listings.map(\.stamp),
+                allowedVariants: roots.allowedVariants,
+                scan: scan
+            )
+        }
+        return scan
+    }
+
+    /// The last scan, but only while the scan roots still look the way they did when it ran.
+    /// Callers that must not block — the app's main actor — use it to skip a rescan.
+    public func cachedScan() -> ModelScan? {
+        guard let cached = cachedScanState.withLock({ $0 }) else { return nil }
+        return cached.matches(scanRoots()) ? cached.scan : nil
+    }
+
+    private func scanRoots() -> ScanRoots {
+        var seenPaths: Set<String> = []
+        var roots: [URL] = []
+        let candidates = orphanScanRoots + ModelCatalog.all.map {
+            installedURL(for: $0.downloadSource).deletingLastPathComponent()
+        }
+        for candidate in candidates where seenPaths.insert(candidate.standardizedFileURL.path).inserted {
+            roots.append(candidate)
+        }
+
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .isDirectoryKey]
+        let listings = roots.map { root -> RootListing in
+            let entries = (try? FileManager.default.contentsOfDirectory(
+                at: root, includingPropertiesForKeys: keys
+            )) ?? []
+            var stamp: [String: Date] = [:]
+            var directories: [URL] = []
+            for entry in entries {
+                let values = try? entry.resourceValues(forKeys: Set(keys))
+                stamp[entry.lastPathComponent] = values?.contentModificationDate ?? .distantPast
+                if values?.isDirectory == true, !entry.lastPathComponent.hasPrefix(".") {
+                    directories.append(entry)
+                }
+            }
+            return RootListing(root: root, directories: directories, stamp: stamp)
+        }
+        return ScanRoots(
+            listings: listings,
+            allowedVariants: managedConfiguration.filterAllowed(ModelCatalog.all)
+        )
+    }
+
+    private func performScan(_ roots: ScanRoots) -> ModelScan {
+        var catalogEntries: [ModelInfo] = []
+        var installedByID: [String: ModelInfo] = [:]
+
+        for variant in roots.allowedVariants {
+            let url = installedURL(for: variant.downloadSource)
+            let onDisk = isFullyDownloaded(at: url)
+            // Apple Speech ships with macOS: the catalog always calls it installed, and it owns no
+            // directory, so the installed-models view only lists it if one somehow exists.
+            let builtIn = variant.engineID == .appleSpeech
+            catalogEntries.append(modelInfo(
+                for: variant,
+                url: builtIn ? nil : (onDisk ? url : nil),
+                isInstalled: builtIn || onDisk
+            ))
+            if onDisk {
+                installedByID[variant.id] = modelInfo(for: variant, url: url, isInstalled: true)
+            }
+        }
+
+        let reservedPaths: Set<String> = Set(
+            (ModelCatalog.all.map { installedURL(for: $0.downloadSource) } + serviceOwnedDirectories)
+                .map(\.standardizedFileURL.path)
+        )
+        let orphanRootPaths = Set(orphanScanRoots.map(\.standardizedFileURL.path))
+
+        for listing in roots.listings where orphanRootPaths.contains(listing.root.standardizedFileURL.path) {
+            for url in listing.directories {
+                if reservedPaths.contains(url.standardizedFileURL.path) { continue }
+                let id = url.lastPathComponent
+                if installedByID[id] != nil { continue }
+                guard let entries = try? FileManager.default.contentsOfDirectory(
+                    at: url, includingPropertiesForKeys: [.isDirectoryKey]
+                ), containsModelWeights(in: entries) else { continue }
+                installedByID[id] = ModelInfo(
+                    name: id,
+                    label: id,
+                    approximateSizeBytes: nil,
+                    isMultilingual: !id.hasSuffix(".en"),
+                    isInstalled: true,
+                    installedURL: url
+                )
+            }
+        }
+
+        return ModelScan(
+            catalog: catalogEntries,
+            installed: installedByID.values.sorted { $0.name < $1.name }
+        )
     }
 
     /// A model directory counts as installed only when no download sidecar remains and the
@@ -138,18 +283,19 @@ public final class ModelStore: Sendable {
     /// fetch is incomplete and removes it on success; the weights check catches the directories an
     /// engine downloader creates but fills somewhere else.
     private func isFullyDownloaded(at url: URL) -> Bool {
-        guard FileManager.default.fileExists(atPath: url.path) else { return false }
-        let sidecar = url.appendingPathComponent(HuggingFaceDownloader.sidecarFilename)
-        guard !FileManager.default.fileExists(atPath: sidecar.path) else { return false }
-        return containsModelWeights(at: url) && compiledBundlesAreComplete(at: url)
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: url, includingPropertiesForKeys: [.isDirectoryKey]
+        ) else { return false }
+        guard !entries.contains(where: { $0.lastPathComponent == HuggingFaceDownloader.sidecarFilename })
+        else { return false }
+        return containsModelWeights(in: entries) && compiledBundlesAreComplete(in: entries)
     }
 
     /// A compiled CoreML bundle is usable only once its metadata and weights have both landed. An
     /// interrupted fetch leaves the `.mlmodelc` behind with an empty `weights` directory, which
     /// otherwise reads as a finished install and fails at load time with a CoreML parse error.
-    private func compiledBundlesAreComplete(at url: URL) -> Bool {
+    private func compiledBundlesAreComplete(in entries: [URL]) -> Bool {
         let fm = FileManager.default
-        let entries = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
         for bundle in entries where bundle.pathExtension == "mlmodelc" {
             // A compiled bundle is a directory; anything else with that extension isn't one.
             guard (try? bundle.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
@@ -168,59 +314,12 @@ public final class ModelStore: Sendable {
 
     /// True when a directory holds something other than tokenizer/config metadata —
     /// i.e. it actually carries model weights. Hidden entries (`.cache`) are ignored.
-    private func containsModelWeights(at url: URL) -> Bool {
-        guard let entries = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil) else {
-            return false
-        }
-        return entries.contains { entry in
+    private func containsModelWeights(in entries: [URL]) -> Bool {
+        entries.contains { entry in
             let name = entry.lastPathComponent
             guard !name.hasPrefix(".") else { return false }
             return !Self.modelMetadataFilenames.contains(name.lowercased())
         }
-    }
-
-    /// Returns models present on disk, even if not in the curated catalog. Includes
-    /// orphan directories left by older app versions or by engine wrappers that
-    /// used a different naming convention.
-    public func installedModels() throws -> [ModelInfo] {
-        let fm = FileManager.default
-        var seen: [String: ModelInfo] = [:]
-
-        for variant in managedConfiguration.filterAllowed(ModelCatalog.all) {
-            let url = installedURL(for: variant.downloadSource)
-            if isFullyDownloaded(at: url) {
-                seen[variant.id] = modelInfo(for: variant, url: url, isInstalled: true)
-            }
-        }
-
-        let reservedPaths: Set<String> = Set(
-            (ModelCatalog.all.map { installedURL(for: $0.downloadSource) } + serviceOwnedDirectories)
-                .map(\.standardizedFileURL.path)
-        )
-
-        for root in orphanScanRoots {
-            guard fm.fileExists(atPath: root.path) else { continue }
-            let entries = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
-            for url in entries {
-                guard !url.lastPathComponent.hasPrefix("."),
-                      (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
-                else { continue }
-                if reservedPaths.contains(url.standardizedFileURL.path) { continue }
-                let id = url.lastPathComponent
-                if seen[id] != nil { continue }
-                guard containsModelWeights(at: url) else { continue }
-                seen[id] = ModelInfo(
-                    name: id,
-                    label: id,
-                    approximateSizeBytes: directorySize(url),
-                    isMultilingual: !id.hasSuffix(".en"),
-                    isInstalled: true,
-                    installedURL: url
-                )
-            }
-        }
-
-        return seen.values.sorted { $0.name < $1.name }
     }
 
     /// Deletes a model directory regardless of whether it's in the curated catalog.
@@ -400,7 +499,11 @@ public final class ModelStore: Sendable {
     }
 
     public func sizeOnDisk(_ variant: String) -> Int? {
-        let url = installedURL(for: variant)
+        sizeOnDisk(at: installedURL(for: variant))
+    }
+
+    /// Bytes under a model directory. Walks the whole tree, so callers keep it off the main thread.
+    public func sizeOnDisk(at url: URL) -> Int? {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         return directorySize(url)
     }

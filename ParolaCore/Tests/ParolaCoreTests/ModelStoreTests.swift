@@ -199,6 +199,55 @@ struct ModelStoreTests {
         #expect(!installed.contains { $0.name == "whisper-tiny" })
     }
 
+    @Test("a scan replayed from cache still matches a store that has never looked at the tree")
+    func cachedScanMatchesFreshStore() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let warm = ModelStore(modelsDirectory: tmp)
+        func fresh() -> ModelStore { ModelStore(modelsDirectory: tmp) }
+        func expectAgreement() throws {
+            let reference = fresh()
+            #expect(warm.catalog() == reference.catalog())
+            #expect(try warm.installedModels() == reference.installedModels())
+        }
+
+        #expect(warm.cachedScan() == nil)
+        try expectAgreement()
+        #expect(warm.cachedScan() != nil)
+
+        let complete = warm.installedURL(for: "openai_whisper-tiny")
+        try FileManager.default.createDirectory(at: complete, withIntermediateDirectories: true)
+        try Data("w".utf8).write(to: complete.appendingPathComponent("weights.bin"))
+        try expectAgreement()
+
+        let partial = warm.installedURL(for: "openai_whisper-base")
+        try FileManager.default.createDirectory(at: partial, withIntermediateDirectories: true)
+        try Data("w".utf8).write(to: partial.appendingPathComponent("weights.bin"))
+        try Data("{}".utf8).write(to: partial.appendingPathComponent(HuggingFaceDownloader.sidecarFilename))
+        try expectAgreement()
+
+        let orphan = tmp.appendingPathComponent("models/FluidInference/leftover-v1", isDirectory: true)
+        try FileManager.default.createDirectory(at: orphan, withIntermediateDirectories: true)
+        try Data("w".utf8).write(to: orphan.appendingPathComponent("model.bin"))
+        try expectAgreement()
+
+        let tokenizerOnly = tmp.appendingPathComponent("models/openai/whisper-tiny", isDirectory: true)
+        try FileManager.default.createDirectory(at: tokenizerOnly, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: tokenizerOnly.appendingPathComponent("config.json"))
+        try expectAgreement()
+
+        try FileManager.default.removeItem(at: partial.appendingPathComponent(HuggingFaceDownloader.sidecarFilename))
+        try expectAgreement()
+        #expect(warm.catalog().first { $0.name == "openai_whisper-base" }?.isInstalled == true)
+
+        try FileManager.default.removeItem(at: complete)
+        try expectAgreement()
+        #expect(warm.catalog().first { $0.name == "openai_whisper-tiny" }?.isInstalled == false)
+    }
+
     @Test("an unrelated FluidInference directory is still reported as installed")
     func keepsUnrelatedFluidInferenceDir() throws {
         let tmp = FileManager.default.temporaryDirectory
