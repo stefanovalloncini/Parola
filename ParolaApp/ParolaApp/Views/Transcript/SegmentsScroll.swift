@@ -21,12 +21,12 @@ struct SegmentsScroll: View {
         let captionLength: CaptionLength
     }
 
-    static let synchronousDeriveCap = 200
-
     @Environment(AppModel.self) private var model
     @State private var hoveredSpeaker: String?
     @State private var derived = Derived()
     @State private var qcByID: [Int: [SubtitleQC.Issue]] = [:]
+    @State private var deriveTask: Task<Void, Never>?
+    @State private var qcTask: Task<Void, Never>?
 
     private var speakerFilterBinding: Binding<String?> {
         Binding(
@@ -95,8 +95,13 @@ struct SegmentsScroll: View {
                     speakerFilterBinding.wrappedValue = nil
                 }
             }
-            .task(id: derivedKey) { await recomputeDerived() }
-            .task(id: qcKey) { await recomputeQC() }
+            // Synchronous so a short transcript commits in the same pass the key changed in, not a frame later.
+            .onChange(of: derivedKey, initial: true) { _, key in recomputeDerived(for: key) }
+            .onChange(of: qcKey, initial: true) { _, key in recomputeQC(for: key) }
+            .onDisappear {
+                deriveTask?.cancel()
+                qcTask?.cancel()
+            }
         }
     }
 
@@ -117,38 +122,46 @@ struct SegmentsScroll: View {
         )
     }
 
-    private func recomputeDerived() async {
+    private func recomputeDerived(for key: DerivedKey) {
+        deriveTask?.cancel()
         guard let segments = model.transcript?.segments else {
             derived = Derived()
             return
         }
-        let speakerFilter = speakerFilter
-        guard segments.count > Self.synchronousDeriveCap else {
+        let speakerFilter = key.speakerFilter
+        guard segments.count > TranscriptDerive.synchronousCap else {
             derived = Self.derive(segments: segments, speakerFilter: speakerFilter)
             return
         }
-        let computed = await Task.detached(priority: .userInitiated) {
-            Self.derive(segments: segments, speakerFilter: speakerFilter)
-        }.value
-        guard !Task.isCancelled else { return }
-        derived = computed
+        deriveTask = Task {
+            let computed = await Task.detached(priority: .userInitiated) {
+                Self.derive(segments: segments, speakerFilter: speakerFilter)
+            }.value
+            guard !Task.isCancelled else { return }
+            derived = computed
+        }
     }
 
-    private func recomputeQC() async {
-        guard model.showSubtitleQC, let segments = model.transcript?.segments else {
+    private func recomputeQC(for key: QCKey) {
+        qcTask?.cancel()
+        guard key.enabled, let segments = model.transcript?.segments else {
             qcByID = [:]
             return
         }
-        let captionLength = model.subtitleCaptionLength
-        guard segments.count > Self.synchronousDeriveCap else {
+        let captionLength = key.captionLength
+        guard segments.count > TranscriptDerive.synchronousCap else {
             qcByID = Self.subtitleQCIssues(segments: segments, captionLength: captionLength)
             return
         }
-        let computed = await Task.detached(priority: .userInitiated) {
-            Self.subtitleQCIssues(segments: segments, captionLength: captionLength)
-        }.value
-        guard !Task.isCancelled else { return }
-        qcByID = computed
+        // Segment ids repeat across entries, so a kept-around map would badge the new entry's cards until the rebuild lands.
+        qcByID = [:]
+        qcTask = Task {
+            let computed = await Task.detached(priority: .userInitiated) {
+                Self.subtitleQCIssues(segments: segments, captionLength: captionLength)
+            }.value
+            guard !Task.isCancelled else { return }
+            qcByID = computed
+        }
     }
 
     nonisolated static func derive(segments: [TranscriptSegment], speakerFilter: String?) -> Derived {

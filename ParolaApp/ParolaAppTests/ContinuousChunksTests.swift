@@ -321,6 +321,43 @@ struct ContinuousChunksTests {
         #expect(gate.needsRebuild(for: 8))
     }
 
+    @MainActor
+    private final class GateBox {
+        var gate = ContinuousChunks.BuildGate()
+
+        func record(_ signature: Int) {
+            gate.applied(signature)
+        }
+    }
+
+    private func buildOffMain(_ segments: [TranscriptSegment], signature: Int, into box: GateBox) async {
+        await ContinuousChunks.buildOffMain(
+            segments: segments,
+            useSpeakerColor: false,
+            primaryText: DS.Color.primaryText,
+            signature: signature
+        ) { _, applied in box.record(applied) }
+    }
+
+    @Test("a cancelled off-main build never claims its signature")
+    func cancelledOffMainBuildLeavesGateOpen() async {
+        let segments = (0..<(ContinuousChunks.synchronousBuildCap + 40)).map { segment($0, "Sentence \($0).") }
+        let signature = ContinuousChunks.contentSignature(segments: segments, useSpeakerColor: false)
+        let box = GateBox()
+
+        let cancelled = Task { await buildOffMain(segments, signature: signature, into: box) }
+        cancelled.cancel()
+        await cancelled.value
+
+        #expect(box.gate.appliedSignature == nil)
+        #expect(box.gate.needsRebuild(for: signature))
+
+        await buildOffMain(segments, signature: signature, into: box)
+
+        #expect(box.gate.appliedSignature == signature)
+        #expect(!box.gate.needsRebuild(for: signature))
+    }
+
     @Test("clearing the transcript reopens the gate for the signature it had built")
     func resetReopensGate() {
         var gate = ContinuousChunks.BuildGate()

@@ -63,7 +63,7 @@ struct InfoInspector: View {
             return
         }
         let text = model.transcriptText
-        guard transcript.segments.count > SegmentsScroll.synchronousDeriveCap else {
+        guard transcript.segments.count > TranscriptDerive.synchronousCap else {
             derived = Self.derive(transcript: transcript, text: text)
             return
         }

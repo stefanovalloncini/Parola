@@ -115,13 +115,30 @@ struct ContinuousChunks: View {
             )
         } else {
             buildTask = Task {
-                let built = await Task.detached(priority: .userInitiated) {
-                    Self.build(segments: segments, useSpeakerColor: useSpeakerColor, primaryText: primaryText)
-                }.value
-                guard !Task.isCancelled else { return }
-                apply(built, signature: signature)
+                await Self.buildOffMain(
+                    segments: segments,
+                    useSpeakerColor: useSpeakerColor,
+                    primaryText: primaryText,
+                    signature: signature,
+                    apply: apply
+                )
             }
         }
+    }
+
+    /// The gate records the signature only once the chunks land, so a build the next pass cancels leaves work to do.
+    static func buildOffMain(
+        segments: [TranscriptSegment],
+        useSpeakerColor: Bool,
+        primaryText: Color,
+        signature: Int,
+        apply: ([Chunk], Int) -> Void
+    ) async {
+        let built = await Task.detached(priority: .userInitiated) {
+            build(segments: segments, useSpeakerColor: useSpeakerColor, primaryText: primaryText)
+        }.value
+        guard !Task.isCancelled else { return }
+        apply(built, signature)
     }
 
     private func apply(_ built: [Chunk], signature: Int) {
