@@ -28,33 +28,21 @@ enum LibraryEntryDisplay {
     }
 }
 
-/// Every string a library row draws, formatted once per entry snapshot instead of once per render.
+/// The strings a library row draws that are costly and never age, formatted once per entry snapshot.
+/// The relative and hover strings stay lazy so only the rows actually on screen pay for them.
 struct LibraryRowDisplay: Identifiable {
     let entry: LibraryEntry
     let title: String
     let timestamp: String
     let sizeLabel: String?
     let languageLabel: String?
-    let lastOpened: String?
-    let tooltip: String
 
     var id: LibraryEntry.ID { entry.id }
     var pinned: Bool { entry.pinned }
     var noteCount: Int { entry.segmentNotes.count }
+    var lastOpened: String? { entry.lastOpenedAt?.formatted(.relative(presentation: .named)) }
 
-    init(entry: LibraryEntry, sizeBytes: Int64?) {
-        let title = LibraryEntryDisplay.title(for: entry)
-        self.entry = entry
-        self.title = title
-        timestamp = entry.createdAt.formatted(Self.shortStamp)
-        if let sizeBytes, sizeBytes > 0 {
-            sizeLabel = ByteCountFormatter.string(fromByteCount: sizeBytes, countStyle: .file)
-        } else {
-            sizeLabel = nil
-        }
-        languageLabel = LanguageDisplay.name(for: entry.language)
-        lastOpened = entry.lastOpenedAt?.formatted(.relative(presentation: .named))
-
+    var tooltip: String {
         var parts = [title, entry.createdAt.formatted(Self.longStamp)]
         if !entry.labels.isEmpty {
             parts.append("Labels: \(entry.labels.joined(separator: ", "))")
@@ -62,7 +50,19 @@ struct LibraryRowDisplay: Identifiable {
         if entry.pinned {
             parts.append("Pinned")
         }
-        tooltip = parts.joined(separator: "\n")
+        return parts.joined(separator: "\n")
+    }
+
+    init(entry: LibraryEntry, sizeBytes: Int64?) {
+        self.entry = entry
+        title = LibraryEntryDisplay.title(for: entry)
+        timestamp = entry.createdAt.formatted(Self.shortStamp)
+        if let sizeBytes, sizeBytes > 0 {
+            sizeLabel = ByteCountFormatter.string(fromByteCount: sizeBytes, countStyle: .file)
+        } else {
+            sizeLabel = nil
+        }
+        languageLabel = LanguageDisplay.name(for: entry.language)
     }
 
     private static let shortStamp = Date.FormatStyle(date: .abbreviated, time: .shortened)

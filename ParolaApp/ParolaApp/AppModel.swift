@@ -221,7 +221,8 @@ final class AppModel {
 
     var batchJobs: [BatchJob] = [] {
         didSet {
-            activeBatchJobCount = batchJobs.count { $0.status == .pending || $0.status == .transcribing }
+            let active = batchJobs.count { $0.status == .pending || $0.status == .transcribing }
+            if active != activeBatchJobCount { activeBatchJobCount = active }
             saveBatchQueueSnapshot()
         }
     }
@@ -810,7 +811,8 @@ final class AppModel {
     var libraryEntries: [LibraryEntry] = [] {
         didSet {
             rebuildLibraryIndex()
-            pinnedEntryCount = libraryEntries.count(where: \.pinned)
+            let pinned = libraryEntries.count(where: \.pinned)
+            if pinned != pinnedEntryCount { pinnedEntryCount = pinned }
             libraryVersion &+= 1
         }
     }

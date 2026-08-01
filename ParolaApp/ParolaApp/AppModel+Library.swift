@@ -36,19 +36,26 @@ extension AppModel {
             let deleted = await library.listDeleted()
             // A later refreshLibrary() cancels this one; its snapshot may predate a mutation, so don't let it overwrite the newer result.
             if Task.isCancelled { return }
-            deletedEntries = deleted
+            setDeletedEntries(deleted)
             refreshBundleSizes(for: active)
             setLibraryEntries(sortedLibraryEntries(active))
         }
     }
 
-    /// A refresh runs on every library touch, most of which change nothing; reassigning anyway would
-    /// repaint every view keyed on libraryVersion. LibraryEntry equality is id-only, so compare manifests.
+    /// A refresh runs on every library touch, most of which change nothing, and reassigning anyway repaints every reader.
     func setLibraryEntries(_ entries: [LibraryEntry]) {
-        let unchanged = entries.count == libraryEntries.count
-            && zip(entries, libraryEntries).allSatisfy { $0.id == $1.id && $0.manifest == $1.manifest }
-        guard !unchanged else { return }
+        guard !Self.sameEntries(entries, libraryEntries) else { return }
         libraryEntries = entries
+    }
+
+    func setDeletedEntries(_ entries: [LibraryEntry]) {
+        guard !Self.sameEntries(entries, deletedEntries) else { return }
+        deletedEntries = entries
+    }
+
+    /// LibraryEntry equality is id-only, so a rename or a pin would slip through without comparing manifests.
+    static func sameEntries(_ lhs: [LibraryEntry], _ rhs: [LibraryEntry]) -> Bool {
+        lhs.count == rhs.count && zip(lhs, rhs).allSatisfy { $0.id == $1.id && $0.manifest == $1.manifest }
     }
 
     func reapplyLibrarySort() {
