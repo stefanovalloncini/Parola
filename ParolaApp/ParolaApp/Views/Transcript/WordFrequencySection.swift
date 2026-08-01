@@ -17,8 +17,7 @@ struct WordFrequencySection: View {
                                 count: entry.count,
                                 fraction: Double(entry.count) / Double(max(1, maxCount))
                             ) {
-                                model.findQuery = entry.word
-                                if !model.findIsOpen { model.toggleFind() }
+                                model.findWord(entry.word)
                             }
                         }
                     }

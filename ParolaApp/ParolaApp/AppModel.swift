@@ -2410,6 +2410,12 @@ final class AppModel {
         }
     }
 
+    /// Opens Find on `word`. Order matters: a query set while Find is closed is discarded by the recompute.
+    func findWord(_ word: String) {
+        if !findIsOpen { toggleFind() }
+        findQuery = word
+    }
+
     // MARK: - Project document
 
     /// Continuation + GCD, not Task.detached: a detached job resuming a main-actor task

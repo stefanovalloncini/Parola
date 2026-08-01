@@ -3,6 +3,16 @@ import Testing
 import ParolaCore
 @testable import Parola
 
+private struct ImmediateClock: Clock {
+    typealias Instant = ContinuousClock.Instant
+    var now: Instant { ContinuousClock().now }
+    var minimumResolution: Duration { .zero }
+    func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+        try Task.checkCancellation()
+        await Task.yield()
+    }
+}
+
 @MainActor
 @Suite("AppModel find & replace")
 struct FindAndReplaceTests {
@@ -155,5 +165,52 @@ struct FindAndReplaceTests {
         #expect(model.match(in: 0).count == 2)
         #expect(model.match(in: 1).count == 1)
         #expect(model.match(in: 99).isEmpty)
+    }
+
+    // MARK: - findWord
+
+    private func makeDebouncedModel() -> AppModel {
+        let bootstrap = AppBootstrap(
+            mode: .test,
+            library: makeTempLibraryURL("findword"),
+            defaultsOverride: UserDefaults(suiteName: "test-\(UUID())")!,
+            sideEffects: [],
+            filePicker: TestFilePicker(),
+            clock: ImmediateClock()
+        )
+        let model = AppModel(bootstrap: bootstrap)
+        model.transcript = Self.makeTranscript()
+        return model
+    }
+
+    private func waitForMatches(_ model: AppModel, on segmentIDs: [Int]) async -> Bool {
+        for _ in 0..<200 {
+            if model.matches.map(\.segmentID) == segmentIDs { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return false
+    }
+
+    @Test("findWord opens Find and lands on the word's matches")
+    func findWordOpensWithMatches() async {
+        let model = makeDebouncedModel()
+
+        model.findWord("world")
+
+        #expect(model.findIsOpen)
+        #expect(model.findQuery == "world")
+        #expect(await waitForMatches(model, on: [0, 1, 2]))
+    }
+
+    @Test("findWord replaces the query while Find is already open")
+    func findWordReplacesOpenQuery() async {
+        let model = makeDebouncedModel()
+        model.findWord("Hello")
+        _ = await waitForMatches(model, on: [0, 1])
+
+        model.findWord("Goodbye")
+
+        #expect(model.findQuery == "Goodbye")
+        #expect(await waitForMatches(model, on: [2]))
     }
 }
