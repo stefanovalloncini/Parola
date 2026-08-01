@@ -39,15 +39,28 @@ struct ReloadSettingsTests {
     }
 
     @Test("reloading to an uninstalled model resets it to a valid one (refreshModelList ran)")
-    func uninstalledModelResets() {
+    func uninstalledModelResets() async {
         let defaults = UserDefaults(suiteName: "test-\(UUID())")!
         let model = makeModel(defaults)
+        await model.awaitModelListRefresh()
 
         defaults.set("totally-uninstalled-model", forKey: "selectedModel")
         model.reloadSettings()
+        await model.awaitModelListRefresh()
 
         #expect(model.selectedModel != "totally-uninstalled-model")
         #expect(model.availableModels.contains { $0.name == model.selectedModel })
+    }
+
+    @Test("the model list lands even when the first scan has to go to disk")
+    func modelListLandsAfterOffMainScan() async {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let model = makeModel(defaults)
+
+        model.refreshModelList()
+        await model.awaitModelListRefresh()
+
+        #expect(!model.availableModels.isEmpty)
     }
 
     @Test("reloadObservedSetting syncs an arbitrary writable key into its live property")

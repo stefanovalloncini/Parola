@@ -1199,11 +1199,37 @@ final class AppModel {
         return (onDisk.count, bytes)
     }
 
+    @ObservationIgnored private var modelScanTask: Task<Void, Never>?
+
+    /// Republishes the model list, off the main actor unless the store can replay a scan it already
+    /// has. Launch and the bridge's post-`setSetting` reload both land here, so it must not block.
     func refreshModelList() {
-        let curated = store.catalog()
-        let extra = (try? store.installedModels())?.filter { ent in
+        if let scan = store.cachedScan() {
+            applyModelScan(scan)
+            return
+        }
+        let store = self.store
+        let previous = modelScanTask
+        modelScanTask = Task { [weak self] in
+            _ = await previous?.value
+            guard let scan = try? await AppModel.offMainIO({ store.scan() }) else { return }
+            self?.applyModelScan(scan)
+        }
+    }
+
+    /// Waits for a pending off-main scan. The UI redraws when the list lands; tests need the seam.
+    func awaitModelListRefresh() async {
+        while let task = modelScanTask {
+            await task.value
+            if modelScanTask == task { modelScanTask = nil }
+        }
+    }
+
+    private func applyModelScan(_ scan: ModelScan) {
+        let curated = scan.catalog
+        let extra = scan.installed.filter { ent in
             !curated.contains { $0.name == ent.name }
-        } ?? []
+        }
         availableModels = curated + extra
 
         if !availableModels.contains(where: { $0.name == selectedModel }) {
@@ -1213,12 +1239,14 @@ final class AppModel {
     }
 
     func refreshModelSizes() {
-        let names = availableModels.filter(\.isInstalled).map(\.name)
+        let installed = availableModels.filter(\.isInstalled).compactMap { info in
+            info.installedURL.map { (info.name, $0) }
+        }
         let store = self.store
         Task.detached(priority: .utility) {
             var sizes: [String: Int64] = [:]
-            for name in names {
-                if let size = store.sizeOnDisk(name) {
+            for (name, url) in installed {
+                if let size = store.sizeOnDisk(at: url) {
                     sizes[name] = Int64(size)
                 }
             }
