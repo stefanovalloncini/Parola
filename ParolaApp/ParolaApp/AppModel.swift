@@ -129,7 +129,7 @@ final class AppModel {
     var userPrivacyMode: Bool = false { didSet { defaults.set(userPrivacyMode, forKey: "parola.userPrivacyMode") } }
     var pinnedModel: String = "" { didSet { defaults.set(pinnedModel, forKey: "pinnedModel") } }
     var mainWindowAlwaysOnTop: Bool = false { didSet { defaults.set(mainWindowAlwaysOnTop, forKey: "mainWindowAlwaysOnTop") } }
-    var recentFilesRaw: String = "[]" { didSet { defaults.set(recentFilesRaw, forKey: "recentFiles") } }
+    var recentFilesRaw: String = "[]" { didSet { defaults.set(recentFilesRaw, forKey: "recentFiles"); cachedRecentFiles = nil } }
     var micHotkeyKeyCode: Int = 15 { didSet { defaults.set(micHotkeyKeyCode, forKey: "micHotkeyKeyCode") } } // kVK_ANSI_R
     var micHotkeyModifiers: Int = 786721 { didSet { defaults.set(micHotkeyModifiers, forKey: "micHotkeyModifiers") } } // ⌃⌥⌘
     var micHotkeyEnabled: Bool = false { didSet { defaults.set(micHotkeyEnabled, forKey: "micHotkeyEnabled") } }
@@ -171,10 +171,15 @@ final class AppModel {
     var recordingCountdown: Int? = nil
     @ObservationIgnored private var countdownTask: Task<Void, Never>?
 
+    @ObservationIgnored private var cachedRecentFiles: [URL]?
     var recentFiles: [URL] {
         get {
+            // The raw read comes first so the Open Recent menu still tracks it on a cache hit.
+            let raw = recentFilesRaw
+            if let cachedRecentFiles { return cachedRecentFiles }
             var list = RecentFilesList(capacity: 10)
-            list.decode(recentFilesRaw)
+            list.decode(raw)
+            cachedRecentFiles = list.urls
             return list.urls
         }
         set {
