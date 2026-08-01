@@ -220,6 +220,35 @@ struct StreamingRealtimeLoopTests {
         _ = await runTask.value
     }
 
+    @Test("a regressive segment at the end of the prefix keeps the rest confirmable")
+    func regressiveSegmentKeepsPrefix() async throws {
+        let (loop, capture, script, recorder) = makeLoop(responses: [
+            [segment(0, 4, "a"), segment(4, 8, "b"), segment(8, 9, "c")],
+            [
+                segment(2, 6, "d"), segment(6, 10, "e"), segment(1, 1.5, "oops"),
+                segment(10, 12, "f"), segment(12, 14, "g"),
+            ],
+        ])
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        capture.push(seconds: 10, value: 0.5)
+        #expect(await eventually { recorder.batches.count == 1 })
+        #expect(recorder.batches.first?.segments.map(\.text) == ["a"])
+
+        capture.push(seconds: 6, value: 0.5)
+        #expect(await eventually { await script.callCount == 2 })
+        #expect(await eventually { recorder.batches.count == 2 })
+        let batch = try #require(recorder.batches.last)
+        #expect(batch.segments.map(\.text) == ["d", "e"], "the segment behind the watermark is the only one dropped")
+        #expect(batch.segments.map(\.end) == [8, 12])
+
+        #expect(await eventually { await loop.windowStartOffsetSamples() == 10 * sampleRate })
+
+        await loop.stop()
+        _ = await runTask.value
+    }
+
     @Test("VAD holds transcription until voice appears")
     func vadGatesTranscription() async throws {
         let (loop, capture, script, recorder) = makeLoop(

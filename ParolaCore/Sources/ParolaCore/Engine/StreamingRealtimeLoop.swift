@@ -252,9 +252,12 @@ actor StreamingRealtimeLoop {
             }
             unconfirmedSegments = []
         } else if segments.count > config.requiredSegmentsForConfirmation {
-            let confirmable = Array(segments.prefix(segments.count - config.requiredSegmentsForConfirmation))
-            if let last = confirmable.last, last.end > lastConfirmedEndSeconds {
-                lastConfirmedEndSeconds = last.end
+            // Whisper timestamps sometimes regress; segments ending at or before the watermark were
+            // already delivered, and the watermark only ever moves forward — the purge math needs that.
+            let confirmable = segments.prefix(segments.count - config.requiredSegmentsForConfirmation)
+                .filter { $0.end > lastConfirmedEndSeconds }
+            if let furthestEnd = confirmable.map(\.end).max() {
+                lastConfirmedEndSeconds = furthestEnd
                 onConfirmed(makeBatch(confirmable))
             }
             unconfirmedSegments = Array(segments.suffix(config.requiredSegmentsForConfirmation))
