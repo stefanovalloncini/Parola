@@ -129,10 +129,16 @@ actor StreamingRealtimeLoop {
     // suddenly decoded at stop — Whisper hallucinates on long silence.
     private func voiceDetectedInTail(_ newSeconds: Float) -> Bool {
         guard config.useVAD else { return true }
-        let energies = inbox.withLock { $0.energies.map(\.rel) }
+        return voiceDetected(inNext: newSeconds)
+    }
+
+    private func voiceDetected(inNext seconds: Float) -> Bool {
+        // isVoiceDetected only reads one entry per 100 ms of new audio off the end, so a longer snapshot would just hold the capture callback's lock for longer.
+        let considered = max(0, Int(seconds / 0.1))
+        let energies = inbox.withLock { $0.energies.suffix(considered).map(\.rel) }
         return AudioProcessor.isVoiceDetected(
             in: energies,
-            nextBufferInSeconds: newSeconds,
+            nextBufferInSeconds: seconds,
             silenceThreshold: config.silenceThreshold
         )
     }
@@ -177,17 +183,9 @@ actor StreamingRealtimeLoop {
             markWaitingForSpeech()
             return try await deps.tick()
         }
-        if config.useVAD {
-            let energies = inbox.withLock { $0.energies.map(\.rel) }
-            let voiceDetected = AudioProcessor.isVoiceDetected(
-                in: energies,
-                nextBufferInSeconds: newSeconds,
-                silenceThreshold: config.silenceThreshold
-            )
-            guard voiceDetected else {
-                markWaitingForSpeech()
-                return try await deps.tick()
-            }
+        if config.useVAD, !voiceDetected(inNext: newSeconds) {
+            markWaitingForSpeech()
+            return try await deps.tick()
         }
         lastTranscribedTotal = totalSamples
         try await transcribeWindow()
@@ -252,8 +250,7 @@ actor StreamingRealtimeLoop {
             }
             unconfirmedSegments = []
         } else if segments.count > config.requiredSegmentsForConfirmation {
-            // Whisper timestamps sometimes regress; segments ending at or before the watermark were
-            // already delivered, and the watermark only ever moves forward — the purge math needs that.
+            // Whisper timestamps sometimes regress: anything ending at or before the watermark was already delivered, and the purge math needs the watermark to only move forward.
             let confirmable = segments.prefix(segments.count - config.requiredSegmentsForConfirmation)
                 .filter { $0.end > lastConfirmedEndSeconds }
             if let furthestEnd = confirmable.map(\.end).max() {
