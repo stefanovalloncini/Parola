@@ -106,12 +106,17 @@ struct ContinuousChunks: View {
         let signature = Self.contentSignature(segments: segments, useSpeakerColor: useSpeakerColor)
         guard gate.needsRebuild(for: signature) else { return }
         buildTask?.cancel()
+        // DS's resolved palette is main-actor storage; read it here so the detached build never touches it.
+        let primaryText = DS.Color.primaryText
         if segments.count <= Self.synchronousBuildCap {
-            apply(Self.build(segments: segments, useSpeakerColor: useSpeakerColor), signature: signature)
+            apply(
+                Self.build(segments: segments, useSpeakerColor: useSpeakerColor, primaryText: primaryText),
+                signature: signature
+            )
         } else {
             buildTask = Task {
                 let built = await Task.detached(priority: .userInitiated) {
-                    Self.build(segments: segments, useSpeakerColor: useSpeakerColor)
+                    Self.build(segments: segments, useSpeakerColor: useSpeakerColor, primaryText: primaryText)
                 }.value
                 guard !Task.isCancelled else { return }
                 apply(built, signature: signature)
@@ -163,6 +168,7 @@ struct ContinuousChunks: View {
     nonisolated static func build(
         segments: [TranscriptSegment],
         useSpeakerColor: Bool,
+        primaryText: Color,
         softCap: Int = ContinuousChunks.softSegmentCap,
         hardCap: Int = ContinuousChunks.hardSegmentCap
     ) -> [Chunk] {
@@ -201,7 +207,7 @@ struct ContinuousChunks: View {
             }
             let startsLine = text.characters.isEmpty || text.characters.last == "\n"
             var piece = AttributedString(startsLine ? body : " " + body)
-            let displayColor = baseColor ?? DS.Color.primaryText
+            let displayColor = baseColor ?? primaryText
             piece.foregroundColor = displayColor
             piece.link = URL(string: "parola-seek://\(seg.id)")
             piece.underlineStyle = nil

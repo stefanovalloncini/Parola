@@ -17,7 +17,13 @@ struct ContinuousChunksTests {
         softCap: Int = ContinuousChunks.softSegmentCap,
         hardCap: Int = ContinuousChunks.hardSegmentCap
     ) -> [ContinuousChunks.Chunk] {
-        ContinuousChunks.build(segments: segments, useSpeakerColor: useSpeakerColor, softCap: softCap, hardCap: hardCap)
+        ContinuousChunks.build(
+            segments: segments,
+            useSpeakerColor: useSpeakerColor,
+            primaryText: DS.Color.primaryText,
+            softCap: softCap,
+            hardCap: hardCap
+        )
     }
 
     private func plainTexts(

@@ -80,9 +80,7 @@ enum DS {
         static let timer = SwiftUI.Font.system(.title, design: .monospaced).weight(.light)
     }
 
-    /// The active palette every element color funnels through. AppModel.applyTheme() sets it on
-    /// the main actor; view bodies read it on the main actor. nonisolated(unsafe) is safe because
-    /// ThemePalette is a Sendable value and access is main-actor in practice.
+    /// The active palette every element color funnels through. AppModel.applyTheme() sets it on the main actor.
     static var theme: ThemePalette {
         get { activeTheme }
         set {
@@ -92,6 +90,7 @@ enum DS {
         }
     }
 
+    // nonisolated(unsafe): both slots are written and read on the main actor only — work that runs off it takes the colors it needs as parameters.
     nonisolated(unsafe) private static var activeTheme = ThemePreset.terracotta.palette
     nonisolated(unsafe) private static var resolved = Resolved(ThemePreset.terracotta.palette)
 
