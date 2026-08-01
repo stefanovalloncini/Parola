@@ -59,6 +59,23 @@ struct ParolaDocumentTests {
         }
     }
 
+    @Test("the initial write keeps transcript.json compact and the manifest readable")
+    func initialWriteFormatting() throws {
+        let scratch = tempDir()
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let bundleURL = try ParolaDocument.write(
+            transcript: sampleTranscript(),
+            audioURL: nil,
+            to: scratch.appendingPathComponent("formatting")
+        )
+
+        let transcript = try String(contentsOf: bundleURL.appendingPathComponent("transcript.json"), encoding: .utf8)
+        let manifest = try String(contentsOf: bundleURL.appendingPathComponent("manifest.json"), encoding: .utf8)
+        #expect(!transcript.contains("\n"))
+        #expect(manifest.contains("\n"))
+    }
+
     @Test("transcript-only round-trip leaves audioURL nil")
     func transcriptOnlyRoundTrip() throws {
         let scratch = tempDir()
