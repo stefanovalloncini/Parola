@@ -2,12 +2,31 @@ import SwiftUI
 import ParolaCore
 
 struct SegmentsScroll: View {
+    struct Derived {
+        var pauseByPrev: [Int: Double] = [:]
+        var confidenceByID: [Int: SegmentConfidence.Bucket] = [:]
+        var visible: [TranscriptSegment] = []
+    }
+
+    private struct DerivedKey: Equatable {
+        let transcriptVersion: Int
+        let entryID: LibraryEntry.ID?
+        let speakerFilter: String?
+    }
+
+    private struct QCKey: Equatable {
+        let transcriptVersion: Int
+        let entryID: LibraryEntry.ID?
+        let enabled: Bool
+        let captionLength: CaptionLength
+    }
+
+    static let synchronousDeriveCap = 200
+
     @Environment(AppModel.self) private var model
     @State private var hoveredSpeaker: String?
-    @State private var pauseByPrev: [Int: Double] = [:]
-    @State private var confidenceByID: [Int: SegmentConfidence.Bucket] = [:]
+    @State private var derived = Derived()
     @State private var qcByID: [Int: [SubtitleQC.Issue]] = [:]
-    @State private var visibleSegmentsCache: [TranscriptSegment] = []
 
     private var speakerFilterBinding: Binding<String?> {
         Binding(
@@ -40,17 +59,17 @@ struct SegmentsScroll: View {
                             SpeakerFilterRow(speakers: speakers, selection: speakerFilterBinding)
                                 .padding(.bottom, DS.Spacing.tight)
                         }
-                        ForEach(visibleSegmentsCache) { seg in
+                        ForEach(derived.visible) { seg in
                             SegmentCard(
                                 segment: seg,
                                 isCurrent: seg.id == model.currentSegmentID,
                                 hoveredSpeaker: $hoveredSpeaker,
-                                confidenceBucket: confidenceByID[seg.id],
+                                confidenceBucket: derived.confidenceByID[seg.id],
                                 qcIssues: qcByID[seg.id] ?? []
                             )
                             .id(seg.id)
                             .opacity(opacity(for: seg))
-                            if let gap = pauseByPrev[seg.id] {
+                            if let gap = derived.pauseByPrev[seg.id] {
                                 LongPauseDivider(seconds: gap)
                             }
                         }
@@ -76,54 +95,81 @@ struct SegmentsScroll: View {
                     speakerFilterBinding.wrappedValue = nil
                 }
             }
-            .onAppear {
-                recomputeDerived()
-                recomputeVisible()
-            }
-            .onChange(of: model.transcriptVersion) { _, _ in
-                recomputeDerived()
-                recomputeVisible()
-            }
-            .onChange(of: model.selectedEntryID) { _, _ in
-                recomputeDerived()
-                recomputeVisible()
-            }
-            .onChange(of: speakerFilter) { _, _ in recomputeVisible() }
-            .onChange(of: model.showSubtitleQC) { _, _ in recomputeQC() }
-            .onChange(of: model.subtitleCaptionLengthRaw) { _, _ in recomputeQC() }
+            .task(id: derivedKey) { await recomputeDerived() }
+            .task(id: qcKey) { await recomputeQC() }
         }
     }
 
-    private func recomputeDerived() {
-        recomputeQC()
+    private var derivedKey: DerivedKey {
+        DerivedKey(
+            transcriptVersion: model.transcriptVersion,
+            entryID: model.selectedEntryID,
+            speakerFilter: speakerFilter
+        )
+    }
+
+    private var qcKey: QCKey {
+        QCKey(
+            transcriptVersion: model.transcriptVersion,
+            entryID: model.selectedEntryID,
+            enabled: model.showSubtitleQC,
+            captionLength: model.subtitleCaptionLength
+        )
+    }
+
+    private func recomputeDerived() async {
         guard let segments = model.transcript?.segments else {
-            pauseByPrev = [:]
-            confidenceByID = [:]
+            derived = Derived()
             return
         }
-        pauseByPrev = Dictionary(
-            uniqueKeysWithValues: SegmentPauses
-                .detect(segments: segments, thresholdSeconds: 3.0)
-                .map { ($0.afterSegmentID, $0.durationSeconds) }
-        )
-        var buckets: [Int: SegmentConfidence.Bucket] = [:]
-        for segment in segments {
-            if let value = SegmentConfidence.average(for: segment) {
-                buckets[segment.id] = SegmentConfidence.bucket(for: value)
-            }
+        let speakerFilter = speakerFilter
+        guard segments.count > Self.synchronousDeriveCap else {
+            derived = Self.derive(segments: segments, speakerFilter: speakerFilter)
+            return
         }
-        confidenceByID = buckets
+        let computed = await Task.detached(priority: .userInitiated) {
+            Self.derive(segments: segments, speakerFilter: speakerFilter)
+        }.value
+        guard !Task.isCancelled else { return }
+        derived = computed
     }
 
-    private func recomputeQC() {
+    private func recomputeQC() async {
         guard model.showSubtitleQC, let segments = model.transcript?.segments else {
             qcByID = [:]
             return
         }
-        qcByID = Self.subtitleQCIssues(segments: segments, captionLength: model.subtitleCaptionLength)
+        let captionLength = model.subtitleCaptionLength
+        guard segments.count > Self.synchronousDeriveCap else {
+            qcByID = Self.subtitleQCIssues(segments: segments, captionLength: captionLength)
+            return
+        }
+        let computed = await Task.detached(priority: .userInitiated) {
+            Self.subtitleQCIssues(segments: segments, captionLength: captionLength)
+        }.value
+        guard !Task.isCancelled else { return }
+        qcByID = computed
     }
 
-    static func subtitleQCIssues(
+    nonisolated static func derive(segments: [TranscriptSegment], speakerFilter: String?) -> Derived {
+        var pauseByPrev: [Int: Double] = [:]
+        for pause in SegmentPauses.detect(segments: segments, thresholdSeconds: 3.0) {
+            pauseByPrev[pause.afterSegmentID] = pause.durationSeconds
+        }
+        var confidenceByID: [Int: SegmentConfidence.Bucket] = [:]
+        for segment in segments {
+            if let value = SegmentConfidence.average(for: segment) {
+                confidenceByID[segment.id] = SegmentConfidence.bucket(for: value)
+            }
+        }
+        return Derived(
+            pauseByPrev: pauseByPrev,
+            confidenceByID: confidenceByID,
+            visible: visibleSegments(from: segments, speakerFilter: speakerFilter)
+        )
+    }
+
+    nonisolated static func subtitleQCIssues(
         segments: [TranscriptSegment],
         captionLength: CaptionLength
     ) -> [Int: [SubtitleQC.Issue]] {
@@ -135,15 +181,7 @@ struct SegmentsScroll: View {
         return issuesByID
     }
 
-    private func recomputeVisible() {
-        guard let segments = model.transcript?.segments else {
-            visibleSegmentsCache = []
-            return
-        }
-        visibleSegmentsCache = Self.visibleSegments(from: segments, speakerFilter: speakerFilter)
-    }
-
-    static func visibleSegments(from segments: [TranscriptSegment], speakerFilter: String?) -> [TranscriptSegment] {
+    nonisolated static func visibleSegments(from segments: [TranscriptSegment], speakerFilter: String?) -> [TranscriptSegment] {
         segments.filter { segment in
             guard !segment.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
             guard let speakerFilter else { return true }

@@ -45,4 +45,52 @@ struct SegmentsVisibilityTests {
         let visible = SegmentsScroll.visibleSegments(from: segments, speakerFilter: "Alice")
         #expect(visible.map(\.id) == [0])
     }
+
+    // MARK: - Derived
+
+    private func scored(_ id: Int, _ text: String, start: Double, end: Double, probability: Double) -> TranscriptSegment {
+        TranscriptSegment(
+            id: id,
+            start: start,
+            end: end,
+            text: text,
+            words: [WordTiming(id: "\(id)-0", word: text, start: start, end: end, probability: probability)]
+        )
+    }
+
+    @Test("derive returns the pauses, the confidence buckets and the visible list in one pass")
+    func deriveCoversEveryList() {
+        let segments = [
+            scored(0, "Hi.", start: 0, end: 1, probability: 0.95),
+            scored(1, "Yo.", start: 8, end: 9, probability: 0.5)
+        ]
+
+        let derived = SegmentsScroll.derive(segments: segments, speakerFilter: nil)
+
+        #expect(derived.pauseByPrev == [0: 7])
+        #expect(derived.confidenceByID == [0: .high, 1: .low])
+        #expect(derived.visible.map(\.id) == [0, 1])
+    }
+
+    @Test("derive applies the speaker filter to the visible list only")
+    func deriveFiltersVisibleOnly() {
+        let segments = [
+            TranscriptSegment(id: 0, start: 0, end: 1, text: "Hi.", speaker: "Alice"),
+            TranscriptSegment(id: 1, start: 8, end: 9, text: "Yo.", speaker: "Bob")
+        ]
+
+        let derived = SegmentsScroll.derive(segments: segments, speakerFilter: "Bob")
+
+        #expect(derived.visible.map(\.id) == [1])
+        #expect(derived.pauseByPrev == [0: 7])
+    }
+
+    @Test("derive on an empty transcript yields empty lists")
+    func deriveEmpty() {
+        let derived = SegmentsScroll.derive(segments: [], speakerFilter: nil)
+
+        #expect(derived.pauseByPrev.isEmpty)
+        #expect(derived.confidenceByID.isEmpty)
+        #expect(derived.visible.isEmpty)
+    }
 }
