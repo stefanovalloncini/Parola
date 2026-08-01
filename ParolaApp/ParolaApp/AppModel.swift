@@ -220,8 +220,12 @@ final class AppModel {
     @ObservationIgnored var freeDiskSpaceProvider: () -> Int64? = { AppModel.systemFreeDiskSpace() }
 
     var batchJobs: [BatchJob] = [] {
-        didSet { saveBatchQueueSnapshot() }
+        didSet {
+            activeBatchJobCount = batchJobs.count { $0.status == .pending || $0.status == .transcribing }
+            saveBatchQueueSnapshot()
+        }
     }
+    private(set) var activeBatchJobCount: Int = 0
     var selectedBatchJobID: BatchJob.ID?
     @ObservationIgnored var batchTask: Task<Void, Never>?
     @ObservationIgnored var lastSavedBatchQueueURLs: [URL]?
@@ -806,10 +810,12 @@ final class AppModel {
     var libraryEntries: [LibraryEntry] = [] {
         didSet {
             rebuildLibraryIndex()
+            pinnedEntryCount = libraryEntries.count(where: \.pinned)
             libraryVersion &+= 1
         }
     }
     private(set) var libraryVersion: Int = 0
+    private(set) var pinnedEntryCount: Int = 0
     var deletedEntries: [LibraryEntry] = []
     var searchResults: [LibraryEntry]?
     var selectedEntryID: LibraryEntry.ID?

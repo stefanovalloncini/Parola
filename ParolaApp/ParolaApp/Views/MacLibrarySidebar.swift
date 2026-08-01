@@ -125,12 +125,12 @@ struct MacLibrarySidebar: View {
     }
 
     private var activeQueueBadge: Int? {
-        let n = model.batchJobs.filter { $0.status == .pending || $0.status == .transcribing }.count
+        let n = model.activeBatchJobCount
         return n > 0 ? n : nil
     }
 
     private var pinnedBadge: Int? {
-        let n = model.libraryEntries.filter { $0.pinned }.count
+        let n = model.pinnedEntryCount
         return n > 0 ? n : nil
     }
 
