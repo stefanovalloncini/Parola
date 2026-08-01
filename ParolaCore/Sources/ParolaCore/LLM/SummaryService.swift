@@ -24,7 +24,7 @@ public actor SummaryService {
     private let budgetTokens: Int
     private let features: FeatureSet
 
-    /// The budget is the prompt-token ceiling (chars/4 estimate); transcripts over it are
+    /// The budget is the prompt-token ceiling (bytes/4 estimate); transcripts over it are
     /// summarised per time-window and reduced. The default fits Apple's 4096-token context.
     public init(budgetTokens: Int = SummaryService.defaultBudgetTokens, features: FeatureSet = .resolve()) {
         self.budgetTokens = budgetTokens

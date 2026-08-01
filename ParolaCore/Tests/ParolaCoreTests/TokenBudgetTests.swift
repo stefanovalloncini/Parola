@@ -10,11 +10,18 @@ struct TokenBudgetTests {
         #expect(TokenBudget.estimateTokens("") == 1)
     }
 
-    @Test("estimateTokens grows roughly with character count")
+    @Test("estimateTokens grows roughly with byte count")
     func growsWithText() {
         let small = TokenBudget.estimateTokens(String(repeating: "x", count: 8))
         let big = TokenBudget.estimateTokens(String(repeating: "x", count: 16))
         #expect(big > small)
+    }
+
+    @Test("estimateTokens counts UTF-8 bytes, not grapheme clusters")
+    func countsBytes() {
+        #expect(TokenBudget.estimateTokens("abcd") == 1)
+        #expect(TokenBudget.estimateTokens("però") == 2)
+        #expect(TokenBudget.estimateTokens("👩‍👩‍👧") == 5)
     }
 
     @Test("check passes when transcript fits in the context window")
