@@ -165,40 +165,27 @@ struct ModelsSettingsPane: View {
 
     @ViewBuilder
     private var content: some View {
-        let installed = filteredInstalledVariants
-        let recommended = filteredRecommendedVariants
-        let categories = installFilter == .all ? filteredCategories : []
+        let sections = self.sections
 
-        if installed.isEmpty && recommended.isEmpty && categories.isEmpty && orphans.isEmpty {
+        if sections.isEmpty {
             ContentUnavailableView.search(text: searchText)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 40)
         } else {
             VStack(alignment: .leading, spacing: 28) {
-                if !installed.isEmpty || installFilter == .installed {
-                    downloadedSection(installed)
+                if !sections.installed.isEmpty || installFilter == .installed {
+                    downloadedSection(sections.installed)
                 }
-                if !orphans.isEmpty {
-                    orphansSection(orphans)
+                if !sections.orphans.isEmpty {
+                    orphansSection(sections.orphans)
                 }
-                if !recommended.isEmpty || installFilter == .available {
-                    recommendedSection(recommended)
+                if !sections.recommended.isEmpty || installFilter == .available {
+                    recommendedSection(sections.recommended)
                 }
-                if !categories.isEmpty {
-                    categoriesSection(categories)
+                if !sections.categories.isEmpty {
+                    categoriesSection(sections.categories)
                 }
             }
-        }
-    }
-
-    private var orphans: [ModelInfo] {
-        guard installFilter != .available else { return [] }
-        let catalogIDs = Set(ModelCatalog.all.map(\.id))
-        let needle = searchNeedle
-        return model.availableModels.filter { info in
-            guard info.isInstalled, !catalogIDs.contains(info.name) else { return false }
-            guard let needle else { return true }
-            return info.name.lowercased().contains(needle)
         }
     }
 
@@ -266,28 +253,10 @@ struct ModelsSettingsPane: View {
             sectionHeader("Recommended Models", count: variants.count)
             LazyVStack(spacing: 10) {
                 ForEach(variants) { variant in
-                    RecommendedRow(
-                        variant: variant,
-                        kind: downloadKind(for: variant),
-                        downloadDisabled: downloadInFlight,
-                        onDownload: { model.downloadModel(variant.id) },
-                        onCancelDownload: { model.cancelModelDownload() }
-                    )
+                    LiveRecommendedRow(variant: variant)
                 }
             }
         }
-    }
-
-    private func downloadKind(for variant: ModelVariant) -> ModelCardRow.Kind {
-        if case .downloadingModel(let name, let progress) = model.phase, name == variant.id {
-            return .downloading(progress: progress)
-        }
-        return .available
-    }
-
-    private var downloadInFlight: Bool {
-        if case .downloadingModel = model.phase { return true }
-        return model.downloadBlockedReason != nil
     }
 
     private func modelErrorBanner(_ message: String) -> some View {
@@ -319,24 +288,41 @@ struct ModelsSettingsPane: View {
 
     // MARK: - Data
 
-    private var installedIDs: Set<String> {
-        Set(model.availableModels.filter(\.isInstalled).map(\.name))
+    private struct Sections {
+        var installed: [ModelVariant] = []
+        var recommended: [ModelVariant] = []
+        var categories: [ModelsCategory] = []
+        var orphans: [ModelInfo] = []
+
+        var isEmpty: Bool {
+            installed.isEmpty && recommended.isEmpty && categories.isEmpty && orphans.isEmpty
+        }
     }
 
-    private var allowedCatalog: [ModelVariant] {
-        ManagedConfiguration.shared.filterAllowed(ModelCatalog.all)
-    }
+    /// Every list the pane renders, from one pass over the model list. Kept together so a redraw
+    /// doesn't rebuild the installed-id set and re-sort the catalog once per section.
+    private var sections: Sections {
+        let installedIDs = Set(model.availableModels.filter(\.isInstalled).map(\.name))
+        let allowed = ManagedConfiguration.shared.filterAllowed(ModelCatalog.all)
+        var sections = Sections()
 
-    private var filteredInstalledVariants: [ModelVariant] {
-        guard installFilter != .available else { return [] }
-        let base = allowedCatalog.filter { installedIDs.contains($0.id) }
-        return sorted(matching(base))
-    }
-
-    private var filteredRecommendedVariants: [ModelVariant] {
-        guard installFilter != .installed else { return [] }
-        let base = allowedCatalog.filter { !installedIDs.contains($0.id) }
-        return sorted(matching(base))
+        if installFilter != .available {
+            sections.installed = sorted(matching(allowed.filter { installedIDs.contains($0.id) }))
+            let catalogIDs = Set(ModelCatalog.all.map(\.id))
+            let needle = searchNeedle
+            sections.orphans = model.availableModels.filter { info in
+                guard info.isInstalled, !catalogIDs.contains(info.name) else { return false }
+                guard let needle else { return true }
+                return info.name.lowercased().contains(needle)
+            }
+        }
+        if installFilter != .installed {
+            sections.recommended = sorted(matching(allowed.filter { !installedIDs.contains($0.id) }))
+        }
+        if installFilter == .all {
+            sections.categories = filteredCategories
+        }
+        return sections
     }
 
     private var filteredCategories: [ModelsCategory] {
@@ -383,6 +369,35 @@ struct ModelsSettingsPane: View {
             }
             Spacer()
         }
+    }
+}
+
+/// Owns the pane's only read of `phase`, which a download rewrites at every percent. Reading it
+/// from the pane body instead would re-derive every section list a hundred times per download.
+private struct LiveRecommendedRow: View {
+    @Environment(AppModel.self) private var model
+    let variant: ModelVariant
+
+    var body: some View {
+        RecommendedRow(
+            variant: variant,
+            kind: kind,
+            downloadDisabled: downloadInFlight,
+            onDownload: { model.downloadModel(variant.id) },
+            onCancelDownload: { model.cancelModelDownload() }
+        )
+    }
+
+    private var kind: ModelCardRow.Kind {
+        if case .downloadingModel(let name, let progress) = model.phase, name == variant.id {
+            return .downloading(progress: progress)
+        }
+        return .available
+    }
+
+    private var downloadInFlight: Bool {
+        if case .downloadingModel = model.phase { return true }
+        return model.downloadBlockedReason != nil
     }
 }
 
