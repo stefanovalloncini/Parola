@@ -126,8 +126,34 @@ public enum TranscriptChat {
         }
     }
 
+    /// A transcript's segments with their keyword sets, so a condensed session tokenises once
+    /// instead of once per question.
+    struct KeywordIndex {
+        let segments: [TranscriptSegment]
+        let keywords: [Set<String>]
+
+        init(_ transcript: Transcript) {
+            segments = transcript.segments
+            keywords = transcript.segments.map { TranscriptChat.keywordTokens($0.text) }
+        }
+    }
+
     static func condensedInstructions(
         for transcript: Transcript,
+        question: String,
+        digest: Summary,
+        budgetTokens: Int
+    ) -> String {
+        condensedInstructions(
+            for: KeywordIndex(transcript),
+            question: question,
+            digest: digest,
+            budgetTokens: budgetTokens
+        )
+    }
+
+    static func condensedInstructions(
+        for index: KeywordIndex,
         question: String,
         digest: Summary,
         budgetTokens: Int
@@ -148,7 +174,7 @@ public enum TranscriptChat {
         }
         out += "\nRELEVANT EXCERPTS:\n"
         let remaining = budgetTokens - TokenBudget.estimateTokens(out)
-        for segment in relevantSegments(in: transcript, question: question, maxTokens: remaining) {
+        for segment in relevantSegments(in: index, question: question, maxTokens: remaining) {
             let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
             out += "\(Timecode.format(segment.start))  \(body)\n"
         }
@@ -160,11 +186,19 @@ public enum TranscriptChat {
         question: String,
         maxTokens: Int
     ) -> [TranscriptSegment] {
+        relevantSegments(in: KeywordIndex(transcript), question: question, maxTokens: maxTokens)
+    }
+
+    static func relevantSegments(
+        in index: KeywordIndex,
+        question: String,
+        maxTokens: Int
+    ) -> [TranscriptSegment] {
         let questionTokens = keywordTokens(question)
         guard !questionTokens.isEmpty, maxTokens > 0 else { return [] }
-        let ranked = transcript.segments
-            .compactMap { segment -> (segment: TranscriptSegment, score: Int)? in
-                let overlap = keywordTokens(segment.text).intersection(questionTokens).count
+        let ranked = zip(index.segments, index.keywords)
+            .compactMap { segment, keywords -> (segment: TranscriptSegment, score: Int)? in
+                let overlap = questionTokens.count { keywords.contains($0) }
                 return overlap > 0 ? (segment, overlap) : nil
             }
             .sorted { $0.score == $1.score ? $0.segment.start < $1.segment.start : $0.score > $1.score }
