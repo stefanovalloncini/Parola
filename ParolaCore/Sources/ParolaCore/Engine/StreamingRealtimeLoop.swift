@@ -212,6 +212,7 @@ actor StreamingRealtimeLoop {
 
     private func transcribeWindow(confirmAll: Bool = false) async throws {
         let offsetSeconds = Double(windowStartSample) / Double(config.sampleRate)
+        let decodedEndSeconds = Float(offsetSeconds + Double(window.count) / Double(config.sampleRate))
         var options = baseDecodingOptions
         // clipTimestamps is window-relative; everything emitted from here back out must be absolute.
         options.clipTimestamps = [Float(max(0, Double(lastConfirmedEndSeconds) - offsetSeconds))]
@@ -255,7 +256,8 @@ actor StreamingRealtimeLoop {
             let confirmable = segments.prefix(segments.count - config.requiredSegmentsForConfirmation)
                 .filter { $0.end > lastConfirmedEndSeconds }
             if let furthestEnd = confirmable.map(\.end).max() {
-                lastConfirmedEndSeconds = furthestEnd
+                // Whisper pads the window to 30 s, so an end past the audio actually decoded is a hallucinated timestamp: taking it would start the next decode beyond speech nobody has read yet.
+                lastConfirmedEndSeconds = max(lastConfirmedEndSeconds, min(furthestEnd, decodedEndSeconds))
                 onConfirmed(makeBatch(confirmable))
             }
             unconfirmedSegments = Array(segments.suffix(config.requiredSegmentsForConfirmation))

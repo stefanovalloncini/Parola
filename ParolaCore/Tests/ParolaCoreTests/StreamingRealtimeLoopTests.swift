@@ -283,6 +283,69 @@ struct StreamingRealtimeLoopTests {
         #expect(tail.audioWindow.count == 5 * sampleRate)
     }
 
+    // Whisper pads short windows to 30 s and dates its hallucinations from the padding: a 1.1 s
+    // window really does come back as one "[BLANK_AUDIO]" segment ending at 10 s.
+    @Test("a hallucinated end past the decoded audio does not skip the speech that follows")
+    func hallucinatedEndDoesNotSkipLaterSpeech() async throws {
+        let (loop, capture, script, recorder) = makeLoop(responses: [
+            [segment(0, 28, "[BLANK_AUDIO]"), segment(28, 29, "uh"), segment(29, 30, "uh")],
+            [
+                segment(2, 4, "the quick"), segment(4, 5, "brown fox"),
+                segment(5, 6, "lazy dog"), segment(6, 7, "tail"),
+            ],
+        ])
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        capture.push(seconds: 5, value: 0.5)
+        #expect(await eventually { recorder.batches.count == 1 })
+        #expect(
+            await eventually { await loop.windowStartOffsetSamples() == 3 * sampleRate },
+            "the watermark stops at the 5 s actually decoded, so the purge keeps the speech"
+        )
+
+        capture.push(seconds: 5, value: 0.5)
+        #expect(await eventually { await script.callCount == 2 })
+        let call2 = try #require(await script.calls.last)
+        #expect(call2.sampleCount == 7 * sampleRate)
+        #expect(call2.clip == [2], "the decode starts inside the window, not past everything it holds")
+
+        await loop.stop()
+        _ = await runTask.value
+
+        #expect(
+            recorder.batches.flatMap { $0.segments.map(\.text) }
+                == ["[BLANK_AUDIO]", "the quick", "brown fox", "lazy dog", "tail"],
+            "the speech after the hallucination still reaches the transcript"
+        )
+    }
+
+    @Test("a re-emitted segment is confirmed only once")
+    func reEmittedSegmentIsConfirmedOnce() async throws {
+        let (loop, capture, script, recorder) = makeLoop(responses: [
+            [segment(0, 3, "one"), segment(3, 4, "two"), segment(4, 8, "three"), segment(8, 9, "four")],
+            [segment(1, 2, "two"), segment(2, 6, "three"), segment(6, 7, "four"), segment(7, 9, "five")],
+        ])
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        capture.push(seconds: 10, value: 0.5)
+        #expect(await eventually { recorder.batches.count == 1 })
+        #expect(await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate })
+
+        capture.push(seconds: 4, value: 0.5)
+        #expect(await eventually { await script.callCount == 2 })
+        #expect(await eventually { recorder.batches.count == 2 })
+
+        await loop.stop()
+        _ = await runTask.value
+
+        #expect(
+            recorder.batches.flatMap { $0.segments.map(\.text) } == ["one", "two", "three", "four", "five"],
+            "the re-decoded segment ending at the watermark is not delivered twice"
+        )
+    }
+
     @Test("an out-of-order confirmed batch still carries its audio")
     func outOfOrderBatchCarriesAudio() async throws {
         let (loop, capture, _, recorder) = makeLoop(
