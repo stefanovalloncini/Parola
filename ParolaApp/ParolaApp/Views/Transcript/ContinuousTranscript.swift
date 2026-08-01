@@ -30,6 +30,23 @@ struct ContinuousChunks: View {
         let runs: [TranscriptSegment.ID: SegmentRun]
     }
 
+    /// Holds the signature of the chunks currently on screen. A build that never lands must not claim one.
+    struct BuildGate {
+        private(set) var appliedSignature: Int?
+
+        func needsRebuild(for signature: Int) -> Bool {
+            signature != appliedSignature
+        }
+
+        mutating func applied(_ signature: Int) {
+            appliedSignature = signature
+        }
+
+        mutating func reset() {
+            appliedSignature = nil
+        }
+    }
+
     nonisolated static let softSegmentCap = 40
     nonisolated static let hardSegmentCap = 48
 
@@ -39,7 +56,7 @@ struct ContinuousChunks: View {
     @State private var chunks: [Chunk] = []
     @State private var chunkIndexBySegment: [TranscriptSegment.ID: Int] = [:]
     @State private var highlightedSegmentID: TranscriptSegment.ID?
-    @State private var builtSignature: Int?
+    @State private var gate = BuildGate()
     @State private var buildTask: Task<Void, Never>?
     @ScaledMetric(relativeTo: .body) private var compactSize: CGFloat = 14
     @ScaledMetric(relativeTo: .body) private var comfortableSize: CGFloat = 18
@@ -76,7 +93,7 @@ struct ContinuousChunks: View {
     private func rebuildChunks() {
         guard let transcript = model.transcript else {
             buildTask?.cancel()
-            builtSignature = nil
+            gate.reset()
             chunks = []
             chunkIndexBySegment = [:]
             highlightedSegmentID = nil
@@ -87,26 +104,26 @@ struct ContinuousChunks: View {
         // transcriptVersion also bumps for mutations that can't change the rendered text
         // (timing nudges, duration backfill); skip the expensive rebuild for those.
         let signature = Self.contentSignature(segments: segments, useSpeakerColor: useSpeakerColor)
-        guard signature != builtSignature else { return }
-        builtSignature = signature
+        guard gate.needsRebuild(for: signature) else { return }
         buildTask?.cancel()
         if segments.count <= Self.synchronousBuildCap {
-            apply(Self.build(segments: segments, useSpeakerColor: useSpeakerColor))
+            apply(Self.build(segments: segments, useSpeakerColor: useSpeakerColor), signature: signature)
         } else {
             buildTask = Task {
                 let built = await Task.detached(priority: .userInitiated) {
                     Self.build(segments: segments, useSpeakerColor: useSpeakerColor)
                 }.value
                 guard !Task.isCancelled else { return }
-                apply(built)
+                apply(built, signature: signature)
             }
         }
     }
 
-    private func apply(_ built: [Chunk]) {
+    private func apply(_ built: [Chunk], signature: Int) {
         chunks = built
         chunkIndexBySegment = Self.chunkIndexBySegment(for: built)
         highlightedSegmentID = nil
+        gate.applied(signature)
         applyHighlight()
     }
 

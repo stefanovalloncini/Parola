@@ -293,4 +293,37 @@ struct ContinuousChunksTests {
         move(&chunks, from: 99, to: nil)
         #expect(chunks[0].text == pristine[0].text)
     }
+
+    // MARK: - Build gate
+
+    @Test("a fresh gate wants a build")
+    func freshGateWantsBuild() {
+        let gate = ContinuousChunks.BuildGate()
+        #expect(gate.appliedSignature == nil)
+        #expect(gate.needsRebuild(for: 7))
+    }
+
+    @Test("a build that never lands leaves the gate open for the next pass")
+    func cancelledBuildLeavesGateOpen() {
+        var gate = ContinuousChunks.BuildGate()
+        #expect(gate.needsRebuild(for: 7))
+        #expect(gate.needsRebuild(for: 7))
+
+        gate.applied(7)
+
+        #expect(!gate.needsRebuild(for: 7))
+        #expect(gate.needsRebuild(for: 8))
+    }
+
+    @Test("clearing the transcript reopens the gate for the signature it had built")
+    func resetReopensGate() {
+        var gate = ContinuousChunks.BuildGate()
+        gate.applied(7)
+        #expect(!gate.needsRebuild(for: 7))
+
+        gate.reset()
+
+        #expect(gate.appliedSignature == nil)
+        #expect(gate.needsRebuild(for: 7))
+    }
 }
