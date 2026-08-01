@@ -38,8 +38,17 @@ extension AppModel {
             if Task.isCancelled { return }
             deletedEntries = deleted
             refreshBundleSizes(for: active)
-            libraryEntries = sortedLibraryEntries(active)
+            setLibraryEntries(sortedLibraryEntries(active))
         }
+    }
+
+    /// A refresh runs on every library touch, most of which change nothing; reassigning anyway would
+    /// repaint every view keyed on libraryVersion. LibraryEntry equality is id-only, so compare manifests.
+    func setLibraryEntries(_ entries: [LibraryEntry]) {
+        let unchanged = entries.count == libraryEntries.count
+            && zip(entries, libraryEntries).allSatisfy { $0.id == $1.id && $0.manifest == $1.manifest }
+        guard !unchanged else { return }
+        libraryEntries = entries
     }
 
     func reapplyLibrarySort() {
