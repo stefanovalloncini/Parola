@@ -210,12 +210,18 @@ actor StreamingRealtimeLoop {
         lastTranscribedTotal = max(lastTranscribedTotal, windowStartSample)
     }
 
+    // The watermark can sit past a retained segment's start when timestamps regress; the next decode and the purge both have to stay behind whichever comes first.
+    private var retainedFloorSeconds: Double {
+        let retainedStart = unconfirmedSegments.map { Double($0.start) }.min() ?? .greatestFiniteMagnitude
+        return min(Double(lastConfirmedEndSeconds), retainedStart)
+    }
+
     private func transcribeWindow(confirmAll: Bool = false) async throws {
         let offsetSeconds = Double(windowStartSample) / Double(config.sampleRate)
         let decodedEndSeconds = Float(offsetSeconds + Double(window.count) / Double(config.sampleRate))
         var options = baseDecodingOptions
         // clipTimestamps is window-relative; everything emitted from here back out must be absolute.
-        options.clipTimestamps = [Float(max(0, Double(lastConfirmedEndSeconds) - offsetSeconds))]
+        options.clipTimestamps = [Float(max(0, retainedFloorSeconds - offsetSeconds))]
         let emitProgressPartials = unconfirmedSegments.isEmpty
         let onPartial = self.onPartial
         let compressionCheckWindow = config.compressionCheckWindow
@@ -292,9 +298,7 @@ actor StreamingRealtimeLoop {
     }
 
     private func purgeConfirmedAudio() {
-        // The watermark can overshoot a retained segment when timestamps regress; purging to it would drop audio that segment still needs.
-        let retainedStart = unconfirmedSegments.map { Double($0.start) }.min() ?? .greatestFiniteMagnitude
-        let cutSeconds = min(Double(lastConfirmedEndSeconds), retainedStart) - config.purgePadSeconds
+        let cutSeconds = retainedFloorSeconds - config.purgePadSeconds
         let cutSample = Int(cutSeconds * Double(config.sampleRate))
         let drop = min(max(0, cutSample - windowStartSample), window.count)
         guard drop > 0 else { return }

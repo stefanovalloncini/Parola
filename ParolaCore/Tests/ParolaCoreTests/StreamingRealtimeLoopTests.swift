@@ -320,6 +320,28 @@ struct StreamingRealtimeLoopTests {
         )
     }
 
+    @Test("the next decode clips behind a retained segment, not past it")
+    func clipStaysBehindTheRetainedTail() async throws {
+        let (loop, capture, script, _) = makeLoop(responses: [
+            [segment(0, 9, "a"), segment(3, 5, "b"), segment(5, 7, "c")],
+            [segment(2, 4, "b"), segment(4, 6, "c"), segment(6, 8, "d")],
+        ])
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        capture.push(seconds: 10, value: 0.5)
+        #expect(await eventually { await loop.windowStartOffsetSamples() == 1 * sampleRate })
+
+        capture.push(seconds: 2, value: 0.5)
+        #expect(await eventually { await script.callCount == 2 })
+        let call2 = try #require(await script.calls.last)
+        #expect(call2.sampleCount == 11 * sampleRate)
+        #expect(call2.clip == [2], "3 s in, where the retained segment starts")
+
+        await loop.stop()
+        _ = await runTask.value
+    }
+
     @Test("a re-emitted segment is confirmed only once")
     func reEmittedSegmentIsConfirmedOnce() async throws {
         let (loop, capture, script, recorder) = makeLoop(responses: [
