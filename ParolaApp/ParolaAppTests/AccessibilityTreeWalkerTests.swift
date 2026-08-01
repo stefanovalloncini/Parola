@@ -213,3 +213,32 @@ struct AccessibilityTreeWalkerTests {
         #expect(leaf["children"] == .array([]))
     }
 }
+
+@Suite("Bridge main-thread hand-off")
+struct OnMainThreadTests {
+
+    @Test("the work runs on the main thread and its value comes back")
+    func runsOnMain() async throws {
+        let onMain = try await onMainThread(deadlineSeconds: 5) { Thread.isMainThread }
+        #expect(onMain)
+    }
+
+    @Test("a thrown error propagates instead of being swallowed")
+    func propagatesFailure() async {
+        await #expect(throws: AutomationError.self) {
+            try await onMainThread(deadlineSeconds: 5) {
+                throw AutomationError.notFound(kind: "element", id: "nope")
+            }
+        }
+    }
+
+    @Test("a wedged main thread fails the call at the deadline")
+    func deadlineFailsCleanly() async throws {
+        DispatchQueue.main.async { Thread.sleep(forTimeInterval: 0.4) }
+        try? await Task.sleep(for: .milliseconds(20))
+
+        await #expect(throws: AutomationError.self) {
+            try await onMainThread(deadlineSeconds: 0.05) { true }
+        }
+    }
+}

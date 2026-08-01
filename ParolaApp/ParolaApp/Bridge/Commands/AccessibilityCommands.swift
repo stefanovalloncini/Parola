@@ -98,7 +98,7 @@ extension ParolaAutomationServer {
                 handler: { args, _ in
                     let id = try args.string("id")
                     try requireAXTrust()
-                    return try await onAXQueue {
+                    return try await onAXThread {
                         guard let element = axFind(in: appAXElement(), identifier: id, depth: 0) else {
                             throw AutomationError.notFound(kind: "element", id: id)
                         }
@@ -118,7 +118,7 @@ extension ParolaAutomationServer {
                 kind: .async,
                 handler: { _, _ in
                     try requireAXTrust()
-                    return try await onAXQueue {
+                    return try await onAXThread {
                         var found: [AutomationValue] = []
                         axCollectIdentified(appAXElement(), into: &found, depth: 0)
                         return .array(found)
@@ -136,14 +136,47 @@ private func requireAXTrust() throws {
     }
 }
 
-/// AX queries against the app's OWN process must not run on the main thread: the AX server calls
-/// back into the main run loop to answer, which deadlocks if main is blocked waiting on the query.
-private func onAXQueue(_ work: @escaping @Sendable () throws -> AutomationValue) async throws -> AutomationValue {
+/// AX queries against the app's OWN process are answered inline on the calling thread — HIServices
+/// hands `_AXXMIG*` straight to AppKit instead of messaging — so SwiftUI evaluates its accessibility
+/// nodes right here, and only the main thread is legal. Nothing blocks waiting on main, so this
+/// can't deadlock the way an out-of-process query would; `deadline` only covers a wedged main thread.
+private func onAXThread(_ work: @escaping @MainActor @Sendable () throws -> AutomationValue) async throws -> AutomationValue {
+    try await onMainThread(deadlineSeconds: 5, work)
+}
+
+/// Runs `work` on the main thread and fails the call once the deadline passes, so a wedged main
+/// thread can't park a bridge command forever.
+func onMainThread<T: Sendable>(
+    deadlineSeconds: Double,
+    _ work: @escaping @MainActor @Sendable () throws -> T
+) async throws -> T {
     try await withCheckedThrowingContinuation { continuation in
-        DispatchQueue.global(qos: .userInitiated).async {
-            do { continuation.resume(returning: try work()) }
-            catch { continuation.resume(throwing: error) }
+        let winner = FirstResume()
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                let result = Result { try work() }
+                if winner.claim() { continuation.resume(with: result) }
+            }
         }
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + deadlineSeconds) {
+            if winner.claim() {
+                continuation.resume(throwing: AutomationError.precondition("main thread did not answer within \(deadlineSeconds)s"))
+            }
+        }
+    }
+}
+
+// @unchecked is safe: the only state is `taken`, guarded by the lock.
+private final class FirstResume: @unchecked Sendable {
+    private let lock = NSLock()
+    private var taken = false
+
+    func claim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if taken { return false }
+        taken = true
+        return true
     }
 }
 
