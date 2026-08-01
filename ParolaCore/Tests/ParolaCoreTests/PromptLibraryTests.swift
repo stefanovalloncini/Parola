@@ -34,7 +34,7 @@ struct PromptLibraryTests {
     @Test("updating a user prompt overwrites name and instructions")
     func updateUserPrompt() async throws {
         let lib = PromptLibrary(storageURL: makeTempStorage())
-        let original = await lib.addUserPrompt(name: "Old", instructions: "old")
+        let original = await lib.addUserPrompt(name: "Old", instructions: "old").prompt
         var edited = original
         edited.name = "New"
         edited.instructions = "new"
@@ -57,14 +57,14 @@ struct PromptLibraryTests {
     @Test("removing a user prompt drops it")
     func removeUserPrompt() async throws {
         let lib = PromptLibrary(storageURL: makeTempStorage())
-        let p = await lib.addUserPrompt(name: "X", instructions: "y")
+        let p = await lib.addUserPrompt(name: "X", instructions: "y").prompt
         let ok = await lib.removeUserPrompt(p.id)
         #expect(ok)
         let userPrompts = await lib.userPrompts
         #expect(userPrompts.isEmpty)
     }
 
-    @Test("an unreadable prompt file is kept aside instead of overwritten")
+    @Test("an unparseable prompt file is kept aside instead of overwritten")
     func unreadableFileIsPreserved() async throws {
         let url = makeTempStorage()
         let original = Data("{ this is not a prompt list".utf8)
@@ -72,13 +72,48 @@ struct PromptLibraryTests {
 
         let lib = PromptLibrary(storageURL: url)
         #expect(await lib.userPrompts.isEmpty)
-        #expect(await lib.loadFailed)
+        #expect(await lib.loadFailure != nil)
 
         _ = await lib.addUserPrompt(name: "Fresh", instructions: "new")
         let backup = url.appendingPathExtension("corrupt")
         #expect((try? Data(contentsOf: backup)) == original)
         #expect(await lib.lastSaveFailed == false)
-        #expect(await lib.loadFailed == false)
+        #expect(await lib.loadFailure == nil)
+    }
+
+    @Test("every kept-aside copy of an unparseable file survives the next one")
+    func repeatedCorruptionKeepsEveryCopy() async throws {
+        let url = makeTempStorage()
+        for round in 1...22 {
+            try Data("{ broken \(round)".utf8).write(to: url)
+            let lib = PromptLibrary(storageURL: url)
+            _ = await lib.addUserPrompt(name: "Fresh \(round)", instructions: "new")
+            #expect(await lib.lastSaveFailed == false)
+        }
+        let parent = url.deletingLastPathComponent()
+        let kept = try FileManager.default.contentsOfDirectory(atPath: parent.path)
+            .filter { $0.hasPrefix(url.lastPathComponent + ".corrupt") }
+        #expect(kept.count == 22)
+    }
+
+    @Test("a file that cannot be read is neither overwritten nor renamed")
+    func unreadableFileIsLeftAlone() async throws {
+        let url = makeTempStorage()
+        let original = try JSONEncoder().encode([Prompt(name: "Mine", instructions: "keep", isBuiltIn: false)])
+        try original.write(to: url)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path) }
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: url.path)
+
+        let lib = PromptLibrary(storageURL: url)
+        #expect(await lib.loadFailure == .unreadable)
+
+        let added = await lib.addUserPrompt(name: "Fresh", instructions: "new")
+        #expect(added.saved == false)
+        #expect(await lib.lastSaveFailed)
+        #expect(FileManager.default.fileExists(atPath: url.appendingPathExtension("corrupt").path) == false)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        #expect(try Data(contentsOf: url) == original)
     }
 
     @Test("a missing prompt file starts empty and still saves")
@@ -86,9 +121,9 @@ struct PromptLibraryTests {
         let url = makeTempStorage()
         let lib = PromptLibrary(storageURL: url)
         #expect(await lib.userPrompts.isEmpty)
-        #expect(await lib.loadFailed == false)
+        #expect(await lib.loadFailure == nil)
 
-        _ = await lib.addUserPrompt(name: "Fresh", instructions: "new")
+        #expect(await lib.addUserPrompt(name: "Fresh", instructions: "new").saved)
         #expect(await lib.lastSaveFailed == false)
         #expect(FileManager.default.fileExists(atPath: url.appendingPathExtension("corrupt").path) == false)
 
@@ -104,9 +139,10 @@ struct PromptLibraryTests {
         let lib = PromptLibrary(storageURL: blocker.appendingPathComponent("Prompts.json"))
 
         let added = await lib.addUserPrompt(name: "Nope", instructions: "n")
+        #expect(added.saved == false)
         #expect(await lib.lastSaveFailed)
-        #expect(await lib.updateUserPrompt(added) == false)
-        #expect(await lib.removeUserPrompt(added.id) == false)
+        #expect(await lib.updateUserPrompt(added.prompt) == false)
+        #expect(await lib.removeUserPrompt(added.prompt.id) == false)
     }
 
     @Test("PromptRunner dispatches via the language model")

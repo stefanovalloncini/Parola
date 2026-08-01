@@ -22,7 +22,7 @@ public enum TranscriptChat {
         let budget = budgetTokens ?? defaultBudgetTokens
         let instructions = systemInstructions(for: transcript)
         let model: any LanguageModel
-        if TokenBudget.estimateTokens(instructions) > budget {
+        if usesCondensedContext(instructions: instructions, budgetTokens: budget) {
             // Probe availability now so an over-budget session fails at creation like the plain path.
             _ = try makeOnDeviceModel(instructions: "")
             model = CondensedChatModel(
@@ -62,7 +62,7 @@ public enum TranscriptChat {
             }
             let instructions = systemInstructions(for: transcript)
             let model: any LanguageModel
-            if TokenBudget.estimateTokens(instructions) > budget {
+            if usesCondensedContext(instructions: instructions, budgetTokens: budget) {
                 // Probe key/policy now so an over-budget session fails at creation like the plain path.
                 _ = try await makeCloudModel("")
                 model = CondensedChatModel(
@@ -100,8 +100,12 @@ public enum TranscriptChat {
         return out
     }
 
+    static func usesCondensedContext(instructions: String, budgetTokens: Int) -> Bool {
+        TokenBudget.estimateTokens(instructions) > budgetTokens
+    }
+
     static func usesCondensedContext(for transcript: Transcript, budgetTokens: Int) -> Bool {
-        TokenBudget.estimateTokens(systemInstructions(for: transcript)) > budgetTokens
+        usesCondensedContext(instructions: systemInstructions(for: transcript), budgetTokens: budgetTokens)
     }
 
     static func cloudBudgetTokens(for id: CloudLLMProviderID, responseHeadroom: Int = 4096) -> Int {

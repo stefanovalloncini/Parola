@@ -1960,6 +1960,17 @@
         }
       }
     },
+    "Couldn't save your prompts": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile salvare i prompt"
+          }
+        }
+      }
+    },
     "Count-in": {
       "extractionState": "manual",
       "localizations": {
@@ -7615,6 +7626,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Termini tecnici (Italiano)"
+          }
+        }
+      }
+    },
+    "The change is only in this session. Check that Parola can write to its Application Support folder.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La modifica vale solo per questa sessione. Verifica che Parola possa scrivere nella sua cartella Application Support."
           }
         }
       }

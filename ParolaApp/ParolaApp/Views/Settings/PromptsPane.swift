@@ -7,11 +7,13 @@ struct PromptsPane: View {
     @State private var sortOption: SortOption = .builtInFirst
     @State private var userPrompts: [Prompt] = []
     @State private var editing: PromptEditDraft?
+    @State private var saveFailed = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             SearchPill(text: $searchText, placeholder: "Search prompts…")
             sortRow
+            if saveFailed { saveErrorBanner }
 
             SettingsSection {
                 let visible = visiblePrompts
@@ -84,6 +86,25 @@ struct PromptsPane: View {
         return prompts
     }
 
+    private var saveErrorBanner: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(DS.Palette.warning)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Couldn't save your prompts")
+                    .font(DS.Font.calloutMedium)
+                Text("The change is only in this session. Check that Parola can write to its Application Support folder.")
+                    .font(DS.Font.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(10)
+        .background(DS.Palette.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
+        .axLeaf("Prompts.Text.SaveError")
+    }
+
     private var sortRow: some View {
         HStack {
             Spacer()
@@ -130,14 +151,14 @@ struct PromptsPane: View {
                 triggerWords: draft.parsedTriggerWords,
                 useSystemInstructions: !draft.assistantMode
             )
-            await model.promptLibrary.updateUserPrompt(updated)
+            saveFailed = await model.promptLibrary.updateUserPrompt(updated) == false
         } else {
-            _ = await model.promptLibrary.addUserPrompt(
+            saveFailed = await model.promptLibrary.addUserPrompt(
                 name: trimmed,
                 instructions: draft.instructions,
                 triggerWords: draft.parsedTriggerWords,
                 useSystemInstructions: !draft.assistantMode
-            )
+            ).saved == false
         }
         await reload()
         await model.refreshDictationTriggerPrompts()
@@ -148,7 +169,7 @@ struct PromptsPane: View {
         guard !prompt.isBuiltIn else { return }
         let id = prompt.id
         Task {
-            await model.promptLibrary.removeUserPrompt(id)
+            saveFailed = await model.promptLibrary.removeUserPrompt(id) == false
             await reload()
             await model.refreshDictationTriggerPrompts()
         }
