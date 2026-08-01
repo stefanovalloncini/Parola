@@ -31,6 +31,7 @@ actor StreamingRealtimeLoop {
 
     enum Outcome: Sendable {
         case stopped
+        case cancelled
         case permissionDenied
         case failed(any Error)
     }
@@ -59,6 +60,7 @@ actor StreamingRealtimeLoop {
     private var unconfirmedSegments: [TranscriptionSegment] = []
     private var currentText = ""
     private var isRunning = false
+    private var didStopCapture = false
 
     init(
         configuration: Configuration,
@@ -88,10 +90,12 @@ actor StreamingRealtimeLoop {
             do {
                 try await iterate()
             } catch is CancellationError {
-                break
+                isRunning = false
+                stopCapture()
+                return .cancelled
             } catch {
                 isRunning = false
-                deps.stopCapture()
+                stopCapture()
                 return .failed(error)
             }
         }
@@ -135,6 +139,12 @@ actor StreamingRealtimeLoop {
 
     func stop() {
         isRunning = false
+        stopCapture()
+    }
+
+    private func stopCapture() {
+        guard !didStopCapture else { return }
+        didStopCapture = true
         deps.stopCapture()
     }
 

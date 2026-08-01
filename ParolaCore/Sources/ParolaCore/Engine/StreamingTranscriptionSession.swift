@@ -172,6 +172,8 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             switch outcome {
             case .stopped, .permissionDenied:
                 await self.handleStreamerEndedWithoutStop()
+            case .cancelled:
+                await self.finishStream(failure: nil)
             case .failed(let error):
                 await self.handleStreamerFailure(error)
             }
@@ -211,19 +213,17 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     public func currentModel() -> String? { loadedModel }
 
     private func handleStreamerFailure(_ error: Error) async {
-        guard loop != nil else { return }
-        continuation?.yield(.failed(error.localizedDescription))
-        segmentContinuation?.finish()
-        await consumerTask?.value
-        continuation?.finish()
-        await persister?.discard()
-        teardown()
+        await finishStream(failure: error.localizedDescription)
     }
 
     // The loop returns without failing when it can't capture (e.g. denied mic); if stop() didn't drive that return (loop still set), surface a failure so the consumer doesn't wait forever.
     private func handleStreamerEndedWithoutStop() async {
+        await finishStream(failure: "Couldn't start the microphone. Check Microphone access in System Settings › Privacy & Security › Microphone.")
+    }
+
+    private func finishStream(failure: String?) async {
         guard loop != nil else { return }
-        continuation?.yield(.failed("Couldn't start the microphone. Check Microphone access in System Settings › Privacy & Security › Microphone."))
+        if let failure { continuation?.yield(.failed(failure)) }
         segmentContinuation?.finish()
         await consumerTask?.value
         continuation?.finish()

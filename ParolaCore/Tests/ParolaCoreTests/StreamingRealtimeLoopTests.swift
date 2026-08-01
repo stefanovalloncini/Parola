@@ -7,8 +7,8 @@ import os
 private let sampleRate = 16_000
 
 private final class FakeCapture: Sendable {
-    private let state = OSAllocatedUnfairLock<(callback: (@Sendable ([Float]) -> Void)?, stopped: Bool)>(
-        initialState: (nil, false)
+    private let state = OSAllocatedUnfairLock<(callback: (@Sendable ([Float]) -> Void)?, stops: Int)>(
+        initialState: (nil, 0)
     )
 
     func install(_ callback: @escaping @Sendable ([Float]) -> Void) {
@@ -16,11 +16,12 @@ private final class FakeCapture: Sendable {
     }
 
     func markStopped() {
-        state.withLock { $0.stopped = true }
+        state.withLock { $0.stops += 1 }
     }
 
     var installed: Bool { state.withLock { $0.callback != nil } }
-    var stopped: Bool { state.withLock { $0.stopped } }
+    var stopped: Bool { state.withLock { $0.stops > 0 } }
+    var stopCount: Int { state.withLock { $0.stops } }
 
     func push(_ samples: [Float]) {
         let callback = state.withLock { $0.callback }
@@ -353,6 +354,60 @@ struct StreamingRealtimeLoopTests {
         #expect(await script.callCount == 1, "a silence-only tail is not decoded")
         #expect(recorder.batches.count == 2)
         #expect(recorder.batches.last?.segments.map(\.text) == ["b", "c"])
+    }
+
+    @Test("cancelling the run releases the mic and skips the flush decode")
+    func cancellationStopsCapture() async throws {
+        let (loop, capture, script, recorder) = makeLoop(responses: [
+            [segment(0, 1, "a"), segment(1, 2, "b"), segment(2, 3, "c")],
+            [segment(1, 2, "b"), segment(2, 3, "c"), segment(3, 3.5, "tail")],
+        ])
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        capture.push(seconds: 3, value: 0.5)
+        #expect(await eventually { await script.callCount == 1 })
+        #expect(await eventually { recorder.batches.count == 1 })
+
+        capture.push(seconds: 0.5, value: 0.5)
+        runTask.cancel()
+        let outcome = await runTask.value
+        guard case .cancelled = outcome else {
+            Issue.record("expected .cancelled, got \(outcome)")
+            return
+        }
+
+        #expect(capture.stopCount == 1, "a cancelled run releases the mic")
+        #expect(await script.callCount == 1, "a cancelled run does not decode a flush")
+        #expect(recorder.batches.count == 1, "a cancelled run promotes no tail")
+    }
+
+    @Test("stopping after a cancelled run stops capture once")
+    func cancelThenStopStopsCaptureOnce() async throws {
+        let (loop, capture, _, _) = makeLoop(responses: [])
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        runTask.cancel()
+        _ = await runTask.value
+        await loop.stop()
+        #expect(capture.stopCount == 1)
+    }
+
+    @Test("cancelling after a stop stops capture once")
+    func stopThenCancelStopsCaptureOnce() async throws {
+        let (loop, capture, _, _) = makeLoop(responses: [])
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        await loop.stop()
+        let outcome = await runTask.value
+        runTask.cancel()
+        guard case .stopped = outcome else {
+            Issue.record("expected .stopped, got \(outcome)")
+            return
+        }
+        #expect(capture.stopCount == 1)
     }
 
     @Test("denied permission ends the run before capture starts")
