@@ -202,13 +202,17 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         }
         ioProcID = nil
         teardownAll()
-        await callbackQueue.drain()
-        captureFailure = handler?.failure
+        // Hand the handler off before the drain await: a second stop that interleaves there must not
+        // clear the failure this one is about to latch.
+        let stopping = handler
         handler = nil
         for continuation in levelContinuations.values {
             continuation.finish()
         }
         levelContinuations.removeAll()
+        guard let stopping else { return }
+        await callbackQueue.drain()
+        captureFailure = stopping.failure
     }
 
     private func teardownAll() {

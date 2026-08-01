@@ -5,13 +5,13 @@ import os
 /// Appends streamed mono Float32 samples to a temporary WAV file as they arrive,
 /// so a live recording never accumulates in memory.
 final class StreamingAudioPersister: Sendable {
-    private static let chunksPerMinuteAt16kHz = 940
-    private static let maxBufferedChunks = 3 * chunksPerMinuteAt16kHz
+    private static let tapChunksPerMinuteAt48kHz = 1800
+    private static let maxBufferedChunks = 3 * tapChunksPerMinuteAt48kHz
 
     let url: URL
     private let continuation: AsyncStream<[Float]>.Continuation
     private let writerTask: Task<URL?, Never>
-    private let droppedAudio = OSAllocatedUnfairLock(initialState: false)
+    private let dropped = OSAllocatedUnfairLock(initialState: false)
 
     init?(sampleRate: Double) {
         guard let format = AVAudioFormat(
@@ -55,21 +55,25 @@ final class StreamingAudioPersister: Sendable {
         }
     }
 
+    /// True when the writer fell behind: the take has gaps but everything else is still on disk.
+    var droppedAudio: Bool {
+        dropped.withLock { $0 }
+    }
+
     func append(_ samples: [Float]) {
         if case .dropped = continuation.yield(samples) {
-            droppedAudio.withLock { $0 = true }
+            noteDrop()
         }
     }
 
-    /// Finishes the WAV and returns its URL, or nil if nothing was written or samples were dropped.
+    func noteDrop() {
+        dropped.withLock { $0 = true }
+    }
+
+    /// Finishes the WAV and returns its URL, or nil if nothing was written or a write failed.
     func finish() async -> URL? {
         continuation.finish()
-        let written = await writerTask.value
-        guard !droppedAudio.withLock({ $0 }) else {
-            if let written { try? FileManager.default.removeItem(at: written) }
-            return nil
-        }
-        return written
+        return await writerTask.value
     }
 
     /// Finishes and deletes the file; for teardown paths that won't use the recording.

@@ -12,6 +12,7 @@ struct StreamChunkConverterTests {
         ))
         let converter = try #require(AVAudioConverter(from: src, to: dst))
 
+        var scratch: AVAudioPCMBuffer?
         var total: AVAudioFrameCount = 0
         for i in 0..<10 {
             let chunk = try #require(AVAudioPCMBuffer(pcmFormat: src, frameCapacity: 4096))
@@ -20,7 +21,7 @@ struct StreamChunkConverterTests {
                 let samples = chunk.floatChannelData![ch]
                 for f in 0..<4096 { samples[f] = sinf(Float(i * 4096 + f) * 0.01) }
             }
-            if let out = StreamChunkConverter.convert(chunk: chunk, with: converter, to: dst) {
+            if let out = StreamChunkConverter.convert(chunk: chunk, with: converter, to: dst, reusing: &scratch) {
                 total += out.frameLength
             }
         }
@@ -42,7 +43,10 @@ struct StreamChunkConverterTests {
 
         for i in 0..<8 {
             let chunk = try Self.tone(format: src, frames: 4096, phase: i * 4096)
-            let a = try #require(StreamChunkConverter.convert(chunk: chunk, with: fresh, to: dst))
+            var perCall: AVAudioPCMBuffer?
+            let a = try #require(StreamChunkConverter.convert(
+                chunk: chunk, with: fresh, to: dst, reusing: &perCall
+            ))
             let b = try #require(StreamChunkConverter.convert(
                 chunk: chunk, with: reusing, to: dst, reusing: &scratch
             ))
@@ -98,8 +102,9 @@ struct StreamChunkConverterTests {
         let converter = try #require(AVAudioConverter(from: src, to: dst))
         let chunk = try #require(AVAudioPCMBuffer(pcmFormat: src, frameCapacity: 4800))
         chunk.frameLength = 4800
+        var scratch: AVAudioPCMBuffer?
 
-        let out = try #require(StreamChunkConverter.convert(chunk: chunk, with: converter, to: dst))
+        let out = try #require(StreamChunkConverter.convert(chunk: chunk, with: converter, to: dst, reusing: &scratch))
         #expect(out.frameLength > 1_000)
         #expect(out.format.sampleRate == 16_000)
         #expect(out.format.channelCount == 1)

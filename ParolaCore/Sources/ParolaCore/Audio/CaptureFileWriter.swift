@@ -1,13 +1,13 @@
 import AVFoundation
 import os
 
-/// Writes a live capture's converted chunks to its file and latches the first failure, so a
-/// take that stopped landing on disk is reported at `prepare()` instead of read back as silence.
-// Unchecked Sendable: `writeChunk` runs only on the capture's own serialized callback path,
-// and the failure latch is lock-guarded so a tap thread can report a drop.
+/// Writes a live capture's converted chunks to its file, latching the first write failure so a
+/// take that stopped landing on disk is reported instead of read back as silence.
+// Unchecked Sendable: `writeChunk` runs only on the capture's own serialized callback path; the latches are lock-guarded so a tap thread can report a drop.
 final class CaptureFileWriter: @unchecked Sendable {
     private let writeChunk: (AVAudioPCMBuffer) throws -> Void
     private let latchedFailure = OSAllocatedUnfairLock<String?>(initialState: nil)
+    private let drops = OSAllocatedUnfairLock<Int>(initialState: 0)
 
     init(file: AVAudioFile) {
         self.writeChunk = { [file] buffer in try file.write(from: buffer) }
@@ -19,6 +19,15 @@ final class CaptureFileWriter: @unchecked Sendable {
 
     var failure: String? {
         latchedFailure.withLock { $0 }
+    }
+
+    var droppedChunks: Int {
+        drops.withLock { $0 }
+    }
+
+    /// A backlog drop leaves a gap in the take but keeps everything already on disk, so it never fails the recording.
+    func noteDrop() {
+        drops.withLock { $0 += 1 }
     }
 
     func write(_ buffer: AVAudioPCMBuffer) {

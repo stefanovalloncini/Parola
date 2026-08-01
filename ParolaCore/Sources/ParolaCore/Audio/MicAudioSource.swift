@@ -107,7 +107,7 @@ public actor MicAudioSource: LiveAudioSource {
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { buffer, _ in
             guard let copy = Self.copy(buffer) else { return }
             if case .dropped = cont.yield(BufferBox(buffer: copy)) {
-                writer.fail("the recorder fell behind and dropped captured audio")
+                writer.noteDrop()
             }
         }
 

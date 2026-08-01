@@ -33,6 +33,18 @@ struct StreamingAudioPersisterTests {
         #expect(!FileManager.default.fileExists(atPath: persister.url.path))
     }
 
+    @Test("a backlog drop keeps the audio that did land")
+    func dropKeepsWrittenAudio() async throws {
+        let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))
+        persister.append([0.1, 0.2])
+        persister.noteDrop()
+
+        let url = try #require(await persister.finish())
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(persister.droppedAudio)
+        #expect(FileManager.default.fileExists(atPath: url.path))
+    }
+
     @Test("discard deletes the written file")
     func discardDeletesFile() async throws {
         let persister = try #require(StreamingAudioPersister(sampleRate: 16_000))

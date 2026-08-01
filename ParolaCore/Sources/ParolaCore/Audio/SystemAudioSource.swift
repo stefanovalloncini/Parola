@@ -220,17 +220,7 @@ private final class SampleHandler: NSObject, SCStreamDelegate, SCStreamOutput, @
 /// callback returns — copying decouples our buffer's lifetime from theirs.
 @available(macOS 13.0, *)
 enum SystemAudioSampleCopy {
-    static func copy(
-        sampleBuffer: CMSampleBuffer,
-        srcFormat: AVAudioFormat,
-        frameCount: AVAudioFrameCount
-    ) -> AVAudioPCMBuffer? {
-        var scratch: AVAudioPCMBuffer?
-        return copy(sampleBuffer: sampleBuffer, srcFormat: srcFormat, frameCount: frameCount, reusing: &scratch)
-    }
-
-    /// Copies into `scratch`, growing it when a callback delivers more frames. The returned buffer
-    /// is the scratch itself, so the caller must be done with it before the next callback.
+    /// Copies into `scratch`, growing it when a callback delivers more frames; the returned buffer is the scratch itself.
     static func copy(
         sampleBuffer: CMSampleBuffer,
         srcFormat: AVAudioFormat,

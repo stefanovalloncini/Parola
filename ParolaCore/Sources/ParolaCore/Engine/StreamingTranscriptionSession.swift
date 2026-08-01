@@ -192,11 +192,15 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         segmentContinuation?.finish()
         await consumerTask?.value
 
+        let recordedURL = await persister?.finish()
+        if persister?.droppedAudio == true {
+            continuation?.yield(.warning("The recorder fell behind, so the saved audio has gaps."))
+        }
         let finalTranscript = Transcript(
             segments: allConfirmed,
             language: optionsForRun?.language ?? "auto",
             modelName: loadedModel ?? "unknown",
-            sourceURL: await persister?.finish(),
+            sourceURL: recordedURL,
             durationSeconds: allConfirmed.last?.end
         )
         continuation?.yield(.finished(finalTranscript))

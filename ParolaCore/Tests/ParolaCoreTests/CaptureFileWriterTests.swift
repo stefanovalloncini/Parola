@@ -40,15 +40,17 @@ struct CaptureFileWriterTests {
         #expect(writer.failure == "fell behind")
     }
 
-    @Test("a reported drop stops later writes")
-    func dropStopsWriting() throws {
+    @Test("a reported drop is counted without failing the take")
+    func dropKeepsWriting() throws {
         let counter = WriteCounter()
         let writer = CaptureFileWriter { _ in counter.bump() }
-        writer.fail("fell behind")
+        writer.noteDrop()
+        writer.noteDrop()
         writer.write(Self.buffer())
 
-        #expect(counter.count == 0)
-        #expect(writer.failure == "fell behind")
+        #expect(counter.count == 1)
+        #expect(writer.droppedChunks == 2)
+        #expect(writer.failure == nil)
     }
 
     @Test("writes land in the backing file")

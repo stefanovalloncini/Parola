@@ -14,11 +14,13 @@ struct SystemAudioSampleCopyTests {
         let frames: AVAudioFrameCount = 960
         let source = try Self.makeBuffer(format: format, frames: frames, channelValues: [0.5, -0.25])
         let sampleBuffer = try Self.makeSampleBuffer(from: source)
+        var scratch: AVAudioPCMBuffer?
 
         let copied = try #require(SystemAudioSampleCopy.copy(
             sampleBuffer: sampleBuffer,
             srcFormat: format,
-            frameCount: frames
+            frameCount: frames,
+            reusing: &scratch
         ))
 
         #expect(copied.frameLength == frames)
@@ -33,11 +35,13 @@ struct SystemAudioSampleCopyTests {
         let frames: AVAudioFrameCount = 480
         let source = try Self.makeBuffer(format: format, frames: frames, channelValues: [0.75])
         let sampleBuffer = try Self.makeSampleBuffer(from: source)
+        var scratch: AVAudioPCMBuffer?
 
         let copied = try #require(SystemAudioSampleCopy.copy(
             sampleBuffer: sampleBuffer,
             srcFormat: format,
-            frameCount: frames
+            frameCount: frames,
+            reusing: &scratch
         ))
 
         #expect(copied.frameLength == frames)

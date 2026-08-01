@@ -6,17 +6,7 @@ import AVFoundation
 /// end-of-stream latches the converter permanently, so every later chunk of the recording
 /// would convert to zero frames and be dropped.
 enum StreamChunkConverter {
-    static func convert(
-        chunk: AVAudioPCMBuffer,
-        with converter: AVAudioConverter,
-        to outputFormat: AVAudioFormat
-    ) -> AVAudioPCMBuffer? {
-        var scratch: AVAudioPCMBuffer?
-        return convert(chunk: chunk, with: converter, to: outputFormat, reusing: &scratch)
-    }
-
-    /// Converts into `scratch`, growing it when a chunk needs more room. The returned buffer is
-    /// the scratch itself, so the caller must be done with it before converting the next chunk.
+    /// Converts into `scratch`, growing it when a chunk needs more room; the returned buffer is the scratch itself.
     static func convert(
         chunk: AVAudioPCMBuffer,
         with converter: AVAudioConverter,
