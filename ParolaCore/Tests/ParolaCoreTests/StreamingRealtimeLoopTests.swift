@@ -112,6 +112,7 @@ private func eventually(
 private func makeLoop(
     responses: [[TranscriptionSegment]],
     failure: (any Error)? = nil,
+    startFailure: (any Error)? = nil,
     useVAD: Bool = false,
     wantsConfirmedAudio: Bool = false,
     maxWindowSeconds: Double = 60,
@@ -129,7 +130,10 @@ private func makeLoop(
         decodingOptions: DecodingOptions(),
         dependencies: .init(
             requestPermission: { permissionGranted },
-            startCapture: { capture.install($0) },
+            startCapture: { callback in
+                if let startFailure { throw startFailure }
+                capture.install(callback)
+            },
             stopCapture: { capture.markStopped() },
             transcribe: { samples, options, _ in try await script.invoke(samples, options) },
             tick: { try await Task.sleep(nanoseconds: 1_000_000) }
@@ -247,6 +251,72 @@ struct StreamingRealtimeLoopTests {
 
         await loop.stop()
         _ = await runTask.value
+    }
+
+    @Test("a confirmed end past the retained tail keeps the tail's audio")
+    func overshootingEndKeepsRetainedAudio() async throws {
+        let (loop, capture, script, recorder) = makeLoop(
+            responses: [
+                [segment(0, 9, "a"), segment(4, 6, "b"), segment(6, 8, "c")],
+                [segment(2, 4, "b"), segment(4, 6, "c")],
+            ],
+            wantsConfirmedAudio: true
+        )
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        capture.pushRamp(seconds: 10)
+        #expect(await eventually { recorder.batches.count == 1 })
+        #expect(recorder.batches.first?.segments.map(\.text) == ["a"])
+        #expect(await eventually { await loop.windowStartOffsetSamples() == 2 * sampleRate })
+
+        capture.push(seconds: 2, value: 0.5)
+        #expect(await eventually { await script.callCount == 2 })
+
+        await loop.stop()
+        _ = await runTask.value
+
+        #expect(recorder.batches.count == 2)
+        let tail = try #require(recorder.batches.last)
+        #expect(tail.segments.map(\.text) == ["b", "c"])
+        #expect(tail.windowStartSeconds == 3.5)
+        #expect(tail.audioWindow.count == 5 * sampleRate)
+    }
+
+    @Test("an out-of-order confirmed batch still carries its audio")
+    func outOfOrderBatchCarriesAudio() async throws {
+        let (loop, capture, _, recorder) = makeLoop(
+            responses: [[
+                segment(8, 9, "late"), segment(0, 1, "early"),
+                segment(9, 10, "x"), segment(10, 11, "y"),
+            ]],
+            wantsConfirmedAudio: true
+        )
+        let runTask = Task { await loop.run() }
+        #expect(await eventually { capture.installed })
+
+        capture.pushRamp(seconds: 10)
+        #expect(await eventually { recorder.batches.count == 1 })
+        let batch = try #require(recorder.batches.first)
+        #expect(batch.segments.map(\.text) == ["late", "early"])
+        #expect(batch.windowStartSeconds == 0)
+        #expect(batch.audioWindow.count == Int(9.5 * Double(sampleRate)))
+
+        await loop.stop()
+        _ = await runTask.value
+    }
+
+    @Test("a capture that fails to start is stopped exactly once")
+    func startCaptureFailureStopsCapture() async throws {
+        let (loop, capture, _, _) = makeLoop(responses: [], startFailure: ScriptError())
+        let outcome = await loop.run()
+        guard case .failed = outcome else {
+            Issue.record("expected .failed, got \(outcome)")
+            return
+        }
+        #expect(capture.stopCount == 1)
+        await loop.stop()
+        #expect(capture.stopCount == 1)
     }
 
     @Test("VAD holds transcription until voice appears")
@@ -371,8 +441,10 @@ struct StreamingRealtimeLoopTests {
         let runTask = Task { await loop.run() }
         #expect(await eventually { capture.installed })
 
-        capture.pushBuffers(count: 10, secondsEach: 0.1, value: 0)
-        capture.pushBuffers(count: 30, secondsEach: 0.1, value: 0.5)
+        // The voice arrives as one buffer: split across many, an iteration landing mid-push
+        // would leave undecoded speech in the tail and the flush would rightly decode it.
+        capture.pushBuffers(count: 1, secondsEach: 0.1, value: 0)
+        capture.push(seconds: 3, value: 0.5)
         #expect(await eventually { await script.callCount == 1 })
         #expect(await eventually { recorder.batches.count == 1 })
 

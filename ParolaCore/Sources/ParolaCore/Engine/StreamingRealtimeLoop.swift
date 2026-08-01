@@ -83,6 +83,7 @@ actor StreamingRealtimeLoop {
         do {
             try deps.startCapture { [weak self] buffer in self?.ingest(buffer) }
         } catch {
+            stopCapture()
             return .failed(error)
         }
         isRunning = true
@@ -266,14 +267,16 @@ actor StreamingRealtimeLoop {
     }
 
     private func makeBatch(_ segments: [TranscriptionSegment]) -> ConfirmedAudioBatch {
-        guard config.wantsConfirmedAudio, let first = segments.first, let last = segments.last else {
+        guard config.wantsConfirmedAudio,
+              let earliestStart = segments.map(\.start).min(),
+              let furthestEnd = segments.map(\.end).max() else {
             return ConfirmedAudioBatch(segments: segments, audioWindow: [], windowStartSeconds: 0)
         }
         let sampleRate = Double(config.sampleRate)
         let windowStart = Double(windowStartSample) / sampleRate
         let windowEnd = windowStart + Double(window.count) / sampleRate
-        let sliceStart = max(windowStart, Double(first.start) - 0.5)
-        let sliceEnd = min(windowEnd, Double(last.end) + 0.5)
+        let sliceStart = max(windowStart, Double(earliestStart) - 0.5)
+        let sliceEnd = min(windowEnd, Double(furthestEnd) + 0.5)
         let lowerBound = Int((sliceStart - windowStart) * sampleRate)
         let upperBound = min(window.count, Int((sliceEnd - windowStart) * sampleRate))
         guard lowerBound >= 0, lowerBound < upperBound else {
@@ -287,7 +290,9 @@ actor StreamingRealtimeLoop {
     }
 
     private func purgeConfirmedAudio() {
-        let cutSeconds = Double(lastConfirmedEndSeconds) - config.purgePadSeconds
+        // The watermark can overshoot a retained segment when timestamps regress; purging to it would drop audio that segment still needs.
+        let retainedStart = unconfirmedSegments.map { Double($0.start) }.min() ?? .greatestFiniteMagnitude
+        let cutSeconds = min(Double(lastConfirmedEndSeconds), retainedStart) - config.purgePadSeconds
         let cutSample = Int(cutSeconds * Double(config.sampleRate))
         let drop = min(max(0, cutSample - windowStartSample), window.count)
         guard drop > 0 else { return }
