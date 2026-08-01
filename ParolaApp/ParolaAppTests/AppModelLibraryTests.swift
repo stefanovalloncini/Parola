@@ -9,6 +9,11 @@ func makeTempLibraryURL(_ label: String = "appmodel") -> URL {
         .appendingPathComponent("parola-test-\(label)-\(UUID().uuidString)", isDirectory: true)
 }
 
+// @unchecked: only written from the observation callback, which the library refresh raises on the main actor.
+private final class ObservationFlag: @unchecked Sendable {
+    var fired = false
+}
+
 @MainActor
 @Suite("AppModel library")
 struct AppModelLibraryTests {
@@ -271,5 +276,36 @@ struct AppModelLibraryTests {
         await model.libraryRefreshTask?.value
 
         #expect(model.libraryEntries.map(\.id) == ["fresh"])
+    }
+
+    @Test("saving a segment note invalidates the observed path the segment card reads")
+    func segmentNoteIsObserved() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        model.selectedEntryID = seeded.id
+
+        let invalidated = ObservationFlag()
+        withObservationTracking {
+            _ = model.currentSegmentNote(for: 0)
+        } onChange: {
+            invalidated.fired = true
+        }
+
+        model.setSegmentNote("check the mix", segmentID: 0)
+        for _ in 0..<200 where model.currentSegmentNote(for: 0) == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(invalidated.fired)
+        #expect(model.currentSegmentNote(for: 0) == "check the mix")
     }
 }

@@ -820,7 +820,9 @@ final class AppModel {
     }
 
     func libraryEntry(id: LibraryEntry.ID) -> LibraryEntry? {
-        libraryEntriesByID[id]
+        // The index is @ObservationIgnored, so readers only repaint if they also touch the version it is rebuilt with.
+        _ = libraryVersion
+        return libraryEntriesByID[id]
     }
     var libraryFilter: EntryCategory?
     /// True when the "All" chip is showing the flat all-categories list. Distinguishes All from Home, which both leave libraryFilter nil.
