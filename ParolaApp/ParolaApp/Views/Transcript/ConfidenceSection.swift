@@ -2,24 +2,14 @@ import SwiftUI
 import ParolaCore
 
 struct ConfidenceSection: View {
+    let overall: Double?
+    let lows: [TranscriptSegment]
+
     @Environment(AppModel.self) private var model
     @State private var expanded = false
 
-    private var transcript: Transcript? { model.transcript }
-
-    private var overall: Double? {
-        guard let transcript else { return nil }
-        return SegmentConfidence.transcriptAverage(for: transcript)
-    }
-
-    private var lows: [TranscriptSegment] {
-        guard let transcript else { return [] }
-        return SegmentConfidence.lowConfidence(segments: transcript.segments)
-    }
-
     var body: some View {
         if let overall {
-            let lows = self.lows
             InfoSection(title: "Confidence") {
                 summaryRow(overall: overall)
                 if !lows.isEmpty {

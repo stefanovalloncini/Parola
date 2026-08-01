@@ -2,12 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct SpeakerStatsSection: View {
-    @Environment(AppModel.self) private var model
-
-    private var stats: [SpeakerStats] {
-        guard let transcript = model.transcript else { return [] }
-        return SpeakerStats.compute(for: transcript)
-    }
+    let stats: [SpeakerStats]
 
     var body: some View {
         if !stats.isEmpty {

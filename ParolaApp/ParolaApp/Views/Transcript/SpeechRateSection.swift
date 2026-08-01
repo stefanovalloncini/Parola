@@ -2,15 +2,9 @@ import SwiftUI
 import ParolaCore
 
 struct SpeechRateSection: View {
-    @Environment(AppModel.self) private var model
-
-    private var bins: [SpeechRateBin] {
-        guard let segments = model.transcript?.segments else { return [] }
-        return SpeechRateSeries.compute(segments: segments, binSeconds: 30)
-    }
+    let bins: [SpeechRateBin]
 
     var body: some View {
-        let bins = self.bins
         if bins.count >= 2 {
             InfoSection(title: "Speech rate") {
                 let values = bins.map(\.wordsPerMinute)

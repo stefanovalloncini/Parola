@@ -2,8 +2,16 @@ import SwiftUI
 import ParolaCore
 
 struct InfoInspector: View {
+    struct Derived {
+        var text = TranscriptTextStats()
+        var speakers: [SpeakerStats] = []
+        var confidenceAverage: Double?
+        var lowConfidence: [TranscriptSegment] = []
+        var speechRate: [SpeechRateBin] = []
+    }
+
     @Environment(AppModel.self) private var model
-    @State private var stats = TranscriptTextStats()
+    @State private var derived = Derived()
 
     private var entry: LibraryEntry? {
         guard let id = model.selectedEntryID else { return nil }
@@ -38,18 +46,42 @@ struct InfoInspector: View {
 
             if model.transcript != nil {
                 LabelsSection()
-                SpeakerStatsSection()
-                ConfidenceSection()
+                SpeakerStatsSection(stats: derived.speakers)
+                ConfidenceSection(overall: derived.confidenceAverage, lows: derived.lowConfidence)
                 ChaptersSection()
                 ActionItemsSection()
-                SpeechRateSection()
+                SpeechRateSection(bins: derived.speechRate)
                 WordFrequencySection()
             }
         }
-        .task(id: model.transcriptVersion) {
-            let text = model.transcriptText
-            stats = await Task.detached { TranscriptTextStats.compute(text: text) }.value
+        .task(id: model.transcriptVersion) { await recomputeDerived() }
+    }
+
+    private func recomputeDerived() async {
+        guard let transcript = model.transcript else {
+            derived = Derived()
+            return
         }
+        let text = model.transcriptText
+        guard transcript.segments.count > SegmentsScroll.synchronousDeriveCap else {
+            derived = Self.derive(transcript: transcript, text: text)
+            return
+        }
+        let computed = await Task.detached(priority: .userInitiated) {
+            Self.derive(transcript: transcript, text: text)
+        }.value
+        guard !Task.isCancelled else { return }
+        derived = computed
+    }
+
+    nonisolated static func derive(transcript: Transcript, text: String) -> Derived {
+        Derived(
+            text: TranscriptTextStats.compute(text: text),
+            speakers: SpeakerStats.compute(for: transcript),
+            confidenceAverage: SegmentConfidence.transcriptAverage(for: transcript),
+            lowConfidence: SegmentConfidence.lowConfidence(segments: transcript.segments),
+            speechRate: SpeechRateSeries.compute(segments: transcript.segments, binSeconds: 30)
+        )
     }
 
     private var languageLabel: String {
@@ -79,21 +111,21 @@ struct InfoInspector: View {
         return date.formatted(date: .abbreviated, time: .shortened)
     }
 
-    private var charCount: Int { stats.charCount }
+    private var charCount: Int { derived.text.charCount }
 
     private var speakerCount: Int {
         model.transcriptSpeakers.count
     }
 
-    private var fillerCount: Int { stats.fillerCount }
+    private var fillerCount: Int { derived.text.fillerCount }
 
     private var readingTimeLabel: String {
         ReadingTime.label(forMinutes: ReadingTime.minutes(forWordCount: wordCount))
     }
 
-    private var sentenceCount: Int { stats.sentenceCount }
+    private var sentenceCount: Int { derived.text.sentenceCount }
 
-    private var wordCount: Int { stats.wordCount }
+    private var wordCount: Int { derived.text.wordCount }
 }
 
 struct InfoSection<Content: View>: View {
