@@ -95,7 +95,7 @@ extension AppModel {
         guard !needsScan.isEmpty || knownSizes.keys.contains(where: { !activeIDs.contains($0) }) else { return }
         let bundles = needsScan.map { (id: $0.id, url: $0.bundleURL, audioFilename: $0.manifest.audioFilename) }
         Task { [weak self] in
-            guard let newSizes = try? await AppModel.offMainIO({
+            guard let newSizes = try? await AppModel.offMainIO(qos: .utility, {
                 var sizes: [String: Int64] = [:]
                 for bundle in bundles {
                     sizes[bundle.id] = AppModel.audioSize(inBundle: bundle.url, named: bundle.audioFilename)

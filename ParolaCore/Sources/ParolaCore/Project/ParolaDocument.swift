@@ -168,6 +168,7 @@ public struct ParolaDocument: Sendable {
                 audioFilename: audioFilename
             )
             try writeJSON(manifest, to: staging.appendingPathComponent("manifest.json"))
+            // Word timings make transcript.json the biggest file in the bundle; indenting it costs more than it's worth.
             try writeJSON(transcript, to: staging.appendingPathComponent("transcript.json"), pretty: false)
 
             if fm.fileExists(atPath: target.path) {
@@ -230,8 +231,6 @@ public struct ParolaDocument: Sendable {
         return audioCandidates.first
     }
 
-    /// `pretty: false` for transcript.json — word timings make it the biggest file in the bundle,
-    /// and indenting it costs more encode time and bytes than a hand-edited file is worth.
     private static func writeJSON<T: Encodable>(_ value: T, to url: URL, pretty: Bool = true) throws {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601

@@ -1298,7 +1298,7 @@ final class AppModel {
         }
         let store = self.store
         Task { [weak self] in
-            guard let sizes = try? await AppModel.offMainIO({
+            guard let sizes = try? await AppModel.offMainIO(qos: .utility, {
                 var sizes: [String: Int64] = [:]
                 for (name, url) in installed {
                     if let size = store.sizeOnDisk(at: url) {
@@ -2461,9 +2461,12 @@ final class AppModel {
     /// Continuation + GCD, not Task.detached: a detached job resuming a main-actor task
     /// around NSURL-bridging Foundation calls has crashed with EXC_ARM_DA_ALIGN before
     /// (same class as the watched-folder bookmark and duration-probe fixes).
-    nonisolated static func offMainIO<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+    nonisolated static func offMainIO<T: Sendable>(
+        qos: DispatchQoS.QoSClass = .userInitiated,
+        _ work: @escaping @Sendable () throws -> T
+    ) async throws -> T {
         try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
+            DispatchQueue.global(qos: qos).async {
                 continuation.resume(with: Result { try work() })
             }
         }
@@ -2697,9 +2700,9 @@ final class AppModel {
     func copyTranscriptToPasteboard(withTimestamps: Bool) {
         guard let transcript else { return }
         Task {
-            let text = await Task.detached {
+            guard let text = try? await AppModel.offMainIO({
                 withTimestamps ? TranscriptTimestampedText.render(transcript) : transcript.text
-            }.value
+            }) else { return }
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
         }
