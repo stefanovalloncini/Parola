@@ -32,17 +32,20 @@ struct LibraryRefreshSkipTests {
         )
     }
 
-    private func makeModel() -> AppModel {
-        AppModel(
+    /// AppModel's init kicks off a library refresh; letting it land keeps it from clobbering the seeded entries.
+    private func makeModel() async -> AppModel {
+        let model = AppModel(
             skipBootstrap: true,
             defaults: UserDefaults(suiteName: "test-\(UUID())")!,
             libraryURL: makeTempLibraryURL("refreshskip")
         )
+        await model.libraryRefreshTask?.value
+        return model
     }
 
     @Test("an unchanged list leaves the version alone")
-    func unchangedListSkipsBump() {
-        let model = makeModel()
+    func unchangedListSkipsBump() async {
+        let model = await makeModel()
         model.setLibraryEntries([entry(id: "a"), entry(id: "b")])
         let version = model.libraryVersion
 
@@ -52,8 +55,8 @@ struct LibraryRefreshSkipTests {
     }
 
     @Test("a new segment note repaints the readers that key off the version")
-    func segmentNoteBumpsVersion() {
-        let model = makeModel()
+    func segmentNoteBumpsVersion() async {
+        let model = await makeModel()
         model.setLibraryEntries([entry(id: "a")])
         let version = model.libraryVersion
 
@@ -66,8 +69,8 @@ struct LibraryRefreshSkipTests {
     @Test("pinning, renaming, labelling and reordering all bump the version", arguments: [
         "pin", "rename", "label", "reorder", "remove",
     ])
-    func mutationsBumpVersion(kind: String) {
-        let model = makeModel()
+    func mutationsBumpVersion(kind: String) async {
+        let model = await makeModel()
         model.setLibraryEntries([entry(id: "a", title: "First"), entry(id: "b", title: "Second")])
         let version = model.libraryVersion
 
