@@ -92,6 +92,7 @@ struct EmptyDropZone: View {
     @ViewBuilder
     private var recentSection: some View {
         let recents = RecentEntries.most(of: model.libraryEntries)
+            .map { LibraryRowDisplay(entry: $0, sizeBytes: model.libraryBundleSizes[$0.id]) }
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             HStack(spacing: DS.Spacing.small) {
                 Text("Recent")
@@ -109,8 +110,8 @@ struct EmptyDropZone: View {
                 .axLeaf("Empty.Button.ViewAll")
             }
             VStack(spacing: 0) {
-                ForEach(Array(recents.enumerated()), id: \.element.id) { index, entry in
-                    RecentEntryRow(entry: entry)
+                ForEach(Array(recents.enumerated()), id: \.element.id) { index, display in
+                    RecentEntryRow(display: display)
                     if index < recents.count - 1 {
                         Divider()
                             .padding(.leading, DS.Spacing.regular)
@@ -132,14 +133,14 @@ struct EmptyDropZone: View {
 
 private struct RecentEntryRow: View {
     @Environment(AppModel.self) private var model
-    let entry: LibraryEntry
+    let display: LibraryRowDisplay
     @State private var isHovering = false
 
     var body: some View {
         Button {
-            model.loadEntry(entry.id)
+            model.loadEntry(display.id)
         } label: {
-            LibraryRow(entry: entry, sizeBytes: model.libraryBundleSizes[entry.id], style: .home)
+            LibraryRow(display: display, style: .home)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, DS.Spacing.regular)
                 .padding(.vertical, DS.Spacing.tight)
@@ -150,7 +151,7 @@ private struct RecentEntryRow: View {
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering }
         }
-        .axLeaf("Empty.Recent.\(entry.id)")
+        .axLeaf("Empty.Recent.\(display.id)")
     }
 }
 

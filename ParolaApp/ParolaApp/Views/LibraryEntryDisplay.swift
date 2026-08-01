@@ -27,3 +27,44 @@ enum LibraryEntryDisplay {
         return machineNamePattern.firstMatch(in: base, range: range) != nil
     }
 }
+
+/// Every string a library row draws, formatted once per entry snapshot instead of once per render.
+struct LibraryRowDisplay: Identifiable {
+    let entry: LibraryEntry
+    let title: String
+    let timestamp: String
+    let sizeLabel: String?
+    let languageLabel: String?
+    let lastOpened: String?
+    let tooltip: String
+
+    var id: LibraryEntry.ID { entry.id }
+    var pinned: Bool { entry.pinned }
+    var noteCount: Int { entry.segmentNotes.count }
+
+    init(entry: LibraryEntry, sizeBytes: Int64?) {
+        let title = LibraryEntryDisplay.title(for: entry)
+        self.entry = entry
+        self.title = title
+        timestamp = entry.createdAt.formatted(Self.shortStamp)
+        if let sizeBytes, sizeBytes > 0 {
+            sizeLabel = ByteCountFormatter.string(fromByteCount: sizeBytes, countStyle: .file)
+        } else {
+            sizeLabel = nil
+        }
+        languageLabel = LanguageDisplay.name(for: entry.language)
+        lastOpened = entry.lastOpenedAt?.formatted(.relative(presentation: .named))
+
+        var parts = [title, entry.createdAt.formatted(Self.longStamp)]
+        if !entry.labels.isEmpty {
+            parts.append("Labels: \(entry.labels.joined(separator: ", "))")
+        }
+        if entry.pinned {
+            parts.append("Pinned")
+        }
+        tooltip = parts.joined(separator: "\n")
+    }
+
+    private static let shortStamp = Date.FormatStyle(date: .abbreviated, time: .shortened)
+    private static let longStamp = Date.FormatStyle(date: .long, time: .shortened)
+}

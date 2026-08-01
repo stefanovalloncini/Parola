@@ -37,13 +37,14 @@ struct LibraryListView: View {
     @State private var labelFilter: String?
     @State private var languageFilter: String?
     @State private var dateRangeFilter: LibraryDateRangeFilter = .all
-    @State private var entries: [LibraryEntry] = []
+    @State private var entries: [LibraryRowDisplay] = []
+    @State private var totalsLabel: String = ""
     @State private var labelOptions: [String] = []
     @State private var languageOptions: [String] = []
     @ScaledMetric(relativeTo: .largeTitle) private var emptyIconSize: CGFloat = 48
 
     @discardableResult
-    private func recomputeEntries() -> [LibraryEntry] {
+    private func recomputeEntries() -> [LibraryRowDisplay] {
         let computed: [LibraryEntry]
         if let searchResults {
             computed = searchResults
@@ -56,8 +57,21 @@ struct LibraryListView: View {
                 dateRange: dateRangeFilter
             )
         }
-        entries = computed
-        return computed
+        let sizes = model.libraryBundleSizes
+        var totalBytes: Int64 = 0
+        let displays = computed.map { entry -> LibraryRowDisplay in
+            let size = sizes[entry.id]
+            totalBytes += size ?? 0
+            return LibraryRowDisplay(entry: entry, sizeBytes: size)
+        }
+        entries = displays
+        if totalBytes > 0 {
+            let size = ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
+            totalsLabel = "\(displays.count) · \(size)"
+        } else {
+            totalsLabel = "\(displays.count)"
+        }
+        return displays
     }
 
     private func recomputeFilterOptions() {
@@ -84,8 +98,9 @@ struct LibraryListView: View {
             if entries.isEmpty {
                 emptyState
             } else {
-                List(entries, id: \.id, selection: $selection) { entry in
-                    LibraryRow(entry: entry, sizeBytes: model.libraryBundleSizes[entry.id])
+                List(entries, id: \.id, selection: $selection) { row in
+                    let entry = row.entry
+                    LibraryRow(display: row)
                         .contentShape(Rectangle())
                         .draggable(entry.bundleURL)
                         .onTapGesture(count: 2) {
@@ -145,6 +160,7 @@ struct LibraryListView: View {
         .onChange(of: labelFilter) { _, _ in recomputeEntries() }
         .onChange(of: languageFilter) { _, _ in recomputeEntries() }
         .onChange(of: dateRangeFilter) { _, _ in recomputeEntries() }
+        .onChange(of: model.libraryBundleSizes) { _, _ in recomputeEntries() }
         .onChange(of: searchResults) { _, _ in
             let newEntries = recomputeEntries()
             selection = selection.intersection(Set(newEntries.map(\.id)))
@@ -224,17 +240,6 @@ struct LibraryListView: View {
         }
         .padding(.horizontal, DS.Spacing.large)
         .padding(.vertical, DS.Spacing.regular)
-    }
-
-    private var totalsLabel: String {
-        let bytes = entries.reduce(Int64(0)) { acc, entry in
-            acc + (model.libraryBundleSizes[entry.id] ?? 0)
-        }
-        if bytes > 0 {
-            let size = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
-            return "\(entries.count) · \(size)"
-        }
-        return "\(entries.count)"
     }
 
     private func performBulkDelete() {
@@ -325,47 +330,30 @@ struct LibraryRow: View {
         case home
     }
 
-    let entry: LibraryEntry
-    let sizeBytes: Int64?
+    let display: LibraryRowDisplay
     var style: Style = .library
 
     @Environment(AppModel.self) private var model
     private var compact: Bool { model.sidebarDensity == "compact" }
 
-    private var languageLabel: String? {
-        LanguageDisplay.name(for: entry.language)
-    }
-
-    private var tooltip: String {
-        var parts: [String] = [LibraryEntryDisplay.title(for: entry)]
-        parts.append(entry.createdAt.formatted(date: .long, time: .shortened))
-        if !entry.labels.isEmpty {
-            parts.append("Labels: \(entry.labels.joined(separator: ", "))")
-        }
-        if entry.pinned {
-            parts.append("Pinned")
-        }
-        return parts.joined(separator: "\n")
-    }
-
     var body: some View {
         HStack(spacing: DS.Spacing.regular) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
-                    if entry.pinned {
+                    if display.pinned {
                         Image(systemName: "pin.fill")
                             .font(DS.Font.caption2)
                             .foregroundStyle(DS.Color.accent)
                     }
-                    Text(LibraryEntryDisplay.title(for: entry))
+                    Text(display.title)
                         .font(DS.Font.body)
                         .foregroundStyle(DS.Color.primaryText)
                         .lineLimit(1)
-                    if !entry.segmentNotes.isEmpty {
+                    if display.noteCount > 0 {
                         HStack(spacing: 2) {
                             Image(systemName: "note.text")
                                 .font(DS.Font.caption2)
-                            Text("\(entry.segmentNotes.count)")
+                            Text("\(display.noteCount)")
                                 .font(DS.Font.caption2Medium)
                         }
                         .foregroundStyle(DS.Color.accent.opacity(0.8))
@@ -377,21 +365,21 @@ struct LibraryRow: View {
                     }
                 }
                 HStack(spacing: 6) {
-                    Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
-                    if let sizeBytes, sizeBytes > 0 {
+                    Text(display.timestamp)
+                    if let size = display.sizeLabel {
                         Text("·")
                             .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
-                        Text(ByteCountFormatter.string(fromByteCount: sizeBytes, countStyle: .file))
+                        Text(size)
                     }
-                    if let lang = languageLabel {
+                    if let lang = display.languageLabel {
                         Text("·")
                             .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
                         Text(lang)
                     }
-                    if style == .library, !compact, let opened = entry.lastOpenedAt {
+                    if style == .library, !compact, let opened = display.lastOpened {
                         Text("·")
                             .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
-                        Text("Last opened: \(opened.formatted(.relative(presentation: .named)))")
+                        Text("Last opened: \(opened)")
                     }
                 }
                 .font(DS.Font.caption)
@@ -401,6 +389,6 @@ struct LibraryRow: View {
             Spacer()
         }
         .padding(.vertical, compact ? DS.Spacing.tight / 2 : DS.Spacing.tight)
-        .help(tooltip)
+        .help(display.tooltip)
     }
 }
