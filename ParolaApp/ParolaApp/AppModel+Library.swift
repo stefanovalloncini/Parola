@@ -93,31 +93,42 @@ extension AppModel {
         let activeIDs = Set(entries.map(\.id))
         let needsScan = entries.filter { knownSizes[$0.id] == nil }
         guard !needsScan.isEmpty || knownSizes.keys.contains(where: { !activeIDs.contains($0) }) else { return }
-        let bundles = needsScan.map { (id: $0.id, url: $0.bundleURL) }
-        Task.detached(priority: .utility) { [weak self] in
-            let fm = FileManager.default
-            var newSizes: [String: Int64] = [:]
-            for bundle in bundles {
-                let contents = (try? fm.contentsOfDirectory(at: bundle.url, includingPropertiesForKeys: nil)) ?? []
-                let audio = contents.first(where: { $0.lastPathComponent.hasPrefix("audio.") })
-                if let audio,
-                   let values = try? audio.resourceValues(forKeys: [.fileSizeKey]),
-                   let size = values.fileSize {
-                    newSizes[bundle.id] = Int64(size)
-                } else {
-                    newSizes[bundle.id] = 0
+        let bundles = needsScan.map { (id: $0.id, url: $0.bundleURL, audioFilename: $0.manifest.audioFilename) }
+        Task { [weak self] in
+            guard let newSizes = try? await AppModel.offMainIO({
+                var sizes: [String: Int64] = [:]
+                for bundle in bundles {
+                    sizes[bundle.id] = AppModel.audioSize(inBundle: bundle.url, named: bundle.audioFilename)
                 }
-            }
-            await MainActor.run {
-                guard let self else { return }
-                var merged = self.libraryBundleSizes.filter { activeIDs.contains($0.key) }
-                merged.merge(newSizes) { _, new in new }
-                self.libraryBundleSizes = merged
-                if self.librarySortOrder == .longest || self.librarySortOrder == .shortest {
-                    self.reapplyLibrarySort()
-                }
+                return sizes
+            }) else { return }
+            guard let self else { return }
+            var merged = self.libraryBundleSizes.filter { activeIDs.contains($0.key) }
+            merged.merge(newSizes) { _, new in new }
+            self.libraryBundleSizes = merged
+            if self.librarySortOrder == .longest || self.librarySortOrder == .shortest {
+                self.reapplyLibrarySort()
             }
         }
+    }
+
+    /// Bundles written before the manifest carried `audioFilename` need the directory listing to find their audio.
+    nonisolated static func audioSize(inBundle bundleURL: URL, named audioFilename: String?) -> Int64 {
+        func size(of url: URL) -> Int64? {
+            guard let values = try? url.resourceValues(forKeys: [.fileSizeKey]), let bytes = values.fileSize else { return nil }
+            return Int64(bytes)
+        }
+        if let audioFilename, !audioFilename.isEmpty,
+           let bytes = size(of: bundleURL.appendingPathComponent(audioFilename)) {
+            return bytes
+        }
+        let contents = (try? FileManager.default.contentsOfDirectory(at: bundleURL, includingPropertiesForKeys: [.fileSizeKey])) ?? []
+        // Same tie-break as ParolaDocument.read, so the size matches the audio the entry actually plays.
+        let audio = contents
+            .filter { $0.lastPathComponent.hasPrefix("audio.") }
+            .min { $0.lastPathComponent < $1.lastPathComponent }
+        guard let audio else { return 0 }
+        return size(of: audio) ?? 0
     }
 
     func setLabels(_ labels: [String], for id: LibraryEntry.ID) {

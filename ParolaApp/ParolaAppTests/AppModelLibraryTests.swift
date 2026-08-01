@@ -180,6 +180,31 @@ struct AppModelLibraryTests {
         #expect(sorted == ["c", "a", "b"])
     }
 
+    @Test("bundle sizing prefers the manifest's audio file and falls back to the listing")
+    func audioSizeUsesManifestName() throws {
+        let bundle = makeTempLibraryURL("audio-size").appendingPathComponent("entry.parola")
+        try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: bundle) }
+        try Data(count: 10).write(to: bundle.appendingPathComponent("audio.mp3"))
+        try Data(count: 40).write(to: bundle.appendingPathComponent("audio.wav"))
+
+        #expect(AppModel.audioSize(inBundle: bundle, named: "audio.wav") == 40)
+        #expect(AppModel.audioSize(inBundle: bundle, named: "audio.mp3") == 10)
+        #expect(AppModel.audioSize(inBundle: bundle, named: "audio.gone") == 10)
+        #expect(AppModel.audioSize(inBundle: bundle, named: nil) == 10)
+    }
+
+    @Test("bundle sizing reports zero when the bundle holds no audio")
+    func audioSizeWithoutAudio() throws {
+        let bundle = makeTempLibraryURL("audio-size-none").appendingPathComponent("entry.parola")
+        try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: bundle) }
+        try Data(count: 5).write(to: bundle.appendingPathComponent("transcript.json"))
+
+        #expect(AppModel.audioSize(inBundle: bundle, named: nil) == 0)
+        #expect(AppModel.audioSize(inBundle: bundle, named: "audio.wav") == 0)
+    }
+
     @Test("lastOpened sort puts opened entries first, then unopened by createdAt desc")
     func sortLastOpened() {
         let entries = [
