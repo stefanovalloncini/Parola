@@ -639,6 +639,36 @@ struct LibraryStoreTests {
         #expect(ghost.isEmpty)
     }
 
+    @Test("a library whose index snapshot is gone rebuilds from the bundles")
+    func missingIndexSnapshotRebuild() async throws {
+        let (store1, libraryURL) = try makeTempLibrary()
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "kryptonite meeting notes")],
+            language: "en",
+            modelName: "tiny"
+        )
+        let entry = try await store1.add(transcript: transcript, audioSource: nil)
+        await store1.flush()
+
+        let indexURL = libraryURL.appendingPathComponent(".search-index.json")
+        try FileManager.default.removeItem(at: indexURL)
+
+        let store2 = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+        #expect(await store2.search("kryptonite").contains(where: { $0.entryID == entry.id }))
+
+        let raw = try #require(String(data: Data(contentsOf: indexURL), encoding: .utf8))
+        #expect(raw.contains("kryptonite"))
+
+        let store3 = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+        #expect(await store3.search("kryptonite").contains(where: { $0.entryID == entry.id }))
+    }
+
+    @Test("an empty library with no snapshot searches without error")
+    func missingIndexSnapshotEmptyLibrary() async throws {
+        let (store, _) = try makeTempLibrary()
+        #expect(await store.search("kryptonite").isEmpty)
+    }
+
     @Test("search on a fresh store instance finds previously indexed entries")
     func coldStoreSearch() async throws {
         let (store1, libraryURL) = try makeTempLibrary()

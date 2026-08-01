@@ -240,6 +240,12 @@ struct LibrarySearchIndexTests {
         #expect(await index.search("sprint").isEmpty)
     }
 
+    @Test("a missing snapshot asks for a rebuild")
+    func missingSnapshotNeedsRebuild() async throws {
+        let (index, _) = makeTempIndex()
+        #expect(await index.needsRebuild())
+    }
+
     @Test("indexing on a cold instance does not clobber the loaded snapshot")
     func coldMutationPreservesSnapshot() async throws {
         let (index1, url) = makeTempIndex()

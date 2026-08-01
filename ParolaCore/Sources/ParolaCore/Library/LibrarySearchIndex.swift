@@ -68,6 +68,12 @@ public actor LibrarySearchIndex {
         case missing
     }
 
+    private enum RebuildNeed: Sendable {
+        case none
+        case staleSnapshot
+        case absentSnapshot
+    }
+
     private static let snapshotVersion = 3
     private static let excerptLength = 200
 
@@ -75,7 +81,7 @@ public actor LibrarySearchIndex {
     private var inverted: [String: Set<String>] = [:]
     private var sortedTokens: [String]?
     private var isLoaded = false
-    private var staleSnapshotDiscarded = false
+    private var rebuildNeed: RebuildNeed = .none
     private let loadTask: Task<LoadOutcome, Never>
     private let indexURL: URL
     private let saveDebounce: Duration
@@ -151,7 +157,7 @@ public actor LibrarySearchIndex {
 
     func needsRebuild() async -> Bool {
         await ensureLoaded()
-        return staleSnapshotDiscarded
+        return rebuildNeed != .none
     }
 
     func rebuild(entries rebuilt: [RebuildEntry]) async {
@@ -161,7 +167,7 @@ public actor LibrarySearchIndex {
         for entry in rebuilt {
             addToIndex(id: entry.id, title: entry.title, text: entry.text, auxiliaryText: entry.auxiliaryText)
         }
-        staleSnapshotDiscarded = false
+        rebuildNeed = .none
         pendingSaveTask?.cancel()
         pendingSaveTask = nil
         saveSnapshot()
@@ -178,9 +184,9 @@ public actor LibrarySearchIndex {
             inverted = state.inverted
             sortedTokens = nil
         case .staleDiscarded:
-            staleSnapshotDiscarded = true
+            rebuildNeed = .staleSnapshot
         case .missing:
-            break
+            rebuildNeed = .absentSnapshot
         }
     }
 
@@ -316,10 +322,18 @@ public actor LibrarySearchIndex {
         saveSnapshot()
     }
 
+    // Saving before the rebuild lands would leave a current-version snapshot that a later launch
+    // trusts: a partial one after a stale discard, an empty one where the file was simply absent.
+    private var canPersistSnapshot: Bool {
+        switch rebuildNeed {
+        case .none: true
+        case .staleSnapshot: false
+        case .absentSnapshot: !entries.isEmpty
+        }
+    }
+
     private func saveSnapshot() {
-        // A save between a stale-snapshot discard and the rebuild would persist a partial
-        // current-version index, which a later launch would trust. Suppress until rebuilt.
-        guard !staleSnapshotDiscarded else { return }
+        guard canPersistSnapshot else { return }
         let snapshot = Snapshot(
             version: Self.snapshotVersion,
             entries: entries.mapValues {
