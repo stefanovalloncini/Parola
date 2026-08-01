@@ -1,6 +1,8 @@
 import Foundation
 import ParolaCore
 
+private let recoveryFileQueue = DispatchQueue(label: "app.parola.recovery-file")
+
 /// What was in flight when Parola last quit: the source of a file transcription, or the
 /// confirmed segments of a streaming recording, checkpointed every ~30s.
 struct RecoveryCheckpoint: Codable, Equatable, Sendable {
@@ -83,19 +85,27 @@ extension AppModel {
         guard activeRecoveryGeneration != nil else { return }
         activeRecoveryGeneration = nil
         recordingRecoveryStartedAt = nil
-        try? FileManager.default.removeItem(at: recoveryFileURL)
+        let url = recoveryFileURL
+        // Synchronous on the same queue the writes use: a checkpoint already queued must land
+        // before this delete, or it resurrects the prompt after the recording stopped.
+        recoveryFileQueue.sync { try? FileManager.default.removeItem(at: url) }
     }
 
     private func writeRecoveryFile(_ checkpoint: RecoveryCheckpoint) {
         let url = recoveryFileURL
         let generation = activeRecoveryGeneration
-        pendingRecoveryWrite = Task.detached(priority: .utility) {
-            guard let data = try? JSONEncoder().encode(checkpoint) else { return }
-            await MainActor.run { [weak self] in
-                // Re-check after the encode: the recording may have ended meanwhile, and a late
-                // write would resurrect a stale recovery prompt on the next launch.
-                guard let self, self.activeRecoveryGeneration == generation else { return }
-                try? data.write(to: url, options: .atomic)
+        pendingRecoveryWrite = Task { [weak self] in
+            guard let data = try? await AppModel.offMainIO({ try JSONEncoder().encode(checkpoint) }) else { return }
+            // Re-check after the encode: the recording may have ended meanwhile, and a late
+            // write would resurrect a stale recovery prompt on the next launch.
+            guard let self, self.activeRecoveryGeneration == generation else { return }
+            // Queued in the same main-actor step as the check above, so an endActiveRecovery
+            // that lands after it still drains this write before deleting the file.
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                recoveryFileQueue.async {
+                    try? data.write(to: url, options: .atomic)
+                    continuation.resume()
+                }
             }
         }
     }
