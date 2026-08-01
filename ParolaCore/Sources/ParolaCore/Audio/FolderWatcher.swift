@@ -210,8 +210,14 @@ public actor FolderWatcher {
         var directories: Set<String> = []
     }
 
+    /// GCD, not `Task.detached`: a detached job resuming actor work around the enumerator's
+    /// NSURL bridging has crashed with EXC_ARM_DA_ALIGN before.
     private func scanFolderOffActor() async -> FolderScan {
-        await Task.detached(priority: .userInitiated) { [self] in scanFolder() }.value
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { [self] in
+                continuation.resume(returning: scanFolder())
+            }
+        }
     }
 
     private nonisolated func scanFolder() -> FolderScan {
