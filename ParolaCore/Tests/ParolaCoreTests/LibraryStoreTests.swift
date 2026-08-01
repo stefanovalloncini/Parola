@@ -687,8 +687,28 @@ struct LibraryStoreTests {
 
     @Test("an empty library with no snapshot searches without error")
     func missingIndexSnapshotEmptyLibrary() async throws {
-        let (store, _) = try makeTempLibrary()
+        let (store, libraryURL) = try makeTempLibrary()
         #expect(await store.search("kryptonite").isEmpty)
+        let indexURL = libraryURL.appendingPathComponent(".search-index.json")
+        #expect(FileManager.default.fileExists(atPath: indexURL.path))
+    }
+
+    @Test("a library directory that will not list writes no empty snapshot")
+    func unreadableLibraryWritesNoSnapshot() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-library-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: tmp.path)
+            try? FileManager.default.removeItem(at: tmp)
+        }
+        // Write and search but no read: the listing fails while a snapshot could still be written there.
+        try FileManager.default.setAttributes([.posixPermissions: 0o300], ofItemAtPath: tmp.path)
+
+        let store = LibraryStore(libraryURL: tmp, extraIndexer: nil)
+        #expect(await store.search("kryptonite").isEmpty)
+        let indexURL = tmp.appendingPathComponent(".search-index.json")
+        #expect(FileManager.default.fileExists(atPath: indexURL.path) == false)
     }
 
     @Test("search on a fresh store instance finds previously indexed entries")

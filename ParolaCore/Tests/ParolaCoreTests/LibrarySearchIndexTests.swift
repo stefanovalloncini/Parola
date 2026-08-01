@@ -3,6 +3,17 @@ import Foundation
 import os
 @testable import ParolaCore
 
+private func eventually(
+    timeoutMs: Int = 5000,
+    _ condition: @escaping @Sendable () async -> Bool
+) async -> Bool {
+    for _ in 0..<timeoutMs {
+        if await condition() { return true }
+        try? await Task.sleep(for: .milliseconds(1))
+    }
+    return await condition()
+}
+
 @Suite("LibrarySearchIndex")
 struct LibrarySearchIndexTests {
     private func makeTempIndex() -> (LibrarySearchIndex, URL) {
@@ -332,7 +343,7 @@ struct LibrarySearchIndexTests {
         let writes = OSAllocatedUnfairLock(initialState: 0)
         let index = LibrarySearchIndex(indexURL: url, saveDebounce: .seconds(60), clock: ContinuousClock()) { data, target in
             writes.withLock { $0 += 1 }
-            try? data.write(to: target, options: .atomic)
+            return (try? data.write(to: target, options: .atomic)) != nil
         }
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
         await index.flush()
@@ -355,19 +366,19 @@ struct LibrarySearchIndexTests {
                 return count == 1
             }
             if isFirst { gate.wait() }
-            try? data.write(to: target, options: .atomic)
+            return (try? data.write(to: target, options: .atomic)) != nil
         }
 
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
         let first = Task { await index.flush() }
-        while written.withLock({ $0 }) == 0 { try await Task.sleep(for: .milliseconds(1)) }
+        #expect(await eventually { written.withLock { $0 } > 0 })
 
         await index.index(id: "e2", title: "Two", text: "retro feedback", createdAt: Date())
         let second = Task { await index.flush() }
-        while await index.snapshotGeneration < 2 { try await Task.sleep(for: .milliseconds(1)) }
+        #expect(await eventually { await index.snapshotGeneration >= 2 })
         await index.index(id: "e3", title: "Three", text: "alpha review", createdAt: Date())
         let third = Task { await index.flush() }
-        while await index.snapshotGeneration < 3 { try await Task.sleep(for: .milliseconds(1)) }
+        #expect(await eventually { await index.snapshotGeneration >= 3 })
 
         gate.signal()
         await first.value
@@ -378,6 +389,49 @@ struct LibrarySearchIndexTests {
         let raw = try #require(String(data: Data(contentsOf: url), encoding: .utf8))
         #expect(raw.contains("\"e2\""))
         #expect(raw.contains("\"e3\""))
+    }
+
+    @Test("a snapshot write that fails leaves the index pending, not clean")
+    func failedWriteStaysPending() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-search-test-\(UUID().uuidString).json")
+        let attempts = OSAllocatedUnfairLock(initialState: 0)
+        let index = LibrarySearchIndex(indexURL: url, saveDebounce: .seconds(60), clock: ContinuousClock()) { data, target in
+            let attempt = attempts.withLock { count -> Int in
+                count += 1
+                return count
+            }
+            guard attempt > 1 else { return false }
+            return (try? data.write(to: target, options: .atomic)) != nil
+        }
+
+        await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
+        await index.flush()
+        #expect(attempts.withLock { $0 } == 1)
+        #expect(FileManager.default.fileExists(atPath: url.path) == false)
+
+        await index.flush()
+        #expect(attempts.withLock { $0 } == 2)
+        let raw = try #require(String(data: Data(contentsOf: url), encoding: .utf8))
+        #expect(raw.contains("\"e1\""))
+    }
+
+    @Test("a failed write reschedules itself without another mutation")
+    func failedWriteReschedules() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-search-test-\(UUID().uuidString).json")
+        let attempts = OSAllocatedUnfairLock(initialState: 0)
+        let index = LibrarySearchIndex(indexURL: url, saveDebounce: .milliseconds(1), clock: ContinuousClock()) { data, target in
+            let attempt = attempts.withLock { count -> Int in
+                count += 1
+                return count
+            }
+            guard attempt > 1 else { return false }
+            return (try? data.write(to: target, options: .atomic)) != nil
+        }
+
+        await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
+        #expect(await eventually { FileManager.default.fileExists(atPath: url.path) })
     }
 
     @Test("a missing snapshot asks for a rebuild")

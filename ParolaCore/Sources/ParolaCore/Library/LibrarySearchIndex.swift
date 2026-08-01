@@ -81,6 +81,12 @@ public actor LibrarySearchIndex {
         case absentSnapshot
     }
 
+    private enum WriteOutcome: Sendable {
+        case written
+        case superseded
+        case failed
+    }
+
     private static let snapshotVersion = 4
     private static let excerptLength = 200
     private static let snapshotPrefix = Data(#"{"version":\#(snapshotVersion),"entries":["#.utf8)
@@ -99,8 +105,9 @@ public actor LibrarySearchIndex {
     private let saveDebounce: Duration
     private let clock: any Clock<Duration>
     private var pendingSaveTask: Task<Void, Never>?
-    private let writeSnapshotData: @Sendable (Data, URL) -> Void
-    private let writeQueue = DispatchQueue(label: "com.parola.search-index-write", qos: .utility)
+    private let writeSnapshotData: @Sendable (Data, URL) -> Bool
+    // .default, not .utility: the quit path blocks the main thread on a plain semaphore, which donates no priority.
+    private let writeQueue = DispatchQueue(label: "com.parola.search-index-write", qos: .default)
     private let latestGeneration = OSAllocatedUnfairLock(initialState: 0)
     private(set) var snapshotGeneration = 0
     private(set) var entriesEncoded = 0
@@ -111,7 +118,7 @@ public actor LibrarySearchIndex {
         clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.init(indexURL: indexURL, saveDebounce: saveDebounce, clock: clock) { data, url in
-            try? data.write(to: url, options: .atomic)
+            (try? data.write(to: url, options: .atomic)) != nil
         }
     }
 
@@ -119,7 +126,7 @@ public actor LibrarySearchIndex {
         indexURL: URL,
         saveDebounce: Duration,
         clock: any Clock<Duration>,
-        writeSnapshotData: @escaping @Sendable (Data, URL) -> Void
+        writeSnapshotData: @escaping @Sendable (Data, URL) -> Bool
     ) {
         self.indexURL = indexURL
         self.saveDebounce = saveDebounce
@@ -364,8 +371,7 @@ public actor LibrarySearchIndex {
         await saveSnapshot()
     }
 
-    // Saving before the rebuild lands would leave a current-version snapshot that a later launch
-    // trusts: a partial one after a stale discard, an empty one where the file was simply absent.
+    // Saving before the rebuild lands would leave a current-version snapshot a later launch trusts: partial after a stale discard, empty where the file was absent.
     private var canPersistSnapshot: Bool {
         switch rebuildNeed {
         case .none: true
@@ -389,15 +395,22 @@ public actor LibrarySearchIndex {
                 pieces.append(.pending(Self.snapshotEntry(id: id, entry: entry)))
             }
         }
-        let encoded = await assembleAndWrite(pieces: pieces, generation: generation)
+        let (encoded, outcome) = await assembleAndWrite(pieces: pieces, generation: generation)
         entriesEncoded &+= encoded.count
         // Anything mutated during the write already carries a fresh blob, so only fill the gaps.
         for (id, blob) in encoded where entries[id] != nil && encodedEntries[id] == nil {
             encodedEntries[id] = blob
         }
+        // A superseded write is the newer generation's problem; a failed one dropped state nothing else holds.
+        guard case .failed = outcome else { return }
+        isDirty = true
+        scheduleSave()
     }
 
-    private func assembleAndWrite(pieces: [SnapshotPiece], generation: Int) async -> [String: Data] {
+    private func assembleAndWrite(
+        pieces: [SnapshotPiece],
+        generation: Int
+    ) async -> (encoded: [String: Data], outcome: WriteOutcome) {
         let url = indexURL
         let write = writeSnapshotData
         let latestGeneration = latestGeneration
@@ -422,8 +435,10 @@ public actor LibrarySearchIndex {
                 }
                 body.append(Self.snapshotSuffix)
                 // A snapshot that lost the race must not land on top of the newer one it queued behind.
-                if latestGeneration.withLock({ $0 }) == generation { write(body, url) }
-                continuation.resume(returning: encoded)
+                guard latestGeneration.withLock({ $0 }) == generation else {
+                    return continuation.resume(returning: (encoded, .superseded))
+                }
+                continuation.resume(returning: (encoded, write(body, url) ? .written : .failed))
             }
         }
     }

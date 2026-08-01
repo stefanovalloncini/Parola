@@ -92,7 +92,7 @@ public actor LibraryStore {
         guard await searchIndex.needsRebuild() else { return }
         let url = libraryURL
         let rebuilt = await offActorIO(qos: .utility) { [self] in
-            scanEntries(at: url).compactMap { entry -> LibrarySearchIndex.RebuildEntry? in
+            scanEntries(at: url)?.compactMap { entry -> LibrarySearchIndex.RebuildEntry? in
                 guard let doc = try? ParolaDocument.read(at: entry.bundleURL) else { return nil }
                 return .init(
                     id: entry.id,
@@ -101,6 +101,10 @@ public actor LibraryStore {
                     auxiliaryText: Self.searchAuxiliaryText(notes: entry.segmentNotes, transcript: doc.transcript)
                 )
             }
+        }
+        guard let rebuilt else {
+            indexReadyTask = nil
+            return
         }
         await searchIndex.rebuild(entries: rebuilt)
     }
@@ -112,11 +116,11 @@ public actor LibraryStore {
             let epoch = listCacheEpoch
             let entries = await offActorIO { [self] in scanEntries(at: url) }
             if epoch == listCacheEpoch {
-                applyScan(entries)
+                applyScan(entries ?? [])
                 return
             }
         }
-        applyScan(scanEntries(at: url))
+        applyScan(scanEntries(at: url) ?? [])
     }
 
     private func applyScan(_ entries: [LibraryEntry]) {
@@ -128,10 +132,12 @@ public actor LibraryStore {
             .sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
     }
 
-    private nonisolated func scanEntries(at libraryURL: URL) -> [LibraryEntry] {
+    /// nil when the directory is there but its listing failed — a caller that writes an authoritative
+    /// index off this scan must not read that as an empty library.
+    private nonisolated func scanEntries(at libraryURL: URL) -> [LibraryEntry]? {
         let fm = FileManager.default
         guard let contents = try? fm.contentsOfDirectory(at: libraryURL, includingPropertiesForKeys: nil) else {
-            return []
+            return fm.fileExists(atPath: libraryURL.path) ? nil : []
         }
         return contents
             .filter { $0.pathExtension == "parola" }
