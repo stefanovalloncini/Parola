@@ -64,6 +64,51 @@ struct PromptLibraryTests {
         #expect(userPrompts.isEmpty)
     }
 
+    @Test("an unreadable prompt file is kept aside instead of overwritten")
+    func unreadableFileIsPreserved() async throws {
+        let url = makeTempStorage()
+        let original = Data("{ this is not a prompt list".utf8)
+        try original.write(to: url)
+
+        let lib = PromptLibrary(storageURL: url)
+        #expect(await lib.userPrompts.isEmpty)
+        #expect(await lib.loadFailed)
+
+        _ = await lib.addUserPrompt(name: "Fresh", instructions: "new")
+        let backup = url.appendingPathExtension("corrupt")
+        #expect((try? Data(contentsOf: backup)) == original)
+        #expect(await lib.lastSaveFailed == false)
+        #expect(await lib.loadFailed == false)
+    }
+
+    @Test("a missing prompt file starts empty and still saves")
+    func missingFileStartsEmpty() async throws {
+        let url = makeTempStorage()
+        let lib = PromptLibrary(storageURL: url)
+        #expect(await lib.userPrompts.isEmpty)
+        #expect(await lib.loadFailed == false)
+
+        _ = await lib.addUserPrompt(name: "Fresh", instructions: "new")
+        #expect(await lib.lastSaveFailed == false)
+        #expect(FileManager.default.fileExists(atPath: url.appendingPathExtension("corrupt").path) == false)
+
+        let reloaded = PromptLibrary(storageURL: url)
+        #expect(await reloaded.userPrompts.count == 1)
+    }
+
+    @Test("a save that cannot be written is reported to the caller")
+    func saveFailureIsReported() async throws {
+        let blocker = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-prompts-blocker-\(UUID().uuidString)")
+        try Data("not a directory".utf8).write(to: blocker)
+        let lib = PromptLibrary(storageURL: blocker.appendingPathComponent("Prompts.json"))
+
+        let added = await lib.addUserPrompt(name: "Nope", instructions: "n")
+        #expect(await lib.lastSaveFailed)
+        #expect(await lib.updateUserPrompt(added) == false)
+        #expect(await lib.removeUserPrompt(added.id) == false)
+    }
+
     @Test("PromptRunner dispatches via the language model")
     func runnerDispatches() async throws {
         let model = MockLanguageModel(scriptedResponses: ["MOCK_RESPONSE"])
