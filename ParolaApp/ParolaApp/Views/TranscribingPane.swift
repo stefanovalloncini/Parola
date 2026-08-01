@@ -12,13 +12,15 @@ struct TranscribingPane: View {
     @State private var eta = ETACalculator()
     @State private var etaDeadline: Date?
     @State private var startDate = Date()
-    @State private var settled = ""
+    @State private var shown = ""
+    @State private var bodyText = AttributedString()
     @State private var isFinishing = false
     @State private var isPreparing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private static let tailID = "transcribing.tail"
+    private static let displayWindowChars = 2000
     private static let caretBlinkPeriod: Double = 0.6
     private static let finishingProgressThreshold = 0.9
     private static let finishingStallSeconds: Double = 3
@@ -55,7 +57,8 @@ struct TranscribingPane: View {
         }
         .onChange(of: file) { _, _ in
             startDate = Date()
-            settled = ""
+            shown = ""
+            bodyText = AttributedString()
             isFinishing = false
             isPreparing = false
             eta.reset()
@@ -72,7 +75,8 @@ struct TranscribingPane: View {
         }
         .task(id: partial) {
             try? await Task.sleep(for: .milliseconds(900))
-            withAnimation(.easeOut(duration: 0.4)) { settled = partial }
+            let window = StreamingText.tail(of: partial, maxChars: Self.displayWindowChars)
+            withAnimation(.easeOut(duration: 0.4)) { bodyText = Self.attributed(settled: window, fresh: "") }
         }
         .task(id: progress) {
             guard let progress, progress >= Self.finishingProgressThreshold else { return }
@@ -80,7 +84,10 @@ struct TranscribingPane: View {
             guard !Task.isCancelled else { return }
             withAnimation(.easeInOut(duration: 0.3)) { isFinishing = true }
         }
-        .onAppear { updateETA(for: progress) }
+        .onAppear {
+            updateETA(for: progress)
+            updateBodyText(for: partial)
+        }
     }
 
     private var header: some View {
@@ -148,16 +155,22 @@ struct TranscribingPane: View {
         etaDeadline = eta.projectedFinish()
     }
 
-    private var transcriptBodyText: Text {
-        let parts = StreamingText.split(shown: settled, latest: partial)
-        var text = AttributedString(parts.settled)
+    private func updateBodyText(for latest: String) {
+        let window = StreamingText.tail(of: latest, maxChars: Self.displayWindowChars)
+        let parts = StreamingText.split(shown: shown, latest: window)
+        shown = window
+        bodyText = Self.attributed(settled: parts.settled, fresh: parts.fresh)
+    }
+
+    private static func attributed(settled: String, fresh: String) -> AttributedString {
+        var text = AttributedString(settled)
         text.foregroundColor = DS.Color.primaryText
-        if !parts.fresh.isEmpty {
-            var tail = AttributedString(parts.fresh)
+        if !fresh.isEmpty {
+            var tail = AttributedString(fresh)
             tail.foregroundColor = DS.Color.primaryText.opacity(0.5)
             text.append(tail)
         }
-        return Text(text)
+        return text
     }
 
     private func caret(visible: Bool) -> Text {
@@ -166,19 +179,18 @@ struct TranscribingPane: View {
     }
 
     private var transcriptBox: some View {
-        let bodyText = transcriptBodyText
-        return ScrollViewReader { proxy in
+        ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.Spacing.regular) {
                     if hasText {
                         TimelineView(.periodic(from: startDate, by: Self.caretBlinkPeriod)) { context in
                             let ticks = Int(context.date.timeIntervalSince(startDate) / Self.caretBlinkPeriod)
-                            (bodyText + caret(visible: reduceMotion || ticks % 2 == 0))
+                            (Text(bodyText) + caret(visible: reduceMotion || ticks % 2 == 0))
                                 .font(DS.Font.transcript)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .textSelection(.enabled)
                                 .contentTransition(.interpolate)
-                                .accessibilityLabel(partial)
+                                .accessibilityLabel(shown)
                         }
                         .transition(.opacity)
                         .id(Self.tailID)
@@ -188,11 +200,11 @@ struct TranscribingPane: View {
                     }
                 }
                 .padding(DS.Spacing.large)
-                .animation(.easeOut(duration: 0.28), value: partial)
+                .animation(.easeOut(duration: 0.28), value: hasText)
             }
             .scrollBounceBehavior(.basedOnSize)
-            .onChange(of: partial) { old, _ in
-                settled = old
+            .onChange(of: partial) { _, newValue in
+                updateBodyText(for: newValue)
                 withAnimation(.easeOut(duration: 0.3)) {
                     proxy.scrollTo(Self.tailID, anchor: .bottom)
                 }

@@ -48,7 +48,7 @@ public enum StreamingText {
 
     /// The trailing `maxChars` of `text`, advanced past a leading half word so the cut never
     /// starts mid-word. A single unbreakable word longer than the cap is returned cut as-is.
-    static func tail(of text: String, maxChars: Int) -> String {
+    public static func tail(of text: String, maxChars: Int) -> String {
         guard maxChars > 0 else { return "" }
         guard let cutStart = text.index(text.endIndex, offsetBy: -maxChars, limitedBy: text.startIndex),
               cutStart > text.startIndex else { return text }
