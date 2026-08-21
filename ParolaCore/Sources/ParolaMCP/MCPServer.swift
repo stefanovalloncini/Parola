@@ -140,37 +140,13 @@ public actor MCPServer {
     }
 
     private func transcribe(args: [String: Any], progress: ProgressSink?) async throws -> MCPToolCallResult {
-        guard let path = args["path"] as? String, !path.isEmpty else {
-            throw MCPToolError("Missing required argument: path")
-        }
-        let url = URL(fileURLWithPath: path)
-        let model = args["model"] as? String
-        let language = args["language"] as? String
-        let format = args["format"] as? String ?? "txt"
-        let source = FileAudioSource(url: url)
+        let request = try TranscribeRequest(args: args)
         let transcript = try await transcribe(
-            source: source,
-            options: TranscriptionOptions(model: model, language: language),
+            source: FileAudioSource(url: request.sourceURL),
+            options: request.options,
             progress: progress
         )
-        let text: String
-        switch format.lowercased() {
-        case "json":
-            let data = try JsonExporter().render(transcript)
-            text = String(decoding: data, as: UTF8.self)
-        case "srt":
-            let data = try SrtExporter().render(transcript)
-            text = String(decoding: data, as: UTF8.self)
-        case "vtt":
-            let data = try VttExporter().render(transcript)
-            text = String(decoding: data, as: UTF8.self)
-        case "md":
-            let data = try MarkdownExporter().render(transcript)
-            text = String(decoding: data, as: UTF8.self)
-        default:
-            text = transcript.text
-        }
-        return MCPToolCallResult(text: text)
+        return MCPToolCallResult(text: try request.format.render(transcript))
     }
 
     private func transcribe(

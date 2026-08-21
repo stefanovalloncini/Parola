@@ -22,7 +22,9 @@ public enum EngineTool: String, CaseIterable, Sendable {
                         "path": ["type": "string", "description": "Absolute path to the audio or video file."],
                         "model": ["type": "string", "description": "Model variant id (see parola_list_models). Defaults to the recommended model."],
                         "language": ["type": "string", "description": "Two-letter language code (en, it, ...). Omit to auto-detect."],
-                        "format": ["type": "string", "description": "Output format: txt, md, srt, vtt, json", "enum": ["txt", "md", "srt", "vtt", "json"]],
+                        "format": ["type": "string", "description": "Output format: txt, md, srt, vtt, json", "enum": TranscribeFormat.allCases.map(\.rawValue)],
+                        "translate": ["type": "boolean", "default": false, "description": "Translate the speech to English instead of transcribing what was said. Only engines whose parola_list_engines row reads translate=true accept it."],
+                        "initial_prompt": ["type": "string", "description": "Words or proper nouns to bias decoding toward. Whisper truncates it internally to about 224 tokens, so keep it short."],
                     ],
                     "required": ["path"],
                 ] as [String: Any])
