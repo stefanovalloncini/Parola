@@ -54,7 +54,7 @@ struct RequestDispatcherTests {
         let collector = OutputCollector()
         let dispatcher = RequestDispatcher(
             server: MCPServer(bridge: GatedBridge()),
-            output: { response in Task { await collector.record(response) } },
+            output: { message in Task { await collector.record(message) } },
             onShutdown: { Task { await collector.waitForResponses(1); await collector.recordShutdown() } }
         )
 
@@ -93,7 +93,7 @@ struct RequestDispatcherTests {
     private func makeDispatcher(bridge: any BridgeProtocol, collector: OutputCollector) -> RequestDispatcher {
         RequestDispatcher(
             server: MCPServer(bridge: bridge),
-            output: { response in Task { await collector.record(response) } }
+            output: { message in Task { await collector.record(message) } }
         )
     }
 
@@ -162,10 +162,11 @@ private actor GatedBridge: BridgeProtocol {
     }
 }
 
-/// Records emitted responses (and the shutdown callback) in order, with continuation-based awaits.
+/// Records emitted messages (and the shutdown callback) in order, with continuation-based awaits.
 private actor OutputCollector {
     enum Event: Sendable {
         case response(JSONRPCResponse)
+        case notification(JSONRPCNotification)
         case shutdown
     }
 
@@ -175,8 +176,11 @@ private actor OutputCollector {
 
     var events: [Event] { recorded }
 
-    func record(_ response: JSONRPCResponse) {
-        recorded.append(.response(response))
+    func record(_ message: JSONRPCMessage) {
+        switch message {
+        case .response(let response): recorded.append(.response(response))
+        case .notification(let notification): recorded.append(.notification(notification))
+        }
         let count = responseCount
         var stillWaiting: [(threshold: Int, continuation: CheckedContinuation<Void, Never>)] = []
         for waiter in responseWaiters {

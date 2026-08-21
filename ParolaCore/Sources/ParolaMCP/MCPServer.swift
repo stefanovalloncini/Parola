@@ -27,7 +27,10 @@ public actor MCPServer {
         self.features = features
     }
 
-    public func handle(_ request: JSONRPCRequest) async throws -> JSONRPCResponse? {
+    public func handle(
+        _ request: JSONRPCRequest,
+        notify: @escaping @Sendable (JSONRPCNotification) async -> Void = { _ in }
+    ) async throws -> JSONRPCResponse? {
         switch request.method {
         case "initialize":
             return JSONRPCResponse.success(id: request.id, result: initializeResult(for: request))
@@ -36,7 +39,7 @@ public actor MCPServer {
         case "tools/list":
             return JSONRPCResponse.success(id: request.id, result: MCPListToolsResult(tools: ToolRegistry.allTools()))
         case "tools/call":
-            return try await callTool(request)
+            return try await callTool(request, notify: notify)
         case "ping":
             return JSONRPCResponse.success(id: request.id, result: AnyEncodable([String: String]()))
         case "shutdown":
@@ -65,7 +68,10 @@ public actor MCPServer {
         )
     }
 
-    private func callTool(_ request: JSONRPCRequest) async throws -> JSONRPCResponse {
+    private func callTool(
+        _ request: JSONRPCRequest,
+        notify: @escaping @Sendable (JSONRPCNotification) async -> Void
+    ) async throws -> JSONRPCResponse {
         guard let params = request.params?.value as? [String: Any],
               let name = params["name"] as? String else {
             return JSONRPCResponse.failure(
@@ -75,11 +81,12 @@ public actor MCPServer {
             )
         }
         let args = params["arguments"] as? [String: Any] ?? [:]
+        let progress = Self.progressToken(in: params).map { ProgressSink(token: $0, notify: notify) }
 
         do {
             let result: MCPToolCallResult
             if let engineTool = EngineTool(rawValue: name) {
-                result = try await invoke(engineTool, args: args)
+                result = try await invoke(engineTool, args: args, progress: progress)
             } else if let typedTool = TypedToolRegistry.byName[name] {
                 result = try await typedTool.invoke(args: args, bridge: bridge)
             } else if name == TypedToolRegistry.appDispatch.name {
@@ -109,9 +116,20 @@ public actor MCPServer {
         }
     }
 
-    private func invoke(_ tool: EngineTool, args: [String: Any]) async throws -> MCPToolCallResult {
+    static func progressToken(in params: [String: Any]) -> ProgressToken? {
+        guard let meta = params["_meta"] as? [String: Any] else { return nil }
+        if let value = meta["progressToken"] as? Int { return .int(value) }
+        if let value = meta["progressToken"] as? String { return .string(value) }
+        return nil
+    }
+
+    private func invoke(
+        _ tool: EngineTool,
+        args: [String: Any],
+        progress: ProgressSink?
+    ) async throws -> MCPToolCallResult {
         switch tool {
-        case .transcribe:    return try await transcribe(args: args)
+        case .transcribe:    return try await transcribe(args: args, progress: progress)
         case .listModels:    return listModels()
         case .listEngines:   return await listEngines()
         case .searchLibrary: return await searchLibrary(args: args)
@@ -121,7 +139,7 @@ public actor MCPServer {
         }
     }
 
-    private func transcribe(args: [String: Any]) async throws -> MCPToolCallResult {
+    private func transcribe(args: [String: Any], progress: ProgressSink?) async throws -> MCPToolCallResult {
         guard let path = args["path"] as? String, !path.isEmpty else {
             throw MCPToolError("Missing required argument: path")
         }
@@ -130,9 +148,10 @@ public actor MCPServer {
         let language = args["language"] as? String
         let format = args["format"] as? String ?? "txt"
         let source = FileAudioSource(url: url)
-        let transcript = try await session.transcribe(
+        let transcript = try await transcribe(
             source: source,
-            options: TranscriptionOptions(model: model, language: language)
+            options: TranscriptionOptions(model: model, language: language),
+            progress: progress
         )
         let text: String
         switch format.lowercased() {
@@ -152,6 +171,37 @@ public actor MCPServer {
             text = transcript.text
         }
         return MCPToolCallResult(text: text)
+    }
+
+    private func transcribe(
+        source: FileAudioSource,
+        options: TranscriptionOptions,
+        progress: ProgressSink?
+    ) async throws -> Transcript {
+        guard let progress else {
+            return try await session.transcribe(source: source, options: options)
+        }
+        let modelName = options.model ?? ModelCatalog.defaultModelID(for: options)
+        let map = TranscribeProgressMap(
+            model: modelName,
+            duration: await source.estimatedDuration(),
+            downloadsModel: !modelStore.isInstalled(modelName)
+        )
+        let reporter = progress.reporter()
+        do {
+            let transcript = try await session.transcribe(
+                source: source,
+                options: options,
+                downloadProgress: { reporter.report(map.downloading($0)) },
+                progressHandler: { reporter.report(map.transcribed(seconds: $0)) },
+                stageHandler: { reporter.report(map.entering($0)) }
+            )
+            await reporter.finish()
+            return transcript
+        } catch {
+            await reporter.finish()
+            throw error
+        }
     }
 
     private func listModels() -> MCPToolCallResult {

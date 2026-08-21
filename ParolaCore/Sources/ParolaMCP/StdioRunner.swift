@@ -51,11 +51,11 @@ public enum StdioRunner {
         return try? JSONDecoder().decode(Envelope.self, from: data).id
     }
 
-    private static func write(_ response: JSONRPCResponse) {
+    private static func write(_ message: JSONRPCMessage) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.withoutEscapingSlashes]
         do {
-            var data = try encoder.encode(response)
+            var data = try encoder.encode(message)
             data.append(0x0A)
             try FileHandle.standardOutput.write(contentsOf: data)
         } catch {

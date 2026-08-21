@@ -31,6 +31,37 @@ public struct JSONRPCResponse: Encodable, Sendable {
     }
 }
 
+public struct JSONRPCNotification: Encodable, Sendable {
+    public let jsonrpc = "2.0"
+    public let method: String
+    public let params: AnyEncodable?
+
+    public init(method: String, params: (any Encodable & Sendable)? = nil) {
+        self.method = method
+        // Applied, not `map(AnyEncodable.init)`: an unapplied reference can't open the existential
+        // and silently picks the `Any` overload, which encodes anything non-JSON as null.
+        self.params = params.map { AnyEncodable($0) }
+    }
+
+    public static func progress(_ params: MCPProgressParams) -> JSONRPCNotification {
+        JSONRPCNotification(method: "notifications/progress", params: params)
+    }
+}
+
+/// Everything the server writes to stdout, so responses and notifications share one writer.
+public enum JSONRPCMessage: Encodable, Sendable {
+    case response(JSONRPCResponse)
+    case notification(JSONRPCNotification)
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .response(let response): try container.encode(response)
+        case .notification(let notification): try container.encode(notification)
+        }
+    }
+}
+
 public struct JSONRPCError: Encodable, Sendable {
     public let code: Int
     public let message: String
@@ -55,6 +86,9 @@ public enum JSONRPCID: Codable, Sendable, Hashable {
         }
     }
 }
+
+/// A `tools/call` progress token: a JSON string or integer the server echoes back verbatim.
+public typealias ProgressToken = JSONRPCID
 
 // MARK: - AnyDecodable / AnyEncodable
 
@@ -177,6 +211,21 @@ public struct MCPToolCallResult: Encodable, Sendable {
 public struct MCPContentBlock: Encodable, Sendable {
     public let type: String
     public let text: String
+}
+
+/// Params of `notifications/progress`. `progress` must strictly increase across a token's notifications.
+public struct MCPProgressParams: Encodable, Sendable {
+    public let progressToken: ProgressToken
+    public let progress: Double
+    public let total: Double?
+    public let message: String?
+
+    public init(progressToken: ProgressToken, progress: Double, total: Double? = nil, message: String? = nil) {
+        self.progressToken = progressToken
+        self.progress = progress
+        self.total = total
+        self.message = message
+    }
 }
 
 // MARK: - JSON-RPC error codes
