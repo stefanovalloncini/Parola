@@ -14,7 +14,8 @@ parola mcp
 client configs written before the subcommand landed; new setups should use
 `parola mcp`.
 
-Build both from source:
+The release app bundles both binaries at `Parola.app/Contents/MacOS/`. To
+build them from source instead:
 
 ```sh
 cd ParolaCore
@@ -26,13 +27,14 @@ swift build          # .build/debug/parola, .build/debug/parola-mcp
 ### Claude Code
 
 ```sh
-claude mcp add parola -- parola mcp
+claude mcp add parola -- /Applications/Parola.app/Contents/MacOS/parola mcp
 ```
 
-If `parola` isn't on your `PATH`, pass the full path to the binary:
+If `parola` is on your `PATH` (for example a source build you symlinked), a
+bare `parola mcp` works too:
 
 ```sh
-claude mcp add parola -- /Users/you/Dev/Parola/ParolaCore/.build/debug/parola mcp
+claude mcp add parola -- parola mcp
 ```
 
 ### Claude Desktop
@@ -43,7 +45,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "parola": {
-      "command": "/usr/local/bin/parola",
+      "command": "/Applications/Parola.app/Contents/MacOS/parola",
       "args": ["mcp"]
     }
   }
@@ -59,9 +61,6 @@ Any MCP-capable client works the same way: run `parola mcp` as a stdio server.
 The server negotiates protocol versions `2024-11-05`, `2025-03-26`, and
 `2025-06-18`, and answers `initialize`, `tools/list`, `tools/call`, `ping`, and
 `shutdown`.
-
-Working in this repo, `.mcp.json` at the root already wires the debug build up
-for Claude Code.
 
 ## Tools
 
