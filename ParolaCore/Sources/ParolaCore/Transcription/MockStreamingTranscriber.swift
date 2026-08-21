@@ -28,15 +28,17 @@ public actor MockStreamingTranscriber: StreamingTranscriber {
                 cont.yield(.partial(text: partial))
                 if perStep > 0 { await sleeper(perStep) }
             }
-            if let failure = response.failure {
-                cont.yield(.failed(failure.message))
-                return
-            }
+            // Failure with canned segments models a take that dies mid-stream:
+            // the confirmed segments land first, then the failure.
             var nextID = 0
             for seed in response.segments {
                 if Task.isCancelled { return }
                 cont.yield(.confirmed(TranscriptSegment(id: nextID, start: seed.start, end: seed.end, text: seed.text, speaker: seed.speaker)))
                 nextID += 1
+            }
+            if let failure = response.failure {
+                cont.yield(.failed(failure.message))
+                return
             }
         }
         return stream

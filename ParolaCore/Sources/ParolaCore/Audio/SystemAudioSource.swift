@@ -18,8 +18,7 @@ public actor SystemAudioSource: LiveAudioSource {
     private var captureFailure: String?
 
     public init() {
-        self.outputURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-system-\(UUID().uuidString).wav")
+        self.outputURL = RecordingScratch.fileURL(prefix: "parola-system")
         guard let format = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: 16_000,
@@ -104,6 +103,8 @@ public actor SystemAudioSource: LiveAudioSource {
         }
         return outputURL
     }
+
+    public func inFlightURL() -> URL? { outputURL }
 
     public func cancel() async {
         try? await stop()

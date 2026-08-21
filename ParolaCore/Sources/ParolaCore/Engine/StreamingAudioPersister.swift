@@ -20,8 +20,7 @@ final class StreamingAudioPersister: Sendable {
             channels: 1,
             interleaved: false
         ) else { return nil }
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-recording-\(UUID().uuidString).wav")
+        let url = RecordingScratch.fileURL(prefix: "parola-recording")
         guard let file = try? AVAudioFile(
             forWriting: url,
             settings: format.settings,

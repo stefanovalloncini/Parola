@@ -8,6 +8,13 @@ public protocol StreamingTranscriber: Sendable {
     ) async throws -> AsyncStream<StreamingEvent>
     func stop() async
     func currentModel() async -> String?
+    /// The take's on-disk audio, when the transcriber persists one: the in-flight file
+    /// while recording, or the file a failure left behind.
+    func recordingAudioURL() async -> URL?
+}
+
+public extension StreamingTranscriber {
+    func recordingAudioURL() async -> URL? { nil }
 }
 
 public enum StreamingTranscriberFactory {

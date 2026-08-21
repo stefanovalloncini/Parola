@@ -47,6 +47,8 @@ public actor MicAudioSource: LiveAudioSource {
         levelContinuations.removeValue(forKey: id)
     }
 
+    public func inFlightURL() -> URL? { session?.outputURL }
+
     private func emitLevel(_ level: Float) {
         for continuation in levelContinuations.values {
             continuation.yield(level)
@@ -77,8 +79,7 @@ public actor MicAudioSource: LiveAudioSource {
             throw ParolaError.captureUnavailable("could not create audio converter \(tapFormat) → \(outFormat)")
         }
 
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-mic-\(UUID().uuidString).wav")
+        let url = RecordingScratch.fileURL(prefix: "parola-mic")
         let file = try AVAudioFile(
             forWriting: url,
             settings: outFormat.settings,

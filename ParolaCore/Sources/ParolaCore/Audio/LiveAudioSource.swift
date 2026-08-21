@@ -10,6 +10,13 @@ import Foundation
 public protocol LiveAudioSource: AudioSource {
     func start() async throws
     func levels() async -> AsyncStream<Float>
+    /// The file this source is capturing into, once known — lets the app checkpoint
+    /// an in-flight take for crash recovery. `nil` for sources that don't record to disk.
+    func inFlightURL() async -> URL?
+}
+
+public extension LiveAudioSource {
+    func inFlightURL() async -> URL? { nil }
 }
 
 public enum LiveAudioSourceFactory {

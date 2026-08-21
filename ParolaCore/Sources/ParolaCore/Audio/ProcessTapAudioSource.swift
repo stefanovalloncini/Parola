@@ -69,8 +69,7 @@ public actor ProcessTapAudioSource: LiveAudioSource {
 
     public init(processObjects: [AudioObjectID]) {
         self.processObjects = processObjects
-        self.outputURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-system-\(UUID().uuidString).wav")
+        self.outputURL = RecordingScratch.fileURL(prefix: "parola-system")
         guard let format = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: 16_000,
@@ -167,6 +166,8 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         }
         return outputURL
     }
+
+    public func inFlightURL() -> URL? { outputURL }
 
     public func cancel() async {
         await stop()

@@ -44,6 +44,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private var loadedModel: String?
     private var optionsForRun: TranscriptionOptions?
     private var speakerLabeler: (any StreamingSpeakerLabeler)?
+    private var failureAudioURL: URL?
     nonisolated let persistAudio: Bool
 
     public init(modelStore: ModelStore = .shared, persistAudio: Bool = false, deviceUID: String? = nil) {
@@ -73,6 +74,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         guard loop == nil else {
             throw ParolaError.transcriptionFailed("session already started")
         }
+        failureAudioURL = nil
 
         let modelName = options.model ?? ModelCatalog.fallbackModelID
         if let variant = ModelCatalog.variant(id: modelName), variant.engineID != .whisperKit {
@@ -212,6 +214,12 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
     public func currentModel() -> String? { loadedModel }
 
+    /// The take's on-disk audio: the in-flight file while recording, or the file a
+    /// failure left behind. `nil` when the session doesn't persist audio.
+    public func recordingAudioURL() -> URL? {
+        persister?.url ?? failureAudioURL
+    }
+
     private func handleStreamerFailure(_ error: Error) async {
         await finishStream(failure: error.localizedDescription)
     }
@@ -223,11 +231,17 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
     private func finishStream(failure: String?) async {
         guard loop != nil else { return }
+        if failure != nil {
+            // Keep the take on disk and publish its URL before the .failed event lands,
+            // so a consumer reacting to the event can't read it mid-finish (actor reentrancy).
+            failureAudioURL = await persister?.finish()
+        } else {
+            await persister?.discard()
+        }
         if let failure { continuation?.yield(.failed(failure)) }
         segmentContinuation?.finish()
         await consumerTask?.value
         continuation?.finish()
-        await persister?.discard()
         teardown()
     }
 
