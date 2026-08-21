@@ -1,6 +1,6 @@
 # Adding a feature to Parola
 
-When you add a user-visible feature, follow these steps. CI enforces every one.
+When you add a user-visible feature, follow these steps.
 
 ## 1. AppModel method
 
@@ -22,42 +22,19 @@ The script appends a fresh `AutomationCommand` value to `ParolaApp/ParolaApp/Bri
 
 Use `--dry-run` to print the block to stdout without touching files.
 
-## 4. Coverage doc
+## 4. Snapshot state (if you added an `@Observable` property)
 
-Add a row to `docs/agent-coverage.md`:
+If a new stored property on `AppModel` belongs in the bridge's state snapshot, add it to `AppModel+StateSnapshot.swift` by hand.
 
-```
-| <axLeaf id> | <command name> | <notes> |
-```
+## 5. Mock (if your feature has an engine seam)
 
-CI fails if a leaf has no row, or if a row references a command the catalog doesn't expose.
+If the feature plugs into `Transcriber`, `LanguageModel`, or `AudioSource`, the mock registries already handle it. Drop a fixture into `ParolaAppTests/Fixtures/Mocks/` when a test needs canned data.
 
-## 5. Snapshot state (if you added an `@Observable` property)
-
-If you added a new stored property on `AppModel`, regenerate the snapshot schema:
-
-```
-scripts/gen-state-schema.sh
-```
-
-That refreshes `AppModel+StateSnapshot.swift`. The pre-commit hook catches drift.
-
-## 6. Mock (if your feature has an engine seam)
-
-If the feature plugs into `Transcriber`, `LanguageModel`, or `AudioSource`, the mock plumbing from v7-B already handles it. Drop a fixture into `ParolaAppTests/Fixtures/Mocks/` when a test needs canned data.
-
-## 7. Tests
+## 6. Tests
 
 - AppModel method — unit test in `AppModel<Area>Tests.swift`.
 - Automation command — integration test in `AutomationCommand<Area>Tests.swift` that dispatches the command through a test-mode bridge and verifies the resulting state slice.
 
-## CI guards
+## Coverage check
 
-- `scripts/check-feature-coverage.sh` — UI elements vs `.axLeaf` vs coverage doc vs catalog.
-- `scripts/gen-state-schema.sh --check` — the generated snapshot file is up to date.
-
-`scripts/audit-automation-surface.swift` is a planned guardrail (SwiftSyntax walker over `AppModel`'s public methods). Not wired yet. Once it lands it will fail CI when an AppModel method ships without a matching catalog command or a `// @AutomationSkip` marker.
-
-## Coverage check modes
-
-`scripts/check-feature-coverage.sh` runs strict by default and exits non-zero on any miss. Pass `--soft` to log warnings without failing — use that during the `.axLeaf` rollout and inside the optional `.githooks/pre-commit` invocation.
+`scripts/check-feature-coverage.sh` compares UI elements, `.axLeaf` identifiers, and the command catalog. It also expects a `docs/agent-coverage.md` table mapping leaf ids to commands; that file doesn't exist yet, so strict mode currently fails on it. It runs strict by default and exits non-zero on any miss; pass `--soft` to log warnings without failing (the optional `.githooks/pre-commit` invocation uses that).
