@@ -220,8 +220,13 @@ final class AppModel {
     @ObservationIgnored var recoveryGeneration: Int = 0
     @ObservationIgnored var activeRecoveryGeneration: Int?
     @ObservationIgnored var recordingRecoveryStartedAt: Date?
+    @ObservationIgnored var liveRecordingAudioURL: URL?
     @ObservationIgnored var recordingWatchTask: Task<Void, Never>?
     @ObservationIgnored var pendingRecoveryWrite: Task<Void, Never>?
+    /// A recorded take whose transcription failed; the file backs the error pane's Retry.
+    var failedTakeAudioURL: URL?
+    @ObservationIgnored var failedTakeTitle: String?
+    @ObservationIgnored var failedTakeCategory: EntryCategory?
     @ObservationIgnored var pendingDictationRestart: Task<Void, Never>?
 
     var recordingDiskSpaceLow: Bool = false
@@ -952,6 +957,7 @@ final class AppModel {
         stopRecordingLevelObserver()
         stopRecordingWatch()
         endActiveRecovery()
+        liveRecordingAudioURL = nil
         streamingConsumer?.cancel()
         streamingConsumer = nil
         if let s = streamingSession {
@@ -1101,6 +1107,8 @@ final class AppModel {
         self.mode = bootstrap.mode
         self.clock = bootstrap.clock
         self.library = LibraryStore(libraryURL: bootstrap.library ?? LibraryStore.defaultLibraryURL)
+        // Takes must outlive a failed transcription, a crash, and the OS temp purge.
+        RecordingScratch.setDirectory(library.libraryURL.appendingPathComponent("inflight", isDirectory: true))
         // A --library override (tests, sandbox) must keep people suggestions out of the real store too.
         self.peopleStore = PeopleStore(
             storageURL: bootstrap.library.map { $0.appendingPathComponent("People.json") }
@@ -1126,6 +1134,7 @@ final class AppModel {
         refreshLibrary()
         restoreBatchQueue()
         loadPendingRecovery()
+        sweepInflightRecordings()
         if features.isEnabled(.dictation) {
             wireDictationController()
         }
@@ -1203,7 +1212,9 @@ final class AppModel {
     /// A non-fatal warning (e.g. a failed library save) shown without replacing the open transcript.
     var nonFatalWarning: String?
 
-    func persistToLibrary(_ result: Transcript, audioSource: URL?, title: String? = nil) {
+    /// `activate: false` saves without taking the selection, auto-titling, or running
+    /// auto-exports — for interrupted or failed takes that only need to survive.
+    func persistToLibrary(_ result: Transcript, audioSource: URL?, title: String? = nil, activate: Bool = true) {
         let category = pendingRecordingCategory
         pendingRecordingCategory = .transcription
         let navigationGeneration = loadEntryGeneration
@@ -1219,16 +1230,16 @@ final class AppModel {
                 refreshLibrary()
                 // library.add copies media for seconds; if the user navigated meanwhile,
                 // taking the selection would repoint their next edits at this new entry.
-                if loadEntryGeneration == navigationGeneration, selectedEntryID == nil {
+                if activate, loadEntryGeneration == navigationGeneration, selectedEntryID == nil {
                     selectedEntryID = entry.id
                 }
-                if autoTitleEntries {
+                if activate, autoTitleEntries {
                     autoTitleEntry(entry.id, transcript: result)
                 }
             } catch {
                 nonFatalWarning = "The transcript is still open, but Parola couldn't save it to your library. \(error.localizedDescription)"
             }
-            if let audioSource {
+            if activate, let audioSource {
                 runAutoExports(transcript: result, sourceURL: audioSource)
             }
         }
@@ -1878,6 +1889,9 @@ final class AppModel {
 
     func dismissError() {
         phase = .idle
+        failedTakeAudioURL = nil
+        failedTakeTitle = nil
+        failedTakeCategory = nil
     }
 
     var cacheDirectoryDisplayPath: String {
@@ -2039,6 +2053,13 @@ final class AppModel {
         guard stopRequestedDuringStart else {
             liveSource = source
             observeRecordingLevels(from: source)
+            // One audio-only checkpoint per take: a crash mid-recording leaves a
+            // pointer to the in-flight file instead of losing the take outright.
+            liveRecordingAudioURL = await source.inFlightURL()
+            if liveRecordingAudioURL != nil {
+                beginRecordingRecovery()
+                writeRecordingCheckpoint()
+            }
             return true
         }
         stopRecordingLevelObserver()
@@ -2134,6 +2155,8 @@ final class AppModel {
             let labeler = await streamingSpeakerLabeler()
             do {
                 let events = try await s.start(options: opts, speakerLabeler: labeler, downloadProgress: progress)
+                liveRecordingAudioURL = await s.recordingAudioURL()
+                writeRecordingCheckpoint()
                 phase = .recording(source: .microphone)
                 for await event in events {
                     await handleStreamingEvent(event)
@@ -2175,6 +2198,7 @@ final class AppModel {
         stopSilenceWatch()
         stopRecordingWatch()
         endActiveRecovery()
+        liveRecordingAudioURL = nil
     }
 
     func handleStreamingEvent(_ event: StreamingEvent) async {
@@ -2191,9 +2215,38 @@ final class AppModel {
         case .warning:
             break
         case .failed(let msg):
+            let streaming = streamingSession
+            let confirmed = liveSegments
             teardownStreaming()
-            phase = .failed(message: msg)
-            resolveRecordingOutcome(.failure(IntentActionError.failed(msg)))
+            let audioURL = await streaming?.recordingAudioURL()
+            var message = msg
+            if !confirmed.isEmpty || audioURL != nil {
+                let takeCategory = pendingRecordingCategory
+                let takeTitle = Self.liveRecordingTitle(category: takeCategory, endedAt: Date())
+                let partial = Transcript(
+                    segments: confirmed,
+                    language: currentOptions.language ?? "auto",
+                    modelName: selectedModel,
+                    sourceURL: audioURL,
+                    durationSeconds: confirmed.last?.end
+                )
+                persistToLibrary(
+                    partial,
+                    audioSource: audioURL,
+                    title: takeTitle + " (interrupted)",
+                    activate: false
+                )
+                if let audioURL {
+                    failedTakeAudioURL = audioURL
+                    failedTakeTitle = takeTitle
+                    failedTakeCategory = takeCategory
+                }
+                message += " " + String(localized: "The recording up to this point was saved to your library.")
+            }
+            liveSegments = []
+            livePartialText = ""
+            phase = .failed(message: message)
+            resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
             drainDeferredArrivals()
         case .finished(let transcript):
             stopRecordingWatch()
@@ -2234,6 +2287,7 @@ final class AppModel {
                 stopRecordingWatch()
                 // Both no-op when .finished already ran; they cover a stream that ends without one.
                 endActiveRecovery()
+                liveRecordingAudioURL = nil
                 resolveRecordingOutcome(.failure(IntentActionError.failed("The recording ended without a transcript.")))
             }
             return
@@ -2252,32 +2306,87 @@ final class AppModel {
             do {
                 let url = try await source.prepare()
                 stopRecordingLevelObserver()
-                sourceFileURL = url
-                installPlayer(for: url)
-
-                phase = .transcribing(file: url)
-                let result = try await session.transcribe(
-                    source: FileAudioSource(url: url),
-                    options: currentOptions
-                )
-                let processed = await postProcessDetached(result)
-                clearDerivedArtifacts()
-                selectedEntryID = nil
-                restorePlaybackSource(url)
-                transcript = processed
-                phase = .ready
-                persistToLibrary(
-                    processed,
-                    audioSource: url,
+                await transcribeRecordedTake(
+                    url: url,
                     title: Self.liveRecordingTitle(category: pendingRecordingCategory, endedAt: Date())
                 )
-                resolveRecordingOutcome(.success(processed.text))
             } catch {
                 stopRecordingLevelObserver()
+                endActiveRecovery()
+                liveRecordingAudioURL = nil
                 let message = Self.transcriptionFailureMessage(for: error)
                 phase = .failed(message: message)
                 resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
             }
+            if !Task.isCancelled {
+                self.fileTranscribeTask = nil
+                self.drainDeferredArrivals()
+            }
+        }
+    }
+
+    /// Transcribes a finished take from its in-flight file. Unlike a user-opened file the
+    /// audio is irreplaceable, so a failure saves it to the library and arms the error
+    /// pane's Retry instead of leaving the file orphaned.
+    func transcribeRecordedTake(url: URL, title: String) async {
+        liveRecordingAudioURL = nil
+        let recoveryToken = beginFileTranscribeRecovery(sourceURL: url, title: title)
+        sourceFileURL = url
+        installPlayer(for: url)
+        phase = .transcribing(file: url)
+        do {
+            let result = try await session.transcribe(
+                source: FileAudioSource(url: url),
+                options: currentOptions
+            )
+            let processed = await postProcessDetached(result)
+            clearDerivedArtifacts()
+            selectedEntryID = nil
+            restorePlaybackSource(url)
+            transcript = processed
+            endRecovery(recoveryToken)
+            failedTakeAudioURL = nil
+            failedTakeTitle = nil
+            failedTakeCategory = nil
+            phase = .ready
+            persistToLibrary(processed, audioSource: url, title: title)
+            resolveRecordingOutcome(.success(processed.text))
+        } catch {
+            endRecovery(recoveryToken)
+            var message = Self.transcriptionFailureMessage(for: error)
+            if !(error is CancellationError), !Task.isCancelled {
+                failedTakeCategory = pendingRecordingCategory
+                failedTakeAudioURL = url
+                failedTakeTitle = title
+                persistToLibrary(
+                    Transcript(
+                        segments: [],
+                        language: currentOptions.language ?? "auto",
+                        modelName: selectedModel,
+                        sourceURL: url
+                    ),
+                    audioSource: url,
+                    title: title + " (transcription failed)",
+                    activate: false
+                )
+                message += " " + String(localized: "The audio was saved to your library.")
+            }
+            phase = .failed(message: message)
+            resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
+        }
+    }
+
+    /// Re-runs transcription of the take a failure left behind.
+    func retryFailedTake() {
+        guard let url = failedTakeAudioURL else { return }
+        let title = failedTakeTitle ?? Self.liveRecordingTitle(category: .transcription, endedAt: Date())
+        pendingRecordingCategory = failedTakeCategory ?? .transcription
+        failedTakeAudioURL = nil
+        failedTakeTitle = nil
+        failedTakeCategory = nil
+        fileTranscribeTask?.cancel()
+        fileTranscribeTask = Task {
+            await transcribeRecordedTake(url: url, title: title)
             if !Task.isCancelled {
                 self.fileTranscribeTask = nil
                 self.drainDeferredArrivals()

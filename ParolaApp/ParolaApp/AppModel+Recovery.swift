@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import ParolaCore
 
@@ -17,6 +18,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
     var sourceURL: URL?
     var language: String?
     var segments: [TranscriptSegment]
+    var audioURL: URL?
+    var title: String?
 
     init(
         kind: Kind,
@@ -24,7 +27,9 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         modelName: String,
         sourceURL: URL? = nil,
         language: String? = nil,
-        segments: [TranscriptSegment] = []
+        segments: [TranscriptSegment] = [],
+        audioURL: URL? = nil,
+        title: String? = nil
     ) {
         self.kind = kind
         self.startedAt = startedAt
@@ -32,6 +37,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         self.sourceURL = sourceURL
         self.language = language
         self.segments = segments
+        self.audioURL = audioURL
+        self.title = title
     }
 }
 
@@ -42,7 +49,7 @@ extension AppModel {
     }
 
     @discardableResult
-    func beginFileTranscribeRecovery(sourceURL: URL) -> Int {
+    func beginFileTranscribeRecovery(sourceURL: URL, title: String? = nil) -> Int {
         recoveryGeneration += 1
         activeRecoveryGeneration = recoveryGeneration
         recordingRecoveryStartedAt = nil
@@ -50,7 +57,8 @@ extension AppModel {
             kind: .fileTranscription,
             startedAt: Date(),
             modelName: selectedModel,
-            sourceURL: sourceURL
+            sourceURL: sourceURL,
+            title: title
         ))
         return recoveryGeneration
     }
@@ -65,13 +73,14 @@ extension AppModel {
 
     func writeRecordingCheckpoint() {
         guard activeRecoveryGeneration != nil, let startedAt = recordingRecoveryStartedAt else { return }
-        guard !liveSegments.isEmpty else { return }
+        guard !liveSegments.isEmpty || liveRecordingAudioURL != nil else { return }
         writeRecoveryFile(RecoveryCheckpoint(
             kind: .recording,
             startedAt: startedAt,
             modelName: selectedModel,
             language: selectedLanguage,
-            segments: liveSegments
+            segments: liveSegments,
+            audioURL: liveRecordingAudioURL
         ))
     }
 
@@ -150,7 +159,9 @@ extension AppModel {
             guard let url = checkpoint.sourceURL else { return false }
             return FileManager.default.fileExists(atPath: url.path)
         case .recording:
-            return !checkpoint.segments.isEmpty
+            if !checkpoint.segments.isEmpty { return true }
+            guard let audioURL = checkpoint.audioURL else { return false }
+            return FileManager.default.fileExists(atPath: audioURL.path)
         }
     }
 
@@ -160,7 +171,20 @@ extension AppModel {
         try? FileManager.default.removeItem(at: recoveryFileURL)
         switch checkpoint.kind {
         case .fileTranscription:
-            if let url = checkpoint.sourceURL, FileManager.default.fileExists(atPath: url.path) {
+            guard let url = checkpoint.sourceURL, FileManager.default.fileExists(atPath: url.path) else { return }
+            if let title = checkpoint.title {
+                // A recorded take mid-transcription when the app died: the take path keeps
+                // its title and saves the audio if this run fails too.
+                fileTranscribeTask?.cancel()
+                fileTranscribeTask = Task { [weak self] in
+                    guard let self else { return }
+                    await transcribeRecordedTake(url: url, title: title)
+                    if !Task.isCancelled {
+                        self.fileTranscribeTask = nil
+                        self.drainDeferredArrivals()
+                    }
+                }
+            } else {
                 transcribe(fileURL: url)
             }
         case .recording:
@@ -175,24 +199,90 @@ extension AppModel {
     }
 
     private func restoreRecoveredRecording(_ checkpoint: RecoveryCheckpoint) {
+        guard let candidate = checkpoint.audioURL else {
+            finishRecordingRestore(checkpoint, audioURL: nil)
+            return
+        }
+        // A crash can leave the in-flight WAV with a stale header; attach it only
+        // when it still opens, and probe off-main (AVAudioFile can block).
+        Task { [weak self] in
+            let audioURL = (try? await AppModel.offMainIO({ Self.readableRecordingURL(candidate) })) ?? nil
+            self?.finishRecordingRestore(checkpoint, audioURL: audioURL)
+        }
+    }
+
+    private func finishRecordingRestore(_ checkpoint: RecoveryCheckpoint, audioURL: URL?) {
+        guard !checkpoint.segments.isEmpty || audioURL != nil else { return }
         let restored = Transcript(
             segments: checkpoint.segments,
             language: checkpoint.language ?? "en",
             modelName: checkpoint.modelName,
+            sourceURL: audioURL,
             durationSeconds: checkpoint.segments.last?.end
         )
         clearDerivedArtifacts()
         selectedEntryID = nil
-        sourceFileURL = nil
         pendingMediaDuration = nil
-        tearDownPlayer()
+        if let audioURL {
+            sourceFileURL = audioURL
+            installPlayer(for: audioURL)
+        } else {
+            sourceFileURL = nil
+            tearDownPlayer()
+        }
         transcript = restored
         phase = .ready
         route = .transcript
-        persistToLibrary(restored, audioSource: nil, title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt))
+        persistToLibrary(restored, audioSource: audioURL, title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt))
+    }
+
+    nonisolated static func readableRecordingURL(_ url: URL) -> URL? {
+        guard let file = try? AVAudioFile(forReading: url), file.length > 0 else { return nil }
+        return url
     }
 
     nonisolated static func recoveredRecordingTitle(startedAt: Date) -> String {
         "Recording \(startedAt.formatted(date: .abbreviated, time: .shortened)) (recovered)"
+    }
+
+    // MARK: - Inflight sweep
+
+    var inflightRecordingsURL: URL {
+        library.libraryURL.appendingPathComponent("inflight", isDirectory: true)
+    }
+
+    /// Deletes in-flight take files that nothing references anymore. Files under 48h
+    /// stay: an active take is always younger, and a fresh orphan may still be wanted.
+    func sweepInflightRecordings() {
+        let dir = inflightRecordingsURL
+        let keep = Set([pendingRecovery?.sourceURL, pendingRecovery?.audioURL]
+            .compactMap { $0?.standardizedFileURL.path })
+        Task {
+            try? await AppModel.offMainIO(qos: .utility, {
+                let fm = FileManager.default
+                guard let files = try? fm.contentsOfDirectory(
+                    at: dir,
+                    includingPropertiesForKeys: [.contentModificationDateKey]
+                ) else { return }
+                let entries = files.map { url in
+                    (url: url,
+                     modified: (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast)
+                }
+                for stale in AppModel.staleInflightFiles(in: entries, keeping: keep, now: Date()) {
+                    try? fm.removeItem(at: stale)
+                }
+            })
+        }
+    }
+
+    nonisolated static func staleInflightFiles(
+        in files: [(url: URL, modified: Date)],
+        keeping: Set<String>,
+        now: Date
+    ) -> [URL] {
+        let cutoff = now.addingTimeInterval(-48 * 3600)
+        return files
+            .filter { !keeping.contains($0.url.standardizedFileURL.path) && $0.modified < cutoff }
+            .map(\.url)
     }
 }

@@ -1,0 +1,246 @@
+import Foundation
+import Testing
+@testable import Parola
+import ParolaCore
+
+private struct StubLiveSource: LiveAudioSource {
+    let url: URL
+    func start() async throws {}
+    func levels() async -> AsyncStream<Float> { AsyncStream { $0.finish() } }
+    func prepare() async throws -> URL { url }
+    func cancel() async {}
+}
+
+private func makeTakeWAV(label: String) throws -> URL {
+    let sampleRate = 16_000, channels = 1, bytesPerSample = 2
+    let frames = Int(Double(sampleRate) * 0.3)
+    let dataBytes = frames * channels * bytesPerSample
+    var data = Data()
+    func ascii(_ s: String) { data.append(contentsOf: Array(s.utf8)) }
+    func le32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) } }
+    func le16(_ v: UInt16) { withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) } }
+    ascii("RIFF"); le32(UInt32(36 + dataBytes)); ascii("WAVE")
+    ascii("fmt "); le32(16); le16(1); le16(UInt16(channels))
+    le32(UInt32(sampleRate)); le32(UInt32(sampleRate * channels * bytesPerSample))
+    le16(UInt16(channels * bytesPerSample)); le16(UInt16(bytesPerSample * 8))
+    ascii("data"); le32(UInt32(dataBytes))
+    data.append(Data(count: dataBytes))
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("parola-take-\(label)-\(UUID().uuidString).wav")
+    try data.write(to: url)
+    return url
+}
+
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("Recording safety", .serialized)
+    struct RecordingSafetyTests {
+
+        private func makeModel(libraryURL: URL = makeTempLibraryURL("recording-safety")) -> AppModel {
+            let bootstrap = AppBootstrap(
+                mode: .test,
+                library: libraryURL,
+                defaultsOverride: UserDefaults(suiteName: "test-\(UUID())")!,
+                sideEffects: [],
+                filePicker: TestFilePicker(),
+                clock: ContinuousClock()
+            )
+            return AppModel(bootstrap: bootstrap)
+        }
+
+        private func waitUntil(timeoutMs: Int = 5000, _ condition: @MainActor () -> Bool) async -> Bool {
+            var elapsed = 0
+            while elapsed < timeoutMs {
+                if condition() { return true }
+                try? await Task.sleep(for: .milliseconds(15))
+                elapsed += 15
+            }
+            return condition()
+        }
+
+        private func entries(_ model: AppModel, count: Int, timeoutMs: Int = 5000) async -> [LibraryEntry] {
+            var listed: [LibraryEntry] = []
+            var elapsed = 0
+            while elapsed < timeoutMs {
+                listed = await model.library.list()
+                if listed.count >= count { return listed }
+                try? await Task.sleep(for: .milliseconds(15))
+                elapsed += 15
+            }
+            return listed
+        }
+
+        @Test("a failed take is saved to the library and Retry re-transcribes it")
+        func failedTakeSavesAudioAndRetryWorks() async throws {
+            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                failure: MockTranscriberFailure(code: .transcriptionFailed, message: "engine boom")
+            ))
+            defer { Task { await MockTranscriberRegistry.shared.clear() } }
+            let model = makeModel()
+            let wav = try makeTakeWAV(label: "failed")
+            defer { try? FileManager.default.removeItem(at: wav) }
+
+            model.liveSource = StubLiveSource(url: wav)
+            model.stopRecordingAndTranscribe()
+
+            let failed = await waitUntil {
+                if case .failed(let message) = model.phase { return message.contains("saved to your library") }
+                return false
+            }
+            #expect(failed)
+            #expect(model.failedTakeAudioURL == wav)
+
+            let saved = await entries(model, count: 1)
+            #expect(saved.count == 1)
+            #expect(saved.first?.title.hasSuffix("(transcription failed)") == true)
+            #expect(saved.first?.manifest.originalAudioName.isEmpty == false)
+
+            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "recovered text")]
+            ))
+            await model.unloadTranscriptionSession()
+
+            model.retryFailedTake()
+
+            let ready = await waitUntil { model.phase == .ready }
+            #expect(ready)
+            #expect(model.transcript?.text == "recovered text")
+            #expect(model.failedTakeAudioURL == nil)
+            let after = await entries(model, count: 2)
+            #expect(after.count == 2)
+            #expect(after.contains { !$0.title.hasSuffix("(transcription failed)") })
+        }
+
+        @Test("a streaming failure persists the confirmed segments as an interrupted take")
+        func streamingFailurePersistsInterruptedTake() async {
+            let model = makeModel()
+            model.liveSegments = [
+                TranscriptSegment(id: 0, start: 0, end: 2, text: "kept before the crash"),
+            ]
+
+            await model.handleStreamingEvent(.failed("stream boom"))
+
+            let failed: Bool
+            if case .failed(let message) = model.phase {
+                failed = message.contains("saved to your library")
+            } else {
+                failed = false
+            }
+            #expect(failed)
+            #expect(model.liveSegments.isEmpty)
+            let saved = await entries(model, count: 1)
+            #expect(saved.count == 1)
+            #expect(saved.first?.title.hasSuffix("(interrupted)") == true)
+        }
+
+        @Test("recording checkpoints carry the in-flight audio URL even without segments")
+        func recordingCheckpointCarriesAudioURL() async throws {
+            let model = makeModel()
+            let audio = URL(fileURLWithPath: "/tmp/parola-inflight-test.wav")
+            model.beginRecordingRecovery()
+            model.liveRecordingAudioURL = audio
+            model.liveSegments = []
+
+            model.writeRecordingCheckpoint()
+
+            await model.pendingRecoveryWrite?.value
+            let data = try Data(contentsOf: model.recoveryFileURL)
+            let checkpoint = try JSONDecoder().decode(RecoveryCheckpoint.self, from: data)
+            #expect(checkpoint.kind == .recording)
+            #expect(checkpoint.audioURL == audio)
+            #expect(checkpoint.segments.isEmpty)
+            model.endActiveRecovery()
+        }
+
+        @Test("accepting a recording recovery attaches the audio when the file still opens")
+        func acceptAttachesRecoveredAudio() async throws {
+            let lib = makeTempLibraryURL("recovery-audio")
+            let wav = try makeTakeWAV(label: "recovered")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            let checkpoint = RecoveryCheckpoint(
+                kind: .recording,
+                startedAt: Date(),
+                modelName: "m",
+                language: "en",
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "salvato")],
+                audioURL: wav
+            )
+            try FileManager.default.createDirectory(at: lib, withIntermediateDirectories: true)
+            try JSONEncoder().encode(checkpoint).write(to: lib.appendingPathComponent("recovery.json"))
+            let model = makeModel(libraryURL: lib)
+            #expect(model.pendingRecovery != nil)
+
+            model.acceptPendingRecovery()
+
+            let restored = await waitUntil { model.sourceFileURL == wav && model.transcript != nil }
+            #expect(restored)
+            #expect(model.transcript?.segments.first?.text == "salvato")
+            let saved = await entries(model, count: 1)
+            #expect(saved.first?.manifest.originalAudioName.isEmpty == false)
+        }
+
+        @Test("accepting a take's transcription recovery keeps its title")
+        func acceptResumesTakeWithTitle() async throws {
+            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "ripresa")]
+            ))
+            defer { Task { await MockTranscriberRegistry.shared.clear() } }
+            let lib = makeTempLibraryURL("recovery-take-title")
+            let wav = try makeTakeWAV(label: "take-title")
+            defer { try? FileManager.default.removeItem(at: wav) }
+            let checkpoint = RecoveryCheckpoint(
+                kind: .fileTranscription,
+                startedAt: Date(),
+                modelName: "m",
+                sourceURL: wav,
+                title: "Meeting 21 Aug 2026"
+            )
+            try FileManager.default.createDirectory(at: lib, withIntermediateDirectories: true)
+            try JSONEncoder().encode(checkpoint).write(to: lib.appendingPathComponent("recovery.json"))
+            let model = makeModel(libraryURL: lib)
+
+            model.acceptPendingRecovery()
+
+            let ready = await waitUntil { model.phase == .ready }
+            #expect(ready)
+            let saved = await entries(model, count: 1)
+            #expect(saved.first?.title == "Meeting 21 Aug 2026")
+        }
+
+        @Test("stale unreferenced inflight files are selected for deletion")
+        func staleInflightSelection() {
+            let now = Date()
+            let old = now.addingTimeInterval(-3 * 24 * 3600)
+            let stale = URL(fileURLWithPath: "/tmp/inflight/stale.wav")
+            let referenced = URL(fileURLWithPath: "/tmp/inflight/referenced.wav")
+            let young = URL(fileURLWithPath: "/tmp/inflight/young.wav")
+            let picked = AppModel.staleInflightFiles(
+                in: [(stale, old), (referenced, old), (young, now)],
+                keeping: [referenced.standardizedFileURL.path],
+                now: now
+            )
+            #expect(picked == [stale])
+        }
+
+        @Test("launch sweeps stale orphans out of the inflight directory")
+        func sweepRemovesStaleOrphans() async throws {
+            let lib = makeTempLibraryURL("sweep")
+            let inflight = lib.appendingPathComponent("inflight", isDirectory: true)
+            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+            let stale = inflight.appendingPathComponent("stale.wav")
+            let fresh = inflight.appendingPathComponent("fresh.wav")
+            try Data([0x01]).write(to: stale)
+            try Data([0x01]).write(to: fresh)
+            try FileManager.default.setAttributes(
+                [.modificationDate: Date().addingTimeInterval(-3 * 24 * 3600)],
+                ofItemAtPath: stale.path
+            )
+
+            _ = makeModel(libraryURL: lib)
+
+            let swept = await waitUntil { !FileManager.default.fileExists(atPath: stale.path) }
+            #expect(swept)
+            #expect(FileManager.default.fileExists(atPath: fresh.path))
+        }
+    }
+}
