@@ -117,6 +117,37 @@ xcodebuild \
 APP_PATH="$EXPORT/Parola.app"
 echo "▶ Built $APP_PATH"
 
+echo "▶ Building parola + parola-mcp (release, arm64)…"
+(cd ParolaCore && swift build -c release --arch arm64 --product parola >/dev/null)
+(cd ParolaCore && swift build -c release --arch arm64 --product parola-mcp >/dev/null)
+BIN_DIR=$(cd ParolaCore && swift build -c release --arch arm64 --show-bin-path)
+
+echo "▶ Bundling CLI + MCP into the app…"
+cp "$BIN_DIR/parola" "$BIN_DIR/parola-mcp" "$APP_PATH/Contents/MacOS/"
+
+# The CLI records from the mic; hardened runtime denies that without the entitlement.
+cat > "$DIST/cli-entitlements.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+</dict>
+</plist>
+PLIST
+codesign --force --options runtime --timestamp \
+  --entitlements "$DIST/cli-entitlements.plist" \
+  --sign "$SIGN_IDENTITY" "$APP_PATH/Contents/MacOS/parola"
+codesign --force --options runtime --timestamp \
+  --sign "$SIGN_IDENTITY" "$APP_PATH/Contents/MacOS/parola-mcp"
+
+# Adding binaries broke the bundle seal; re-sign the app with its own entitlements.
+codesign -d --entitlements - --xml "$APP_PATH" > "$DIST/app-entitlements.plist"
+codesign --force --options runtime --timestamp \
+  --entitlements "$DIST/app-entitlements.plist" \
+  --sign "$SIGN_IDENTITY" "$APP_PATH"
+
 echo "▶ Verifying code signature…"
 if ! codesign --verify --deep --strict --verbose=2 "$APP_PATH" 2>&1; then
   echo "✘ Code signature verification failed. The exported app is not properly signed."
@@ -193,7 +224,7 @@ cat <<APPCAST
         <sparkle:version>$VERSION</sparkle:version>
         <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
         <enclosure
-            url="https://CHANGEME/releases/$DMG_NAME"
+            url="https://github.com/stefanovalloncini/Parola/releases/download/v$VERSION/$DMG_NAME"
             $ED_SIG
             $LENGTH
             type="application/octet-stream" />
