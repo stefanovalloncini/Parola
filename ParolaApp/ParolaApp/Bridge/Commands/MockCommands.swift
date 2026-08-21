@@ -251,11 +251,10 @@ private func parseAudioKind(_ raw: String) -> MockAudioSourceRegistry.Kind? {
 
 private func buildTranscriberResponse(args: AutomationArgs) throws -> MockTranscriberResponse {
     let failure = try decodeTranscriberFailure(args.rawValue("failure"))
-    if failure != nil {
-        return MockTranscriberResponse(failure: failure)
-    }
+    // failure + response composes: canned segments land first, then the failure —
+    // that's how a take that dies mid-stream is modelled.
     guard let raw = args.rawValue("response"), case .object(let obj) = raw else {
-        return MockTranscriberResponse()
+        return MockTranscriberResponse(failure: failure)
     }
     let segments = try decodeSegments(obj["segments"])
     let partials = decodeStringArray(obj["partials"])
@@ -273,7 +272,8 @@ private func buildTranscriberResponse(args: AutomationArgs) throws -> MockTransc
         language: language,
         durationSeconds: durationSeconds,
         modelName: modelName,
-        delayMs: delayMs
+        delayMs: delayMs,
+        failure: failure
     )
 }
 

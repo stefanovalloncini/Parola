@@ -77,6 +77,7 @@ final class LiveCaptionsController {
                 self?.state.isLoading = false
                 for await event in events {
                     self?.handle(event)
+                    if case .failed = event { break }
                 }
             } catch is CancellationError {
                 return

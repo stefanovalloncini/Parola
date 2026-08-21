@@ -2175,6 +2175,9 @@ final class AppModel {
                 phase = .recording(source: .microphone)
                 for await event in events {
                     await handleStreamingEvent(event)
+                    // Self-cancellation inside the .failed handler races the stream's buffer;
+                    // a buffered late .finished must not resurrect the torn-down take.
+                    if case .failed = event { break }
                 }
             } catch {
                 teardownStreaming()

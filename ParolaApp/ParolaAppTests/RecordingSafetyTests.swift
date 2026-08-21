@@ -207,6 +207,32 @@ extension TranscriberMockSuites {
             #expect(saved.first?.title == "Meeting 21 Aug 2026")
         }
 
+        @Test("a stale .finished after a streaming failure cannot resurrect the take")
+        func staleFinishedAfterFailureStaysDead() async {
+            MockStreamingTranscriberRegistry.shared.install(MockTranscriberResponse(
+                failure: MockTranscriberFailure(code: .transcriptionFailed, message: "instant boom")
+            ))
+            defer { MockStreamingTranscriberRegistry.shared.clear() }
+            let model = makeModel()
+            model.useStreaming = true
+
+            model.startRecording(source: .microphone)
+
+            let failed = await waitUntil {
+                if case .failed = model.phase { return true }
+                return false
+            }
+            #expect(failed)
+            // The mock's stop() yields .finished after the failure; give it time to land wrongly.
+            try? await Task.sleep(for: .milliseconds(300))
+            let stillFailed: Bool
+            if case .failed = model.phase { stillFailed = true } else { stillFailed = false }
+            #expect(stillFailed)
+            #expect(model.transcript == nil)
+            let saved = await model.library.list()
+            #expect(saved.isEmpty)
+        }
+
         @Test("stale unreferenced inflight files are selected for deletion")
         func staleInflightSelection() {
             let now = Date()
