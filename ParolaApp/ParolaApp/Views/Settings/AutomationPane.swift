@@ -107,7 +107,7 @@ struct AutomationPane: View {
                                 .font(.system(.caption, design: .monospaced))
                                 .foregroundStyle(.secondary)
                             #else
-                            Text("Build parola-mcp from the Parola source, then point your MCP client at the binary.")
+                            Text("This build doesn't include parola-mcp. Reinstall from the official DMG, or build it from the Parola source.")
                                 .font(DS.Font.caption)
                                 .foregroundStyle(.secondary)
                             #endif

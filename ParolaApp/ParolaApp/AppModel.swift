@@ -1389,7 +1389,8 @@ final class AppModel {
                 refreshModelList()
             } catch {
                 if !Task.isCancelled {
-                    let message = "Download failed: \(error.localizedDescription)"
+                    let message = Self.offlineMessage(for: error)
+                        ?? "Download failed: \(error.localizedDescription)"
                     phase = .failed(message: message)
                     modelActionError = message
                 }
@@ -1827,7 +1828,21 @@ final class AppModel {
         if case ParolaError.transcriptionFailed(let reason) = error {
             return String(localized: "Transcription failed: \(reason)", bundle: bundle)
         }
+        if let offline = offlineMessage(for: error, bundle: bundle) { return offline }
         return error.localizedDescription
+    }
+
+    /// Model downloads are the only network dependency, so name them when the network is the problem.
+    nonisolated static func offlineMessage(for error: Error, bundle: Bundle = .main) -> String? {
+        let code = (error as NSError).code
+        let domain = (error as NSError).domain
+        guard domain == NSURLErrorDomain,
+              [NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost, NSURLErrorCannotFindHost,
+               NSURLErrorCannotConnectToHost, NSURLErrorTimedOut].contains(code) else { return nil }
+        return String(
+            localized: "Parola needs to download the speech model, and the network isn't reachable. Connect to the internet and try again — after that, transcription runs fully offline.",
+            bundle: bundle
+        )
     }
 
     nonisolated static func unsupportedURLMessage(bundle: Bundle = .main) -> String {

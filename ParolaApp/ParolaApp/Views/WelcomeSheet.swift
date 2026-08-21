@@ -10,6 +10,14 @@ struct WelcomeSheet: View {
             || model.features.isEnabled(.liveCaptions)
     }
 
+    private var modelDownloadNote: String? {
+        let installed = model.availableModels.first(where: { $0.name == model.selectedModel })?.isInstalled ?? false
+        guard !installed, let variant = ModelCatalog.variant(id: model.selectedModel) else { return nil }
+        let label = AppModel.modelLabel(model.selectedModel)
+        let size = DS.formatBytes(Int(variant.sizeBytes))
+        return String(localized: "No speech model is installed yet — your first transcription downloads \(label) (\(size)).")
+    }
+
     var body: some View {
         SheetFrame(icon: "waveform", title: "Welcome to Parola", onClose: { dismiss() }) {
             VStack(alignment: .leading, spacing: DS.Spacing.medium) {
@@ -62,6 +70,12 @@ struct WelcomeSheet: View {
                 Text("Grant each permission the first time you use its feature.")
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.secondaryText)
+
+                if let modelDownloadNote {
+                    Text(modelDownloadNote)
+                        .font(DS.Font.caption)
+                        .foregroundStyle(DS.Color.secondaryText)
+                }
             }
             .padding(20)
         } footer: {

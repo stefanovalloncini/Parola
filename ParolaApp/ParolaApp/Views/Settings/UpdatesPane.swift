@@ -12,6 +12,7 @@ struct UpdatesPane: View {
                            description: "Looks for updates in the background once a day.",
                            isFirst: true) {
                     Toggle("", isOn: $model.sparkleAutomatic).labelsHidden()
+                        .disabled(!feedConfigured)
                         .axLeaf("Updates.Toggle.Automatic")
                 }
                 SettingRow("Channel", description: model.sparkleChannel.description) {
@@ -23,6 +24,7 @@ struct UpdatesPane: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(width: 200)
+                    .disabled(!feedConfigured)
                     .axLeaf("Updates.Picker.Channel")
                 }
                 SettingRow("Check now") {
@@ -37,13 +39,17 @@ struct UpdatesPane: View {
             if !feedConfigured {
                 SettingsSection {
                     SettingRow("Update feed",
-                               description: "An appcast URL hasn't been configured yet, so checks won't run.",
+                               description: "Automatic updates aren't available in this build.",
                                isFirst: true) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(DS.Palette.warning)
                     }
                 }
-                SettingHelper(text: "Set the SUFeedURL and SUPublicEDKey keys in Info.plist before shipping. Generate the keypair once with Sparkle's generate_keys tool.")
+                #if DEBUG
+                SettingHelper(text: "Set the SUFeedURL and SUPublicEDKey keys in project.yml before shipping. Generate the keypair once with Sparkle's generate_keys tool.")
+                #else
+                SettingHelper(text: "New versions are published on the project's GitHub releases page.")
+                #endif
             } else {
                 SettingHelper(text: "Updates are signed and verified with Sparkle's EdDSA keys before installation.")
             }
