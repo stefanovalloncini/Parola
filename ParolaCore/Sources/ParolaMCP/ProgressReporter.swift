@@ -6,24 +6,33 @@ struct ProgressSample: Sendable {
     let message: String
 }
 
-/// Gates samples to one per whole percent and at most ten a second, letting a changed message
-/// through at once. The admitted percent is bumped past the last one so it never repeats.
+/// Gates samples to one per whole percent and at most ten a second, letting a changed message through
+/// at once. A sample inside the window is held, not dropped, so what goes out next is the newest
+/// reading. The released percent is bumped past the last one so it never repeats.
 struct ProgressThrottle {
     static let minimumInterval: TimeInterval = 0.1
 
     private var lastPercent = -1
     private var lastMessage = ""
     private var lastSent: TimeInterval?
+    private var held: ProgressSample?
 
-    mutating func admit(_ sample: ProgressSample, at now: TimeInterval) -> Int? {
+    mutating func admit(_ sample: ProgressSample, at now: TimeInterval) -> ProgressSample? {
         let changedMessage = sample.message != lastMessage
         guard changedMessage || sample.percent > lastPercent else { return nil }
+        held = sample
         if !changedMessage, let lastSent, now - lastSent < Self.minimumInterval { return nil }
+        return release(at: now)
+    }
+
+    mutating func release(at now: TimeInterval) -> ProgressSample? {
+        guard let sample = held else { return nil }
+        held = nil
         let percent = max(sample.percent, lastPercent + 1)
         lastPercent = percent
         lastMessage = sample.message
         lastSent = now
-        return percent
+        return ProgressSample(percent: percent, message: sample.message)
     }
 }
 
@@ -48,15 +57,22 @@ struct ProgressReporter: Sendable {
         let (stream, continuation) = AsyncStream<ProgressSample>.makeStream()
         samples = continuation
         pump = Task {
-            var throttle = ProgressThrottle()
-            for await sample in stream {
-                guard let percent = throttle.admit(sample, at: ProcessInfo.processInfo.systemUptime) else { continue }
+            func emit(_ sample: ProgressSample) async {
                 await send(.progress(MCPProgressParams(
                     progressToken: token,
-                    progress: Double(percent),
+                    progress: Double(sample.percent),
                     total: 100,
                     message: sample.message
                 )))
+            }
+            var throttle = ProgressThrottle()
+            for await sample in stream {
+                guard let admitted = throttle.admit(sample, at: ProcessInfo.processInfo.systemUptime) else { continue }
+                await emit(admitted)
+            }
+            // The run's last reading is usually still held, and the call's response follows immediately.
+            if let last = throttle.release(at: ProcessInfo.processInfo.systemUptime) {
+                await emit(last)
             }
         }
     }

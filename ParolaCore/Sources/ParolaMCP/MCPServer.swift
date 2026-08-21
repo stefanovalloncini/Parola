@@ -119,6 +119,8 @@ public actor MCPServer {
     static func progressToken(in params: [String: Any]) -> ProgressToken? {
         guard let meta = params["_meta"] as? [String: Any] else { return nil }
         if let value = meta["progressToken"] as? Int { return .int(value) }
+        // A fractional or exponent literal is a legal token and decodes to Double, not Int.
+        if let value = meta["progressToken"] as? Double { return .number(value) }
         if let value = meta["progressToken"] as? String { return .string(value) }
         return nil
     }
@@ -147,21 +149,29 @@ public actor MCPServer {
             progress: progress
         )
         let rendered = try request.format.render(transcript)
-        var blocks: [String] = []
-        if let outputURL = try request.writeOutput(rendered) {
-            blocks.append(TranscribeReport.text(
-                for: transcript,
-                rendered: rendered,
-                format: request.format,
-                outputURL: outputURL
-            ))
-        } else {
-            blocks.append(rendered)
-        }
+        var blocks = outputBlocks(for: transcript, rendered: rendered, request: request)
         if request.save {
             blocks.append(await saveNote(for: transcript, sourceURL: request.sourceURL))
         }
         return MCPToolCallResult(texts: blocks)
+    }
+
+    /// A failed write is reported rather than thrown, for the same reason as a failed save: the
+    /// transcript is finished, and dropping it costs the caller the whole run again.
+    func outputBlocks(for transcript: Transcript, rendered: String, request: TranscribeRequest) -> [String] {
+        let transcriptBlock = rendered.isEmpty ? TranscribeReport.noSpeechNote : rendered
+        guard let outputURL = request.outputURL else { return [transcriptBlock] }
+        do {
+            _ = try request.writeOutput(rendered)
+            return [TranscribeReport.text(
+                for: transcript,
+                rendered: rendered,
+                format: request.format,
+                outputURL: outputURL
+            )]
+        } catch {
+            return [transcriptBlock, "Writing \(outputURL.path) failed: \(error.localizedDescription)"]
+        }
     }
 
     /// A failed library save is reported rather than thrown: the transcription itself succeeded and
@@ -169,6 +179,8 @@ public actor MCPServer {
     func saveNote(for transcript: Transcript, sourceURL: URL) async -> String {
         do {
             let entry = try await libraryStore.add(transcript: transcript, audioSource: sourceURL)
+            // The search index saves on a debounce; this process can exit before it fires.
+            await libraryStore.flush()
             return "Saved to the library as `\(entry.id)`."
         } catch {
             return "Saving to the library failed: \(error.localizedDescription)"
@@ -183,11 +195,12 @@ public actor MCPServer {
         guard let progress else {
             return try await session.transcribe(source: source, options: options)
         }
-        let modelName = options.model ?? ModelCatalog.defaultModelID(for: options)
+        // The session owns the store and the configuration that pick the model; resolving it here could disagree.
+        let plan = await session.modelPlan(for: options)
         let map = TranscribeProgressMap(
-            model: modelName,
+            model: plan.model,
             duration: await source.estimatedDuration(),
-            downloadsModel: !modelStore.isInstalled(modelName)
+            downloadsModel: plan.needsDownload
         )
         let reporter = progress.reporter()
         do {

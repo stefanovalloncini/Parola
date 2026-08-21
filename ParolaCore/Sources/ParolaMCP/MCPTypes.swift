@@ -87,8 +87,22 @@ public enum JSONRPCID: Codable, Sendable, Hashable {
     }
 }
 
-/// A `tools/call` progress token: a JSON string or integer the server echoes back verbatim.
-public typealias ProgressToken = JSONRPCID
+/// A `tools/call` progress token: the JSON string or number the server echoes back verbatim. MCP
+/// allows a fractional number here, which a request id may not carry, so it is its own type.
+public enum ProgressToken: Encodable, Sendable, Hashable {
+    case int(Int)
+    case number(Double)
+    case string(String)
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        switch self {
+        case .int(let value): try c.encode(value)
+        case .number(let value): try c.encode(value)
+        case .string(let value): try c.encode(value)
+        }
+    }
+}
 
 // MARK: - AnyDecodable / AnyEncodable
 

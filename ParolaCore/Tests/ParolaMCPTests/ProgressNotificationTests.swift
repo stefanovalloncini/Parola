@@ -1,4 +1,6 @@
+import AVFoundation
 import Foundation
+import ParolaCore
 import Testing
 import os
 @testable import ParolaMCP
@@ -18,6 +20,12 @@ struct ProgressNotificationTests {
     func stringTokenRoundTrips() throws {
         let params = try callParams(meta: #"{"progressToken":"tok-1"}"#)
         #expect(MCPServer.progressToken(in: params) == .string("tok-1"))
+    }
+
+    @Test("a fractional progressToken is kept, not dropped for being a non-integer")
+    func fractionalTokenRoundTrips() throws {
+        let params = try callParams(meta: #"{"progressToken":4.5}"#)
+        #expect(MCPServer.progressToken(in: params) == .number(4.5))
     }
 
     @Test("a call with no usable token yields nil")
@@ -64,24 +72,43 @@ struct ProgressNotificationTests {
     @Test("a sample below the next whole percent is dropped")
     func throttleNeedsAWholePercent() {
         var throttle = ProgressThrottle()
-        #expect(throttle.admit(ProgressSample(percent: 10, message: "a"), at: 0) == 10)
+        #expect(throttle.admit(ProgressSample(percent: 10, message: "a"), at: 0)?.percent == 10)
         #expect(throttle.admit(ProgressSample(percent: 10, message: "a"), at: 5) == nil)
-        #expect(throttle.admit(ProgressSample(percent: 11, message: "a"), at: 5) == 11)
+        #expect(throttle.admit(ProgressSample(percent: 11, message: "a"), at: 5)?.percent == 11)
     }
 
-    @Test("samples closer than the minimum interval are dropped")
+    @Test("samples closer than the minimum interval are held back")
     func throttleCapsTheRate() {
         var throttle = ProgressThrottle()
-        #expect(throttle.admit(ProgressSample(percent: 1, message: "a"), at: 0) == 1)
+        #expect(throttle.admit(ProgressSample(percent: 1, message: "a"), at: 0)?.percent == 1)
         #expect(throttle.admit(ProgressSample(percent: 2, message: "a"), at: 0.05) == nil)
-        #expect(throttle.admit(ProgressSample(percent: 3, message: "a"), at: 0.2) == 3)
+        #expect(throttle.admit(ProgressSample(percent: 3, message: "a"), at: 0.2)?.percent == 3)
+    }
+
+    @Test("a burst inside one window reports its newest sample, not its oldest")
+    func throttleKeepsTheNewestOfABurst() {
+        var throttle = ProgressThrottle()
+        #expect(throttle.admit(ProgressSample(percent: 5, message: "a"), at: 0)?.percent == 5)
+        for percent in 6...97 {
+            #expect(throttle.admit(ProgressSample(percent: percent, message: "a"), at: 0.01) == nil)
+        }
+        #expect(throttle.admit(ProgressSample(percent: 98, message: "a"), at: 0.5)?.percent == 98)
+    }
+
+    @Test("the sample held when the samples stop is still released")
+    func throttleReleasesTheHeldSample() {
+        var throttle = ProgressThrottle()
+        #expect(throttle.admit(ProgressSample(percent: 5, message: "a"), at: 0)?.percent == 5)
+        #expect(throttle.admit(ProgressSample(percent: 60, message: "a"), at: 0.01) == nil)
+        #expect(throttle.release(at: 0.02)?.percent == 60)
+        #expect(throttle.release(at: 0.03) == nil)
     }
 
     @Test("a stage change passes at once and still advances the reported percent")
     func throttleLetsAStageChangeThrough() {
         var throttle = ProgressThrottle()
-        #expect(throttle.admit(ProgressSample(percent: 30, message: "Downloading tiny"), at: 0) == 30)
-        #expect(throttle.admit(ProgressSample(percent: 30, message: "Preparing audio"), at: 0.01) == 31)
+        #expect(throttle.admit(ProgressSample(percent: 30, message: "Downloading tiny"), at: 0)?.percent == 30)
+        #expect(throttle.admit(ProgressSample(percent: 30, message: "Preparing audio"), at: 0.01)?.percent == 31)
     }
 
     // MARK: - Reporter
@@ -99,6 +126,21 @@ struct ProgressNotificationTests {
         #expect(messages == ["one", "two", "three"])
         let values = try log.notifications.map { try progressValue(in: $0) }
         #expect(values == [10, 20, 30])
+    }
+
+    @Test("the last sample of a burst reaches the client before finish returns")
+    func reporterReportsTheLastSampleOfABurst() async throws {
+        let log = NotificationLog()
+        let reporter = ProgressReporter(token: .string("tok"), send: { log.append($0) })
+        for percent in stride(from: 5, through: 95, by: 5) {
+            reporter.report(ProgressSample(percent: percent, message: "Transcribing"))
+        }
+        await reporter.finish()
+
+        let values = try log.notifications.map { try progressValue(in: $0) }
+        #expect(values.first == 5)
+        #expect(values.last == 95)
+        #expect(values == values.sorted())
     }
 
     // MARK: - Single writer
@@ -150,25 +192,40 @@ struct ProgressNotificationTests {
 
     // MARK: - Opt-in
 
-    @Test("a tools/call without a progress token sends no notifications")
-    func noTokenSendsNothing() async throws {
+    @Test("a transcribe with a progress token climbs to the end of the run")
+    func transcribeWithATokenReportsProgress() async throws {
+        let fixture = try await MockEngineFixture()
+        defer { fixture.tearDown() }
         let log = NotificationLog()
-        let server = MCPServer(bridge: NullBridge())
-        _ = try await server.handle(
-            toolCall(name: "parola_transcribe", id: 1),
+
+        let response = try await fixture.server.handle(
+            fixture.transcribeCall(id: 1, meta: #"{"progressToken":"tok-1"}"#),
             notify: { log.append($0) }
         )
-        #expect(log.notifications.isEmpty)
+        #expect(response != nil)
+
+        let values = try log.notifications.map { try progressValue(in: $0) }
+        #expect(!values.isEmpty)
+        #expect(values == values.sorted())
+        #expect(Set(values).count == values.count)
+        #expect(values.last == 99)
+        for notification in log.notifications {
+            let params = try #require(try object(notification)["params"] as? [String: Any])
+            #expect(params["progressToken"] as? String == "tok-1")
+        }
     }
 
-    @Test("a tool with nothing to report sends no notifications even with a token")
-    func tokenAloneSendsNothing() async throws {
+    @Test("the same transcribe without a token sends no notifications")
+    func transcribeWithoutATokenSendsNothing() async throws {
+        let fixture = try await MockEngineFixture()
+        defer { fixture.tearDown() }
         let log = NotificationLog()
-        let server = MCPServer(bridge: NullBridge())
-        _ = try await server.handle(
-            toolCall(name: "parola_app_ping", id: 1, meta: #"{"progressToken":1}"#),
+
+        let response = try await fixture.server.handle(
+            fixture.transcribeCall(id: 1),
             notify: { log.append($0) }
         )
+        #expect(response != nil)
         #expect(log.notifications.isEmpty)
     }
 
@@ -293,4 +350,74 @@ private actor GateBridge: BridgeProtocol {
 
 private struct NullBridge: BridgeProtocol {
     func call(_ cmd: String, argsJSON: Data) async throws -> String { "{}" }
+}
+
+/// A server whose transcribe runs a mock engine over a real one-second file, so the progress path
+/// runs end to end without a model on disk.
+private struct MockEngineFixture {
+    let server: MCPServer
+    let audioURL: URL
+    private let root: URL
+
+    init() async throws {
+        root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-mcp-progress-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        audioURL = root.appendingPathComponent("input.wav")
+        try Self.writeSilence(seconds: 1, to: audioURL)
+
+        let registry = EngineRegistry()
+        let response = MockTranscriberResponse(
+            segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "ciao")],
+            progressSeconds: (1...10).map { Double($0) / 10 },
+            durationSeconds: 1,
+            modelName: "openai_whisper-tiny"
+        )
+        await registry.register(engineID: .whisperKit, capabilities: .whisperKitDefaults) { _ in
+            MockTranscriber.make(response: response, clock: ContinuousClock())
+        }
+        let modelStore = ModelStore(modelsDirectory: root)
+        let installed = modelStore.installedURL(for: "openai_whisper-tiny")
+        try FileManager.default.createDirectory(at: installed, withIntermediateDirectories: true)
+        // Without a weights file the directory reads as a half-download and the session fetches the real model.
+        try Data("weights".utf8).write(to: installed.appendingPathComponent("model.bin"))
+        server = MCPServer(
+            session: TranscriptionSession(modelStore: modelStore, registry: registry),
+            modelStore: modelStore,
+            libraryStore: LibraryStore(libraryURL: root.appending(path: "Library"), extraIndexer: nil),
+            bridge: NullBridge()
+        )
+    }
+
+    func transcribeCall(id: Int, meta: String? = nil) -> JSONRPCRequest {
+        var params: [String: Any] = [
+            "name": "parola_transcribe",
+            "arguments": ["path": audioURL.path, "model": "openai_whisper-tiny"] as [String: Any],
+        ]
+        if let meta, let decoded = try? JSONSerialization.jsonObject(with: Data(meta.utf8)) as? [String: Any] {
+            params["_meta"] = decoded
+        }
+        return JSONRPCRequest(jsonrpc: "2.0", id: .int(id), method: "tools/call", params: AnyDecodable(params))
+    }
+
+    func tearDown() {
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    private static func writeSilence(seconds: Double, to url: URL) throws {
+        let file = try AVAudioFile(forWriting: url, settings: [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: 16_000.0,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+        ])
+        let frames = AVAudioFrameCount(seconds * file.processingFormat.sampleRate)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames) else {
+            throw MCPToolError("could not allocate a silent buffer")
+        }
+        buffer.frameLength = frames
+        try file.write(from: buffer)
+    }
 }

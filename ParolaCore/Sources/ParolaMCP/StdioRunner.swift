@@ -41,6 +41,7 @@ public enum StdioRunner {
         }
 
         await dispatcher.cancelAll()
+        drainOutput()
     }
 
     /// Second-pass parse so a malformed body still surfaces the envelope id, letting the client correlate the error.
@@ -51,16 +52,28 @@ public enum StdioRunner {
         return try? JSONDecoder().decode(Envelope.self, from: data).id
     }
 
+    private static let writer = DispatchQueue(label: "app.parola.mcp.stdout")
+
+    /// Queued, not written inline: a client that stops draining stdout blocks the pipe, and the caller is the dispatcher actor.
     private static func write(_ message: JSONRPCMessage) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.withoutEscapingSlashes]
         do {
-            var data = try encoder.encode(message)
-            data.append(0x0A)
-            try FileHandle.standardOutput.write(contentsOf: data)
+            let line = try encoder.encode(message) + Data([0x0A])
+            writer.async {
+                do {
+                    try FileHandle.standardOutput.write(contentsOf: line)
+                } catch {
+                    log("write error: \(error)")
+                }
+            }
         } catch {
-            log("write error: \(error)")
+            log("encode error: \(error)")
         }
+    }
+
+    private static func drainOutput() {
+        writer.sync {}
     }
 
     private static func log(_ message: String) {

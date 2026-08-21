@@ -108,8 +108,8 @@ answers. The wire protocol and the bridge's own gating live in
 | `format` | string | `txt` (default), `md`, `srt`, `vtt`, `json`. |
 | `translate` | bool | Translate the speech to English instead of writing down what was said. Only engines whose `parola_list_engines` row reads `translate=true` accept it. |
 | `initial_prompt` | string | Words or proper nouns to bias decoding toward. Whisper truncates it internally to about 224 tokens, so keep it short. |
-| `output_path` | string | Absolute path to write the transcript to. Missing parent directories are created. |
-| `save` | bool | Also store the transcript in Parola's library. |
+| `output_path` | string | Absolute path to write the transcript to. Missing parent directories are created, and an existing file there is overwritten. A path nothing can be written to is refused before the audio is touched. |
+| `save` | bool | Also store the transcript in Parola's library. The entry keeps a copy of the source file. |
 
 An example call:
 
@@ -146,12 +146,19 @@ Morning, everyone.
 ```
 
 The preview stops at 500 characters. A two-hour recording stays out of the
-client's context that way.
+client's context that way. A file with no speech in it reports that instead of
+a preview.
+
+An existing file at `output_path` is replaced. Nothing warns first, so don't
+point a run at a transcript someone has edited by hand. If the write fails
+anyway — the disk filled, the folder went away — the transcript comes back in
+the result with the failure next to it, rather than being lost.
 
 `save` adds a second text block naming the library entry, which
-`parola_search_library` and `parola_list_recent` can then find. A failed save
-is reported in that block rather than failing the call — the transcript itself
-is still returned.
+`parola_search_library` and `parola_list_recent` can then find. The entry keeps
+a copy of the source audio or video, so saving a 2 GB recording puts another
+2 GB in the library. A failed save is reported in that block rather than
+failing the call — the transcript itself is still returned.
 
 ## Progress notifications
 
@@ -187,15 +194,21 @@ transcription.
 Every notification for a call is written before that call's response. A call
 with no token gets no notifications. A cancelled call stops producing them.
 
-Progress matters most on the first ever call, which downloads a model before
-it can transcribe anything. That download runs for minutes on a large variant,
-and used to look like the server had hung.
+Progress matters most on a call that has to fetch a Whisper or Parakeet model
+first: that download runs for minutes on a large variant, and used to look like
+the server had hung. Apple Speech, the default on macOS 26, is the exception.
+Its locale assets are installed by the system, which reports nothing back, so
+the first call with it sits at `Preparing audio` until they land — and
+`parola_list_models` marks it `[x]` either way.
 
 ## Troubleshooting
 
-**The first call takes forever.** It's downloading a model. Send a
-`progressToken` and the client can show it. `parola_list_models` marks
-installed variants with `[x]`; anything else gets fetched on demand.
+**The first call takes forever.** It's fetching a model. With a Whisper or
+Parakeet variant a `progressToken` shows the download climbing;
+`parola_list_models` marks installed variants with `[x]` and anything else gets
+fetched on demand. With Apple Speech there's nothing to show: macOS installs
+its locale assets itself and reports no progress, and the row reads `[x]`
+whether or not they're on disk.
 
 **`parola mcp` isn't in `parola --help`.** The subcommand is gated on the
 `automation` feature unit. A managed config whose `enabledFeatures` omits

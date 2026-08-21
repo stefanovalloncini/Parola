@@ -25,8 +25,8 @@ public enum EngineTool: String, CaseIterable, Sendable {
                         "format": ["type": "string", "description": "Output format: txt, md, srt, vtt, json", "enum": TranscribeFormat.allCases.map(\.rawValue)],
                         "translate": ["type": "boolean", "default": false, "description": "Translate the speech to English instead of transcribing what was said. Only engines whose parola_list_engines row reads translate=true accept it."],
                         "initial_prompt": ["type": "string", "description": "Words or proper nouns to bias decoding toward. Whisper truncates it internally to about 224 tokens, so keep it short."],
-                        "output_path": ["type": "string", "description": "Absolute path to write the transcript to, in the chosen format. Missing parent directories are created. The result then carries a short report and a preview instead of the whole transcript."],
-                        "save": ["type": "boolean", "default": false, "description": "Also store the transcript in Parola's library, where parola_search_library and parola_list_recent can find it."],
+                        "output_path": ["type": "string", "description": "Absolute path to write the transcript to, in the chosen format. Missing parent directories are created, and an existing file at that path is overwritten. The result then carries a short report and a preview instead of the whole transcript."],
+                        "save": ["type": "boolean", "default": false, "description": "Also store the transcript in Parola's library, where parola_search_library and parola_list_recent can find it. The entry keeps a copy of the source file, so a large recording is duplicated on disk."],
                     ],
                     "required": ["path"],
                 ] as [String: Any])
@@ -46,7 +46,7 @@ public enum EngineTool: String, CaseIterable, Sendable {
         case .searchLibrary:
             return MCPTool(
                 name: rawValue,
-                description: "Search Parola's transcript library by title substring.",
+                description: "Full-text search over Parola's transcript library. Matches titles, transcript text, summaries, notes and speaker names, and returns entry ids with a score and a snippet.",
                 inputSchema: AnyEncodable([
                     "type": "object",
                     "properties": [

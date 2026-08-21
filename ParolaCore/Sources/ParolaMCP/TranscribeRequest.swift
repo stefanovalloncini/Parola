@@ -67,7 +67,33 @@ struct TranscribeRequest: Sendable {
         guard path.hasPrefix("/") else {
             throw MCPToolError("output_path must be an absolute path, got \"\(path)\".")
         }
-        return URL(fileURLWithPath: path)
+        let url = URL(fileURLWithPath: path)
+        try requireWritable(url)
+        return url
+    }
+
+    /// Probed before the run starts: an hour of transcription must not end on an unwritable path.
+    private static func requireWritable(_ url: URL) throws {
+        let fm = FileManager.default
+        var isDirectory: ObjCBool = false
+        if fm.fileExists(atPath: url.path, isDirectory: &isDirectory) {
+            guard !isDirectory.boolValue else {
+                throw MCPToolError("output_path \"\(url.path)\" is a directory, not a file.")
+            }
+            guard fm.isWritableFile(atPath: url.path) else {
+                throw MCPToolError("output_path \"\(url.path)\" is not writable.")
+            }
+            return
+        }
+        var ancestor = url.deletingLastPathComponent()
+        while !fm.fileExists(atPath: ancestor.path, isDirectory: &isDirectory) {
+            let parent = ancestor.deletingLastPathComponent()
+            guard parent != ancestor else { break }
+            ancestor = parent
+        }
+        guard isDirectory.boolValue, fm.isWritableFile(atPath: ancestor.path) else {
+            throw MCPToolError("output_path \"\(url.path)\" is not writable: \(ancestor.path) is not a folder this can write into.")
+        }
     }
 
     private static func text(_ value: Any?) -> String? {
@@ -81,6 +107,7 @@ struct TranscribeRequest: Sendable {
 /// see it worked. Keeps a long recording out of the client's context.
 enum TranscribeReport {
     static let previewCharacters = 500
+    static let noSpeechNote = "No speech detected: the transcript is empty."
 
     static func text(
         for transcript: Transcript,
@@ -90,12 +117,12 @@ enum TranscribeReport {
     ) -> String {
         let count = transcript.segments.count
         let duration = transcript.durationSeconds ?? transcript.segments.last?.end ?? 0
+        let body = rendered.isEmpty ? noSpeechNote : "Preview:\n\(preview(of: rendered))"
         return """
         Wrote \(format.rawValue) to \(outputURL.path)
         \(count) segment\(count == 1 ? "" : "s"), \(Format.timestampHHMMSS(duration))
 
-        Preview:
-        \(preview(of: rendered))
+        \(body)
         """
     }
 

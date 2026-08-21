@@ -232,6 +232,12 @@ public actor TranscriptionSession {
         ModelCatalog.defaultModelID(for: options, configuration: managedConfiguration)
     }
 
+    /// The model a `transcribe` with these options would run, and whether it has to be fetched first.
+    public func modelPlan(for options: TranscriptionOptions) -> (model: String, needsDownload: Bool) {
+        let model = options.model ?? defaultModelName(for: options)
+        return (model, !modelStore.isInstalled(model))
+    }
+
     private func scheduleIdleUnload() {
         cancelIdleTimer()
         let modelTimeout = idleTimeout

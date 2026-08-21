@@ -115,6 +115,68 @@ struct TranscribeRequestTests {
         #expect(try request.writeOutput("anything") == nil)
     }
 
+    @Test("an output_path that no file can land on is refused before any audio is touched")
+    func unwritableOutputPathRefusedUpFront() throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let directory = root.appending(path: "already-a-directory")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let onADirectory = try #require(throws: MCPToolError.self) {
+            try TranscribeRequest(args: ["path": "/tmp/talk.wav", "output_path": directory.path])
+        }
+        #expect(onADirectory.message.contains("directory"))
+
+        let readOnly = try #require(throws: MCPToolError.self) {
+            try TranscribeRequest(args: ["path": "/tmp/talk.wav", "output_path": "/talk.srt"])
+        }
+        #expect(readOnly.message.contains("not writable"))
+    }
+
+    @Test("a write that fails anyway still returns the transcript, with the failure alongside")
+    func failedWriteKeepsTheTranscript() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let target = root.appending(path: "out.txt")
+        let request = try TranscribeRequest(args: ["path": "/tmp/talk.wav", "output_path": target.path])
+        // A directory in the file's place, the shape of a path that goes unwritable after the check.
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        let server = MCPServer(libraryStore: temporaryLibrary(in: root), bridge: NullBridge())
+
+        let transcript = fixture()
+        let blocks = await server.outputBlocks(for: transcript, rendered: transcript.text, request: request)
+
+        #expect(blocks.first == transcript.text)
+        #expect(blocks.count == 2)
+        #expect(blocks.last?.contains(target.path) == true)
+    }
+
+    // MARK: - Nothing said
+
+    @Test("a transcript with nothing in it says so instead of trailing an empty preview")
+    func emptyTranscriptIsReportedAsSuch() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let empty = Transcript(segments: [], language: "en", modelName: "tiny", durationSeconds: 0)
+        let server = MCPServer(libraryStore: temporaryLibrary(in: root), bridge: NullBridge())
+
+        let plain = try TranscribeRequest(args: ["path": "/tmp/talk.wav"])
+        let plainBlocks = await server.outputBlocks(for: empty, rendered: "", request: plain)
+        #expect(plainBlocks == [TranscribeReport.noSpeechNote])
+
+        let target = root.appending(path: "out.srt")
+        let written = try TranscribeRequest(args: [
+            "path": "/tmp/talk.wav",
+            "format": "srt",
+            "output_path": target.path,
+        ])
+        let writtenBlocks = await server.outputBlocks(for: empty, rendered: "", request: written)
+        let report = try #require(writtenBlocks.first)
+        #expect(report.contains(TranscribeReport.noSpeechNote))
+        #expect(!report.contains("Preview:"))
+        #expect(FileManager.default.fileExists(atPath: target.path))
+    }
+
     // MARK: - Report
 
     @Test("the report names the file, counts the segments and truncates the preview")
@@ -171,6 +233,26 @@ struct TranscribeRequestTests {
         #expect(matches.contains { $0.entryID == entry.id })
     }
 
+    @Test("a saved entry is searchable from a fresh store, not just this one's memory")
+    func saveFlushesTheSearchIndex() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let library = root.appending(path: "Library")
+        let audio = root.appending(path: "talk.m4a")
+        try Data("fake audio".utf8).write(to: audio)
+        let server = MCPServer(
+            libraryStore: LibraryStore(libraryURL: library, extraIndexer: nil),
+            bridge: NullBridge()
+        )
+
+        let note = await server.saveNote(for: fixture(), sourceURL: audio)
+        #expect(!note.contains("failed"))
+
+        // The debounced index save has not fired yet; a process that exits now must not lose it.
+        let reopened = LibraryStore(libraryURL: library, extraIndexer: nil)
+        #expect(await !reopened.search("sprint").isEmpty)
+    }
+
     @Test("a library that can't be written is reported, not thrown")
     func failedSaveIsReported() async throws {
         let store = LibraryStore(libraryURL: URL(fileURLWithPath: "/dev/null/parola"), extraIndexer: nil)
@@ -202,6 +284,10 @@ struct TranscribeRequestTests {
             modelName: "tiny",
             durationSeconds: 4
         )
+    }
+
+    private func temporaryLibrary(in root: URL) -> LibraryStore {
+        LibraryStore(libraryURL: root.appending(path: "Library"), extraIndexer: nil)
     }
 
     private func temporaryDirectory() throws -> URL {
