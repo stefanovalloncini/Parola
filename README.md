@@ -46,6 +46,19 @@ xcodegen generate
 open ParolaApp.xcodeproj
 ```
 
+## Use from Claude and other LLMs
+
+Parola speaks MCP over stdio. Point Claude Code at the bundled CLI:
+
+```sh
+claude mcp add parola -- /Applications/Parola.app/Contents/MacOS/parola mcp
+```
+
+Then ask in plain language: "transcribe ~/Recordings/standup.m4a as SRT next to
+the file". Claude calls the engine directly, on device, and gets progress back
+while the model runs. [docs/mcp.md](docs/mcp.md) has the setup for Claude
+Desktop and other clients, plus the full tool reference.
+
 ## License
 
 [MIT](LICENSE)
