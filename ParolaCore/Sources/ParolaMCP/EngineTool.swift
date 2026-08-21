@@ -15,7 +15,7 @@ public enum EngineTool: String, CaseIterable, Sendable {
         case .transcribe:
             return MCPTool(
                 name: rawValue,
-                description: "Transcribe an audio or video file using Parola's on-device engine.",
+                description: "Transcribe an audio or video file using Parola's on-device engine. Returns the transcript, or a short report and a preview when output_path is set.",
                 inputSchema: AnyEncodable([
                     "type": "object",
                     "properties": [
@@ -25,6 +25,8 @@ public enum EngineTool: String, CaseIterable, Sendable {
                         "format": ["type": "string", "description": "Output format: txt, md, srt, vtt, json", "enum": TranscribeFormat.allCases.map(\.rawValue)],
                         "translate": ["type": "boolean", "default": false, "description": "Translate the speech to English instead of transcribing what was said. Only engines whose parola_list_engines row reads translate=true accept it."],
                         "initial_prompt": ["type": "string", "description": "Words or proper nouns to bias decoding toward. Whisper truncates it internally to about 224 tokens, so keep it short."],
+                        "output_path": ["type": "string", "description": "Absolute path to write the transcript to, in the chosen format. Missing parent directories are created. The result then carries a short report and a preview instead of the whole transcript."],
+                        "save": ["type": "boolean", "default": false, "description": "Also store the transcript in Parola's library, where parola_search_library and parola_list_recent can find it."],
                     ],
                     "required": ["path"],
                 ] as [String: Any])

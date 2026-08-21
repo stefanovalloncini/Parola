@@ -24,6 +24,8 @@ struct TranscribeRequest: Sendable {
     let sourceURL: URL
     let options: TranscriptionOptions
     let format: TranscribeFormat
+    let outputURL: URL?
+    let save: Bool
 
     init(args: [String: Any]) throws {
         guard let path = Self.text(args["path"]) else {
@@ -42,11 +44,63 @@ struct TranscribeRequest: Sendable {
             task: args["translate"] as? Bool == true ? .translate : .transcribe,
             initialPrompt: Self.text(args["initial_prompt"])
         )
+        outputURL = try Self.outputURL(args["output_path"])
+        save = args["save"] as? Bool ?? false
+    }
+
+    /// Writes the rendered transcript where the call asked for it, creating missing parents, and
+    /// returns that file. Nil when the call carried no `output_path`.
+    func writeOutput(_ rendered: String) throws -> URL? {
+        guard let outputURL else { return nil }
+        try FileManager.default.createDirectory(
+            at: outputURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(rendered.utf8).write(to: outputURL, options: .atomic)
+        return outputURL
+    }
+
+    private static func outputURL(_ value: Any?) throws -> URL? {
+        guard let path = text(value) else { return nil }
+        // Resolving a relative path against the server's working directory would drop the file
+        // somewhere neither the client nor the user can predict.
+        guard path.hasPrefix("/") else {
+            throw MCPToolError("output_path must be an absolute path, got \"\(path)\".")
+        }
+        return URL(fileURLWithPath: path)
     }
 
     private static func text(_ value: Any?) -> String? {
         guard let string = value as? String else { return nil }
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+/// Stands in for a transcript that went to a file: what landed where, plus enough of the head to
+/// see it worked. Keeps a long recording out of the client's context.
+enum TranscribeReport {
+    static let previewCharacters = 500
+
+    static func text(
+        for transcript: Transcript,
+        rendered: String,
+        format: TranscribeFormat,
+        outputURL: URL
+    ) -> String {
+        let count = transcript.segments.count
+        let duration = transcript.durationSeconds ?? transcript.segments.last?.end ?? 0
+        return """
+        Wrote \(format.rawValue) to \(outputURL.path)
+        \(count) segment\(count == 1 ? "" : "s"), \(Format.timestampHHMMSS(duration))
+
+        Preview:
+        \(preview(of: rendered))
+        """
+    }
+
+    static func preview(of rendered: String) -> String {
+        let head = rendered.prefix(previewCharacters)
+        return head.count < rendered.count ? head + "…" : String(head)
     }
 }

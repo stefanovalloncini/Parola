@@ -203,7 +203,11 @@ public struct MCPToolCallResult: Encodable, Sendable {
     public let isError: Bool
 
     public init(text: String, isError: Bool = false) {
-        self.content = [MCPContentBlock(type: "text", text: text)]
+        self.init(texts: [text], isError: isError)
+    }
+
+    public init(texts: [String], isError: Bool = false) {
+        self.content = texts.map { MCPContentBlock(type: "text", text: $0) }
         self.isError = isError
     }
 }

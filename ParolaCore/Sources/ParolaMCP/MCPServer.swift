@@ -146,7 +146,33 @@ public actor MCPServer {
             options: request.options,
             progress: progress
         )
-        return MCPToolCallResult(text: try request.format.render(transcript))
+        let rendered = try request.format.render(transcript)
+        var blocks: [String] = []
+        if let outputURL = try request.writeOutput(rendered) {
+            blocks.append(TranscribeReport.text(
+                for: transcript,
+                rendered: rendered,
+                format: request.format,
+                outputURL: outputURL
+            ))
+        } else {
+            blocks.append(rendered)
+        }
+        if request.save {
+            blocks.append(await saveNote(for: transcript, sourceURL: request.sourceURL))
+        }
+        return MCPToolCallResult(texts: blocks)
+    }
+
+    /// A failed library save is reported rather than thrown: the transcription itself succeeded and
+    /// the caller still wants its text back.
+    func saveNote(for transcript: Transcript, sourceURL: URL) async -> String {
+        do {
+            let entry = try await libraryStore.add(transcript: transcript, audioSource: sourceURL)
+            return "Saved to the library as `\(entry.id)`."
+        } catch {
+            return "Saving to the library failed: \(error.localizedDescription)"
+        }
     }
 
     private func transcribe(
