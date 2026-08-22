@@ -73,7 +73,6 @@ public enum TypedToolRegistry {
             description: "Submit a YouTube URL to the running app. The app downloads audio via yt-dlp, then transcribes.",
             properties: [
                 .string("url", description: "YouTube URL."),
-                .int("expectedSpeakers", description: "Optional hint for diarisation."),
             ],
             required: ["url"]
         ),
@@ -103,19 +102,16 @@ public enum TypedToolRegistry {
             bridgeCmd: "runPrompt",
             description: "Run a prompt against the currently loaded transcript. List prompts via parola_app_dispatch {command: 'listPrompts'}; pass the prompt's id or name.",
             properties: [
-                .string("promptID", description: "Prompt id from parola_app_list_prompts."),
+                .string("id", description: "Prompt id, as returned by listPrompts."),
                 .string("name", description: "Alternative: prompt display name."),
-                .string("id", description: "Alias for promptID."),
             ],
             required: []
         ),
         TypedTool(
             name: "parola_get_state",
             bridgeCmd: "getState",
-            description: "Snapshot the running app's state. Optional 'include' filters by area: app, selection, transcript, library, batch, find, recording, dictation, sheets, windows.",
-            properties: [
-                .stringArray("include", description: "Whitelist of state areas to include."),
-            ],
+            description: "Snapshot the running app's state.",
+            properties: [],
             required: []
         ),
         TypedTool(
