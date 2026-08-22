@@ -73,6 +73,8 @@ struct ParolaApp: App {
         let bootstrap = AppBootstrap.test(from: CommandLine.arguments) ?? .normal
         DefaultsStore.current = bootstrap.defaults
         ManagedConfiguration.userSettingsStore = bootstrap.defaults
+        // Must precede AppModel, whose refreshModelList() is the first touch of ModelStore.shared.
+        ModelStore.sharedDirectoryOverride = bootstrap.models
         let m = AppModel(bootstrap: bootstrap)
         let lc = LiveCaptionsController()
         m.liveCaptions = lc

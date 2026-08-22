@@ -15,7 +15,11 @@ public struct ModelScan: Sendable {
 /// Configuration is immutable after init and the scan cache sits behind a lock, so the type is
 /// `Sendable` without actor isolation.
 public final class ModelStore: Sendable {
-    public static let shared = ModelStore()
+    /// Set before the first `shared` access to point the singleton at another folder; the
+    /// app writes it from `--models=` so a sandboxed launch never reads the real model store.
+    public nonisolated(unsafe) static var sharedDirectoryOverride: URL?
+
+    public static let shared = ModelStore(modelsDirectory: sharedDirectoryOverride)
 
     private let modelsDirectory: URL
     private let managedConfiguration: ManagedConfiguration
