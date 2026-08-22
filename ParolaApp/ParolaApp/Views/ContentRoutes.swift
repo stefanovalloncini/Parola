@@ -34,9 +34,13 @@ struct ContentRoutes: View {
     @ViewBuilder
     private var transcriptContent: some View {
         if !model.batchJobs.isEmpty {
-            HSplitView {
+            // Fixed width rather than a split: TranscriptPane already nests an HSplitView, and
+            // two nested ones overflow the window instead of compressing — the batch list ate
+            // the slack until the sidebar and the inspector both clipped at their window edges.
+            HStack(spacing: 0) {
                 BatchSidebar()
-                    .frame(minWidth: 240, idealWidth: 280)
+                    .frame(width: 260)
+                Divider()
                 batchDetail
             }
         } else if showsLibraryBrowse {
