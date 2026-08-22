@@ -1367,6 +1367,17 @@
         }
       }
     },
+    "Built in": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Integrato"
+          }
+        }
+      }
+    },
     "Built on": {
       "extractionState": "manual",
       "localizations": {
@@ -2811,6 +2822,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rimuove \"scratch that\", \"wait, no\" e collassa esitazioni come \", I mean,\"."
+          }
+        }
+      }
+    },
+    "EN only": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo EN"
           }
         }
       }

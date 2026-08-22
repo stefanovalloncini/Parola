@@ -116,7 +116,7 @@ struct Chip: View {
     }
 }
 
-private struct OptionalHelp: ViewModifier {
+struct OptionalHelp: ViewModifier {
     let help: String?
     func body(content: Content) -> some View {
         if let help { content.help(help) } else { content }

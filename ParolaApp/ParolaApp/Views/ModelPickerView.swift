@@ -37,7 +37,9 @@ struct ModelPickerView: View {
                         PillPopoverRow(
                             title: pinned.displayName,
                             isSelected: pinned.id == model.selectedModel,
-                            trailingText: DS.formatBytes(Int(pinned.sizeBytes)),
+                            trailingText: Self.sizeLabel(pinned),
+                            badgeText: Self.badge(for: pinned),
+                            help: pinned.tagline,
                             leadingSystemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle",
                             leadingTint: installed ? .green : .secondary,
                             action: { select(variant: pinned) }
@@ -53,7 +55,9 @@ struct ModelPickerView: View {
                             PillPopoverRow(
                                 title: variant.displayName,
                                 isSelected: variant.id == model.selectedModel,
-                                trailingText: DS.formatBytes(Int(variant.sizeBytes)),
+                                trailingText: Self.sizeLabel(variant),
+                                badgeText: Self.badge(for: variant),
+                                help: variant.tagline,
                                 leadingSystemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle",
                                 leadingTint: installed ? .green : .secondary,
                                 action: { select(variant: variant) }
@@ -79,6 +83,17 @@ struct ModelPickerView: View {
             .padding(.horizontal, 6)
         }
         .help("Active model. Models are downloaded on demand.")
+    }
+
+    /// Built-in engines report no download size; "Zero kB" reads like a bug next to real sizes.
+    static func sizeLabel(_ variant: ModelVariant) -> String {
+        variant.sizeBytes > 0 ? DS.formatBytes(Int(variant.sizeBytes)) : String(localized: "Built in")
+    }
+
+    /// English-only models silently disable the language picker, so say so before the pick.
+    static func badge(for variant: ModelVariant) -> String? {
+        guard case .some(.only(let codes)) = variant.languageScope, codes == ["en"] else { return nil }
+        return String(localized: "EN only")
     }
 
     private var searchField: some View {

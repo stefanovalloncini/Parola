@@ -13,6 +13,9 @@ struct ContentToolbar: ToolbarContent {
                     .disabled(selectedModelIsEnglishOnly)
                     .modifier(EnglishOnlyHelpModifier(isEnglishOnly: selectedModelIsEnglishOnly))
             }
+            // The toolbar's glass capsule hugs the item, so without this the pills' own
+            // capsules run flush into its rounded ends and read as spilling out of it.
+            .padding(.horizontal, 5)
         }
         ToolbarItem(placement: .navigation) {
             optionsButton

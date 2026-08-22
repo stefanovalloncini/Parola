@@ -107,6 +107,8 @@ struct PillPopoverRow: View {
     let title: String
     let isSelected: Bool
     let trailingText: String?
+    let badgeText: String?
+    let help: String?
     let leadingSystemImage: String?
     let leadingTint: Color?
     let action: () -> Void
@@ -117,6 +119,8 @@ struct PillPopoverRow: View {
         title: String,
         isSelected: Bool = false,
         trailingText: String? = nil,
+        badgeText: String? = nil,
+        help: String? = nil,
         leadingSystemImage: String? = nil,
         leadingTint: Color? = nil,
         action: @escaping () -> Void
@@ -124,6 +128,8 @@ struct PillPopoverRow: View {
         self.title = title
         self.isSelected = isSelected
         self.trailingText = trailingText
+        self.badgeText = badgeText
+        self.help = help
         self.leadingSystemImage = leadingSystemImage
         self.leadingTint = leadingTint
         self.action = action
@@ -141,6 +147,14 @@ struct PillPopoverRow: View {
                 }
                 Text(title)
                     .foregroundStyle(.primary)
+                if let badgeText {
+                    Text(verbatim: badgeText)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Capsule(style: .continuous).fill(Color.primary.opacity(0.08)))
+                }
                 Spacer()
                 if let trailingText {
                     Text(trailingText)
@@ -163,6 +177,7 @@ struct PillPopoverRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+        .modifier(OptionalHelp(help: help))
         .axLeaf("Pill.PopoverRow.\(title)")
     }
 }
