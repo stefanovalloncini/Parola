@@ -2,7 +2,7 @@
 # Build a release .dmg of Parola.
 # Default: archive, export, verify codesign, package DMG. The notarize/staple/sign-update
 # steps print at the end as manual reminders.
-# With --ship: also notarize, staple, sign the Sparkle update, and emit the appcast item.
+# With --ship: also notarize, staple, sign the Sparkle update, and add the item to appcast.xml.
 # See RELEASING.md for the full release ritual.
 
 set -euo pipefail
@@ -24,7 +24,7 @@ Without --ship the script stops after building a signed DMG and prints the
 remaining manual steps. With --ship the script runs the full pipeline:
 
   archive → export → codesign verify → DMG → notarize (--wait) → staple →
-  sign-update → emit <item> XML to stdout.
+  sign-update → append the release to appcast.xml.
 
 VERSION defaults to MARKETING_VERSION in ParolaApp/project.yml.
 --notary-profile defaults to "parola-notarize". Set it up with
@@ -176,7 +176,7 @@ if [ "$SHIP" -eq 0 ]; then
   echo "  2. Staple:      xcrun stapler staple \"$DMG\""
   echo "  3. Sign Sparkle update with your private EdDSA key:"
   echo "       ./scripts/sign-update.sh \"$DMG\""
-  echo "  4. Upload $DMG and append the printed <item> to your appcast.xml."
+  echo "  4. Upload $DMG and add its item to appcast.xml (--ship does this for you)."
   exit 0
 fi
 
@@ -212,21 +212,79 @@ fi
 PUB_DATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
 DMG_NAME=$(basename "$DMG")
 
-echo
-echo "✓ Shipped Parola $VERSION."
-echo
-echo "Appcast <item> (append to appcast.xml after uploading $DMG_NAME):"
-echo
-cat <<APPCAST
-    <item>
-        <title>Version $VERSION</title>
-        <pubDate>$PUB_DATE</pubDate>
-        <sparkle:version>$VERSION</sparkle:version>
-        <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
-        <enclosure
-            url="https://github.com/stefanovalloncini/Parola/releases/download/v$VERSION/$DMG_NAME"
-            $ED_SIG
-            $LENGTH
-            type="application/octet-stream" />
-    </item>
+# sparkle:version is compared against the installed app's CFBundleVersion, so it must be
+# the build number, not the marketing version, or Sparkle never sees the update as newer.
+BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_PATH/Contents/Info.plist")
+if [ -z "$BUILD" ]; then
+  echo "✘ Could not read CFBundleVersion from $APP_PATH/Contents/Info.plist."
+  exit 1
+fi
+MIN_OS=$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$APP_PATH/Contents/Info.plist")
+
+ITEM=$(cat <<APPCAST
+        <item>
+            <title>Version $VERSION</title>
+            <pubDate>$PUB_DATE</pubDate>
+            <sparkle:version>$BUILD</sparkle:version>
+            <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>$MIN_OS</sparkle:minimumSystemVersion>
+            <enclosure
+                url="https://github.com/stefanovalloncini/Parola/releases/download/v$VERSION/$DMG_NAME"
+                $ED_SIG
+                $LENGTH
+                type="application/octet-stream" />
+        </item>
 APPCAST
+)
+
+APPCAST_FILE="appcast.xml"
+ITEM_MARKER="<!-- New items go directly below this line, newest first. -->"
+
+if [ ! -f "$APPCAST_FILE" ]; then
+  cat > "$APPCAST_FILE" <<SKELETON
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+    <channel>
+        <title>Parola</title>
+        <link>https://github.com/stefanovalloncini/Parola/releases/latest/download/appcast.xml</link>
+        <description>Updates for Parola.</description>
+        <language>en</language>
+        $ITEM_MARKER
+    </channel>
+</rss>
+SKELETON
+  echo "▶ Created $APPCAST_FILE"
+fi
+
+if grep -qF "<title>Version $VERSION</title>" "$APPCAST_FILE"; then
+  echo "✘ $APPCAST_FILE already has an item for $VERSION. Remove it before re-releasing."
+  exit 1
+fi
+
+if ! grep -qF "$ITEM_MARKER" "$APPCAST_FILE"; then
+  echo "✘ $APPCAST_FILE is missing the insertion marker:"
+  echo "    $ITEM_MARKER"
+  echo "  Add it back inside <channel>, or append this item by hand:"
+  echo "$ITEM"
+  exit 1
+fi
+
+ITEM_FILE=$(mktemp)
+printf '%s\n' "$ITEM" > "$ITEM_FILE"
+sed "/New items go directly below/r $ITEM_FILE" "$APPCAST_FILE" > "$APPCAST_FILE.tmp"
+mv "$APPCAST_FILE.tmp" "$APPCAST_FILE"
+rm -f "$ITEM_FILE"
+
+if ! grep -qF "<title>Version $VERSION</title>" "$APPCAST_FILE"; then
+  echo "✘ Failed to insert the $VERSION item into $APPCAST_FILE. Add it by hand:"
+  echo "$ITEM"
+  exit 1
+fi
+
+echo
+echo "✓ Shipped Parola $VERSION (build $BUILD)."
+echo "✓ Added the $VERSION item to $APPCAST_FILE."
+echo
+echo "Next:"
+echo "  git add $APPCAST_FILE && git commit -m \"appcast: $VERSION\" && git push"
+echo "  gh release create v$VERSION \"$DMG\" $APPCAST_FILE --title \"$VERSION\" --notes-from-tag"

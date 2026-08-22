@@ -1,0 +1,77 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-version:
+    name: Tag matches the version in source
+    runs-on: macos-15
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare tag against Parola.swift and both project.yml files
+        id: check
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          SWIFT=$(grep -E 'public static let version' ParolaCore/Sources/ParolaCore/Parola.swift | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          MAC=$(grep -E 'MARKETING_VERSION:' ParolaApp/project.yml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          IOS=$(grep -E 'MARKETING_VERSION:' ParolaiOS/project.yml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "tag=$TAG swift=$SWIFT macos=$MAC ios=$IOS"
+          if [ "$TAG" != "$SWIFT" ] || [ "$TAG" != "$MAC" ] || [ "$TAG" != "$IOS" ]; then
+            echo "::error::Tag v$TAG disagrees with source (Parola.swift=$SWIFT, macOS=$MAC, iOS=$IOS). Tag the commit made by scripts/bump.sh."
+            exit 1
+          fi
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Changelog has a section for this version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          if ! grep -qE "^## $TAG " CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## $TAG' section."
+            exit 1
+          fi
+
+  build:
+    name: Release build
+    needs: verify-version
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: swift build + test
+        working-directory: ParolaCore
+        run: |
+          swift build -c release
+          swift test --parallel
+
+      - name: Generate Xcode project
+        working-directory: ParolaApp
+        run: xcodegen generate
+
+      - name: xcodebuild (Release, unsigned)
+        run: |
+          xcodebuild \
+            -project ParolaApp/ParolaApp.xcodeproj \
+            -scheme ParolaApp \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Remind about the signed build
+        run: |
+          echo "::notice::Signing, notarization and the Sparkle appcast run locally — see RELEASING.md. Run: ./scripts/release.sh --ship"

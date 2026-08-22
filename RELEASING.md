@@ -1,6 +1,6 @@
 # Releasing Parola
 
-Cutting a release is a few manual steps plus one script.
+Cutting a release is two scripts and a push. Version numbering lives in [docs/versioning.md](docs/versioning.md).
 
 Sparkle is wired up. The hooks live in `ParolaApp/project.yml` (`SUFeedURL`, `SUPublicEDKey`, `SUEnableAutomaticChecks`), `AppDelegate.swift` starts the updater on launch, and `SparkleUpdater.swift` handles channel selection. `SUFeedURL` and `SUPublicEDKey` ship empty in source — they need values before the first auto-update release, otherwise `SparkleUpdater.start()` returns early.
 
@@ -40,11 +40,15 @@ After steps 1–4: `(cd ParolaApp && xcodegen generate)` and commit the updated 
 ## Cutting a release
 
 ```sh
-./scripts/bump.sh X.Y.Z              # bumps version, regenerates projects, runs full build + tests, then commits + tags
+./scripts/bump.sh                    # derives the version from Release: trailers, then builds, tests, commits, tags
 git push --follow-tags origin main
 
-./scripts/release.sh --ship          # archive → export → codesign verify → DMG → notarize → staple → sign-update → print <item>
+./scripts/release.sh --ship          # archive → export → codesign verify → DMG → notarize → staple → sign-update → appcast.xml
 ```
+
+How the version is chosen, what the `Release:` trailer does, and why 1.0.0 is
+explicit: [docs/versioning.md](docs/versioning.md). Check the plan first with
+`./scripts/bump.sh --dry-run`.
 
 The `--ship` flag runs the full pipeline. Without it, `release.sh` stops after building the signed DMG and prints the remaining manual commands. The four steps that follow look like this when run by hand:
 
@@ -55,31 +59,38 @@ xcrun stapler staple dist/Parola-X.Y.Z.dmg
 ./scripts/sign-update.sh dist/Parola-X.Y.Z.dmg
 ```
 
-Tag the release `vX.Y.Z`, then append an `<item>` to `appcast.xml` (keep the full version history in the file):
+`--ship` also writes the release into `appcast.xml`, creating the file on the first
+run and inserting later releases above the previous ones. Each item looks like this:
 
 ```xml
 <item>
     <title>Version X.Y.Z</title>
     <pubDate>...</pubDate>
+    <sparkle:version>1181</sparkle:version>
+    <sparkle:shortVersionString>X.Y.Z</sparkle:shortVersionString>
+    <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
     <enclosure
         url="https://github.com/stefanovalloncini/Parola/releases/download/vX.Y.Z/Parola-X.Y.Z.dmg"
-        sparkle:version="X.Y.Z"
         sparkle:edSignature="..."
         length="..."
         type="application/octet-stream" />
 </item>
 ```
 
-Publish both the DMG and the updated `appcast.xml` as assets on the release:
+`sparkle:version` is the build number (`CFBundleVersion`), read from the app that
+was just built. Sparkle compares it against the installed copy's `CFBundleVersion`,
+so putting the marketing version there makes every install look newer than the feed
+and no update is ever offered. `sparkle:shortVersionString` is what users see.
+
+Commit the updated `appcast.xml`, then publish it alongside the DMG:
 
 ```sh
-gh release create vX.Y.Z dist/Parola-X.Y.Z.dmg appcast.xml --title "X.Y.Z" --notes "…"
+git add appcast.xml && git commit -m "appcast: X.Y.Z" && git push
+gh release create vX.Y.Z dist/Parola-X.Y.Z.dmg appcast.xml --title "X.Y.Z" --notes-from-tag
 ```
 
 Because `SUFeedURL` points at `releases/latest/download/appcast.xml`, existing installs pick up the new version on their next Sparkle check.
 
-## Smoke test before announcing
-
-- Open the released `.app` directly (no drag-install) from another Mac if possible.
-- Run `parola --version` against the CLI binary inside the bundle.
-- Confirm "Check for Updates…" in the menu finds the new version on a previous-version install.
+Pushing the tag also runs `.github/workflows/release.yml`, which rebuilds and refuses
+the tag if it disagrees with the version in source or `CHANGELOG.md` has no section
+for it. It does not sign or notarize — CI holds no certificates.
