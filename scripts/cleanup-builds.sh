@@ -1,23 +1,27 @@
 #!/usr/bin/env bash
-# Wipe every Parola.app build product on this Mac.
+# Wipe every Parola.app build product on this Mac, or with --keep-latest just the stale ones.
 # Default mode is dry-run; pass --yes to actually delete.
 
 set -euo pipefail
 
 DRY_RUN=1
 QUIET=0
+KEEP_LATEST=0
 for arg in "$@"; do
   case "$arg" in
     --yes|-y) DRY_RUN=0 ;;
     --quiet|-q) QUIET=1 ;;
+    --keep-latest|-k) KEEP_LATEST=1 ;;
     --help|-h)
       cat <<EOF
-Usage: cleanup-builds.sh [--yes] [--quiet]
+Usage: cleanup-builds.sh [--keep-latest] [--yes] [--quiet]
 
+  --keep-latest  Delete every DerivedData folder and archive except the newest of
+                 each. Installed apps, ParolaCore/.build and dist/ are left alone.
   --yes, -y      Actually delete (default is dry-run).
   --quiet, -q    Only print the summary line.
 
-Targets:
+Targets (full wipe):
   - /Applications/Parola.app and ~/Applications/Parola.app
   - All Parola.app instances under ~/Library/Developer/Xcode/DerivedData
   - ParolaApp-* and ParolaiOS-* DerivedData folders themselves
@@ -45,25 +49,36 @@ add_if_exists() {
   if [ -e "$1" ]; then targets+=("$1"); fi
 }
 
-add_if_exists "/Applications/Parola.app"
-add_if_exists "$HOME/Applications/Parola.app"
+# All but the newest of each: `ls -t` ranks by last write, and the folder Xcode is
+# currently building into is the one it wrote to last.
+stale() { ls -dt "$@" 2>/dev/null | tail -n +2; }
 
-if [ -d "$DERIVED" ]; then
-  while IFS= read -r -d '' dir; do
-    targets+=("$dir")
-  done < <(find "$DERIVED" -maxdepth 1 -type d \( -name "ParolaApp-*" -o -name "ParolaiOS-*" -o -name "ParolaCore-*" \) -print0)
+if [ "$KEEP_LATEST" -eq 1 ]; then
+  for prefix in ParolaApp ParolaiOS ParolaCore; do
+    while IFS= read -r dir; do targets+=("$dir"); done < <(stale "$DERIVED/$prefix"-*)
+  done
+  while IFS= read -r archive; do targets+=("$archive"); done < <(stale "$ARCHIVES"/*/Parola*.xcarchive)
+else
+  add_if_exists "/Applications/Parola.app"
+  add_if_exists "$HOME/Applications/Parola.app"
+
+  if [ -d "$DERIVED" ]; then
+    while IFS= read -r -d '' dir; do
+      targets+=("$dir")
+    done < <(find "$DERIVED" -maxdepth 1 -type d \( -name "ParolaApp-*" -o -name "ParolaiOS-*" -o -name "ParolaCore-*" \) -print0)
+  fi
+
+  if [ -d "$ARCHIVES" ]; then
+    while IFS= read -r -d '' archive; do
+      targets+=("$archive")
+    done < <(find "$ARCHIVES" -type d -name "Parola*.xcarchive" -print0)
+  fi
+
+  add_if_exists "$REPO_ROOT/ParolaApp/build"
+  add_if_exists "$REPO_ROOT/ParolaiOS/build"
+  add_if_exists "$REPO_ROOT/ParolaCore/.build"
+  add_if_exists "$REPO_ROOT/dist"
 fi
-
-if [ -d "$ARCHIVES" ]; then
-  while IFS= read -r -d '' archive; do
-    targets+=("$archive")
-  done < <(find "$ARCHIVES" -type d -name "Parola*.xcarchive" -print0)
-fi
-
-add_if_exists "$REPO_ROOT/ParolaApp/build"
-add_if_exists "$REPO_ROOT/ParolaiOS/build"
-add_if_exists "$REPO_ROOT/ParolaCore/.build"
-add_if_exists "$REPO_ROOT/dist"
 
 if [ ${#targets[@]} -eq 0 ]; then
   log "Nothing to clean."
