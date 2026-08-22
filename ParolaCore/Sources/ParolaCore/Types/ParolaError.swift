@@ -56,19 +56,20 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
     public var errorDescription: String? { description }
 
     /// Sanitized rendering for diagnostics. Drops every associated value that
-    /// could carry a path, a file name, or a laundered `localizedDescription`.
+    /// could carry a path, a file name, or a laundered `localizedDescription`;
+    /// echoes only values that pass an allowlist check.
     public var logKind: String {
         switch self {
         case .modelNotFound(let name):
-            return "ParolaError.modelNotFound(\(name))"
+            return "ParolaError.modelNotFound(\(Self.logSafeModelID(name)))"
         case .unknownModel(let name, _):
-            return "ParolaError.unknownModel(\(name))"
+            return "ParolaError.unknownModel(\(Self.logSafeModelID(name)))"
         case .policyRestricted:
             return "ParolaError.policyRestricted"
         case .featureDisabled(let feature):
             return "ParolaError.featureDisabled(\(feature.rawValue))"
         case .modelDownloadFailed(let name, _):
-            return "ParolaError.modelDownloadFailed(\(name))"
+            return "ParolaError.modelDownloadFailed(\(Self.logSafeModelID(name)))"
         case .modelChecksumMismatch:
             return "ParolaError.modelChecksumMismatch"
         case .audioLoadFailed:
@@ -80,14 +81,33 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
         case .captureUnavailable:
             return "ParolaError.captureUnavailable"
         case .invalidLanguage(let code):
-            return "ParolaError.invalidLanguage(\(code))"
+            return "ParolaError.invalidLanguage(\(Self.logSafeLanguageCode(code)))"
         case .ioError:
             return "ParolaError.ioError"
         case .engineNotRegistered(let id):
-            return "ParolaError.engineNotRegistered(\(id))"
+            return "ParolaError.engineNotRegistered(\(Self.logSafeEngineID(id)))"
         case .unsupportedForEngine:
             return "ParolaError.unsupportedForEngine"
         }
+    }
+
+    private static let unrecognizedLogValue = "unrecognized"
+
+    private static let knownEngineIDs: Set<String> = [
+        EngineID.whisperKit.rawValue, EngineID.parakeet.rawValue, EngineID.appleSpeech.rawValue,
+    ]
+
+    private static func logSafeModelID(_ name: String) -> String {
+        ModelCatalog.variant(id: name) != nil ? name : unrecognizedLogValue
+    }
+
+    private static func logSafeEngineID(_ id: String) -> String {
+        knownEngineIDs.contains(id) ? id : unrecognizedLogValue
+    }
+
+    private static func logSafeLanguageCode(_ code: String) -> String {
+        let pattern = #"^[a-z]{2,3}(-[a-zA-Z0-9]{2,8})*$"#
+        return code.range(of: pattern, options: .regularExpression) != nil ? code : unrecognizedLogValue
     }
 }
 
