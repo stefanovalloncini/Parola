@@ -366,6 +366,12 @@ struct LibraryRow: View {
                 }
                 HStack(spacing: 6) {
                     Text(display.timestamp)
+                    if let duration = display.durationLabel {
+                        Text("·")
+                            .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
+                        Text(duration)
+                            .monospacedDigit()
+                    }
                     if let size = display.sizeLabel {
                         Text("·")
                             .foregroundStyle(DS.Color.secondaryText.opacity(0.5))

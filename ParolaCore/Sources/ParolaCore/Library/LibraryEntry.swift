@@ -26,6 +26,7 @@ public struct LibraryEntry: Identifiable, Hashable, Sendable {
     public var labels: [String] { manifest.labels }
     public var segmentNotes: [String: String] { manifest.segmentNotes }
     public var pinned: Bool { manifest.pinned }
+    public var durationSeconds: Double? { manifest.durationSeconds }
     public var language: String { manifest.language }
 
     public func note(forSegment id: Int) -> String? {

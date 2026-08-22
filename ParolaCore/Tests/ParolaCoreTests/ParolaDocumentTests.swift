@@ -281,3 +281,55 @@ struct ParolaDocumentTests {
         #expect(decoded == manifest)
     }
 }
+
+@Suite("Manifest duration")
+struct ManifestDurationTests {
+    @Test("a written bundle records the transcript duration")
+    func writeRecordsDuration() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-duration-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 96, text: "hello")],
+            language: "en",
+            modelName: "test",
+            durationSeconds: 96
+        )
+        let url = try ParolaDocument.write(transcript: transcript, audioURL: nil, to: dir.appendingPathComponent("entry"))
+
+        #expect(try ParolaDocument.read(at: url).manifest.durationSeconds == 96)
+    }
+
+    @Test("a manifest without a duration still decodes")
+    func decodesWithoutDuration() throws {
+        let json = """
+        {"version":1,"createdAt":"2026-08-22T10:00:00Z","originalAudioName":"a.wav",\
+        "modelName":"test","language":"en","category":"transcription"}
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let manifest = try decoder.decode(ParolaDocument.Manifest.self, from: Data(json.utf8))
+
+        #expect(manifest.durationSeconds == nil)
+    }
+
+    @Test("a zero duration is left out rather than written as 0")
+    func zeroDurationIsOmitted() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-duration-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hi")],
+            language: "en",
+            modelName: "test",
+            durationSeconds: 0
+        )
+        let url = try ParolaDocument.write(transcript: transcript, audioURL: nil, to: dir.appendingPathComponent("entry"))
+
+        #expect(try ParolaDocument.read(at: url).manifest.durationSeconds == nil)
+    }
+}

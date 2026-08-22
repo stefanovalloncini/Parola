@@ -35,6 +35,7 @@ struct LibraryRowDisplay: Identifiable {
     let title: String
     let timestamp: String
     let sizeLabel: String?
+    let durationLabel: String?
     let languageLabel: String?
 
     var id: LibraryEntry.ID { entry.id }
@@ -62,6 +63,7 @@ struct LibraryRowDisplay: Identifiable {
         } else {
             sizeLabel = nil
         }
+        durationLabel = entry.durationSeconds.flatMap { $0 > 0 ? Timecode.format($0) : nil }
         languageLabel = LanguageDisplay.name(for: entry.language)
     }
 

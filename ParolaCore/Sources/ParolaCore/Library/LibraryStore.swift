@@ -153,6 +153,11 @@ public actor LibraryStore {
             throw LibraryError.notFound(id)
         }
         let doc = try ParolaDocument.read(at: bundleURL)
+        // Bundles written before the manifest carried a duration learn it the first time
+        // they're opened, so the library list fills in instead of staying blank forever.
+        if doc.manifest.durationSeconds == nil, let duration = doc.transcript.durationSeconds, duration > 0 {
+            try? ParolaDocument.updateManifest(at: bundleURL) { $0.durationSeconds = duration }
+        }
         let entry = try makeEntry(bundleURL: bundleURL)
         let loaded = LoadedEntry(entry: entry, document: doc)
         cachedLoaded = (id, loaded)
@@ -281,6 +286,9 @@ public actor LibraryStore {
             try data.write(to: transcriptURL, options: .atomic)
             try ParolaDocument.updateManifest(at: bundleURL) { manifest in
                 manifest.updatedAt = now
+                if let duration = transcript.durationSeconds, duration > 0 {
+                    manifest.durationSeconds = duration
+                }
             }
         } catch {
             // transcript.json lands before the manifest, so a throw in between puts disk ahead of memory.
