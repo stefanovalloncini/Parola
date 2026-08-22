@@ -389,14 +389,21 @@ final class AppModel {
     var isRunningPrompt: Bool = false
     var actionItems: [ActionItem] = []
     var isExtractingActionItems: Bool = false
+    var actionItemsError: String?
     var smartChapters: [Chapter] = []
     var isExtractingChapters: Bool = false
+    var chaptersError: String?
     var entrySpeakerFilters: [String: String] = [:]
+
+    /// Nil while the on-device model can serve requests; otherwise the reason to show the user.
+    var aiUnavailableReason: String?
+    var isAIAvailable: Bool { aiUnavailableReason == nil }
 
     struct PromptOutput: Identifiable {
         let id = UUID()
         let promptName: String
         let text: String
+        var failure: String?
     }
 
     // MARK: - Auto-export rules
@@ -1903,7 +1910,8 @@ final class AppModel {
     }
 
     func dismissError() {
-        phase = .idle
+        // Back to the transcript when one is loaded: a failed export or prompt shouldn't cost the user their place.
+        phase = transcript == nil ? .idle : .ready
         failedTakeAudioURL = nil
         failedTakeTitle = nil
         failedTakeCategory = nil
@@ -2679,6 +2687,7 @@ final class AppModel {
                 guard let self, generation == summaryGeneration else { return }
                 summaryError = error.localizedDescription
                 isSummarising = false
+                refreshAIAvailability()
             }
         }
     }

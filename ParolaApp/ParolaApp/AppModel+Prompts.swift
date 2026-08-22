@@ -42,8 +42,13 @@ extension AppModel {
                 }
             } catch {
                 if generation == derivedArtifactsGeneration {
-                    phase = .failed(message: Self.promptFailureMessage(.prompt, error: error))
+                    promptOutput = PromptOutput(
+                        promptName: prompt.name,
+                        text: "",
+                        failure: Self.promptFailureMessage(.prompt, error: error)
+                    )
                 }
+                refreshAIAvailability()
             }
             isRunningPrompt = false
         }
@@ -55,6 +60,7 @@ extension AppModel {
         guard !isExtractingActionItems else { return }
         guard let prompt = Prompt.builtIns.first(where: { $0.name == "Action items" }) else { return }
         isExtractingActionItems = true
+        actionItemsError = nil
         let generation = derivedArtifactsGeneration
         Task { [weak self] in
             guard let self else { return }
@@ -66,8 +72,9 @@ extension AppModel {
                 }
             } catch {
                 if generation == derivedArtifactsGeneration {
-                    phase = .failed(message: Self.promptFailureMessage(.actionItems, error: error))
+                    actionItemsError = Self.promptFailureMessage(.actionItems, error: error)
                 }
+                refreshAIAvailability()
             }
             isExtractingActionItems = false
         }
@@ -85,6 +92,18 @@ extension AppModel {
         if promptOutput != nil { promptOutput = nil }
         if !actionItems.isEmpty { actionItems = [] }
         if !smartChapters.isEmpty { smartChapters = [] }
+        if actionItemsError != nil { actionItemsError = nil }
+        if chaptersError != nil { chaptersError = nil }
+    }
+
+    /// Re-reads whether Apple Intelligence can serve a request, so AI affordances can gate on it
+    /// before the user clicks. Safe to call from `.task` — it doesn't load the model.
+    func refreshAIAvailability() {
+        guard features.isEnabled(.ai) else { return }
+        Task { [weak self] in
+            let availability = await LanguageModelFactory.onDeviceAvailability()
+            self?.aiUnavailableReason = availability.reason
+        }
     }
 
     func extractSmartChapters() {
@@ -92,6 +111,7 @@ extension AppModel {
         guard let transcript = self.transcript else { return }
         guard !isExtractingChapters else { return }
         isExtractingChapters = true
+        chaptersError = nil
         let generation = derivedArtifactsGeneration
         Task { [weak self] in
             guard let self else { return }
@@ -103,8 +123,9 @@ extension AppModel {
                 }
             } catch {
                 if generation == derivedArtifactsGeneration {
-                    phase = .failed(message: Self.promptFailureMessage(.chapterExtraction, error: error))
+                    chaptersError = Self.promptFailureMessage(.chapterExtraction, error: error)
                 }
+                refreshAIAvailability()
             }
             isExtractingChapters = false
         }
@@ -161,8 +182,13 @@ extension AppModel {
                 }
             } catch {
                 if generation == derivedArtifactsGeneration {
-                    phase = .failed(message: Self.promptFailureMessage(.chapterGeneration, error: error))
+                    promptOutput = PromptOutput(
+                        promptName: "YouTube Chapters",
+                        text: "",
+                        failure: Self.promptFailureMessage(.chapterGeneration, error: error)
+                    )
                 }
+                refreshAIAvailability()
             }
             isRunningPrompt = false
         }

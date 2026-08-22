@@ -20,6 +20,7 @@ struct SummaryPane: View {
             content
         }
         .background(DS.Color.surface)
+        .task { model.refreshAIAvailability() }
         .axBranch("Summary")
     }
 
@@ -40,7 +41,7 @@ struct SummaryPane: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(DS.Color.secondaryText)
-            .disabled(model.transcript == nil || model.isSummarising)
+            .disabled(model.transcript == nil || model.isSummarising || !model.isAIAvailable)
             .help(model.transcript?.summary == nil ? "Generate summary" : "Regenerate summary")
             .accessibilityLabel("Regenerate summary")
             .axLeaf("Summary.Button.Regenerate")
@@ -90,6 +91,13 @@ struct SummaryPane: View {
                 systemImage: "doc.text",
                 description: Text("Open a transcript to generate a summary.")
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let reason = model.aiUnavailableReason {
+            ContentUnavailableView {
+                Label("Summaries need Apple Intelligence", systemImage: "sparkles")
+            } description: {
+                Text(verbatim: reason)
+            }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             SummaryEmpty(isWorking: model.isSummarising) {

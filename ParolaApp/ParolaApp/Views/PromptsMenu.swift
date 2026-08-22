@@ -8,15 +8,22 @@ struct PromptsMenu: View {
     var body: some View {
         Menu {
             Group {
-                ForEach(Prompt.builtIns) { prompt in
-                    Button(prompt.name) { model.runPrompt(prompt) }
-                        .accessibilityIdentifier("prompts.\(Self.identifierSlug(prompt.name))")
-                        .axLeaf("HeaderBar.MenuItem.BuiltinPrompt.\(Self.identifierSlug(prompt.name))")
+                if let reason = model.aiUnavailableReason {
+                    Text(verbatim: reason)
+                    Divider()
                 }
-                Divider()
-                Button("YouTube Chapters") { model.generateYouTubeChapters() }
-                    .accessibilityIdentifier("prompts.youtube_chapters")
-                    .axLeaf("HeaderBar.MenuItem.YouTubeChapters")
+                Group {
+                    ForEach(Prompt.builtIns) { prompt in
+                        Button(prompt.name) { model.runPrompt(prompt) }
+                            .accessibilityIdentifier("prompts.\(Self.identifierSlug(prompt.name))")
+                            .axLeaf("HeaderBar.MenuItem.BuiltinPrompt.\(Self.identifierSlug(prompt.name))")
+                    }
+                    Divider()
+                    Button("YouTube Chapters") { model.generateYouTubeChapters() }
+                        .accessibilityIdentifier("prompts.youtube_chapters")
+                        .axLeaf("HeaderBar.MenuItem.YouTubeChapters")
+                }
+                .disabled(!model.isAIAvailable)
                 Button("Speakers…") { model.showingSpeakersSheet = true }
                     .accessibilityIdentifier("prompts.speakers")
                     .axLeaf("HeaderBar.MenuItem.Speakers")
@@ -27,12 +34,14 @@ struct PromptsMenu: View {
                             .accessibilityIdentifier("prompts.\(Self.identifierSlug(prompt.name))")
                             .axLeaf("HeaderBar.MenuItem.UserPrompt.\(Self.identifierSlug(prompt.name))")
                     }
+                    .disabled(!model.isAIAvailable)
                 }
             }
             // The toolbar keeps this view alive, so .task runs once; re-read on every
             // open or prompts added/renamed/deleted in Settings never show up here.
             .onAppear {
                 Task { userPrompts = await model.promptLibrary.userPrompts }
+                model.refreshAIAvailability()
             }
         } label: {
             if model.isRunningPrompt {
@@ -42,11 +51,12 @@ struct PromptsMenu: View {
             }
         }
         .menuIndicator(.hidden)
-        .modifier(PromptsMenuHelp(isRunning: model.isRunningPrompt))
+        .modifier(PromptsMenuHelp(isRunning: model.isRunningPrompt, unavailableReason: model.aiUnavailableReason))
         .accessibilityIdentifier("toolbar.prompts")
         .axLeaf("HeaderBar.Menu.Prompts")
         .task {
             userPrompts = await model.promptLibrary.userPrompts
+            model.refreshAIAvailability()
         }
     }
 
@@ -60,7 +70,13 @@ struct PromptsMenu: View {
 
 private struct PromptsMenuHelp: ViewModifier {
     let isRunning: Bool
+    let unavailableReason: String?
+
     func body(content: Content) -> some View {
-        content.help(isRunning ? "Running prompt…" : "Run a prompt against the transcript")
+        if let unavailableReason {
+            content.help(Text(verbatim: unavailableReason))
+        } else {
+            content.help(isRunning ? "Running prompt…" : "Run a prompt against the transcript")
+        }
     }
 }

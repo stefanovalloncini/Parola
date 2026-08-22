@@ -34,7 +34,10 @@ public actor SummaryService {
     public func summarise(_ transcript: Transcript) async throws -> Summary {
         try features.require(.ai)
         #if canImport(FoundationModels)
-        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
+        // The structured path talks to FoundationModels directly, so it can't see an installed
+        // mock — route mocked runs through the text path, which resolves models via the factory.
+        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
+           await MockLanguageModelStore.shared.resolve(for: .foundation) == nil {
             return try await summariseStructured(transcript)
         }
         #endif

@@ -77,6 +77,7 @@ struct TranscriptPane: View {
         .sheet(isPresented: $chatSheetOpen) {
             ChatSheet().environment(model)
         }
+        .task { model.refreshAIAvailability() }
         .axBranch("Transcript")
     }
 

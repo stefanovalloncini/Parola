@@ -10,7 +10,7 @@ struct PromptOutputSheet: View {
     var body: some View {
         SheetFrame(
             icon: iconName,
-            iconTint: DS.Color.accent,
+            iconTint: output.failure == nil ? DS.Color.accent : DS.Color.danger,
             titleVerbatim: output.promptName,
             onClose: { dismiss() },
             content: { contentBody },
@@ -23,7 +23,14 @@ struct PromptOutputSheet: View {
     }
 
     @ViewBuilder private var contentBody: some View {
-        if shownText.isEmpty {
+        if let failure = output.failure {
+            ContentUnavailableView {
+                Label("Couldn't run this prompt", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(verbatim: failure)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if shownText.isEmpty {
             ContentUnavailableView(
                 "No Output",
                 systemImage: "sparkles",
@@ -48,27 +55,38 @@ struct PromptOutputSheet: View {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var footerBody: some View {
-        HStack(spacing: DS.Spacing.small) {
-            Button("Close") { dismiss() }
-                .sheetSecondaryAction()
-                .keyboardShortcut(.cancelAction)
-                .axLeaf("PromptOutput.Button.Close")
-
-            Spacer()
-
-            Button(action: copy) {
-                Label(copied ? "Copied" : "Copy",
-                      systemImage: copied ? "checkmark" : "doc.on.doc")
+    @ViewBuilder private var footerBody: some View {
+        if output.failure != nil {
+            HStack {
+                Spacer()
+                Button("Close") { dismiss() }
+                    .sheetPrimaryAction()
+                    .keyboardShortcut(.defaultAction)
+                    .axLeaf("PromptOutput.Button.Close")
             }
-            .sheetPrimaryAction()
-            .keyboardShortcut(.defaultAction)
-            .disabled(shownText.isEmpty)
-            .axLeaf("PromptOutput.Button.Copy")
+        } else {
+            HStack(spacing: DS.Spacing.small) {
+                Button("Close") { dismiss() }
+                    .sheetSecondaryAction()
+                    .keyboardShortcut(.cancelAction)
+                    .axLeaf("PromptOutput.Button.Close")
+
+                Spacer()
+
+                Button(action: copy) {
+                    Label(copied ? "Copied" : "Copy",
+                          systemImage: copied ? "checkmark" : "doc.on.doc")
+                }
+                .sheetPrimaryAction()
+                .keyboardShortcut(.defaultAction)
+                .disabled(shownText.isEmpty)
+                .axLeaf("PromptOutput.Button.Copy")
+            }
         }
     }
 
     private var iconName: String {
+        if output.failure != nil { return "exclamationmark.triangle" }
         let lower = output.promptName.lowercased()
         if lower.contains("chapter") { return "list.bullet.rectangle" }
         if lower.contains("summary") || lower.contains("summar") { return "text.alignleft" }

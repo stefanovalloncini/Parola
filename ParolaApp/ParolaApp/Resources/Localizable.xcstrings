@@ -2191,6 +2191,17 @@
         }
       }
     },
+    "Couldn't run this prompt": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile eseguire questo prompt"
+          }
+        }
+      }
+    },
     "Couldn't save your prompts": {
       "extractionState": "manual",
       "localizations": {
@@ -8093,6 +8104,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sobrio"
+          }
+        }
+      }
+    },
+    "Summaries need Apple Intelligence": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I riassunti richiedono Apple Intelligence"
           }
         }
       }

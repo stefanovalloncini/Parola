@@ -34,17 +34,31 @@ struct ChaptersSection: View {
     }
 
     private var emptyRow: some View {
-        Button("Generate chapters") { model.extractSmartChapters() }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .accessibilityIdentifier("transcript.inspector.chapters")
-            .axLeaf("Chapters.Button.Generate")
+        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            Button("Generate chapters") { model.extractSmartChapters() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(!model.isAIAvailable)
+                .accessibilityIdentifier("transcript.inspector.chapters")
+                .axLeaf("Chapters.Button.Generate")
+            statusNote
+        }
+    }
+
+    @ViewBuilder
+    private var statusNote: some View {
+        if let reason = model.aiUnavailableReason {
+            AIStatusNote(message: reason)
+        } else if let error = model.chaptersError {
+            AIStatusNote(message: error, kind: .failure)
+        }
     }
 
     private var actionsRow: some View {
         HStack(spacing: DS.Spacing.small) {
             Button("Regenerate") { model.extractSmartChapters() }
                 .controlSize(.small)
+                .disabled(!model.isAIAvailable)
                 .axLeaf("Chapters.Button.Regenerate")
             Spacer()
             Button("Clear") { model.clearSmartChapters() }

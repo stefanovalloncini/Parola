@@ -53,6 +53,42 @@ public enum LanguageModelFactory {
         return OllamaLanguageModel(model: model, endpoint: endpoint, instructions: instructions, contextTokens: contextTokens)
     }
 
+    /// Whether the on-device model can serve a request right now, and why not when it can't.
+    public enum OnDeviceAvailability: Sendable, Equatable {
+        case available
+        case unavailable(reason: String)
+
+        public var isAvailable: Bool {
+            if case .available = self { return true }
+            return false
+        }
+
+        public var reason: String? {
+            if case .unavailable(let reason) = self { return reason }
+            return nil
+        }
+    }
+
+    /// Cheap enough to call whenever a view appears: it reads cached system state, it doesn't load the model.
+    public static func onDeviceAvailability() async -> OnDeviceAvailability {
+        if await MockLanguageModelStore.shared.resolve(for: .foundation) != nil {
+            return .available
+        }
+        #if canImport(FoundationModels)
+        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
+            switch SystemLanguageModel.default.availability {
+            case .available:
+                return .available
+            case .unavailable(let reason):
+                return .unavailable(reason: unavailableMessage(for: reason))
+            @unknown default:
+                return .unavailable(reason: "Apple Intelligence isn't available right now.")
+            }
+        }
+        #endif
+        return .unavailable(reason: "Apple Intelligence needs macOS 26 or iOS 26 or newer.")
+    }
+
     public static func makeOnDevice(
         instructions: String = "You're a helpful assistant.",
         clock: any Clock<Duration> = ContinuousClock()
@@ -60,16 +96,12 @@ public enum LanguageModelFactory {
         if let mock = await MockLanguageModelStore.shared.resolve(for: .foundation) {
             return MockLanguageModel.make(response: mock, clock: clock)
         }
+        if let reason = await onDeviceAvailability().reason {
+            throw Failure.notAvailable(reason)
+        }
         #if canImport(FoundationModels)
         if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
-            switch SystemLanguageModel.default.availability {
-            case .available:
-                return FoundationLanguageModel(instructions: instructions)
-            case .unavailable(let reason):
-                throw Failure.notAvailable(unavailableMessage(for: reason))
-            @unknown default:
-                throw Failure.notAvailable("Apple Intelligence isn't available right now.")
-            }
+            return FoundationLanguageModel(instructions: instructions)
         }
         #endif
         throw Failure.notAvailable("Apple Intelligence needs macOS 26 or iOS 26 or newer.")

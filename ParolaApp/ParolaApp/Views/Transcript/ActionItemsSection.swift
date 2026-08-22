@@ -34,17 +34,31 @@ struct ActionItemsSection: View {
     }
 
     private var emptyRow: some View {
-        Button("Find action items") { model.extractActionItems() }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .accessibilityIdentifier("transcript.inspector.actionItems")
-            .axLeaf("ActionItems.Button.Find")
+        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            Button("Find action items") { model.extractActionItems() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(!model.isAIAvailable)
+                .accessibilityIdentifier("transcript.inspector.actionItems")
+                .axLeaf("ActionItems.Button.Find")
+            statusNote
+        }
+    }
+
+    @ViewBuilder
+    private var statusNote: some View {
+        if let reason = model.aiUnavailableReason {
+            AIStatusNote(message: reason)
+        } else if let error = model.actionItemsError {
+            AIStatusNote(message: error, kind: .failure)
+        }
     }
 
     private var actionsRow: some View {
         HStack(spacing: DS.Spacing.small) {
             Button("Re-extract") { model.extractActionItems() }
                 .controlSize(.small)
+                .disabled(!model.isAIAvailable)
                 .axLeaf("ActionItems.Button.Reextract")
             Button("Copy") { copyToClipboard() }
                 .controlSize(.small)
