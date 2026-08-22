@@ -67,6 +67,12 @@ extension ParolaAutomationServer {
                         required: true,
                         summary: "Export format"
                     ),
+                    .init(
+                        name: "includeTimestamps",
+                        kind: .boolean,
+                        required: false,
+                        summary: "Overrides the saved timestamp preference for txt, md and html"
+                    ),
                 ],
                 handler: { args, ctx in
                     guard ctx.model.transcript != nil else {
@@ -76,7 +82,8 @@ extension ParolaAutomationServer {
                     guard let format = ExportFormat(rawValue: raw) else {
                         throw AutomationError.invalidArgs(field: "format", reason: "invalid format: \(raw)")
                     }
-                    ctx.model.performExport(format)
+                    let includeTimestamps = try args.optionalBool("includeTimestamps")
+                    ctx.model.performExport(format, includeTimestamps: includeTimestamps)
                     return .object(["queued": .bool(true), "format": .string(raw)])
                 }
             ),

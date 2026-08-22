@@ -83,6 +83,23 @@ struct ExportOptionsTests {
         #expect((model.makeExporter(for: .txt) as? TxtExporter)?.options.showTimestamps == false)
     }
 
+    @Test("an explicit includeTimestamps overrides the saved preference in both directions")
+    func makeExporterHonorsTimestampOverride() {
+        let model = makeModel()
+
+        model.txtExportTimestamps = false
+        model.markdownTimestamps = false
+        #expect((model.makeExporter(for: .txt, includeTimestamps: true) as? TxtExporter)?.options.showTimestamps == true)
+        #expect((model.makeExporter(for: .md, includeTimestamps: true) as? MarkdownExporter)?.options.showTimestamps == true)
+        #expect((model.makeExporter(for: .html, includeTimestamps: false) as? HtmlExporter)?.options.showTimestamps == false)
+
+        model.txtExportTimestamps = true
+        model.markdownTimestamps = true
+        #expect((model.makeExporter(for: .txt, includeTimestamps: false) as? TxtExporter)?.options.showTimestamps == false)
+        #expect((model.makeExporter(for: .md, includeTimestamps: false) as? MarkdownExporter)?.options.showTimestamps == false)
+        #expect((model.makeExporter(for: .txt) as? TxtExporter)?.options.showTimestamps == true)
+    }
+
     @Test("txt timestamps persist to defaults and survive reloadSettings")
     func txtTimestampsRoundTrip() {
         let defaults = makeIsolatedDefaults()

@@ -2904,7 +2904,7 @@ final class AppModel {
         return result
     }
 
-    func performExport(_ format: ExportFormat) {
+    func performExport(_ format: ExportFormat, includeTimestamps: Bool? = nil) {
         guard let transcript else { return }
         Task { [weak self] in
             guard let self else { return }
@@ -2914,7 +2914,7 @@ final class AppModel {
                 // .plainText, and a constrained panel rewrites their extension to .txt.
                 allowedTypes: []
             ) else { return }
-            let exporter = self.makeExporter(for: format)
+            let exporter = self.makeExporter(for: format, includeTimestamps: includeTimestamps)
             do {
                 try await AppModel.offMainIO {
                     let data = try exporter.render(transcript)
@@ -2930,15 +2930,15 @@ final class AppModel {
         CaptionLength(rawValue: subtitleCaptionLengthRaw) ?? .none
     }
 
-    func makeExporter(for format: ExportFormat) -> TranscriptExporter {
+    func makeExporter(for format: ExportFormat, includeTimestamps: Bool? = nil) -> TranscriptExporter {
         switch format {
-        case .txt: return TxtExporter(options: TxtOptions(showTimestamps: txtExportTimestamps))
+        case .txt: return TxtExporter(options: TxtOptions(showTimestamps: includeTimestamps ?? txtExportTimestamps))
         case .srt: return SrtExporter(options: SubtitleOptions(captionLength: subtitleCaptionLength))
         case .vtt: return VttExporter(options: SubtitleOptions(captionLength: subtitleCaptionLength))
-        case .md:  return MarkdownExporter(options: MarkdownOptions(showTimestamps: markdownTimestamps))
+        case .md:  return MarkdownExporter(options: MarkdownOptions(showTimestamps: includeTimestamps ?? markdownTimestamps))
         case .html:
             let theme = HtmlExportTheme(rawValue: htmlExportThemeRaw) ?? .light
-            return HtmlExporter(options: HtmlOptions(theme: theme))
+            return HtmlExporter(options: HtmlOptions(theme: theme, showTimestamps: includeTimestamps ?? true))
         default:   return Exporters.exporter(for: format)
         }
     }
