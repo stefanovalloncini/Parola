@@ -320,6 +320,20 @@ extension AppModel {
         }
     }
 
+    /// Sidebar Home. The launcher only renders with nothing loaded, so a transcript left in
+    /// place would keep showing under a selected Home row; flush first so a debounced edit
+    /// from the last second still reaches the library.
+    func goHome() {
+        libraryFilter = nil
+        libraryBrowsingAll = false
+        route = .transcript
+        guard case .ready = phase, transcript != nil else { return }
+        Task { [weak self] in
+            await self?.flushPendingTranscriptSave()
+            self?.clearLoadedEntry()
+        }
+    }
+
     func search(_ query: String) {
         searchTask?.cancel()
         let q = query.trimmingCharacters(in: .whitespaces)

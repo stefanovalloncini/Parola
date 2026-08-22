@@ -344,4 +344,92 @@ struct AppModelLibraryTests {
         #expect(invalidated.fired)
         #expect(model.currentSegmentNote(for: 0) == "check the mix")
     }
+
+    @Test("goHome unloads the transcript so the launcher can render under the Home row")
+    func goHomeUnloadsTranscript() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        model.loadEntry(seeded.id)
+        for _ in 0..<200 where model.selectedEntryID != seeded.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        model.libraryFilter = .meeting
+        model.libraryBrowsingAll = true
+
+        model.goHome()
+
+        #expect(model.libraryFilter == nil)
+        #expect(model.libraryBrowsingAll == false)
+        #expect(model.route == .transcript)
+        for _ in 0..<200 where model.transcript != nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.transcript == nil)
+        #expect(model.selectedEntryID == nil)
+        if case .idle = model.phase {} else {
+            Issue.record("expected .idle after goHome, got \(model.phase)")
+        }
+    }
+
+    @Test("goHome flushes a debounced transcript edit instead of dropping it")
+    func goHomeFlushesPendingEdit() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "before")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        model.loadEntry(seeded.id)
+        for _ in 0..<200 where model.selectedEntryID != seeded.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "after")],
+            language: "en",
+            modelName: "stub"
+        )
+        model.persistCurrentTranscriptIfLoaded()
+        model.goHome()
+
+        for _ in 0..<300 where model.transcript != nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        // Fresh store: seedStore caches the loaded document, which would hide the write.
+        let readBack = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let reloaded = try await readBack.load(seeded.id)
+        #expect(reloaded.document.transcript.segments.first?.text == "after")
+    }
+
+    @Test("goHome leaves a run in flight alone")
+    func goHomeKeepsRunningWork() {
+        let model = makeModel()
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "partial")],
+            language: "en",
+            modelName: "stub"
+        )
+        model.phase = .transcribing(file: URL(fileURLWithPath: "/tmp/clip.wav"))
+
+        model.goHome()
+
+        #expect(model.transcript != nil)
+        if case .transcribing = model.phase {} else {
+            Issue.record("expected the transcribing phase to survive goHome, got \(model.phase)")
+        }
+    }
 }

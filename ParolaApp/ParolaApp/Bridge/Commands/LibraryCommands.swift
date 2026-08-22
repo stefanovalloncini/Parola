@@ -63,6 +63,17 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "goHome",
+                area: .library,
+                summary: "Selects the sidebar Home row: clears the library filter and unloads any transcript.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    ctx.model.goHome()
+                    return .object(["route": .string(ctx.model.route.rawValue)])
+                }
+            ),
+
+            AutomationCommand(
                 name: "search",
                 area: .library,
                 summary: "Searches the library and waits up to 2s for results to land.",

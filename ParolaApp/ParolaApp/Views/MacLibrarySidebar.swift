@@ -44,9 +44,7 @@ struct MacLibrarySidebar: View {
                         isSelected: selectedRoute == .home,
                         badge: pinnedBadge
                     ) {
-                        model.libraryFilter = nil
-                        model.libraryBrowsingAll = false
-                        model.route = .transcript
+                        model.goHome()
                     }
                     .accessibilityIdentifier("library.home")
                     .axLeaf("Sidebar.Button.Home")
