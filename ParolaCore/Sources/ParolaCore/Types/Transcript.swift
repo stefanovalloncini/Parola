@@ -110,4 +110,24 @@ public struct Transcript: Codable, Hashable, Sendable {
             .filter { !$0.isEmpty }
             .joined(separator: " ")
     }
+
+    /// What the LLM features send. Diarized transcripts keep their speaker labels — prompts ask
+    /// who said what, and `text` alone flattens that away. Falls back to `text` without speakers.
+    public var promptText: String {
+        guard segments.contains(where: { $0.speaker?.isEmpty == false }) else { return text }
+        var lines: [String] = []
+        var lastSpeaker: String?
+        for segment in segments {
+            let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !body.isEmpty else { continue }
+            let speaker = segment.speaker?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let speaker, !speaker.isEmpty, speaker != lastSpeaker {
+                lines.append("\(speaker): \(body)")
+                lastSpeaker = speaker
+            } else {
+                lines.append(body)
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
 }

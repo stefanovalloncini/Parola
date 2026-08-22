@@ -36,7 +36,7 @@ extension AppModel {
             guard let self else { return }
             do {
                 let model = try await LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
-                let result = try await PromptRunner.run(prompt, on: transcript.text, model: model, features: features)
+                let result = try await PromptRunner.run(prompt, on: transcript.promptText, model: model, features: features)
                 if generation == derivedArtifactsGeneration {
                     promptOutput = PromptOutput(promptName: prompt.name, text: result)
                 }
@@ -66,7 +66,7 @@ extension AppModel {
             guard let self else { return }
             do {
                 let model = try await LanguageModelFactory.makeOnDevice(instructions: prompt.instructions)
-                let result = try await PromptRunner.run(prompt, on: transcript.text, model: model, features: features)
+                let result = try await PromptRunner.run(prompt, on: transcript.promptText, model: model, features: features)
                 if generation == derivedArtifactsGeneration {
                     actionItems = ActionItemParser.parse(result)
                 }

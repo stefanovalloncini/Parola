@@ -14,6 +14,10 @@ enum TranscriptPromptContext {
     static func timestampedLine(for segment: TranscriptSegment) -> String? {
         let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !body.isEmpty else { return nil }
-        return "\(Timecode.format(segment.start))  \(body)\n"
+        let speaker = segment.speaker?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let speaker, !speaker.isEmpty else {
+            return "\(Timecode.format(segment.start))  \(body)\n"
+        }
+        return "\(Timecode.format(segment.start))  \(speaker): \(body)\n"
     }
 }
