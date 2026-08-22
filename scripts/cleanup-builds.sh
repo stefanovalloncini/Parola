@@ -41,7 +41,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DERIVED="$HOME/Library/Developer/Xcode/DerivedData"
 ARCHIVES="$HOME/Library/Developer/Xcode/Archives"
 
-log() { [ "$QUIET" -eq 0 ] && echo "$@"; }
+log() { if [ "$QUIET" -eq 0 ]; then echo "$@"; fi; }
 
 targets=()
 
