@@ -18,7 +18,7 @@ struct LogValueTests {
     @Test("safe wraps a LogSafe token")
     func safeWrapsToken() {
         #expect(LogValue.safe(EngineID.parakeet).text == "parakeet")
-        #expect(LogValue.safe(ModelToken("v3")).text == "v3")
+        #expect(LogValue.safe(ModelToken("openai_whisper-tiny")).text == "openai_whisper-tiny")
     }
 
     @Test("ids are truncated so they correlate without being unique handles")

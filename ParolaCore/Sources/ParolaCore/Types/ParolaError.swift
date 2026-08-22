@@ -91,23 +91,16 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
         }
     }
 
-    private static let unrecognizedLogValue = "unrecognized"
-
-    private static let knownEngineIDs: Set<String> = [
-        EngineID.whisperKit.rawValue, EngineID.parakeet.rawValue, EngineID.appleSpeech.rawValue,
-    ]
-
     private static func logSafeModelID(_ name: String) -> String {
-        ModelCatalog.variant(id: name) != nil ? name : unrecognizedLogValue
+        LogAllowlist.modelID(name)
     }
 
     private static func logSafeEngineID(_ id: String) -> String {
-        knownEngineIDs.contains(id) ? id : unrecognizedLogValue
+        LogAllowlist.engineID(id)
     }
 
     private static func logSafeLanguageCode(_ code: String) -> String {
-        let pattern = #"^[a-z]{2,3}(-[a-zA-Z0-9]{2,8})*$"#
-        return code.range(of: pattern, options: .regularExpression) != nil ? code : unrecognizedLogValue
+        LogAllowlist.languageCode(code)
     }
 }
 

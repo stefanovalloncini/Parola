@@ -10,12 +10,13 @@ public protocol LogSafe: Sendable {
 /// Wraps a model identifier for logging. Retire this once model ids become a
 /// dedicated type that can conform to `LogSafe` directly.
 public struct ModelToken: LogSafe {
-    public let logToken: String
-    public init(_ id: String) { self.logToken = id }
+    private let id: String
+    public var logToken: String { LogAllowlist.modelID(id) }
+    public init(_ id: String) { self.id = id }
 }
 
 extension EngineID: LogSafe {
-    public var logToken: String { rawValue }
+    public var logToken: String { LogAllowlist.engineID(rawValue) }
 }
 
 extension ParolaFeature: LogSafe {

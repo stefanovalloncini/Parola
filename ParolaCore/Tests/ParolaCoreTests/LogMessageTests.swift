@@ -14,12 +14,12 @@ struct LogMessageTests {
 
     @Test("interpolated LogSafe values are captured separately from literals")
     func separatesLiteralsFromValues() {
-        let message: LogMessage = "model \(ModelToken("whisper-large-v3")) failed after \(61) s"
+        let message: LogMessage = "model \(ModelToken("openai_whisper-large-v3")) failed after \(61) s"
         #expect(message.template == "model %@ failed after %@ s")
-        #expect(message.rendered == "model whisper-large-v3 failed after 61 s")
+        #expect(message.rendered == "model openai_whisper-large-v3 failed after 61 s")
         #expect(message.segments == [
             .literal("model "),
-            .value("whisper-large-v3"),
+            .value("openai_whisper-large-v3"),
             .literal(" failed after "),
             .value("61"),
             .literal(" s"),
