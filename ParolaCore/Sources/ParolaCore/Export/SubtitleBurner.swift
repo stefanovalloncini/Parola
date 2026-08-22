@@ -86,16 +86,26 @@ public enum SubtitleBurner {
         let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compVideoTrack)
         layerInstruction.setTransform(preferredTransform, at: .zero)
 
+        // Captions ride on their own track id: the animation tool's postProcessingAsVideoLayer
+        // variant drops the source video and exports solid white frames on macOS 26 and 27.
+        let overlayTrackID = composition.unusedTrackID()
+        let overlayInstruction = AVMutableVideoCompositionLayerInstruction()
+        overlayInstruction.trackID = overlayTrackID
+
         let instruction = AVMutableVideoCompositionInstruction()
         instruction.timeRange = CMTimeRangeMake(start: .zero, duration: assetDuration)
-        instruction.layerInstructions = [layerInstruction]
+        // Front to back: captions first, video behind them.
+        instruction.layerInstructions = [overlayInstruction, layerInstruction]
         videoComposition.instructions = [instruction]
 
-        videoComposition.animationTool = makeAnimationTool(
-            transcript: transcript,
-            duration: CMTimeGetSeconds(assetDuration),
-            renderSize: renderSize,
-            style: style
+        videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
+            additionalLayer: makeOverlayLayer(
+                transcript: transcript,
+                duration: CMTimeGetSeconds(assetDuration),
+                renderSize: renderSize,
+                style: style
+            ),
+            asTrackID: overlayTrackID
         )
 
         if FileManager.default.fileExists(atPath: output.path) {
@@ -129,18 +139,14 @@ public enum SubtitleBurner {
         }
     }
 
-    private static func makeAnimationTool(
+    private static func makeOverlayLayer(
         transcript: Transcript,
         duration: TimeInterval,
         renderSize: CGSize,
         style: Style
-    ) -> AVVideoCompositionCoreAnimationTool {
-        let videoFrame = CGRect(origin: .zero, size: renderSize)
+    ) -> CALayer {
         let parentLayer = CALayer()
-        let videoLayer = CALayer()
-        parentLayer.frame = videoFrame
-        videoLayer.frame = videoFrame
-        parentLayer.addSublayer(videoLayer)
+        parentLayer.frame = CGRect(origin: .zero, size: renderSize)
 
         for segment in transcript.segments {
             let textLayer = makeTextLayer(
@@ -159,10 +165,7 @@ public enum SubtitleBurner {
             parentLayer.addSublayer(textLayer)
         }
 
-        return AVVideoCompositionCoreAnimationTool(
-            postProcessingAsVideoLayer: videoLayer,
-            in: parentLayer
-        )
+        return parentLayer
     }
 
     private static func makeTextLayer(text: String, language: String, style: Style, renderSize: CGSize) -> CALayer {
