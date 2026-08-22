@@ -54,6 +54,41 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
     }
 
     public var errorDescription: String? { description }
+
+    /// Sanitized rendering for diagnostics. Drops every associated value that
+    /// could carry a path, a file name, or a laundered `localizedDescription`.
+    public var logKind: String {
+        switch self {
+        case .modelNotFound(let name):
+            return "ParolaError.modelNotFound(\(name))"
+        case .unknownModel(let name, _):
+            return "ParolaError.unknownModel(\(name))"
+        case .policyRestricted:
+            return "ParolaError.policyRestricted"
+        case .featureDisabled(let feature):
+            return "ParolaError.featureDisabled(\(feature.rawValue))"
+        case .modelDownloadFailed(let name, _):
+            return "ParolaError.modelDownloadFailed(\(name))"
+        case .modelChecksumMismatch:
+            return "ParolaError.modelChecksumMismatch"
+        case .audioLoadFailed:
+            return "ParolaError.audioLoadFailed"
+        case .transcriptionFailed:
+            return "ParolaError.transcriptionFailed"
+        case .unsupportedAudioFormat:
+            return "ParolaError.unsupportedAudioFormat"
+        case .captureUnavailable:
+            return "ParolaError.captureUnavailable"
+        case .invalidLanguage(let code):
+            return "ParolaError.invalidLanguage(\(code))"
+        case .ioError:
+            return "ParolaError.ioError"
+        case .engineNotRegistered(let id):
+            return "ParolaError.engineNotRegistered(\(id))"
+        case .unsupportedForEngine:
+            return "ParolaError.unsupportedForEngine"
+        }
+    }
 }
 
 /// URLSession surfaces a cancelled Swift task as `URLError(.cancelled)`, not `CancellationError`,

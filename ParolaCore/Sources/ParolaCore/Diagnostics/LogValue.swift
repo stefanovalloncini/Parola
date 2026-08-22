@@ -42,6 +42,10 @@ public struct LogValue: Sendable, Equatable {
     public static func id(_ value: UUID) -> LogValue {
         LogValue(kind: .token, text: String(value.uuidString.prefix(8)))
     }
+
+    public static func error(_ error: any Error) -> LogValue {
+        LogValue(kind: .token, text: LogErrorKind.describe(error))
+    }
 }
 
 public enum LogField: String, Sendable, CaseIterable, Comparable {
