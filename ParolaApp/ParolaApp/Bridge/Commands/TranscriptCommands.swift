@@ -49,8 +49,7 @@ extension ParolaAutomationServer {
                 summary: "Clears the loaded transcript and returns to idle.",
                 kind: .mutating,
                 handler: { _, ctx in
-                    ctx.model.transcript = nil
-                    if case .ready = ctx.model.phase { ctx.model.phase = .idle }
+                    ctx.model.clearLoadedEntry()
                     return .object(["cleared": .bool(true)])
                 }
             ),
