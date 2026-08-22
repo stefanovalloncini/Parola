@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import Parola
+import ParolaCore
 
 @Suite("Bootstrap side-effect sets + launch flag parsing")
 struct BootstrapSideEffectTests {
@@ -40,10 +41,8 @@ struct BootstrapSideEffectTests {
             "--test-mode",
             "--library=/tmp/foo",
             "--models=/tmp/bar",
-            "--cache-dir=/tmp/baz",
             "--defaults-suite=t",
-            "--bridge-port=58213",
-            "--bridge-token=abc123",
+            "--enabled-features=batch",
         ]
         let bootstrap = try #require(AppBootstrap.test(from: args))
 
@@ -52,11 +51,17 @@ struct BootstrapSideEffectTests {
         }
         #expect(bootstrap.library?.path == "/tmp/foo")
         #expect(bootstrap.models?.path == "/tmp/bar")
-        #expect(bootstrap.cacheDir?.path == "/tmp/baz")
         #expect(bootstrap.defaultsSuite == "t")
-        #expect(bootstrap.bridgePort == 58213)
-        #expect(bootstrap.bridgeToken == "abc123")
+        #expect(bootstrap.enabledFeaturesOverride == [.batch])
         #expect(bootstrap.sideEffects == BootstrapSideEffect.testing)
+    }
+
+    /// Every flag the parser accepts must reach something; unread ones read as working and don't.
+    @Test("--models is the only path flag beyond --library, and it lands on the model store")
+    func modelsFlagIsWired() throws {
+        let bootstrap = try #require(AppBootstrap.test(from: ["Parola", "--test-mode", "--models=/tmp/bar"]))
+        #expect(bootstrap.models?.path == "/tmp/bar")
+        #expect(ModelStore(modelsDirectory: bootstrap.models).directory.path == "/tmp/bar")
     }
 
     @Test("AppBootstrap.test ignores unknown flags")
@@ -72,7 +77,7 @@ struct BootstrapSideEffectTests {
 
         #expect(bootstrap.library?.path == "/tmp/foo")
         #expect(bootstrap.models == nil)
-        #expect(bootstrap.bridgeToken == nil)
+        #expect(bootstrap.defaultsSuite == nil)
     }
 }
 
