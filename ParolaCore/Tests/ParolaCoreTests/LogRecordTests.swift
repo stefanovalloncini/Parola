@@ -10,7 +10,7 @@ struct LogRecordTests {
             level: level,
             subsystem: "app.parola.core",
             category: .engineWhisperKit,
-            message: "model \(ModelToken("whisper-v3")) failed",
+            message: "model \(ModelToken("openai_whisper-large-v3_turbo")) failed",
             fields: [.elapsed: .seconds(61.2), .error: .error(ParolaError.ioError("x"))],
             file: "ParolaCore/WhisperKitTranscriber.swift",
             line: 130
@@ -29,7 +29,7 @@ struct LogRecordTests {
         let line = record().formattedLine
         #expect(line.contains("error"))
         #expect(line.contains("engine.whisperkit"))
-        #expect(line.contains("model whisper-v3 failed"))
+        #expect(line.contains("model openai_whisper-large-v3_turbo failed"))
         #expect(line.contains("elapsed=61.20"))
         #expect(line.contains("error=ParolaError.ioError"))
     }
