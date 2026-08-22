@@ -105,6 +105,17 @@
         }
       }
     },
+    "%lld days left": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld giorni rimasti"
+          }
+        }
+      }
+    },
     "%lld entries · %@": {
       "localizations": {
         "en": {
@@ -121,6 +132,17 @@
         }
       }
     },
+    "%lld expiring soon": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld in scadenza"
+          }
+        }
+      }
+    },
     "%lld files": {
       "extractionState": "manual",
       "localizations": {
@@ -128,6 +150,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld file"
+          }
+        }
+      }
+    },
+    "%lld hours left": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld ore rimaste"
           }
         }
       }
@@ -144,6 +177,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld installati · %@"
+          }
+        }
+      }
+    },
+    "%lld items": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld elementi"
           }
         }
       }
@@ -267,6 +311,28 @@
         }
       }
     },
+    "1 day left": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 giorno rimasto"
+          }
+        }
+      }
+    },
+    "1 expiring soon": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 in scadenza"
+          }
+        }
+      }
+    },
     "1 file": {
       "extractionState": "manual",
       "localizations": {
@@ -274,6 +340,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 file"
+          }
+        }
+      }
+    },
+    "1 hour left": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 ora rimasta"
+          }
+        }
+      }
+    },
+    "1 item": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 elemento"
           }
         }
       }
@@ -1600,6 +1688,28 @@
         }
       }
     },
+    "Clear filters": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi filtri"
+          }
+        }
+      }
+    },
+    "Clear search": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancella ricerca"
+          }
+        }
+      }
+    },
     "Clear selection": {
       "extractionState": "manual",
       "localizations": {
@@ -2284,6 +2394,39 @@
         }
       }
     },
+    "Deleted %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminato il %@"
+          }
+        }
+      }
+    },
+    "Deleted %@ · due %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminato il %@ · scade il %@"
+          }
+        }
+      }
+    },
+    "Deleted %@ · was due %@ · removed the next time Parola opens": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminato il %@ · scaduto il %@ · verrà rimosso al prossimo avvio di Parola"
+          }
+        }
+      }
+    },
     "Deleted earliest": {
       "extractionState": "manual",
       "localizations": {
@@ -2623,7 +2766,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vuoto"
+            "value": "Svuota"
           }
         }
       }
@@ -2784,6 +2927,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vista estesa"
+          }
+        }
+      }
+    },
+    "Expiring first": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In scadenza per primi"
+          }
+        }
+      }
+    },
+    "Expiring later": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scade più avanti"
+          }
+        }
+      }
+    },
+    "Expiring this week": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In scadenza questa settimana"
           }
         }
       }
@@ -3019,6 +3195,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Filtri"
+          }
+        }
+      }
+    },
+    "Final 48 hours": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultime 48 ore"
           }
         }
       }
@@ -3854,6 +4041,17 @@
         }
       }
     },
+    "Less than an hour left": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meno di un'ora"
+          }
+        }
+      }
+    },
     "Lets parola-mcp drive this app (transcribe, switch model, control recording…). Listens on 127.0.0.1 only.": {
       "extractionState": "manual",
       "localizations": {
@@ -4144,6 +4342,17 @@
         }
       }
     },
+    "Meeting": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riunione"
+          }
+        }
+      }
+    },
     "Meetings": {
       "extractionState": "manual",
       "localizations": {
@@ -4365,6 +4574,17 @@
         }
       }
     },
+    "Most time left": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Più tempo rimasto"
+          }
+        }
+      }
+    },
     "Move to": {
       "extractionState": "manual",
       "localizations": {
@@ -4540,6 +4760,17 @@
         }
       }
     },
+    "No deadline": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senza scadenza"
+          }
+        }
+      }
+    },
     "No formats selected.": {
       "comment": "A message displayed when a user has not selected any export formats.",
       "isCommentAutoGenerated": true,
@@ -4548,6 +4779,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nessun formato selezionato."
+          }
+        }
+      }
+    },
+    "No items match these filters": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun elemento corrisponde ai filtri"
           }
         }
       }
@@ -5286,6 +5528,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parola osserva le applicazioni in esecuzione; nulla esce dal Mac."
+          }
+        }
+      }
+    },
+    "Past deadline": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oltre la scadenza"
           }
         }
       }
@@ -8036,6 +8289,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dettagli trascrizione"
+          }
+        }
+      }
+    },
+    "Try a different When or Kind filter.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prova un altro filtro di periodo o tipo."
           }
         }
       }

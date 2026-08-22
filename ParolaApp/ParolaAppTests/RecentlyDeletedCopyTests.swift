@@ -63,13 +63,129 @@ struct RecentlyDeletedCopyTests {
     func sortLabelsItalian() throws {
         let it = try italianBundle()
         let expected: [RecentlyDeletedSort: String] = [
-            .recentlyDeleted: "Eliminati di recente",
-            .deletedEarliest: "Eliminati per primi",
+            .recentlyDeleted: "Più tempo rimasto",
+            .deletedEarliest: "In scadenza per primi",
             .titleAZ: "Titolo A→Z",
             .titleZA: "Titolo Z→A",
         ]
         for option in RecentlyDeletedSort.allCases {
             #expect(it.localizedString(forKey: option.title, value: "MISSING", table: nil) == expected[option])
         }
+    }
+
+    @Test("the subtitle count uses the singular for one item")
+    func subtitleCountSingular() {
+        #expect(RecentlyDeletedCopy.subtitleCount(1) == "1 item")
+    }
+
+    @Test("the subtitle count uses the plural for several items")
+    func subtitleCountPlural() {
+        #expect(RecentlyDeletedCopy.subtitleCount(8) == "8 items")
+    }
+
+    @Test("the expiring clause uses the singular for one item")
+    func subtitleExpiringSingular() {
+        #expect(RecentlyDeletedCopy.subtitleExpiring(1) == "1 expiring soon")
+    }
+
+    @Test("the expiring clause uses the plural for several items")
+    func subtitleExpiringPlural() {
+        #expect(RecentlyDeletedCopy.subtitleExpiring(2) == "2 expiring soon")
+    }
+
+    @Test("an entry without a deletion date has no days left")
+    func daysLeftUndated() throws {
+        let now = try noon()
+        #expect(RecentlyDeletedCopy.daysLeft(deletedAt: nil, now: now, retentionDays: 30) == nil)
+    }
+
+    @Test("days left counts down from the retention window")
+    func daysLeftBoundaries() throws {
+        let now = try noon()
+        let expected: [Int: Int] = [0: 30, 22: 8, 23: 7, 27: 3, 28: 2, 29: 1, 30: 0, 31: -1, 45: -15]
+        for (daysAgo, days) in expected {
+            #expect(
+                RecentlyDeletedCopy.daysLeft(deletedAt: deleted(daysAgo, before: now), now: now, retentionDays: 30) == days,
+                "deleted \(daysAgo) days ago"
+            )
+        }
+    }
+
+    @Test("tiers split on the deadline thresholds")
+    func tierMapping() {
+        #expect(RecentlyDeletedCopy.tier(daysLeft: nil) == .undated)
+        #expect(RecentlyDeletedCopy.tier(daysLeft: -1) == .overdue)
+        #expect(RecentlyDeletedCopy.tier(daysLeft: 0) == .critical)
+        #expect(RecentlyDeletedCopy.tier(daysLeft: 2) == .critical)
+        #expect(RecentlyDeletedCopy.tier(daysLeft: 3) == .soon)
+        #expect(RecentlyDeletedCopy.tier(daysLeft: 7) == .soon)
+        #expect(RecentlyDeletedCopy.tier(daysLeft: 8) == .calm)
+        #expect(RecentlyDeletedCopy.tier(daysLeft: 30) == .calm)
+    }
+
+    @Test("the countdown uses days above the final day")
+    func timeLeftInDays() throws {
+        let now = try noon()
+        #expect(label(deleted(0, before: now), now) == "30 days left")
+        #expect(label(deleted(28, before: now), now) == "2 days left")
+        #expect(label(deleted(29, before: now), now) == "1 day left")
+    }
+
+    @Test("the countdown switches to hours on the final day")
+    func timeLeftInHours() throws {
+        let now = try noon()
+        #expect(label(deleted(30, offsetHours: 5, before: now), now) == "5 hours left")
+        #expect(label(deleted(30, offsetHours: 1.5, before: now), now) == "1 hour left")
+        #expect(label(deleted(30, offsetHours: 0.5, before: now), now) == "Less than an hour left")
+    }
+
+    @Test("the countdown reports a missed deadline")
+    func timeLeftPastDeadline() throws {
+        let now = try noon()
+        #expect(label(deleted(30, before: now), now) == "Past deadline")
+        #expect(label(deleted(31, before: now), now) == "Past deadline")
+    }
+
+    @Test("an entry without a deletion date has no countdown")
+    func timeLeftUndated() throws {
+        let now = try noon()
+        #expect(label(nil, now) == "No deadline")
+    }
+
+    @Test("the countdown is localized to Italian")
+    func timeLeftItalian() throws {
+        let now = try noon()
+        let it = try italianBundle()
+        #expect(label(deleted(23, before: now), now, bundle: it) == "7 giorni rimasti")
+        #expect(label(deleted(29, before: now), now, bundle: it) == "1 giorno rimasto")
+        #expect(label(deleted(30, offsetHours: 5, before: now), now, bundle: it) == "5 ore rimaste")
+        #expect(label(deleted(31, before: now), now, bundle: it) == "Oltre la scadenza")
+        #expect(label(nil, now, bundle: it) == "Senza scadenza")
+    }
+
+    @Test("the subtitle pieces are localized to Italian")
+    func subtitleItalian() throws {
+        let it = try italianBundle()
+        #expect(RecentlyDeletedCopy.subtitleCount(1, bundle: it) == "1 elemento")
+        #expect(RecentlyDeletedCopy.subtitleCount(8, bundle: it) == "8 elementi")
+        #expect(RecentlyDeletedCopy.subtitleExpiring(1, bundle: it) == "1 in scadenza")
+        #expect(RecentlyDeletedCopy.subtitleExpiring(2, bundle: it) == "2 in scadenza")
+    }
+
+    private func noon() throws -> Date {
+        var components = DateComponents()
+        components.year = 2026
+        components.month = 8
+        components.day = 22
+        components.hour = 12
+        return try #require(Calendar.current.date(from: components))
+    }
+
+    private func deleted(_ daysAgo: Int, offsetHours: Double = 0, before now: Date) -> Date {
+        now.addingTimeInterval(-Double(daysAgo) * 86_400 + offsetHours * 3_600)
+    }
+
+    private func label(_ deletedAt: Date?, _ now: Date, bundle: Bundle = .main) -> String {
+        RecentlyDeletedCopy.timeLeftLabel(deletedAt: deletedAt, now: now, retentionDays: 30, bundle: bundle)
     }
 }

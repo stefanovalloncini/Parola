@@ -11,7 +11,7 @@ enum RecentlyDeletedDateFilter: String, CaseIterable, Identifiable {
         case .today: return "Today"
         case .week: return "This Week"
         case .month: return "This Month"
-        case .older: return "Older"
+        case .older: return "Past deadline"
         }
     }
 }
@@ -29,13 +29,18 @@ enum RecentlyDeletedCategoryFilter: String, CaseIterable, Identifiable {
         }
     }
 
-    func matches(_ category: EntryCategory) -> Bool {
+    var category: EntryCategory? {
         switch self {
-        case .all: return true
-        case .transcriptions: return category == .transcription
-        case .meetings: return category == .meeting
-        case .dictations: return category == .dictation
+        case .all: return nil
+        case .transcriptions: return .transcription
+        case .meetings: return .meeting
+        case .dictations: return .dictation
         }
+    }
+
+    func matches(_ category: EntryCategory) -> Bool {
+        guard let own = self.category else { return true }
+        return own == category
     }
 }
 
@@ -45,8 +50,8 @@ enum RecentlyDeletedSort: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .recentlyDeleted: return "Recently deleted"
-        case .deletedEarliest: return "Deleted earliest"
+        case .recentlyDeleted: return "Most time left"
+        case .deletedEarliest: return "Expiring first"
         case .titleAZ: return "Title A→Z"
         case .titleZA: return "Title Z→A"
         }
@@ -65,23 +70,42 @@ struct RecentlyDeletedToolbar: View {
     @Binding var searchText: String
     @Binding var sortOption: RecentlyDeletedSort
     @Binding var confirmingEmpty: Bool
+    let expiringSoon: Int
     let onDone: () -> Void
 
     var body: some View {
         HStack(spacing: DS.Spacing.regular) {
-            Text("Recently Deleted")
-                .font(.system(.title2, design: .default, weight: .semibold))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Recently Deleted")
+                    .font(DS.Font.title2)
+                if !model.deletedEntries.isEmpty {
+                    subtitle
+                        .font(DS.Font.caption)
+                        .foregroundStyle(DS.Color.secondaryText)
+                }
+            }
             Spacer(minLength: DS.Spacing.regular)
             searchField
             sortMenu
             actionMenu
-            emptyTrashButton
             Button("Done", action: onDone)
                 .keyboardShortcut(.defaultAction)
                 .axLeaf("Toolbar.Button.Done")
         }
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, DS.Spacing.small)
+    }
+
+    private var subtitle: Text {
+        var line = AttributedString(RecentlyDeletedCopy.subtitleCount(model.deletedEntries.count))
+        if expiringSoon > 0 {
+            line.append(AttributedString(" · "))
+            var clause = AttributedString(RecentlyDeletedCopy.subtitleExpiring(expiringSoon))
+            clause.font = DS.Font.captionEmphasized
+            clause.foregroundColor = DS.Color.danger
+            line.append(clause)
+        }
+        return Text(line)
     }
 
     var searchField: some View {
@@ -158,21 +182,6 @@ struct RecentlyDeletedToolbar: View {
         .accessibilityLabel("More actions")
         .axLeaf("Toolbar.Menu.Actions")
     }
-
-    var emptyTrashButton: some View {
-        Button { confirmingEmpty = true } label: {
-            Image(systemName: "trash")
-                .font(DS.Font.calloutEmphasized)
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 26)
-                .background(RecentlyDeletedPillChrome())
-        }
-        .buttonStyle(.plain)
-        .disabled(model.deletedEntries.isEmpty)
-        .help("Empty Recently Deleted")
-        .accessibilityLabel("Empty Recently Deleted")
-        .axLeaf("Toolbar.Button.EmptyTrash")
-    }
 }
 
 struct RecentlyDeletedFilterBar: View {
@@ -180,61 +189,53 @@ struct RecentlyDeletedFilterBar: View {
     @Binding var categoryFilter: RecentlyDeletedCategoryFilter
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            chipRow(
-                label: "When",
-                options: RecentlyDeletedDateFilter.allCases,
-                selection: $dateFilter,
-                title: \.title
-            )
-            chipRow(
-                label: "Kind",
-                options: RecentlyDeletedCategoryFilter.allCases,
-                selection: $categoryFilter,
-                title: \.title
-            )
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, DS.Spacing.regular)
-        .padding(.vertical, 6)
-    }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(RecentlyDeletedDateFilter.allCases) { option in
+                    Chip(
+                        title: LocalizedStringKey(option.title),
+                        isSelected: dateFilter == option,
+                        size: .compact,
+                        weight: .semibold
+                    ) {
+                        dateFilter = option
+                    }
+                }
 
-    @ViewBuilder
-    private func chipRow<Option: Identifiable & Hashable>(
-        label: LocalizedStringKey,
-        options: [Option],
-        selection: Binding<Option>,
-        title: KeyPath<Option, String>
-    ) -> some View {
-        HStack(spacing: 6) {
-            Text(label)
-                .textCase(.uppercase)
-                .font(.caption2.weight(.semibold))
-                .tracking(0.6)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .frame(width: 50, alignment: .leading)
-            ForEach(options) { option in
-                Chip(
-                    title: LocalizedStringKey(option[keyPath: title]),
-                    isSelected: selection.wrappedValue == option,
-                    size: .compact,
-                    weight: .semibold
-                ) {
-                    selection.wrappedValue = option
+                Rectangle()
+                    .fill(DS.Color.separator)
+                    .frame(width: 1, height: 14)
+                    .padding(.horizontal, DS.Spacing.small)
+
+                ForEach(RecentlyDeletedCategoryFilter.allCases) { option in
+                    Chip(
+                        title: LocalizedStringKey(option.title),
+                        tint: dot(for: option),
+                        isSelected: categoryFilter == option,
+                        size: .compact,
+                        weight: .semibold
+                    ) {
+                        categoryFilter = option
+                    }
                 }
             }
+            .padding(.horizontal, DS.Spacing.regular)
+            .padding(.vertical, DS.Spacing.small)
         }
-        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func dot(for option: RecentlyDeletedCategoryFilter) -> Color? {
+        guard let category = option.category, categoryFilter != option else { return nil }
+        return DS.categoryTint(for: category)
     }
 }
 
 struct RecentlyDeletedPillChrome: View {
     var body: some View {
-        RoundedRectangle(cornerRadius: 13, style: .continuous)
+        Capsule(style: .continuous)
             .fill(DS.Color.surfaceElevated.opacity(0.85))
             .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                Capsule(style: .continuous)
                     .stroke(DS.Color.separator.opacity(0.4), lineWidth: 0.5)
             )
     }

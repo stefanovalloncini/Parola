@@ -4,16 +4,19 @@ import ParolaCore
 struct MacRecentlyDeletedView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var confirmingPurge: LibraryEntry.ID?
     @State private var confirmingPurgeBulk: Set<LibraryEntry.ID> = []
     @State private var confirmingEmpty = false
     @State private var searchText = ""
     @State private var dateFilter: RecentlyDeletedDateFilter = .all
     @State private var categoryFilter: RecentlyDeletedCategoryFilter = .all
-    @State private var sortOption: RecentlyDeletedSort = .recentlyDeleted
+    @State private var sortOption: RecentlyDeletedSort = .deletedEarliest
     @State private var previews: [LibraryEntry.ID: String] = [:]
     @State private var selection: Set<LibraryEntry.ID> = []
     @State private var lastSelected: LibraryEntry.ID?
+    @State private var purging: Set<LibraryEntry.ID> = []
+    @State private var now = Date()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,16 +24,17 @@ struct MacRecentlyDeletedView: View {
                 searchText: $searchText,
                 sortOption: $sortOption,
                 confirmingEmpty: $confirmingEmpty,
+                expiringSoon: expiringSoon,
                 onDone: { dismiss() }
             )
             RecentlyDeletedFilterBar(
                 dateFilter: $dateFilter,
                 categoryFilter: $categoryFilter
             )
+            Divider().opacity(0.5)
             if !selection.isEmpty {
                 selectionBar
             }
-            Divider().opacity(0.5)
             if model.deletedEntries.isEmpty {
                 empty
             } else if filtered.isEmpty {
@@ -38,15 +42,18 @@ struct MacRecentlyDeletedView: View {
             } else {
                 list
             }
+            footer
         }
         .onChange(of: model.deletedEntries) { _, entries in
             let live = Set(entries.map(\.id))
             previews = previews.filter { live.contains($0.key) }
+            now = Date()
         }
         .task {
+            now = Date()
             for entry in model.deletedEntries { await loadPreview(for: entry) }
         }
-        .frame(minWidth: 640, idealWidth: 820, minHeight: 520, idealHeight: 680)
+        .frame(minWidth: 760, idealWidth: 920, minHeight: 560, idealHeight: 720)
         .background(DS.Color.surface)
         .ignoresSafeArea(.container, edges: .top)
         .confirmationDialog(
@@ -54,7 +61,7 @@ struct MacRecentlyDeletedView: View {
             isPresented: isPurgingSingle
         ) {
             Button("Delete permanently", role: .destructive) {
-                if let id = confirmingPurge { model.purgeEntry(id) }
+                if let id = confirmingPurge { purge([id]) }
                 confirmingPurge = nil
             }
             Button("Cancel", role: .cancel) { confirmingPurge = nil }
@@ -66,7 +73,7 @@ struct MacRecentlyDeletedView: View {
             isPresented: isPurgingBulk
         ) {
             Button("Delete permanently", role: .destructive) {
-                for id in confirmingPurgeBulk { model.purgeEntry(id) }
+                purge(Array(confirmingPurgeBulk))
                 confirmingPurgeBulk = []
                 selection = []
             }
@@ -79,7 +86,7 @@ struct MacRecentlyDeletedView: View {
             isPresented: $confirmingEmpty
         ) {
             Button("Empty", role: .destructive) {
-                for entry in model.deletedEntries { model.purgeEntry(entry.id) }
+                purge(model.deletedEntries.map(\.id))
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -91,110 +98,173 @@ struct MacRecentlyDeletedView: View {
     private var selectionBar: some View {
         HStack(spacing: DS.Spacing.regular) {
             Text(RecentlyDeletedCopy.selectionCount(selection.count))
-                .font(DS.Font.body.weight(.medium))
+                .font(DS.Font.calloutEmphasized)
             Spacer()
-            Button {
-                for id in selection { model.restoreEntry(id) }
-                selection = []
-            } label: {
-                Label("Restore", systemImage: "arrow.uturn.backward")
-            }
-            .buttonStyle(.bordered)
-            .axLeaf("Selection.Button.Restore")
-            Button(role: .destructive) {
-                confirmingPurgeBulk = selection
-            } label: {
-                Label("Delete permanently", systemImage: "trash")
-            }
-            .buttonStyle(.bordered)
-            .axLeaf("Selection.Button.DeletePermanently")
+            Button("Restore") { restore(Array(selection)) }
+                .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+                .axLeaf("Selection.Button.Restore")
+            Button("Delete permanently") { confirmingPurgeBulk = selection }
+                .buttonStyle(.plain)
+                .font(DS.Font.subheadlineMedium)
+                .foregroundStyle(DS.Color.danger)
+                .axLeaf("Selection.Button.DeletePermanently")
             Button("Clear selection") { selection = [] }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .axLeaf("Selection.Button.ClearSelection")
         }
         .padding(.horizontal, DS.Spacing.regular)
-        .padding(.vertical, DS.Spacing.small)
+        .frame(height: 36)
         .background(DS.Color.surfaceElevated)
+        .overlay(alignment: .bottom) { Divider().opacity(0.5) }
     }
 
     private var list: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: DS.Spacing.large, pinnedViews: []) {
-                ForEach(sections, id: \.0.id) { group in
-                    section(bucket: group.0, entries: group.1)
-                }
-                footer
-            }
-            .padding(.horizontal, DS.Spacing.regular)
-            .padding(.top, DS.Spacing.regular)
-            .padding(.bottom, DS.Spacing.small)
-        }
-    }
-
-    private func section(bucket: Bucket, entries: [LibraryEntry]) -> some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            if let header = bucket.header {
-                header
-                    .textCase(.uppercase)
-                    .font(.system(.caption, design: .default, weight: .semibold))
-                    .tracking(0.8)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 4)
-            }
-            VStack(spacing: DS.Spacing.small) {
-                ForEach(entries) { entry in
-                    RecentlyDeletedRow(
-                        entry: entry,
-                        preview: previews[entry.id],
-                        isSelected: selection.contains(entry.id),
-                        onRestore: { model.restoreEntry(entry.id) },
-                        onPurge: { confirmingPurge = entry.id },
-                        onTap: { handleTap(entry: entry, modifiers: NSEvent.modifierFlags) }
-                    )
-                    .task(id: entry.id) {
-                        await loadPreview(for: entry)
+        let groups = sections
+        return ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                ForEach(groups) { group in
+                    Section {
+                        ForEach(group.entries) { entry in
+                            row(entry, isLast: entry.id == group.entries.last?.id)
+                        }
+                    } header: {
+                        sectionHeader(group, isFirst: group.id == groups.first?.id)
                     }
                 }
             }
+            .padding(.horizontal, DS.Spacing.medium)
+            .padding(.top, DS.Spacing.small)
+            .padding(.bottom, DS.Spacing.medium)
+            .animation(.easeOut(duration: 0.18), value: model.deletedEntries)
+        }
+    }
+
+    private func row(_ entry: LibraryEntry, isLast: Bool) -> some View {
+        RecentlyDeletedRow(
+            entry: entry,
+            preview: previews[entry.id],
+            daysLeft: daysLeft(for: entry),
+            timeLeft: timeLeft(for: entry),
+            isSelected: selection.contains(entry.id),
+            isPurging: purging.contains(entry.id),
+            showsSeparator: !isLast,
+            onRestore: { restore([entry.id]) },
+            onPurge: { confirmingPurge = entry.id },
+            onTap: { handleTap(entry: entry, modifiers: NSEvent.modifierFlags) }
+        )
+        .transition(rowTransition)
+        .task(id: entry.id) {
+            await loadPreview(for: entry)
+        }
+    }
+
+    @ViewBuilder
+    private func sectionHeader(_ group: BucketGroup, isFirst: Bool) -> some View {
+        if let header = group.bucket.header {
+            HStack(spacing: DS.Spacing.small) {
+                header
+                    .textCase(.uppercase)
+                    .font(DS.Font.caption2Emphasized)
+                    .tracking(0.6)
+                    .foregroundStyle(group.bucket.tint)
+                Rectangle()
+                    .fill(DS.Color.separator.opacity(0.5))
+                    .frame(height: 1)
+                Text(group.entries.count, format: .number)
+                    .font(DS.Font.caption2Mono)
+                    .foregroundStyle(DS.Color.secondaryText)
+            }
+            .padding(.vertical, DS.Spacing.tight)
+            .padding(.top, isFirst ? 0 : DS.Spacing.large)
+            .background(DS.Color.surface)
         }
     }
 
     private var footer: some View {
-        Text("Items are removed for good after \(AppModel.trashRetentionDays) days.")
-            .font(DS.Font.caption)
-            .foregroundStyle(.secondary)
-            .padding(.top, DS.Spacing.small)
-            .padding(.leading, 4)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(spacing: DS.Spacing.regular) {
+            Text("Items are removed for good after \(AppModel.trashRetentionDays) days.")
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.secondaryText)
+            Spacer(minLength: DS.Spacing.regular)
+            Button("Empty") { confirmingEmpty = true }
+                .buttonStyle(.plain)
+                .font(DS.Font.subheadlineMedium)
+                .foregroundStyle(model.deletedEntries.isEmpty ? DS.Color.secondaryText.opacity(0.5) : DS.Color.danger)
+                .disabled(model.deletedEntries.isEmpty)
+                .help("Empty Recently Deleted")
+                .axLeaf("Toolbar.Button.EmptyTrash")
+        }
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.small)
+        .background(DS.Color.surface)
+        .overlay(alignment: .top) { Divider().opacity(0.5) }
     }
 
     private var empty: some View {
-        ContentUnavailableView(
-            "Nothing's been deleted",
-            systemImage: "trash",
-            description: Text("Deleted transcripts appear here for \(AppModel.trashRetentionDays) days.")
-        )
+        VStack(spacing: DS.Spacing.large) {
+            DecayStrip(
+                daysRemaining: 0,
+                totalDays: AppModel.trashRetentionDays,
+                seed: "",
+                liveColor: DS.Color.separator.opacity(0.55),
+                barWidth: 3,
+                spacing: 3,
+                height: 28,
+                collapsed: true
+            )
+            VStack(spacing: DS.Spacing.small) {
+                Text("Nothing's been deleted")
+                    .font(DS.Font.title3)
+                    .foregroundStyle(DS.Color.primaryText)
+                Text("Deleted transcripts appear here for \(AppModel.trashRetentionDays) days.")
+                    .font(DS.Font.callout)
+                    .foregroundStyle(DS.Color.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 320)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    @ViewBuilder
     private var noMatches: some View {
-        if searchText.isEmpty {
-            ContentUnavailableView(
-                "No items match these filters",
-                systemImage: "line.3.horizontal.decrease.circle",
-                description: Text("Try a different When or Kind filter.")
-            )
-        } else {
-            ContentUnavailableView.search(text: searchText)
+        VStack(spacing: DS.Spacing.large) {
+            Image(systemName: searchText.isEmpty ? "line.3.horizontal.decrease.circle" : "magnifyingglass")
+                .font(DS.Font.largeTitle)
+                .imageScale(.large)
+                .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
+            VStack(spacing: DS.Spacing.small) {
+                Text(noMatchesTitle)
+                    .font(DS.Font.title3)
+                    .foregroundStyle(DS.Color.primaryText)
+                if searchText.isEmpty {
+                    Text("Try a different When or Kind filter.")
+                        .font(DS.Font.callout)
+                        .foregroundStyle(DS.Color.secondaryText)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 320)
+                }
+            }
+            Button("Clear filters") {
+                searchText = ""
+                dateFilter = .all
+                categoryFilter = .all
+            }
+            .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+            .axLeaf("NoMatches.Button.ClearFilters")
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var noMatchesTitle: LocalizedStringKey {
+        searchText.isEmpty ? "No items match these filters" : "No matches"
     }
 
     private var filtered: [LibraryEntry] {
         let q = searchText.lowercased()
         return model.deletedEntries.filter { entry in
             guard categoryFilter.matches(entry.category) else { return false }
-            guard dateFilter.matches(entry.deletedAt, now: Date()) else { return false }
+            guard dateFilter.matches(entry.deletedAt, now: now) else { return false }
             guard !q.isEmpty else { return true }
             if entry.title.lowercased().contains(q) { return true }
             return previews[entry.id]?.lowercased().contains(q) ?? false
@@ -218,62 +288,118 @@ struct MacRecentlyDeletedView: View {
         }
     }
 
-    private var sections: [(Bucket, [LibraryEntry])] {
-        guard sortOption.groupsByDate else { return [(.none, sorted)] }
+    private var sections: [BucketGroup] {
+        guard sortOption.groupsByDate else { return [BucketGroup(bucket: .none, entries: sorted)] }
         var seen = Set<String>()
         var order: [Bucket] = []
         var bucketed: [String: [LibraryEntry]] = [:]
         for entry in sorted {
-            let key = bucket(for: entry.deletedAt)
+            let key = bucket(for: entry)
             if seen.insert(key.id).inserted { order.append(key) }
             bucketed[key.id, default: []].append(entry)
         }
-        return order.map { ($0, bucketed[$0.id] ?? []) }
+        return order.map { BucketGroup(bucket: $0, entries: bucketed[$0.id] ?? []) }
+    }
+
+    private struct BucketGroup: Identifiable {
+        let bucket: Bucket
+        let entries: [LibraryEntry]
+        var id: String { bucket.id }
     }
 
     private enum Bucket {
         case none
-        case today
-        case yesterday
-        case earlierThisWeek
-        case earlierThisMonth
-        case month(String)
-        case unknown
+        case overdue
+        case critical
+        case soon
+        case calm
+        case undated
 
         var id: String {
             switch self {
             case .none: return ""
-            case .today: return "today"
-            case .yesterday: return "yesterday"
-            case .earlierThisWeek: return "earlierThisWeek"
-            case .earlierThisMonth: return "earlierThisMonth"
-            case .month(let label): return label
-            case .unknown: return "unknown"
+            case .overdue: return "overdue"
+            case .critical: return "critical"
+            case .soon: return "soon"
+            case .calm: return "calm"
+            case .undated: return "undated"
             }
         }
 
         var header: Text? {
             switch self {
             case .none: return nil
-            case .today: return Text("Today")
-            case .yesterday: return Text("Yesterday")
-            case .earlierThisWeek: return Text("Earlier This Week")
-            case .earlierThisMonth: return Text("Earlier This Month")
-            case .month(let label): return Text(verbatim: label)
-            case .unknown: return Text("Unknown")
+            case .overdue: return Text("Past deadline")
+            case .critical: return Text("Final 48 hours")
+            case .soon: return Text("Expiring this week")
+            case .calm: return Text("Expiring later")
+            case .undated: return Text("No deadline")
+            }
+        }
+
+        var tint: Color {
+            switch self {
+            case .none, .calm, .undated: return DS.Color.secondaryText
+            case .soon: return DS.Palette.warning
+            case .critical, .overdue: return DS.Color.danger
             }
         }
     }
 
-    private func bucket(for date: Date?) -> Bucket {
-        guard let date else { return .unknown }
-        let cal = Calendar.current
-        if cal.isDateInToday(date) { return .today }
-        if cal.isDateInYesterday(date) { return .yesterday }
-        let days = cal.dateComponents([.day], from: cal.startOfDay(for: date), to: cal.startOfDay(for: Date())).day ?? 0
-        if days < 7 { return .earlierThisWeek }
-        if days < 30 { return .earlierThisMonth }
-        return .month(date.formatted(.dateTime.month(.wide).year()))
+    private func bucket(for entry: LibraryEntry) -> Bucket {
+        switch RecentlyDeletedCopy.tier(daysLeft: daysLeft(for: entry)) {
+        case .overdue: return .overdue
+        case .critical: return .critical
+        case .soon: return .soon
+        case .calm: return .calm
+        case .undated: return .undated
+        }
+    }
+
+    private func daysLeft(for entry: LibraryEntry) -> Int? {
+        RecentlyDeletedCopy.daysLeft(
+            deletedAt: entry.deletedAt,
+            now: now,
+            retentionDays: AppModel.trashRetentionDays
+        )
+    }
+
+    private func timeLeft(for entry: LibraryEntry) -> String {
+        RecentlyDeletedCopy.timeLeftLabel(
+            deletedAt: entry.deletedAt,
+            now: now,
+            retentionDays: AppModel.trashRetentionDays
+        )
+    }
+
+    private var expiringSoon: Int {
+        model.deletedEntries.filter { entry in
+            guard let days = daysLeft(for: entry) else { return false }
+            return days <= 2
+        }.count
+    }
+
+    private var rowTransition: AnyTransition {
+        reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .leading))
+    }
+
+    private func restore(_ ids: [LibraryEntry.ID]) {
+        for id in ids { model.restoreEntry(id) }
+        selection.subtract(ids)
+    }
+
+    // The strip has to finish flatlining before the entry goes, so the purge waits out the animation.
+    private func purge(_ ids: [LibraryEntry.ID]) {
+        guard !reduceMotion else {
+            for id in ids { model.purgeEntry(id) }
+            return
+        }
+        withAnimation(.easeOut(duration: 0.18)) { purging.formUnion(ids) }
+        Task {
+            try? await Task.sleep(for: .milliseconds(200))
+            for id in ids { model.purgeEntry(id) }
+            purging.subtract(ids)
+        }
     }
 
     private func handleTap(entry: LibraryEntry, modifiers: NSEvent.ModifierFlags) {
@@ -333,4 +459,3 @@ struct MacRecentlyDeletedView: View {
         )
     }
 }
-
