@@ -20,6 +20,7 @@ enum SettingsExportService {
                 keys.insert(key)
             }
         }
+        keys.formUnion(UnscopedSettingsKeys.all)
         return Array(keys).sorted()
     }()
 

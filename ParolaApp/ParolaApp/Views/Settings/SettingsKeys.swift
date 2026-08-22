@@ -195,6 +195,19 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     }
 }
 
+/// Persisted settings that no Settings pane hosts — they are set from the transcript view, the
+/// burn-in sheet and the captions windows. They stay out of `SettingsPaneScope.defaultsKeys` so a
+/// pane's own Reset button only clears what that pane shows, but a backup or a full reset covers them.
+enum UnscopedSettingsKeys {
+    static let all: [String] = [
+        "burnFontSize", "burnTextColor", "burnOutline",
+        "subtitleFPS", "skipSilences", "playbackRate",
+        "transcriptCompact", "transcriptDisplayMode",
+        "mainWindowAlwaysOnTop", "pinnedModel",
+        "liveCaptions.fontSize", "liveCaptions.opacity", "presenter.fontSize",
+    ]
+}
+
 struct ResetPaneButton: View {
     let scope: SettingsPaneScope
     @State private var confirming = false
@@ -246,6 +259,9 @@ enum SettingsResetService {
             for key in scope.defaultsKeys {
                 defaults.removeObject(forKey: key)
             }
+        }
+        for key in UnscopedSettingsKeys.all {
+            defaults.removeObject(forKey: key)
         }
         NotificationCenter.default.post(name: .parolaSettingsReset, object: nil)
     }

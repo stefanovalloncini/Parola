@@ -12,6 +12,17 @@
         }
       }
     },
+    "%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@"
+          }
+        }
+      }
+    },
     "%@ (default)": {
       "extractionState": "manual",
       "localizations": {
@@ -63,6 +74,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Preset di riscrittura %@"
+          }
+        }
+      }
+    },
+    "%@%%": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@%%"
           }
         }
       }
@@ -366,6 +388,17 @@
         }
       }
     },
+    "1 item will be deleted for good.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 elemento sarà eliminato per sempre."
+          }
+        }
+      }
+    },
     "1 low-confidence segment": {
       "extractionState": "manual",
       "localizations": {
@@ -373,6 +406,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 segmento a bassa confidenza"
+          }
+        }
+      }
+    },
+    "1 selected": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 selezionato"
           }
         }
       }
@@ -613,6 +657,17 @@
         }
       }
     },
+    "Action item extraction failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estrazione delle azioni non riuscita: %@"
+          }
+        }
+      }
+    },
     "Actions": {
       "extractionState": "manual",
       "localizations": {
@@ -669,6 +724,17 @@
         }
       }
     },
+    "Activity": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attività"
+          }
+        }
+      }
+    },
     "Add Files": {
       "extractionState": "manual",
       "localizations": {
@@ -691,17 +757,6 @@
         }
       }
     },
-    "Activity": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Attività"
-          }
-        }
-      }
-    },
     "Add Format": {
       "extractionState": "manual",
       "localizations": {
@@ -720,6 +775,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aggiungi persone"
+          }
+        }
+      }
+    },
+    "Add URL rule": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi regola URL"
           }
         }
       }
@@ -808,17 +874,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aggiungi snippet"
-          }
-        }
-      }
-    },
-    "Add URL rule": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiungi regola URL"
           }
         }
       }
@@ -965,6 +1020,17 @@
         }
       }
     },
+    "Any time": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sempre"
+          }
+        }
+      }
+    },
     "Appearance": {
       "extractionState": "manual",
       "localizations": {
@@ -1028,6 +1094,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Chiede a Whisper i timestamp parola per parola. Karaoke più preciso ma più lento."
+          }
+        }
+      }
+    },
+    "Assistant mode": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modalità assistente"
           }
         }
       }
@@ -1157,6 +1234,17 @@
         }
       }
     },
+    "BYOK": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BYOK"
+          }
+        }
+      }
+    },
     "Back": {
       "extractionState": "manual",
       "localizations": {
@@ -1256,6 +1344,17 @@
         }
       }
     },
+    "Both apply to dictation too. Mute is skipped when the recording source is system audio.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entrambe si applicano anche alla dettatura. La silenziatura viene saltata quando la sorgente è l'audio di sistema."
+          }
+        }
+      }
+    },
     "Bridge disabled": {
       "comment": "A label displayed when the automation bridge is disabled.",
       "isCommentAutoGenerated": true,
@@ -1324,28 +1423,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "ACQUISIZIONE"
-          }
-        }
-      }
-    },
-    "Captures your voice for recordings and dictation.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registra la tua voce per registrazioni e dettatura."
-          }
-        }
-      }
-    },
-    "Choose a completed file to see its transcript.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Scegli un file completato per vederne la trascrizione."
           }
         }
       }
@@ -1427,6 +1504,17 @@
         }
       }
     },
+    "Captures your voice for recordings and dictation.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra la tua voce per registrazioni e dettatura."
+          }
+        }
+      }
+    },
     "Case sensitive": {
       "extractionState": "manual",
       "localizations": {
@@ -1478,6 +1566,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Canale"
+          }
+        }
+      }
+    },
+    "Chapter extraction failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estrazione dei capitoli non riuscita: %@"
+          }
+        }
+      }
+    },
+    "Chapter generation failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generazione dei capitoli non riuscita: %@"
           }
         }
       }
@@ -1584,6 +1694,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Controlla ora"
+          }
+        }
+      }
+    },
+    "Choose a completed file to see its transcript.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli un file completato per vederne la trascrizione."
           }
         }
       }
@@ -2291,28 +2412,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Eliminare 1 elemento definitivamente?"
-          }
-        }
-      }
-    },
-    "1 item will be deleted for good.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 elemento sarà eliminato per sempre."
-          }
-        }
-      }
-    },
-    "1 selected": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 selezionato"
           }
         }
       }
@@ -3125,6 +3224,17 @@
         }
       }
     },
+    "F5": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "F5"
+          }
+        }
+      }
+    },
     "Failed": {
       "extractionState": "manual",
       "localizations": {
@@ -3167,6 +3277,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Filtra per mittente"
+          }
+        }
+      }
+    },
+    "Filter chat (⌘F)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtra chat (⌘F)"
           }
         }
       }
@@ -3609,6 +3730,17 @@
         }
       }
     },
+    "Hybrid": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ibrido"
+          }
+        }
+      }
+    },
     "Identify multiple speakers in the audio (slower).": {
       "extractionState": "manual",
       "localizations": {
@@ -4008,6 +4140,28 @@
         }
       }
     },
+    "Last 30 days": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultimi 30 giorni"
+          }
+        }
+      }
+    },
+    "Last 7 days": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultimi 7 giorni"
+          }
+        }
+      }
+    },
     "Last opened": {
       "extractionState": "manual",
       "localizations": {
@@ -4026,6 +4180,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ultima apertura: %@"
+          }
+        }
+      }
+    },
+    "Last year": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultimo anno"
           }
         }
       }
@@ -4618,6 +4783,28 @@
         }
       }
     },
+    "Mute system audio": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silenzia l'audio di sistema"
+          }
+        }
+      }
+    },
+    "Mutes the default output device while recording from the microphone, so playback doesn't leak into your transcript. Restores the previous mute state when recording stops.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silenzia l'uscita audio predefinita durante la registrazione dal microfono, così la riproduzione non finisce nella trascrizione. Ripristina lo stato precedente quando la registrazione finisce."
+          }
+        }
+      }
+    },
     "Name": {
       "extractionState": "manual",
       "localizations": {
@@ -4771,6 +4958,28 @@
         }
       }
     },
+    "No dictations yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna dettatura"
+          }
+        }
+      }
+    },
+    "No entries yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessun elemento"
+          }
+        }
+      }
+    },
     "No formats selected.": {
       "comment": "A message displayed when a user has not selected any export formats.",
       "isCommentAutoGenerated": true,
@@ -4823,6 +5032,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nessuna corrispondenza"
+          }
+        }
+      }
+    },
+    "No meetings yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna riunione"
           }
         }
       }
@@ -4965,6 +5185,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nessun testo di trascrizione."
+          }
+        }
+      }
+    },
+    "No transcriptions yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna trascrizione"
           }
         }
       }
@@ -5277,39 +5508,6 @@
         }
       }
     },
-    "Open a File…": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apri un file…"
-          }
-        }
-      }
-    },
-    "Open or Drop File": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apri o trascina un file"
-          }
-        }
-      }
-    },
-    "Parola needs Screen Recording permission to capture system audio. Open System Settings → Privacy & Security → Screen Recording and grant Parola access, then start recording again.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Parola ha bisogno del permesso Registrazione schermo per catturare l'audio di sistema. Apri Impostazioni di Sistema → Privacy e sicurezza → Registrazione schermo e concedi l'accesso a Parola, poi avvia di nuovo la registrazione."
-          }
-        }
-      }
-    },
     "Open System Settings…": {
       "extractionState": "manual",
       "localizations": {
@@ -5317,6 +5515,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apri Impostazioni di Sistema…"
+          }
+        }
+      }
+    },
+    "Open a File…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri un file…"
           }
         }
       }
@@ -5396,6 +5605,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apri più file audio insieme per accodarli alla trascrizione batch."
+          }
+        }
+      }
+    },
+    "Open or Drop File": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri o trascina un file"
           }
         }
       }
@@ -5494,6 +5714,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parola"
+          }
+        }
+      }
+    },
+    "Parola needs Screen Recording permission to capture system audio. Open System Settings → Privacy & Security → Screen Recording and grant Parola access, then start recording again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola ha bisogno del permesso Registrazione schermo per catturare l'audio di sistema. Apri Impostazioni di Sistema → Privacy e sicurezza → Registrazione schermo e concedi l'accesso a Parola, poi avvia di nuovo la registrazione."
           }
         }
       }
@@ -5629,6 +5860,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pausa"
+          }
+        }
+      }
+    },
+    "Pause Music, Spotify, YouTube": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metti in pausa Music, Spotify, YouTube"
           }
         }
       }
@@ -5914,6 +6156,17 @@
         }
       }
     },
+    "Prompt failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prompt non riuscito: %@"
+          }
+        }
+      }
+    },
     "Prompts": {
       "extractionState": "manual",
       "localizations": {
@@ -5949,6 +6202,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Proprietà"
+          }
+        }
+      }
+    },
+    "Push to talk": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Push to talk"
           }
         }
       }
@@ -6065,17 +6329,6 @@
         }
       }
     },
-    "Reads on-screen text in the frontmost window via OCR. Slower, requires Screen Recording permission, and the window content is sent to the cleanup model.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Legge il testo a schermo nella finestra in primo piano tramite OCR. Più lento, richiede il permesso di Registrazione dello schermo, e il contenuto della finestra viene inviato al modello di pulizia."
-          }
-        }
-      }
-    },
     "Reading time": {
       "extractionState": "manual",
       "localizations": {
@@ -6083,6 +6336,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tempo di lettura"
+          }
+        }
+      }
+    },
+    "Reads on-screen text in the frontmost window via OCR. Slower, requires Screen Recording permission, and the window content is sent to the cleanup model.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legge il testo a schermo nella finestra in primo piano tramite OCR. Più lento, richiede il permesso di Registrazione dello schermo, e il contenuto della finestra viene inviato al modello di pulizia."
           }
         }
       }
@@ -6125,6 +6389,17 @@
         }
       }
     },
+    "Recently deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminati di recente"
+          }
+        }
+      }
+    },
     "Recommended": {
       "extractionState": "manual",
       "localizations": {
@@ -6143,17 +6418,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Modelli consigliati"
-          }
-        }
-      }
-    },
-    "Recently deleted": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Eliminati di recente"
           }
         }
       }
@@ -6341,6 +6605,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Regex"
+          }
+        }
+      }
+    },
+    "Release builds keep the bridge off by default so notarised binaries don't open a local listener without consent. Turn it on when you want to drive Parola from Claude Code / Codex / a custom MCP client.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le build Release tengono il bridge spento per default, così i binari notarizzati non aprono un listener locale senza consenso. Attivalo per pilotare Parola da Claude Code / Codex / un client MCP custom."
           }
         }
       }
@@ -6609,6 +6884,17 @@
         }
       }
     },
+    "Returns every setting to its default. Models on disk are untouched.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riporta ogni impostazione al suo valore predefinito. I modelli su disco non vengono toccati."
+          }
+        }
+      }
+    },
     "Reveal in Finder": {
       "extractionState": "manual",
       "localizations": {
@@ -6747,6 +7033,17 @@
         }
       }
     },
+    "Save your settings to a `.parola-settings` file, or restore one. Downloaded models and the prompt library are not included.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva le tue impostazioni in un file `.parola-settings`, o ripristinane uno. I modelli scaricati e la libreria dei prompt non sono inclusi."
+          }
+        }
+      }
+    },
     "Saves the %@ next to each transcribed file.": {
       "extractionState": "manual",
       "localizations": {
@@ -6879,6 +7176,17 @@
         }
       }
     },
+    "Search results": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Risultati della ricerca"
+          }
+        }
+      }
+    },
     "Search rules…": {
       "extractionState": "manual",
       "localizations": {
@@ -6989,17 +7297,6 @@
         }
       }
     },
-    "Sends the highlighted text in the frontmost app to the cleanup model so proper nouns spell right. Requires Accessibility permission.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Invia il testo evidenziato nell'app in primo piano al modello di pulizia, così i nomi propri vengono scritti correttamente. Richiede il permesso di Accessibilità."
-          }
-        }
-      }
-    },
     "Send via Mail…": {
       "extractionState": "manual",
       "localizations": {
@@ -7007,6 +7304,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Invia via Mail…"
+          }
+        }
+      }
+    },
+    "Sends a pause command to whatever app is playing media when recording starts, and resumes when it stops.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia un comando di pausa all'app che sta riproducendo contenuti quando inizi a registrare, e la fa ripartire quando smetti."
+          }
+        }
+      }
+    },
+    "Sends the highlighted text in the frontmost app to the cleanup model so proper nouns spell right. Requires Accessibility permission.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia il testo evidenziato nell'app in primo piano al modello di pulizia, così i nomi propri vengono scritti correttamente. Richiede il permesso di Accessibilità."
           }
         }
       }
@@ -7712,6 +8031,17 @@
         }
       }
     },
+    "SubRip Subtitles": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli SubRip"
+          }
+        }
+      }
+    },
     "Substitutions applied to every new transcript before it's saved. Term packs add curated rules in one click.": {
       "extractionState": "manual",
       "localizations": {
@@ -7828,17 +8158,6 @@
         }
       }
     },
-    "That URL isn't on a host yt-dlp can fetch.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Questo URL non proviene da una sorgente supportata da yt-dlp."
-          }
-        }
-      }
-    },
     "TRANSCRIPTION": {
       "extractionState": "manual",
       "localizations": {
@@ -7879,6 +8198,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Termini tecnici (Italiano)"
+          }
+        }
+      }
+    },
+    "That URL isn't on a host yt-dlp can fetch.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo URL non proviene da una sorgente supportata da yt-dlp."
           }
         }
       }
@@ -8055,6 +8385,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Titolo Z→A"
+          }
+        }
+      }
+    },
+    "Today": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oggi"
+          }
+        }
+      }
+    },
+    "Toggle": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alternato"
           }
         }
       }
@@ -8293,61 +8645,6 @@
         }
       }
     },
-    "Try a different When or Kind filter.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prova un altro filtro di periodo o tipo."
-          }
-        }
-      }
-    },
-    "Action item extraction failed: %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Estrazione delle azioni non riuscita: %@"
-          }
-        }
-      }
-    },
-    "Chapter extraction failed: %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Estrazione dei capitoli non riuscita: %@"
-          }
-        }
-      }
-    },
-    "Chapter generation failed: %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Generazione dei capitoli non riuscita: %@"
-          }
-        }
-      }
-    },
-    "Prompt failed: %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prompt non riuscito: %@"
-          }
-        }
-      }
-    },
     "Transcription failed: %@": {
       "extractionState": "manual",
       "localizations": {
@@ -8472,6 +8769,17 @@
         }
       }
     },
+    "Trigger words": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parole trigger"
+          }
+        }
+      }
+    },
     "Triggers fire on dictated text only; matching is case-insensitive and word-bounded.": {
       "extractionState": "manual",
       "localizations": {
@@ -8479,6 +8787,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "I trigger scattano solo sul testo dettato; il match è case-insensitive e su parole intere."
+          }
+        }
+      }
+    },
+    "Try a different When or Kind filter.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prova un altro filtro di periodo o tipo."
           }
         }
       }
@@ -8769,6 +9088,17 @@
         }
       }
     },
+    "WebVTT Subtitles": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli WebVTT"
+          }
+        }
+      }
+    },
     "Welcome to Parola": {
       "extractionState": "manual",
       "localizations": {
@@ -8787,6 +9117,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Quando"
+          }
+        }
+      }
+    },
+    "When on, the LLM answers your dictation instead of cleaning it up. Use this for voice Q&A.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando attivo, l'LLM risponde alla dettatura invece di pulirla. Utile per Q&A vocali."
           }
         }
       }
@@ -8812,6 +9153,17 @@
         }
       }
     },
+    "While recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durante la registrazione"
+          }
+        }
+      }
+    },
     "Whisper translates from the detected source language into English.": {
       "extractionState": "manual",
       "localizations": {
@@ -8830,6 +9182,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "WhisperKit · FluidAudio · Sparkle"
+          }
+        }
+      }
+    },
+    "Word Document": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Documento Word"
           }
         }
       }
@@ -8862,6 +9225,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parole"
+          }
+        }
+      }
+    },
+    "Words that switch to this prompt for one dictation. Separate with commas.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parole che attivano questo prompt per una sola dettatura. Separale con la virgola."
           }
         }
       }
@@ -9114,6 +9488,17 @@
         }
       }
     },
+    "summary, recap": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "riepilogo, sintesi"
+          }
+        }
+      }
+    },
     "trigger phrase": {
       "extractionState": "manual",
       "localizations": {
@@ -9223,369 +9608,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "⌘S"
-          }
-        }
-      }
-    },
-    "F5": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "F5"
-          }
-        }
-      }
-    },
-    "%@": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@"
-          }
-        }
-      }
-    },
-    "%@%%": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@%%"
-          }
-        }
-      }
-    },
-    "BYOK": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "BYOK"
-          }
-        }
-      }
-    },
-    "Push to talk": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Push to talk"
-          }
-        }
-      }
-    },
-    "Toggle": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Alternato"
-          }
-        }
-      }
-    },
-    "Hybrid": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ibrido"
-          }
-        }
-      }
-    },
-    "Release builds keep the bridge off by default so notarised binaries don't open a local listener without consent. Turn it on when you want to drive Parola from Claude Code / Codex / a custom MCP client.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le build Release tengono il bridge spento per default, così i binari notarizzati non aprono un listener locale senza consenso. Attivalo per pilotare Parola da Claude Code / Codex / un client MCP custom."
-          }
-        }
-      }
-    },
-    "Filter chat (⌘F)": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Filtra chat (⌘F)"
-          }
-        }
-      }
-    },
-    "Trigger words": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Parole trigger"
-          }
-        }
-      }
-    },
-    "summary, recap": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "riepilogo, sintesi"
-          }
-        }
-      }
-    },
-    "Words that switch to this prompt for one dictation. Separate with commas.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Parole che attivano questo prompt per una sola dettatura. Separale con la virgola."
-          }
-        }
-      }
-    },
-    "Assistant mode": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Modalità assistente"
-          }
-        }
-      }
-    },
-    "When on, the LLM answers your dictation instead of cleaning it up. Use this for voice Q&A.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quando attivo, l'LLM risponde alla dettatura invece di pulirla. Utile per Q&A vocali."
-          }
-        }
-      }
-    },
-    "While recording": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Durante la registrazione"
-          }
-        }
-      }
-    },
-    "Mute system audio": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Silenzia l'audio di sistema"
-          }
-        }
-      }
-    },
-    "Mutes the default output device while recording from the microphone, so playback doesn't leak into your transcript. Restores the previous mute state when recording stops.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Silenzia l'uscita audio predefinita durante la registrazione dal microfono, così la riproduzione non finisce nella trascrizione. Ripristina lo stato precedente quando la registrazione finisce."
-          }
-        }
-      }
-    },
-    "Pause Music, Spotify, YouTube": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Metti in pausa Music, Spotify, YouTube"
-          }
-        }
-      }
-    },
-    "Sends a pause command to whatever app is playing media when recording starts, and resumes when it stops.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Invia un comando di pausa all'app che sta riproducendo contenuti quando inizi a registrare, e la fa ripartire quando smetti."
-          }
-        }
-      }
-    },
-    "Both apply to dictation too. Mute is skipped when the recording source is system audio.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Entrambe si applicano anche alla dettatura. La silenziatura viene saltata quando la sorgente è l'audio di sistema."
-          }
-        }
-      }
-    },
-    "Search results": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Risultati della ricerca"
-          }
-        }
-      }
-    },
-    "No transcriptions yet": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ancora nessuna trascrizione"
-          }
-        }
-      }
-    },
-    "No meetings yet": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ancora nessuna riunione"
-          }
-        }
-      }
-    },
-    "No dictations yet": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ancora nessuna dettatura"
-          }
-        }
-      }
-    },
-    "No entries yet": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ancora nessun elemento"
-          }
-        }
-      }
-    },
-    "Any time": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sempre"
-          }
-        }
-      }
-    },
-    "Today": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Oggi"
-          }
-        }
-      }
-    },
-    "Last 7 days": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ultimi 7 giorni"
-          }
-        }
-      }
-    },
-    "Last 30 days": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ultimi 30 giorni"
-          }
-        }
-      }
-    },
-    "Last year": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ultimo anno"
-          }
-        }
-      }
-    },
-    "SubRip Subtitles": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sottotitoli SubRip"
-          }
-        }
-      }
-    },
-    "WebVTT Subtitles": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sottotitoli WebVTT"
-          }
-        }
-      }
-    },
-    "Word Document": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Documento Word"
           }
         }
       }

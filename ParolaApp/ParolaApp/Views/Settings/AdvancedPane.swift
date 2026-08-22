@@ -23,7 +23,7 @@ struct AdvancedPane: View {
 
             SettingsSection("Backup & restore") {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Save the settings from every pane to a `.parola-settings` file, or restore one. Downloaded models and the prompt library are not included.")
+                    Text("Save your settings to a `.parola-settings` file, or restore one. Downloaded models and the prompt library are not included.")
                         .font(DS.Font.caption)
                         .foregroundStyle(.secondary)
                     HStack(spacing: 8) {
@@ -54,7 +54,7 @@ struct AdvancedPane: View {
 
             SettingsSection("Reset") {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Returns every Settings pane to its defaults. Models on disk are untouched.")
+                    Text("Returns every setting to its default. Models on disk are untouched.")
                         .font(DS.Font.caption)
                         .foregroundStyle(.secondary)
                     Button(role: .destructive) {
