@@ -76,12 +76,35 @@ struct FileDiagnosticsSinkTests {
         #expect(object["template"] as? String == "shaped")
     }
 
-    @Test("a write failure disables the sink instead of trapping")
-    func writeFailureDisables() async {
+    @Test("an unwritable directory disables the sink instead of trapping")
+    func unwritableDirectoryDisables() async {
         let unwritable = URL(fileURLWithPath: "/dev/null/nope", isDirectory: true)
         let sink = FileDiagnosticsSink(directory: unwritable)
         sink.enqueue(record(.error, "boom"))
         await sink.flush()
         #expect(sink.isDisabled)
+    }
+
+    @Test("concurrent enqueues across a rotation boundary lose no records")
+    func concurrentEnqueuesAcrossRotationLoseNothing() async throws {
+        let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir, maxFileBytes: 2_000)
+        let total = 200
+        let entry = record(.info, "line")
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<total {
+                group.addTask { sink.enqueue(entry) }
+            }
+        }
+        await sink.flush()
+
+        let files = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix("parola-") && $0.pathExtension == "jsonl" }
+        var lineCount = 0
+        for file in files {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            lineCount += text.split(separator: "\n").count
+        }
+        #expect(lineCount == total)
     }
 }

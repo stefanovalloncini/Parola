@@ -1,16 +1,23 @@
 import Foundation
 import os
 
-public final class FileDiagnosticsSink: DiagnosticsSink {
-    private struct State {
+// fileState is mutated only inside closures dispatched onto fileQueue, its sole owner.
+public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
+    private struct BufferState {
         var buffer: [LogRecord] = []
-        var handle: FileHandle?
-        var bytesWritten: Int = 0
-        var rotation: Int = 0
         var disabled: Bool = false
     }
 
-    private let state = OSAllocatedUnfairLock(initialState: State())
+    private struct FileState {
+        var handle: FileHandle?
+        var bytesWritten: Int = 0
+        var rotation: Int = 0
+    }
+
+    private let bufferState = OSAllocatedUnfairLock(initialState: BufferState())
+    private let fileQueue = DispatchQueue(label: "com.parola.diagnostics.file-sink")
+    private var fileState = FileState()
+
     private let directory: URL
     private let minimumLevel: LogLevel
     private let maxFileBytes: Int
@@ -35,30 +42,40 @@ public final class FileDiagnosticsSink: DiagnosticsSink {
         self.baseName = "parola-\(pid)-\(epoch)"
     }
 
-    public var isDisabled: Bool { state.withLock { $0.disabled } }
+    public var isDisabled: Bool { bufferState.withLock { $0.disabled } }
 
     public var currentFileURL: URL {
-        let rotation = state.withLock { $0.rotation }
+        let rotation = fileQueue.sync { fileState.rotation }
         let name = rotation == 0 ? "\(baseName).jsonl" : "\(baseName)-\(rotation).jsonl"
         return directory.appendingPathComponent(name)
     }
 
     public func enqueue(_ record: LogRecord) {
         guard record.level >= minimumLevel else { return }
-        let shouldDrainNow: Bool = state.withLock { current in
+        let shouldDrainNow: Bool = bufferState.withLock { current in
             guard !current.disabled else { return false }
             current.buffer.append(record)
             return record.level >= .error || current.buffer.count >= 64
         }
-        if shouldDrainNow { drain() }
+        guard shouldDrainNow else { return }
+        if record.level >= .error {
+            fileQueue.sync { self.drainOnQueue() }
+        } else {
+            fileQueue.async { self.drainOnQueue() }
+        }
     }
 
     public func flush() async {
-        drain()
+        await withCheckedContinuation { continuation in
+            fileQueue.async {
+                self.drainOnQueue()
+                continuation.resume()
+            }
+        }
     }
 
-    private func drain() {
-        let pending: [LogRecord] = state.withLock { current in
+    private func drainOnQueue() {
+        let pending: [LogRecord] = bufferState.withLock { current in
             guard !current.disabled, !current.buffer.isEmpty else { return [] }
             let records = current.buffer
             current.buffer = []
@@ -72,7 +89,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink {
             payload.append(line)
             payload.append(0x0A)
         }
-        write(payload)
+        writeOnQueue(payload)
     }
 
     private static func encode(_ record: LogRecord) -> Data? {
@@ -94,41 +111,38 @@ public final class FileDiagnosticsSink: DiagnosticsSink {
         return try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     }
 
-    private func write(_ data: Data) {
-        guard ensureHandle() else { return }
-        state.withLock { current in
-            guard let handle = current.handle else { return }
-            do {
-                try handle.write(contentsOf: data)
-                current.bytesWritten += data.count
-                if current.bytesWritten >= maxFileBytes {
-                    try? handle.close()
-                    current.handle = nil
-                    current.bytesWritten = 0
-                    current.rotation += 1
-                }
-            } catch {
-                current.disabled = true
+    private func writeOnQueue(_ data: Data) {
+        guard ensureHandleOnQueue(), let handle = fileState.handle else { return }
+        do {
+            try handle.write(contentsOf: data)
+            fileState.bytesWritten += data.count
+            if fileState.bytesWritten >= maxFileBytes {
                 try? handle.close()
-                current.handle = nil
+                fileState.handle = nil
+                fileState.bytesWritten = 0
+                fileState.rotation += 1
             }
+        } catch {
+            bufferState.withLock { $0.disabled = true }
+            try? handle.close()
+            fileState.handle = nil
         }
     }
 
-    private func ensureHandle() -> Bool {
-        let needsHandle = state.withLock { !$0.disabled && $0.handle == nil }
-        if !needsHandle { return state.withLock { !$0.disabled } }
+    private func ensureHandleOnQueue() -> Bool {
+        if fileState.handle != nil { return true }
 
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         } catch {
-            state.withLock { $0.disabled = true }
+            bufferState.withLock { $0.disabled = true }
             return false
         }
-        let url = currentFileURL
+        let name = fileState.rotation == 0 ? "\(baseName).jsonl" : "\(baseName)-\(fileState.rotation).jsonl"
+        let url = directory.appendingPathComponent(name)
         if !FileManager.default.fileExists(atPath: url.path) {
             guard FileManager.default.createFile(atPath: url.path, contents: nil) else {
-                state.withLock { $0.disabled = true }
+                bufferState.withLock { $0.disabled = true }
                 return false
             }
         }
@@ -137,13 +151,11 @@ public final class FileDiagnosticsSink: DiagnosticsSink {
             try opened.seekToEnd()
             let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
             let size = (attributes?[.size] as? Int) ?? 0
-            state.withLock {
-                $0.handle = opened
-                $0.bytesWritten = size
-            }
+            fileState.handle = opened
+            fileState.bytesWritten = size
             return true
         } catch {
-            state.withLock { $0.disabled = true }
+            bufferState.withLock { $0.disabled = true }
             return false
         }
     }
