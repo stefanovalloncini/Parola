@@ -82,7 +82,7 @@ public struct LogRecord: Sendable, Equatable {
     }
 
     public var formattedLine: String {
-        let stamp = ISO8601DateFormatter.logStamp.string(from: timestamp)
+        let stamp = LogTimestamp.string(from: timestamp)
         var line = "\(stamp)  \(level.name)  \(category.rawValue)  \(message.rendered)"
         let rendered = formattedFields
         if !rendered.isEmpty { line += "  \(rendered)" }
@@ -90,11 +90,8 @@ public struct LogRecord: Sendable, Equatable {
     }
 }
 
-extension ISO8601DateFormatter {
-    // Formatting on a shared ISO8601DateFormatter is thread-safe; Foundation just hasn't marked it Sendable.
-    nonisolated(unsafe) static let logStamp: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
+enum LogTimestamp {
+    static let style = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+
+    static func string(from date: Date) -> String { style.format(date) }
 }

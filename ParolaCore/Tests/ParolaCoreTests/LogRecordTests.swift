@@ -27,6 +27,7 @@ struct LogRecordTests {
     @Test("a formatted line carries timestamp, level, category and fields")
     func formattedLine() {
         let line = record().formattedLine
+        #expect(line.hasPrefix("2025-08-22T13:58:02.114Z"))
         #expect(line.contains("error"))
         #expect(line.contains("engine.whisperkit"))
         #expect(line.contains("model openai_whisper-large-v3_turbo failed"))
