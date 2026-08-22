@@ -45,12 +45,13 @@ struct DictationPane: View {
             }
             SettingsSection {
                 SettingRow("Enable dictation",
-                           descriptionVerbatim: modeDescription,
+                           descriptionVerbatim: enableDescription,
                            isFirst: true) {
                     Toggle("", isOn: $model.dictationEnabled).labelsHidden()
                         .axLeaf("Dictation.Toggle.Enabled")
                 }
-                SettingRow("Mode") {
+                SettingRow("Mode",
+                           descriptionVerbatim: model.dictationMode.description) {
                     Picker("", selection: $model.dictationModeRaw) {
                         ForEach(DictationMode.allCases, id: \.rawValue) { mode in
                             Text(mode.displayName).tag(mode.rawValue)
@@ -192,8 +193,8 @@ struct DictationPane: View {
         }
     }
 
-    private var modeDescription: String {
-        model.dictationMode.description + " " + String(localized: "While enabled, a mic icon in the menu bar starts and stops dictation.")
+    private var enableDescription: String {
+        String(localized: "Arms the activation key so you can dictate into any app. A mic icon in the menu bar also starts and stops it.")
     }
 
     private var isBareFunctionKey: Bool {

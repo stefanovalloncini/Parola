@@ -1064,6 +1064,17 @@
         }
       }
     },
+    "Arms the activation key so you can dictate into any app. A mic icon in the menu bar also starts and stops it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attiva il tasto di scelta rapida per dettare in qualsiasi app. Anche l'icona del microfono nella barra dei menu avvia e ferma la dettatura."
+          }
+        }
+      }
+    },
     "Ask about this transcript…": {
       "extractionState": "manual",
       "localizations": {
@@ -1406,6 +1417,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Prima i predefiniti"
+          }
+        }
+      }
+    },
+    "Built-in prompts are read-only. Add your own to get a new entry in the Transcript menu.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I prompt integrati sono di sola lettura. Aggiungi i tuoi per avere una nuova voce nel menu Trascrizione."
           }
         }
       }
@@ -3524,6 +3546,28 @@
         }
       }
     },
+    "Folders Parola watches, so anything dropped in is transcribed on its own.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le cartelle sorvegliate da Parola: quello che ci finisce dentro viene trascritto da solo."
+          }
+        }
+      }
+    },
+    "Follows the system unless you pick light or dark.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segue il sistema, a meno che tu non scelga chiaro o scuro."
+          }
+        }
+      }
+    },
     "Font Size": {
       "comment": "A label displayed next to a picker for selecting the font size of a transcript",
       "extractionState": "stale",
@@ -3686,6 +3730,17 @@
         }
       }
     },
+    "Helper tools Parola uses to fetch audio from links.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gli strumenti che Parola usa per scaricare l'audio dai link."
+          }
+        }
+      }
+    },
     "Hide Scratchpad": {
       "extractionState": "manual",
       "localizations": {
@@ -3748,6 +3803,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Home"
+          }
+        }
+      }
+    },
+    "How Parola checks for new versions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Come Parola controlla se ci sono nuove versioni."
+          }
+        }
+      }
+    },
+    "How Parola starts up, plus defaults that apply to every transcript.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Come si avvia Parola e le impostazioni predefinite di ogni trascrizione."
           }
         }
       }
@@ -3928,6 +4005,17 @@
         }
       }
     },
+    "Input level from the selected device, so you can check it before recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il livello in ingresso del dispositivo scelto, per controllarlo prima di registrare."
+          }
+        }
+      }
+    },
     "Install with Homebrew": {
       "extractionState": "manual",
       "localizations": {
@@ -4103,6 +4191,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scorciatoie da tastiera…"
+          }
+        }
+      }
+    },
+    "Keyboard shortcuts for the main window commands.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le scorciatoie da tastiera dei comandi della finestra principale."
           }
         }
       }
@@ -4365,6 +4464,17 @@
         }
       }
     },
+    "Live transcription of what you hear, in a floating window.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La trascrizione in tempo reale di quello che senti, in una finestra mobile."
+          }
+        }
+      }
+    },
     "Load a transcript to run actions.": {
       "extractionState": "manual",
       "localizations": {
@@ -4438,6 +4548,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Modelli locali"
+          }
+        }
+      }
+    },
+    "Looks for a new version straight away.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca subito una nuova versione."
           }
         }
       }
@@ -6217,17 +6338,6 @@
         }
       }
     },
-    "Prompts rewrite transcripts after recording — used by dictation cleanup and the Transcript menu.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I prompt riscrivono le trascrizioni dopo la registrazione — usati dalla pulizia dettatura e dal menu Trascrizione."
-          }
-        }
-      }
-    },
     "Properties": {
       "extractionState": "manual",
       "localizations": {
@@ -6583,6 +6693,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registrazione da %@, %@"
+          }
+        }
+      }
+    },
+    "Recording meeting audio, and what Parola does when a meeting app starts.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La registrazione dell'audio delle riunioni e cosa fa Parola quando parte un'app di riunioni."
           }
         }
       }
@@ -6950,6 +7071,17 @@
         }
       }
     },
+    "Rules that write a transcript to disk as soon as it's ready.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le regole che salvano la trascrizione su disco appena è pronta."
+          }
+        }
+      }
+    },
     "Run `swift build --product parola-mcp` in ParolaCore and relaunch.": {
       "extractionState": "manual",
       "localizations": {
@@ -7286,6 +7418,17 @@
         }
       }
     },
+    "Segments dropped from a transcript when the text matches a pattern.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I segmenti eliminati dalla trascrizione quando il testo corrisponde a un modello."
+          }
+        }
+      }
+    },
     "Segments matching a pattern (case-insensitive, trimmed) are removed before saving.": {
       "extractionState": "manual",
       "localizations": {
@@ -7392,6 +7535,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Impostazioni"
+          }
+        }
+      }
+    },
+    "Short triggers that expand into longer text while you dictate.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abbreviazioni che diventano testo più lungo mentre detti."
           }
         }
       }
@@ -7754,6 +7908,17 @@
         }
       }
     },
+    "Speech models on this Mac, and the space they take up.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I modelli vocali su questo Mac e lo spazio che occupano."
+          }
+        }
+      }
+    },
     "Speech rate": {
       "extractionState": "manual",
       "localizations": {
@@ -8086,6 +8251,17 @@
         }
       }
     },
+    "Substitutions applied to every transcript before it's saved.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le sostituzioni applicate a ogni trascrizione prima del salvataggio."
+          }
+        }
+      }
+    },
     "Subtitle QC": {
       "extractionState": "manual",
       "localizations": {
@@ -8257,6 +8433,17 @@
         }
       }
     },
+    "The MCP server other apps and agents use to drive Parola.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il server MCP con cui altre app e agenti pilotano Parola."
+          }
+        }
+      }
+    },
     "The change is only in this session. Check that Parola can write to its Application Support folder.": {
       "extractionState": "manual",
       "localizations": {
@@ -8268,6 +8455,17 @@
         }
       }
     },
+    "The hotkey that turns speech into text in any app.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il tasto che trasforma la voce in testo in qualsiasi app."
+          }
+        }
+      }
+    },
     "The main-window toolbar overrides these per transcript.": {
       "extractionState": "manual",
       "localizations": {
@@ -8275,6 +8473,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "La toolbar della finestra principale fa override di queste impostazioni per trascrizione."
+          }
+        }
+      }
+    },
+    "The model and language new transcriptions start with.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il modello e la lingua con cui parte ogni nuova trascrizione."
+          }
+        }
+      }
+    },
+    "The prompt library behind dictation cleanup and the Transcript menu.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La libreria di prompt dietro la pulizia della dettatura e il menu Trascrizione."
+          }
+        }
+      }
+    },
+    "Theme colors and how dense the interface is.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I colori del tema e quanto è compatta l'interfaccia."
           }
         }
       }
@@ -9060,6 +9291,17 @@
         }
       }
     },
+    "Version and project links.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Versione e link al progetto."
+          }
+        }
+      }
+    },
     "View all (%lld)": {
       "extractionState": "manual",
       "localizations": {
@@ -9154,6 +9396,28 @@
         }
       }
     },
+    "What each export format puts in the file.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cosa mette nel file ogni formato di esportazione."
+          }
+        }
+      }
+    },
+    "What happens to files exported from a batch run.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cosa succede ai file esportati da un lotto."
+          }
+        }
+      }
+    },
     "When": {
       "extractionState": "manual",
       "localizations": {
@@ -9193,6 +9457,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Quando l'app in primo piano corrisponde, la dettatura usa queste regole. Il prompt pulisce il testo dopo la trascrizione; la lingua suggerisce al motore prima della trascrizione. Le regole URL hanno la precedenza sul predefinito dell'app per i browser supportati."
+          }
+        }
+      }
+    },
+    "Where models are stored, plus backup and reset.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dove sono archiviati i modelli, più backup e ripristino."
+          }
+        }
+      }
+    },
+    "Whether Parola translates transcripts into English as it works.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se Parola traduce in inglese le trascrizioni mentre lavora."
+          }
+        }
+      }
+    },
+    "Whether captions are running right now.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se i sottotitoli sono attivi in questo momento."
+          }
+        }
+      }
+    },
+    "Which input Parola records from, and what happens while recording.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Da quale ingresso registra Parola e cosa succede durante la registrazione."
           }
         }
       }
@@ -9237,6 +9545,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Documento Word"
+          }
+        }
+      }
+    },
+    "Word replacements applied to dictated text after each take.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le sostituzioni applicate al testo dettato dopo ogni ripresa."
           }
         }
       }

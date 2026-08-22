@@ -61,3 +61,23 @@ struct SettingsSidebarCatalogTests {
         #expect(!SettingsSidebarCatalog.matches(route: .about, query: "srt"))
     }
 }
+
+@Suite("Settings pane summaries")
+struct SettingsPaneSummaryTests {
+    @Test("every pane explains itself in one sentence")
+    func everyRouteHasASummary() {
+        for route in SettingsRoute.allCases {
+            let summary = route.summary
+            #expect(!summary.isEmpty, "\(route.rawValue) has no summary")
+            #expect(summary != route.label, "\(route.rawValue) summary repeats its title")
+            #expect(summary.hasSuffix("."), "\(route.rawValue) summary is not a sentence")
+        }
+    }
+
+    @Test("summaries are searchable from the sidebar")
+    func summaryFeedsSearch() {
+        let hits = SettingsSidebarCatalog.visibleGroups(features: .all, search: "hotkey")
+            .flatMap(\.routes)
+        #expect(hits.contains(.dictation))
+    }
+}

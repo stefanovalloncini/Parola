@@ -9,7 +9,9 @@ struct CustomizationPane: View {
         @Bindable var model = model
         return VStack(alignment: .leading, spacing: 12) {
             SettingsSection {
-                SettingRow("Appearance", isFirst: true) {
+                SettingRow("Appearance",
+                           description: "Follows the system unless you pick light or dark.",
+                           isFirst: true) {
                     Picker("", selection: $model.appTheme) {
                         Text("Match system").tag("system")
                         Text("Light").tag("light")

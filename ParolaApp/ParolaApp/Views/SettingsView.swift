@@ -47,6 +47,8 @@ enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
 
     var label: String { String(localized: String.LocalizationValue(meta.titleKey)) }
     var localizedLabelKey: LocalizedStringKey { LocalizedStringKey(meta.titleKey) }
+    var summary: String { String(localized: String.LocalizationValue(meta.summaryKey)) }
+    var localizedSummaryKey: LocalizedStringKey { LocalizedStringKey(meta.summaryKey) }
     var symbol: String { meta.symbol }
     var paneScope: SettingsPaneScope? { meta.scope }
 
@@ -79,7 +81,7 @@ enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     }
 
     var searchTerms: [String] {
-        var terms = [label.lowercased()]
+        var terms = [label.lowercased(), summary.lowercased()]
         terms.append(contentsOf: extraSearchKeywords.map { $0.lowercased() })
         if let paneScope {
             terms.append(contentsOf: paneScope.searchKeywords.map { $0.lowercased() })
@@ -90,34 +92,35 @@ enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
 
 private struct SettingsRouteMeta {
     let titleKey: String
+    let summaryKey: String
     let symbol: String
     let scope: SettingsPaneScope?
 
     static let table: [SettingsRoute: SettingsRouteMeta] = [
-        .general: SettingsRouteMeta(titleKey: "General", symbol: "gearshape", scope: .general),
-        .customization: SettingsRouteMeta(titleKey: "Customization", symbol: "paintbrush", scope: .customization),
-        .watchedFolders: SettingsRouteMeta(titleKey: "Watched Folders", symbol: "folder.badge.gearshape", scope: .watchedFolders),
-        .recordMeetings: SettingsRouteMeta(titleKey: "Record Meetings", symbol: "video.bubble", scope: .recordMeetings),
-        .shortcuts: SettingsRouteMeta(titleKey: "Shortcuts", symbol: "command", scope: .shortcuts),
-        .microphone: SettingsRouteMeta(titleKey: "Microphone", symbol: "mic", scope: .microphone),
-        .liveCaptions: SettingsRouteMeta(titleKey: "Live Captions", symbol: "captions.bubble", scope: .liveCaptions),
-        .dictation: SettingsRouteMeta(titleKey: "Dictation", symbol: "text.bubble", scope: .dictation),
-        .snippets: SettingsRouteMeta(titleKey: "Snippets", symbol: "text.append", scope: .snippets),
-        .corrections: SettingsRouteMeta(titleKey: "Corrections", symbol: "wand.and.rays", scope: .corrections),
-        .localModels: SettingsRouteMeta(titleKey: "Local Models", symbol: "cpu", scope: nil),
-        .transcriptionDefaults: SettingsRouteMeta(titleKey: "Transcription Defaults", symbol: "slider.horizontal.3", scope: .transcriptionDefaults),
-        .translation: SettingsRouteMeta(titleKey: "Translation", symbol: "character.book.closed", scope: .translation),
-        .ignoredSegments: SettingsRouteMeta(titleKey: "Ignored Segments", symbol: "line.3.horizontal.decrease.circle", scope: .ignoredSegments),
-        .findReplace: SettingsRouteMeta(titleKey: "Find & Replace", symbol: "arrow.triangle.2.circlepath", scope: .findReplace),
-        .exportFormats: SettingsRouteMeta(titleKey: "Export Formats", symbol: "square.and.arrow.up", scope: .exportFormats),
-        .batchExport: SettingsRouteMeta(titleKey: "Batch Export", symbol: "rectangle.stack.badge.play", scope: .batchExport),
-        .autoExport: SettingsRouteMeta(titleKey: "Auto-Export", symbol: "arrow.up.doc", scope: .autoExport),
-        .integrations: SettingsRouteMeta(titleKey: "Integrations", symbol: "puzzlepiece.extension", scope: .integrations),
-        .prompts: SettingsRouteMeta(titleKey: "Prompts", symbol: "text.cursor", scope: .prompts),
-        .automation: SettingsRouteMeta(titleKey: "MCP & Automation", symbol: "bolt.horizontal.circle", scope: .automation),
-        .updates: SettingsRouteMeta(titleKey: "Updates", symbol: "arrow.down.circle", scope: .updates),
-        .advanced: SettingsRouteMeta(titleKey: "Advanced", symbol: "wrench.and.screwdriver", scope: .advanced),
-        .about: SettingsRouteMeta(titleKey: "About", symbol: "info.circle", scope: nil)
+        .general: SettingsRouteMeta(titleKey: "General", summaryKey: "How Parola starts up, plus defaults that apply to every transcript.", symbol: "gearshape", scope: .general),
+        .customization: SettingsRouteMeta(titleKey: "Customization", summaryKey: "Theme colors and how dense the interface is.", symbol: "paintbrush", scope: .customization),
+        .watchedFolders: SettingsRouteMeta(titleKey: "Watched Folders", summaryKey: "Folders Parola watches, so anything dropped in is transcribed on its own.", symbol: "folder.badge.gearshape", scope: .watchedFolders),
+        .recordMeetings: SettingsRouteMeta(titleKey: "Record Meetings", summaryKey: "Recording meeting audio, and what Parola does when a meeting app starts.", symbol: "video.bubble", scope: .recordMeetings),
+        .shortcuts: SettingsRouteMeta(titleKey: "Shortcuts", summaryKey: "Keyboard shortcuts for the main window commands.", symbol: "command", scope: .shortcuts),
+        .microphone: SettingsRouteMeta(titleKey: "Microphone", summaryKey: "Which input Parola records from, and what happens while recording.", symbol: "mic", scope: .microphone),
+        .liveCaptions: SettingsRouteMeta(titleKey: "Live Captions", summaryKey: "Live transcription of what you hear, in a floating window.", symbol: "captions.bubble", scope: .liveCaptions),
+        .dictation: SettingsRouteMeta(titleKey: "Dictation", summaryKey: "The hotkey that turns speech into text in any app.", symbol: "text.bubble", scope: .dictation),
+        .snippets: SettingsRouteMeta(titleKey: "Snippets", summaryKey: "Short triggers that expand into longer text while you dictate.", symbol: "text.append", scope: .snippets),
+        .corrections: SettingsRouteMeta(titleKey: "Corrections", summaryKey: "Word replacements applied to dictated text after each take.", symbol: "wand.and.rays", scope: .corrections),
+        .localModels: SettingsRouteMeta(titleKey: "Local Models", summaryKey: "Speech models on this Mac, and the space they take up.", symbol: "cpu", scope: nil),
+        .transcriptionDefaults: SettingsRouteMeta(titleKey: "Transcription Defaults", summaryKey: "The model and language new transcriptions start with.", symbol: "slider.horizontal.3", scope: .transcriptionDefaults),
+        .translation: SettingsRouteMeta(titleKey: "Translation", summaryKey: "Whether Parola translates transcripts into English as it works.", symbol: "character.book.closed", scope: .translation),
+        .ignoredSegments: SettingsRouteMeta(titleKey: "Ignored Segments", summaryKey: "Segments dropped from a transcript when the text matches a pattern.", symbol: "line.3.horizontal.decrease.circle", scope: .ignoredSegments),
+        .findReplace: SettingsRouteMeta(titleKey: "Find & Replace", summaryKey: "Substitutions applied to every transcript before it's saved.", symbol: "arrow.triangle.2.circlepath", scope: .findReplace),
+        .exportFormats: SettingsRouteMeta(titleKey: "Export Formats", summaryKey: "What each export format puts in the file.", symbol: "square.and.arrow.up", scope: .exportFormats),
+        .batchExport: SettingsRouteMeta(titleKey: "Batch Export", summaryKey: "What happens to files exported from a batch run.", symbol: "rectangle.stack.badge.play", scope: .batchExport),
+        .autoExport: SettingsRouteMeta(titleKey: "Auto-Export", summaryKey: "Rules that write a transcript to disk as soon as it's ready.", symbol: "arrow.up.doc", scope: .autoExport),
+        .integrations: SettingsRouteMeta(titleKey: "Integrations", summaryKey: "Helper tools Parola uses to fetch audio from links.", symbol: "puzzlepiece.extension", scope: .integrations),
+        .prompts: SettingsRouteMeta(titleKey: "Prompts", summaryKey: "The prompt library behind dictation cleanup and the Transcript menu.", symbol: "text.cursor", scope: .prompts),
+        .automation: SettingsRouteMeta(titleKey: "MCP & Automation", summaryKey: "The MCP server other apps and agents use to drive Parola.", symbol: "bolt.horizontal.circle", scope: .automation),
+        .updates: SettingsRouteMeta(titleKey: "Updates", summaryKey: "How Parola checks for new versions.", symbol: "arrow.down.circle", scope: .updates),
+        .advanced: SettingsRouteMeta(titleKey: "Advanced", summaryKey: "Where models are stored, plus backup and reset.", symbol: "wrench.and.screwdriver", scope: .advanced),
+        .about: SettingsRouteMeta(titleKey: "About", summaryKey: "Version and project links.", symbol: "info.circle", scope: nil)
     ]
 }
 
@@ -222,9 +225,15 @@ private struct SettingsDetail: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                Text(route.localizedLabelKey)
-                    .font(DS.Font.title3)
-                    .padding(.top, 20)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(route.localizedLabelKey)
+                        .font(DS.Font.title3)
+                    Text(route.localizedSummaryKey)
+                        .font(DS.Font.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.top, 20)
                 content
                 Spacer(minLength: 24)
             }

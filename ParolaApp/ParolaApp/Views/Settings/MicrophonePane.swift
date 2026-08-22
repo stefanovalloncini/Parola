@@ -48,7 +48,8 @@ struct MicrophonePane: View {
                     .frame(minWidth: 220)
                     .axLeaf("Microphone.Picker.InputDevice")
                 }
-                SettingRow("Live preview") {
+                SettingRow("Live preview",
+                           description: "Input level from the selected device, so you can check it before recording.") {
                     VUMeter(level: level)
                         .frame(width: 220, height: 18)
                 }

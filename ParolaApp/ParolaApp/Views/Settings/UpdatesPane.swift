@@ -27,7 +27,8 @@ struct UpdatesPane: View {
                     .disabled(!feedConfigured)
                     .axLeaf("Updates.Picker.Channel")
                 }
-                SettingRow("Check now") {
+                SettingRow("Check now",
+                           description: "Looks for a new version straight away.") {
                     Button("Check for updates…") {
                         SparkleUpdater.shared.checkForUpdates()
                     }

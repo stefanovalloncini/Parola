@@ -27,7 +27,8 @@ struct LiveCaptionsPane: View {
                         .padding(.top, 2)
                         .axLeaf("LiveCaptions.Label.TranslateWarning")
                 }
-                SettingRow("Status") {
+                SettingRow("Status",
+                           description: "Whether captions are running right now.") {
                     Text(liveCaptions.isActive ? "Running" : "Stopped")
                         .foregroundStyle(.secondary)
                 }

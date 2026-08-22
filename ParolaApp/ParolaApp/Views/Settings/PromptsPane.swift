@@ -45,7 +45,7 @@ struct PromptsPane: View {
                 Spacer()
             }
 
-            SettingHelper(text: "Prompts rewrite transcripts after recording — used by dictation cleanup and the Transcript menu.")
+            SettingHelper(text: "Built-in prompts are read-only. Add your own to get a new entry in the Transcript menu.")
         }
         .task { await reload() }
         .sheet(item: $editing) { draft in
