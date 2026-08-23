@@ -30,9 +30,7 @@ struct ModelStorePolicyTests {
     @Test("an installed model is returned even when downloads are disabled")
     func installedModelSurvivesPolicy() async throws {
         let store = makeStore(["disableModelDownloads": true])
-        let installed = store.installedURL(for: "openai_whisper-tiny")
-        try FileManager.default.createDirectory(at: installed, withIntermediateDirectories: true)
-        try Data("weights".utf8).write(to: installed.appendingPathComponent("model.bin"))
+        try store.seedInstalledModel("openai_whisper-tiny")
         let url = try await store.download(variant: "openai_whisper-tiny")
         #expect(url == store.installedURL(for: "openai_whisper-tiny"))
     }
@@ -195,10 +193,7 @@ struct TranscriptionSessionPolicyTests {
             .appendingPathComponent("parola-default-fallback-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let store = ModelStore(modelsDirectory: dir)
-        try FileManager.default.createDirectory(
-            at: store.installedURL(for: ModelCatalog.fallbackModelID),
-            withIntermediateDirectories: true
-        )
+        try store.seedInstalledModel(ModelCatalog.fallbackModelID)
         let audioURL = dir.appendingPathComponent("input.wav")
         try Data("RIFFstub".utf8).write(to: audioURL)
 

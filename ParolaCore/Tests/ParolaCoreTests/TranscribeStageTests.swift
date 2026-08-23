@@ -91,10 +91,7 @@ struct TranscribeStageTests {
             .appendingPathComponent("parola-stage-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let store = ModelStore(modelsDirectory: dir)
-        try FileManager.default.createDirectory(
-            at: store.installedURL(for: "openai_whisper-tiny"),
-            withIntermediateDirectories: true
-        )
+        try store.seedInstalledModel("openai_whisper-tiny")
         let audioURL = dir.appendingPathComponent("input.wav")
         try Data("RIFFstub".utf8).write(to: audioURL)
         let session = TranscriptionSession(modelStore: store, registry: registry)

@@ -117,10 +117,7 @@ struct TranscriptionSessionIdleTests {
             .appendingPathComponent("parola-idle-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let store = ModelStore(modelsDirectory: dir)
-        try FileManager.default.createDirectory(
-            at: store.installedURL(for: "openai_whisper-tiny"),
-            withIntermediateDirectories: true
-        )
+        try store.seedInstalledModel("openai_whisper-tiny")
         let session = TranscriptionSession(modelStore: store, registry: registry, clock: clock)
         let audioURL = dir.appendingPathComponent("input.wav")
         try Data("RIFFstub".utf8).write(to: audioURL)
