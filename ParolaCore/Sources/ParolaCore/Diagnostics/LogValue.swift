@@ -52,14 +52,12 @@ public enum LogField: String, Sendable, CaseIterable, Comparable {
     case attempt
     case audioSeconds
     case bytes
-    case code
     case count
     case elapsed
     case engine
     case entry
     case error
     case model
-    case reason
     case stage
 
     public static func < (lhs: LogField, rhs: LogField) -> Bool {

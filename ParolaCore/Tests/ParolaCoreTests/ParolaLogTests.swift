@@ -58,8 +58,8 @@ struct ParolaLogTests {
     @Test("the subsystem is configurable by the frontend")
     func configurableSubsystem() throws {
         try withSink { sink in
-            ParolaLog.configure(subsystem: "app.parola.app")
-            defer { ParolaLog.configure(subsystem: "app.parola.core") }
+            ParolaLog.configure(subsystem: .app)
+            defer { ParolaLog.configure(subsystem: .core) }
             ParolaLog.info(.appLifecycle, "launched")
             let records = sink.records.filter { $0.category == .appLifecycle }
             let record = try #require(records.first)

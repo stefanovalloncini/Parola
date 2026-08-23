@@ -55,7 +55,7 @@ public struct LogRecord: Sendable, Equatable {
     public let file: String
     public let line: UInt
 
-    public init(
+    init(
         timestamp: Date,
         level: LogLevel,
         subsystem: String,

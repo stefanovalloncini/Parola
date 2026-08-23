@@ -1,6 +1,7 @@
 import Foundation
 
 public struct LogMessage: ExpressibleByStringInterpolation, Sendable, Equatable {
+    /// Pinning this to `StaticString` is what keeps `LogMessage(stringLiteral:)` from accepting a runtime `String`, and it closes the inherited grapheme-cluster and unicode-scalar literal initializers by inference too.
     public typealias StringLiteralType = StaticString
 
     public enum Segment: Sendable, Equatable {

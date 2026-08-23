@@ -44,4 +44,10 @@ struct LogMessageTests {
         #expect(EngineID.whisperKit.logToken == "whisperkit")
         #expect(ParolaFeature.dictation.logToken == "dictation")
     }
+
+    @Test("String and URL must never conform to LogSafe")
+    func stringIsNotLogSafe() {
+        #expect(("x" as Any) as? any LogSafe == nil)
+        #expect((URL(fileURLWithPath: "/x") as Any) as? any LogSafe == nil)
+    }
 }

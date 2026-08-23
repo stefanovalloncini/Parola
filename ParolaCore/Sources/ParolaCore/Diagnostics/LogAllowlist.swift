@@ -16,6 +16,7 @@ enum LogAllowlist {
     }
 
     static func languageCode(_ code: String) -> String {
+        guard code.count <= 35 else { return unrecognized }
         let pattern = #"^[a-z]{2,3}(-[a-zA-Z0-9]{2,8})*$"#
         return code.range(of: pattern, options: .regularExpression) != nil ? code : unrecognized
     }

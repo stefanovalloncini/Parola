@@ -11,6 +11,6 @@ public enum LogErrorKind {
         if bridged.domain.contains("ErrorDomain") || bridged.domain.hasPrefix("kCF") {
             return "\(bridged.domain).\(bridged.code)"
         }
-        return String(describing: type(of: error))
+        return String(reflecting: type(of: error))
     }
 }

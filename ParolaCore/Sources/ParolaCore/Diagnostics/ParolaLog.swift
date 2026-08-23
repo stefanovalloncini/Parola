@@ -1,18 +1,24 @@
 import Foundation
 import os
 
+public enum LogSubsystem: String, Sendable {
+    case core = "app.parola.core"
+    case app = "app.parola.app"
+    case cli = "app.parola.cli"
+}
+
 public enum ParolaLog {
     private struct State {
         var sink: (any DiagnosticsSink)?
-        var subsystem: String = "app.parola.core"
+        var subsystem: String = LogSubsystem.core.rawValue
         var loggers: [LogCategory: Logger] = [:]
     }
 
     private static let state = OSAllocatedUnfairLock(initialState: State())
 
-    public static func configure(subsystem: String) {
+    public static func configure(subsystem: LogSubsystem) {
         state.withLock {
-            $0.subsystem = subsystem
+            $0.subsystem = subsystem.rawValue
             $0.loggers = [:]
         }
     }
@@ -25,7 +31,7 @@ public enum ParolaLog {
         state.withLock { $0.sink = nil }
     }
 
-    public static var installedSink: (any DiagnosticsSink)? {
+    static var installedSink: (any DiagnosticsSink)? {
         state.withLock { $0.sink }
     }
 

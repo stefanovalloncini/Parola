@@ -20,13 +20,25 @@ struct FileDiagnosticsSinkTests {
         )
     }
 
+    private func waitForContent(
+        _ substring: String, in url: URL, timeout: Duration = .seconds(2)
+    ) async throws {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
+            if let text = try? String(contentsOf: url, encoding: .utf8), text.contains(substring) {
+                return
+            }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        Issue.record("expected \"\(substring)\" in \(url.path) within \(timeout)")
+    }
+
     @Test("an error flushes to disk without an explicit flush")
-    func errorFlushesEagerly() throws {
+    func errorFlushesEagerly() async throws {
         let dir = tempDirectory()
         let sink = FileDiagnosticsSink(directory: dir)
         sink.enqueue(record(.error, "boom"))
-        let text = try String(contentsOf: sink.currentFileURL, encoding: .utf8)
-        #expect(text.contains("boom"))
+        try await waitForContent("boom", in: sink.currentFileURL)
     }
 
     @Test("info records buffer until flushed")

@@ -61,15 +61,15 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
     public var logKind: String {
         switch self {
         case .modelNotFound(let name):
-            return "ParolaError.modelNotFound(\(Self.logSafeModelID(name)))"
+            return "ParolaError.modelNotFound(\(LogAllowlist.modelID(name)))"
         case .unknownModel(let name, _):
-            return "ParolaError.unknownModel(\(Self.logSafeModelID(name)))"
+            return "ParolaError.unknownModel(\(LogAllowlist.modelID(name)))"
         case .policyRestricted:
             return "ParolaError.policyRestricted"
         case .featureDisabled(let feature):
             return "ParolaError.featureDisabled(\(feature.rawValue))"
         case .modelDownloadFailed(let name, _):
-            return "ParolaError.modelDownloadFailed(\(Self.logSafeModelID(name)))"
+            return "ParolaError.modelDownloadFailed(\(LogAllowlist.modelID(name)))"
         case .modelChecksumMismatch:
             return "ParolaError.modelChecksumMismatch"
         case .audioLoadFailed:
@@ -81,26 +81,14 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
         case .captureUnavailable:
             return "ParolaError.captureUnavailable"
         case .invalidLanguage(let code):
-            return "ParolaError.invalidLanguage(\(Self.logSafeLanguageCode(code)))"
+            return "ParolaError.invalidLanguage(\(LogAllowlist.languageCode(code)))"
         case .ioError:
             return "ParolaError.ioError"
         case .engineNotRegistered(let id):
-            return "ParolaError.engineNotRegistered(\(Self.logSafeEngineID(id)))"
+            return "ParolaError.engineNotRegistered(\(LogAllowlist.engineID(id)))"
         case .unsupportedForEngine:
             return "ParolaError.unsupportedForEngine"
         }
-    }
-
-    private static func logSafeModelID(_ name: String) -> String {
-        LogAllowlist.modelID(name)
-    }
-
-    private static func logSafeEngineID(_ id: String) -> String {
-        LogAllowlist.engineID(id)
-    }
-
-    private static func logSafeLanguageCode(_ code: String) -> String {
-        LogAllowlist.languageCode(code)
     }
 }
 

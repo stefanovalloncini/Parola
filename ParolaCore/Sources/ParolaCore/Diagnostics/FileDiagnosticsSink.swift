@@ -40,7 +40,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         let pid = ProcessInfo.processInfo.processIdentifier
         let epoch = Int(Date().timeIntervalSince1970)
         self.baseName = "parola-\(pid)-\(epoch)"
-        sweep(now: Date())
+        DispatchQueue.global(qos: .utility).async { self.sweep(now: Date()) }
     }
 
     public var isDisabled: Bool { bufferState.withLock { $0.disabled } }
@@ -59,11 +59,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             return record.level >= .error || current.buffer.count >= 64
         }
         guard shouldDrainNow else { return }
-        if record.level >= .error {
-            fileQueue.sync { self.drainOnQueue() }
-        } else {
-            fileQueue.async { self.drainOnQueue() }
-        }
+        fileQueue.async { self.drainOnQueue() }
     }
 
     public func flush() async {
@@ -163,7 +159,6 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
 
     func sweep(now: Date) {
         let manager = FileManager.default
-        let activeFilename = currentFileURL.lastPathComponent
         guard let entries = try? manager.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
@@ -180,7 +175,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
             let date = values?.contentModificationDate ?? now
             let size = values?.fileSize ?? 0
-            if date < cutoff && url.lastPathComponent != activeFilename {
+            if date < cutoff && !url.lastPathComponent.hasPrefix(baseName) {
                 try? manager.removeItem(at: url)
                 if manager.fileExists(atPath: url.path) {
                     surviving.append((url, date, size))
@@ -195,7 +190,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         var index = 0
         while total > totalBudgetBytes, index < surviving.count {
             let candidate = surviving[index]
-            if candidate.url.lastPathComponent != activeFilename {
+            if !candidate.url.lastPathComponent.hasPrefix(baseName) {
                 do {
                     try manager.removeItem(at: candidate.url)
                     total -= candidate.size
