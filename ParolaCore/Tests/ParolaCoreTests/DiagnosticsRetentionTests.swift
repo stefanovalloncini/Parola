@@ -51,4 +51,18 @@ struct DiagnosticsRetentionTests {
         sink.sweep(now: Date())
         #expect(FileManager.default.fileExists(atPath: foreign.path))
     }
+
+    @Test("the active file survives both the age cutoff and the budget trim")
+    func activeFileSurvives() throws {
+        let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7, totalBudgetBytes: 100)
+        let active = sink.currentFileURL
+        try Data(repeating: 0x61, count: 5_000).write(to: active)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-30 * 86_400)],
+            ofItemAtPath: active.path
+        )
+        sink.sweep(now: Date())
+        #expect(FileManager.default.fileExists(atPath: active.path))
+    }
 }

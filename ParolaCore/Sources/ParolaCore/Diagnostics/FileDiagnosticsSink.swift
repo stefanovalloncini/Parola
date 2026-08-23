@@ -163,7 +163,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
 
     func sweep(now: Date) {
         let manager = FileManager.default
-        let active = currentFileURL
+        let activeFilename = currentFileURL.lastPathComponent
         guard let entries = try? manager.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
@@ -180,7 +180,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
             let date = values?.contentModificationDate ?? now
             let size = values?.fileSize ?? 0
-            if date < cutoff {
+            if date < cutoff && url.lastPathComponent != activeFilename {
                 try? manager.removeItem(at: url)
             } else {
                 surviving.append((url, date, size))
@@ -192,9 +192,12 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         var index = 0
         while total > totalBudgetBytes, index < surviving.count {
             let candidate = surviving[index]
-            if candidate.url != active {
-                try? manager.removeItem(at: candidate.url)
-                total -= candidate.size
+            if candidate.url.lastPathComponent != activeFilename {
+                do {
+                    try manager.removeItem(at: candidate.url)
+                    total -= candidate.size
+                } catch {
+                }
             }
             index += 1
         }
