@@ -16,7 +16,11 @@ struct SpotlightIndexerLoggingTests {
         )
         #expect(source.contains("Logger(subsystem") == false)
         #expect(source.contains("localizedDescription") == false)
-        #expect(source.contains("ParolaLog."))
+        let facadeCalls = source.components(separatedBy: "ParolaLog.error(.librarySpotlight,").count - 1
+        #expect(
+            facadeCalls == 2,
+            "both the index and deindex catch blocks must report through the facade"
+        )
         #expect(source.contains(#"static let domainID = "com.parola.library""#))
     }
 }
