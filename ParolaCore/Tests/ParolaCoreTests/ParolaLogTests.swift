@@ -55,15 +55,33 @@ struct ParolaLogTests {
         }
     }
 
-    @Test("the subsystem is configurable by the frontend")
-    func configurableSubsystem() throws {
+    @Test("a record's subsystem follows its category, not the host process")
+    func subsystemFollowsCategory() throws {
         try withSink { sink in
-            ParolaLog.configure(subsystem: .app)
-            defer { ParolaLog.configure(subsystem: .core) }
             ParolaLog.info(.appLifecycle, "launched")
-            let records = sink.records.filter { $0.category == .appLifecycle }
-            let record = try #require(records.first)
-            #expect(record.subsystem == "app.parola.app")
+            ParolaLog.info(.library, "swept")
+            ParolaLog.info(.cli, "ran")
+            #expect(sink.records.first { $0.category == .appLifecycle }?.subsystem == .app)
+            #expect(sink.records.first { $0.category == .library }?.subsystem == .core)
+            #expect(sink.records.first { $0.category == .cli }?.subsystem == .cli)
         }
+    }
+
+    @Test("every engine category stays on the subsystem its signposter hardcodes")
+    func engineCategoriesStayOnCore() {
+        let engineCategories: [LogCategory] = [.engineWhisperKit, .engineParakeet, .engineAppleSpeech]
+        for category in engineCategories {
+            #expect(
+                category.subsystem == .core,
+                "\(category.rawValue) must match OSSignposter(subsystem: \"app.parola.core\")"
+            )
+        }
+    }
+
+    @Test("no category falls outside the three known subsystems")
+    func everyCategoryMapsSomewhere() {
+        let byApp = LogCategory.allCases.filter { $0.subsystem == .app }.map(\.rawValue)
+        #expect(byApp.sorted() == ["app.bridge", "app.lifecycle", "app.permissions", "app.recovery"])
+        #expect(LogCategory.allCases.filter { $0.subsystem == .cli }.map(\.rawValue) == ["cli"])
     }
 }

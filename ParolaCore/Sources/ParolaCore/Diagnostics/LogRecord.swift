@@ -22,6 +22,12 @@ public enum LogLevel: Int, Sendable, Comparable, CaseIterable {
     }
 }
 
+public enum LogSubsystem: String, Sendable {
+    case core = "app.parola.core"
+    case app = "app.parola.app"
+    case cli = "app.parola.cli"
+}
+
 public enum LogCategory: String, Sendable, CaseIterable {
     case engineWhisperKit = "engine.whisperkit"
     case engineParakeet = "engine.parakeet"
@@ -43,12 +49,25 @@ public enum LogCategory: String, Sendable, CaseIterable {
     case appBridge = "app.bridge"
     case appRecovery = "app.recovery"
     case cli
+    case diagnostics
+}
+
+extension LogCategory {
+    /// A framework logs under its own subsystem whatever process hosts it, so Core's categories
+    /// stay on `app.parola.core` and keep matching the engines' hardcoded signposters.
+    public var subsystem: LogSubsystem {
+        switch self {
+        case .appLifecycle, .appPermissions, .appBridge, .appRecovery: .app
+        case .cli: .cli
+        default: .core
+        }
+    }
 }
 
 public struct LogRecord: Sendable, Equatable {
     public let timestamp: Date
     public let level: LogLevel
-    public let subsystem: String
+    public let subsystem: LogSubsystem
     public let category: LogCategory
     public let message: LogMessage
     public let fields: [LogField: LogValue]
@@ -58,7 +77,7 @@ public struct LogRecord: Sendable, Equatable {
     init(
         timestamp: Date,
         level: LogLevel,
-        subsystem: String,
+        subsystem: LogSubsystem,
         category: LogCategory,
         message: LogMessage,
         fields: [LogField: LogValue],

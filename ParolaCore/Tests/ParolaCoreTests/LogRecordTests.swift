@@ -8,7 +8,7 @@ struct LogRecordTests {
         LogRecord(
             timestamp: Date(timeIntervalSince1970: 1_755_871_082.114),
             level: level,
-            subsystem: "app.parola.core",
+            subsystem: .core,
             category: .engineWhisperKit,
             message: "model \(ModelToken("openai_whisper-large-v3_turbo")) failed",
             fields: [.elapsed: .seconds(61.2), .error: .error(ParolaError.ioError("x"))],

@@ -1,27 +1,13 @@
 import Foundation
 import os
 
-public enum LogSubsystem: String, Sendable {
-    case core = "app.parola.core"
-    case app = "app.parola.app"
-    case cli = "app.parola.cli"
-}
-
 public enum ParolaLog {
     private struct State {
         var sink: (any DiagnosticsSink)?
-        var subsystem: String = LogSubsystem.core.rawValue
         var loggers: [LogCategory: Logger] = [:]
     }
 
     private static let state = OSAllocatedUnfairLock(initialState: State())
-
-    public static func configure(subsystem: LogSubsystem) {
-        state.withLock {
-            $0.subsystem = subsystem.rawValue
-            $0.loggers = [:]
-        }
-    }
 
     public static func install(_ sink: any DiagnosticsSink) {
         state.withLock { $0.sink = sink }
@@ -73,29 +59,36 @@ public enum ParolaLog {
         _ file: StaticString,
         _ line: UInt
     ) {
-        let (logger, subsystem) = resolve(category)
         let record = LogRecord(
             timestamp: Date(),
             level: level,
-            subsystem: subsystem,
+            subsystem: category.subsystem,
             category: category,
             message: message,
             fields: fields,
             file: file.description,
             line: line
         )
-        logger.log(level: level.osLogType, "\(record.message.rendered, privacy: .public) \(record.formattedFields, privacy: .public)")
+        let logger = logger(for: category)
+        if logger.isEnabled(type: level.osLogType) {
+            let fieldText = record.formattedFields
+            let text = fieldText.isEmpty
+                ? record.message.rendered
+                : "\(record.message.rendered) \(fieldText)"
+            logger.log(level: level.osLogType, "\(text, privacy: .public)")
+        }
         installedSink?.enqueue(record)
     }
 
-    private static func resolve(_ category: LogCategory) -> (Logger, String) {
+    private static func logger(for category: LogCategory) -> Logger {
         state.withLock { current in
-            if let existing = current.loggers[category] {
-                return (existing, current.subsystem)
-            }
-            let logger = Logger(subsystem: current.subsystem, category: category.rawValue)
+            if let existing = current.loggers[category] { return existing }
+            let logger = Logger(
+                subsystem: category.subsystem.rawValue,
+                category: category.rawValue
+            )
             current.loggers[category] = logger
-            return (logger, current.subsystem)
+            return logger
         }
     }
 }

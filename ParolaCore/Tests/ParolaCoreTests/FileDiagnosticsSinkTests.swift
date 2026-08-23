@@ -14,7 +14,7 @@ struct FileDiagnosticsSinkTests {
     private func record(_ level: LogLevel, _ text: StaticString) -> LogRecord {
         LogRecord(
             timestamp: Date(timeIntervalSince1970: 1_755_871_082),
-            level: level, subsystem: "app.parola.core", category: .models,
+            level: level, subsystem: .core, category: .models,
             message: LogMessage(stringLiteral: text), fields: [:],
             file: "T.swift", line: 1
         )

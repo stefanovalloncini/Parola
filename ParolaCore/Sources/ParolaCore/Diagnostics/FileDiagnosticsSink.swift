@@ -99,7 +99,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         var object: [String: Any] = [
             "ts": LogTimestamp.string(from: record.timestamp),
             "level": record.level.name,
-            "subsystem": record.subsystem,
+            "subsystem": record.subsystem.rawValue,
             "category": record.category.rawValue,
             "message": record.message.rendered,
             "template": record.message.template,
