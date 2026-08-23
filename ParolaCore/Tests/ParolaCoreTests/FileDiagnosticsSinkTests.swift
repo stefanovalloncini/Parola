@@ -97,6 +97,21 @@ struct FileDiagnosticsSinkTests {
         #expect(sink.isDisabled)
     }
 
+    @Test("the sink never blocks a caller on its own file queue")
+    func neverBlocksOnTheFileQueue() throws {
+        let source = try String(
+            contentsOfFile: #filePath.replacingOccurrences(
+                of: "Tests/ParolaCoreTests/FileDiagnosticsSinkTests.swift",
+                with: "Sources/ParolaCore/Diagnostics/FileDiagnosticsSink.swift"
+            ),
+            encoding: .utf8
+        )
+        #expect(
+            source.contains("fileQueue.sync") == false,
+            "fileQueue.sync deadlocks when reached from inside a fileQueue closure, and puts disk I/O on the caller's thread"
+        )
+    }
+
     @Test("concurrent enqueues across a rotation boundary lose no records")
     func concurrentEnqueuesAcrossRotationLoseNothing() async throws {
         let dir = tempDirectory()

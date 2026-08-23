@@ -1,7 +1,8 @@
 import Foundation
 import os
 
-// fileState is mutated only inside closures dispatched onto fileQueue, its sole owner.
+// fileState is mutated only inside closures dispatched onto fileQueue, its sole owner; every
+// other stored property is immutable or lock-protected.
 public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     private struct BufferState {
         var buffer: [LogRecord] = []
@@ -11,10 +12,12 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     private struct FileState {
         var handle: FileHandle?
         var bytesWritten: Int = 0
-        var rotation: Int = 0
     }
 
+    private static let filePrefix = "parola-"
+
     private let bufferState = OSAllocatedUnfairLock(initialState: BufferState())
+    private let rotationState = OSAllocatedUnfairLock(initialState: 0)
     private let fileQueue = DispatchQueue(label: "com.parola.diagnostics.file-sink")
     private var fileState = FileState()
 
@@ -39,16 +42,19 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         self.totalBudgetBytes = totalBudgetBytes
         let pid = ProcessInfo.processInfo.processIdentifier
         let epoch = Int(Date().timeIntervalSince1970)
-        self.baseName = "parola-\(pid)-\(epoch)"
+        self.baseName = "\(Self.filePrefix)\(pid)-\(epoch)"
         DispatchQueue.global(qos: .utility).async { self.sweep(now: Date()) }
     }
 
     public var isDisabled: Bool { bufferState.withLock { $0.disabled } }
 
     public var currentFileURL: URL {
-        let rotation = fileQueue.sync { fileState.rotation }
-        let name = rotation == 0 ? "\(baseName).jsonl" : "\(baseName)-\(rotation).jsonl"
-        return directory.appendingPathComponent(name)
+        directory.appendingPathComponent(currentFileName)
+    }
+
+    private var currentFileName: String {
+        let rotation = rotationState.withLock { $0 }
+        return rotation == 0 ? "\(baseName).jsonl" : "\(baseName)-\(rotation).jsonl"
     }
 
     public func enqueue(_ record: LogRecord) {
@@ -117,7 +123,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
                 try? handle.close()
                 fileState.handle = nil
                 fileState.bytesWritten = 0
-                fileState.rotation += 1
+                rotationState.withLock { $0 += 1 }
             }
         } catch {
             bufferState.withLock { $0.disabled = true }
@@ -135,8 +141,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             bufferState.withLock { $0.disabled = true }
             return false
         }
-        let name = fileState.rotation == 0 ? "\(baseName).jsonl" : "\(baseName)-\(fileState.rotation).jsonl"
-        let url = directory.appendingPathComponent(name)
+        let url = directory.appendingPathComponent(currentFileName)
         if !FileManager.default.fileExists(atPath: url.path) {
             guard FileManager.default.createFile(atPath: url.path, contents: nil) else {
                 bufferState.withLock { $0.disabled = true }
@@ -166,7 +171,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         ) else { return }
 
         let mine = entries.filter {
-            $0.lastPathComponent.hasPrefix("parola-") && $0.pathExtension == "jsonl"
+            $0.lastPathComponent.hasPrefix(Self.filePrefix) && $0.pathExtension == "jsonl"
         }
 
         var surviving: [(url: URL, date: Date, size: Int)] = []
@@ -190,7 +195,8 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         var index = 0
         while total > totalBudgetBytes, index < surviving.count {
             let candidate = surviving[index]
-            if !candidate.url.lastPathComponent.hasPrefix(baseName) {
+            let name = candidate.url.lastPathComponent
+            if !name.hasPrefix(baseName), !Self.isOwnedByLiveProcess(name) {
                 do {
                     try manager.removeItem(at: candidate.url)
                     total -= candidate.size
@@ -199,5 +205,18 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             }
             index += 1
         }
+    }
+
+    /// A sibling process still holding its log open would keep writing into an unlinked inode, so
+    /// the budget trim skips it. A recycled pid can spare a dead process's file until the age
+    /// cutoff — which runs no liveness check — catches it.
+    private static func isOwnedByLiveProcess(_ fileName: String) -> Bool {
+        guard fileName.hasPrefix(filePrefix) else { return false }
+        let rest = fileName.dropFirst(filePrefix.count)
+        guard let separator = rest.firstIndex(of: "-"),
+              let pid = pid_t(rest[rest.startIndex..<separator]),
+              pid > 0
+        else { return false }
+        return kill(pid, 0) == 0 || errno == EPERM
     }
 }

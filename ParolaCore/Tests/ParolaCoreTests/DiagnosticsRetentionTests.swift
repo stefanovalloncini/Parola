@@ -11,6 +11,9 @@ struct DiagnosticsRetentionTests {
         return url
     }
 
+    /// Above PID_MAX, so no process can ever own a file named after it.
+    private static let deadPID = 999_999
+
     private func makeFile(_ dir: URL, _ name: String, bytes: Int, ageDays: Int) throws -> URL {
         let url = dir.appendingPathComponent(name)
         try Data(repeating: 0x61, count: bytes).write(to: url)
@@ -33,9 +36,9 @@ struct DiagnosticsRetentionTests {
     @Test("oldest files are dropped first when over the byte budget")
     func trimsToBudgetOldestFirst() throws {
         let dir = tempDirectory()
-        let oldest = try makeFile(dir, "parola-1-100.jsonl", bytes: 600, ageDays: 3)
-        let middle = try makeFile(dir, "parola-2-200.jsonl", bytes: 600, ageDays: 2)
-        let newest = try makeFile(dir, "parola-3-300.jsonl", bytes: 600, ageDays: 1)
+        let oldest = try makeFile(dir, "parola-\(Self.deadPID)-100.jsonl", bytes: 600, ageDays: 3)
+        let middle = try makeFile(dir, "parola-\(Self.deadPID)-200.jsonl", bytes: 600, ageDays: 2)
+        let newest = try makeFile(dir, "parola-\(Self.deadPID)-300.jsonl", bytes: 600, ageDays: 1)
         let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7, totalBudgetBytes: 1_400)
         sink.sweep(now: Date())
         #expect(FileManager.default.fileExists(atPath: oldest.path) == false)
@@ -50,6 +53,31 @@ struct DiagnosticsRetentionTests {
         let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7)
         sink.sweep(now: Date())
         #expect(FileManager.default.fileExists(atPath: foreign.path))
+    }
+
+    @Test("the budget trim spares a file a live sibling process is still writing")
+    func budgetTrimSparesLiveSibling() throws {
+        let dir = tempDirectory()
+        let livePID = ProcessInfo.processInfo.processIdentifier
+        let sibling = try makeFile(dir, "parola-\(livePID)-100.jsonl", bytes: 600, ageDays: 3)
+        let orphan = try makeFile(dir, "parola-\(Self.deadPID)-200.jsonl", bytes: 600, ageDays: 2)
+        let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7, totalBudgetBytes: 700)
+        sink.sweep(now: Date())
+        #expect(
+            FileManager.default.fileExists(atPath: sibling.path),
+            "deleting a live process's open log unlinks the inode it keeps writing to"
+        )
+        #expect(FileManager.default.fileExists(atPath: orphan.path) == false)
+    }
+
+    @Test("the age cutoff deletes an expired file even when its pid is live again")
+    func expiredFileIsDeletedRegardlessOfLiveness() throws {
+        let dir = tempDirectory()
+        let livePID = ProcessInfo.processInfo.processIdentifier
+        let expired = try makeFile(dir, "parola-\(livePID)-100.jsonl", bytes: 10, ageDays: 9)
+        let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7)
+        sink.sweep(now: Date())
+        #expect(FileManager.default.fileExists(atPath: expired.path) == false)
     }
 
     @Test("the active file survives both the age cutoff and the budget trim")
