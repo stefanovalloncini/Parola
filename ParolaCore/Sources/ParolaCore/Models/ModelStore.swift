@@ -422,7 +422,9 @@ public final class ModelStore: Sendable {
         )
         let engineID = ModelCatalog.variant(id: variant)?.engineID ?? .whisperKit
         var downloader = await registry.downloader(for: engineID)
-        if downloader == nil {
+        // Only bootstrap a registry nobody has populated: register(engineID:) replaces the whole
+        // entry, so seeding built-ins over a caller's own engines would swap out their factory too.
+        if downloader == nil, await registry.registeredEngines().isEmpty {
             await ParolaCoreBootstrap.registerBuiltInEngines(registry: registry)
             downloader = await registry.downloader(for: engineID)
         }

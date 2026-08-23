@@ -67,7 +67,9 @@ public actor TranscriptionSession {
         try await validate(options: options, engineID: engineID, variant: variant)
 
         if !modelStore.isInstalled(modelName) {
-            _ = try await modelStore.download(variant: modelName, progress: downloadProgress)
+            _ = try await modelStore.download(
+                variant: modelName, progress: downloadProgress, registry: registry
+            )
         }
         try Task.checkCancellation()
         cancelIdleTimer()
