@@ -21,6 +21,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     private let fileQueue = DispatchQueue(label: "com.parola.diagnostics.file-sink")
     private var fileState = FileState()
 
+    private let write: @Sendable (FileHandle, Data) throws -> Void
     private let directory: URL
     private let minimumLevel: LogLevel
     private let maxFileBytes: Int
@@ -28,13 +29,34 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     private let totalBudgetBytes: Int
     private let baseName: String
 
-    public init(
+    public convenience init(
         directory: URL,
         minimumLevel: LogLevel = .info,
         maxFileBytes: Int = 5_000_000,
         retentionDays: Int = 7,
         totalBudgetBytes: Int = 10_000_000
     ) {
+        self.init(
+            directory: directory,
+            minimumLevel: minimumLevel,
+            maxFileBytes: maxFileBytes,
+            retentionDays: retentionDays,
+            totalBudgetBytes: totalBudgetBytes,
+            write: { try $0.write(contentsOf: $1) }
+        )
+    }
+
+    /// `write` exists so tests can reach the write-failure branch: once the handle is open, no
+    /// portable filesystem trick makes `write(2)` fail.
+    init(
+        directory: URL,
+        minimumLevel: LogLevel = .info,
+        maxFileBytes: Int = 5_000_000,
+        retentionDays: Int = 7,
+        totalBudgetBytes: Int = 10_000_000,
+        write: @escaping @Sendable (FileHandle, Data) throws -> Void
+    ) {
+        self.write = write
         self.directory = directory
         self.minimumLevel = minimumLevel
         self.maxFileBytes = maxFileBytes
@@ -43,7 +65,15 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         let pid = ProcessInfo.processInfo.processIdentifier
         let epoch = Int(Date().timeIntervalSince1970)
         self.baseName = "\(Self.filePrefix)\(pid)-\(epoch)"
-        DispatchQueue.global(qos: .utility).async { self.sweep(now: Date()) }
+        DispatchQueue.global(qos: .utility).async {
+            let outcome = self.sweep(now: Date())
+            guard outcome.overBudget else { return }
+            ParolaLog.notice(
+                .diagnostics,
+                "diagnostics sweep finished over budget",
+                [.bytes: .bytes(Int64(outcome.bytesRemaining)), .count: .int(outcome.skippedLive)]
+            )
+        }
     }
 
     public var isDisabled: Bool { bufferState.withLock { $0.disabled } }
@@ -117,7 +147,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     private func writeOnQueue(_ data: Data) {
         guard ensureHandleOnQueue(), let handle = fileState.handle else { return }
         do {
-            try handle.write(contentsOf: data)
+            try write(handle, data)
             fileState.bytesWritten += data.count
             if fileState.bytesWritten >= maxFileBytes {
                 try? handle.close()
@@ -162,13 +192,25 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         }
     }
 
-    func sweep(now: Date) {
+    /// What one sweep did. `overBudget` means the trim ran out of files it was allowed to delete
+    /// — every survivor is either this instance's or a live sibling's — so the folder stays large.
+    struct SweepOutcome: Sendable, Equatable {
+        var deleted = 0
+        var skippedLive = 0
+        var bytesRemaining = 0
+        var overBudget = false
+    }
+
+    @discardableResult
+    func sweep(now: Date) -> SweepOutcome {
         let manager = FileManager.default
         guard let entries = try? manager.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
             options: [.skipsHiddenFiles]
-        ) else { return }
+        ) else { return SweepOutcome() }
+
+        var outcome = SweepOutcome()
 
         let mine = entries.filter {
             $0.lastPathComponent.hasPrefix(Self.filePrefix) && $0.pathExtension == "jsonl"
@@ -184,6 +226,8 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
                 try? manager.removeItem(at: url)
                 if manager.fileExists(atPath: url.path) {
                     surviving.append((url, date, size))
+                } else {
+                    outcome.deleted += 1
                 }
             } else {
                 surviving.append((url, date, size))
@@ -196,15 +240,27 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         while total > totalBudgetBytes, index < surviving.count {
             let candidate = surviving[index]
             let name = candidate.url.lastPathComponent
-            if !name.hasPrefix(baseName), !Self.isOwnedByLiveProcess(name) {
-                do {
-                    try manager.removeItem(at: candidate.url)
-                    total -= candidate.size
-                } catch {
-                }
+            if name.hasPrefix(baseName) {
+                index += 1
+                continue
+            }
+            if Self.isOwnedByLiveProcess(name) {
+                outcome.skippedLive += 1
+                index += 1
+                continue
+            }
+            do {
+                try manager.removeItem(at: candidate.url)
+                total -= candidate.size
+                outcome.deleted += 1
+            } catch {
             }
             index += 1
         }
+
+        outcome.bytesRemaining = total
+        outcome.overBudget = total > totalBudgetBytes
+        return outcome
     }
 
     /// A sibling process still holding its log open would keep writing into an unlinked inode, so

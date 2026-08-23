@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-@Suite("Diagnostics retention", .serialized)
+@Suite("Diagnostics retention", .serialized, .logFacade)
 struct DiagnosticsRetentionTests {
     private func tempDirectory() -> URL {
         let url = FileManager.default.temporaryDirectory
@@ -78,6 +78,33 @@ struct DiagnosticsRetentionTests {
         let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7)
         sink.sweep(now: Date())
         #expect(FileManager.default.fileExists(atPath: expired.path) == false)
+    }
+
+    @Test("a sweep that cannot get under budget says so")
+    func sweepReportsStillOverBudget() throws {
+        let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7, totalBudgetBytes: 100)
+        try Data(repeating: 0x61, count: 5_000).write(to: sink.currentFileURL)
+        let livePID = ProcessInfo.processInfo.processIdentifier
+        _ = try makeFile(dir, "parola-\(livePID)-100.jsonl", bytes: 600, ageDays: 3)
+        let outcome = sink.sweep(now: Date())
+        #expect(outcome.overBudget)
+        #expect(outcome.bytesRemaining == 5_600)
+        #expect(outcome.skippedLive == 1)
+        #expect(outcome.deleted == 0)
+    }
+
+    @Test("a sweep that gets under budget reports what it deleted")
+    func sweepReportsDeletions() throws {
+        let dir = tempDirectory()
+        _ = try makeFile(dir, "parola-\(Self.deadPID)-100.jsonl", bytes: 600, ageDays: 9)
+        _ = try makeFile(dir, "parola-\(Self.deadPID)-200.jsonl", bytes: 600, ageDays: 3)
+        _ = try makeFile(dir, "parola-\(Self.deadPID)-300.jsonl", bytes: 600, ageDays: 1)
+        let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7, totalBudgetBytes: 700)
+        let outcome = sink.sweep(now: Date())
+        #expect(outcome.deleted == 2, "one past the age cutoff, one to reach the budget")
+        #expect(outcome.overBudget == false)
+        #expect(outcome.bytesRemaining == 600)
     }
 
     @Test("the active file survives both the age cutoff and the budget trim")

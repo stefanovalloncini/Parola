@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-@Suite("Parola log facade", .serialized)
+@Suite("Parola log facade", .serialized, .logFacade)
 struct ParolaLogTests {
     private func withSink(_ body: (CapturingDiagnosticsSink) throws -> Void) rethrows {
         let sink = CapturingDiagnosticsSink()

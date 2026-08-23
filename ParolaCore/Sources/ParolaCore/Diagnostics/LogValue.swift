@@ -1,11 +1,13 @@
 import Foundation
 
 public struct LogValue: Sendable, Equatable {
-    public enum Kind: String, Sendable, Equatable {
+    enum Kind: String, Sendable, Equatable {
         case int, seconds, bytes, flag, token
     }
 
-    public let kind: Kind
+    /// Not persisted: the exported log stays flat, and `LogField` is closed, so a renderer can
+    /// map field to kind statically instead of paying for it on every line.
+    let kind: Kind
     public let text: String
 
     private init(kind: Kind, text: String) {

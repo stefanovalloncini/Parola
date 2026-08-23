@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-@Suite("File diagnostics sink", .serialized)
+@Suite("File diagnostics sink", .serialized, .logFacade)
 struct FileDiagnosticsSinkTests {
     private func tempDirectory() -> URL {
         let url = FileManager.default.temporaryDirectory
@@ -86,6 +86,24 @@ struct FileDiagnosticsSinkTests {
         #expect(object["category"] as? String == "models")
         #expect(object["message"] as? String == "shaped")
         #expect(object["template"] as? String == "shaped")
+        #expect(object["subsystem"] as? String == "app.parola.core")
+    }
+
+    @Test("field values persist as flat strings, without their kind")
+    func fieldsPersistFlat() async throws {
+        let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir)
+        sink.enqueue(LogRecord(
+            timestamp: Date(timeIntervalSince1970: 1_755_871_082),
+            level: .notice, subsystem: .core, category: .models,
+            message: "sized", fields: [.bytes: .bytes(4823), .elapsed: .seconds(1.2)],
+            file: "T.swift", line: 1
+        ))
+        await sink.flush()
+        let text = try String(contentsOf: sink.currentFileURL, encoding: .utf8)
+        let first = text.split(separator: "\n")[0]
+        let object = try JSONSerialization.jsonObject(with: Data(first.utf8)) as! [String: Any]
+        #expect(object["fields"] as? [String: String] == ["bytes": "4823", "elapsed": "1.20"])
     }
 
     @Test("an unwritable directory disables the sink instead of trapping")
@@ -95,6 +113,21 @@ struct FileDiagnosticsSinkTests {
         sink.enqueue(record(.error, "boom"))
         await sink.flush()
         #expect(sink.isDisabled)
+    }
+
+    @Test("a failing write disables the sink and drops the handle")
+    func writeFailureDisables() async throws {
+        let dir = tempDirectory()
+        struct WriteRefused: Error {}
+        let sink = FileDiagnosticsSink(directory: dir, write: { _, _ in throw WriteRefused() })
+        sink.enqueue(record(.error, "boom"))
+        await sink.flush()
+        #expect(sink.isDisabled)
+
+        sink.enqueue(record(.error, "after"))
+        await sink.flush()
+        let text = (try? String(contentsOf: sink.currentFileURL, encoding: .utf8)) ?? ""
+        #expect(text.isEmpty, "a disabled sink must stop buffering, not queue records forever")
     }
 
     @Test("the sink never blocks a caller on its own file queue")
