@@ -182,6 +182,9 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             let size = values?.fileSize ?? 0
             if date < cutoff && url.lastPathComponent != activeFilename {
                 try? manager.removeItem(at: url)
+                if manager.fileExists(atPath: url.path) {
+                    surviving.append((url, date, size))
+                }
             } else {
                 surviving.append((url, date, size))
             }
