@@ -40,6 +40,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         let pid = ProcessInfo.processInfo.processIdentifier
         let epoch = Int(Date().timeIntervalSince1970)
         self.baseName = "parola-\(pid)-\(epoch)"
+        sweep(now: Date())
     }
 
     public var isDisabled: Bool { bufferState.withLock { $0.disabled } }
@@ -157,6 +158,45 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         } catch {
             bufferState.withLock { $0.disabled = true }
             return false
+        }
+    }
+
+    func sweep(now: Date) {
+        let manager = FileManager.default
+        let active = currentFileURL
+        guard let entries = try? manager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        ) else { return }
+
+        let mine = entries.filter {
+            $0.lastPathComponent.hasPrefix("parola-") && $0.pathExtension == "jsonl"
+        }
+
+        var surviving: [(url: URL, date: Date, size: Int)] = []
+        let cutoff = now.addingTimeInterval(-Double(retentionDays) * 86_400)
+        for url in mine {
+            let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+            let date = values?.contentModificationDate ?? now
+            let size = values?.fileSize ?? 0
+            if date < cutoff {
+                try? manager.removeItem(at: url)
+            } else {
+                surviving.append((url, date, size))
+            }
+        }
+
+        surviving.sort { $0.date < $1.date }
+        var total = surviving.reduce(0) { $0 + $1.size }
+        var index = 0
+        while total > totalBudgetBytes, index < surviving.count {
+            let candidate = surviving[index]
+            if candidate.url != active {
+                try? manager.removeItem(at: candidate.url)
+                total -= candidate.size
+            }
+            index += 1
         }
     }
 }
