@@ -1,12 +1,9 @@
 import CoreSpotlight
 import Foundation
-import os
 import UniformTypeIdentifiers
 
 struct SpotlightIndexer: LibraryIndexer {
     static let domainID = "com.parola.library"
-
-    private static let log = Logger(subsystem: "com.parola.library", category: "spotlight")
 
     init() {}
 
@@ -23,7 +20,9 @@ struct SpotlightIndexer: LibraryIndexer {
         do {
             try await CSSearchableIndex.default().indexSearchableItems([item])
         } catch {
-            Self.log.error("spotlight index failed for \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            var fields: [LogField: LogValue] = [.error: .error(error)]
+            if let uuid = UUID(uuidString: id) { fields[.entry] = .id(uuid) }
+            ParolaLog.error(.librarySpotlight, "spotlight index failed", fields)
         }
     }
 
@@ -31,7 +30,9 @@ struct SpotlightIndexer: LibraryIndexer {
         do {
             try await CSSearchableIndex.default().deleteSearchableItems(withIdentifiers: [id])
         } catch {
-            Self.log.error("spotlight deindex failed for \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            var fields: [LogField: LogValue] = [.error: .error(error)]
+            if let uuid = UUID(uuidString: id) { fields[.entry] = .id(uuid) }
+            ParolaLog.error(.librarySpotlight, "spotlight deindex failed", fields)
         }
     }
 }
