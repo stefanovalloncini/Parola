@@ -33,17 +33,6 @@ struct FileDiagnosticsSinkTests {
         Issue.record("expected \"\(substring)\" in \(url.path) within \(timeout)")
     }
 
-    private func waitForInitialSweep(
-        _ sink: FileDiagnosticsSink, timeout: Duration = .seconds(2)
-    ) async throws {
-        let deadline = ContinuousClock.now + timeout
-        while ContinuousClock.now < deadline {
-            if sink.completedSweeps > 0 { return }
-            try await Task.sleep(for: .milliseconds(5))
-        }
-        Issue.record("the install-time sweep never finished")
-    }
-
     private func waitUntilDeleted(_ url: URL, timeout: Duration = .seconds(2)) async throws {
         let deadline = ContinuousClock.now + timeout
         while ContinuousClock.now < deadline {
@@ -189,7 +178,7 @@ struct FileDiagnosticsSinkTests {
         let dir = tempDirectory()
         var sink: FileDiagnosticsSink? = FileDiagnosticsSink(directory: dir)
         let url = sink!.currentFileURL
-        try await waitForInitialSweep(sink!)
+        try await sink!.waitForInstallSweep()
         sink!.enqueue(record(.info, "last words"))
         sink = nil
         let text = try String(contentsOf: url, encoding: .utf8)
@@ -200,7 +189,7 @@ struct FileDiagnosticsSinkTests {
     func rotationSweepsAgain() async throws {
         let dir = tempDirectory()
         let sink = FileDiagnosticsSink(directory: dir, maxFileBytes: 400)
-        try await waitForInitialSweep(sink)
+        try await sink.waitForInstallSweep()
 
         let expired = dir.appendingPathComponent("parola-999999-100.jsonl")
         try Data(repeating: 0x61, count: 10).write(to: expired)

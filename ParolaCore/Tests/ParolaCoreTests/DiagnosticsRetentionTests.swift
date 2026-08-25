@@ -95,12 +95,13 @@ struct DiagnosticsRetentionTests {
     }
 
     @Test("a sweep that gets under budget reports what it deleted")
-    func sweepReportsDeletions() throws {
+    func sweepReportsDeletions() async throws {
         let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7, totalBudgetBytes: 700)
+        try await sink.waitForInstallSweep()
         _ = try makeFile(dir, "parola-\(Self.deadPID)-100.jsonl", bytes: 600, ageDays: 9)
         _ = try makeFile(dir, "parola-\(Self.deadPID)-200.jsonl", bytes: 600, ageDays: 3)
         _ = try makeFile(dir, "parola-\(Self.deadPID)-300.jsonl", bytes: 600, ageDays: 1)
-        let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7, totalBudgetBytes: 700)
         let outcome = sink.sweep(now: Date())
         #expect(outcome.deleted == 2, "one past the age cutoff, one to reach the budget")
         #expect(outcome.overBudget == false)
