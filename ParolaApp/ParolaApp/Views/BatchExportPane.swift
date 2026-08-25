@@ -87,9 +87,6 @@ struct BatchFormatCard: View {
                     ) {
                         Toggle("", isOn: writeToSourceFolder)
                             .labelsHidden()
-                            .toggleStyle(.switch)
-                            .controlSize(.small)
-                            .tint(DS.Color.accent)
                             .accessibilityIdentifier("batch.format.\(format.fileExtension).toggle")
                             .axLeaf("Export.Toggle.WriteToSourceFolder.\(format.fileExtension)")
                     }
@@ -100,9 +97,6 @@ struct BatchFormatCard: View {
                         ) {
                             Toggle("", isOn: includeTimestamps)
                                 .labelsHidden()
-                                .toggleStyle(.switch)
-                                .controlSize(.small)
-                                .tint(DS.Color.accent)
                                 .axLeaf("Export.Toggle.IncludeTimestamps.\(format.fileExtension)")
                         }
                     }
@@ -178,6 +172,7 @@ struct BatchSettingRow<Control: View>: View {
             }
             Spacer(minLength: DS.Spacing.small)
             control
+                .toggleStyle(DSSwitchToggleStyle())
         }
     }
 }

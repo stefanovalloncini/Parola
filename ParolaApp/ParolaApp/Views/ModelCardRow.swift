@@ -40,9 +40,9 @@ struct ModelCardRow: View {
             trailing
         }
         .padding(14)
-        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
                 .strokeBorder(borderColor, lineWidth: borderWidth)
         )
         .contextMenu {
@@ -64,7 +64,7 @@ struct ModelCardRow: View {
 
     private var iconTile: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
+            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                 .fill(iconTint.opacity(0.15))
             Image(systemName: iconName)
                 .font(DS.Font.title3)
@@ -158,13 +158,13 @@ struct ModelCardRow: View {
     private var chips: [ModelTagChip.Chip] {
         var result: [ModelTagChip.Chip] = []
         if variant.qualityTier == .best {
-            result.append(.init(label: "High accuracy", color: .orange))
+            result.append(.init(label: "High accuracy", color: DS.Palette.warning))
         }
         if variant.speedTier == .fastest {
-            result.append(.init(label: "Fast", color: .green))
+            result.append(.init(label: "Fast", color: DS.Palette.success))
         }
         if case .some(.only(let codes)) = variant.languageScope, codes == ["en"] {
-            result.append(.init(label: "English-only", color: .blue))
+            result.append(.init(label: "English-only", color: DS.Color.secondaryText))
         }
         return result
     }
@@ -214,10 +214,10 @@ struct ModelTagChip: View {
     var body: some View {
         Text(label)
             .font(.caption2.weight(.semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(color)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(color, in: Capsule())
+            .background(color.opacity(0.15), in: Capsule())
     }
 }
 

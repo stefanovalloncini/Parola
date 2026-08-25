@@ -58,6 +58,17 @@ extension View {
     }
 }
 
+/// The switch every settings row's trailing accessory wears. Checkboxes stay for inline labelled
+/// options inside a rule editor, where the label sits next to the box.
+struct DSSwitchToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Toggle(configuration)
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .tint(DS.Color.accent)
+    }
+}
+
 struct DSIconChip: View {
     let systemImage: String
 

@@ -20,17 +20,17 @@ struct StorageRow: View {
                 .truncationMode(.middle)
             Spacer()
             Button("Choose…") { chooseStorage() }
-                .controlSize(.small)
+                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
             if overridePath != nil {
                 Button("Use Default") { resetStorage() }
-                    .controlSize(.small)
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DS.Spacing.medium)
+        .padding(.vertical, DS.Spacing.small)
         .background(
-            RoundedRectangle(cornerRadius: DS.Radius.small)
-                .fill(Color.primary.opacity(0.04))
+            RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
+                .fill(DS.Color.surfaceElevated)
         )
         .onAppear { overridePath = Self.currentOverride() }
         .alert("Restart required", isPresented: $showingRestartAlert) {

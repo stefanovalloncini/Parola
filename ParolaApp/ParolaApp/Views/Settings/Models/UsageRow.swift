@@ -17,11 +17,11 @@ struct UsageRow: View {
                 .foregroundStyle(.primary)
             Spacer()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DS.Spacing.medium)
+        .padding(.vertical, DS.Spacing.small)
         .background(
-            RoundedRectangle(cornerRadius: DS.Radius.small)
-                .fill(Color.primary.opacity(0.04))
+            RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
+                .fill(DS.Color.surfaceElevated)
         )
     }
 }

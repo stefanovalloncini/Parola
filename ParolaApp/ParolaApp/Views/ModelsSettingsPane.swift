@@ -42,22 +42,17 @@ struct ModelsSettingsPane: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                if let error = model.modelActionError {
-                    modelErrorBanner(error)
-                }
-                StorageRow()
-                modelsUsageRow
-                libraryUsageRow
-                controls
-                content
+        VStack(alignment: .leading, spacing: 16) {
+            if let error = model.modelActionError {
+                modelErrorBanner(error)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            StorageRow()
+            modelsUsageRow
+            libraryUsageRow
+            controls
+            content
         }
-        .background(DS.Color.surface)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .task { model.refreshModelList() }
         .confirmationDialog(
             confirmationTitle,
