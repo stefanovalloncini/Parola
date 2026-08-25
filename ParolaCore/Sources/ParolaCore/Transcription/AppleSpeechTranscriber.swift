@@ -96,13 +96,20 @@ actor AppleSpeechTranscriber: Transcriber {
     ) async throws -> Transcript {
         #if canImport(Speech)
         handlers.onStage?(.preparingAudio)
-        let locale = Self.pickLocale(language: options.language)
+        let resolution = try await resolveLocale(
+            url: url,
+            language: options.language,
+            cancellation: cancellation
+        )
+        let locale = resolution.locale
 
         let transcriber = SpeechTranscriber(
             locale: locale,
             transcriptionOptions: [],
             reportingOptions: [],
-            attributeOptions: [.audioTimeRange]
+            attributeOptions: resolution.needsRunConfidence
+                ? [.audioTimeRange, .transcriptionConfidence]
+                : [.audioTimeRange]
         )
 
         do {
@@ -122,8 +129,9 @@ actor AppleSpeechTranscriber: Transcriber {
         let audioFile = try AVAudioFile(forReading: url)
         let durationSeconds = Double(audioFile.length) / audioFile.processingFormat.sampleRate
 
-        let collectorTask = Task { () async throws -> [TranscriptSegment] in
+        let collectorTask = Task { () async throws -> (segments: [TranscriptSegment], confidence: Double?) in
             var segments: [TranscriptSegment] = []
+            var meter = ConfidenceMeter()
             var nextID = 0
             var assembler = SpeechPartialAssembler()
             var sawFirstResult = false
@@ -146,15 +154,16 @@ actor AppleSpeechTranscriber: Transcriber {
                     words: nil
                 ))
                 nextID += 1
+                meter.add(result.text)
                 assembler.addFinal(text)
                 handlers.onPartial?(assembler.tail())
             }
-            return segments
+            return (segments, meter.value)
         }
 
-        let segments: [TranscriptSegment]
+        let run: (segments: [TranscriptSegment], confidence: Double?)
         do {
-            segments = try await withTaskCancellationHandler {
+            run = try await withTaskCancellationHandler {
                 try Task.checkCancellation()
                 _ = try await analyzer.analyzeSequence(from: audioFile)
                 try await analyzer.finalizeAndFinishThroughEndOfInput()
@@ -175,16 +184,110 @@ actor AppleSpeechTranscriber: Transcriber {
             ?? options.language
             ?? "en"
         return Transcript(
-            segments: segments,
+            segments: run.segments,
             language: resolvedLanguage,
             modelName: modelName,
             sourceURL: url,
-            durationSeconds: durationSeconds > 0 ? durationSeconds : nil
+            durationSeconds: durationSeconds > 0 ? durationSeconds : nil,
+            languageDetection: resolution.detection(
+                afterRun: run.confidence,
+                isEmpty: run.segments.isEmpty
+            )
         )
         #else
         throw ParolaError.unsupportedForEngine("Apple Speech framework not available in this build.")
         #endif
     }
+
+    @available(macOS 26.0, iOS 26.0, *)
+    private func resolveLocale(
+        url: URL,
+        language: String?,
+        cancellation: AnalyzerCancellation
+    ) async throws -> LocaleResolution {
+        #if canImport(Speech)
+        if let language, !language.isEmpty {
+            return .specified(Self.pickLocale(language: language))
+        }
+        let fallback = Self.pickLocale(language: nil)
+        guard let pick = try await detectLocale(url: url, fallback: fallback, cancellation: cancellation) else {
+            return .unverified(fallback)
+        }
+        return .probed(pick)
+        #else
+        return .specified(Self.pickLocale(language: language))
+        #endif
+    }
+
+    #if canImport(Speech)
+    @available(macOS 26.0, iOS 26.0, *)
+    private func detectLocale(
+        url: URL,
+        fallback: Locale,
+        cancellation: AnalyzerCancellation
+    ) async throws -> LanguagePick? {
+        let interval = signposter.beginInterval("detect-language")
+        defer { signposter.endInterval("detect-language", interval) }
+        // Only languages whose Speech assets are already on disk are probed: installing one costs
+        // a download the user never asked for, mid-transcribe.
+        let candidates = LanguageCandidates.installedMatches(
+            for: LanguageCandidates.autoDetect(preferred: Locale.preferredLanguages, current: fallback),
+            installed: await SpeechTranscriber.installedLocales
+        )
+        guard candidates.count > 1 else { return nil }
+
+        let probeURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-language-probe-\(UUID().uuidString).caf")
+        defer { try? FileManager.default.removeItem(at: probeURL) }
+        guard let windows = try? ProbeAudioExtractor.extract(from: url, to: probeURL),
+              !windows.isEmpty else { return nil }
+
+        let picker = AutoLanguagePicker { locale in
+            try await Self.runProbe(url: probeURL, locale: locale, cancellation: cancellation)
+        }
+        return try await picker.pick(candidates: candidates, fallback: fallback)
+    }
+
+    @available(macOS 26.0, iOS 26.0, *)
+    private static func runProbe(
+        url: URL,
+        locale: Locale,
+        cancellation: AnalyzerCancellation
+    ) async throws -> LanguageProbeOutcome {
+        let transcriber = SpeechTranscriber(
+            locale: locale,
+            transcriptionOptions: [],
+            reportingOptions: [],
+            attributeOptions: [.transcriptionConfidence]
+        )
+        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        await cancellation.attach(analyzer: analyzer)
+        let file = try AVAudioFile(forReading: url)
+        let collector = Task { () async throws -> LanguageProbeOutcome in
+            var parts: [String] = []
+            var meter = ConfidenceMeter()
+            for try await result in transcriber.results where result.isFinal {
+                parts.append(String(result.text.characters))
+                meter.add(result.text)
+            }
+            return LanguageProbeOutcome(text: parts.joined(separator: " "), confidence: meter.value)
+        }
+        do {
+            return try await withTaskCancellationHandler {
+                try Task.checkCancellation()
+                _ = try await analyzer.analyzeSequence(from: file)
+                try await analyzer.finalizeAndFinishThroughEndOfInput()
+                return try await collector.value
+            } onCancel: {
+                collector.cancel()
+                Task { await cancellation.cancel() }
+            }
+        } catch {
+            collector.cancel()
+            throw error
+        }
+    }
+    #endif
 
     static let regionDefaults: [String: String] = [
         "en": "US", "it": "IT", "fr": "FR", "de": "DE", "es": "ES",
@@ -207,6 +310,23 @@ actor AppleSpeechTranscriber: Transcriber {
 }
 
 #if canImport(Speech)
+@available(macOS 26.0, iOS 26.0, *)
+private struct ConfidenceMeter {
+    private var weighted = 0.0
+    private var weight = 0.0
+
+    var value: Double? { weight > 0 ? weighted / weight : nil }
+
+    mutating func add(_ text: AttributedString) {
+        for run in text.runs {
+            guard let confidence = run.transcriptionConfidence else { continue }
+            let length = Double(text[run.range].characters.count)
+            weighted += confidence * length
+            weight += length
+        }
+    }
+}
+
 @available(macOS 26.0, iOS 26.0, *)
 final actor AnalyzerCancellation {
     private var analyzer: SpeechAnalyzer?

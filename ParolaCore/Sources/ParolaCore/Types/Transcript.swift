@@ -72,6 +72,11 @@ public struct Transcript: Codable, Hashable, Sendable {
     public var summary: Summary?
     public var chatHistory: [ChatMessage]?
 
+    /// Set only when the caller left the language unset and the engine has something to say about
+    /// it. `.assumed` means the language above is a guess the user should be given a chance to
+    /// correct; nil means the run answered no such question.
+    public var languageDetection: LanguageDetection?
+
     public init(
         schemaVersion: Int = Transcript.currentSchemaVersion,
         segments: [TranscriptSegment],
@@ -80,7 +85,8 @@ public struct Transcript: Codable, Hashable, Sendable {
         sourceURL: URL? = nil,
         durationSeconds: Double? = nil,
         summary: Summary? = nil,
-        chatHistory: [ChatMessage]? = nil
+        chatHistory: [ChatMessage]? = nil,
+        languageDetection: LanguageDetection? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.segments = segments
@@ -90,6 +96,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         self.durationSeconds = durationSeconds
         self.summary = summary
         self.chatHistory = chatHistory
+        self.languageDetection = languageDetection
     }
 
     public init(from decoder: any Decoder) throws {
@@ -102,6 +109,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         durationSeconds = try c.decodeIfPresent(Double.self, forKey: .durationSeconds)
         summary = try c.decodeIfPresent(Summary.self, forKey: .summary)
         chatHistory = try c.decodeIfPresent([ChatMessage].self, forKey: .chatHistory)
+        languageDetection = try c.decodeIfPresent(LanguageDetection.self, forKey: .languageDetection)
     }
 
     public var text: String {

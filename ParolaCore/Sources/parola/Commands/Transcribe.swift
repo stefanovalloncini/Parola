@@ -159,7 +159,13 @@ struct Transcribe: AsyncParsableCommand {
                 stderr("warning: summary skipped — \(error.localizedDescription)")
             }
         }
+        warnIfLanguageAssumed(transcript)
         try emitTranscript(transcript, sourceURL: sourceURL, emitter: emitter)
+    }
+
+    private func warnIfLanguageAssumed(_ transcript: Transcript) {
+        guard !mcp, let detection = transcript.languageDetection, detection.isAssumed else { return }
+        stderr("note: couldn't detect the language — assumed \(detection.code). Re-run with --language to set it.")
     }
 
     private func emitTranscript(_ transcript: Transcript, sourceURL: URL, emitter: MCPProgressEmitter) throws {
@@ -219,6 +225,7 @@ struct Transcribe: AsyncParsableCommand {
                 let rendered = try Exporters.exporter(for: format).render(orthographyCorrected(transcript))
                 try rendered.write(to: target, options: .atomic)
                 stderr("✓ \(job.url.lastPathComponent) → \(target.path)")
+                warnIfLanguageAssumed(transcript)
             case .failed(let id, let reason):
                 if let job = jobByID[id] { stderr("✘ \(job.url.lastPathComponent): \(reason)") }
             case .cancelled(let id):
