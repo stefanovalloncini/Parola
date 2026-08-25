@@ -56,12 +56,7 @@ final class AppModel {
     var phase: Phase = .idle
     var transcript: Transcript? {
         didSet {
-            // Backfill re-assigns and returns so the recursive didSet pass runs the side effects exactly once.
-            if let d = pendingMediaDuration, var patched = transcript, (patched.durationSeconds ?? 0) < d - 0.05 {
-                patched.durationSeconds = d
-                transcript = patched
-                return
-            }
+            transcriptMatchesLoadedMedia = false
             if transcript == nil, promptOutput != nil { promptOutput = nil }
             currentSegmentIndex = nil
             cachedTranscriptText = nil
@@ -347,8 +342,10 @@ final class AppModel {
     @ObservationIgnored var playerTimeObserver: Any?
     @ObservationIgnored var timeControlObserver: NSKeyValueObservation?
     @ObservationIgnored var playerInstallToken: Int = 0
-    /// Duration loaded from the player asset, applied once the transcript arrives — the transcribe path installs the player before the transcript exists.
-    @ObservationIgnored var pendingMediaDuration: Double?
+    /// Length of the media the player holds, from the asset or a probe of the file being transcribed.
+    @ObservationIgnored var mediaDurationSeconds: Double?
+    /// True only while the loaded transcript describes that media; a length measured for any other file must never reach it.
+    @ObservationIgnored var transcriptMatchesLoadedMedia = false
 
     var pendingExport: ExportFormat?
     var exportOptionsFormat: ExportFormat?
@@ -1548,7 +1545,7 @@ final class AppModel {
                 }
             }
             guard let self, let duration, self.sourceFileURL == fileURL else { return }
-            if self.pendingMediaDuration == nil { self.pendingMediaDuration = duration }
+            if self.mediaDurationSeconds == nil { self.mediaDurationSeconds = duration }
         }
         filePartialText = ""
         fileTranscribeFraction = nil
@@ -1578,6 +1575,7 @@ final class AppModel {
                 selectedEntryID = nil
                 restorePlaybackSource(fileURL)
                 transcript = processed
+                adoptLoadedMediaDuration()
                 filePartialText = ""
                 fileTranscribeFraction = nil
                 fileTranscribeStage = nil
@@ -1690,7 +1688,7 @@ final class AppModel {
         let throttle = FileProgressThrottle()
         return { [weak self] seconds in
             Task { @MainActor [weak self] in
-                guard let self, let duration = self.pendingMediaDuration, duration > 0 else { return }
+                guard let self, let duration = self.mediaDurationSeconds, duration > 0 else { return }
                 let fraction = min(1, max(throttle.lastFraction, seconds / duration))
                 let percent = Int(fraction * 100)
                 guard percent != throttle.lastPercent else { return }
@@ -1769,6 +1767,7 @@ final class AppModel {
                 selectedEntryID = nil
                 restorePlaybackSource(audioURL)
                 transcript = processed
+                adoptLoadedMediaDuration()
                 phase = .ready
                 persistToLibrary(processed, audioSource: audioURL)
             } catch {
@@ -2287,6 +2286,7 @@ final class AppModel {
             if let audioURL = processed.sourceURL {
                 sourceFileURL = audioURL
                 installPlayer(for: audioURL)
+                adoptLoadedMediaDuration()
             }
             persistToLibrary(
                 processed,
@@ -2370,6 +2370,7 @@ final class AppModel {
             selectedEntryID = nil
             restorePlaybackSource(url)
             transcript = processed
+            adoptLoadedMediaDuration()
             endRecovery(recoveryToken)
             failedTakeAudioURL = nil
             failedTakeTitle = nil
@@ -2625,6 +2626,7 @@ final class AppModel {
             transcript = doc.transcript
             if let audio = doc.audioURL {
                 installPlayer(for: audio)
+                adoptLoadedMediaDuration()
             } else {
                 tearDownPlayer()
             }

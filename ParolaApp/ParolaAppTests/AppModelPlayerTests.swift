@@ -57,22 +57,35 @@ struct AppModelPlayerTests {
         #expect(model.playerInstallToken == before &+ 1)
     }
 
-    @Test("cached media duration is applied to a transcript that arrives after the player")
+    @Test("the media's length is applied to a transcript that arrives after the player")
     func mediaDurationAppliedToLateTranscript() {
         let model = makeModel()
-        model.pendingMediaDuration = 6164
+        model.mediaDurationSeconds = 6164
         model.transcript = Self.makeTranscript([(0, 0, 1)])
+        model.adoptLoadedMediaDuration()
         #expect(model.transcript?.durationSeconds == 6164)
     }
 
-    @Test("cached media duration does not override a longer transcript duration")
-    func mediaDurationDoesNotShrink() {
+    @Test("the media's length replaces a longer recorded duration")
+    func mediaDurationCorrectsAnOverlongTranscript() {
         let model = makeModel()
-        model.pendingMediaDuration = 100
+        model.mediaDurationSeconds = 100
         var transcript = Self.makeTranscript([(0, 0, 1)])
         transcript.durationSeconds = 200
         model.transcript = transcript
-        #expect(model.transcript?.durationSeconds == 200)
+        model.adoptLoadedMediaDuration()
+        #expect(model.transcript?.durationSeconds == 100)
+    }
+
+    @Test("a transcript from another entry never takes the loaded media's length")
+    func mediaDurationStaysOffForeignTranscript() {
+        let model = makeModel()
+        model.mediaDurationSeconds = 100
+        var transcript = Self.makeTranscript([(0, 0, 1)])
+        transcript.durationSeconds = 12
+        model.transcript = transcript
+        model.applyLoadedMediaDuration()
+        #expect(model.transcript?.durationSeconds == 12)
     }
 
     @Test("tearDownPlayer clears player and all derived state")
@@ -343,12 +356,13 @@ struct AppModelPlayerTests {
         #expect(model.currentSegmentID == nil)
     }
 
-    @Test("duration backfill bumps transcriptVersion once")
-    func durationBackfillSingleVersionBump() {
+    @Test("adopting the media's length bumps transcriptVersion once")
+    func durationAdoptionSingleVersionBump() {
         let model = makeModel()
-        model.pendingMediaDuration = 100
-        let before = model.transcriptVersion
+        model.mediaDurationSeconds = 100
         model.transcript = Self.makeTranscript([(0, 0, 2)])
+        let before = model.transcriptVersion
+        model.adoptLoadedMediaDuration()
         #expect(model.transcript?.durationSeconds == 100)
         #expect(model.transcriptVersion == before + 1)
     }

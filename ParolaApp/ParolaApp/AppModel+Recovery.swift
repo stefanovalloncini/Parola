@@ -222,7 +222,6 @@ extension AppModel {
         )
         clearDerivedArtifacts()
         selectedEntryID = nil
-        pendingMediaDuration = nil
         if let audioURL {
             sourceFileURL = audioURL
             installPlayer(for: audioURL)
@@ -231,6 +230,7 @@ extension AppModel {
             tearDownPlayer()
         }
         transcript = restored
+        if audioURL != nil { adoptLoadedMediaDuration() }
         phase = .ready
         route = .transcript
         persistToLibrary(restored, audioSource: audioURL, title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt))

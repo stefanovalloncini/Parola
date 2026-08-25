@@ -304,6 +304,7 @@ extension AppModel {
                 selectedEntryID = id
                 if let audioURL = loaded.document.audioURL {
                     installPlayer(for: audioURL)
+                    adoptLoadedMediaDuration()
                 } else {
                     tearDownPlayer()
                 }

@@ -332,6 +332,7 @@ extension AppModel {
             selectedEntryID = nil
             transcript = t
             installPlayer(for: job.url)
+            adoptLoadedMediaDuration()
             if let pending {
                 Task { [library] in
                     try? await library.updateTranscript(pending.transcript, for: pending.id)
@@ -383,6 +384,7 @@ extension AppModel {
         selectedEntryID = nil
         transcript = t
         installPlayer(for: job.url)
+        adoptLoadedMediaDuration()
         phase = .ready
         route = .transcript
     }

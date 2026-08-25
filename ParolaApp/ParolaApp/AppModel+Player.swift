@@ -19,7 +19,25 @@ extension AppModel {
         isPlaying = false
         currentSegmentID = nil
         currentWordID = nil
-        pendingMediaDuration = nil
+        mediaDurationSeconds = nil
+        transcriptMatchesLoadedMedia = false
+    }
+
+    /// Declares that the loaded transcript describes the media the player holds, so that media's length wins.
+    func adoptLoadedMediaDuration() {
+        transcriptMatchesLoadedMedia = true
+        applyLoadedMediaDuration()
+    }
+
+    func applyLoadedMediaDuration() {
+        guard transcriptMatchesLoadedMedia,
+              let duration = mediaDurationSeconds, duration > 0,
+              var patched = transcript,
+              abs((patched.durationSeconds ?? 0) - duration) > 0.05 else { return }
+        patched.durationSeconds = duration
+        transcript = patched
+        // The assignment clears the flag through didSet, and the patched transcript still describes this media.
+        transcriptMatchesLoadedMedia = true
     }
 
     func installPlayer(for url: URL) {
@@ -51,11 +69,8 @@ extension AppModel {
             guard let self, self.playerInstallToken == token else { return }
             self.hasVideo = !tracks.isEmpty
             if let assetDuration, assetDuration.isFinite, assetDuration > 0 {
-                self.pendingMediaDuration = assetDuration
-                if var t = self.transcript, (t.durationSeconds ?? 0) < assetDuration - 0.05 {
-                    t.durationSeconds = assetDuration
-                    self.transcript = t
-                }
+                self.mediaDurationSeconds = assetDuration
+                self.applyLoadedMediaDuration()
             }
         }
     }
