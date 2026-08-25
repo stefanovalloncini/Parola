@@ -470,6 +470,10 @@ final class ParolaAutomationServer {
             "youtubeSheetOpen": .bool(model.youtubeSheetOpen),
             "liveCaptionsActive": .bool(model.liveCaptions?.isActive ?? false),
             "batchJobCount": .int(model.batchJobs.count),
+            "dropPayload": .string(model.dropDragPayload?.name ?? ""),
+            "dropPayloadCount": .int(model.dropDragPayload?.count ?? 0),
+            "dropHighlight": .string(model.dropHighlight?.rawValue ?? ""),
+            "dropZones": .string(model.dropZonePlan.name),
             "meetingDetectedApp": model.meetingDetectedApp.map { .string($0) } ?? .null,
         ])
     }

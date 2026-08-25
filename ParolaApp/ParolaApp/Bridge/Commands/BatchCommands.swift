@@ -36,6 +36,83 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "dropFiles",
+                area: .batch,
+                summary: "Routes files through the split drop zone: half 'now' transcribes, 'queue' enqueues.",
+                kind: .mutating,
+                args: [
+                    .init(name: "paths", kind: .stringArray, required: true, summary: "Absolute paths to input files"),
+                    .init(
+                        name: "half",
+                        kind: .string(enum: AppModel.DropHalf.allCases.map(\.rawValue)),
+                        required: false,
+                        summary: "Which half of the drop zone the files landed on",
+                        defaultValue: .string(AppModel.DropHalf.now.rawValue)
+                    ),
+                ],
+                handler: { args, ctx in
+                    let urls = try resolveExistingPaths(args)
+                    let raw = (try args.optionalString("half")) ?? AppModel.DropHalf.now.rawValue
+                    guard let half = AppModel.DropHalf(rawValue: raw) else {
+                        throw AutomationError.invalidArgs(field: "half", reason: "unknown half: \(raw)")
+                    }
+                    ctx.model.drop(urls, on: half)
+                    return .object([
+                        "half": .string(half.rawValue),
+                        "count": .int(urls.count),
+                        "route": .string(ctx.model.route.rawValue),
+                    ])
+                }
+            ),
+
+            AutomationCommand(
+                name: "previewDropZone",
+                area: .test,
+                summary: "Test mode only: shapes the split drop overlay without a drag so it can be captured.",
+                kind: .mutating,
+                args: [
+                    .init(
+                        name: "payload",
+                        kind: .string(enum: ["media", "subtitles", "projects", "links", "mixed", "unsupported", ""]),
+                        required: false,
+                        summary: "Payload kind to shape the overlay for; empty clears the preview",
+                        defaultValue: .string("media")
+                    ),
+                    .init(name: "count", kind: .integer, required: false, summary: "How many items the payload holds", defaultValue: .int(3)),
+                    .init(
+                        name: "half",
+                        kind: .string(enum: AppModel.DropHalf.allCases.map(\.rawValue) + [""]),
+                        required: false,
+                        summary: "Which half reads as hot; empty for neither",
+                        defaultValue: .string("")
+                    ),
+                ],
+                handler: { args, ctx in
+                    guard ctx.model.mode == .test else {
+                        throw AutomationError.precondition("previewDropZone needs --test-mode")
+                    }
+                    let name = (try args.optionalString("payload")) ?? ""
+                    guard !name.isEmpty else {
+                        ctx.model.dropDragPayload = nil
+                        ctx.model.dropHighlight = nil
+                        return .object(["payload": .string("")])
+                    }
+                    let count = (try args.optionalInt("count")) ?? 3
+                    guard let payload = DroppedFiles.kind(named: name, count: count) else {
+                        throw AutomationError.invalidArgs(field: "payload", reason: "unknown payload: \(name)")
+                    }
+                    ctx.model.dropDragPayload = payload
+                    ctx.model.dropHighlight = AppModel.DropHalf(rawValue: (try args.optionalString("half")) ?? "")
+                    return .object([
+                        "payload": .string(payload.name),
+                        "count": .int(payload.count),
+                        "half": .string(ctx.model.dropHighlight?.rawValue ?? ""),
+                        "zones": .string(ctx.model.dropZonePlan.name),
+                    ])
+                }
+            ),
+
+            AutomationCommand(
                 name: "clearBatch",
                 area: .batch,
                 summary: "Clears the batch job list.",

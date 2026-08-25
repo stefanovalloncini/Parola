@@ -13,6 +13,39 @@ enum DroppedFiles {
         case links(count: Int)
         case mixed(count: Int)
         case unsupported
+
+        var name: String {
+            switch self {
+            case .media: "media"
+            case .subtitles: "subtitles"
+            case .projects: "projects"
+            case .links: "links"
+            case .mixed: "mixed"
+            case .unsupported: "unsupported"
+            }
+        }
+
+        var count: Int {
+            switch self {
+            case .media(let count), .subtitles(let count), .projects(let count),
+                 .links(let count), .mixed(let count):
+                count
+            case .unsupported:
+                0
+            }
+        }
+    }
+
+    static func kind(named name: String, count: Int) -> Kind? {
+        switch name {
+        case "media": .media(count: count)
+        case "subtitles": .subtitles(count: count)
+        case "projects": .projects(count: count)
+        case "links": .links(count: count)
+        case "mixed": .mixed(count: count)
+        case "unsupported": .unsupported
+        default: nil
+        }
     }
 
     /// Hovering classifies shallow (it runs on every drag entering the window); the drop itself
@@ -141,6 +174,18 @@ extension DroppedFiles {
         case openProjects(count: Int)
         case transcribeLink
         case none
+
+        var name: String {
+            switch self {
+            case .split: "split"
+            case .transcribeOnly: "transcribeOnly"
+            case .queueOnly: "queueOnly"
+            case .importSubtitles: "importSubtitles"
+            case .openProjects: "openProjects"
+            case .transcribeLink: "transcribeLink"
+            case .none: "none"
+            }
+        }
     }
 
     static func plan(
