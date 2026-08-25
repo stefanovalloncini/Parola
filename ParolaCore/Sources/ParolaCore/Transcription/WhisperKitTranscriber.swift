@@ -76,7 +76,9 @@ actor WhisperKitTranscriber: Transcriber {
         }
         let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
         defer { signposter.endInterval("transcribe", interval) }
+        handlers.onStage?(.preparingAudio)
         let probed = options.language == nil ? await probeLanguage(kit: kit, url: url) : nil
+        try Task.checkCancellation()
         let pin = WhisperLanguagePin.resolve(requested: options.language, probed: probed)
         var decoding = DecodingOptions(
             verbose: options.verbose,
@@ -121,7 +123,6 @@ actor WhisperKitTranscriber: Transcriber {
         }
         defer { kit.segmentDiscoveryCallback = nil }
 
-        handlers.onStage?(.preparingAudio)
         let results = await kit.transcribe(
             audioPaths: [url.path],
             decodeOptions: decoding,
