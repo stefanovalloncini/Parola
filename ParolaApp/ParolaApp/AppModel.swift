@@ -310,6 +310,14 @@ final class AppModel {
         return "\(AppModel.modelLabel(selectedModel)) is English-only. Pick a multilingual model (like Whisper) to transcribe other languages."
     }
 
+    /// Set when the loaded transcript's language was a fallback rather than something the engine
+    /// heard; nil for a detected language and for entries saved before the field existed.
+    var assumedLanguageNotice: String? {
+        guard let detection = transcript?.languageDetection, detection.isAssumed else { return nil }
+        let name = LanguageDisplay.name(for: detection.code) ?? detection.code.uppercased()
+        return String(localized: "Parola couldn't detect the language and assumed \(name). Set it in the toolbar and transcribe again.")
+    }
+
     var diarizeMismatchWarning: String? {
         guard diarize, !selectedModelCapabilities.supportsDiarization else { return nil }
         return "\(AppModel.modelLabel(selectedModel)) can't identify speakers, so Diarize is skipped."

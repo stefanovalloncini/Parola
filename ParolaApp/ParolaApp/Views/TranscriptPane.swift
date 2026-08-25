@@ -20,6 +20,26 @@ struct PlayerSurface: NSViewRepresentable {
     }
 }
 
+struct AssumedLanguageNote: View {
+    let text: String
+
+    var body: some View {
+        Label {
+            Text(text)
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.leading)
+        } icon: {
+            Image(systemName: "globe.badge.chevron.backward")
+        }
+        .font(DS.Font.caption)
+        .foregroundStyle(DS.Color.secondaryText)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.small)
+        .axLeaf("Transcript.Label.AssumedLanguage")
+    }
+}
+
 enum TranscriptDisplayMode: String, CaseIterable, Identifiable {
     case transcript
     case segments
@@ -104,6 +124,11 @@ struct TranscriptPane: View {
 
     private var transcriptColumn: some View {
         VStack(spacing: 0) {
+            if let notice = model.assumedLanguageNotice {
+                AssumedLanguageNote(text: notice)
+                Divider()
+            }
+
             transcriptBody
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 

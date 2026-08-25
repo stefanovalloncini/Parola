@@ -1142,6 +1142,17 @@
         }
       }
     },
+    "Assumed language": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lingua ipotizzata"
+          }
+        }
+      }
+    },
     "Audio Duration": {
       "extractionState": "manual",
       "localizations": {
@@ -6012,6 +6023,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parola"
+          }
+        }
+      }
+    },
+    "Parola couldn't detect the language and assumed %@. Set it in the toolbar and transcribe again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola non è riuscita a rilevare la lingua e ha ipotizzato %@. Impostala nella toolbar e trascrivi di nuovo."
           }
         }
       }

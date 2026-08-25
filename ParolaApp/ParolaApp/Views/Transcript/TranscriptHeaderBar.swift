@@ -30,7 +30,7 @@ struct TranscriptHeaderBar: View {
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(Capsule().fill(DS.Color.accent.opacity(0.14)))
-                    .help("Detected language")
+                    .modifier(LanguagePillHelpModifier(isAssumed: model.assumedLanguageNotice != nil))
             }
 
             Spacer()
@@ -179,6 +179,13 @@ struct TranscriptHeaderBar: View {
         model.seekTo(seconds: seconds)
         jumpDraft = ""
         jumpOpen = false
+    }
+}
+
+private struct LanguagePillHelpModifier: ViewModifier {
+    let isAssumed: Bool
+    func body(content: Content) -> some View {
+        content.help(isAssumed ? "Assumed language" : "Detected language")
     }
 }
 
