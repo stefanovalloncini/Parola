@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import os
 @testable import ParolaCore
 
 @Suite("Parola log facade", .serialized, .logFacade)
@@ -52,6 +53,36 @@ struct ParolaLogTests {
             ParolaLog.fault(.cli, "f")
             let records = sink.records.filter { $0.category == .cli }
             #expect(records.map(\.level) == [.debug, .info, .notice, .error, .fault])
+        }
+    }
+
+    @Test("a filtered call builds neither its message nor its fields")
+    func filteredCallBuildsNothing() {
+        ParolaLog.uninstall()
+        let logger = Logger(
+            subsystem: LogSubsystem.core.rawValue, category: LogCategory.models.rawValue
+        )
+        guard !logger.isEnabled(type: .debug) else { return }
+        var builds = 0
+        func token() -> ModelToken {
+            builds += 1
+            return ModelToken("openai_whisper-tiny")
+        }
+        ParolaLog.debug(.models, "loading \(token())", [.model: .safe(token())])
+        #expect(builds == 0)
+    }
+
+    @Test("a call an installed sink will see builds its message and fields")
+    func capturedCallBuildsEverything() {
+        withSink { sink in
+            var builds = 0
+            func token() -> ModelToken {
+                builds += 1
+                return ModelToken("openai_whisper-tiny")
+            }
+            ParolaLog.debug(.models, "loading \(token())", [.model: .safe(token())])
+            #expect(builds == 2)
+            #expect(sink.records.filter { $0.category == .models }.count == 1)
         }
     }
 

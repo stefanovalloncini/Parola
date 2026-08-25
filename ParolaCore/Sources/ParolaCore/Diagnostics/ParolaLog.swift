@@ -22,73 +22,78 @@ public enum ParolaLog {
     }
 
     public static func debug(
-        _ category: LogCategory, _ message: LogMessage,
-        _ fields: [LogField: LogValue] = [:],
+        _ category: LogCategory, _ message: @autoclosure () -> LogMessage,
+        _ fields: @autoclosure () -> [LogField: LogValue] = [:],
         file: StaticString = #fileID, line: UInt = #line
     ) { emit(.debug, category, message, fields, file, line) }
 
     public static func info(
-        _ category: LogCategory, _ message: LogMessage,
-        _ fields: [LogField: LogValue] = [:],
+        _ category: LogCategory, _ message: @autoclosure () -> LogMessage,
+        _ fields: @autoclosure () -> [LogField: LogValue] = [:],
         file: StaticString = #fileID, line: UInt = #line
     ) { emit(.info, category, message, fields, file, line) }
 
     public static func notice(
-        _ category: LogCategory, _ message: LogMessage,
-        _ fields: [LogField: LogValue] = [:],
+        _ category: LogCategory, _ message: @autoclosure () -> LogMessage,
+        _ fields: @autoclosure () -> [LogField: LogValue] = [:],
         file: StaticString = #fileID, line: UInt = #line
     ) { emit(.notice, category, message, fields, file, line) }
 
     public static func error(
-        _ category: LogCategory, _ message: LogMessage,
-        _ fields: [LogField: LogValue] = [:],
+        _ category: LogCategory, _ message: @autoclosure () -> LogMessage,
+        _ fields: @autoclosure () -> [LogField: LogValue] = [:],
         file: StaticString = #fileID, line: UInt = #line
     ) { emit(.error, category, message, fields, file, line) }
 
     public static func fault(
-        _ category: LogCategory, _ message: LogMessage,
-        _ fields: [LogField: LogValue] = [:],
+        _ category: LogCategory, _ message: @autoclosure () -> LogMessage,
+        _ fields: @autoclosure () -> [LogField: LogValue] = [:],
         file: StaticString = #fileID, line: UInt = #line
     ) { emit(.fault, category, message, fields, file, line) }
 
     private static func emit(
         _ level: LogLevel,
         _ category: LogCategory,
-        _ message: LogMessage,
-        _ fields: [LogField: LogValue],
+        _ message: () -> LogMessage,
+        _ fields: () -> [LogField: LogValue],
         _ file: StaticString,
         _ line: UInt
     ) {
+        let (sink, logger) = destination(for: category)
+        let osLogEnabled = logger.isEnabled(type: level.osLogType)
+        guard sink != nil || osLogEnabled else { return }
+
         let record = LogRecord(
             timestamp: Date(),
             level: level,
             subsystem: category.subsystem,
             category: category,
-            message: message,
-            fields: fields,
+            message: message(),
+            fields: fields(),
             file: file.description,
             line: line
         )
-        let logger = logger(for: category)
-        if logger.isEnabled(type: level.osLogType) {
+        if osLogEnabled {
             let fieldText = record.formattedFields
             let text = fieldText.isEmpty
                 ? record.message.rendered
                 : "\(record.message.rendered) \(fieldText)"
             logger.log(level: level.osLogType, "\(text, privacy: .public)")
         }
-        installedSink?.enqueue(record)
+        sink?.enqueue(record)
     }
 
-    private static func logger(for category: LogCategory) -> Logger {
+    private static func destination(
+        for category: LogCategory
+    ) -> ((any DiagnosticsSink)?, Logger) {
         state.withLock { current in
-            if let existing = current.loggers[category] { return existing }
+            if let existing = current.loggers[category] { return (current.sink, existing) }
             let logger = Logger(
                 subsystem: category.subsystem.rawValue,
                 category: category.rawValue
             )
             current.loggers[category] = logger
-            return logger
+            return (current.sink, logger)
         }
     }
 }
