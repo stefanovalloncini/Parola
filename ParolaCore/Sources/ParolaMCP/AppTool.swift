@@ -127,8 +127,8 @@ public enum AppTools {
         AppTool(
             name: "parola_app_set_library_filter",
             bridgeCmd: "setLibraryFilter",
-            description: "Filter the library detail view by entry category. Pass 'transcription', 'meeting', 'dictation', or an empty string to clear the filter and return to Home.",
-            properties: [.string("category", enum: ["transcription", "meeting", "dictation", ""])],
+            description: "Filter the library detail view by entry category. Pass 'transcription', 'meeting', 'dictation', 'all' for the sidebar's All row, or an empty string to clear the filter and return to Home.",
+            properties: [.string("category", enum: ["transcription", "meeting", "dictation", "all", ""])],
             required: []
         ),
         AppTool(
