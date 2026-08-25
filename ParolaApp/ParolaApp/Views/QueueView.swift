@@ -101,10 +101,10 @@ struct QueueView: View {
     }
 
     private var empty: some View {
-        ContentUnavailableView(
-            "No jobs yet",
+        EmptyStateView(
             systemImage: "list.bullet.indent",
-            description: Text("Batch transcriptions appear here. They stay until you clear them.")
+            title: "No jobs yet",
+            message: "Batch transcriptions appear here. They stay until you clear them."
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

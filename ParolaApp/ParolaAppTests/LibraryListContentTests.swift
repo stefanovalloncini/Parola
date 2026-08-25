@@ -126,4 +126,21 @@ struct LibraryListContentTests {
         )
         #expect(byDate.isEmpty)
     }
+
+    @Test("each filter's empty state leads with an action that produces that kind of entry")
+    func emptyActionsMatchTheFilter() {
+        #expect(LibraryListContent.emptyActions(for: .dictation, features: .all).first == .startDictation)
+        #expect(LibraryListContent.emptyActions(for: .meeting, features: .all).first == .recordSystemAudio)
+        #expect(LibraryListContent.emptyActions(for: .transcription, features: .all).first == .openFile)
+        #expect(LibraryListContent.emptyActions(for: nil, features: .all).first == .openFile)
+    }
+
+    @Test("empty-state actions drop the ones their feature is gated off")
+    func emptyActionsRespectFeatures() {
+        let noCapture = FeatureSet(enabled: [.batch])
+        #expect(LibraryListContent.emptyActions(for: nil, features: noCapture) == [.openFile])
+        #expect(LibraryListContent.emptyActions(for: .transcription, features: .all) == [.openFile, .recordMicrophone])
+        #expect(LibraryListContent.emptyActions(for: .meeting, features: noCapture) == [.openFile])
+        #expect(LibraryListContent.emptyActions(for: .dictation, features: noCapture) == [.openFile])
+    }
 }

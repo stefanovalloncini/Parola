@@ -3,39 +3,21 @@ import SwiftUI
 struct BatchEmptyState: View {
     @Environment(AppModel.self) private var model
     let isDropping: Bool
-    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 48
 
     var body: some View {
-        VStack(spacing: DS.Spacing.medium) {
-            Image(systemName: "square.stack.3d.up")
-                .font(.system(size: iconSize, weight: .light))
-                .foregroundStyle(DS.Color.secondaryText.opacity(0.55))
-                .padding(.bottom, DS.Spacing.small)
-
-            Text("Batch Mode.")
-                .font(.system(.largeTitle, design: .default, weight: .bold))
-                .foregroundStyle(DS.Color.primaryText)
-
-            Text("Transcribe and export multiple files at once.\nSelect files to transcribe or drag them onto the app to continue.")
-                .font(DS.Font.body)
-                .foregroundStyle(DS.Color.secondaryText)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-
+        EmptyStateView(
+            systemImage: "square.stack.3d.up",
+            title: "Batch Mode",
+            message: "Transcribe and export multiple files at once. Select files or drag them onto the app."
+        ) {
             Button {
                 model.presentBatchOpenPanel()
             } label: {
                 Text("Open Files")
-                    .font(.body.weight(.semibold))
-                    .padding(.horizontal, DS.Spacing.large)
-                    .padding(.vertical, DS.Spacing.small)
             }
             .buttonStyle(DSPillButtonStyle(kind: .primary))
-            .padding(.top, DS.Spacing.small)
             .accessibilityIdentifier("batch.openFiles")
         }
-        .frame(maxWidth: 460)
-        .padding(DS.Spacing.large)
         .opacity(isDropping ? 0.4 : 1)
     }
 }

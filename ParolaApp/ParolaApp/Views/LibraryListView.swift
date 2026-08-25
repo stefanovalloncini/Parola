@@ -1,7 +1,26 @@
 import SwiftUI
 import ParolaCore
 
+enum LibraryEmptyAction {
+    case openFile
+    case recordMicrophone
+    case recordSystemAudio
+    case startDictation
+}
+
 enum LibraryListContent {
+    /// Leads with the action that produces the kind of entry the filter shows, then the fallbacks.
+    static func emptyActions(for category: EntryCategory?, features: FeatureSet) -> [LibraryEmptyAction] {
+        var actions: [LibraryEmptyAction] = []
+        if category == .meeting, features.isEnabled(.meetings) { actions.append(.recordSystemAudio) }
+        if category == .dictation, features.isEnabled(.dictation) { actions.append(.startDictation) }
+        actions.append(.openFile)
+        if category != .meeting, category != .dictation, features.isEnabled(.micRecording) {
+            actions.append(.recordMicrophone)
+        }
+        return actions
+    }
+
     static func rows(
         from entries: [LibraryEntry],
         category: EntryCategory?,
@@ -41,7 +60,6 @@ struct LibraryListView: View {
     @State private var totalsLabel: String = ""
     @State private var labelOptions: [String] = []
     @State private var languageOptions: [String] = []
-    @ScaledMetric(relativeTo: .largeTitle) private var emptyIconSize: CGFloat = 48
 
     @discardableResult
     private func recomputeEntries() -> [LibraryRowDisplay] {
@@ -258,32 +276,28 @@ struct LibraryListView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: DS.Spacing.regular) {
-            Image(systemName: emptyIcon)
-                .font(.system(size: emptyIconSize, weight: .regular))
-                .foregroundStyle(DS.Color.secondaryText.opacity(0.55))
-            Text(emptyTitle)
-                .font(DS.Font.heading)
-                .foregroundStyle(DS.Color.secondaryText)
-            HStack(spacing: 10) {
+        EmptyStateView(systemImage: emptyIcon, title: emptyTitle) {
+            let actions = LibraryListContent.emptyActions(for: category, features: model.features)
+            ForEach(Array(actions.enumerated()), id: \.offset) { index, action in
                 Button {
-                    model.presentOpenPanel()
+                    perform(action)
                 } label: {
-                    Label("Open file…", systemImage: "doc.badge.plus")
+                    Label(action.title, systemImage: action.systemImage)
                 }
-                .buttonStyle(DSPillButtonStyle(kind: .primary))
-                .axLeaf("Empty.Button.OpenFile")
-                Button {
-                    model.startRecording(source: .microphone)
-                } label: {
-                    Label("Record", systemImage: "mic.fill")
-                }
-                .buttonStyle(.bordered)
-                .axLeaf("Empty.Button.Record")
+                .buttonStyle(DSPillButtonStyle(kind: index == 0 ? .primary : .secondary))
+                .axLeaf(action.axIdentifier)
             }
-            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func perform(_ action: LibraryEmptyAction) {
+        switch action {
+        case .openFile: model.presentOpenPanel()
+        case .recordMicrophone: model.startRecording(source: .microphone)
+        case .recordSystemAudio: model.startRecording(source: .systemAudio)
+        case .startDictation: model.startDictationFromIntent()
+        }
     }
 
     private var headerTitle: LocalizedStringKey {
@@ -312,6 +326,35 @@ struct LibraryListView: View {
         case .meeting: return "person.2"
         case .dictation: return "text.cursor"
         case nil: return searchResults != nil ? "magnifyingglass" : "tray"
+        }
+    }
+}
+
+extension LibraryEmptyAction {
+    var title: LocalizedStringKey {
+        switch self {
+        case .openFile: return "Open file…"
+        case .recordMicrophone: return "Record"
+        case .recordSystemAudio: return "Record System Audio"
+        case .startDictation: return "Start Dictation"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .openFile: return "doc.badge.plus"
+        case .recordMicrophone: return "mic.fill"
+        case .recordSystemAudio: return "waveform.circle.fill"
+        case .startDictation: return "text.cursor"
+        }
+    }
+
+    var axIdentifier: String {
+        switch self {
+        case .openFile: return "Empty.Button.OpenFile"
+        case .recordMicrophone: return "Empty.Button.Record"
+        case .recordSystemAudio: return "Empty.Button.RecordSystemAudio"
+        case .startDictation: return "Empty.Button.StartDictation"
         }
     }
 }

@@ -3,7 +3,6 @@ import ParolaCore
 
 struct EmptyDropZone: View {
     @Environment(AppModel.self) private var model
-    @ScaledMetric(relativeTo: .largeTitle) private var emptyIconSize: CGFloat = 48
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: DS.Spacing.regular), count: 4)
 
@@ -71,16 +70,9 @@ struct EmptyDropZone: View {
                 }
 
                 if model.libraryEntries.isEmpty {
-                    VStack(spacing: DS.Spacing.regular) {
-                        Image(systemName: "clock")
-                            .font(.system(size: emptyIconSize, weight: .regular))
-                            .foregroundStyle(DS.Color.secondaryText.opacity(0.55))
-                        Text("No Transcriptions Yet")
-                            .font(DS.Font.heading)
-                            .foregroundStyle(DS.Color.secondaryText)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, DS.Spacing.xlarge)
+                    EmptyStateView(systemImage: "clock", title: "No Transcriptions Yet")
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, DS.Spacing.medium)
                 }
             }
             .padding(.horizontal, DS.Spacing.large)

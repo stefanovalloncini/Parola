@@ -2,10 +2,11 @@ import SwiftUI
 
 struct EmptyTranscriptPane: View {
     var body: some View {
-        ContentUnavailableView {
-            Label("No Speech Detected", systemImage: "waveform.slash")
-        } description: {
-            Text("Parola didn't find any speech in this audio.")
-        }
+        EmptyStateView(
+            systemImage: "waveform.slash",
+            title: "No Speech Detected",
+            message: "Parola didn't find any speech in this audio."
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
