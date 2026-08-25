@@ -76,11 +76,13 @@ actor WhisperKitTranscriber: Transcriber {
         }
         let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
         defer { signposter.endInterval("transcribe", interval) }
+        let probed = options.language == nil ? await probeLanguage(kit: kit, url: url) : nil
+        let pin = WhisperLanguagePin.resolve(requested: options.language, probed: probed)
         var decoding = DecodingOptions(
             verbose: options.verbose,
             task: options.task == .translate ? .translate : .transcribe,
-            language: options.language,
-            detectLanguage: options.language == nil,
+            language: pin.language,
+            detectLanguage: pin.detectLanguage,
             skipSpecialTokens: true,
             wordTimestamps: options.wordTimestamps,
             chunkingStrategy: .vad
@@ -168,6 +170,44 @@ actor WhisperKitTranscriber: Transcriber {
             sourceURL: url,
             durationSeconds: maxEnd > 0 ? maxEnd : nil
         )
+    }
+
+    private static let languageProbePrefixSeconds: Double = 300
+
+    private func probeLanguage(kit: WhisperKit, url: URL) async -> String? {
+        guard kit.textDecoder.isModelMultilingual else { return nil }
+        guard let samples = probeSamples(url: url), !samples.isEmpty else { return nil }
+        let offset = SpeechWindowFinder.firstSpeechOffset(
+            in: samples, sampleRate: WhisperKit.sampleRate
+        ) ?? 0
+        let windowSamples = kit.featureExtractor.windowSamples ?? Constants.defaultWindowSamples
+        let window = Array(samples[offset..<min(samples.count, offset + windowSamples)])
+        guard !window.isEmpty else { return nil }
+        return try? await kit.detectLangauge(audioArray: window).language
+    }
+
+    private func probeSamples(url: URL) -> [Float]? {
+        guard let buffer = try? AudioProcessor.loadAudio(
+            fromPath: url.path,
+            startTime: 0,
+            endTime: Self.languageProbePrefixSeconds
+        ) else { return nil }
+        return AudioProcessor.convertBufferToArray(buffer: buffer)
+    }
+}
+
+/// Whisper re-detects the language on every VAD chunk when `detectLanguage` is on, and a quiet
+/// chunk lands anywhere — Greek inside an Italian file. One probe up front pins the whole run.
+enum WhisperLanguagePin {
+    static func resolve(
+        requested: String?,
+        probed: String?
+    ) -> (language: String?, detectLanguage: Bool) {
+        if let requested { return (requested, false) }
+        if let probed, !probed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return (probed, false)
+        }
+        return (nil, true)
     }
 }
 
