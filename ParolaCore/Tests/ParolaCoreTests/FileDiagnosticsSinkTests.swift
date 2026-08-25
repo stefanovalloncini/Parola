@@ -165,6 +165,18 @@ struct FileDiagnosticsSinkTests {
         )
     }
 
+    @Test("dropping the sink writes out what it still held")
+    func deallocationDrains() async throws {
+        let dir = tempDirectory()
+        var sink: FileDiagnosticsSink? = FileDiagnosticsSink(directory: dir)
+        let url = sink!.currentFileURL
+        try await waitForInitialSweep(sink!)
+        sink!.enqueue(record(.info, "last words"))
+        sink = nil
+        let text = try String(contentsOf: url, encoding: .utf8)
+        #expect(text.contains("last words"))
+    }
+
     @Test("a rotation re-runs the retention sweep")
     func rotationSweepsAgain() async throws {
         let dir = tempDirectory()

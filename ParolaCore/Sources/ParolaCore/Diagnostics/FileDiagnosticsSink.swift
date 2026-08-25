@@ -69,6 +69,13 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         scheduleSweep()
     }
 
+    /// A queued drain holds a strong `self`, so deinit only runs once the file queue is idle and
+    /// touching `fileState` from here is safe.
+    deinit {
+        drainOnQueue()
+        try? fileState.handle?.close()
+    }
+
     private func scheduleSweep() {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let outcome = self?.sweep(now: Date()), outcome.overBudget else { return }
