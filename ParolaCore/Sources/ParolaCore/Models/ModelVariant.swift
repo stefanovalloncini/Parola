@@ -51,12 +51,28 @@ public struct ModelDownloadSource: Sendable, Hashable, Codable {
     /// Directory under `<store>/models` that holds the installed files, defaulting to `repo/subpath`.
     /// FluidAudio-backed engines override it: their downloader writes to a folder name of its own choosing.
     public let installDirectory: String
+    /// Directories under `<store>/models` an earlier release installed this variant into. They hold
+    /// weights the current entry no longer uses, so the store reports them as removable leftovers.
+    public let supersededInstallDirectories: [String]
 
-    public init(huggingFaceRepo: String, subpath: String, installDirectory: String? = nil) {
+    public init(
+        huggingFaceRepo: String,
+        subpath: String,
+        installDirectory: String? = nil,
+        supersededInstallDirectories: [String] = []
+    ) {
         self.huggingFaceRepo = huggingFaceRepo
         self.subpath = subpath
         self.installDirectory = installDirectory
             ?? [huggingFaceRepo, subpath].filter { !$0.isEmpty }.joined(separator: "/")
+        self.supersededInstallDirectories = supersededInstallDirectories
+    }
+
+    /// The name an engine's own downloader is handed: the repo folder when this source names one,
+    /// otherwise the catalog id, which is what a downloader with no subpath resolves its own
+    /// directory from.
+    public func downloadName(defaultingTo variantID: String) -> String {
+        subpath.isEmpty ? variantID : subpath
     }
 }
 
@@ -71,6 +87,10 @@ public struct ModelVariant: Sendable, Hashable, Identifiable, Codable {
     public let speedTier: SpeedTier
     public let qualityTier: QualityTier
     public let languageScope: SupportedLanguages?
+    /// Decoder depth of the checkpoint this entry promises, read back from the installed
+    /// `config.json`. Set it where a repo folder could plausibly hold a different model than its
+    /// name suggests; a directory that disagrees reads as needing a fresh download.
+    public let expectedDecoderLayers: Int?
     public let badges: [String]
 
     public init(
@@ -84,6 +104,7 @@ public struct ModelVariant: Sendable, Hashable, Identifiable, Codable {
         speedTier: SpeedTier,
         qualityTier: QualityTier,
         languageScope: SupportedLanguages? = nil,
+        expectedDecoderLayers: Int? = nil,
         badges: [String] = []
     ) {
         self.id = id
@@ -96,6 +117,7 @@ public struct ModelVariant: Sendable, Hashable, Identifiable, Codable {
         self.speedTier = speedTier
         self.qualityTier = qualityTier
         self.languageScope = languageScope
+        self.expectedDecoderLayers = expectedDecoderLayers
         self.badges = badges
     }
 }

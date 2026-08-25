@@ -71,6 +71,18 @@ struct Models: AsyncParsableCommand {
                     print("✓  \(name)\(m.label) — \(size)")
                 }
             }
+
+            let superseded = store.supersededInstalls()
+            if !superseded.isEmpty {
+                print("\nUNUSED COPIES")
+                for old in superseded {
+                    let name = old.url.lastPathComponent
+                        .padding(toLength: nameWidth, withPad: " ", startingAt: 0)
+                    let size = store.sizeOnDisk(at: old.url).map(humanBytes) ?? "—"
+                    print("✗  \(name)\(old.displayName) — \(size)")
+                    print("      An earlier release installed it here. Run: parola models rm \(old.variantID)")
+                }
+            }
         }
 
         private func printFlat(_ entries: [ModelInfo]) {

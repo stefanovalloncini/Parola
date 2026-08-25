@@ -32,10 +32,14 @@ public enum ModelCatalog {
             tagline: "Best balance for most people",
             engineID: .whisperKit,
             sizeBytes: 1_600_000_000,
-            downloadSource: whisperKitSource("openai_whisper-large-v3_turbo"),
+            downloadSource: whisperKitSource(
+                "openai_whisper-large-v3-v20240930",
+                replacing: ["openai_whisper-large-v3_turbo"]
+            ),
             category: .recommended,
             speedTier: .fast,
             qualityTier: .best,
+            expectedDecoderLayers: 4,
             badges: ["Multilingual", "Recommended"]
         ),
         ModelVariant(
@@ -131,8 +135,17 @@ public enum ModelCatalog {
         )
     ]
 
-    private static func whisperKitSource(_ id: String) -> ModelDownloadSource {
-        ModelDownloadSource(huggingFaceRepo: "argmaxinc/whisperkit-coreml", subpath: id)
+    /// `replacing` names repo folders an earlier release installed this variant from.
+    private static func whisperKitSource(
+        _ id: String,
+        replacing supersededIDs: [String] = []
+    ) -> ModelDownloadSource {
+        let repo = "argmaxinc/whisperkit-coreml"
+        return ModelDownloadSource(
+            huggingFaceRepo: repo,
+            subpath: id,
+            supersededInstallDirectories: supersededIDs.map { "\(repo)/\($0)" }
+        )
     }
 
     /// Last-resort model when nothing better is known: smallest multilingual Whisper.

@@ -10,6 +10,32 @@ struct ModelCatalogTests {
         #expect(recommended.contains { $0.id == "openai_whisper-large-v3_turbo" })
     }
 
+    @Test("the turbo entry points at the four-layer turbo checkpoint, not plain large-v3")
+    func turboPointsAtTheRealTurboCheckpoint() throws {
+        let turbo = try #require(ModelCatalog.variant(id: "openai_whisper-large-v3_turbo"))
+        let largeV3 = try #require(ModelCatalog.variant(id: "openai_whisper-large-v3"))
+        #expect(turbo.downloadSource.subpath == "openai_whisper-large-v3-v20240930")
+        #expect(turbo.expectedDecoderLayers == 4)
+        #expect(turbo.downloadSource.installDirectory != largeV3.downloadSource.installDirectory)
+        #expect(largeV3.downloadSource.subpath == "openai_whisper-large-v3")
+        #expect(largeV3.expectedDecoderLayers == nil)
+    }
+
+    @Test("the turbo id a stored selection holds still resolves after the folder move")
+    func storedTurboSelectionStillResolves() {
+        #expect(ModelCatalog.variant(id: "openai_whisper-large-v3_turbo")?.displayName == "Whisper Large v3 Turbo")
+        #expect(ModelCatalog.variant(id: "openai_whisper-large-v3_turbo")?.downloadSource
+            .supersededInstallDirectories == ["argmaxinc/whisperkit-coreml/openai_whisper-large-v3_turbo"])
+    }
+
+    @Test("downloadName is the repo folder for Whisper and the catalog id for the rest")
+    func downloadNameFollowsTheSource() throws {
+        let turbo = try #require(ModelCatalog.variant(id: "openai_whisper-large-v3_turbo"))
+        #expect(turbo.downloadSource.downloadName(defaultingTo: turbo.id) == "openai_whisper-large-v3-v20240930")
+        let parakeet = try #require(ModelCatalog.variant(id: "nvidia_parakeet-tdt-0.6b-v2"))
+        #expect(parakeet.downloadSource.downloadName(defaultingTo: parakeet.id) == parakeet.id)
+    }
+
     @Test("Parakeet TDT 0.6B v2 is in the Fastest category and English-only")
     func parakeetIsFastestEnglishOnly() {
         guard let parakeet = ModelCatalog.variant(id: "nvidia_parakeet-tdt-0.6b-v2") else {

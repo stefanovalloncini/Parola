@@ -7,6 +7,23 @@ public struct ModelScan: Sendable {
     public let installed: [ModelInfo]
 }
 
+/// The slice of a Whisper `config.json` that identifies which checkpoint a folder holds.
+private struct WhisperCheckpointConfig: Decodable {
+    let decoderLayers: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case decoderLayers = "decoder_layers"
+    }
+}
+
+/// Weights an earlier release installed for a variant that has since moved to another folder.
+/// Nothing loads them; `ModelStore.delete(variant:)` clears them along with the current install.
+public struct SupersededInstall: Sendable, Hashable {
+    public let variantID: String
+    public let displayName: String
+    public let url: URL
+}
+
 /// Manages the on-disk cache of transcription models.
 ///
 /// Both the macOS app and the CLI use the same cache directory so a model
@@ -133,6 +150,32 @@ public final class ModelStore: Sendable {
             .appendingPathComponent(source.installDirectory, isDirectory: true)
     }
 
+    /// Directories an earlier release installed a variant into, whether or not they still exist.
+    private func supersededURLs(for source: ModelDownloadSource) -> [URL] {
+        source.supersededInstallDirectories.map {
+            modelsDirectory
+                .appendingPathComponent("models", isDirectory: true)
+                .appendingPathComponent($0, isDirectory: true)
+        }
+    }
+
+    /// Leftover weights from a variant that has since moved to another folder, so a caller can
+    /// show what an upgrade orphaned. Only directories that still hold weights are listed.
+    public func supersededInstalls() -> [SupersededInstall] {
+        ModelCatalog.all.flatMap { variant in
+            supersededURLs(for: variant.downloadSource)
+                .filter { url in
+                    guard let entries = try? FileManager.default.contentsOfDirectory(
+                        at: url, includingPropertiesForKeys: [.isDirectoryKey]
+                    ) else { return false }
+                    return containsModelWeights(in: entries)
+                }
+                .map {
+                    SupersededInstall(variantID: variant.id, displayName: variant.displayName, url: $0)
+                }
+        }
+    }
+
     /// Returns the curated catalog merged with what's actually on disk.
     /// Filters by the managed-config engine allowlist if one is set.
     public func catalog() -> [ModelInfo] {
@@ -238,7 +281,7 @@ public final class ModelStore: Sendable {
 
         for variant in roots.allowedVariants {
             let url = installedURL(for: variant.downloadSource)
-            let onDisk = isFullyDownloaded(at: url)
+            let onDisk = isFullyDownloaded(at: url, expecting: variant)
             // Apple Speech ships with macOS: the catalog always calls it installed, and it owns no
             // directory, so the installed-models view only lists it if one somehow exists.
             let builtIn = variant.engineID == .appleSpeech
@@ -252,9 +295,13 @@ public final class ModelStore: Sendable {
             }
         }
 
+        // Superseded directories are reserved too: listing one as an orphan would show a second
+        // row under the variant's own id, claiming installed for a model nothing can load.
+        let catalogDirectories = ModelCatalog.all.flatMap {
+            [installedURL(for: $0.downloadSource)] + supersededURLs(for: $0.downloadSource)
+        }
         let reservedPaths: Set<String> = Set(
-            (ModelCatalog.all.map { installedURL(for: $0.downloadSource) } + serviceOwnedDirectories)
-                .map(\.standardizedFileURL.path)
+            (catalogDirectories + serviceOwnedDirectories).map(\.standardizedFileURL.path)
         )
         let orphanRootPaths = Set(orphanScanRoots.map(\.standardizedFileURL.path))
 
@@ -287,13 +334,27 @@ public final class ModelStore: Sendable {
     /// directory actually holds weights. HuggingFaceDownloader leaves that sidecar behind while a
     /// fetch is incomplete and removes it on success; the weights check catches the directories an
     /// engine downloader creates but fills somewhere else.
-    private func isFullyDownloaded(at url: URL) -> Bool {
+    private func isFullyDownloaded(at url: URL, expecting variant: ModelVariant? = nil) -> Bool {
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: url, includingPropertiesForKeys: [.isDirectoryKey]
         ) else { return false }
         guard !entries.contains(where: { $0.lastPathComponent == HuggingFaceDownloader.sidecarFilename })
         else { return false }
-        return containsModelWeights(in: entries) && compiledBundlesAreComplete(in: entries)
+        return containsModelWeights(in: entries)
+            && compiledBundlesAreComplete(in: entries)
+            && checkpointMatches(variant, at: url)
+    }
+
+    /// Guards against the wrong checkpoint sitting under the right folder name — weights left by an
+    /// older catalog, or a repo folder whose contents don't match what its name advertises. A config
+    /// we can't read or that omits the depth passes: a re-download is worse than a missed check.
+    private func checkpointMatches(_ variant: ModelVariant?, at url: URL) -> Bool {
+        guard let expected = variant?.expectedDecoderLayers else { return true }
+        guard let data = try? Data(contentsOf: url.appendingPathComponent("config.json")),
+              let config = try? JSONDecoder().decode(WhisperCheckpointConfig.self, from: data),
+              let layers = config.decoderLayers
+        else { return true }
+        return layers == expected
     }
 
     /// A compiled CoreML bundle is usable only once its metadata and weights have both landed. An
@@ -366,10 +427,9 @@ public final class ModelStore: Sendable {
     }
 
     public func isInstalled(_ variant: String) -> Bool {
-        if let entry = ModelCatalog.variant(id: variant), entry.engineID == .appleSpeech {
-            return true
-        }
-        return isFullyDownloaded(at: installedURL(for: variant))
+        let entry = ModelCatalog.variant(id: variant)
+        if entry?.engineID == .appleSpeech { return true }
+        return isFullyDownloaded(at: installedURL(for: variant), expecting: entry)
     }
 
     /// Downloads a model variant into our cache directory. If already present, returns immediately.
@@ -430,7 +490,10 @@ public final class ModelStore: Sendable {
         }
         if let downloader {
             return try await downloadViaRegistry(
-                downloader, variant: variant, source: source, progress: progress
+                downloader,
+                name: source.downloadName(defaultingTo: variant),
+                source: source,
+                progress: progress
             )
         }
         // The generic snapshot only reproduces WhisperKit's repo-per-subpath layout. Taking it for
@@ -445,7 +508,7 @@ public final class ModelStore: Sendable {
     /// uses, so an interrupted fetch is never mistaken for an installed model.
     private func downloadViaRegistry(
         _ downloader: EngineRegistry.Downloader,
-        variant: String,
+        name: String,
         source: ModelDownloadSource,
         progress: (@Sendable (Double) -> Void)?
     ) async throws -> URL {
@@ -456,7 +519,7 @@ public final class ModelStore: Sendable {
             let placeholder = DownloadSidecar(repo: source.huggingFaceRepo, revision: "main", files: [:])
             try? placeholder.write(to: sidecar)
         }
-        let result = try await downloader(variant, self, progress)
+        let result = try await downloader(name, self, progress)
         // WhisperKit's HubApi returns success when cancelled between files; keep the sidecar then.
         try Task.checkCancellation()
         try? FileManager.default.removeItem(at: sidecar)
@@ -493,15 +556,21 @@ public final class ModelStore: Sendable {
         }
     }
 
+    /// Removes a variant's directory along with any an earlier release installed it into, so
+    /// deleting a model that has moved folders frees every copy of it.
     public func delete(variant: String) throws {
-        let url = installedURL(for: variant)
-        guard FileManager.default.fileExists(atPath: url.path) else {
+        let superseded = ModelCatalog.variant(id: variant).map { supersededURLs(for: $0.downloadSource) } ?? []
+        let targets = ([installedURL(for: variant)] + superseded)
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+        guard !targets.isEmpty else {
             throw ParolaError.modelNotFound(variant)
         }
-        do {
-            try FileManager.default.removeItem(at: url)
-        } catch {
-            throw ParolaError.ioError("Failed to delete \(variant): \(error.localizedDescription)")
+        for url in targets {
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch {
+                throw ParolaError.ioError("Failed to delete \(variant): \(error.localizedDescription)")
+            }
         }
     }
 

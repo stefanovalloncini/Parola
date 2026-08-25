@@ -3,6 +3,22 @@ import FluidAudio
 import Testing
 @testable import ParolaCore
 
+private final class NameProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var names: [String] = []
+
+    func record(_ name: String) {
+        lock.lock()
+        names.append(name)
+        lock.unlock()
+    }
+
+    var recorded: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return names
+    }
+}
+
 @Suite("ModelStore")
 struct ModelStoreTests {
     @Test("catalog returns curated entries with isInstalled reflecting disk state")
@@ -267,6 +283,175 @@ struct ModelStoreTests {
         #expect(restricted.contains { $0.name == "openai_whisper-tiny" } == false)
         #expect(restricted.count < unrestricted.count)
         #expect(warm.catalog() == restricted)
+    }
+
+    @Test("weights left in the folder the turbo entry used to install into never read as installed")
+    func supersededTurboFolderIsNotInstalled() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let old = tmp.appendingPathComponent(
+            "models/argmaxinc/whisperkit-coreml/openai_whisper-large-v3_turbo", isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+        try Data("w".utf8).write(to: old.appendingPathComponent("TextDecoder.mlmodelc"))
+
+        #expect(store.isInstalled("openai_whisper-large-v3_turbo") == false)
+        #expect(store.catalog().first { $0.name == "openai_whisper-large-v3_turbo" }?.isInstalled == false)
+        #expect(try !store.installedModels().contains { $0.name == "openai_whisper-large-v3_turbo" })
+
+        let leftovers = store.supersededInstalls()
+        #expect(leftovers.count == 1)
+        #expect(leftovers.first?.variantID == "openai_whisper-large-v3_turbo")
+        #expect(leftovers.first?.displayName == "Whisper Large v3 Turbo")
+        #expect(leftovers.first?.url.standardizedFileURL == old.standardizedFileURL)
+    }
+
+    @Test("deleting the turbo entry clears the folder an earlier release installed it into")
+    func deleteClearsSupersededCopy() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let old = tmp.appendingPathComponent(
+            "models/argmaxinc/whisperkit-coreml/openai_whisper-large-v3_turbo", isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+        try Data("w".utf8).write(to: old.appendingPathComponent("TextDecoder.mlmodelc"))
+        let current = store.installedURL(for: "openai_whisper-large-v3_turbo")
+        try FileManager.default.createDirectory(at: current, withIntermediateDirectories: true)
+        try Data("w".utf8).write(to: current.appendingPathComponent("TextDecoder.mlmodelc"))
+
+        try store.deleteAny(idOrPath: "openai_whisper-large-v3_turbo")
+        #expect(!FileManager.default.fileExists(atPath: old.path))
+        #expect(!FileManager.default.fileExists(atPath: current.path))
+        #expect(store.supersededInstalls().isEmpty)
+    }
+
+    @Test("the old copy alone is enough for delete to succeed")
+    func deleteSucceedsWithOnlyTheSupersededCopy() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let old = tmp.appendingPathComponent(
+            "models/argmaxinc/whisperkit-coreml/openai_whisper-large-v3_turbo", isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+        try Data("w".utf8).write(to: old.appendingPathComponent("TextDecoder.mlmodelc"))
+
+        try store.delete(variant: "openai_whisper-large-v3_turbo")
+        #expect(!FileManager.default.fileExists(atPath: old.path))
+        #expect(throws: ParolaError.self) { try store.delete(variant: "openai_whisper-large-v3_turbo") }
+    }
+
+    @Test("a checkpoint whose config disagrees with the catalog reads as needing a download")
+    func mismatchedCheckpointIsNotInstalled() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let url = store.installedURL(for: "openai_whisper-large-v3_turbo")
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        try Data("w".utf8).write(to: url.appendingPathComponent("TextDecoder.mlmodelc"))
+        let config = url.appendingPathComponent("config.json")
+
+        try Data(#"{"decoder_layers": 32}"#.utf8).write(to: config)
+        #expect(store.isInstalled("openai_whisper-large-v3_turbo") == false)
+
+        try Data(#"{"decoder_layers": 4}"#.utf8).write(to: config)
+        #expect(store.isInstalled("openai_whisper-large-v3_turbo"))
+
+        try Data("not json".utf8).write(to: config)
+        #expect(store.isInstalled("openai_whisper-large-v3_turbo"))
+
+        try FileManager.default.removeItem(at: config)
+        #expect(store.isInstalled("openai_whisper-large-v3_turbo"))
+    }
+
+    @Test("the engine downloader is handed the repo folder, and the download lands where the catalog says")
+    func downloaderReceivesTheRepoFolder() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let probe = NameProbe()
+        let registry = EngineRegistry()
+        let destination = store.installedURL(for: "openai_whisper-large-v3_turbo")
+        await registry.register(
+            engineID: .whisperKit,
+            capabilities: .whisperKitDefaults,
+            factory: { _ in fatalError("factory unused") },
+            downloader: { name, _, _ in
+                probe.record(name)
+                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+                try Data("w".utf8).write(to: destination.appendingPathComponent("TextDecoder.mlmodelc"))
+                return destination
+            }
+        )
+
+        let url = try await store.download(variant: "openai_whisper-large-v3_turbo", registry: registry)
+        #expect(probe.recorded == ["openai_whisper-large-v3-v20240930"])
+        #expect(url.standardizedFileURL == destination.standardizedFileURL)
+        #expect(destination.lastPathComponent == "openai_whisper-large-v3-v20240930")
+        #expect(store.isInstalled("openai_whisper-large-v3_turbo"))
+    }
+
+    @Test("an engine that resolves its own directory still gets the catalog id")
+    func downloaderWithoutASubpathGetsTheCatalogID() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let probe = NameProbe()
+        let registry = EngineRegistry()
+        await registry.register(
+            engineID: .parakeet,
+            capabilities: .parakeetDefaults,
+            factory: { _ in fatalError("factory unused") },
+            downloader: { name, store, _ in
+                probe.record(name)
+                let destination = store.installedURL(for: name)
+                try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+                try Data("w".utf8).write(to: destination.appendingPathComponent("Encoder.mlmodelc"))
+                return destination
+            }
+        )
+
+        _ = try await store.download(variant: "nvidia_parakeet-tdt-0.6b-v2", registry: registry)
+        #expect(probe.recorded == ["nvidia_parakeet-tdt-0.6b-v2"])
+        #expect(store.isInstalled("nvidia_parakeet-tdt-0.6b-v2"))
+    }
+
+    @Test("plain Whisper Large v3 stays a separate entry the turbo move doesn't touch")
+    func largeV3IsUnaffectedByTheTurboMove() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let url = store.installedURL(for: "openai_whisper-large-v3")
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        try Data("w".utf8).write(to: url.appendingPathComponent("TextDecoder.mlmodelc"))
+        try Data(#"{"decoder_layers": 32}"#.utf8).write(to: url.appendingPathComponent("config.json"))
+
+        #expect(store.isInstalled("openai_whisper-large-v3"))
+        #expect(store.isInstalled("openai_whisper-large-v3_turbo") == false)
+        #expect(store.supersededInstalls().isEmpty)
     }
 
     @Test("an unrelated FluidInference directory is still reported as installed")
