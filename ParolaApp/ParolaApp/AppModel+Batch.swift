@@ -122,8 +122,12 @@ extension AppModel {
                 phase = .ready
             }
             refreshLibrary()
+            // Draining alongside a resume would hand the queue two competing batch tasks; the
+            // pending wave ends in another .finished, and the parked files drain there.
             let pending = batchJobs.filter { $0.status == .pending }
-            if !pending.isEmpty {
+            if pending.isEmpty {
+                drainDeferredArrivals()
+            } else {
                 resumeBatch(pendingJobs: pending)
             }
         }

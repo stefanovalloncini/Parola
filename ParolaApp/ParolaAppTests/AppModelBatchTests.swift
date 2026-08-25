@@ -714,6 +714,65 @@ struct AppModelBatchTests {
         model.clearBatch()
     }
 
+    @Test("a finished batch drains the files parked while it ran")
+    func finishedBatchDrainsDeferredArrivals() async {
+        let model = makeModel()
+        model.startBatch(urls: [Self.makeURL("a")])
+        let jobID = model.batchJobs[0].id
+        await model.handleBatchEvent(.started(jobID: jobID))
+        let parked = Self.makeURL("parked")
+        model.deferredArrivals = [parked]
+
+        await model.handleBatchEvent(.completed(jobID: jobID, transcript: Self.makeTranscript()))
+        await model.handleBatchEvent(.finished)
+
+        #expect(model.deferredArrivals.isEmpty)
+        #expect(model.batchJobs.contains { $0.url == parked })
+        model.clearBatch()
+    }
+
+    @Test("a batch that ends on a failure and a cancellation still drains parked files")
+    func finishedBatchDrainsAfterTerminalJobStates() async {
+        let model = makeModel()
+        model.startBatch(urls: [Self.makeURL("a"), Self.makeURL("b")])
+        let failed = model.batchJobs[0].id
+        let cancelled = model.batchJobs[1].id
+        let parked = Self.makeURL("parked")
+        model.deferredArrivals = [parked]
+
+        await model.handleBatchEvent(.failed(jobID: failed, reason: "boom"))
+        await model.handleBatchEvent(.cancelled(jobID: cancelled))
+        await model.handleBatchEvent(.finished)
+
+        #expect(model.deferredArrivals.isEmpty)
+        #expect(model.batchJobs.contains { $0.url == parked })
+        model.clearBatch()
+    }
+
+    @Test("parked files wait while a finished wave still has pending jobs behind it")
+    func deferredArrivalsWaitForPendingJobs() async {
+        let model = makeModel()
+        model.startBatch(urls: [Self.makeURL("a")])
+        let jobID = model.batchJobs[0].id
+        await model.handleBatchEvent(.started(jobID: jobID))
+        model.batchJobs.append(Self.makeJob("queued"))
+        let parked = Self.makeURL("parked")
+        model.deferredArrivals = [parked]
+
+        await model.handleBatchEvent(.completed(jobID: jobID, transcript: Self.makeTranscript()))
+        await model.handleBatchEvent(.finished)
+
+        #expect(model.deferredArrivals == [parked])
+        #expect(model.batchJobs.map(\.url).contains(parked) == false)
+
+        model.batchJobs[1].status = .done
+        await model.handleBatchEvent(.finished)
+
+        #expect(model.deferredArrivals.isEmpty)
+        #expect(model.batchJobs.contains { $0.url == parked })
+        model.clearBatch()
+    }
+
     @Test("arrivals during a subtitle burn defer instead of racing the export")
     func exportingDefersArrivals() {
         let model = makeModel()
