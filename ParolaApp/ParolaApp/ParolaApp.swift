@@ -90,7 +90,7 @@ struct ParolaApp: App {
                 .tint(DS.Color.accent)
                 .environment(model)
                 .environment(liveCaptions)
-                .frame(minWidth: 920, minHeight: 600)
+                .frame(minWidth: MainWindowLayout.minimumWidth, minHeight: MainWindowLayout.minimumHeight)
                 .preferredColorScheme(model.preferredColorScheme)
                 .onAppear {
                     model.liveCaptions = liveCaptions

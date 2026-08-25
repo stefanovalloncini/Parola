@@ -118,7 +118,11 @@ struct MacLibrarySidebar: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 10)
         }
-        .navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 320)
+        .navigationSplitViewColumnWidth(
+            min: MainWindowLayout.sidebarMinWidth,
+            ideal: MainWindowLayout.sidebarIdealWidth,
+            max: MainWindowLayout.sidebarMaxWidth
+        )
         .onChange(of: searchText) { _, newValue in model.search(newValue) }
     }
 

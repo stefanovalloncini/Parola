@@ -58,16 +58,19 @@ struct TranscriptPane: View {
                 FindBar()
             }
 
-            HSplitView {
+            // Fixed width rather than a split: an HSplitView lays its panes out at their
+            // combined minimum and draws past the window when the detail column is narrower.
+            HStack(spacing: 0) {
                 transcriptColumn
-                    .frame(minWidth: 320)
+                    .frame(minWidth: MainWindowLayout.transcriptMinWidth, maxWidth: .infinity)
 
                 if inspectorVisible {
+                    Divider()
                     TranscriptInspector(
                         mode: inspectorModeBinding,
                         inspectorVisible: $inspectorVisible
                     )
-                    .frame(minWidth: 280, idealWidth: 300, maxWidth: 340)
+                    .frame(width: MainWindowLayout.inspectorWidth)
                 }
             }
         }
