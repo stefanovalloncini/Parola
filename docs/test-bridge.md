@@ -49,12 +49,12 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | Tool | Args | What it does |
 |---|---|---|
 | `parola_app_ping` | — | Returns `{pong: true}`. Use to confirm the bridge is up. |
-| `parola_app_state` | — | Full state snapshot: phase, route, selectedModel, language, libraryFilter, appTheme, availableModels, transcript presence. |
+| `parola_app_state` | — | Full state snapshot: phase, route, selectedModel, language, libraryFilter, appTheme, availableModels, transcript presence. While transcribing, `phaseDetail` also carries `progress`, `stage` and `hasPartialText`. |
 | `parola_app_select_model` | **name** | Set selectedModel to a catalog id. |
 | `parola_app_set_language` | code | Two-letter language code, or empty string to auto-detect. |
 | `parola_app_set_theme` | **theme** | `light` / `dark` / `system`. |
 | `parola_app_set_route` | **route** | `transcript` / `batch` / `queue`. |
-| `parola_app_set_library_filter` | category | `transcription` / `meeting` / `dictation`, or empty to clear. |
+| `parola_app_set_library_filter` | category | `transcription` / `meeting` / `dictation`, `all` for the sidebar's All row, or empty to clear. |
 | `parola_app_transcribe_youtube` | **url** | Paste a YouTube URL and start the download-then-transcribe flow. |
 | `parola_app_fetch_youtube_subs` | **url** | Same input, but fetch existing captions instead of running Whisper. |
 | `parola_app_start_recording` | source, category | Start mic (default) or systemAudio. Category tags the saved entry. |
@@ -65,7 +65,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_wait_for_phase` | **phase**, timeoutMs | Poll until phase matches or timeout fires. Returns `{matched, state}`. |
 | `parola_app_get_transcript` | — | Text + language + modelName + segment count + duration. Null if none loaded. |
 | `parola_app_clear_transcript` | — | Drop the in-memory transcript. |
-| `parola_app_list_entries` | category, limit | Library entries with id, title, category, createdAt. |
+| `parola_app_list_entries` | category, limit | Library entries with id, title, category, createdAt, durationSeconds, language. |
 | `parola_app_load_entry` | **id** | Open a library entry by id. |
 | `parola_app_delete_entry` | **id** | Move an entry to Recently Deleted. |
 | `parola_app_download_model` | **name** | Trigger a download from inside the app. Progress shows in the UI. |
@@ -74,6 +74,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_dismiss_error` | — | Clear a failed phase (equivalent to clicking "Try again"). |
 | `parola_app_screenshot` | path | Capture the main window to PNG via ScreenCaptureKit (needs Screen Recording permission). `path` is a bare filename stored under `Caches/Parola/Screenshots`. |
 | `parola_app_list_windows` | — | Visible NSWindows: title, size, key/main flags. |
+| `setWindowFrame` | x, y, w, h | Move and resize the main window; the reply carries the frame that landed after the window's minimum size clamped it. AX resize is refused on ad-hoc-signed builds, so layout checks go through here. |
 
 ### Settings + library
 
