@@ -1440,7 +1440,7 @@ final class AppModel {
     func handleIncomingFiles(_ urls: [URL], translateOverride: Bool? = nil) {
         let files = DroppedFiles.classify(urls)
         guard !files.isEmpty else { return }
-        if files.media.isEmpty, files.subtitles.isEmpty, files.projects.isEmpty, let link = files.links.first {
+        if case .links = files.kind, let link = files.links.first {
             transcribeYouTube(urlString: link.absoluteString)
             return
         }

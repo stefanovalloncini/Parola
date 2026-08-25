@@ -65,8 +65,6 @@ enum DroppedFiles {
             media.isEmpty && subtitles.isEmpty && projects.isEmpty && links.isEmpty
         }
 
-        var files: [URL] { media + subtitles + projects }
-
         var kind: Kind {
             if isEmpty { return .unsupported }
             if !media.isEmpty {

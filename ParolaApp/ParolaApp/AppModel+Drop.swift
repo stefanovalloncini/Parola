@@ -30,7 +30,7 @@ extension AppModel {
     func transcribeNow(urls: [URL]) {
         let files = DroppedFiles.classify(urls)
         guard !files.isEmpty else { return }
-        if let link = files.links.first, files.files.isEmpty {
+        if case .links = files.kind, let link = files.links.first {
             transcribeYouTube(urlString: link.absoluteString)
             return
         }
@@ -82,14 +82,13 @@ extension AppModel {
         openedFilesFlushTask?.cancel()
         openedFilesFlushTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(150))
-            guard !Task.isCancelled else { return }
-            self?.flushOpenedFiles()
+            guard !Task.isCancelled, let self else { return }
+            self.openedFilesFlushTask = nil
+            self.flushOpenedFiles()
         }
     }
 
     func flushOpenedFiles() {
-        openedFilesFlushTask?.cancel()
-        openedFilesFlushTask = nil
         let urls = pendingOpenedFiles
         pendingOpenedFiles = []
         guard !urls.isEmpty else { return }
