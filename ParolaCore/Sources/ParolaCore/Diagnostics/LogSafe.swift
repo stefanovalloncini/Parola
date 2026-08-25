@@ -32,7 +32,7 @@ extension Bool: LogSafe {
 }
 
 extension Double: LogSafe {
-    public var logToken: String { String(format: "%.2f", self) }
+    public var logToken: String { LogDecimal.twoPlaces(self) }
 }
 
 extension UUID: LogSafe {

@@ -32,6 +32,32 @@ struct LogValueTests {
         #expect(LogValue.duration(.milliseconds(1500)).text == "1.50")
     }
 
+    @Test("seconds always carry two decimals, rounded away from zero")
+    func secondsRenderTwoDecimals() {
+        #expect(LogValue.seconds(0).text == "0.00")
+        #expect(LogValue.seconds(1.2).text == "1.20")
+        #expect(LogValue.seconds(0.005).text == "0.01")
+        #expect(LogValue.seconds(3600.456).text == "3600.46")
+        #expect(LogValue.seconds(99.999).text == "100.00")
+        #expect(LogValue.seconds(-1.5).text == "-1.50")
+        #expect(LogValue.seconds(0.125).text == "0.13")
+    }
+
+    @Test("a value too large or not finite renders without trapping")
+    func extremeSecondsSurvive() {
+        #expect(LogValue.seconds(1e19).text == "10000000000000000000.00")
+        #expect(LogValue.seconds(.infinity).text == "inf")
+        #expect(LogValue.seconds(-.infinity).text == "-inf")
+        #expect(LogValue.seconds(.nan).text == "nan")
+    }
+
+    @Test("a Double log token renders with two decimals")
+    func doubleTokenRendersTwoDecimals() {
+        #expect(Double(0.5).logToken == "0.50")
+        #expect(Double(-0.5).logToken == "-0.50")
+        #expect(Double(12).logToken == "12.00")
+    }
+
     @Test("fields sort deterministically for stable output")
     func fieldsSort() {
         let sorted = [LogField.model, .elapsed, .error].sorted()

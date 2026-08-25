@@ -28,7 +28,7 @@ public struct LogValue: Sendable, Equatable {
     }
 
     public static func seconds(_ value: Double) -> LogValue {
-        LogValue(kind: .seconds, text: String(format: "%.2f", value))
+        LogValue(kind: .seconds, text: LogDecimal.twoPlaces(value))
     }
 
     public static func duration(_ value: Duration) -> LogValue {
@@ -47,6 +47,20 @@ public struct LogValue: Sendable, Equatable {
 
     public static func error(_ error: any Error) -> LogValue {
         LogValue(kind: .token, text: LogErrorKind.describe(error))
+    }
+}
+
+enum LogDecimal {
+    /// Hand-rolled because `String(format: "%.2f", …)` costs ~600 ns, which every duration field pays.
+    static func twoPlaces(_ value: Double) -> String {
+        let scaled = (value * 100).rounded()
+        guard scaled.magnitude < 9e18 else { return String(format: "%.2f", value) }
+        let magnitude = Int64(scaled.magnitude)
+        let sign = scaled < 0 ? "-" : ""
+        let fraction = magnitude % 100
+        return fraction < 10
+            ? "\(sign)\(magnitude / 100).0\(fraction)"
+            : "\(sign)\(magnitude / 100).\(fraction)"
     }
 }
 
