@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 @testable import ParolaCore
@@ -106,6 +107,43 @@ struct LogErrorKindTests {
         let text = LogErrorKind.describe(SecretError())
         #expect(text.contains("SecretError"))
         #expect(text.contains("/Users") == false)
+    }
+
+    @Test("an Apple reverse-DNS domain keeps its domain and code")
+    func reverseDNSDomainSurvives() {
+        let domains = ["com.apple.coreaudio.avfaudio", "com.apple.CoreML", "com.apple.MediaExperience"]
+        for domain in domains {
+            let error = NSError(domain: domain, code: 42, userInfo: [
+                NSFilePathErrorKey: "/Users/realname/Music/board-meeting-q3.m4a",
+            ])
+            let text = LogErrorKind.describe(error)
+            #expect(text == "\(domain).42")
+            #expect(text.contains("/Users") == false)
+        }
+    }
+
+    @Test("a real AVFoundation load failure renders its domain and code")
+    func avFoundationFailureKeepsDomain() {
+        let missing = URL(fileURLWithPath: "/tmp/parola-absent-\(UUID().uuidString).wav")
+        do {
+            _ = try AVAudioFile(forReading: missing)
+            Issue.record("reading a missing file must fail")
+        } catch {
+            let text = LogErrorKind.describe(error)
+            #expect(text.hasPrefix("com.apple.coreaudio.avfaudio."))
+            #expect(text.contains("parola-absent") == false)
+            #expect(text.contains("/tmp") == false)
+        }
+    }
+
+    @Test("cases of a Swift error enum stay distinguishable")
+    func swiftEnumCasesKeepTheirCode() {
+        enum EngineFailure: Error { case load, decode }
+        let load = LogErrorKind.describe(EngineFailure.load)
+        let decode = LogErrorKind.describe(EngineFailure.decode)
+        #expect(load.contains("EngineFailure"))
+        #expect(load.hasSuffix(".0"))
+        #expect(decode.hasSuffix(".1"))
     }
 
     @Test("LogValue.error routes through the sanitizer")

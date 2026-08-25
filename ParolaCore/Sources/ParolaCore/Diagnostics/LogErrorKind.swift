@@ -8,9 +8,7 @@ public enum LogErrorKind {
             return urlError.code == .cancelled ? "cancelled" : "URLError.\(urlError.code.rawValue)"
         }
         let bridged = error as NSError
-        if bridged.domain.contains("ErrorDomain") || bridged.domain.hasPrefix("kCF") {
-            return "\(bridged.domain).\(bridged.code)"
-        }
-        return String(reflecting: type(of: error))
+        if type(of: error) is NSError.Type { return "\(bridged.domain).\(bridged.code)" }
+        return "\(String(reflecting: type(of: error))).\(bridged.code)"
     }
 }
