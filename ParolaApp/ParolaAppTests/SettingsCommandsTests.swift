@@ -44,6 +44,11 @@ struct SettingsCommandsTests {
             "libraryFilter": .string("all"),
             "libraryBrowsingAll": .bool(true),
         ]))
+        guard case .object(let state) = server.snapshotState() else {
+            Issue.record("snapshotState should return an object")
+            return
+        }
+        #expect(state["libraryBrowsingAll"] == .bool(true), "All and Home both leave libraryFilter empty")
     }
 
     @Test("a category filter leaves browse-all behind")
