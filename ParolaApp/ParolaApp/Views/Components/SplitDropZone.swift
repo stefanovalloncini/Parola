@@ -121,7 +121,7 @@ private struct SplitDropOverlay: View {
 
     var body: some View {
         ZStack {
-            DS.Palette.canvas.opacity(0.92)
+            DS.Palette.canvas.opacity(0.96)
                 .ignoresSafeArea()
             VStack(spacing: DS.Spacing.small) {
                 header
