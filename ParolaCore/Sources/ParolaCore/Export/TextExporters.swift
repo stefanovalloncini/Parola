@@ -17,7 +17,7 @@ public struct TxtExporter: TranscriptExporter {
     }
 
     public func render(_ transcript: Transcript) throws -> Data {
-        let text = transcript.segments
+        let lines = transcript.segments
             .compactMap { seg -> String? in
                 let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !body.isEmpty else { return nil }
@@ -30,8 +30,8 @@ public struct TxtExporter: TranscriptExporter {
                 guard options.showTimestamps else { return line }
                 return "[\(Format.timestampHHMMSS(seg.start))] \(line)"
             }
-            .joined(separator: "\n")
-        return utf8(text)
+        guard !lines.isEmpty else { return Data() }
+        return utf8(lines.joined(separator: "\n") + "\n")
     }
 }
 

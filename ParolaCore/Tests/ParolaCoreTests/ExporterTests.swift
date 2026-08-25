@@ -19,10 +19,21 @@ struct ExporterTests {
         )
     }
 
-    @Test("txt joins segment lines")
+    @Test("txt joins segment lines and ends the last one with a newline")
     func txt() throws {
         let out = try TxtExporter().renderText(sample())
-        #expect(out == "Hello world.\nThis is Parola.\nGoodbye.")
+        #expect(out == "Hello world.\nThis is Parola.\nGoodbye.\n")
+    }
+
+    @Test("txt renders nothing at all when no segment survives")
+    func txtEmptyTranscript() throws {
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "  ")],
+            language: "en",
+            modelName: "x"
+        )
+        #expect(try TxtExporter().render(transcript).isEmpty)
+        #expect(try TxtExporter().render(Transcript(segments: [], language: "en", modelName: "x")).isEmpty)
     }
 
     @Test("txt prefixes each segment with its speaker label")
@@ -37,7 +48,7 @@ struct ExporterTests {
             modelName: "x"
         )
         let out = try TxtExporter().renderText(transcript)
-        #expect(out == "Alice: Hello.\nBob: Hi there.\nAlice: Anything else?")
+        #expect(out == "Alice: Hello.\nBob: Hi there.\nAlice: Anything else?\n")
     }
 
     @Test("txt leaves unlabeled segments bare and labels the rest")
@@ -51,7 +62,7 @@ struct ExporterTests {
             modelName: "x"
         )
         let out = try TxtExporter().renderText(transcript)
-        #expect(out == "Intro.\nAlice: Over to you.")
+        #expect(out == "Intro.\nAlice: Over to you.\n")
     }
 
     @Test("txt drops a segment whose text trims to empty")
@@ -67,13 +78,13 @@ struct ExporterTests {
             modelName: "x"
         )
         let out = try TxtExporter().renderText(transcript)
-        #expect(out == "Hello.\nWorld.")
+        #expect(out == "Hello.\nWorld.\n")
     }
 
     @Test("txt with timestamps prefixes each line with its start time")
     func txtTimestamps() throws {
         let out = try TxtExporter(options: TxtOptions(showTimestamps: true)).renderText(sample())
-        #expect(out == "[00:00:00] Hello world.\n[00:00:01] This is Parola.\n[00:00:04] Goodbye.")
+        #expect(out == "[00:00:00] Hello world.\n[00:00:01] This is Parola.\n[00:00:04] Goodbye.\n")
     }
 
     @Test("txt with timestamps keeps speaker labels after the stamp")
@@ -87,7 +98,7 @@ struct ExporterTests {
             modelName: "x"
         )
         let out = try TxtExporter(options: TxtOptions(showTimestamps: true)).renderText(transcript)
-        #expect(out == "[00:00:00] Alice: Hello.\n[00:01:01] Hi.")
+        #expect(out == "[00:00:00] Alice: Hello.\n[00:01:01] Hi.\n")
     }
 
     @Test("TxtOptions defaults to no timestamps")
