@@ -5,7 +5,7 @@ struct ActionItemsSection: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        InfoSection(titleVerbatim: titleLabel) {
+        InspectorSection(titleVerbatim: titleLabel) {
             if model.isExtractingActionItems {
                 progressRow
             } else if model.actionItems.isEmpty {

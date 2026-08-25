@@ -20,7 +20,7 @@ struct InfoInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.large) {
-            InfoSection(title: "Properties") {
+            InspectorSection(title: "Properties") {
                 InfoRow(icon: "clock", label: "Audio Duration", value: durationLabel)
                 InfoRow(icon: "calendar", label: "Created", value: dateLabel(entry?.createdAt))
                 if let updated = entry?.updatedAt {
@@ -28,7 +28,7 @@ struct InfoInspector: View {
                 }
             }
 
-            InfoSection(title: "Transcription Details") {
+            InspectorSection(title: "Transcription Details") {
                 InfoRow(icon: "globe", label: "Language", value: languageLabel)
                 InfoRow(icon: "cube", label: "Model", value: modelLabel)
                 InfoRow(icon: "cpu", label: "Engine", value: engineLabel)
@@ -126,32 +126,6 @@ struct InfoInspector: View {
     private var sentenceCount: Int { derived.text.sentenceCount }
 
     private var wordCount: Int { derived.text.wordCount }
-}
-
-struct InfoSection<Content: View>: View {
-    private let titleText: Text
-    private let content: Content
-
-    init(title: LocalizedStringKey, @ViewBuilder content: () -> Content) {
-        self.titleText = Text(title)
-        self.content = content()
-    }
-
-    init(titleVerbatim: String, @ViewBuilder content: () -> Content) {
-        self.titleText = Text(titleVerbatim)
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            titleText
-                .font(DS.Font.caption)
-                .foregroundStyle(DS.Color.secondaryText)
-                .textCase(.uppercase)
-            content
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
 }
 
 struct InfoRow: View {

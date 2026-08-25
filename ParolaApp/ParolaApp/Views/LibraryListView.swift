@@ -256,9 +256,12 @@ struct LibraryListView: View {
                 .font(DS.Font.captionMono)
                 .foregroundStyle(DS.Color.secondaryText)
         }
-        .padding(.horizontal, DS.Spacing.large)
+        .padding(.horizontal, Self.listRowInset)
         .padding(.vertical, DS.Spacing.regular)
     }
+
+    /// What `List(.inset)` insets its rows by — the header matches it so both share a left edge.
+    private static let listRowInset: CGFloat = 15
 
     private func performBulkDelete() {
         let targets = selection

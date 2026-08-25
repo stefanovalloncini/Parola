@@ -28,7 +28,7 @@ struct TranscriptInspector: View {
                 .padding(DS.Spacing.regular)
             }
         }
-        .background(DS.Color.surface)
+        .chromeSurface()
     }
 
     private var modeRow: some View {
@@ -74,20 +74,26 @@ struct InspectorModeIcon: View {
     }
 }
 
-struct InspectorGroup<Content: View>: View {
-    let title: LocalizedStringKey
-    let content: Content
+struct InspectorSection<Content: View>: View {
+    private let titleText: Text
+    private let content: Content
 
     init(title: LocalizedStringKey, @ViewBuilder content: () -> Content) {
-        self.title = title
+        self.titleText = Text(title)
+        self.content = content()
+    }
+
+    init(titleVerbatim: String, @ViewBuilder content: () -> Content) {
+        self.titleText = Text(titleVerbatim)
         self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            Text(title)
+            titleText
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.secondaryText)
+                .textCase(.uppercase)
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)

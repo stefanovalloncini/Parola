@@ -6,7 +6,7 @@ struct SpeechRateSection: View {
 
     var body: some View {
         if bins.count >= 2 {
-            InfoSection(title: "Speech rate") {
+            InspectorSection(title: "Speech rate") {
                 let values = bins.map(\.wordsPerMinute)
                 let maxValue = max(values.max() ?? 1, 1)
                 let average = values.reduce(0, +) / Double(values.count)

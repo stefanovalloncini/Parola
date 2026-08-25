@@ -78,7 +78,7 @@ struct MediaBar: View {
         }
         .padding(.horizontal, DS.Spacing.regular)
         .frame(height: 52)
-        .background(DS.Color.surfaceElevated)
+        .chromeSurface()
         .onAppear { applyRate() }
         .onChange(of: model.isPlaying) { _, playing in
             if playing { applyRate() }

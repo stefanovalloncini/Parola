@@ -14,7 +14,7 @@ struct FormatInspector: View {
 
             displayModesSection
 
-            InspectorGroup(title: "People") {
+            InspectorSection(title: "People") {
                 TextField("Add a speaker…", text: $newSpeaker)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { commitSpeaker() }
@@ -47,7 +47,7 @@ struct FormatInspector: View {
 
     private var displayModesSection: some View {
         @Bindable var model = model
-        return InspectorGroup(title: "Display Modes") {
+        return InspectorSection(title: "Display Modes") {
             HStack(spacing: DS.Spacing.small) {
                 DisplayModeCard(
                     title: "Transcript",

@@ -10,7 +10,7 @@ struct ConfidenceSection: View {
 
     var body: some View {
         if let overall {
-            InfoSection(title: "Confidence") {
+            InspectorSection(title: "Confidence") {
                 summaryRow(overall: overall)
                 if !lows.isEmpty {
                     DisclosureGroup(isExpanded: $expanded) {

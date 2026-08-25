@@ -6,7 +6,7 @@ struct SpeakerStatsSection: View {
 
     var body: some View {
         if !stats.isEmpty {
-            InfoSection(title: "Speakers · \(stats.count)") {
+            InspectorSection(title: "Speakers · \(stats.count)") {
                 ForEach(stats) { row in
                     StatRow(stats: row)
                 }

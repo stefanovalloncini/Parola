@@ -14,7 +14,7 @@ struct LabelsSection: View {
 
     var body: some View {
         if entry != nil {
-            InfoSection(title: "Labels") {
+            InspectorSection(title: "Labels") {
                 if labels.isEmpty {
                     Text("No labels yet")
                         .font(DS.Font.body)

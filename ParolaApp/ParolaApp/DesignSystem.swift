@@ -230,6 +230,12 @@ extension View {
             .contentShape(Capsule(style: .continuous))
     }
 
+    /// Secondary chrome (inspector, media bar). A material, not a token fill, so it keeps the hue of
+    /// the window materials it abuts instead of reading as a detached neutral slab.
+    func chromeSurface() -> some View {
+        background(.regularMaterial)
+    }
+
     func inspectorPanel() -> some View {
         background(DS.Palette.surface)
             .overlay(alignment: .leading) {

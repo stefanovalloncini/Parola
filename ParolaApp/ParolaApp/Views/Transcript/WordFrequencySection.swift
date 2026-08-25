@@ -8,7 +8,7 @@ struct WordFrequencySection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !entries.isEmpty {
-                InfoSection(title: "Top words") {
+                InspectorSection(title: "Top words") {
                     let maxCount = entries.first?.count ?? 1
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(entries) { entry in
