@@ -6,7 +6,6 @@ struct ContentRoutes: View {
 
     var body: some View {
         content
-            .modifier(RouteAwareDropDestination(route: model.route, handler: handleDroppedURLs))
             .onChange(of: model.pendingExport) { _, format in
                 if let format {
                     model.performExport(format)
@@ -147,9 +146,6 @@ struct ContentRoutes: View {
         }
     }
 
-    private func handleDroppedURLs(_ urls: [URL]) {
-        model.handleIncomingFiles(urls)
-    }
 }
 
 /// Owns the route's only reads of the per-partial properties, which arrive several times a second.
@@ -166,22 +162,6 @@ private struct LiveTranscribingPane: View {
             expectsPartials: model.activeEngineStreamsPartials,
             stage: model.fileTranscribeStage
         )
-    }
-}
-
-private struct RouteAwareDropDestination: ViewModifier {
-    let route: AppModel.Route
-    let handler: ([URL]) -> Void
-
-    func body(content: Content) -> some View {
-        if route == .batch {
-            content
-        } else {
-            content.dropDestination(for: URL.self) { urls, _ in
-                handler(urls)
-                return !urls.isEmpty
-            }
-        }
     }
 }
 

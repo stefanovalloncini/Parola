@@ -13,6 +13,7 @@ struct ContentView: View {
                 .modifier(HideToolbarTitleIfAvailable())
         }
         .contentSheets()
+        .modifier(SplitDropZone())
         .overlay {
             if let count = model.recordingCountdown {
                 CountInOverlay(count: count) { model.cancelRecordingCountdown() }

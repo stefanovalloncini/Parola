@@ -1,10 +1,8 @@
 import SwiftUI
-import UniformTypeIdentifiers
 import ParolaCore
 
 struct BatchView: View {
     @Environment(AppModel.self) private var model
-    @State private var isDropping: Bool = false
     @AppStorage("batch.exportPaneVisible", store: DefaultsStore.current) private var exportPaneVisible: Bool = true
 
     var body: some View {
@@ -91,36 +89,17 @@ struct BatchView: View {
     private var queuePane: some View {
         ZStack {
             if model.batchJobs.isEmpty {
-                BatchEmptyState(isDropping: isDropping)
+                BatchEmptyState()
             } else {
                 BatchJobList()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)
-        .overlay {
-            if isDropping {
-                RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
-                    .strokeBorder(DS.Color.accent, style: StrokeStyle(lineWidth: 2, dash: [6, 6]))
-                    .padding(DS.Spacing.medium)
-                    .allowsHitTesting(false)
-            }
-        }
-        .dropDestination(for: URL.self) { urls, _ in
-            model.addBatchFiles(urls.filter(Self.isMediaURL))
-            return true
-        } isTargeted: { hovering in
-            isDropping = hovering
-        }
     }
 
     private var exportPane: some View {
         BatchExportPanel()
             .background(DS.Color.surfaceElevated)
-    }
-
-    static func isMediaURL(_ url: URL) -> Bool {
-        guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
-        return type.conforms(to: .audio) || type.conforms(to: .movie) || type.conforms(to: .audiovisualContent)
     }
 }

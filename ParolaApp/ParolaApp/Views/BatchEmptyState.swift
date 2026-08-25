@@ -2,7 +2,6 @@ import SwiftUI
 
 struct BatchEmptyState: View {
     @Environment(AppModel.self) private var model
-    let isDropping: Bool
 
     var body: some View {
         EmptyStateView(
@@ -18,6 +17,5 @@ struct BatchEmptyState: View {
             .buttonStyle(DSPillButtonStyle(kind: .primary))
             .accessibilityIdentifier("batch.openFiles")
         }
-        .opacity(isDropping ? 0.4 : 1)
     }
 }
