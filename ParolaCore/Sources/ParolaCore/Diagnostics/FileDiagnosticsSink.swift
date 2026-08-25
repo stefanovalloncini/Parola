@@ -6,6 +6,7 @@ import os
 public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     private struct BufferState {
         var buffer: [LogRecord] = []
+        var dropped: Int = 0
         var disabled: Bool = false
     }
 
@@ -28,6 +29,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     private let maxFileBytes: Int
     private let retentionDays: Int
     private let totalBudgetBytes: Int
+    private let maxBufferedRecords: Int
     private let baseName: String
 
     public convenience init(
@@ -35,7 +37,8 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         minimumLevel: LogLevel = .info,
         maxFileBytes: Int = 5_000_000,
         retentionDays: Int = 7,
-        totalBudgetBytes: Int = 10_000_000
+        totalBudgetBytes: Int = 10_000_000,
+        maxBufferedRecords: Int = 4_096
     ) {
         self.init(
             directory: directory,
@@ -43,6 +46,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             maxFileBytes: maxFileBytes,
             retentionDays: retentionDays,
             totalBudgetBytes: totalBudgetBytes,
+            maxBufferedRecords: maxBufferedRecords,
             write: { try $0.write(contentsOf: $1) }
         )
     }
@@ -55,6 +59,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         maxFileBytes: Int = 5_000_000,
         retentionDays: Int = 7,
         totalBudgetBytes: Int = 10_000_000,
+        maxBufferedRecords: Int = 4_096,
         write: @escaping @Sendable (FileHandle, Data) throws -> Void
     ) {
         self.write = write
@@ -63,6 +68,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         self.maxFileBytes = maxFileBytes
         self.retentionDays = retentionDays
         self.totalBudgetBytes = totalBudgetBytes
+        self.maxBufferedRecords = maxBufferedRecords
         let pid = ProcessInfo.processInfo.processIdentifier
         let epoch = Int(Date().timeIntervalSince1970)
         self.baseName = "\(Self.filePrefix)\(pid)-\(epoch)"
@@ -104,6 +110,10 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         guard record.level >= minimumLevel else { return }
         let shouldDrainNow: Bool = bufferState.withLock { current in
             guard !current.disabled else { return false }
+            guard current.buffer.count < maxBufferedRecords else {
+                current.dropped += 1
+                return true
+            }
             current.buffer.append(record)
             return record.level >= .error || current.buffer.count >= 64
         }
@@ -121,21 +131,39 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     }
 
     private func drainOnQueue() {
-        let pending: [LogRecord] = bufferState.withLock { current in
-            guard !current.disabled, !current.buffer.isEmpty else { return [] }
-            let records = current.buffer
+        let pending: (records: [LogRecord], dropped: Int) = bufferState.withLock { current in
+            guard !current.disabled else { return ([], 0) }
+            let taken = (current.buffer, current.dropped)
             current.buffer = []
-            return records
+            current.dropped = 0
+            return taken
         }
-        guard !pending.isEmpty else { return }
+        guard !pending.records.isEmpty || pending.dropped > 0 else { return }
 
         var payload = Data()
-        for record in pending {
+        for record in pending.records {
             guard let line = Self.encode(record) else { continue }
             payload.append(line)
             payload.append(0x0A)
         }
+        if pending.dropped > 0, let line = Self.encode(Self.dropNotice(pending.dropped)) {
+            payload.append(line)
+            payload.append(0x0A)
+        }
         writeOnQueue(payload)
+    }
+
+    private static func dropNotice(_ count: Int) -> LogRecord {
+        LogRecord(
+            timestamp: Date(),
+            level: .notice,
+            subsystem: LogCategory.diagnostics.subsystem,
+            category: .diagnostics,
+            message: "diagnostics buffer full, records dropped",
+            fields: [.count: .int(count)],
+            file: "FileDiagnosticsSink.swift",
+            line: 0
+        )
     }
 
     private static func encode(_ record: LogRecord) -> Data? {

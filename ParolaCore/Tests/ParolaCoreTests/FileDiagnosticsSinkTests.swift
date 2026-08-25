@@ -165,6 +165,25 @@ struct FileDiagnosticsSinkTests {
         )
     }
 
+    @Test("a full buffer drops records and reports how many")
+    func fullBufferReportsDrops() async throws {
+        let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir, maxBufferedRecords: 2)
+        sink.enqueue(record(.info, "one"))
+        sink.enqueue(record(.info, "two"))
+        sink.enqueue(record(.info, "three"))
+        await sink.flush()
+
+        let text = try String(contentsOf: sink.currentFileURL, encoding: .utf8)
+        let objects = try text.split(separator: "\n").map {
+            try JSONSerialization.jsonObject(with: Data($0.utf8)) as! [String: Any]
+        }
+        #expect(objects.compactMap { $0["message"] as? String }
+            == ["one", "two", "diagnostics buffer full, records dropped"])
+        #expect(objects.last?["category"] as? String == "diagnostics")
+        #expect((objects.last?["fields"] as? [String: String])?["count"] == "1")
+    }
+
     @Test("dropping the sink writes out what it still held")
     func deallocationDrains() async throws {
         let dir = tempDirectory()
