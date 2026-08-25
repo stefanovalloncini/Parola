@@ -19,7 +19,7 @@ struct CustomizationPane: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .frame(width: 160)
+                    .frame(width: 160, alignment: .trailing)
                     .axLeaf("Customization.Picker.Appearance")
                 }
                 SettingRow("Theme",
@@ -62,7 +62,7 @@ struct CustomizationPane: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .frame(width: 160)
+                    .frame(width: 160, alignment: .trailing)
                     .axLeaf("Customization.Picker.SidebarDensity")
                 }
             }

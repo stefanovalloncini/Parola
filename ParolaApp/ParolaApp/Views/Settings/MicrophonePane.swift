@@ -45,7 +45,7 @@ struct MicrophonePane: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .frame(minWidth: 220)
+                    .frame(minWidth: 220, alignment: .trailing)
                     .axLeaf("Microphone.Picker.InputDevice")
                 }
                 SettingRow("Live preview",
@@ -66,7 +66,7 @@ struct MicrophonePane: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .frame(width: 120)
+                        .frame(width: 120, alignment: .trailing)
                         .axLeaf("Microphone.Picker.AutoStop")
                     }
                 }
@@ -80,7 +80,7 @@ struct MicrophonePane: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .frame(width: 140)
+                    .frame(width: 140, alignment: .trailing)
                     .axLeaf("Microphone.Picker.CountIn")
                 }
             }

@@ -126,7 +126,7 @@ struct WorkflowRow: View {
         }
         .labelsHidden()
         .pickerStyle(.menu)
-        .frame(width: 120)
+        .frame(width: 120, alignment: .trailing)
         .axLeaf("Workflow.Picker.Insertion")
     }
 

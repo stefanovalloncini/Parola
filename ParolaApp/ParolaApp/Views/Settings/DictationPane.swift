@@ -59,7 +59,7 @@ struct DictationPane: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .frame(width: 200)
+                    .frame(width: 200, alignment: .trailing)
                     .axLeaf("Dictation.Picker.Mode")
                 }
                 SettingRow("Model",
@@ -103,7 +103,7 @@ struct DictationPane: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .frame(width: 200)
+                    .frame(width: 200, alignment: .trailing)
                     .axLeaf("Dictation.Picker.IndicatorStyle")
                 }
                 SettingRow("HUD opacity",

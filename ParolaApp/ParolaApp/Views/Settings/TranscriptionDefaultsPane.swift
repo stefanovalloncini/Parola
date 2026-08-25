@@ -21,7 +21,7 @@ struct TranscriptionDefaultsPane: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .frame(minWidth: 220)
+                    .frame(minWidth: 220, alignment: .trailing)
                     .axLeaf("TranscriptionDefaults.Picker.Model")
                 }
                 SettingRow("Default language",
@@ -34,7 +34,7 @@ struct TranscriptionDefaultsPane: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .frame(minWidth: 220)
+                    .frame(minWidth: 220, alignment: .trailing)
                     .axLeaf("TranscriptionDefaults.Picker.Language")
                 }
                 SettingRow("Word timestamps",

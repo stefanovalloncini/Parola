@@ -23,7 +23,7 @@ struct UpdatesPane: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .frame(width: 200)
+                    .frame(width: 200, alignment: .trailing)
                     .disabled(!feedConfigured)
                     .axLeaf("Updates.Picker.Channel")
                 }

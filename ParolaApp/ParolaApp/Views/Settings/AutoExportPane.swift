@@ -69,7 +69,7 @@ struct AutoExportPane: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .frame(width: 200)
+                    .frame(width: 200, alignment: .trailing)
                     .axLeaf("AutoExport.Picker.SubtitleLength")
                 }
                 SettingRow("Markdown timestamps",
@@ -91,7 +91,7 @@ struct AutoExportPane: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .frame(width: 160)
+                    .frame(width: 160, alignment: .trailing)
                     .axLeaf("AutoExport.Picker.HtmlTheme")
                 }
             }
