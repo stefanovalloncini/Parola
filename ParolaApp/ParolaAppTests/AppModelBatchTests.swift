@@ -714,6 +714,24 @@ struct AppModelBatchTests {
         model.clearBatch()
     }
 
+    @Test("startBatch during a running batch appends instead of stranding the in-flight job")
+    func startBatchDuringRunningBatchAppends() async {
+        let model = makeModel()
+        model.startBatch(urls: [Self.makeURL("a")])
+        let jobID = model.batchJobs[0].id
+        await model.handleBatchEvent(.started(jobID: jobID))
+        let live = model.batchTask
+
+        model.startBatch(urls: [Self.makeURL("b")])
+
+        #expect(model.batchJobs.map(\.url) == [Self.makeURL("a"), Self.makeURL("b")])
+        #expect(model.batchJobs[0].status == .transcribing)
+        #expect(model.batchJobs[1].status == .pending)
+        #expect(model.selectedBatchJobID == jobID)
+        #expect(model.batchTask == live)
+        model.clearBatch()
+    }
+
     @Test("a finished batch drains the files parked while it ran")
     func finishedBatchDrainsDeferredArrivals() async {
         let model = makeModel()

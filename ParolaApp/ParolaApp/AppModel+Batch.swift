@@ -69,6 +69,11 @@ extension AppModel {
             phase = .failed(message: ParolaError.featureDisabled(.batch).description)
             return
         }
+        // Replacing batchJobs mid-run would strand the job the queue is still transcribing.
+        if batchIsRunning {
+            addBatchFiles(urls)
+            return
+        }
         // A single-file or YouTube run owns phase and transcript until it drains; starting here
         // would let both flows write them and leave whichever finished last on screen.
         if phaseDefersArrivals || transcribeTaskRunning {
