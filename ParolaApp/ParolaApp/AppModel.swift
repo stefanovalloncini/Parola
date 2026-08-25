@@ -2546,28 +2546,26 @@ final class AppModel {
         }
     }
 
-    /// Flushes any pending debounced transcript write immediately. Call at entry-switch or batch-select.
+    /// Flushes a pending debounced transcript write immediately. Call at entry-switch or batch-select.
+    /// With nothing edited it writes nothing: `updatedAt` and the search index must not move on browsing.
     func flushPendingTranscriptSave() async {
-        guard let id = selectedEntryID, let transcript else {
-            pendingTranscriptSaveTask?.cancel()
-            pendingTranscriptSaveTask = nil
-            pendingSaveTextChanged = false
-            return
-        }
+        let hadEdit = pendingTranscriptSaveTask != nil
         pendingTranscriptSaveTask?.cancel()
         pendingTranscriptSaveTask = nil
         let reindex = pendingSaveTextChanged
         pendingSaveTextChanged = false
+        guard hadEdit, let id = selectedEntryID, let transcript else { return }
         try? await library.updateTranscript(transcript, for: id, reindex: reindex)
     }
 
-    /// Synchronously cancels any pending debounced save and returns the snapshot to write.
+    /// Synchronously cancels a pending debounced save and returns the snapshot to write.
     /// Used by AppDelegate.applicationWillTerminate, which cannot await async functions.
     func cancelAndDrainPendingTranscriptSave() -> (id: LibraryEntry.ID, transcript: Transcript)? {
+        let hadEdit = pendingTranscriptSaveTask != nil
         pendingTranscriptSaveTask?.cancel()
         pendingTranscriptSaveTask = nil
         pendingSaveTextChanged = false
-        guard let id = selectedEntryID, let transcript else { return nil }
+        guard hadEdit, let id = selectedEntryID, let transcript else { return nil }
         return (id, transcript)
     }
 
