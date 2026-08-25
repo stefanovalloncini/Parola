@@ -1,11 +1,14 @@
 import Foundation
+import ParolaCore
 
 actor AutomationAuditLog {
     private static let rotateThreshold: Int = 100 * 1024 * 1024
+    private static let filePrefix = "automation-audit-"
 
     private let directory: URL
-    private let pid: Int
-    private let startedAtUnix: Int
+    private let baseName: String
+    private let retentionDays: Int
+    private let totalBudgetBytes: Int
     private let timestampFormatter: ISO8601DateFormatter
 
     private var rotation: Int = 0
@@ -13,7 +16,7 @@ actor AutomationAuditLog {
     private var bytesWritten: Int = 0
     private var disabled: Bool = false
 
-    init(cacheDir: URL? = nil) {
+    init(cacheDir: URL? = nil, retentionDays: Int = 7, totalBudgetBytes: Int = 10_000_000) {
         let resolved: URL
         if let cacheDir {
             resolved = cacheDir
@@ -24,8 +27,11 @@ actor AutomationAuditLog {
             resolved = caches.appendingPathComponent("Parola", isDirectory: true)
         }
         self.directory = resolved
-        self.pid = Int(ProcessInfo.processInfo.processIdentifier)
-        self.startedAtUnix = Int(Date().timeIntervalSince1970)
+        self.retentionDays = retentionDays
+        self.totalBudgetBytes = totalBudgetBytes
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let startedAtUnix = Int(Date().timeIntervalSince1970)
+        self.baseName = "\(Self.filePrefix)\(pid)-\(startedAtUnix)"
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         self.timestampFormatter = formatter
@@ -114,10 +120,92 @@ actor AutomationAuditLog {
         rotation += 1
     }
 
-    private func currentFileURL() -> URL {
-        let base = "automation-audit-\(pid)-\(startedAtUnix)"
-        let name = rotation == 0 ? "\(base).jsonl" : "\(base)-\(rotation).jsonl"
+    func currentFileURL() -> URL {
+        let name = rotation == 0 ? "\(baseName).jsonl" : "\(baseName)-\(rotation).jsonl"
         return directory.appendingPathComponent(name)
+    }
+
+    /// What one sweep did. `overBudget` means the trim ran out of files it was allowed to delete
+    /// — every survivor is either this instance's or a live sibling's — so the folder stays large.
+    struct SweepOutcome: Sendable, Equatable {
+        var deleted = 0
+        var skippedLive = 0
+        var bytesRemaining = 0
+        var overBudget = false
+    }
+
+    @discardableResult
+    func sweep(now: Date = Date()) -> SweepOutcome {
+        let manager = FileManager.default
+        guard let entries = try? manager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        ) else { return SweepOutcome() }
+
+        var outcome = SweepOutcome()
+        var surviving: [(url: URL, date: Date, size: Int)] = []
+        let cutoff = now.addingTimeInterval(-Double(retentionDays) * 86_400)
+        let mine = entries.filter {
+            $0.lastPathComponent.hasPrefix(Self.filePrefix) && $0.pathExtension == "jsonl"
+        }
+
+        for url in mine {
+            let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+            let date = values?.contentModificationDate ?? now
+            let size = values?.fileSize ?? 0
+            guard date < cutoff, !url.lastPathComponent.hasPrefix(baseName) else {
+                surviving.append((url, date, size))
+                continue
+            }
+            try? manager.removeItem(at: url)
+            if manager.fileExists(atPath: url.path) {
+                surviving.append((url, date, size))
+            } else {
+                outcome.deleted += 1
+            }
+        }
+
+        surviving.sort { $0.date < $1.date }
+        var total = surviving.reduce(0) { $0 + $1.size }
+        var index = 0
+        while total > totalBudgetBytes, index < surviving.count {
+            let candidate = surviving[index]
+            index += 1
+            let name = candidate.url.lastPathComponent
+            if name.hasPrefix(baseName) { continue }
+            if Self.isOwnedByLiveProcess(name) {
+                outcome.skippedLive += 1
+                continue
+            }
+            guard (try? manager.removeItem(at: candidate.url)) != nil else { continue }
+            total -= candidate.size
+            outcome.deleted += 1
+        }
+
+        outcome.bytesRemaining = total
+        outcome.overBudget = total > totalBudgetBytes
+        if outcome.overBudget {
+            ParolaLog.notice(
+                .appBridge,
+                "automation audit sweep finished over budget",
+                [.bytes: .bytes(Int64(total)), .count: .int(outcome.skippedLive)]
+            )
+        }
+        return outcome
+    }
+
+    /// A sibling process still holding its log open would keep writing into an unlinked inode, so
+    /// the budget trim skips it. A recycled pid can spare a dead process's file until the age
+    /// cutoff — which runs no liveness check — catches it.
+    private static func isOwnedByLiveProcess(_ fileName: String) -> Bool {
+        guard fileName.hasPrefix(filePrefix) else { return false }
+        let rest = fileName.dropFirst(filePrefix.count)
+        guard let separator = rest.firstIndex(of: "-"),
+              let pid = pid_t(rest[rest.startIndex..<separator]),
+              pid > 0
+        else { return false }
+        return kill(pid, 0) == 0 || errno == EPERM
     }
 
     deinit {

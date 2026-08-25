@@ -5,9 +5,21 @@ import Testing
 @Suite("AutomationAuditLog")
 struct AutomationAuditLogTests {
 
+    /// Above PID_MAX, so no process can ever own a file named after it.
+    private static let deadPID = 999_999
+
     private func scratchDir() -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("AutomationAuditLogTests-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    private func makeFile(_ dir: URL, _ name: String, bytes: Int, ageDays: Int) throws -> URL {
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent(name)
+        try Data(repeating: 0x61, count: bytes).write(to: url)
+        let date = Date().addingTimeInterval(-Double(ageDays) * 86_400)
+        try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
+        return url
     }
 
     private func readLines(in directory: URL) throws -> [[String: Any]] {
@@ -119,6 +131,90 @@ struct AutomationAuditLogTests {
         #expect(args["files"] as? [String] == ["a.wav", "b.wav"])
         let options = try #require(args["options"] as? [String: Any])
         #expect(options["timestamps"] as? Bool == true)
+    }
+
+    @Test("files past the retention window are deleted")
+    func sweepDeletesExpired() async throws {
+        let dir = scratchDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let old = try makeFile(dir, "automation-audit-\(Self.deadPID)-100.jsonl", bytes: 10, ageDays: 9)
+        let fresh = try makeFile(dir, "automation-audit-\(Self.deadPID)-200.jsonl", bytes: 10, ageDays: 1)
+        let log = AutomationAuditLog(cacheDir: dir, retentionDays: 7)
+
+        let outcome = await log.sweep(now: Date())
+
+        #expect(outcome.deleted == 1)
+        #expect(FileManager.default.fileExists(atPath: old.path) == false)
+        #expect(FileManager.default.fileExists(atPath: fresh.path))
+    }
+
+    @Test("oldest files are dropped first when over the byte budget")
+    func sweepTrimsToBudgetOldestFirst() async throws {
+        let dir = scratchDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let oldest = try makeFile(dir, "automation-audit-\(Self.deadPID)-100.jsonl", bytes: 600, ageDays: 3)
+        let middle = try makeFile(dir, "automation-audit-\(Self.deadPID)-200.jsonl", bytes: 600, ageDays: 2)
+        let newest = try makeFile(dir, "automation-audit-\(Self.deadPID)-300.jsonl", bytes: 600, ageDays: 1)
+        let log = AutomationAuditLog(cacheDir: dir, retentionDays: 7, totalBudgetBytes: 1_400)
+
+        let outcome = await log.sweep(now: Date())
+
+        #expect(outcome.deleted == 1)
+        #expect(outcome.overBudget == false)
+        #expect(outcome.bytesRemaining == 1_200)
+        #expect(FileManager.default.fileExists(atPath: oldest.path) == false)
+        #expect(FileManager.default.fileExists(atPath: middle.path))
+        #expect(FileManager.default.fileExists(atPath: newest.path))
+    }
+
+    @Test("diagnostics files sharing the directory are left alone")
+    func sweepIgnoresForeignFiles() async throws {
+        let dir = scratchDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let foreign = try makeFile(dir, "parola-1-100.jsonl", bytes: 4_000, ageDays: 30)
+        let log = AutomationAuditLog(cacheDir: dir, retentionDays: 7, totalBudgetBytes: 100)
+
+        let outcome = await log.sweep(now: Date())
+
+        #expect(outcome.deleted == 0)
+        #expect(FileManager.default.fileExists(atPath: foreign.path))
+    }
+
+    @Test("the budget trim spares a file a live sibling process is still writing")
+    func sweepSparesLiveSibling() async throws {
+        let dir = scratchDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let livePID = ProcessInfo.processInfo.processIdentifier
+        let sibling = try makeFile(dir, "automation-audit-\(livePID)-100.jsonl", bytes: 600, ageDays: 3)
+        let orphan = try makeFile(dir, "automation-audit-\(Self.deadPID)-200.jsonl", bytes: 600, ageDays: 2)
+        let log = AutomationAuditLog(cacheDir: dir, retentionDays: 7, totalBudgetBytes: 700)
+
+        let outcome = await log.sweep(now: Date())
+
+        #expect(outcome.skippedLive == 1)
+        #expect(
+            FileManager.default.fileExists(atPath: sibling.path),
+            "deleting a live process's open log unlinks the inode it keeps writing to"
+        )
+        #expect(FileManager.default.fileExists(atPath: orphan.path) == false)
+    }
+
+    @Test("the file this process is writing survives both the age cutoff and the budget trim")
+    func sweepSparesOwnFile() async throws {
+        let dir = scratchDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let log = AutomationAuditLog(cacheDir: dir, retentionDays: 7, totalBudgetBytes: 100)
+        await log.record(id: "x", command: "noop", args: AutomationArgs(), ok: true, elapsedMs: 0)
+        let own = await log.currentFileURL()
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-30 * 86_400)],
+            ofItemAtPath: own.path
+        )
+
+        let outcome = await log.sweep(now: Date())
+
+        #expect(outcome.deleted == 0)
+        #expect(FileManager.default.fileExists(atPath: own.path))
     }
 
     @Test("writes into the supplied cache directory, creating it on demand")
