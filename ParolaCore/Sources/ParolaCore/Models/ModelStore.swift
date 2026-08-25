@@ -17,7 +17,7 @@ private struct WhisperCheckpointConfig: Decodable {
 }
 
 /// Weights an earlier release installed for a variant that has since moved to another folder.
-/// Nothing loads them; `ModelStore.delete(variant:)` clears them along with the current install.
+/// Nothing loads them; `ModelStore.deleteLeftovers(variant:)` clears them.
 public struct SupersededInstall: Sendable, Hashable {
     public let variantID: String
     public let displayName: String
@@ -556,12 +556,21 @@ public final class ModelStore: Sendable {
         }
     }
 
-    /// Removes a variant's directory along with any an earlier release installed it into, so
-    /// deleting a model that has moved folders frees every copy of it.
+    /// Removes the directory a variant is installed in now. Copies an earlier release left
+    /// elsewhere survive — `deleteLeftovers(variant:)` clears those.
     public func delete(variant: String) throws {
+        try remove([installedURL(for: variant)], describedBy: variant)
+    }
+
+    /// Removes the directories an earlier release installed a variant into, leaving the current
+    /// install in place.
+    public func deleteLeftovers(variant: String) throws {
         let superseded = ModelCatalog.variant(id: variant).map { supersededURLs(for: $0.downloadSource) } ?? []
-        let targets = ([installedURL(for: variant)] + superseded)
-            .filter { FileManager.default.fileExists(atPath: $0.path) }
+        try remove(superseded, describedBy: variant)
+    }
+
+    private func remove(_ urls: [URL], describedBy variant: String) throws {
+        let targets = urls.filter { FileManager.default.fileExists(atPath: $0.path) }
         guard !targets.isEmpty else {
             throw ParolaError.modelNotFound(variant)
         }

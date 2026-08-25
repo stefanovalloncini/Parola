@@ -310,8 +310,8 @@ struct ModelStoreTests {
         #expect(leftovers.first?.url.standardizedFileURL == old.standardizedFileURL)
     }
 
-    @Test("deleting the turbo entry clears the folder an earlier release installed it into")
-    func deleteClearsSupersededCopy() throws {
+    @Test("deleting the turbo entry leaves the folder an earlier release installed it into")
+    func deleteKeepsSupersededCopy() throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
@@ -328,13 +328,37 @@ struct ModelStoreTests {
         try Data("w".utf8).write(to: current.appendingPathComponent("TextDecoder.mlmodelc"))
 
         try store.deleteAny(idOrPath: "openai_whisper-large-v3_turbo")
-        #expect(!FileManager.default.fileExists(atPath: old.path))
         #expect(!FileManager.default.fileExists(atPath: current.path))
+        #expect(FileManager.default.fileExists(atPath: old.path))
+        #expect(store.supersededInstalls().count == 1)
+    }
+
+    @Test("deleteLeftovers clears the old copy and leaves the current install alone")
+    func deleteLeftoversSparesTheCurrentInstall() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let old = tmp.appendingPathComponent(
+            "models/argmaxinc/whisperkit-coreml/openai_whisper-large-v3_turbo", isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+        try Data("w".utf8).write(to: old.appendingPathComponent("TextDecoder.mlmodelc"))
+        let current = store.installedURL(for: "openai_whisper-large-v3_turbo")
+        try FileManager.default.createDirectory(at: current, withIntermediateDirectories: true)
+        try Data("w".utf8).write(to: current.appendingPathComponent("TextDecoder.mlmodelc"))
+
+        try store.deleteLeftovers(variant: "openai_whisper-large-v3_turbo")
+        #expect(!FileManager.default.fileExists(atPath: old.path))
+        #expect(FileManager.default.fileExists(atPath: current.path))
+        #expect(store.isInstalled("openai_whisper-large-v3_turbo"))
         #expect(store.supersededInstalls().isEmpty)
     }
 
-    @Test("the old copy alone is enough for delete to succeed")
-    func deleteSucceedsWithOnlyTheSupersededCopy() throws {
+    @Test("the old copy alone is not enough for delete to succeed")
+    func deleteNeedsTheCurrentInstall() throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
@@ -347,9 +371,28 @@ struct ModelStoreTests {
         try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
         try Data("w".utf8).write(to: old.appendingPathComponent("TextDecoder.mlmodelc"))
 
-        try store.delete(variant: "openai_whisper-large-v3_turbo")
-        #expect(!FileManager.default.fileExists(atPath: old.path))
         #expect(throws: ParolaError.self) { try store.delete(variant: "openai_whisper-large-v3_turbo") }
+        #expect(FileManager.default.fileExists(atPath: old.path))
+
+        try store.deleteLeftovers(variant: "openai_whisper-large-v3_turbo")
+        #expect(!FileManager.default.fileExists(atPath: old.path))
+        #expect(throws: ParolaError.self) { try store.deleteLeftovers(variant: "openai_whisper-large-v3_turbo") }
+    }
+
+    @Test("deleteLeftovers on a variant that never moved folders throws instead of touching it")
+    func deleteLeftoversThrowsForAVariantThatNeverMoved() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let current = store.installedURL(for: "openai_whisper-tiny")
+        try FileManager.default.createDirectory(at: current, withIntermediateDirectories: true)
+        try Data("w".utf8).write(to: current.appendingPathComponent("TextDecoder.mlmodelc"))
+
+        #expect(throws: ParolaError.self) { try store.deleteLeftovers(variant: "openai_whisper-tiny") }
+        #expect(FileManager.default.fileExists(atPath: current.path))
     }
 
     @Test("a checkpoint whose config disagrees with the catalog reads as needing a download")

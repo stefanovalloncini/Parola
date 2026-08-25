@@ -80,7 +80,7 @@ struct Models: AsyncParsableCommand {
                         .padding(toLength: nameWidth, withPad: " ", startingAt: 0)
                     let size = store.sizeOnDisk(at: old.url).map(humanBytes) ?? "—"
                     print("✗  \(name)\(old.displayName) — \(size)")
-                    print("      An earlier release installed it here. Run: parola models rm \(old.variantID)")
+                    print("      An earlier release installed it here. Run: parola models rm \(old.variantID) --leftovers")
                 }
             }
         }
@@ -134,8 +134,16 @@ struct Models: AsyncParsableCommand {
         @Argument(help: "Model variant name, or a directory name from the OTHER INSTALLED list.")
         var name: String
 
+        @Flag(help: "Delete only the UNUSED COPIES of this model, keeping the one in use.")
+        var leftovers: Bool = false
+
         func run() async throws {
             let store = ModelStore.shared
+            if leftovers {
+                try store.deleteLeftovers(variant: name)
+                print("Removed the unused copies of \(name).")
+                return
+            }
             try store.deleteAny(idOrPath: name)
             print("Removed \(name).")
         }

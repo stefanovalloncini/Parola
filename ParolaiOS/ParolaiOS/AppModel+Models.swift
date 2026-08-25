@@ -11,6 +11,7 @@ extension AppModel {
     }
 
     func deleteModel(_ name: String) {
+        try? ModelStore.shared.deleteLeftovers(variant: name)
         try? ModelStore.shared.delete(variant: name)
         refreshModelList()
     }

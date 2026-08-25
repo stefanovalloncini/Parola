@@ -1339,7 +1339,12 @@ final class AppModel {
         Task { [weak self] in
             let failure: (any Error)?
             do {
-                try await AppModel.offMainIO { try store.deleteAny(idOrPath: name) }
+                // One row per model here and no leftovers list, so Delete frees every copy —
+                // the CLI splits the two into `models rm` and `models rm --leftovers`.
+                try await AppModel.offMainIO {
+                    try? store.deleteLeftovers(variant: name)
+                    try store.deleteAny(idOrPath: name)
+                }
                 failure = nil
             } catch {
                 failure = error
