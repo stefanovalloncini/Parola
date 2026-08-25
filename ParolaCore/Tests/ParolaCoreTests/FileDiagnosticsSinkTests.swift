@@ -33,6 +33,26 @@ struct FileDiagnosticsSinkTests {
         Issue.record("expected \"\(substring)\" in \(url.path) within \(timeout)")
     }
 
+    private func waitForInitialSweep(
+        _ sink: FileDiagnosticsSink, timeout: Duration = .seconds(2)
+    ) async throws {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
+            if sink.completedSweeps > 0 { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        Issue.record("the install-time sweep never finished")
+    }
+
+    private func waitUntilDeleted(_ url: URL, timeout: Duration = .seconds(2)) async throws {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
+            if !FileManager.default.fileExists(atPath: url.path) { return }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        Issue.record("expected \(url.lastPathComponent) to be swept within \(timeout)")
+    }
+
     @Test("an error flushes to disk without an explicit flush")
     func errorFlushesEagerly() async throws {
         let dir = tempDirectory()
@@ -143,6 +163,24 @@ struct FileDiagnosticsSinkTests {
             source.contains("fileQueue.sync") == false,
             "fileQueue.sync deadlocks when reached from inside a fileQueue closure, and puts disk I/O on the caller's thread"
         )
+    }
+
+    @Test("a rotation re-runs the retention sweep")
+    func rotationSweepsAgain() async throws {
+        let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir, maxFileBytes: 400)
+        try await waitForInitialSweep(sink)
+
+        let expired = dir.appendingPathComponent("parola-999999-100.jsonl")
+        try Data(repeating: 0x61, count: 10).write(to: expired)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-9 * 86_400)],
+            ofItemAtPath: expired.path
+        )
+
+        for _ in 0..<20 { sink.enqueue(record(.error, "spin")) }
+        await sink.flush()
+        try await waitUntilDeleted(expired)
     }
 
     @Test("concurrent enqueues across a rotation boundary lose no records")

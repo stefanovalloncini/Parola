@@ -18,6 +18,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
 
     private let bufferState = OSAllocatedUnfairLock(initialState: BufferState())
     private let rotationState = OSAllocatedUnfairLock(initialState: 0)
+    private let sweepState = OSAllocatedUnfairLock(initialState: 0)
     private let fileQueue = DispatchQueue(label: "com.parola.diagnostics.file-sink")
     private var fileState = FileState()
 
@@ -65,9 +66,12 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         let pid = ProcessInfo.processInfo.processIdentifier
         let epoch = Int(Date().timeIntervalSince1970)
         self.baseName = "\(Self.filePrefix)\(pid)-\(epoch)"
-        DispatchQueue.global(qos: .utility).async {
-            let outcome = self.sweep(now: Date())
-            guard outcome.overBudget else { return }
+        scheduleSweep()
+    }
+
+    private func scheduleSweep() {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let outcome = self?.sweep(now: Date()), outcome.overBudget else { return }
             ParolaLog.notice(
                 .diagnostics,
                 "diagnostics sweep finished over budget",
@@ -77,6 +81,8 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     }
 
     public var isDisabled: Bool { bufferState.withLock { $0.disabled } }
+
+    var completedSweeps: Int { sweepState.withLock { $0 } }
 
     public var currentFileURL: URL {
         directory.appendingPathComponent(currentFileName)
@@ -154,6 +160,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
                 fileState.handle = nil
                 fileState.bytesWritten = 0
                 rotationState.withLock { $0 += 1 }
+                scheduleSweep()
             }
         } catch {
             bufferState.withLock { $0.disabled = true }
@@ -260,6 +267,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
 
         outcome.bytesRemaining = total
         outcome.overBudget = total > totalBudgetBytes
+        sweepState.withLock { $0 += 1 }
         return outcome
     }
 
