@@ -98,6 +98,8 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_transcribe_file` | **path**, translate | Drop-equivalent: transcribe a file by absolute path. |
 | `parola_app_start_batch` | **paths** | Submit multiple files. Auto-navigates to Batch view. |
 | `parola_app_add_batch_files` | **paths** | Append more files to the existing batch. |
+| `dropFiles` | **paths**, half | Routes files through the split drop zone: `now` transcribes, `queue` enqueues. |
+| `previewDropZone` | payload, count, half | Test mode only: shapes the drop overlay without a drag so it can be captured. |
 | `parola_app_clear_batch` | — | Cancel and remove all queued jobs. |
 | `parola_app_select_batch_job` | **id** | Select a specific job to view its transcript. |
 | `parola_app_get_batch_jobs` | — | All jobs: id, file, status (pending/transcribing/done/failed/cancelled), progress, error. |
