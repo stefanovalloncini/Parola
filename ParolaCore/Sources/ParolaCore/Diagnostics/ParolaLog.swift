@@ -17,10 +17,6 @@ public enum ParolaLog {
         state.withLock { $0.sink = nil }
     }
 
-    static var installedSink: (any DiagnosticsSink)? {
-        state.withLock { $0.sink }
-    }
-
     public static func debug(
         _ category: LogCategory, _ message: @autoclosure () -> LogMessage,
         _ fields: @autoclosure () -> [LogField: LogValue] = [:],
