@@ -4,41 +4,23 @@ import ParolaCore
 struct EmptyDropZone: View {
     @Environment(AppModel.self) private var model
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: DS.Spacing.regular), count: 4)
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.large) {
-                LazyVGrid(columns: columns, alignment: .leading, spacing: DS.Spacing.regular) {
-                    ActionCard(
-                        title: "Open or Drop File",
-                        systemImage: "folder.fill.badge.plus",
-                        action: { model.presentOpenPanel() }
-                    )
+                IntakeDropWell()
                     .axLeaf("Empty.Button.OpenFile")
-                    if model.features.isEnabled(.micRecording) {
-                        ActionCard(
-                            title: "Record Microphone",
-                            systemImage: "mic.fill",
-                            action: { model.startRecording(source: .microphone) }
-                        )
-                        .axLeaf("Empty.Button.RecordMic")
-                    }
-                    if model.features.isEnabled(.meetings) {
-                        ActionCard(
-                            title: "Record System Audio",
-                            systemImage: "waveform.circle.fill",
-                            action: { model.startRecording(source: .systemAudio) }
-                        )
-                        .axLeaf("Empty.Button.RecordSystemAudio")
-                    }
-                    if model.features.isEnabled(.youtube) {
-                        ActionCard(
-                            title: "YouTube URL",
-                            systemImage: "play.rectangle.fill",
-                            action: { model.youtubeSheetOpen = true }
-                        )
-                        .axLeaf("Empty.Button.YouTube")
+
+                let actions = startActions
+                if !actions.isEmpty {
+                    LazyVGrid(columns: columns(for: actions.count), alignment: .leading, spacing: DS.Spacing.regular) {
+                        ForEach(actions) { action in
+                            ActionCard(
+                                title: action.title,
+                                systemImage: action.systemImage,
+                                action: action.run
+                            )
+                            .axLeaf(action.id)
+                        }
                     }
                 }
 
@@ -81,6 +63,46 @@ struct EmptyDropZone: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private struct StartAction: Identifiable {
+        let id: String
+        let title: LocalizedStringKey
+        let systemImage: String
+        let run: () -> Void
+    }
+
+    private var startActions: [StartAction] {
+        var actions: [StartAction] = []
+        if model.features.isEnabled(.micRecording) {
+            actions.append(StartAction(
+                id: "Empty.Button.RecordMic",
+                title: "Record Microphone",
+                systemImage: "mic.fill",
+                run: { model.startRecording(source: .microphone) }
+            ))
+        }
+        if model.features.isEnabled(.meetings) {
+            actions.append(StartAction(
+                id: "Empty.Button.RecordSystemAudio",
+                title: "Record System Audio",
+                systemImage: "waveform.circle.fill",
+                run: { model.startRecording(source: .systemAudio) }
+            ))
+        }
+        if model.features.isEnabled(.youtube) {
+            actions.append(StartAction(
+                id: "Empty.Button.YouTube",
+                title: "YouTube URL",
+                systemImage: "play.rectangle.fill",
+                run: { model.youtubeSheetOpen = true }
+            ))
+        }
+        return actions
+    }
+
+    private func columns(for count: Int) -> [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: DS.Spacing.regular), count: max(1, min(count, 4)))
+    }
+
     @ViewBuilder
     private var recentSection: some View {
         let recents = RecentEntries.most(of: model.libraryEntries)
@@ -120,6 +142,56 @@ struct EmptyDropZone: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
         }
+    }
+}
+
+/// The resting half of the split drop zone: the window says a drop is welcome before a drag
+/// ever starts, and shows the model and language it would commit to.
+private struct IntakeDropWell: View {
+    @Environment(AppModel.self) private var model
+    @State private var isHovering = false
+    @ScaledMetric(relativeTo: .title) private var iconSize: CGFloat = 26
+
+    var body: some View {
+        Button {
+            model.presentOpenPanel()
+        } label: {
+            HStack(spacing: DS.Spacing.regular) {
+                Image(systemName: "arrow.down.doc")
+                    .font(.system(size: iconSize, weight: .regular))
+                    .foregroundStyle(DS.Color.accent)
+                VStack(alignment: .leading, spacing: DS.Spacing.tight) {
+                    Text("Drop audio or video")
+                        .font(DS.Font.heading)
+                        .foregroundStyle(DS.Color.primaryText)
+                    Text("or click to choose files")
+                        .font(DS.Font.subheadline)
+                        .foregroundStyle(DS.Color.secondaryText)
+                }
+                Spacer(minLength: DS.Spacing.regular)
+                IntakeStateChips()
+            }
+            .padding(.horizontal, DS.Spacing.large)
+            .padding(.vertical, DS.Spacing.regular)
+            .frame(maxWidth: .infinity, minHeight: 84, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
+                    .fill(DS.Color.surfaceElevated.opacity(isHovering ? 1 : 0.6))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
+                    .strokeBorder(
+                        DS.Color.accent.opacity(isHovering ? 0.9 : 0.45),
+                        style: StrokeStyle(lineWidth: 1.5, dash: [6, 6])
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering }
+        }
+        .help("Drop audio or video")
     }
 }
 
