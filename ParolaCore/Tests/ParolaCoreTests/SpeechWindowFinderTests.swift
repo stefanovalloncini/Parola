@@ -5,6 +5,7 @@ import Testing
 @Suite("Speech window finder")
 struct SpeechWindowFinderTests {
     private let sampleRate = 16_000
+    private var windowLength: Int { 30 * sampleRate }
 
     private func silence(seconds: Double) -> [Float] {
         [Float](repeating: 0, count: Int(seconds * Double(sampleRate)))
@@ -17,50 +18,130 @@ struct SpeechWindowFinderTests {
         }
     }
 
-    @Test("skips leading silence and lands on the first sustained speech")
-    func skipsLeadingSilence() throws {
-        let samples = silence(seconds: 12) + tone(seconds: 5)
+    @Test("the loudest stretch is offered first")
+    func loudestFirst() throws {
+        let samples = silence(seconds: 30) + tone(seconds: 30) + silence(seconds: 30)
 
-        let offset = SpeechWindowFinder.firstSpeechOffset(in: samples, sampleRate: sampleRate)
-
-        let seconds = Double(try #require(offset)) / Double(sampleRate)
-        #expect(seconds >= 11.5 && seconds <= 12.5)
-    }
-
-    @Test("returns zero when speech starts immediately")
-    func speechFromTheStart() {
-        let offset = SpeechWindowFinder.firstSpeechOffset(
-            in: tone(seconds: 4), sampleRate: sampleRate
+        let offsets = SpeechWindowFinder.loudestWindowOffsets(
+            in: samples, windowLength: windowLength, limit: 3
         )
 
-        #expect(offset == 0)
+        let seconds = Double(try #require(offsets.first)) / Double(sampleRate)
+        #expect(seconds >= 25 && seconds <= 35)
     }
 
-    @Test("a silent file has no speech window")
-    func allSilence() {
-        #expect(SpeechWindowFinder.firstSpeechOffset(in: silence(seconds: 30), sampleRate: sampleRate) == nil)
+    @Test("a quiet stretch is still offered once the loud ones are taken")
+    func quieterStretchesFollow() {
+        let samples = tone(seconds: 30, amplitude: 0.4)
+            + tone(seconds: 30, amplitude: 0.05)
+            + tone(seconds: 30, amplitude: 0.2)
+
+        let offsets = SpeechWindowFinder.loudestWindowOffsets(
+            in: samples, windowLength: windowLength, limit: 3
+        )
+
+        #expect(offsets.count == 3)
     }
 
-    @Test("an isolated click is too short to count as speech")
-    func ignoresShortBursts() {
-        let samples = silence(seconds: 3) + tone(seconds: 0.2) + silence(seconds: 3)
+    @Test("picked windows never overlap")
+    func windowsDoNotOverlap() {
+        let samples = tone(seconds: 120)
 
-        #expect(SpeechWindowFinder.firstSpeechOffset(in: samples, sampleRate: sampleRate) == nil)
+        let offsets = SpeechWindowFinder.loudestWindowOffsets(
+            in: samples, windowLength: windowLength, limit: 4
+        )
+
+        let sorted = offsets.sorted()
+        for (earlier, later) in zip(sorted, sorted.dropFirst()) {
+            #expect(later - earlier >= windowLength)
+        }
     }
 
-    @Test("a click before real speech does not win over the sustained stretch")
-    func prefersSustainedSpeechOverClick() throws {
-        let samples = silence(seconds: 2) + tone(seconds: 0.2) + silence(seconds: 8) + tone(seconds: 6)
+    @Test("limit caps how many windows are offered")
+    func limitCaps() {
+        let offsets = SpeechWindowFinder.loudestWindowOffsets(
+            in: tone(seconds: 300), windowLength: windowLength, limit: 2
+        )
 
-        let offset = SpeechWindowFinder.firstSpeechOffset(in: samples, sampleRate: sampleRate)
-
-        let seconds = Double(try #require(offset)) / Double(sampleRate)
-        #expect(seconds >= 9.5 && seconds <= 10.5)
+        #expect(offsets.count == 2)
     }
 
-    @Test("an empty waveform has no speech window")
+    @Test("a waveform shorter than one window starts at zero")
+    func shorterThanOneWindow() {
+        let offsets = SpeechWindowFinder.loudestWindowOffsets(
+            in: tone(seconds: 8), windowLength: windowLength, limit: 4
+        )
+
+        #expect(offsets == [0])
+    }
+
+    @Test("silence still yields windows so the probe has something to read")
+    func silenceStillYieldsWindows() {
+        let offsets = SpeechWindowFinder.loudestWindowOffsets(
+            in: silence(seconds: 120), windowLength: windowLength, limit: 3
+        )
+
+        #expect(!offsets.isEmpty)
+    }
+
+    @Test("an empty waveform has no windows")
     func emptyWaveform() {
-        #expect(SpeechWindowFinder.firstSpeechOffset(in: [], sampleRate: sampleRate) == nil)
+        #expect(SpeechWindowFinder.loudestWindowOffsets(in: [], windowLength: windowLength, limit: 3).isEmpty)
+    }
+}
+
+@Suite("Whisper language vote")
+struct WhisperLanguageVoteTests {
+    private func reading(_ language: String, _ confidence: Double) -> WhisperLanguageReading {
+        WhisperLanguageReading(language: language, confidence: confidence)
+    }
+
+    @Test("windows that agree pin the language")
+    func agreementPins() {
+        let vote = WhisperLanguageVote.decide([reading("it", 0.9), reading("it", 0.8)])
+
+        #expect(vote == "it")
+    }
+
+    @Test("two noise windows disagreeing lose to the pair that agrees")
+    func speechOutvotesNoise() {
+        let vote = WhisperLanguageVote.decide([
+            reading("cs", 0.7), reading("en", 0.6), reading("it", 0.9), reading("it", 0.85),
+        ])
+
+        #expect(vote == "it")
+    }
+
+    @Test("an even split leaves the language unpinned")
+    func evenSplitDoesNotPin() {
+        #expect(WhisperLanguageVote.decide([reading("it", 0.8), reading("cs", 0.8)]) == nil)
+    }
+
+    @Test("a reading the detector barely believes is not evidence")
+    func lowConfidenceIgnored() {
+        let vote = WhisperLanguageVote.decide([reading("cs", 0.05), reading("it", 0.9)])
+
+        #expect(vote == "it")
+    }
+
+    @Test("nothing but low-confidence readings leaves the language unpinned")
+    func onlyLowConfidence() {
+        #expect(WhisperLanguageVote.decide([reading("cs", 0.05), reading("ru", 0.04)]) == nil)
+    }
+
+    @Test("no readings leaves the language unpinned")
+    func noReadings() {
+        #expect(WhisperLanguageVote.decide([]) == nil)
+    }
+
+    @Test("one confident reading is enough when there is nothing else to read")
+    func singleReading() {
+        #expect(WhisperLanguageVote.decide([reading("it", 0.9)]) == "it")
+    }
+
+    @Test("a blank language code is not a vote")
+    func blankCode() {
+        #expect(WhisperLanguageVote.decide([reading("  ", 0.95)]) == nil)
     }
 }
 

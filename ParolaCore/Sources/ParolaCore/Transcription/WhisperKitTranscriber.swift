@@ -174,17 +174,26 @@ actor WhisperKitTranscriber: Transcriber {
     }
 
     private static let languageProbePrefixSeconds: Double = 300
+    private static let languageProbeWindows = 5
 
     private func probeLanguage(kit: WhisperKit, url: URL) async -> String? {
         guard kit.textDecoder.isModelMultilingual else { return nil }
         guard let samples = probeSamples(url: url), !samples.isEmpty else { return nil }
-        let offset = SpeechWindowFinder.firstSpeechOffset(
-            in: samples, sampleRate: WhisperKit.sampleRate
-        ) ?? 0
         let windowSamples = kit.featureExtractor.windowSamples ?? Constants.defaultWindowSamples
-        let window = Array(samples[offset..<min(samples.count, offset + windowSamples)])
-        guard !window.isEmpty else { return nil }
-        return try? await kit.detectLangauge(audioArray: window).language
+        let offsets = SpeechWindowFinder.loudestWindowOffsets(
+            in: samples, windowLength: windowSamples, limit: Self.languageProbeWindows
+        )
+        var readings: [WhisperLanguageReading] = []
+        for offset in offsets {
+            if Task.isCancelled { break }
+            let window = Array(samples[offset..<min(samples.count, offset + windowSamples)])
+            guard !window.isEmpty, let probe = try? await kit.detectLangauge(audioArray: window) else { continue }
+            readings.append(WhisperLanguageReading(
+                language: probe.language,
+                confidence: probe.langProbs[probe.language].map { exp(Double($0)) } ?? 0
+            ))
+        }
+        return WhisperLanguageVote.decide(readings)
     }
 
     private func probeSamples(url: URL) -> [Float]? {
@@ -194,6 +203,33 @@ actor WhisperKitTranscriber: Transcriber {
             endTime: Self.languageProbePrefixSeconds
         ) else { return nil }
         return AudioProcessor.convertBufferToArray(buffer: buffer)
+    }
+}
+
+struct WhisperLanguageReading: Hashable, Sendable {
+    var language: String
+    var confidence: Double
+}
+
+/// Weighs one language reading per probe window. A window of room tone reads as a confident
+/// language all the same — Czech, Russian, whatever the noise resembles — so no single window is
+/// trusted: the winner has to carry a clear majority of the confidence, otherwise the run is left
+/// to detect per chunk as it did before.
+enum WhisperLanguageVote {
+    static let minimumConfidence = 0.1
+    static let lead = 1.25
+
+    static func decide(_ readings: [WhisperLanguageReading]) -> String? {
+        var mass: [String: Double] = [:]
+        for reading in readings where reading.confidence >= minimumConfidence {
+            let code = reading.language.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !code.isEmpty else { continue }
+            mass[code, default: 0] += reading.confidence
+        }
+        let ranked = mass.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
+        guard let best = ranked.first else { return nil }
+        guard ranked.count == 1 || best.value >= ranked[1].value * lead else { return nil }
+        return best.key
     }
 }
 

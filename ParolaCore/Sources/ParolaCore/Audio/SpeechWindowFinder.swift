@@ -1,34 +1,32 @@
 import Foundation
 
-/// Locates the first stretch of sustained voice in a mono waveform by frame energy.
+/// Offers the loudest stretches of a mono waveform, loudest first, for callers that can only afford
+/// to look at a few seconds of a long file.
 enum SpeechWindowFinder {
-    static func firstSpeechOffset(
+    static func loudestWindowOffsets(
         in samples: [Float],
-        sampleRate: Int,
-        frameSeconds: Double = 0.1,
-        energyThreshold: Float = 0.02,
-        minimumSpeechSeconds: Double = 1.0
-    ) -> Int? {
-        let frameLength = Int(frameSeconds * Double(sampleRate))
-        guard frameLength > 0, !samples.isEmpty else { return nil }
-        let framesNeeded = max(1, Int((minimumSpeechSeconds / frameSeconds).rounded(.up)))
+        windowLength: Int,
+        limit: Int,
+        hopLength: Int? = nil
+    ) -> [Int] {
+        guard windowLength > 0, limit > 0, !samples.isEmpty else { return [] }
+        guard samples.count > windowLength else { return [0] }
+        let hop = max(1, hopLength ?? windowLength / 2)
 
-        var runStart: Int?
-        var runLength = 0
-        var frameStart = 0
-        while frameStart < samples.count {
-            let frameEnd = min(frameStart + frameLength, samples.count)
-            if rootMeanSquare(samples[frameStart..<frameEnd]) >= energyThreshold {
-                if runStart == nil { runStart = frameStart }
-                runLength += 1
-                if runLength >= framesNeeded { return runStart }
-            } else {
-                runStart = nil
-                runLength = 0
-            }
-            frameStart += frameLength
+        var measured: [(offset: Int, energy: Float)] = []
+        var offset = 0
+        while offset + windowLength <= samples.count {
+            measured.append((offset, rootMeanSquare(samples[offset..<(offset + windowLength)])))
+            offset += hop
         }
-        return nil
+        measured.sort { $0.energy == $1.energy ? $0.offset < $1.offset : $0.energy > $1.energy }
+
+        var picked: [Int] = []
+        for candidate in measured where picked.allSatisfy({ abs($0 - candidate.offset) >= windowLength }) {
+            picked.append(candidate.offset)
+            if picked.count == limit { break }
+        }
+        return picked
     }
 
     private static func rootMeanSquare(_ frame: ArraySlice<Float>) -> Float {
