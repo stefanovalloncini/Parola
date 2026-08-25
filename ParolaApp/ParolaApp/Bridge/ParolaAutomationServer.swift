@@ -362,6 +362,7 @@ final class ParolaAutomationServer {
         "meetingDetectorEnabled", "dictationModeRaw", "dictationKeyCode",
         "dictationIndicatorStyleRaw", "automationBridgeEnabled",
         "transcriptDisplayMode", "autoTitleEntries", "appAccentColor",
+        "inspectorMode",
     ]
 
     func runScreenshot(requestedFileName: String?) async throws -> AutomationValue {
@@ -386,8 +387,14 @@ final class ParolaAutomationServer {
         return dir.appendingPathComponent(bare)
     }
 
+    static func mainAutomationWindow() -> NSWindow? {
+        NSApp.windows.first {
+            $0.isVisible && $0.contentView != nil && !$0.isMiniaturized && $0.frame.size.width > 200
+        }
+    }
+
     private func captureMainWindow(path: String) async throws -> AutomationValue {
-        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil && !$0.isMiniaturized && $0.frame.size.width > 200 }) else {
+        guard let window = Self.mainAutomationWindow() else {
             throw AutomationError.precondition("no visible main window to capture")
         }
         do {
@@ -454,7 +461,7 @@ final class ParolaAutomationServer {
 
         return .object([
             "phase": .string(Self.phaseName(model.phase)),
-            "phaseDetail": Self.phaseDetail(model.phase),
+            "phaseDetail": Self.phaseDetail(model.phase, progress: TranscribeProgress(model: model)),
             "route": .string(model.route.rawValue),
             "settingsPane": .string(model.settingsPane),
             "libraryFilter": .string(model.libraryFilter?.rawValue ?? ""),
@@ -494,7 +501,10 @@ final class ParolaAutomationServer {
         }
     }
 
-    static func phaseDetail(_ phase: AppModel.Phase) -> AutomationValue {
+    static func phaseDetail(
+        _ phase: AppModel.Phase,
+        progress: TranscribeProgress = TranscribeProgress()
+    ) -> AutomationValue {
         switch phase {
         case .idle, .ready:
             return .object([:])
@@ -503,7 +513,12 @@ final class ParolaAutomationServer {
         case .loadingModel(let name):
             return .object(["name": .string(name)])
         case .transcribing(let file):
-            return .object(["file": .string(file.path)])
+            return .object([
+                "file": .string(file.path),
+                "progress": progress.fraction.map { .double($0) } ?? .null,
+                "stage": progress.stage.map { .string(Self.stageName($0)) } ?? .null,
+                "hasPartialText": .bool(progress.hasPartialText),
+            ])
         case .recording(let source):
             return .object(["source": .string(source.rawValue)])
         case .exporting(let progress):
@@ -511,5 +526,35 @@ final class ParolaAutomationServer {
         case .failed(let message):
             return .object(["message": .string(message)])
         }
+    }
+
+    static func stageName(_ stage: TranscribeStage) -> String {
+        switch stage {
+        case .preparingAudio: return "preparingAudio"
+        case .transcribing: return "transcribing"
+        }
+    }
+}
+
+/// What the transcribing phase reports beyond the file: the model tracks these three for the
+/// progress pane, and an agent driving the bridge needs them to tell a slow run from a wedged one.
+struct TranscribeProgress {
+    let fraction: Double?
+    let stage: TranscribeStage?
+    let hasPartialText: Bool
+
+    init(fraction: Double? = nil, stage: TranscribeStage? = nil, hasPartialText: Bool = false) {
+        self.fraction = fraction
+        self.stage = stage
+        self.hasPartialText = hasPartialText
+    }
+
+    @MainActor
+    init(model: AppModel) {
+        self.init(
+            fraction: model.fileTranscribeFraction,
+            stage: model.fileTranscribeStage,
+            hasPartialText: !model.filePartialText.isEmpty
+        )
     }
 }

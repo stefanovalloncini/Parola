@@ -153,21 +153,31 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "setLibraryFilter",
                 area: .settings,
-                summary: "Filters the library by category; empty string clears the filter.",
+                summary: "Filters the library by category; 'all' selects the sidebar All row, empty string clears the filter.",
                 kind: .mutating,
                 args: [
-                    .init(name: "category", kind: .string(), required: false, summary: "EntryCategory rawValue or empty", defaultValue: .string("")),
+                    .init(name: "category", kind: .string(), required: false, summary: "EntryCategory rawValue, 'all', or empty", defaultValue: .string("")),
                 ],
                 handler: { args, ctx in
                     let raw = (try args.optionalString("category")) ?? ""
                     if raw.isEmpty {
                         ctx.model.libraryFilter = nil
+                        ctx.model.libraryBrowsingAll = false
+                    } else if raw == "all" {
+                        ctx.model.libraryFilter = nil
+                        ctx.model.libraryBrowsingAll = true
+                        ctx.model.route = .transcript
                     } else if let cat = EntryCategory(rawValue: raw) {
                         ctx.model.libraryFilter = cat
+                        ctx.model.libraryBrowsingAll = false
+                        ctx.model.route = .transcript
                     } else {
                         throw AutomationError.invalidArgs(field: "category", reason: "unknown category: \(raw)")
                     }
-                    return .object(["libraryFilter": .string(raw)])
+                    return .object([
+                        "libraryFilter": .string(raw),
+                        "libraryBrowsingAll": .bool(ctx.model.libraryBrowsingAll),
+                    ])
                 }
             ),
         ]

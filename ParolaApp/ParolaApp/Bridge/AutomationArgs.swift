@@ -74,6 +74,17 @@ struct AutomationArgs: Sendable {
         }
     }
 
+    func optionalDouble(_ key: String) throws -> Double? {
+        guard let v = values[key] else { return nil }
+        switch v {
+        case .null: return nil
+        case .double(let d): return d
+        case .int(let i): return Double(i)
+        default:
+            throw AutomationError.invalidArgs(field: key, reason: "must be a number")
+        }
+    }
+
     func bool(_ key: String) throws -> Bool {
         guard let v = values[key] else {
             throw AutomationError.invalidArgs(field: key, reason: "missing required boolean")
