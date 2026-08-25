@@ -124,6 +124,7 @@ final class ParolaAutomationServer {
                     FileHandle.standardError.write(
                         Data("[ParolaAutomationServer] listening on 127.0.0.1:\(portString)\n".utf8)
                     )
+                    ParolaLog.notice(.appBridge, "bridge listening on port \(Int(port.rawValue))")
                     self.onPortReady?(port.rawValue)
                 }
             }
@@ -189,6 +190,7 @@ final class ParolaAutomationServer {
                 FileHandle.standardError.write(
                     Data("[ParolaAutomationServer] receive error: \(error)\n".utf8)
                 )
+                ParolaLog.error(.appBridge, "bridge receive failed", [.error: .error(error)])
                 conn.cancel()
                 return
             }
@@ -214,6 +216,7 @@ final class ParolaAutomationServer {
                     FileHandle.standardError.write(
                         Data("[ParolaAutomationServer] send error: \(sendErr)\n".utf8)
                     )
+                    ParolaLog.error(.appBridge, "bridge send failed", [.error: .error(sendErr)])
                 }
                 if ending {
                     conn.cancel()
