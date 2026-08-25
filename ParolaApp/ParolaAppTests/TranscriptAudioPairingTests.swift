@@ -72,10 +72,10 @@ extension TranscriberMockSuites {
             (model.player?.currentItem?.asset as? AVURLAsset)?.url
         }
 
-        private func slowMock() -> MockTranscriberResponse {
+        private func heldMock(_ gate: MockTranscriberGate) -> MockTranscriberResponse {
             MockTranscriberResponse(
                 segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the run's own words")],
-                delayMs: 6000
+                gate: gate
             )
         }
 
@@ -101,7 +101,9 @@ extension TranscriberMockSuites {
         @Test("a file transcription that lands after the user opened an entry keeps its own audio")
         func fileTranscribePairsWithItsSource() async throws {
             try await withMocksCleared {
-                await MockTranscriberRegistry.shared.install(engineID: nil, response: slowMock())
+                let gate = MockTranscriberGate()
+                defer { Task { await gate.open() } }
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: heldMock(gate))
 
                 let model = makeModel()
                 let wav = try makeSilentWAV(label: "file")
@@ -112,6 +114,7 @@ extension TranscriberMockSuites {
                 #expect(model.sourceFileURL == entryAudio)
                 try #require(model.transcript?.text.contains("own words") != true, "the run must still be in flight")
 
+                await gate.open()
                 let finished = await waitUntil { model.phase == .ready && model.transcript?.text.contains("own words") == true }
                 #expect(finished)
                 #expect(model.sourceFileURL == wav)
@@ -122,9 +125,11 @@ extension TranscriberMockSuites {
         @Test("a recording's transcript lands with the recording's audio, not the entry opened meanwhile")
         func recordingPairsWithItsSource() async throws {
             try await withMocksCleared {
+                let gate = MockTranscriberGate()
+                defer { Task { await gate.open() } }
                 let fixture = try makeSilentWAV(label: "take")
                 await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
-                await MockTranscriberRegistry.shared.install(engineID: nil, response: slowMock())
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: heldMock(gate))
 
                 let model = makeModel()
                 model.useStreaming = false
@@ -146,6 +151,7 @@ extension TranscriberMockSuites {
                 #expect(model.sourceFileURL == entryAudio)
                 try #require(model.transcript?.text.contains("own words") != true, "the take must still be transcribing")
 
+                await gate.open()
                 let finished = await waitUntil { model.phase == .ready && model.transcript?.text.contains("own words") == true }
                 #expect(finished)
                 #expect(model.sourceFileURL == fixture)
@@ -156,9 +162,11 @@ extension TranscriberMockSuites {
         @Test("a YouTube transcription that lands after a navigation keeps its own audio")
         func youtubePairsWithItsSource() async throws {
             try await withMocksCleared {
+                let gate = MockTranscriberGate()
+                defer { Task { await gate.open() } }
                 let fixture = try makeSilentWAV(label: "youtube")
                 MockMediaFetcherRegistry.shared.install(fixture)
-                await MockTranscriberRegistry.shared.install(engineID: nil, response: slowMock())
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: heldMock(gate))
 
                 let model = makeModel()
                 model.transcribeYouTube(urlString: "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
@@ -169,6 +177,7 @@ extension TranscriberMockSuites {
                 #expect(model.sourceFileURL == entryAudio)
                 try #require(model.transcript?.text.contains("own words") != true, "the fetch's run must still be in flight")
 
+                await gate.open()
                 let finished = await waitUntil { model.phase == .ready && model.transcript?.text.contains("own words") == true }
                 #expect(finished)
                 #expect(model.sourceFileURL == fixture)

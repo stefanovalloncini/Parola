@@ -74,6 +74,28 @@ public struct MockTranscriberFailure: Sendable {
     }
 }
 
+/// Holds a mock run in flight until the test lets it land. A test that needs a run to still be
+/// running while it does something else can say exactly that, instead of picking a delay long
+/// enough to cover the slowest machine.
+public actor MockTranscriberGate {
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    public init() {}
+
+    public func open() {
+        isOpen = true
+        let pending = waiters
+        waiters.removeAll()
+        for waiter in pending { waiter.resume() }
+    }
+
+    func wait() async {
+        guard !isOpen else { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+}
+
 public struct MockTranscriberResponse: Sendable {
     public var segments: [TranscriptSegmentSeed]
     public var partials: [String]
@@ -84,6 +106,7 @@ public struct MockTranscriberResponse: Sendable {
     public var modelName: String
     public var delayMs: Int
     public var failure: MockTranscriberFailure?
+    public var gate: MockTranscriberGate?
 
     public init(
         segments: [TranscriptSegmentSeed] = [],
@@ -94,7 +117,8 @@ public struct MockTranscriberResponse: Sendable {
         durationSeconds: Double = 0,
         modelName: String = "mock",
         delayMs: Int = 0,
-        failure: MockTranscriberFailure? = nil
+        failure: MockTranscriberFailure? = nil,
+        gate: MockTranscriberGate? = nil
     ) {
         self.segments = segments
         self.partials = partials
@@ -105,6 +129,7 @@ public struct MockTranscriberResponse: Sendable {
         self.modelName = modelName
         self.delayMs = delayMs
         self.failure = failure
+        self.gate = gate
     }
 
     func materialise(sourceURL: URL?) -> Transcript {
@@ -183,6 +208,7 @@ public actor MockTranscriber: Transcriber {
             if response.delayMs > 0 {
                 try? await sleeper(response.delayMs)
             }
+            await response.gate?.wait()
             throw failure.asError()
         }
 
@@ -215,6 +241,7 @@ public actor MockTranscriber: Transcriber {
             handlers.onStage?(.transcribing)
         }
 
+        await response.gate?.wait()
         try Task.checkCancellation()
         return response.materialise(sourceURL: url)
     }
