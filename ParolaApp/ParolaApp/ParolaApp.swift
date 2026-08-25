@@ -23,7 +23,7 @@ private func applyAlwaysOnTop(_ on: Bool) {
 @MainActor
 func handleParolaOpen(_ url: URL, model: AppModel) {
     if url.isFileURL {
-        model.transcribe(fileURL: url)
+        model.collectOpenedFile(url)
         return
     }
     guard url.scheme?.lowercased() == "parola" else { return }

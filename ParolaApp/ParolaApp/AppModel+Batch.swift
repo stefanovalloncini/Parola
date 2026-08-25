@@ -235,7 +235,14 @@ extension AppModel {
         let audioURLs = urls.filter { $0.pathExtension != "parola" && !Self.isSubtitleImport($0) }
         // Subtitles first: a batch kicked off by addBatchFiles could flip batchIsRunning and re-defer them.
         for url in subtitleURLs { importSubtitle(fileURL: url) }
-        if !audioURLs.isEmpty { addBatchFiles(audioURLs) }
+        if !audioURLs.isEmpty {
+            if features.isEnabled(.batch) {
+                addBatchFiles(audioURLs)
+            } else {
+                transcribe(fileURL: audioURLs[0])
+                deferredArrivals.append(contentsOf: audioURLs.dropFirst())
+            }
+        }
         for url in parolaURLs {
             Task { [weak self] in await self?.openProjectDocument(at: url) }
         }

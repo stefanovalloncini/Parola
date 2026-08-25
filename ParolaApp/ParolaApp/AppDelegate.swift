@@ -155,7 +155,8 @@ final class ServicesProvider: NSObject {
     }
 
     private func handle(pasteboard: NSPasteboard, translate: Bool, errorPtr: AutoreleasingUnsafeMutablePointer<NSString>?) {
-        guard let url = Self.firstFileURL(from: pasteboard) else {
+        let urls = Self.fileURLs(from: pasteboard)
+        guard !urls.isEmpty else {
             errorPtr?.pointee = "No audio or video file found on the pasteboard." as NSString
             return
         }
@@ -164,18 +165,17 @@ final class ServicesProvider: NSObject {
             return
         }
         NSApp.activate(ignoringOtherApps: true)
-        model.transcribe(fileURL: url, translateOverride: translate)
+        model.handleIncomingFiles(urls, translateOverride: translate)
     }
 
-    static func firstFileURL(from pasteboard: NSPasteboard) -> URL? {
+    static func fileURLs(from pasteboard: NSPasteboard) -> [URL] {
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
-           let url = urls.first {
-            return url
+           !urls.isEmpty {
+            return urls
         }
-        if let names = pasteboard.propertyList(forType: NSPasteboard.PasteboardType("NSFilenamesPboardType")) as? [String],
-           let path = names.first {
-            return URL(fileURLWithPath: path)
+        if let names = pasteboard.propertyList(forType: NSPasteboard.PasteboardType("NSFilenamesPboardType")) as? [String] {
+            return names.map { URL(fileURLWithPath: $0) }
         }
-        return nil
+        return []
     }
 }

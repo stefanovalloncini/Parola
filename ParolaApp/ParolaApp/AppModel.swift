@@ -53,6 +53,8 @@ final class AppModel {
     var route: Route = .transcript
     var settingsPane: String = "general"
     var settingsRoutePreview = false  // test-mode only: renders SettingsView in the main window so the bridge can screenshot panes
+    var dropDragPayload: DroppedFiles.Kind?
+    var dropHighlight: DropHalf?
     var phase: Phase = .idle
     var transcript: Transcript? {
         didSet {
@@ -912,6 +914,8 @@ final class AppModel {
 
     @ObservationIgnored var liveSource: AudioSource?
     @ObservationIgnored var deferredArrivals: [URL] = []
+    @ObservationIgnored var pendingOpenedFiles: [URL] = []
+    @ObservationIgnored var openedFilesFlushTask: Task<Void, Never>?
     @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
     @ObservationIgnored var streamingConsumer: Task<Void, Never>?
     @ObservationIgnored var fileTranscribeTask: Task<Void, Never>?
@@ -1432,32 +1436,29 @@ final class AppModel {
         }
     }
 
-    func handleIncomingFiles(_ urls: [URL]) {
-        let expanded = urls.flatMap(Self.expandingDroppedFolder)
-        let subtitles = expanded.filter(Self.isSubtitleImport)
-        let media = expanded.filter { !Self.isSubtitleImport($0) }
-        for url in subtitles { importSubtitle(fileURL: url) }
-        if media.count == 1 {
-            transcribe(fileURL: media[0])
-        } else if !media.isEmpty {
-            startBatch(urls: media)
+    /// A batch runs on the global translate setting, so the override only reaches a single-file run.
+    func handleIncomingFiles(_ urls: [URL], translateOverride: Bool? = nil) {
+        let files = DroppedFiles.classify(urls)
+        guard !files.isEmpty else { return }
+        if files.media.isEmpty, files.subtitles.isEmpty, files.projects.isEmpty, let link = files.links.first {
+            transcribeYouTube(urlString: link.absoluteString)
+            return
         }
-    }
-
-    /// Batch Export promises "drop a folder of files to start a batch" — a dropped
-    /// directory expands to its media files (one level, sorted for a stable queue order).
-    nonisolated static func expandingDroppedFolder(_ url: URL) -> [URL] {
-        guard (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true else {
-            return [url]
+        for url in files.subtitles { importSubtitle(fileURL: url) }
+        guard !files.media.isEmpty else {
+            if let project = files.projects.first {
+                Task { [weak self] in await self?.openProjectDocument(at: project) }
+            }
+            return
         }
-        let contents = (try? FileManager.default.contentsOfDirectory(
-            at: url,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        )) ?? []
-        return contents
-            .filter { FolderWatcher.isMediaFile($0) || isSubtitleImport($0) }
-            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+        if batchIsRunning {
+            addBatchFiles(files.media)
+        } else if files.media.count > 1, features.isEnabled(.batch) {
+            startBatch(urls: files.media)
+        } else {
+            transcribe(fileURL: files.media[0], translateOverride: translateOverride)
+            deferredArrivals.append(contentsOf: files.media.dropFirst())
+        }
     }
 
     // MARK: - Subtitle import
@@ -1515,6 +1516,10 @@ final class AppModel {
     }
 
     func transcribe(fileURL: URL, translateOverride: Bool? = nil) {
+        guard fileURL.isFileURL else {
+            transcribeYouTube(urlString: fileURL.absoluteString)
+            return
+        }
         if phaseDefersArrivals {
             deferredArrivals.append(fileURL)
             return
