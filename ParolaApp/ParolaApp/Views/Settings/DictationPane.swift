@@ -123,7 +123,7 @@ struct DictationPane: View {
                     DictationModeRow(selectedID: $model.dictationCleanupPromptID)
                 }
                 SettingRow("Strip self-corrections",
-                           description: "Drops \"scratch that\", \"wait, no\", and collapses \", I mean,\" hedges.") {
+                           description: "Drops “scratch that”, “wait, no”, and collapses “, I mean,” hedges.") {
                     Toggle("", isOn: $model.dictationStripSelfCorrections).labelsHidden()
                         .axLeaf("Dictation.Toggle.StripSelfCorrections")
                 }
@@ -206,7 +206,7 @@ struct DictationPane: View {
     private var activationDescription: String {
         var text = String(localized: "Click to record any key combination.")
         if isBareFunctionKey {
-            text += " " + String(localized: "Bare F-keys reach Parola only when pressed with Fn, unless \"Use F1, F2… as standard function keys\" is on.")
+            text += " " + String(localized: "Bare F-keys need Fn unless “standard function keys” is on in Keyboard settings.")
         }
         return text
     }

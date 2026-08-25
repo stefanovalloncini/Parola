@@ -51,7 +51,7 @@ struct IgnoredSegmentsPane: View {
             }
             .axLeaf("IgnoredSegments.Button.AddPattern")
 
-            SettingHelper(text: "A segment is removed when its entire text equals a pattern (case-insensitive, trimmed). Catches filler-only segments like \"uh\" — not words inside sentences. Applies to new transcriptions; saved transcripts don't change.")
+            SettingHelper(text: "A segment is removed when its entire text equals a pattern (case-insensitive, trimmed). Catches filler-only segments like “uh” — not words inside sentences. Applies to new transcriptions; saved transcripts don't change.")
             ResetPaneButton(scope: .ignoredSegments)
         }
     }

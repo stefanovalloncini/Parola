@@ -11,7 +11,7 @@ struct RecordMeetingsPane: View {
             SettingsSection("Permissions") {
                 PermissionRow(
                     title: String(localized: "Screen Recording"),
-                    detail: String(localized: "Captures the system-wide audio mix. Used unless \"Record only the meeting app's audio\" is on."),
+                    detail: String(localized: "Captures the system-wide audio mix. Used unless “Record only the meeting app's audio” is on."),
                     granted: model.capturePermissions.screenRecordingGranted,
                     isFirst: true,
                     axID: "RecordMeetings.Button.GrantScreenRecording",
@@ -20,7 +20,7 @@ struct RecordMeetingsPane: View {
                 )
                 PermissionRow(
                     title: String(localized: "System Audio Recording"),
-                    detail: String(localized: "Captures a single app's audio. Used when \"Record only the meeting app's audio\" is on."),
+                    detail: String(localized: "Captures a single app's audio. Used when “Record only the meeting app's audio” is on."),
                     granted: model.capturePermissions.systemAudioGranted,
                     isFirst: false,
                     axID: "RecordMeetings.Button.GrantSystemAudio",

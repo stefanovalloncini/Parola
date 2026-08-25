@@ -43,7 +43,7 @@ struct CorrectionsPane: View {
             }
             .axLeaf("Corrections.Button.AddCorrection")
 
-            SettingHelper(text: "Word-bounded replacements applied after every dictation. Use this for mis-transcribed jargon like \"q three\" → \"Q3\".")
+            SettingHelper(text: "Word-bounded replacements applied after every dictation. Use this for mis-transcribed jargon like “q three” → “Q3”.")
             ResetPaneButton(scope: .corrections)
         }
     }
