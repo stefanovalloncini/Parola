@@ -99,7 +99,10 @@ public actor TranscriptionSession {
         }
         transcript = TranscriptCleanup.apply(
             to: transcript,
-            options: TranscriptCleanupOptions(filtersHallucinations: options.filtersHallucinations)
+            options: TranscriptCleanupOptions(
+                filtersHallucinations: options.filtersHallucinations,
+                mergesSentences: engineID == .whisperKit
+            )
         )
         if options.diarize {
             try Task.checkCancellation()

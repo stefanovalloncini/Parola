@@ -3,8 +3,13 @@ import Foundation
 public struct TranscriptCleanupOptions: Sendable {
     public var filtersHallucinations: Bool
 
-    public init(filtersHallucinations: Bool = true) {
+    /// Whisper cuts mid-sentence; engines that already emit sentence-shaped segments leave
+    /// this off so their own segmentation survives.
+    public var mergesSentences: Bool
+
+    public init(filtersHallucinations: Bool = true, mergesSentences: Bool = false) {
         self.filtersHallucinations = filtersHallucinations
+        self.mergesSentences = mergesSentences
     }
 }
 
@@ -18,6 +23,9 @@ public enum TranscriptCleanup {
         var segments = transcript.segments.droppingBlankText()
         if options.filtersHallucinations {
             segments = IgnoredSegments.applyBuiltInDefaults(to: segments)
+        }
+        if options.mergesSentences {
+            segments = SentenceMerger.merged(segments.chronologicallyOrdered())
         }
         var out = transcript
         out.segments = segments.chronologicallyOrdered()
