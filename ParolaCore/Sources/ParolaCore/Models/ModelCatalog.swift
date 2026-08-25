@@ -185,6 +185,22 @@ public enum ModelCatalog {
         all.filter { $0.engineID == engineID }
     }
 
+    /// A model that can handle `language`, to offer when the selected one can't. Prefers a
+    /// drop-in on the same engine, then the recommended model, then anything that fits.
+    public static func variantSupporting(
+        language: String,
+        preferring engineID: EngineID? = nil,
+        configuration: ManagedConfiguration = .shared
+    ) -> ModelVariant? {
+        let candidates = configuration.filterAllowed(all).filter {
+            staticCapabilities(for: $0)?.supportedLanguages.allows(language) == true
+        }
+        return candidates.first { $0.engineID == engineID && $0.category == .recommended }
+            ?? candidates.first { $0.engineID == engineID }
+            ?? candidates.first { $0.category == .recommended }
+            ?? candidates.first
+    }
+
     public static func effectiveCapabilities(
         for variant: ModelVariant,
         registry: EngineRegistry = .shared

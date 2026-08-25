@@ -197,17 +197,45 @@ public actor TranscriptionSession {
             throw ParolaError.engineNotRegistered(engineID.rawValue)
         }
         let caps = baseCaps.tightened(by: variant?.languageScope)
-        if !caps.supportedLanguages.allows(options.language) && options.language != nil {
-            throw ParolaError.unsupportedForEngine(
-                "Engine \(engineID) does not support language \"\(options.language ?? "?")\""
-            )
+        if let language = options.language, !caps.supportedLanguages.allows(language) {
+            throw ParolaError.unsupportedForEngine(Self.languageRejection(
+                language, engineID: engineID, variant: variant, supported: caps.supportedLanguages
+            ))
         }
         if options.task == .translate, !caps.supportsTranslate {
-            throw ParolaError.unsupportedForEngine("Engine \(engineID) does not support translate task")
+            throw ParolaError.unsupportedForEngine("\(engineID.displayName) does not support translation.")
         }
         if options.diarize, !caps.supportsDiarization {
-            throw ParolaError.unsupportedForEngine("Engine \(engineID) does not support diarization")
+            throw ParolaError.unsupportedForEngine("\(engineID.displayName) does not support speaker labels.")
         }
+    }
+
+    /// Names the model rather than the engine: the usual cause is an English-only variant on an
+    /// otherwise multilingual engine, and blaming the engine sends people looking in the wrong place.
+    private static func languageRejection(
+        _ language: String,
+        engineID: EngineID,
+        variant: ModelVariant?,
+        supported: SupportedLanguages
+    ) -> String {
+        guard let variant else {
+            return "\(engineID.displayName) can't transcribe \"\(language)\"."
+        }
+        var message = named(variant)
+        if case .only(let codes) = supported, !codes.isEmpty {
+            let spoken = codes == ["en"] ? "English" : codes.sorted().joined(separator: ", ")
+            message += " only handles \(spoken) and"
+        }
+        message += " can't transcribe \"\(language)\"."
+        if let alternative = ModelCatalog.variantSupporting(language: language, preferring: engineID) {
+            message += " Pick a multilingual model such as \(named(alternative))."
+        }
+        return message
+    }
+
+    /// A display name that already carries a parenthetical would read as a double bracket.
+    private static func named(_ variant: ModelVariant) -> String {
+        variant.displayName.contains("(") ? variant.id : "\(variant.displayName) (\(variant.id))"
     }
 
     private func ensureBootstrap() async {

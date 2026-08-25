@@ -85,6 +85,59 @@ struct CapabilityGuardTests {
         }
     }
 
+    @Test("an English-only Whisper variant is named in the rejection, not the engine")
+    func englishOnlyVariantIsNamedInRejection() async throws {
+        let session = await makeSession()
+        let audio = DummyAudioSource(url: FileManager.default.temporaryDirectory.appendingPathComponent("none.wav"))
+
+        var message = ""
+        do {
+            _ = try await session.transcribe(
+                source: audio,
+                options: TranscriptionOptions(model: "distil-whisper_distil-large-v3", language: "it")
+            )
+        } catch let error as ParolaError {
+            message = error.description
+        }
+        #expect(message.contains("Distil Whisper Large v3"))
+        #expect(message.contains("distil-whisper_distil-large-v3"))
+        #expect(message.contains("English"))
+        #expect(message.contains("\"it\""))
+        #expect(message.contains("multilingual"))
+        #expect(!message.lowercased().contains("engine whisperkit"))
+    }
+
+    @Test("the rejection points at a model that can handle the requested language")
+    func rejectionSuggestsAWorkingModel() async throws {
+        let session = await makeSession()
+        let audio = DummyAudioSource(url: FileManager.default.temporaryDirectory.appendingPathComponent("none.wav"))
+
+        var message = ""
+        do {
+            _ = try await session.transcribe(
+                source: audio,
+                options: TranscriptionOptions(model: "nvidia_parakeet-tdt-0.6b-v2", language: "it")
+            )
+        } catch let error as ParolaError {
+            message = error.description
+        }
+        let suggested = try #require(ModelCatalog.variantSupporting(language: "it", preferring: .parakeet))
+        #expect(message.contains("Parakeet TDT 0.6B v2"))
+        #expect(message.contains(suggested.id))
+        #expect(ModelCatalog.staticCapabilities(for: suggested)?.supportedLanguages.allows("it") == true)
+    }
+
+    @Test("variantSupporting prefers the requested engine, then the recommended model")
+    func variantSupportingPrefersSameEngine() {
+        #expect(ModelCatalog.variantSupporting(language: "it", preferring: .whisperKit)?.id
+            == "openai_whisper-large-v3_turbo")
+        #expect(ModelCatalog.variantSupporting(language: "en", preferring: .parakeet)?.id
+            == "nvidia_parakeet-tdt-0.6b-v2")
+        let fallback = try? #require(ModelCatalog.variantSupporting(language: "it", preferring: .parakeet))
+        #expect(fallback?.engineID != .parakeet)
+        #expect(fallback?.category == .recommended)
+    }
+
     @Test("Parakeet rejects translate task")
     func parakeetRejectsTranslate() async throws {
         let session = await makeSession()
