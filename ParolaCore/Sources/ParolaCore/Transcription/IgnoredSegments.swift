@@ -33,4 +33,12 @@ public enum IgnoredSegments {
             return !patterns.contains(normalized)
         }
     }
+
+    /// Drops the built-in ``HallucinationPhrases`` list. Kept apart from ``apply(rules:to:)``
+    /// so a frontend that already ran this pass doesn't run it a second time over user rules.
+    public static func applyBuiltInDefaults(
+        to segments: [TranscriptSegment]
+    ) -> [TranscriptSegment] {
+        segments.filter { !HallucinationPhrases.matchSet.contains(HallucinationPhrases.normalized($0.text)) }
+    }
 }

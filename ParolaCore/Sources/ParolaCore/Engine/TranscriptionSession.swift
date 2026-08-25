@@ -97,7 +97,10 @@ public actor TranscriptionSession {
         } onCancel: {
             Task { await self.cancelInFlight() }
         }
-        transcript = TranscriptCleanup.apply(to: transcript)
+        transcript = TranscriptCleanup.apply(
+            to: transcript,
+            options: TranscriptCleanupOptions(filtersHallucinations: options.filtersHallucinations)
+        )
         if options.diarize {
             try Task.checkCancellation()
             transcript = try await diarizer.diarize(

@@ -25,6 +25,10 @@ public struct TranscriptionOptions: Sendable {
     /// Hint for the diarizer when known. Nil → auto-detect.
     public var expectedSpeakers: Int?
 
+    /// Drops the stock filler Whisper decodes out of silence — see ``HallucinationPhrases``.
+    /// Set false to get the engine's output verbatim.
+    public var filtersHallucinations: Bool
+
     public init(
         model: String? = nil,
         language: String? = nil,
@@ -33,7 +37,8 @@ public struct TranscriptionOptions: Sendable {
         verbose: Bool = false,
         initialPrompt: String? = nil,
         diarize: Bool = false,
-        expectedSpeakers: Int? = nil
+        expectedSpeakers: Int? = nil,
+        filtersHallucinations: Bool = true
     ) {
         self.model = model
         self.language = language
@@ -43,6 +48,7 @@ public struct TranscriptionOptions: Sendable {
         self.initialPrompt = initialPrompt
         self.diarize = diarize
         self.expectedSpeakers = expectedSpeakers
+        self.filtersHallucinations = filtersHallucinations
     }
 
     public static let `default` = TranscriptionOptions()
