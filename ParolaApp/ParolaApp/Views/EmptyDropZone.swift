@@ -195,7 +195,7 @@ struct ActionCard: View {
                     .font(DS.Font.body)
                     .fontWeight(.medium)
                     .foregroundStyle(DS.Color.primaryText)
-                    .lineLimit(2)
+                    .lineLimit(2, reservesSpace: true)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
