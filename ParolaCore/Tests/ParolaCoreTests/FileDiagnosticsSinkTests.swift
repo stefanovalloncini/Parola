@@ -98,6 +98,32 @@ struct FileDiagnosticsSinkTests {
         #expect(object["subsystem"] as? String == "app.parola.core")
     }
 
+    @Test("every line carries the schema version and a pinned set of keys")
+    func linesCarrySchemaVersion() async throws {
+        let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir)
+        sink.enqueue(record(.notice, "bare"))
+        sink.enqueue(LogRecord(
+            timestamp: Date(timeIntervalSince1970: 1_755_871_082),
+            level: .notice, subsystem: .core, category: .models,
+            message: "counted", fields: [.count: .int(3)],
+            file: "T.swift", line: 1
+        ))
+        await sink.flush()
+
+        let text = try String(contentsOf: sink.currentFileURL, encoding: .utf8)
+        let objects = try text.split(separator: "\n").map {
+            try JSONSerialization.jsonObject(with: Data($0.utf8)) as! [String: Any]
+        }
+        let common: Set<String> = [
+            "schemaVersion", "ts", "level", "subsystem", "category", "message", "template",
+            "file", "line",
+        ]
+        #expect(objects.allSatisfy { $0["schemaVersion"] as? Int == FileDiagnosticsSink.schemaVersion })
+        #expect(Set(objects[0].keys) == common)
+        #expect(Set(objects[1].keys) == common.union(["fields"]))
+    }
+
     @Test("field values persist as flat strings, without their kind")
     func fieldsPersistFlat() async throws {
         let dir = tempDirectory()

@@ -15,6 +15,10 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         var bytesWritten: Int = 0
     }
 
+    /// Stamped on every JSONL line. Bump it whenever the line's keys change, so a reader handed a
+    /// file from an older build knows what shape to expect.
+    public static let schemaVersion = 1
+
     private static let filePrefix = "parola-"
 
     private let bufferState = OSAllocatedUnfairLock(initialState: BufferState())
@@ -168,6 +172,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
 
     private static func encode(_ record: LogRecord) -> Data? {
         var object: [String: Any] = [
+            "schemaVersion": schemaVersion,
             "ts": LogTimestamp.string(from: record.timestamp),
             "level": record.level.name,
             "subsystem": record.subsystem.rawValue,
