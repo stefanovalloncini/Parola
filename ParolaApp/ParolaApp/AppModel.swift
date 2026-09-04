@@ -1463,7 +1463,7 @@ final class AppModel {
         }
         for url in files.subtitles { importSubtitle(fileURL: url) }
         guard !files.media.isEmpty else {
-            if let project = files.projects.first {
+            for project in files.projects {
                 Task { [weak self] in await self?.openProjectDocument(at: project) }
             }
             return

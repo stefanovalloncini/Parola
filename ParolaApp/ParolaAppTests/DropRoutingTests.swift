@@ -196,7 +196,7 @@ struct DropRoutingTests {
         #expect(ready == .transcribeLink)
     }
 
-    @Test("two dropped projects open one instead of becoming batch jobs")
+    @Test("dropped projects never become batch jobs")
     func projectsNeverBecomeBatchJobs() {
         let model = makeModel()
 
@@ -204,6 +204,43 @@ struct DropRoutingTests {
 
         #expect(model.batchJobs.isEmpty)
         #expect(model.deferredArrivals.isEmpty)
+    }
+
+    @Test("every entry point opens every dropped project, not just the first")
+    func everyDroppedProjectOpens() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DropRoutingTests-projects-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let base = dir.appendingPathComponent("second")
+        _ = try ParolaDocument.write(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "second project")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioURL: nil,
+            to: base
+        )
+        let dropped = [Self.media("first.parola"), base.appendingPathExtension("parola")]
+        let routes: [(AppModel, [URL]) -> Void] = [
+            { $0.transcribeNow(urls: $1) },
+            { $0.addToQueue(urls: $1) },
+            { $0.handleIncomingFiles($1) },
+        ]
+
+        for route in routes {
+            let model = makeModel()
+            route(model, dropped)
+
+            var opened = false
+            for _ in 0..<300 where !opened {
+                if model.transcript?.segments.first?.text == "second project" { opened = true }
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+            #expect(opened, "the project behind the first one never opened")
+            #expect(model.batchJobs.isEmpty)
+        }
     }
 
     @Test("dropping a PDF does nothing at all")

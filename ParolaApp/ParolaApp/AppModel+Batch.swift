@@ -239,9 +239,9 @@ extension AppModel {
         guard !deferredArrivals.isEmpty || !deferredLinks.isEmpty else { return }
         let urls = deferredArrivals
         deferredArrivals = []
-        let parolaURLs = urls.filter { $0.pathExtension == "parola" }
+        let parolaURLs = urls.filter(DroppedFiles.isProject)
         let subtitleURLs = urls.filter(Self.isSubtitleImport)
-        let audioURLs = urls.filter { $0.pathExtension != "parola" && !Self.isSubtitleImport($0) }
+        let audioURLs = urls.filter { !DroppedFiles.isProject($0) && !Self.isSubtitleImport($0) }
         // Subtitles first: a batch kicked off by addBatchFiles could flip batchIsRunning and re-defer them.
         for url in subtitleURLs { importSubtitle(fileURL: url) }
         if !audioURLs.isEmpty {

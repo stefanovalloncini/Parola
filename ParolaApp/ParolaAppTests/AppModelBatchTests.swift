@@ -817,6 +817,17 @@ struct AppModelBatchTests {
         model.clearBatch()
     }
 
+    @Test("a parked project drains as a project whatever case its extension carries")
+    func drainRecognisesUppercaseProjectExtension() {
+        let model = makeModel()
+        model.deferredArrivals = [URL(fileURLWithPath: "/tmp/AppModelBatchTests/Notes.Parola")]
+
+        model.drainDeferredArrivals()
+
+        #expect(model.deferredArrivals.isEmpty)
+        #expect(model.batchJobs.isEmpty)
+    }
+
     @Test("arrivals during a subtitle burn defer instead of racing the export")
     func exportingDefersArrivals() {
         let model = makeModel()
