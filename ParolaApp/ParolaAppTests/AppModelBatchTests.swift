@@ -714,6 +714,32 @@ struct AppModelBatchTests {
         model.clearBatch()
     }
 
+    @Test("startBatch appends to a queue restored from a quit instead of discarding it")
+    func startBatchKeepsRestoredPendingJobs() throws {
+        let model = makeModel()
+        let restored = [Self.makeURL("restored-a"), Self.makeURL("restored-b")]
+        try FileManager.default.createDirectory(
+            at: model.batchQueueFileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try JSONEncoder().encode(restored).write(to: model.batchQueueFileURL)
+
+        model.restoreBatchQueue()
+        #expect(model.batchJobs.map(\.url) == restored)
+        let selected = try #require(model.selectedBatchJobID)
+
+        let added = Self.makeURL("added")
+        model.startBatch(urls: [added])
+
+        #expect(model.batchJobs.map(\.url) == restored + [added])
+        #expect(model.batchJobs.allSatisfy { $0.status == .pending })
+        #expect(model.selectedBatchJobID == selected)
+
+        let snapshot = try JSONDecoder().decode([URL].self, from: Data(contentsOf: model.batchQueueFileURL))
+        #expect(snapshot == restored + [added])
+        model.clearBatch()
+    }
+
     @Test("startBatch during a running batch appends instead of stranding the in-flight job")
     func startBatchDuringRunningBatchAppends() async {
         let model = makeModel()

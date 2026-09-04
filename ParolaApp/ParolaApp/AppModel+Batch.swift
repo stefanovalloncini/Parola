@@ -69,8 +69,8 @@ extension AppModel {
             phase = .failed(message: ParolaError.featureDisabled(.batch).description)
             return
         }
-        // Replacing batchJobs mid-run would strand the job the queue is still transcribing.
-        if batchIsRunning {
+        // Replacing batchJobs would strand the running job and the pending ones Resume waits on.
+        if batchJobs.contains(where: { $0.status == .pending || $0.status == .transcribing }) {
             addBatchFiles(urls)
             return
         }
