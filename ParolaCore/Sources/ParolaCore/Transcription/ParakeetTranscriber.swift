@@ -33,6 +33,10 @@ actor ParakeetTranscriber: Transcriber {
             self.manager = asr
             self.loadedModel = model
         } catch {
+            ParolaLog.error(
+                .engineParakeet, "model \(ModelToken(model)) failed to load",
+                [.error: .error(error)]
+            )
             throw ParolaError.transcriptionFailed("Parakeet load failed: \(error.localizedDescription)")
         }
     }
@@ -43,12 +47,15 @@ actor ParakeetTranscriber: Transcriber {
         handlers: TranscribeHandlers
     ) async throws -> Transcript {
         guard let asr = manager, let modelName = loadedModel else {
+            ParolaLog.fault(.engineParakeet, "transcribe called with no model loaded")
             throw ParolaError.transcriptionFailed("Parakeet model not loaded")
         }
         if let lang = options.language, lang.lowercased() != "en" {
+            ParolaLog.notice(.engineParakeet, "rejected language \(LanguageToken(lang))")
             throw ParolaError.unsupportedForEngine("Parakeet only supports English (got \"\(lang)\")")
         }
         if options.task == .translate {
+            ParolaLog.notice(.engineParakeet, "rejected translate: unsupported")
             throw ParolaError.unsupportedForEngine("Parakeet does not support translation")
         }
         let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
@@ -59,9 +66,19 @@ actor ParakeetTranscriber: Transcriber {
         // FluidAudio decodes and infers inside one opaque call, so the run counts as transcribing from here.
         handlers.onStage?(.transcribing)
         let result: ASRResult
+        let startedAt = ContinuousClock.now
         do {
             result = try await asr.transcribe(url, decoderState: &decoderState, language: nil)
         } catch {
+            var fields: [LogField: LogValue] = [
+                .model: .safe(ModelToken(modelName)),
+                .elapsed: .duration(startedAt.duration(to: .now)),
+                .error: .error(error),
+            ]
+            if let seconds = FileAudioSource(url: url).synchronousDuration() {
+                fields[.audioSeconds] = .seconds(seconds)
+            }
+            ParolaLog.error(.engineParakeet, "transcribe failed", fields)
             throw ParolaError.transcriptionFailed("Parakeet transcribe failed: \(error.localizedDescription)")
         }
 
@@ -115,6 +132,10 @@ actor ParakeetTranscriber: Transcriber {
             )
         } catch {
             if isCancellation(error) { throw CancellationError() }
+            ParolaLog.error(
+                .models, "parakeet download failed for \(ModelToken(model))",
+                [.error: .error(error)]
+            )
             throw ParolaError.modelDownloadFailed(model, underlying: String(describing: error))
         }
     }

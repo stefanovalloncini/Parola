@@ -20,6 +20,7 @@ actor WhisperKitTranscriber: Transcriber {
         if loadedModel == model, whisperKit != nil { return }
         let interval = signposter.beginInterval("load", "model=\(model, privacy: .public)")
         defer { signposter.endInterval("load", interval) }
+        let startedAt = ContinuousClock.now
         do {
             let folder = modelStore.installedURL(for: model).path
             let kit = try await WhisperKit(
@@ -34,7 +35,15 @@ actor WhisperKitTranscriber: Transcriber {
             )
             self.whisperKit = kit
             self.loadedModel = model
+            ParolaLog.info(
+                .engineWhisperKit, "model \(ModelToken(model)) loaded",
+                [.elapsed: .duration(startedAt.duration(to: .now))]
+            )
         } catch {
+            ParolaLog.error(
+                .engineWhisperKit, "model \(ModelToken(model)) failed to load",
+                [.error: .error(error)]
+            )
             throw ParolaError.transcriptionFailed("model load failed: \(error.localizedDescription)")
         }
     }
@@ -62,6 +71,10 @@ actor WhisperKitTranscriber: Transcriber {
             )
         } catch {
             if isCancellation(error) { throw CancellationError() }
+            ParolaLog.error(
+                .models, "whisperkit download failed for \(ModelToken(variant))",
+                [.error: .error(error)]
+            )
             throw ParolaError.modelDownloadFailed(variant, underlying: String(describing: error))
         }
     }
@@ -72,6 +85,7 @@ actor WhisperKitTranscriber: Transcriber {
         handlers: TranscribeHandlers
     ) async throws -> Transcript {
         guard let kit = whisperKit, let modelName = loadedModel else {
+            ParolaLog.fault(.engineWhisperKit, "transcribe called with no model loaded")
             throw ParolaError.transcriptionFailed("model not loaded")
         }
         let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
@@ -130,9 +144,17 @@ actor WhisperKitTranscriber: Transcriber {
         )
 
         guard let first = results.first, let outcomes = first else {
+            ParolaLog.error(
+                .engineWhisperKit, "engine returned no results",
+                Self.emptyResultFields(model: modelName, url: url)
+            )
             throw ParolaError.transcriptionFailed("WhisperKit returned no results")
         }
         guard !outcomes.isEmpty else {
+            ParolaLog.error(
+                .engineWhisperKit, "engine returned an empty result set",
+                Self.emptyResultFields(model: modelName, url: url)
+            )
             throw ParolaError.transcriptionFailed("WhisperKit returned an empty result set")
         }
 
@@ -173,6 +195,15 @@ actor WhisperKitTranscriber: Transcriber {
         )
     }
 
+    /// Reads the length back off the file header, which only a run that already failed pays for.
+    private static func emptyResultFields(model: String, url: URL) -> [LogField: LogValue] {
+        var fields: [LogField: LogValue] = [.model: .safe(ModelToken(model))]
+        if let seconds = FileAudioSource(url: url).synchronousDuration() {
+            fields[.audioSeconds] = .seconds(seconds)
+        }
+        return fields
+    }
+
     private static let languageProbePrefixSeconds: Double = 300
     private static let languageProbeWindows = 5
 
@@ -193,7 +224,13 @@ actor WhisperKitTranscriber: Transcriber {
                 confidence: probe.langProbs[probe.language].map { exp(Double($0)) } ?? 0
             ))
         }
-        return WhisperLanguageVote.decide(readings)
+        let decided = WhisperLanguageVote.decide(readings)
+        if decided == nil {
+            ParolaLog.info(
+                .engineWhisperKit, "language probe inconclusive", [.count: .int(readings.count)]
+            )
+        }
+        return decided
     }
 
     private func probeSamples(url: URL) -> [Float]? {

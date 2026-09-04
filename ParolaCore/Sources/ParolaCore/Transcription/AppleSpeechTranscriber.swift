@@ -41,6 +41,7 @@ actor AppleSpeechTranscriber: Transcriber {
             throw ParolaError.unsupportedForEngine("Apple Speech does not support translation")
         }
         guard #available(macOS 26.0, iOS 26.0, *) else {
+            ParolaLog.notice(.engineAppleSpeech, "engine unavailable on this OS")
             throw ParolaError.unsupportedForEngine(
                 "Apple SpeechAnalyzer requires macOS 26 or iOS 26."
             )
@@ -119,6 +120,7 @@ actor AppleSpeechTranscriber: Transcriber {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
+            ParolaLog.error(.engineAppleSpeech, "analyzer setup failed", [.error: .error(error)])
             throw ParolaError.unsupportedForEngine(
                 "Apple Speech has no model for \(locale.identifier): \(error.localizedDescription)"
             )
@@ -162,6 +164,7 @@ actor AppleSpeechTranscriber: Transcriber {
         }
 
         let run: (segments: [TranscriptSegment], confidence: Double?)
+        let startedAt = ContinuousClock.now
         do {
             run = try await withTaskCancellationHandler {
                 try Task.checkCancellation()
@@ -177,6 +180,14 @@ actor AppleSpeechTranscriber: Transcriber {
             throw CancellationError()
         } catch {
             collectorTask.cancel()
+            ParolaLog.error(
+                .engineAppleSpeech, "transcribe failed",
+                [
+                    .audioSeconds: .seconds(durationSeconds),
+                    .elapsed: .duration(startedAt.duration(to: .now)),
+                    .error: .error(error),
+                ]
+            )
             throw ParolaError.transcriptionFailed("Apple Speech failed: \(error.localizedDescription)")
         }
 
