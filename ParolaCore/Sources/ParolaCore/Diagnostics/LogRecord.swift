@@ -20,6 +20,13 @@ public enum LogLevel: Int, Sendable, Comparable, CaseIterable {
         case .fault: return "fault"
         }
     }
+
+    /// Reads back a persisted level. Derived from `name`, whose switch has no `default`, so a new
+    /// level cannot be decoded until its spelling is decided.
+    public init?(name: String) {
+        guard let match = Self.allCases.first(where: { $0.name == name }) else { return nil }
+        self = match
+    }
 }
 
 public enum LogSubsystem: String, Sendable {

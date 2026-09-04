@@ -15,6 +15,14 @@ public struct ModelToken: LogSafe {
     public init(_ id: String) { self.id = id }
 }
 
+/// Wraps a language code for logging. An unrecognized code renders as the allowlist's
+/// fallback, never as the string it was given.
+public struct LanguageToken: LogSafe {
+    private let code: String
+    public var logToken: String { LogAllowlist.languageCode(code) }
+    public init(_ code: String) { self.code = code }
+}
+
 extension EngineID: LogSafe {
     public var logToken: String { LogAllowlist.engineID(rawValue) }
 }
@@ -23,7 +31,46 @@ extension ParolaFeature: LogSafe {
     public var logToken: String { rawValue }
 }
 
+extension ModelVariant: LogSafe {
+    public var logToken: String { LogAllowlist.modelID(id) }
+}
+
+extension ExportFormat: LogSafe {
+    public var logToken: String { rawValue }
+}
+
+extension EntryCategory: LogSafe {
+    public var logToken: String { rawValue }
+}
+
+extension BatchJob.Status: LogSafe {
+    public var logToken: String { rawValue }
+}
+
+extension TranscribeStage: LogSafe {
+    public var logToken: String {
+        switch self {
+        case .preparingAudio: return "preparingAudio"
+        case .transcribing: return "transcribing"
+        }
+    }
+}
+
+extension SystemAudioRecordingPermission: LogSafe {
+    public var logToken: String {
+        switch self {
+        case .granted: return "granted"
+        case .undetermined: return "undetermined"
+        case .denied: return "denied"
+        }
+    }
+}
+
 extension Int: LogSafe {
+    public var logToken: String { String(self) }
+}
+
+extension Int64: LogSafe {
     public var logToken: String { String(self) }
 }
 

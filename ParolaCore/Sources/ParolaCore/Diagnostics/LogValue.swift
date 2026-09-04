@@ -73,6 +73,11 @@ public enum LogField: String, Sendable, CaseIterable, Comparable {
     case engine
     case entry
     case error
+    case feature
+    case format
+    case job
+    case language
+    case mode
     case model
     case stage
 

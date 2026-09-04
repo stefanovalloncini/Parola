@@ -24,6 +24,20 @@ struct LogRecordTests {
         #expect(LogLevel.error < LogLevel.fault)
     }
 
+    @Test("every level round-trips through its name")
+    func levelsRoundTripByName() {
+        for level in LogLevel.allCases {
+            #expect(LogLevel(name: level.name) == level)
+        }
+    }
+
+    @Test("an unknown level name reads back as nil")
+    func unknownLevelNameIsNil() {
+        #expect(LogLevel(name: "warning") == nil)
+        #expect(LogLevel(name: "") == nil)
+        #expect(LogLevel(name: "Error") == nil)
+    }
+
     @Test("a formatted line carries timestamp, level, category and fields")
     func formattedLine() {
         let line = record().formattedLine

@@ -5,6 +5,16 @@ import os
 
 @Suite("Parola log facade", .serialized, .logFacade)
 struct ParolaLogTests {
+    private final class FlushCountingSink: DiagnosticsSink {
+        private let state = OSAllocatedUnfairLock(initialState: 0)
+
+        var flushes: Int { state.withLock { $0 } }
+
+        func enqueue(_ record: LogRecord) {}
+
+        func flush() async { state.withLock { $0 += 1 } }
+    }
+
     private func withSink(_ body: (CapturingDiagnosticsSink) throws -> Void) rethrows {
         let sink = CapturingDiagnosticsSink()
         ParolaLog.install(sink)
@@ -41,6 +51,30 @@ struct ParolaLogTests {
     func noSinkIsSafe() {
         ParolaLog.uninstall()
         ParolaLog.error(.models, "no sink installed")
+    }
+
+    @Test("a flush reaches the installed sink")
+    func flushReachesSink() async {
+        let sink = FlushCountingSink()
+        ParolaLog.install(sink)
+        defer { ParolaLog.uninstall() }
+        await ParolaLog.flush()
+        #expect(sink.flushes == 1)
+    }
+
+    @Test("flushing with no sink installed does not trap")
+    func flushWithoutSinkIsSafe() async {
+        ParolaLog.uninstall()
+        await ParolaLog.flush()
+    }
+
+    @Test("an uninstalled sink stops seeing flushes")
+    func uninstalledSinkStopsFlushing() async {
+        let sink = FlushCountingSink()
+        ParolaLog.install(sink)
+        ParolaLog.uninstall()
+        await ParolaLog.flush()
+        #expect(sink.flushes == 0)
     }
 
     @Test("every level reaches the sink")

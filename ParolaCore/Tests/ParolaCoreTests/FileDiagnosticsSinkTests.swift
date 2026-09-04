@@ -141,6 +141,28 @@ struct FileDiagnosticsSinkTests {
         #expect(object["fields"] as? [String: String] == ["bytes": "4823", "elapsed": "1.20"])
     }
 
+    @Test("every field's on-disk key is pinned")
+    func fieldKeysArePinned() async throws {
+        let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir)
+        let fields = Dictionary(uniqueKeysWithValues: LogField.allCases.map { ($0, LogValue.int(1)) })
+        sink.enqueue(LogRecord(
+            timestamp: Date(timeIntervalSince1970: 1_755_871_082),
+            level: .notice, subsystem: .core, category: .models,
+            message: "every field", fields: fields,
+            file: "T.swift", line: 1
+        ))
+        await sink.flush()
+        let text = try String(contentsOf: sink.currentFileURL, encoding: .utf8)
+        let first = text.split(separator: "\n")[0]
+        let object = try JSONSerialization.jsonObject(with: Data(first.utf8)) as! [String: Any]
+        let keys = try #require(object["fields"] as? [String: String]).keys
+        #expect(keys.sorted() == [
+            "attempt", "audioSeconds", "bytes", "count", "elapsed", "engine", "entry", "error",
+            "feature", "format", "job", "language", "mode", "model", "stage",
+        ])
+    }
+
     @Test("an unwritable directory disables the sink instead of trapping")
     func unwritableDirectoryDisables() async {
         let unwritable = URL(fileURLWithPath: "/dev/null/nope", isDirectory: true)
