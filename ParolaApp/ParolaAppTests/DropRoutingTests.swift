@@ -267,6 +267,19 @@ struct DropRoutingTests {
         #expect(model.dropZonePlan == .queueOnly(count: 2))
     }
 
+    @Test("the overlay stands down while the drag is over the chat composer")
+    func composerDragSuppressesTheOverlay() {
+        let model = makeModel()
+        model.dropDragPayload = .media(count: 1)
+        #expect(model.dropZonePlan == .split(count: 1))
+
+        model.dragOverComposer = true
+        #expect(model.dropZonePlan == .none)
+
+        model.dragOverComposer = false
+        #expect(model.dropZonePlan == .split(count: 1))
+    }
+
     @Test("Open With collects every file before routing them")
     func openedFilesArriveAsOneBatch() {
         let model = makeModel()

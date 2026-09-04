@@ -9,7 +9,8 @@ extension AppModel {
     }
 
     var dropZonePlan: DroppedFiles.ZonePlan {
-        guard let payload = dropDragPayload else { return .none }
+        // The chat composer is a nested drop target: it wins the drop, so the overlay must not claim it.
+        guard let payload = dropDragPayload, !dragOverComposer else { return .none }
         return DroppedFiles.plan(
             for: payload,
             batchEnabled: features.isEnabled(.batch),

@@ -67,20 +67,8 @@ private struct SplitDropDelegate: DropDelegate {
         model.dropDragPayload = nil
         model.dropHighlight = nil
         let urls = Self.draggedURLs()
-        if !urls.isEmpty {
-            model.drop(urls, on: target)
-            return true
-        }
-        let providers = info.itemProviders(for: [.fileURL, .url])
-        guard !providers.isEmpty else { return false }
-        Task { @MainActor in
-            var loaded: [URL] = []
-            for provider in providers {
-                if let url = await Self.loadURL(from: provider) { loaded.append(url) }
-            }
-            guard !loaded.isEmpty else { return }
-            model.drop(loaded, on: target)
-        }
+        guard !urls.isEmpty else { return false }
+        model.drop(urls, on: target)
         return true
     }
 
@@ -104,14 +92,6 @@ private struct SplitDropDelegate: DropDelegate {
             options: [.urlReadingFileURLsOnly: false]
         )
         return (objects as? [URL]) ?? []
-    }
-
-    private static func loadURL(from provider: NSItemProvider) async -> URL? {
-        await withCheckedContinuation { continuation in
-            _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                continuation.resume(returning: url)
-            }
-        }
     }
 }
 

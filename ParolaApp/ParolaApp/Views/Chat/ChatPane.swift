@@ -166,6 +166,8 @@ struct ChatPane: View {
                 .dropDestination(for: URL.self) { urls, _ in
                     attachFiles(urls)
                     return !urls.isEmpty
+                } isTargeted: { targeted in
+                    model.dragOverComposer = targeted
                 }
 
             Button(action: send) {

@@ -55,6 +55,7 @@ final class AppModel {
     var settingsRoutePreview = false  // test-mode only: renders SettingsView in the main window so the bridge can screenshot panes
     var dropDragPayload: DroppedFiles.Kind?
     var dropHighlight: DropHalf?
+    var dragOverComposer = false
     var phase: Phase = .idle
     var transcript: Transcript? {
         didSet {
