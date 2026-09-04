@@ -236,7 +236,7 @@ extension AppModel {
     }
 
     func drainDeferredArrivals() {
-        guard !deferredArrivals.isEmpty else { return }
+        guard !deferredArrivals.isEmpty || !deferredLinks.isEmpty else { return }
         let urls = deferredArrivals
         deferredArrivals = []
         let parolaURLs = urls.filter { $0.pathExtension == "parola" }
@@ -255,6 +255,9 @@ extension AppModel {
         for url in parolaURLs {
             Task { [weak self] in await self?.openProjectDocument(at: url) }
         }
+        let links = deferredLinks
+        deferredLinks = []
+        for link in links { transcribeYouTube(urlString: link) }
     }
 
     var batchIsRunning: Bool {

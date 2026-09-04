@@ -60,6 +60,10 @@ extension AppModel {
     func addToQueue(urls: [URL]) {
         let files = DroppedFiles.classify(urls)
         guard !files.isEmpty else { return }
+        if case .links = files.kind, let link = files.links.first {
+            transcribeYouTube(urlString: link.absoluteString)
+            return
+        }
         for url in files.subtitles { importSubtitle(fileURL: url) }
         guard !files.media.isEmpty else {
             if let project = files.projects.first {

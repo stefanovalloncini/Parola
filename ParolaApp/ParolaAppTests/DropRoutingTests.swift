@@ -21,6 +21,8 @@ struct DropRoutingTests {
         URL(fileURLWithPath: "/tmp/DropRoutingTests/\(name)")
     }
 
+    private static let link = URL(string: "https://www.youtube.com/watch?v=dQw4w9WgXcQ")!
+
     @Test("the Transcribe Now half shows the transcript route and keeps the drop order")
     func transcribeNowTakesTheTranscriptRoute() {
         let model = makeModel()
@@ -122,6 +124,76 @@ struct DropRoutingTests {
         #expect(model.sourceFileURL == nil)
         #expect(model.deferredArrivals.isEmpty)
         #expect(model.phase == .idle)
+    }
+
+    @Test("a link dropped while recording parks instead of taking the phase off the take")
+    func linkWhileRecordingParks() {
+        let model = makeModel()
+        model.phase = .recording(source: .microphone)
+
+        model.transcribeNow(urls: [Self.link])
+
+        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.deferredLinks == [Self.link.absoluteString])
+        #expect(model.transcribeTaskRunning == false)
+
+        model.phase = .ready
+        model.drainDeferredArrivals()
+
+        #expect(model.deferredLinks.isEmpty)
+        #expect(model.transcribeTaskRunning)
+        model.cancelCurrentWork()
+    }
+
+    @Test("transcribeYouTube parks a link handed straight to it during a take")
+    func transcribeYouTubeParksWhileRecording() {
+        let model = makeModel()
+        model.phase = .recording(source: .microphone)
+
+        model.transcribeYouTube(urlString: Self.link.absoluteString)
+
+        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.deferredLinks == [Self.link.absoluteString])
+        #expect(model.transcribeTaskRunning == false)
+    }
+
+    @Test("the Add to Queue half parks a link rather than dropping it on the floor")
+    func addToQueueParksLink() {
+        let model = makeModel()
+        model.phase = .recording(source: .microphone)
+
+        model.addToQueue(urls: [Self.link])
+
+        #expect(model.deferredLinks == [Self.link.absoluteString])
+        #expect(model.batchJobs.isEmpty)
+        #expect(model.phase == .recording(source: .microphone))
+    }
+
+    @Test("a link the window will park gets the same plan a parked file gets")
+    func deferredLinkPlanMatchesMediaPlan() {
+        for batchEnabled in [true, false] {
+            let links = DroppedFiles.plan(
+                for: .links(count: 1),
+                batchEnabled: batchEnabled,
+                youtubeEnabled: true,
+                arrivalsDeferred: true
+            )
+            let media = DroppedFiles.plan(
+                for: .media(count: 1),
+                batchEnabled: batchEnabled,
+                youtubeEnabled: true,
+                arrivalsDeferred: true
+            )
+            #expect(links == media)
+        }
+
+        let ready = DroppedFiles.plan(
+            for: .links(count: 1),
+            batchEnabled: true,
+            youtubeEnabled: true,
+            arrivalsDeferred: false
+        )
+        #expect(ready == .transcribeLink)
     }
 
     @Test("two dropped projects open one instead of becoming batch jobs")

@@ -199,12 +199,17 @@ extension DroppedFiles {
             return .importSubtitles(count: count)
         case .projects(let count):
             return .openProjects(count: count)
-        case .links:
-            return youtubeEnabled ? .transcribeLink : .none
+        case .links(let count):
+            guard youtubeEnabled else { return .none }
+            if arrivalsDeferred { return parkedPlan(count: count, batchEnabled: batchEnabled) }
+            return .transcribeLink
         case .media(let count), .mixed(let count):
-            if !batchEnabled { return .transcribeOnly(count: count) }
-            if arrivalsDeferred { return .queueOnly(count: count) }
-            return .split(count: count)
+            if arrivalsDeferred { return parkedPlan(count: count, batchEnabled: batchEnabled) }
+            return batchEnabled ? .split(count: count) : .transcribeOnly(count: count)
         }
+    }
+
+    private static func parkedPlan(count: Int, batchEnabled: Bool) -> ZonePlan {
+        batchEnabled ? .queueOnly(count: count) : .transcribeOnly(count: count)
     }
 }

@@ -922,6 +922,7 @@ final class AppModel {
 
     @ObservationIgnored var liveSource: AudioSource?
     @ObservationIgnored var deferredArrivals: [URL] = []
+    @ObservationIgnored var deferredLinks: [String] = []
     @ObservationIgnored var pendingOpenedFiles: [URL] = []
     @ObservationIgnored var openedFilesFlushTask: Task<Void, Never>?
     @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
@@ -992,6 +993,7 @@ final class AppModel {
         let hadWork = canCancel || liveSource != nil
         cancelAllInFlightBatchJobs()
         deferredArrivals = []
+        deferredLinks = []
         downloadTask?.cancel()
         downloadTask = nil
         fileTranscribeTask?.cancel()
@@ -1762,6 +1764,11 @@ final class AppModel {
             return
         }
         guard let url = makeYouTubeURL(urlString) else { return }
+        // The download flips phase off .recording, and every stop affordance is keyed on it.
+        if phaseDefersArrivals || transcribeTaskRunning {
+            deferredLinks.append(url.absoluteString)
+            return
+        }
 
         cancelTranscriptionRuns()
         youtubeTranscribeTask = Task { [weak self] in
