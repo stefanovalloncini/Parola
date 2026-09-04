@@ -65,6 +65,11 @@ public actor TranscriptionSession {
         let engineID = variant?.engineID ?? .whisperKit
 
         try await validate(options: options, engineID: engineID, variant: variant)
+        let startedAt = ContinuousClock.now
+        ParolaLog.info(
+            .models, "transcribe starting on \(engineID)",
+            [.model: .safe(ModelToken(modelName))]
+        )
 
         if !modelStore.isInstalled(modelName) {
             _ = try await modelStore.download(
@@ -112,6 +117,15 @@ public actor TranscriptionSession {
                 numberOfSpeakers: options.expectedSpeakers
             )
         }
+        ParolaLog.info(
+            .models, "transcribe finished",
+            [
+                .model: .safe(ModelToken(modelName)),
+                .engine: .safe(engineID),
+                .elapsed: .duration(startedAt.duration(to: .now)),
+                .count: .int(transcript.segments.count),
+            ]
+        )
         return transcript
     }
 
@@ -147,7 +161,7 @@ public actor TranscriptionSession {
     }
 
     /// Best-effort warm-up: bootstraps the engine and loads the requested model if it's installed.
-    /// Silently no-ops if the model isn't downloaded, a run is active or queued, or load fails.
+    /// No-ops if the model isn't downloaded, a run is active or queued, or load fails.
     public func prewarm(modelName: String) async {
         installPressureSourceIfNeeded()
         await ensureBootstrap()
@@ -162,6 +176,9 @@ public actor TranscriptionSession {
             let active = try await ensureTranscriber(for: engineID)
             try await active.load(model: modelName)
         } catch {
+            ParolaLog.debug(
+                .models, "prewarm failed for \(ModelToken(modelName))", [.error: .error(error)]
+            )
         }
     }
 
@@ -190,29 +207,38 @@ public actor TranscriptionSession {
         variant: ModelVariant?
     ) async throws {
         if let allowed = managedConfiguration.allowedEngines, !allowed.contains(engineID) {
+            ParolaLog.notice(.models, "rejected by policy: engine \(engineID)")
             throw ParolaError.policyRestricted(
                 "The \(engineID.displayName) engine is disabled by a managed policy."
             )
         }
         if managedConfiguration.requireEnglishOnly,
            let language = options.language, language.lowercased() != "en" {
+            ParolaLog.notice(.models, "rejected by policy: language")
             throw ParolaError.policyRestricted(
                 "Transcription is restricted to English by a managed policy."
             )
         }
         guard let baseCaps = await registry.capabilities(for: engineID) else {
+            ParolaLog.error(.models, "engine \(engineID) is not registered")
             throw ParolaError.engineNotRegistered(engineID.rawValue)
         }
         let caps = baseCaps.tightened(by: variant?.languageScope)
         if let language = options.language, !caps.supportedLanguages.allows(language) {
+            ParolaLog.notice(
+                .models, "engine \(engineID) rejected language",
+                [.language: .safe(LanguageToken(language))]
+            )
             throw ParolaError.unsupportedForEngine(Self.languageRejection(
                 language, engineID: engineID, variant: variant, supported: caps.supportedLanguages
             ))
         }
         if options.task == .translate, !caps.supportsTranslate {
+            ParolaLog.notice(.models, "engine \(engineID) rejected translate")
             throw ParolaError.unsupportedForEngine("\(engineID.displayName) does not support translation.")
         }
         if options.diarize, !caps.supportsDiarization {
+            ParolaLog.notice(.models, "engine \(engineID) rejected diarize")
             throw ParolaError.unsupportedForEngine("\(engineID.displayName) does not support speaker labels.")
         }
     }
@@ -302,6 +328,7 @@ public actor TranscriptionSession {
     private func unloadIfIdle(epoch: Int) async {
         guard epoch == idleEpoch else { return }
         await unloadModel()
+        ParolaLog.info(.models, "model unloaded after idle", [.elapsed: .seconds(idleTimeout)])
     }
 
     private func cancelIdleTimer() {
