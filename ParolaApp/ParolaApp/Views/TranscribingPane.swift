@@ -108,13 +108,7 @@ struct TranscribingPane: View {
                     .controlSize(.small)
                     .axLeaf("Transcribing.Button.Cancel")
             }
-            if let progress, !isFinishing {
-                DSProgressBar(value: progress)
-            } else {
-                ProgressView()
-                    .progressViewStyle(.linear)
-                    .tint(DS.Color.accent)
-            }
+            DSProgressBar(value: isFinishing ? nil : progress)
         }
     }
 
@@ -130,7 +124,7 @@ struct TranscribingPane: View {
                     .animation(reduceMotion ? nil : DS.Motion.progress, value: progress)
                 if let etaDeadline {
                     Text(verbatim: "·")
-                        .foregroundStyle(DS.Color.onAccent.opacity(0.6))
+                        .foregroundStyle(DS.Color.accentText.opacity(0.6))
                     TimelineView(.periodic(from: startDate, by: 1)) { context in
                         let remaining = max(0, etaDeadline.timeIntervalSince(context.date))
                         Text("\(ETACalculator.format(remaining)) left")

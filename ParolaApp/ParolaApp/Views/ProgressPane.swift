@@ -19,24 +19,20 @@ struct ProgressPane: View {
                     .controlSize(.small)
                     .axLeaf("Progress.Button.Cancel")
             }
+            DSProgressBar(value: progress)
+                .frame(width: 280)
             if let progress {
-                DSProgressBar(value: progress)
-                    .frame(width: 280)
                 HStack(spacing: DS.Spacing.tight) {
                     Text("\(Int(progress * 100))%")
                         .contentTransition(.numericText())
                     if let etaLabel {
                         Text(verbatim: "·")
-                            .foregroundStyle(DS.Color.onAccent.opacity(0.6))
+                            .foregroundStyle(DS.Color.accentText.opacity(0.6))
                         Text("\(etaLabel) left")
                     }
                 }
                 .accentPill()
             } else {
-                ProgressView()
-                    .progressViewStyle(.linear)
-                    .tint(DS.Color.accent)
-                    .frame(width: 280)
                 TimelineView(.periodic(from: startDate, by: 1)) { context in
                     Text("\(ETACalculator.format(context.date.timeIntervalSince(startDate))) elapsed")
                         .monospacedDigit()
