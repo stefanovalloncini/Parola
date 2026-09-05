@@ -2577,7 +2577,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Elimina ogni elemento in Eliminati di recente"
+            "value": "Elimina ogni elemento da Eliminati di recente"
           }
         }
       }
@@ -2794,7 +2794,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hotkey dettatura"
+            "value": "Scorciatoia per la dettatura"
           }
         }
       }
@@ -3159,6 +3159,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ogni build dal main. Aspettati bug."
+          }
+        }
+      }
+    },
+    "Every transcript": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ogni trascrizione"
           }
         }
       }
@@ -4872,7 +4883,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gli equivalenti menu sono fissi. Le scorciatoie globali richiedono il permesso di Monitoraggio Input. L'elenco completo è in Aiuto > Scorciatoie da tastiera."
+            "value": "Le voci di menu sono fisse. Le scorciatoie globali richiedono il permesso di Monitoraggio Input. L'elenco completo è in Aiuto > Scorciatoie da tastiera."
           }
         }
       }
@@ -4905,7 +4916,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hotkey registrazione microfono"
+            "value": "Scorciatoia per la registrazione dal microfono"
           }
         }
       }
@@ -9077,14 +9088,14 @@
         }
       }
     },
-    "Transcribe and export multiple files at once. Select files or drag them onto the app.": {
+    "Transcribe and export multiple files at once. Add files or drag them onto the app.": {
       "comment": "A description of the Batch Mode feature.",
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trascrivi ed esporta più file insieme. Seleziona i file o trascinali sull'app."
+            "value": "Trascrivi ed esporta più file insieme. Aggiungi i file o trascinali sull'app."
           }
         }
       }
@@ -9234,17 +9245,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dettagli trascrizione"
-          }
-        }
-      }
-    },
-    "Transcription defaults": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Valori predefiniti di trascrizione"
           }
         }
       }

@@ -1,8 +1,6 @@
 import Foundation
 
-/// Numbers and dates in the interface go through here so a file size and the date beside it
-/// can never come from two different locales: `ByteCountFormatter` has no locale of its own
-/// and follows the system, while `Date.FormatStyle` follows the app.
+/// One locale for every number and date on screen; `ByteCountFormatter` has none of its own.
 enum AppFormat {
     static let locale: Locale = .autoupdatingCurrent
 

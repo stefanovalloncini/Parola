@@ -7,7 +7,7 @@ struct BatchEmptyState: View {
         EmptyStateView(
             systemImage: "square.stack.3d.up",
             title: "Batch",
-            message: "Transcribe and export multiple files at once. Select files or drag them onto the app."
+            message: "Transcribe and export multiple files at once. Add files or drag them onto the app."
         ) {
             Button {
                 model.presentBatchOpenPanel()
