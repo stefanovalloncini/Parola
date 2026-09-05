@@ -52,8 +52,20 @@ final class SystemCapturePermissions {
     var systemAudioGranted: Bool { systemAudioStatus == .granted }
 
     func refresh() {
+        let previousScreen = screenRecordingGranted
+        let previousAudio = systemAudioStatus
         screenRecordingGranted = screenCheck()
         systemAudioStatus = audioCheck()
+        // Every app activation refreshes, so only a changed answer is worth a record.
+        if screenRecordingGranted != previousScreen {
+            ParolaLog.notice(
+                .appPermissions,
+                "screen recording permission \(PermissionState(granted: screenRecordingGranted))"
+            )
+        }
+        if systemAudioStatus != previousAudio {
+            ParolaLog.notice(.appPermissions, "system audio permission \(systemAudioStatus)")
+        }
     }
 
     func requestScreenRecording() {

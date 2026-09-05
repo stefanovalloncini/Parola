@@ -1098,7 +1098,13 @@ final class AppModel {
         // and expose the tests' AppModels to whatever harness connects mid-run.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         let auditLog = AutomationAuditLog()
-        guard let bridge = try? ParolaAutomationServer(model: self, auditLog: auditLog) else { return }
+        let bridge: ParolaAutomationServer
+        do {
+            bridge = try ParolaAutomationServer(model: self, auditLog: auditLog)
+        } catch {
+            ParolaLog.error(.appBridge, "bridge server could not be created", [.error: .error(error)])
+            return
+        }
         Task(priority: .utility) { await auditLog.sweep() }
         bridge.start { [weak self] port in
             self?.automationBridgePort = port
@@ -2067,6 +2073,7 @@ final class AppModel {
             let captureTargets = pendingCaptureBundleIDs ?? []
             pendingCaptureBundleIDs = nil
             if source == .microphone, mode == .normal, await AVCaptureDevice.requestAccess(for: .audio) == false {
+                ParolaLog.notice(.appPermissions, "microphone access request was denied")
                 let message = Self.microphoneAccessOffMessage()
                 phase = .failed(message: message)
                 resolveRecordingOutcome(.failure(IntentActionError.failed(message)))

@@ -237,7 +237,7 @@ final class ParolaAutomationServer {
         return out
     }
 
-    private func handle(line: Data) async -> Data {
+    func handle(line: Data) async -> Data {
         let start = ContinuousClock.now
 
         let id: String
@@ -262,6 +262,7 @@ final class ParolaAutomationServer {
         }
 
         guard authenticate(auth) else {
+            ParolaLog.notice(.appBridge, "bridge rejected a command with a bad token")
             return AutomationResponseEncoder.encode(.failure(
                 id: id,
                 command: cmd,
@@ -327,6 +328,7 @@ final class ParolaAutomationServer {
             await auditLog?.record(id: id, command: cmd, args: parsedArgs, ok: false, elapsedMs: response.elapsedMs, errorCode: err.code)
             return AutomationResponseEncoder.encode(response)
         } catch {
+            ParolaLog.error(.appBridge, "bridge command threw an unmapped error", [.error: .error(error)])
             let mapped: AutomationError = .internal("\(error)")
             let response = AutomationResponse.failure(
                 id: id, command: cmd,

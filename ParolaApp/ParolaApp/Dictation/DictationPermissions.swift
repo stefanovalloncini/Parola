@@ -2,6 +2,7 @@ import AppKit
 import ApplicationServices
 import AVFoundation
 import Observation
+import ParolaCore
 
 @MainActor
 @Observable
@@ -73,10 +74,23 @@ final class DictationPermissions {
 
     func refresh() {
         let wasGranted = accessibilityGranted
+        let previousMicrophone = PermissionState(
+            granted: microphoneAuthorized, undetermined: microphoneUndetermined
+        )
         accessibilityGranted = trustCheck()
         let mic = microphoneStatus()
         microphoneAuthorized = mic == .authorized
         microphoneUndetermined = mic == .notDetermined
+        // Every app activation refreshes, so only a changed answer is worth a record.
+        if accessibilityGranted != wasGranted {
+            ParolaLog.notice(
+                .appPermissions,
+                "accessibility permission \(PermissionState(granted: accessibilityGranted))"
+            )
+        }
+        if PermissionState(mic) != previousMicrophone {
+            ParolaLog.notice(.appPermissions, "microphone permission \(PermissionState(mic))")
+        }
         if !wasGranted, accessibilityGranted {
             onAccessibilityGranted?()
         }
