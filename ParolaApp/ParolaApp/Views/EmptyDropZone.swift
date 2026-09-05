@@ -3,69 +3,68 @@ import ParolaCore
 
 struct EmptyDropZone: View {
     @Environment(AppModel.self) private var model
+    @State private var recentRowSpace: CGFloat = 0
+    @ScaledMetric(relativeTo: .body) private var recentRowHeight: CGFloat = 49
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: DS.Spacing.large) {
-                IntakeDropWell()
-                    .axLeaf("Empty.Button.OpenFile")
+        VStack(alignment: .leading, spacing: DS.Spacing.large) {
+            IntakeDropWell()
+                .axLeaf("Empty.Button.OpenFile")
 
-                let actions = startActions
-                if !actions.isEmpty {
-                    LazyVGrid(columns: columns(for: actions.count), alignment: .leading, spacing: DS.Spacing.regular) {
-                        ForEach(actions) { action in
-                            ActionCard(
-                                title: action.title,
-                                systemImage: action.systemImage,
-                                action: action.run
-                            )
-                            .axLeaf(action.id)
-                        }
+            let actions = startActions
+            if !actions.isEmpty {
+                LazyVGrid(columns: columns(for: actions.count), alignment: .leading, spacing: DS.Spacing.regular) {
+                    ForEach(actions) { action in
+                        ActionCard(
+                            title: action.title,
+                            subtitle: action.subtitle,
+                            systemImage: action.systemImage,
+                            action: action.run
+                        )
+                        .axLeaf(action.id)
                     }
-                }
-
-                if model.features.isEnabled(.liveCaptions) || model.features.isEnabled(.dictation) {
-                    HStack(spacing: DS.Spacing.small) {
-                        if model.features.isEnabled(.liveCaptions) {
-                            ModeButton(
-                                title: "Live Captions",
-                                systemImage: "captions.bubble.fill",
-                                action: { model.toggleLiveCaptions() }
-                            )
-                            .disabled(model.liveCaptionsUnavailableReason != nil)
-                            .help(model.liveCaptionsUnavailableReason ?? "")
-                            .axLeaf("Empty.Button.LiveCaptions")
-                        }
-                        if model.features.isEnabled(.dictation) {
-                            ModeButton(
-                                title: "Dictation",
-                                systemImage: "text.cursor",
-                                action: { model.startDictationFromIntent() }
-                            )
-                            .axLeaf("Empty.Button.Dictation")
-                        }
-                    }
-                }
-
-                if !model.libraryEntries.isEmpty {
-                    recentSection
-                }
-
-                if model.libraryEntries.isEmpty {
-                    EmptyStateView(systemImage: "clock", title: "No Transcriptions Yet")
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, DS.Spacing.medium)
                 }
             }
-            .padding(.horizontal, DS.Spacing.large)
-            .padding(.vertical, DS.Spacing.large)
+
+            if model.features.isEnabled(.liveCaptions) || model.features.isEnabled(.dictation) {
+                HStack(spacing: DS.Spacing.small) {
+                    if model.features.isEnabled(.liveCaptions) {
+                        ModeButton(
+                            title: "Live Captions",
+                            systemImage: "captions.bubble.fill",
+                            action: { model.toggleLiveCaptions() }
+                        )
+                        .disabled(model.liveCaptionsUnavailableReason != nil)
+                        .help(model.liveCaptionsUnavailableReason ?? "")
+                        .axLeaf("Empty.Button.LiveCaptions")
+                    }
+                    if model.features.isEnabled(.dictation) {
+                        ModeButton(
+                            title: "Dictation",
+                            systemImage: "text.cursor",
+                            action: { model.startDictationFromIntent() }
+                        )
+                        .axLeaf("Empty.Button.Dictation")
+                    }
+                }
+            }
+
+            if model.libraryEntries.isEmpty {
+                EmptyStateView(systemImage: "clock", title: "No Transcriptions Yet")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                recentSection
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, DS.Spacing.large)
+        .padding(.vertical, DS.Spacing.large)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private struct StartAction: Identifiable {
         let id: String
         let title: LocalizedStringKey
+        let subtitle: LocalizedStringKey
         let systemImage: String
         let run: () -> Void
     }
@@ -76,6 +75,7 @@ struct EmptyDropZone: View {
             actions.append(StartAction(
                 id: "Empty.Button.RecordMic",
                 title: "Record Microphone",
+                subtitle: "Capture from the mic",
                 systemImage: "mic.fill",
                 run: { model.startRecording(source: .microphone) }
             ))
@@ -84,6 +84,7 @@ struct EmptyDropZone: View {
             actions.append(StartAction(
                 id: "Empty.Button.RecordSystemAudio",
                 title: "Record System Audio",
+                subtitle: "Capture what your Mac plays",
                 systemImage: "waveform.circle.fill",
                 run: { model.startRecording(source: .systemAudio) }
             ))
@@ -92,6 +93,7 @@ struct EmptyDropZone: View {
             actions.append(StartAction(
                 id: "Empty.Button.YouTube",
                 title: "YouTube URL",
+                subtitle: "Paste a link to transcribe",
                 systemImage: "play.rectangle.fill",
                 run: { model.youtubeSheetOpen = true }
             ))
@@ -99,13 +101,18 @@ struct EmptyDropZone: View {
         return actions
     }
 
+    /// The cap keeps a wide window from stretching three cards into slabs.
     private func columns(for count: Int) -> [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: DS.Spacing.regular), count: max(1, min(count, 4)))
+        Array(
+            repeating: GridItem(.flexible(maximum: 420), spacing: DS.Spacing.regular),
+            count: max(1, min(count, 4))
+        )
     }
 
     @ViewBuilder
     private var recentSection: some View {
-        let recents = RecentEntries.most(of: model.libraryEntries)
+        let recents = RecentEntries
+            .most(of: model.libraryEntries, limit: RecentEntries.rowsThatFit(inHeight: recentRowSpace, rowHeight: recentRowHeight))
             .map { LibraryRowDisplay(entry: $0, sizeBytes: model.libraryBundleSizes[$0.id]) }
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             HStack(spacing: DS.Spacing.small) {
@@ -123,24 +130,31 @@ struct EmptyDropZone: View {
                 .foregroundStyle(DS.Color.accent)
                 .axLeaf("Empty.Button.ViewAll")
             }
-            VStack(spacing: 0) {
-                ForEach(Array(recents.enumerated()), id: \.element.id) { index, display in
-                    RecentEntryRow(display: display)
-                    if index < recents.count - 1 {
-                        Divider()
-                            .padding(.leading, DS.Spacing.regular)
+            // Color.clear takes the leftover height, so the row count follows the space the
+            // window has rather than feeding back into it.
+            Color.clear
+                .overlay(alignment: .top) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(recents.enumerated()), id: \.element.id) { index, display in
+                            RecentEntryRow(display: display)
+                            if index < recents.count - 1 {
+                                Divider()
+                                    .padding(.leading, DS.Spacing.regular)
+                            }
+                        }
                     }
+                    .background(
+                        RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
+                            .fill(DS.Color.surfaceElevated)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
+                            .strokeBorder(DS.Color.separator.opacity(0.5), lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
                 }
-            }
-            .background(
-                RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                    .fill(DS.Color.surfaceElevated)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                    .strokeBorder(DS.Color.separator.opacity(0.5), lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
+                .clipped()
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { recentRowSpace = $0 }
         }
     }
 }
@@ -248,6 +262,7 @@ private struct ModeButton: View {
 
 struct ActionCard: View {
     let title: LocalizedStringKey
+    var subtitle: LocalizedStringKey?
     let systemImage: String
     var isEnabled: Bool = true
     let action: () -> Void
@@ -257,22 +272,28 @@ struct ActionCard: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: DS.Spacing.regular) {
+            VStack(alignment: .leading, spacing: DS.Spacing.small) {
                 Image(systemName: systemImage)
                     .font(.system(size: iconSize, weight: .regular))
                     .foregroundStyle(DS.Color.accent)
                     .frame(height: 28, alignment: .leading)
-                Spacer(minLength: 0)
-                Text(title)
-                    .font(DS.Font.body)
-                    .fontWeight(.medium)
-                    .foregroundStyle(DS.Color.primaryText)
-                    .lineLimit(2, reservesSpace: true)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(DS.Font.body)
+                        .fontWeight(.medium)
+                        .foregroundStyle(DS.Color.primaryText)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(DS.Font.caption)
+                            .foregroundStyle(DS.Color.secondaryText)
+                    }
+                }
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
             }
             .padding(DS.Spacing.regular)
-            .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
             .background(cardBackground)
             .overlay(
                 RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)

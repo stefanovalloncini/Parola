@@ -1571,6 +1571,26 @@
         }
       }
     },
+    "Capture from the mic": {
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cattura dal microfono"
+          }
+        }
+      }
+    },
+    "Capture what your Mac plays": {
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cattura l'audio del Mac"
+          }
+        }
+      }
+    },
     "Captures the start and end time of each word. Required for karaoke highlight.": {
       "extractionState": "manual",
       "localizations": {
@@ -6232,6 +6252,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Incolla un link da YouTube, Vimeo, X, TikTok, SoundCloud o qualsiasi altro sito supportato. Parola scarica l'audio in locale."
+          }
+        }
+      }
+    },
+    "Paste a link to transcribe": {
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incolla un link da trascrivere"
           }
         }
       }

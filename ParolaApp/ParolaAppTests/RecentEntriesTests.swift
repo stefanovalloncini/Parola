@@ -64,6 +64,24 @@ struct RecentEntriesTests {
     func matchesFullSort() {
         let entries = (0..<400).map { entry("e\($0)", at: TimeInterval($0)) }.shuffled()
         let expected = entries.sorted { $0.createdAt > $1.createdAt }.prefix(5).map(\.id)
-        #expect(RecentEntries.most(of: entries).map(\.id) == Array(expected))
+        #expect(RecentEntries.most(of: entries, limit: 5).map(\.id) == Array(expected))
+    }
+
+    @Test("the row count follows the height the layout gave the list")
+    func rowsFollowAvailableHeight() {
+        #expect(RecentEntries.rowsThatFit(inHeight: 520, rowHeight: 52) == 10)
+        #expect(RecentEntries.rowsThatFit(inHeight: 210, rowHeight: 52) == 4)
+        #expect(RecentEntries.rowsThatFit(inHeight: 30, rowHeight: 52) == 1)
+    }
+
+    @Test("an unmeasured list falls back to the fixed count")
+    func unmeasuredHeightFallsBack() {
+        #expect(RecentEntries.rowsThatFit(inHeight: 0, rowHeight: 52) == RecentEntries.homeFallback)
+        #expect(RecentEntries.rowsThatFit(inHeight: 520, rowHeight: 0) == RecentEntries.homeFallback)
+    }
+
+    @Test("a tall window stops at the maximum rather than the whole library")
+    func tallWindowStopsAtMaximum() {
+        #expect(RecentEntries.rowsThatFit(inHeight: 8000, rowHeight: 52) == RecentEntries.homeMaximum)
     }
 }

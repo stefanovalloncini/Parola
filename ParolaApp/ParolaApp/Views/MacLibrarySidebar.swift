@@ -43,8 +43,7 @@ struct MacLibrarySidebar: View {
                     SidebarRow(
                         title: "Home",
                         systemImage: "house.fill",
-                        isSelected: selectedRoute == .home,
-                        badge: pinnedBadge
+                        isSelected: selectedRoute == .home
                     ) {
                         model.goHome()
                     }
@@ -130,11 +129,6 @@ struct MacLibrarySidebar: View {
 
     private var activeQueueBadge: Int? {
         let n = model.activeBatchJobCount
-        return n > 0 ? n : nil
-    }
-
-    private var pinnedBadge: Int? {
-        let n = model.pinnedEntryCount
         return n > 0 ? n : nil
     }
 
