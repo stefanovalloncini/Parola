@@ -22,6 +22,14 @@ enum DS {
         static let idealWidth: CGFloat = 320
     }
 
+    /// Durations for chrome that moves on its own. Every site pairs these with
+    /// `accessibilityReduceMotion` and passes `nil` instead when it is set.
+    enum Motion {
+        static let route = SwiftUI.Animation.easeInOut(duration: 0.2)
+        static let rowState = SwiftUI.Animation.easeOut(duration: 0.12)
+        static let listRows = SwiftUI.Animation.easeOut(duration: 0.22)
+    }
+
     /// Text-style-based scale so every label tracks the user's text-size / "Larger Text"
     /// accessibility setting. Pick the token whose default macOS point size is nearest the
     /// design value (largeTitle 26, title 22, title2 17, title3 15, headline/body 13,

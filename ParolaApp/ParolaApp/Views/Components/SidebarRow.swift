@@ -9,6 +9,7 @@ struct SidebarRow: View {
     let action: () -> Void
 
     @State private var isHovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: action) {
@@ -48,14 +49,16 @@ struct SidebarRow: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    @ViewBuilder
+    // One shape with an animatable fill: the three states have to interpolate, not swap views.
     private var rowBackground: some View {
-        if isSelected {
-            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                .fill(DS.Color.accent.opacity(0.85))
-        } else if isHovering {
-            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                .fill(DS.Palette.surfaceHover)
-        }
+        RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+            .fill(rowFill)
+            .animation(reduceMotion ? nil : DS.Motion.rowState, value: rowFill)
+    }
+
+    private var rowFill: Color {
+        if isSelected { return DS.Color.accent.opacity(0.85) }
+        if isHovering { return DS.Palette.surfaceHover }
+        return .clear
     }
 }

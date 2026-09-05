@@ -3,15 +3,25 @@ import ParolaCore
 
 struct ContentRoutes: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        content
+        routedContent
             .onChange(of: model.pendingExport) { _, format in
                 if let format {
                     model.performExport(format)
                     model.pendingExport = nil
                 }
             }
+    }
+
+    private var routedContent: some View {
+        ZStack {
+            content
+                .id(routeID)
+                .transition(.opacity)
+        }
+        .animation(reduceMotion ? nil : DS.Motion.route, value: routeID)
     }
 
     @ViewBuilder
@@ -28,6 +38,33 @@ struct ContentRoutes: View {
                 transcriptContent
             }
         }
+    }
+
+    /// Coarse enough that the phase machine keeps its own cross-fade: everything `phaseContent`
+    /// covers collapses to a single case here.
+    private var routeID: RouteID {
+        if model.mode == .test, model.settingsRoutePreview { return .settingsPreview }
+        switch model.route {
+        case .batch: return .batch
+        case .queue: return .queue
+        case .transcript:
+            if !model.batchJobs.isEmpty { return .batchDetail }
+            guard showsLibraryBrowse else { return .phase }
+            if model.searchResults != nil { return .search }
+            if let filter = model.libraryFilter { return .category(filter) }
+            return .allEntries
+        }
+    }
+
+    private enum RouteID: Hashable {
+        case settingsPreview
+        case batch
+        case queue
+        case batchDetail
+        case search
+        case category(EntryCategory)
+        case allEntries
+        case phase
     }
 
     @ViewBuilder

@@ -111,6 +111,7 @@ enum LibraryListContent {
 
 struct LibraryListView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let category: EntryCategory?
     var searchResults: [LibraryEntry]? = nil
 
@@ -226,6 +227,7 @@ struct LibraryListView: View {
                 }
                 .listStyle(.inset)
                 .tint(DS.Color.accent)
+                .animation(reduceMotion ? nil : DS.Motion.listRows, value: entries.map(\.id))
                 .onKeyPress(.return) {
                     guard selection.count == 1, let id = selection.first else { return .ignored }
                     model.loadEntry(id)
