@@ -64,6 +64,10 @@ public actor BatchQueue {
         options: TranscriptionOptions
     ) -> AsyncStream<BatchEvent> {
         guard features.isEnabled(.batch) else {
+            ParolaLog.notice(
+                .batch, "batch refused: \(ParolaFeature.batch) disabled",
+                [.count: .int(jobs.count)]
+            )
             return AsyncStream { continuation in
                 let reason = ParolaError.featureDisabled(.batch).description
                 for job in jobs { continuation.yield(.failed(jobID: job.id, reason: reason)) }
@@ -93,6 +97,7 @@ public actor BatchQueue {
                 continue
             }
             continuation.yield(.started(jobID: job.id))
+            let startedAt = ContinuousClock.now
             do {
                 let source = FileAudioSource(url: job.url)
                 let duration = await source.estimatedDuration()
@@ -112,11 +117,21 @@ public actor BatchQueue {
                 )
                 continuation.yield(.completed(jobID: job.id, transcript: transcript))
             } catch is CancellationError {
+                ParolaLog.info(.batch, "job cancelled", [.job: .id(job.id)])
                 continuation.yield(.cancelled(jobID: job.id))
             } catch {
+                ParolaLog.error(
+                    .batch, "job failed",
+                    [
+                        .job: .id(job.id),
+                        .elapsed: .duration(startedAt.duration(to: .now)),
+                        .error: .error(error),
+                    ]
+                )
                 continuation.yield(.failed(jobID: job.id, reason: String(describing: error)))
             }
         }
+        ParolaLog.info(.batch, "batch finished", [.count: .int(jobs.count)])
         continuation.yield(.finished)
         continuation.finish()
     }
