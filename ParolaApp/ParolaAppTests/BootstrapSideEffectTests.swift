@@ -6,14 +6,14 @@ import ParolaCore
 @Suite("Bootstrap side-effect sets + launch flag parsing")
 struct BootstrapSideEffectTests {
 
-    @Test(".all contains all 13 cases")
-    func allHasThirteenCases() {
-        #expect(BootstrapSideEffect.all.count == 13)
+    @Test(".all contains all 14 cases")
+    func allHasFourteenCases() {
+        #expect(BootstrapSideEffect.all.count == 14)
         let expected: Set<BootstrapSideEffect> = [
             .sparkle, .launchAtLogin, .menuBarExtra, .dockIconRegistration, .appIntentsDonation,
             .meetingDetector, .watchedFolders, .dictationHotkey,
             .libraryPurgeOnLaunch, .refreshYtDlp, .liveCaptionsTranslateRestore,
-            .automationBridge, .modelsPathSync,
+            .automationBridge, .modelsPathSync, .diagnosticsLog,
         ]
         #expect(BootstrapSideEffect.all == expected)
     }
@@ -21,6 +21,13 @@ struct BootstrapSideEffectTests {
     @Test(".testing is exactly {.automationBridge}")
     func testingIsBridgeOnly() {
         #expect(BootstrapSideEffect.testing == [.automationBridge])
+    }
+
+    /// A sandbox instance writing diagnostics would put a second process into the shared cache
+    /// directory the real app owns.
+    @Test("test mode installs no diagnostics sink")
+    func testingExcludesDiagnosticsLog() {
+        #expect(!BootstrapSideEffect.testing.contains(.diagnosticsLog))
     }
 
     @Test(".testing is a subset of .all")

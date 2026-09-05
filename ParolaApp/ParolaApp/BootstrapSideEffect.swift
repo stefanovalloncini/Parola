@@ -14,12 +14,13 @@ enum BootstrapSideEffect: Sendable, Hashable {
     case liveCaptionsTranslateRestore
     case automationBridge
     case modelsPathSync
+    case diagnosticsLog
 
     static let all: Set<BootstrapSideEffect> = [
         .sparkle, .launchAtLogin, .menuBarExtra, .dockIconRegistration, .appIntentsDonation,
         .meetingDetector, .watchedFolders, .dictationHotkey,
         .libraryPurgeOnLaunch, .refreshYtDlp, .liveCaptionsTranslateRestore,
-        .automationBridge, .modelsPathSync
+        .automationBridge, .modelsPathSync, .diagnosticsLog
     ]
 
     static let testing: Set<BootstrapSideEffect> = [.automationBridge]

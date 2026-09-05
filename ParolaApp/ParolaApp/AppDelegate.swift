@@ -67,12 +67,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let model else { return }
         let pending = model.cancelAndDrainPendingTranscriptSave()
         let library = model.library
+        let diagnostics = DiagnosticsInstaller.current
+        diagnostics?.stopPeriodicFlush()
         let semaphore = DispatchSemaphore(value: 0)
         Task.detached {
             if let pending {
                 try? await library.updateTranscript(pending.transcript, for: pending.id)
             }
             await library.flush()
+            await diagnostics?.flushForTermination()
             semaphore.signal()
         }
         _ = semaphore.wait(timeout: .now() + 2)
