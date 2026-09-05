@@ -17,16 +17,14 @@ enum SilentRepetitions {
     static let minimumRepeats = 3
 
     /// A window holding at least a tenth of the peak is one the planner would call speech
-    /// (`ProbeWindowPlanner.pick`); the middle of that set is what a spoken line measures, and it
-    /// moves neither when a door slam lifts the peak nor when most of the file is silence.
+    /// (`ProbeWindowPlanner.pick`); the middle of that set is what a spoken line measures there.
     static let loudWindowShare = ProbeWindowPlanner.silenceFloor
     static let minimumLoudWindows = 3
 
-    /// Silence is four tenths of that. Three measured cases pin the share:
-    /// the 159 memo's windows give a floor of 0.0157, over its loudest hallucination (0.0124) and
-    /// 4.2× under its quietest speech (0.066); uniform speech at 0.02 with one 0.15 thump gives
-    /// 0.008, so speech-level repeats stay; 16 windows of room tone against 8 at 0.08 give 0.032,
-    /// so a repeat measuring 0.005 over that silence still goes.
+    /// Silence is four tenths of that. Three measured tables pin the share:
+    /// the 159 memo gives 0.0157 — over its loudest hallucination (0.0124), 4.2× under its speech;
+    /// uniform speech at 0.02 with one 0.15 thump gives 0.008, so speech-level repeats stay;
+    /// 16 windows of room tone against 8 at 0.08 give 0.032, so a 0.005 repeat over silence goes.
     static let quietShareOfSpeech = 0.4
 
     /// Below three loud windows there is no middle to take. The fallback is the whole-file median,

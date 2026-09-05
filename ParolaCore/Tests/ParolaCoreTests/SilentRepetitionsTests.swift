@@ -103,13 +103,24 @@ struct SilentRepetitionsTests {
         #expect(SilentRepetitions.dropped(from: Self.trio, probe: probe(windows, at: speech)) == Self.trio)
     }
 
+    /// At exactly ten times the speech level the qualifying threshold lands on the speech windows
+    /// themselves, so only the transient clears it and the whole-file median takes over.
     @Test("a transient loud enough to stand alone falls back to the whole-file median")
     func floorFallsBackForALonelyPeak() throws {
         let speech = 0.02
         let windows = Array(repeating: speech, count: 23) + [0.2]
         let floor = try #require(SilentRepetitions.floor(forWindows: windows))
-        #expect(floor < speech)
+        #expect(abs(floor - 0.016) < 0.0001)
         #expect(SilentRepetitions.dropped(from: Self.trio, probe: probe(windows, at: speech)) == Self.trio)
+    }
+
+    @Test("three loud windows take their middle, two fall back")
+    func loudWindowBoundary() throws {
+        let three = Array(repeating: 0.1, count: 3) + Array(repeating: 0.001, count: 21)
+        #expect(abs(try #require(SilentRepetitions.floor(forWindows: three)) - 0.04) < 0.0001)
+
+        let two = Array(repeating: 0.1, count: 2) + Array(repeating: 0.001, count: 22)
+        #expect(abs(try #require(SilentRepetitions.floor(forWindows: two)) - 0.001) < 0.0001)
     }
 
     @Test("a file that is mostly silence still drops its repeats")
