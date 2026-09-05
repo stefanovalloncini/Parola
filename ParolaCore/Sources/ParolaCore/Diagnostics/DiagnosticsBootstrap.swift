@@ -60,6 +60,10 @@ public final class DiagnosticsBootstrap: Sendable {
         await sink.flush()
     }
 
+    public func startNewFile() async {
+        await sink.startNewFile()
+    }
+
     public func flushSynchronously() {
         sink.flushSynchronously()
     }

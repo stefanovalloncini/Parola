@@ -41,6 +41,7 @@ public enum StdioRunner {
             // The line iterator throws EBADF once the signal handler closes stdin; treat as EOF.
         }
 
+        ParolaLog.notice(.cli, "stdin closed, shutting down")
         await dispatcher.cancelAll()
         drainOutput()
         await ParolaLog.flush()

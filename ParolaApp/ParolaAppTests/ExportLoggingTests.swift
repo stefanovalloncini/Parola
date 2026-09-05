@@ -174,6 +174,6 @@ struct ExportLoggingTests {
                 #expect(call.contains("localizedDescription") == false, "\(name) logs a localized description")
             }
         }
-        #expect(total == 8)
+        #expect(total == 9)
     }
 }

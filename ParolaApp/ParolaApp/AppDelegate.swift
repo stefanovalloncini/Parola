@@ -54,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        ParolaLog.info(.appLifecycle, "app launched, version \(AppVersionToken())")
         NSApp.servicesProvider = provider
         NSUpdateDynamicServices()
         if CommandLine.arguments.contains("--headless") {
@@ -64,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        ParolaLog.info(.appLifecycle, "app terminating in phase \(model?.phase)")
         let diagnostics = DiagnosticsInstaller.current
         diagnostics?.stopPeriodicFlush()
         let pending = model?.cancelAndDrainPendingTranscriptSave()

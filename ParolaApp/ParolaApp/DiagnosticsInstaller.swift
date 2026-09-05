@@ -6,16 +6,10 @@ final class DiagnosticsInstaller {
     /// Set at launch so the terminate barrier in `AppDelegate` can reach the sink it installed.
     static var current: DiagnosticsInstaller?
 
-    static var defaultDirectory: URL {
-        let caches = (try? FileManager.default.url(
-            for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true
-        )) ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Caches")
-        return caches.appendingPathComponent("Parola/diagnostics", isDirectory: true)
-    }
+    static var defaultDirectory: URL { DiagnosticsBootstrap.defaultDirectory }
 
     nonisolated let directory: URL
-    private nonisolated let sink: FileDiagnosticsSink
-    private var flushTask: Task<Void, Never>?
+    private nonisolated let bootstrap: DiagnosticsBootstrap
 
     init(
         directory: URL = DiagnosticsInstaller.defaultDirectory,
@@ -23,22 +17,12 @@ final class DiagnosticsInstaller {
         flushInterval: Duration = .seconds(2)
     ) {
         self.directory = directory
-        let sink = FileDiagnosticsSink(
+        self.bootstrap = DiagnosticsBootstrap(
             directory: directory,
-            minimumLevel: Self.minimumLevel(environment: environment)
+            environment: environment,
+            periodicFlush: true,
+            flushInterval: flushInterval
         )
-        self.sink = sink
-        // Best effort: the sink sweeps its own retention inside that initializer, so anything the
-        // sweep logs is emitted before this install can catch it.
-        ParolaLog.install(sink)
-        ParolaLog.info(.appLifecycle, "diagnostics sink installed")
-        flushTask = Task.detached { [sink] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: flushInterval)
-                guard !Task.isCancelled else { return }
-                await sink.flush()
-            }
-        }
     }
 
     /// A unit-test host must not install the sink: seeded failures and mock records would land in
@@ -57,20 +41,19 @@ final class DiagnosticsInstaller {
     }
 
     nonisolated static func minimumLevel(environment: [String: String]) -> LogLevel {
-        environment["PAROLA_LOG_LEVEL"].flatMap(LogLevel.init(name:)) ?? .info
+        DiagnosticsBootstrap.minimumLevel(environment: environment)
     }
 
     func stopPeriodicFlush() {
-        flushTask?.cancel()
-        flushTask = nil
+        bootstrap.stopPeriodicFlush()
     }
 
     /// Runs inside the terminate barrier, which blocks the main thread, so it must not hop to it.
     nonisolated func flushForTermination() async {
-        await sink.flush()
+        await bootstrap.flush()
     }
 
     nonisolated func startNewFile() async {
-        await sink.startNewFile()
+        await bootstrap.startNewFile()
     }
 }

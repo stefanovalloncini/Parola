@@ -1170,6 +1170,10 @@ final class AppModel {
 
         let sideEffects = bootstrap.sideEffects.subtracting(features.excludedSideEffects(mode: bootstrap.mode))
         self.activeSideEffects = sideEffects
+        ParolaLog.info(
+            .appLifecycle,
+            "side effects \(TokenList(sideEffects)), features \(TokenList(features.enabled))"
+        )
         if sideEffects.contains(.refreshYtDlp) {
             refreshYtDlpAvailability()
         }
@@ -3028,3 +3032,18 @@ final class AppModel {
     }
 }
 
+extension AppModel.Phase: LogSafe {
+    /// The case name only: `failed`'s message and `transcribing`'s file are not loggable.
+    var logToken: String {
+        switch self {
+        case .idle: return "idle"
+        case .downloadingModel: return "downloadingModel"
+        case .loadingModel: return "loadingModel"
+        case .transcribing: return "transcribing"
+        case .recording: return "recording"
+        case .exporting: return "exporting"
+        case .ready: return "ready"
+        case .failed: return "failed"
+        }
+    }
+}

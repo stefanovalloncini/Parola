@@ -45,6 +45,10 @@ struct Record: AsyncParsableCommand {
 
     func run() async throws {
         CLIDiagnostics.installIfWanted(alwaysOn: true)
+        ParolaLog.info(
+            .cli, "record started from \(source)",
+            model.map { [LogField.model: LogValue.safe(ModelToken($0))] } ?? [:]
+        )
         switch source {
         case .mic: try ParolaCLI.features.require(.micRecording)
         case .system: try ParolaCLI.features.require(.meetings)
@@ -160,4 +164,8 @@ struct Record: AsyncParsableCommand {
         await session.stop()
         await consumer.value
     }
+}
+
+extension Record.Source: LogSafe {
+    var logToken: String { rawValue }
 }
