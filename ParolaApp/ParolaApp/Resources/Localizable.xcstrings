@@ -1300,6 +1300,17 @@
         }
       }
     },
+    "Back 15 seconds": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indietro di 15 secondi"
+          }
+        }
+      }
+    },
     "Backup & restore": {
       "extractionState": "manual",
       "localizations": {
