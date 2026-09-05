@@ -217,11 +217,10 @@ struct ResetPaneButton: View {
             EmptyView()
         } else {
             HStack {
-                Button("Reset to defaults") {
+                Button("Reset to Defaults") {
                     confirming = true
                 }
-                .controlSize(.small)
-                .buttonStyle(.bordered)
+                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .axLeaf("Pane.Button.ResetToDefaults.\(scope.rawValue)")
                 Spacer()
             }

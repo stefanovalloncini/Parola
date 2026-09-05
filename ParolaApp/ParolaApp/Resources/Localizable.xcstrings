@@ -7269,13 +7269,13 @@
         }
       }
     },
-    "Reset to defaults": {
+    "Reset to Defaults": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ripristina ai default"
+            "value": "Ripristina i valori predefiniti"
           }
         }
       }
