@@ -1,6 +1,15 @@
 import SwiftUI
 import ParolaCore
 
+enum BatchProgress {
+    /// Nothing queued or running means the batch is settled, and a frozen "3 of 3" would only add noise.
+    static func label(for jobs: [BatchJob]) -> String? {
+        guard jobs.contains(where: { $0.status == .pending || $0.status == .transcribing }) else { return nil }
+        let finished = jobs.count { $0.status == .done }
+        return String(localized: "\(finished) of \(jobs.count)")
+    }
+}
+
 struct BatchView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("batch.exportPaneVisible", store: DefaultsStore.current) private var exportPaneVisible: Bool = true
@@ -40,6 +49,14 @@ struct BatchView: View {
             Text("Batch")
                 .font(DS.Font.title)
                 .foregroundStyle(DS.Color.primaryText)
+
+            if let progress = BatchProgress.label(for: model.batchJobs) {
+                Text(progress)
+                    .font(DS.Font.calloutMono)
+                    .monospacedDigit()
+                    .foregroundStyle(DS.Color.secondaryText)
+                    .axLeaf("Header.Text.Progress")
+            }
 
             Spacer()
 

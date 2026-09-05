@@ -12,9 +12,15 @@ struct BatchJobDetail: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             progressBar
-            Text(statusText)
-                .font(DS.Font.caption)
-                .foregroundStyle(statusColor)
+            HStack(spacing: 4) {
+                if let statusSymbol {
+                    Image(systemName: statusSymbol)
+                        .font(DS.Font.caption)
+                }
+                Text(statusText)
+                    .font(DS.Font.caption)
+            }
+            .foregroundStyle(statusColor)
         }
     }
 
@@ -36,10 +42,7 @@ struct BatchJobDetail: View {
                     .frame(height: 3)
             }
         case .done:
-            ProgressView(value: 1)
-                .progressViewStyle(.linear)
-                .tint(statusFill)
-                .frame(height: 3)
+            EmptyView()
         case .failed:
             ProgressView(value: 1)
                 .progressViewStyle(.linear)
@@ -65,6 +68,10 @@ struct BatchJobDetail: View {
         case .failed: return job.error ?? String(localized: "Failed")
         case .cancelled: return String(localized: "Cancelled")
         }
+    }
+
+    private var statusSymbol: String? {
+        job.status == .done ? "checkmark.circle.fill" : nil
     }
 
     /// For the label. A fill answers a different question — see `statusFill`.
