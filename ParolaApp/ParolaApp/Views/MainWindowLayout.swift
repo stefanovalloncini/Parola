@@ -29,4 +29,8 @@ enum MainWindowLayout {
     static var batchPaneMinWidth: CGFloat {
         batchQueueMinWidth + dividerWidth + batchExportPaneWidth
     }
+
+    static var narrowestPaneWidth: CGFloat {
+        min(transcriptMinWidth, batchQueueMinWidth)
+    }
 }

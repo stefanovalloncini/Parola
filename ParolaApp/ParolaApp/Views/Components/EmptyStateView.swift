@@ -46,9 +46,9 @@ struct EmptyStateView<Actions: View>: View {
                 .padding(.top, DS.Spacing.small)
             }
         }
-        // A minimum width as well as a maximum: proposed no width, the message wraps one character
-        // per line and the route reports a minimum height taller than the window.
-        .frame(minWidth: 280, maxWidth: 420)
+        // A floor as well as a ceiling: proposed no width, the message wraps one character per line and
+        // the route reports a minimum height taller than the window. The floor is what a pane can spare.
+        .frame(minWidth: MainWindowLayout.narrowestPaneWidth - 2 * DS.Spacing.large, maxWidth: 420)
         .padding(DS.Spacing.large)
     }
 }

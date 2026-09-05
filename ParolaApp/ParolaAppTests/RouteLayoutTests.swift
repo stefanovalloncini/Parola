@@ -74,6 +74,19 @@ struct RouteLayoutTests {
         }
     }
 
+    @Test("nothing in the batch route is laid out past the edges of the narrowest detail column", arguments: [0, 3])
+    func batchFitsDetailColumn(jobs: Int) {
+        withIsolatedDefaults { defaults in
+            let model = makeModel(defaults, jobs: jobs)
+            let host = NSHostingView(rootView: BatchView().environment(model))
+            let detailWidth = MainWindowLayout.minimumWidth - MainWindowLayout.sidebarMaxWidth
+            host.frame = NSRect(x: 0, y: 0, width: detailWidth, height: MainWindowLayout.minimumHeight)
+            host.layoutSubtreeIfNeeded()
+            let overflowing = viewsPastEdges(of: host, axis: .horizontal)
+            #expect(overflowing.isEmpty, "laid out past \(detailWidth)pt with \(jobs) jobs: \(overflowing.joined(separator: ", "))")
+        }
+    }
+
     @Test(
         "the queue route fits the window it is given",
         arguments: [CGSize(width: 1180, height: 760), CGSize(width: 920, height: 700)], [0, 3]
