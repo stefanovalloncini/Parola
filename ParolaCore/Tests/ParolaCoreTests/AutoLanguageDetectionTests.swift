@@ -380,11 +380,44 @@ struct AutoLanguageDetectionTests {
 
         let samples = try #require(WhisperKitTranscriber.probeSamples(url: url, scratch: probeURL))
 
-        #expect((samples.map(abs).max() ?? 0) > 0.2)
-        let offsets = SpeechWindowFinder.loudestWindowOffsets(
-            in: samples, windowLength: 30 * 16_000, limit: 5
-        )
-        #expect(!offsets.isEmpty)
+        let offsets = WhisperKitTranscriber.probeWindowOffsets(in: samples, windowSamples: Self.whisperWindow)
+        #expect(offsets.count == 3)
+        #expect(offsets.allSatisfy { Self.loudness(of: samples, at: $0) > 0.2 })
+    }
+
+    @Test("a recording too short to tile twice is still read as two windows")
+    func shortRecordingIsReadTwice() throws {
+        let url = try Self.writeTone(sampleRate: 16_000, seconds: 45, loudRange: 0..<45)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let probeURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-probe-\(UUID().uuidString).caf")
+        defer { try? FileManager.default.removeItem(at: probeURL) }
+
+        let samples = try #require(WhisperKitTranscriber.probeSamples(url: url, scratch: probeURL))
+
+        let offsets = WhisperKitTranscriber.probeWindowOffsets(in: samples, windowSamples: Self.whisperWindow)
+        #expect(offsets.count == 2)
+        #expect(offsets.allSatisfy { Self.loudness(of: samples, at: $0) > 0.2 })
+    }
+
+    @Test("a recording shorter than one window is read once")
+    func veryShortRecordingIsReadOnce() throws {
+        let url = try Self.writeTone(sampleRate: 16_000, seconds: 25, loudRange: 0..<25)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let probeURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-probe-\(UUID().uuidString).caf")
+        defer { try? FileManager.default.removeItem(at: probeURL) }
+
+        let samples = try #require(WhisperKitTranscriber.probeSamples(url: url, scratch: probeURL))
+
+        #expect(WhisperKitTranscriber.probeWindowOffsets(in: samples, windowSamples: Self.whisperWindow) == [0])
+    }
+
+    private static let whisperWindow = 30 * 16_000
+
+    private static func loudness(of samples: [Float], at offset: Int) -> Float {
+        let window = samples[offset..<min(samples.count, offset + whisperWindow)]
+        return (window.reduce(Float(0)) { $0 + $1 * $1 } / Float(window.count)).squareRoot()
     }
 
     @Test("a stereo source with sound on one side only is extracted as audible mono")

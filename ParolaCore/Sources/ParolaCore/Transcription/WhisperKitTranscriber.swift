@@ -219,11 +219,8 @@ actor WhisperKitTranscriber: Transcriber {
         defer { try? FileManager.default.removeItem(at: scratch) }
         guard let samples = Self.probeSamples(url: url, scratch: scratch), !samples.isEmpty else { return nil }
         let windowSamples = kit.featureExtractor.windowSamples ?? Constants.defaultWindowSamples
-        // The windows tile the scratch file: overlapping candidates crowd each other out, and a minute of speech would be read as one.
-        let offsets = SpeechWindowFinder.loudestWindowOffsets(
-            in: samples, windowLength: windowSamples, limit: Self.languageProbeWindows,
-            hopLength: windowSamples
-        )
+        let offsets = Self.probeWindowOffsets(in: samples, windowSamples: windowSamples)
+        // Loudest window first, so a probe cut short by cancellation has read the best evidence.
         var readings: [WhisperLanguageReading] = []
         for offset in offsets {
             if Task.isCancelled { break }
@@ -243,8 +240,18 @@ actor WhisperKitTranscriber: Transcriber {
         return decided
     }
 
-    /// The loudest stretches of the whole recording, copied into one short scratch file: a lecture
-    /// whose speaker starts at minute nine used to be probed on nothing but its opening room tone.
+    /// Windows tiling the scratch file, or overlapping halves when it is too short to tile twice —
+    /// one reading has nothing to check itself against.
+    static func probeWindowOffsets(in samples: [Float], windowSamples: Int) -> [Int] {
+        let spacing = samples.count >= 2 * windowSamples ? windowSamples : windowSamples / 2
+        return SpeechWindowFinder.loudestWindowOffsets(
+            in: samples, windowLength: windowSamples, limit: languageProbeWindows,
+            hopLength: spacing, minimumSpacing: spacing
+        )
+    }
+
+    /// The loudest stretches of the whole recording, written to `scratch`, which the caller deletes:
+    /// a lecture whose speaker starts at minute nine used to be probed on its opening room tone.
     static func probeSamples(url: URL, scratch: URL) -> [Float]? {
         guard let windows = try? ProbeAudioExtractor.extract(from: url, to: scratch),
               !windows.isEmpty else { return nil }
@@ -260,12 +267,16 @@ struct WhisperLanguageReading: Hashable, Sendable {
 
 /// Weighs one language reading per probe window. A window of room tone reads as a confident
 /// language all the same — Czech, Russian, whatever the noise resembles — so no single window is
-/// trusted: a winner is detected only once a second window corroborates it and it carries a clear
-/// majority of the confidence. A lone surviving reading still pins the run, but as an assumption;
-/// a close call pins nothing and the run detects per chunk as it did before.
+/// trusted: a winner is detected once a second reading survives the confidence filter and it carries
+/// a clear majority of the confidence. On its own a reading has to be near-certain to count as
+/// detected; otherwise it still pins the run, but as an assumption. A close call pins nothing and
+/// the run detects per chunk as it did before.
 enum WhisperLanguageVote {
     static let minimumConfidence = 0.1
     static let lead = 1.25
+    /// Measured on the turbo model: clean speech reads 0.98-0.9999, a window of white noise 0.45, the
+    /// half-English stretch of an Italian memo 0.56, and the noise window that pinned Czech in T23 0.12.
+    static let certainty = 0.85
 
     static func decide(_ readings: [WhisperLanguageReading]) -> LanguageDetection? {
         var mass: [String: Double] = [:]
@@ -279,7 +290,8 @@ enum WhisperLanguageVote {
         let ranked = mass.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
         guard let best = ranked.first else { return nil }
         guard let runnerUp = ranked.dropFirst().first else {
-            return counted > 1 ? .detected(best.key) : .assumed(best.key)
+            if counted > 1 || best.value >= certainty { return .detected(best.key) }
+            return .assumed(best.key)
         }
         guard best.value >= runnerUp.value * lead else { return nil }
         return .detected(best.key)

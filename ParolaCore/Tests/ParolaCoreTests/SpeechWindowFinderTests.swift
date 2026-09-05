@@ -137,13 +137,13 @@ struct WhisperLanguageVoteTests {
 
     @Test("a reading the detector barely believes is not evidence")
     func lowConfidenceIgnored() {
-        let vote = WhisperLanguageVote.decide([reading("cs", 0.05), reading("it", 0.9)])
+        let vote = WhisperLanguageVote.decide([reading("cs", 0.05), reading("it", 0.99)])
 
-        #expect(vote == .assumed("it"))
+        #expect(vote == .detected("it"))
     }
 
-    @Test("a weak runner-up still counts as corroboration for the winner")
-    func weakRunnerUpCorroborates() {
+    @Test("a dissenting second reading still leaves a clear winner")
+    func dissentingSecondReading() {
         let vote = WhisperLanguageVote.decide([reading("cs", 0.11), reading("it", 0.9)])
 
         #expect(vote == .detected("it"))
@@ -159,9 +159,14 @@ struct WhisperLanguageVoteTests {
         #expect(WhisperLanguageVote.decide([]) == nil)
     }
 
-    @Test("one confident reading pins the language but only as an assumption")
-    func singleReading() {
-        #expect(WhisperLanguageVote.decide([reading("it", 0.9)]) == .assumed("it"))
+    @Test("a lone reading counts as detected when it is near-certain")
+    func singleCertainReading() {
+        #expect(WhisperLanguageVote.decide([reading("it", 0.99)]) == .detected("it"))
+    }
+
+    @Test("a lone reading the detector half believes is only an assumption")
+    func singleHalfHeartedReading() {
+        #expect(WhisperLanguageVote.decide([reading("cs", 0.45)]) == .assumed("cs"))
     }
 
     @Test("a blank language code is not a vote")
