@@ -16,13 +16,23 @@ protocol SegmentEnergyProbe {
 enum SilentRepetitions {
     static let minimumRepeats = 3
 
-    /// The reference is capped at eight times the median window: one door slam is enough to make
-    /// the loudest window several times louder than any speech in the file, and a floor scaled off
-    /// that slam alone would sit above the quiet half of a conversation.
-    static let medianReferenceFactor = 8.0
+    /// A window holding at least a tenth of the peak is one the planner would call speech
+    /// (`ProbeWindowPlanner.pick`); the middle of that set is what a spoken line measures, and it
+    /// moves neither when a door slam lifts the peak nor when most of the file is silence.
+    static let loudWindowShare = ProbeWindowPlanner.silenceFloor
+    static let minimumLoudWindows = 3
 
-    /// It never drops below a tenth of the peak either, or a recording that is mostly digital
-    /// silence — median zero — would have no reference at all and nothing would ever be dropped.
+    /// Silence is four tenths of that. Three measured cases pin the share:
+    /// the 159 memo's windows give a floor of 0.0157, over its loudest hallucination (0.0124) and
+    /// 4.2× under its quietest speech (0.066); uniform speech at 0.02 with one 0.15 thump gives
+    /// 0.008, so speech-level repeats stay; 16 windows of room tone against 8 at 0.08 give 0.032,
+    /// so a repeat measuring 0.005 over that silence still goes.
+    static let quietShareOfSpeech = 0.4
+
+    /// Below three loud windows there is no middle to take. The fallback is the whole-file median,
+    /// capped so one transient cannot set the level alone and floored so a recording that is
+    /// almost all digital silence still has a reference to scale from.
+    static let medianReferenceFactor = 8.0
     static let minimumReferenceShare = 0.1
 
     static func dropped(from segments: [TranscriptSegment], probe: SegmentEnergyProbe) -> [TranscriptSegment] {
@@ -65,11 +75,15 @@ enum SilentRepetitions {
     /// because a phone memo and a lapel rig sit decades apart.
     static func floor(forWindows energies: [Double]) -> Double? {
         guard let peak = energies.max(), peak > 0 else { return nil }
-        let reference = min(
-            peak,
-            max(median(of: energies) * medianReferenceFactor, peak * minimumReferenceShare)
-        )
-        return reference * ProbeWindowPlanner.silenceFloor
+        let loud = energies.filter { $0 >= peak * loudWindowShare }
+        guard loud.count >= minimumLoudWindows else {
+            let reference = min(
+                peak,
+                max(median(of: energies) * medianReferenceFactor, peak * minimumReferenceShare)
+            )
+            return reference * ProbeWindowPlanner.silenceFloor
+        }
+        return median(of: loud) * quietShareOfSpeech
     }
 
     static func normalized(_ text: String) -> String {

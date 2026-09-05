@@ -38,7 +38,9 @@ struct SilentRepetitionsTests {
 
     @Test("one loud transient does not lift the floor into the speech band")
     func keepsSpeechLevelRepeatsDespiteATransient() throws {
-        let url = try LeadInSilenceFixture.write(speechAmplitude: 0.05, transientAt: 120)
+        let url = try LeadInSilenceFixture.write(
+            speechAmplitude: 0.05, transientAt: 120, transientAmplitude: 0.4
+        )
         defer { try? FileManager.default.removeItem(at: url) }
         let probe = try #require(AudioFileEnergyProbe(url: url))
 
@@ -92,18 +94,40 @@ struct SilentRepetitionsTests {
         #expect(SilentRepetitions.dropped(from: segments, probe: probe) == segments)
     }
 
-    @Test("a lone transient is capped out of the floor")
+    @Test("a lone transient does not lift the floor off the speech windows")
     func floorIgnoresALoneTransient() throws {
         let speech = 0.02
-        let windows = Array(repeating: speech, count: 23) + [0.5]
+        let windows = Array(repeating: speech, count: 23) + [0.15]
+        let floor = try #require(SilentRepetitions.floor(forWindows: windows))
+        #expect(abs(floor - 0.008) < 0.0001)
+        #expect(SilentRepetitions.dropped(from: Self.trio, probe: probe(windows, at: speech)) == Self.trio)
+    }
+
+    @Test("a transient loud enough to stand alone falls back to the whole-file median")
+    func floorFallsBackForALonelyPeak() throws {
+        let speech = 0.02
+        let windows = Array(repeating: speech, count: 23) + [0.2]
         let floor = try #require(SilentRepetitions.floor(forWindows: windows))
         #expect(floor < speech)
+        #expect(SilentRepetitions.dropped(from: Self.trio, probe: probe(windows, at: speech)) == Self.trio)
+    }
 
-        let segments = (0..<3).map {
-            TranscriptSegment(id: $0, start: Double($0) * 20, end: Double($0) * 20 + 19, text: "Sì.")
-        }
-        let probe = StubEnergyProbe(windows: windows, quietBefore: 0, speechEnergy: speech)
-        #expect(SilentRepetitions.dropped(from: segments, probe: probe) == segments)
+    @Test("a file that is mostly silence still drops its repeats")
+    func dropsRepeatsWhenSilenceFillsMostWindows() throws {
+        let windows = Array(repeating: 0.002, count: 16) + Array(repeating: 0.08, count: 8)
+        let floor = try #require(SilentRepetitions.floor(forWindows: windows))
+        #expect(abs(floor - 0.032) < 0.0001)
+        #expect(SilentRepetitions.dropped(from: Self.trio, probe: probe(windows, at: 0.005)).isEmpty)
+        #expect(SilentRepetitions.dropped(from: Self.trio, probe: probe(windows, at: 0.08)) == Self.trio)
+    }
+
+    @Test("a recording that is almost all digital silence keeps a reference")
+    func floorSurvivesNearTotalSilence() throws {
+        let windows = Array(repeating: 0.0005, count: 22) + Array(repeating: 0.1, count: 2)
+        let floor = try #require(SilentRepetitions.floor(forWindows: windows))
+        #expect(abs(floor - 0.001) < 0.0001)
+        #expect(SilentRepetitions.dropped(from: Self.trio, probe: probe(windows, at: 0.0005)).isEmpty)
+        #expect(SilentRepetitions.dropped(from: Self.trio, probe: probe(windows, at: 0.1)) == Self.trio)
     }
 
     /// The 24 window levels measured off the 159 memo. The lead-in hallucinations there run
@@ -117,6 +141,7 @@ struct SilentRepetitionsTests {
             0.01264, 0.01576, 0.02202, 0.01018, 0.00615, 0.01831, 0.07960, 0.18455,
         ]
         let floor = try #require(SilentRepetitions.floor(forWindows: windows))
+        #expect(abs(floor - 0.01574) < 0.0001)
         #expect(floor > 0.0124)
         #expect(floor * 3 < 0.066)
     }
@@ -152,6 +177,14 @@ struct SilentRepetitionsTests {
         ])
     }
 
+    private static let trio = (0..<3).map {
+        TranscriptSegment(id: $0, start: Double($0) * 20, end: Double($0) * 20 + 19, text: "Sì.")
+    }
+
+    private func probe(_ windows: [Double], at energy: Double) -> StubEnergyProbe {
+        StubEnergyProbe(windows: windows, quietBefore: 0, speechEnergy: energy)
+    }
+
     private static let mixedTranscript = Transcript(
         segments: [
             TranscriptSegment(id: 0, start: 0, end: 9, text: "  "),
@@ -177,6 +210,7 @@ enum LeadInSilenceFixture {
         roomAmplitude: Double = 0.002,
         speechAmplitude: Double = 0.8,
         transientAt: Double? = nil,
+        transientAmplitude: Double = 0.9,
         transientSeconds: Double = 2
     ) throws -> URL {
         let sampleRate = 8000.0
@@ -189,7 +223,7 @@ enum LeadInSilenceFixture {
             let time = Double(frame) / sampleRate
             var amplitude = time < speechStart ? roomAmplitude : speechAmplitude
             if let transientAt, time >= transientAt, time < transientAt + transientSeconds {
-                amplitude = 0.9
+                amplitude = transientAmplitude
             }
             samples[frame] = Float(sin(2 * .pi * 440 * time) * amplitude)
         }
