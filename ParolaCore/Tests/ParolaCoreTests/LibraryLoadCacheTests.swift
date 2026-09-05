@@ -108,21 +108,70 @@ struct LibraryLoadCacheTests {
         #expect(firstText(loaded) == "original")
     }
 
+    /// Resumes once the racing task is running, so the sleep that follows measures the off-actor
+    /// decode and not task start-up.
+    private func waitingForStart(_ count: Int, _ stream: AsyncStream<Void>) async {
+        var seen = 0
+        for await _ in stream {
+            seen += 1
+            if seen == count { return }
+        }
+    }
+
     @Test("a load in flight when updateTranscript lands never answers with the pre-update transcript")
     func loadRacingUpdateSeesTheUpdate() async throws {
         let (store, _) = try makeStore()
         // Big enough that the off-actor decode cannot finish inside the head start the update gets.
-        let entry = try await store.add(transcript: makeTranscript("original 0", segments: 20_000), audioSource: nil)
+        let entry = try await store.add(transcript: makeTranscript("original 0", segments: 5_000), audioSource: nil)
 
-        for i in 0..<2 {
+        for i in 0..<8 {
             if i > 0 {
-                try await store.updateTranscript(makeTranscript("original \(i)", segments: 20_000), for: entry.id)
+                try await store.updateTranscript(makeTranscript("original \(i)", segments: 5_000), for: entry.id)
             }
-            let loading = Task { try await store.load(entry.id) }
+            let started = AsyncStream<Void>.makeStream()
+            let signal = started.continuation
+            let loading = Task { () -> LoadedEntry in
+                signal.yield()
+                return try await store.load(entry.id)
+            }
+            await waitingForStart(1, started.stream)
             try await Task.sleep(for: .milliseconds(1))
             try await store.updateTranscript(makeTranscript("edited \(i)"), for: entry.id)
 
             #expect(firstText(try await loading.value) == "edited \(i)")
+            #expect(firstText(try await store.load(entry.id)) == "edited \(i)")
+        }
+    }
+
+    @Test("two concurrent loads of the same entry agree on one whole version")
+    func concurrentLoadsAgree() async throws {
+        let (store, _) = try makeStore()
+        let entry = try await store.add(transcript: makeTranscript("original 0", segments: 5_000), audioSource: nil)
+
+        for i in 0..<8 {
+            if i > 0 {
+                try await store.updateTranscript(makeTranscript("original \(i)", segments: 5_000), for: entry.id)
+            }
+            let started = AsyncStream<Void>.makeStream()
+            let signal = started.continuation
+            let first = Task { () -> LoadedEntry in
+                signal.yield()
+                return try await store.load(entry.id)
+            }
+            let second = Task { () -> LoadedEntry in
+                signal.yield()
+                return try await store.load(entry.id)
+            }
+            await waitingForStart(2, started.stream)
+            try await Task.sleep(for: .milliseconds(1))
+            try await store.updateTranscript(makeTranscript("edited \(i)"), for: entry.id)
+
+            let firstTexts = Set(try await first.value.document.transcript.segments.map(\.text))
+            let secondTexts = Set(try await second.value.document.transcript.segments.map(\.text))
+            #expect(firstTexts.count == 1, "a load blended two versions of the transcript")
+            #expect(secondTexts.count == 1, "a load blended two versions of the transcript")
+            #expect(firstTexts == secondTexts, "concurrent loads of one entry disagreed")
+            #expect(firstTexts.first == "original \(i)" || firstTexts.first == "edited \(i)")
             #expect(firstText(try await store.load(entry.id)) == "edited \(i)")
         }
     }
