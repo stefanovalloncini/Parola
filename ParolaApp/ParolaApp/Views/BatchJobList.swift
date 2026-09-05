@@ -151,15 +151,9 @@ struct BatchJobList: View {
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
-                .font(DS.Font.calloutMedium)
-                .foregroundStyle(.secondary)
-                .frame(width: 26, height: 26)
-                .background(
-                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                        .fill(DS.Palette.subtleFill)
-                )
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(DSIconChipButtonStyle(side: 26))
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort: \(sortOrder.localizedTitle)")

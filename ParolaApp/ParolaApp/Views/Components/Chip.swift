@@ -112,11 +112,28 @@ struct ChipButtonStyle: ButtonStyle {
     var weight: Font.Weight = .medium
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(size.font(weight: weight))
-            .foregroundStyle(isSelected ? DS.Color.onAccent : Color.primary.opacity(0.85))
-            .chipChrome(isSelected: isSelected, size: size, hovering: configuration.isPressed)
-            .opacity(configuration.isPressed ? 0.85 : 1)
+        Chrome(configuration: configuration, isSelected: isSelected, size: size, weight: weight)
+    }
+
+    private struct Chrome: View {
+        let configuration: Configuration
+        let isSelected: Bool
+        let size: Chip.Size
+        let weight: Font.Weight
+        @State private var hovering = false
+
+        var body: some View {
+            configuration.label
+                .font(size.font(weight: weight))
+                .foregroundStyle(isSelected ? DS.Color.onAccent : Color.primary.opacity(0.85))
+                .chipChrome(
+                    isSelected: isSelected,
+                    size: size,
+                    hovering: hovering || configuration.isPressed
+                )
+                .onHover { hovering = $0 }
+                .opacity(configuration.isPressed ? 0.85 : 1)
+        }
     }
 }
 

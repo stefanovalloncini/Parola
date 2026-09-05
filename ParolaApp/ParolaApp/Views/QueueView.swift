@@ -67,9 +67,10 @@ struct QueueView: View {
                 }
             }
         } label: {
-            DSIconChip(systemImage: "arrow.up.arrow.down")
+            Image(systemName: "arrow.up.arrow.down")
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(DSIconChipButtonStyle(side: 26))
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort jobs")

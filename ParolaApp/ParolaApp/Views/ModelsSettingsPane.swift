@@ -137,15 +137,9 @@ struct ModelsSettingsPane: View {
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
-                .font(DS.Font.calloutEmphasized)
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                        .fill(DS.Palette.subtleFill)
-                )
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(DSIconChipButtonStyle(side: 28))
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort: \(sortOption.label)")
