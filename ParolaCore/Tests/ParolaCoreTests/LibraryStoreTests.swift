@@ -499,7 +499,37 @@ struct LibraryStoreTests {
         let loaded = try await store.load(entry.id)
 
         #expect(loaded.document.transcript.segments.map(\.text) == ["hi", "there"])
-        #expect(loaded.document.transcript.segments.map(\.id) == [0, 1])
+        #expect(loaded.document.transcript.segments.map(\.id) == [0, 2], "notes are keyed by segment id")
+    }
+
+    @Test("a note keyed to a segment after a blank row still lands on that segment")
+    func loadKeepsNotesOnTheirSegments() async throws {
+        let (store, _) = try makeTempLibrary()
+        let segments = (0...8).map { index in
+            TranscriptSegment(
+                id: index,
+                start: Double(index),
+                end: Double(index) + 0.9,
+                text: index == 3 ? "" : "line \(index)"
+            )
+        }
+        let entry = try await store.add(
+            transcript: Transcript(segments: segments, language: "en", modelName: "tiny"),
+            audioSource: nil
+        )
+        try await store.setSegmentNote("check this", segmentID: 7, for: entry.id)
+
+        let loaded = try await store.load(entry.id)
+
+        let noted = loaded.document.transcript.segments.first { loaded.entry.note(forSegment: $0.id) != nil }
+        #expect(noted?.text == "line 7")
+    }
+
+    /// Read through FileManager, not URL.resourceValues: URL caches the first answer, so a second
+    /// read of the same URL would report the file as untouched however often it was rewritten.
+    private func snapshotWrittenAt(_ dir: URL) throws -> Date? {
+        let url = dir.appendingPathComponent(".search-index.json")
+        return try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date
     }
 
     private func makeTempLibraryDirectory() throws -> URL {

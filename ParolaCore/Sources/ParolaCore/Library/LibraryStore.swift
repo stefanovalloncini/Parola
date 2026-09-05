@@ -184,11 +184,8 @@ public actor LibraryStore {
         }
         var doc = try ParolaDocument.read(at: bundleURL)
         // Entries written before the blank-drop moved to assembly time still carry silent VAD
-        // chunks as empty rows.
-        doc.transcript = TranscriptCleanup.apply(
-            to: doc.transcript,
-            options: TranscriptCleanupOptions(filtersHallucinations: false, mergesSentences: false)
-        )
+        // chunks as empty rows. The surviving ids stay as they are: `segmentNotes` is keyed by them.
+        doc.transcript.segments = doc.transcript.segments.droppingBlankText()
         // Bundles written before the manifest carried a duration learn it the first time
         // they're opened, so the library list fills in instead of staying blank forever.
         if doc.manifest.durationSeconds == nil, let duration = doc.transcript.durationSeconds, duration > 0 {
