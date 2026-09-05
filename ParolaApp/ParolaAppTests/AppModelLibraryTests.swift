@@ -26,13 +26,15 @@ struct AppModelLibraryTests {
         createdAt: Date,
         lastOpenedAt: Date? = nil,
         labels: [String] = [],
-        language: String = "en"
+        language: String = "en",
+        category: EntryCategory = .transcription
     ) -> LibraryEntry {
         let manifest = ParolaDocument.Manifest(
             createdAt: createdAt,
             originalAudioName: "\(title).m4a",
             modelName: "stub",
             language: language,
+            category: category,
             lastOpenedAt: lastOpenedAt,
             labels: labels
         )
@@ -390,7 +392,7 @@ struct AppModelLibraryTests {
         #expect(model.allKnownLabels == ["draft", "final"])
     }
 
-    @Test("allKnownLanguages deduplicates the codes the entries carry and sorts them")
+    @Test("knownLanguages deduplicates the codes the entries carry and sorts them")
     func knownLanguages() {
         let model = makeModel()
         model.libraryEntries = [
@@ -400,18 +402,46 @@ struct AppModelLibraryTests {
             Self.entry(id: "4", title: "w", createdAt: Self.baseDate, language: ""),
         ]
 
-        #expect(model.allKnownLanguages == ["EN", "IT"])
+        #expect(model.knownLanguages(in: nil) == ["EN", "IT"])
     }
 
-    @Test("allKnownLanguages follows the library instead of a stale cache")
+    @Test("knownLanguages follows the library instead of a stale cache")
     func knownLanguagesFollowMutations() {
         let model = makeModel()
         model.libraryEntries = [Self.entry(id: "1", title: "x", createdAt: Self.baseDate, language: "en")]
-        #expect(model.allKnownLanguages == ["EN"])
+        #expect(model.knownLanguages(in: nil) == ["EN"])
 
         model.libraryEntries = [Self.entry(id: "1", title: "x", createdAt: Self.baseDate, language: "fr")]
 
-        #expect(model.allKnownLanguages == ["FR"])
+        #expect(model.knownLanguages(in: nil) == ["FR"])
+    }
+
+    @Test("the filter vocabulary only offers what the category itself uses")
+    func vocabularyIsScopedToTheCategory() {
+        let model = makeModel()
+        model.libraryEntries = [
+            Self.entry(id: "1", title: "x", createdAt: Self.baseDate, labels: ["draft"], language: "it"),
+            Self.entry(id: "2", title: "y", createdAt: Self.baseDate, labels: ["recap"], language: "en", category: .meeting),
+        ]
+
+        #expect(model.knownLabels(in: .meeting) == ["recap"])
+        #expect(model.knownLanguages(in: .meeting) == ["EN"])
+        #expect(model.knownLabels(in: .transcription) == ["draft"])
+        #expect(model.knownLanguages(in: .dictation).isEmpty)
+        #expect(model.knownLabels(in: nil) == ["draft", "recap"])
+        // The inspector suggests every label in the library, whatever category the entry sits in.
+        #expect(model.allKnownLabels == ["draft", "recap"])
+    }
+
+    @Test("the per-category vocabulary is dropped when the library changes")
+    func vocabularyFollowsMutations() {
+        let model = makeModel()
+        model.libraryEntries = [Self.entry(id: "1", title: "x", createdAt: Self.baseDate, labels: ["recap"], category: .meeting)]
+        #expect(model.knownLabels(in: .meeting) == ["recap"])
+
+        model.libraryEntries = [Self.entry(id: "1", title: "x", createdAt: Self.baseDate, labels: ["agenda"], category: .meeting)]
+
+        #expect(model.knownLabels(in: .meeting) == ["agenda"])
     }
 
     @Test("the search debounce stays short enough to feel immediate")

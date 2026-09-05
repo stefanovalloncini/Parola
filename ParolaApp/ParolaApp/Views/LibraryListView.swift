@@ -223,8 +223,8 @@ struct LibraryListView: View {
                     labelFilter: $labelFilter,
                     languageFilter: $languageFilter,
                     dateRangeFilter: $dateRangeFilter,
-                    labelOptions: model.allKnownLabels,
-                    languageOptions: model.allKnownLanguages
+                    labelOptions: model.knownLabels(in: category),
+                    languageOptions: model.knownLanguages(in: category)
                 )
             }
             Spacer()

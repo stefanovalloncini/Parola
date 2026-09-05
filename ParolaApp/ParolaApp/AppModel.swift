@@ -873,44 +873,45 @@ final class AppModel {
         return libraryEntriesByID[id]
     }
 
-    @ObservationIgnored private var cachedKnownLabels: [String] = []
-    @ObservationIgnored private var cachedKnownLabelsVersion: Int = -1
-
-    /// Scanned and sorted once per library version; the inspector reads it several times per body.
-    var allKnownLabels: [String] {
-        let version = libraryVersion
-        if cachedKnownLabelsVersion == version { return cachedKnownLabels }
-        var seen = Set<String>()
-        var ordered: [String] = []
-        for entry in libraryEntries {
-            for label in entry.labels where seen.insert(label).inserted {
-                ordered.append(label)
-            }
-        }
-        ordered.sort { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
-        cachedKnownLabels = ordered
-        cachedKnownLabelsVersion = version
-        return ordered
+    struct FilterVocabulary {
+        var labels: [String] = []
+        var languages: [String] = []
     }
 
-    @ObservationIgnored private var cachedKnownLanguages: [String] = []
-    @ObservationIgnored private var cachedKnownLanguagesVersion: Int = -1
+    @ObservationIgnored private var cachedVocabulary: [EntryCategory?: FilterVocabulary] = [:]
+    @ObservationIgnored private var cachedVocabularyVersion: Int = -1
 
-    /// Same deal as the labels: the library filter bar asks for it on every list rebuild.
-    var allKnownLanguages: [String] {
+    /// The labels in use in one category, sorted. The inspector and the filter bar both read it several times per body.
+    func knownLabels(in category: EntryCategory?) -> [String] { vocabulary(in: category).labels }
+
+    /// The language codes in use in one category, sorted.
+    func knownLanguages(in category: EntryCategory?) -> [String] { vocabulary(in: category).languages }
+
+    /// Every label in the library. Label suggestions are not scoped to the category the entry happens to be in.
+    var allKnownLabels: [String] { knownLabels(in: nil) }
+
+    private func vocabulary(in category: EntryCategory?) -> FilterVocabulary {
         let version = libraryVersion
-        if cachedKnownLanguagesVersion == version { return cachedKnownLanguages }
-        var seen = Set<String>()
-        var ordered: [String] = []
-        for entry in libraryEntries {
-            if let code = LanguageDisplay.code(for: entry.language), seen.insert(code).inserted {
-                ordered.append(code)
+        if cachedVocabularyVersion != version {
+            cachedVocabulary.removeAll(keepingCapacity: true)
+            cachedVocabularyVersion = version
+        }
+        if let cached = cachedVocabulary[category] { return cached }
+        var seenLabels = Set<String>()
+        var seenLanguages = Set<String>()
+        var found = FilterVocabulary()
+        for entry in libraryEntries where category == nil || entry.category == category {
+            for label in entry.labels where seenLabels.insert(label).inserted {
+                found.labels.append(label)
+            }
+            if let code = LanguageDisplay.code(for: entry.language), seenLanguages.insert(code).inserted {
+                found.languages.append(code)
             }
         }
-        ordered.sort()
-        cachedKnownLanguages = ordered
-        cachedKnownLanguagesVersion = version
-        return ordered
+        found.labels.sort { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        found.languages.sort()
+        cachedVocabulary[category] = found
+        return found
     }
     var libraryFilter: EntryCategory?
     /// True when the "All" chip is showing the flat all-categories list. Distinguishes All from Home, which both leave libraryFilter nil.
