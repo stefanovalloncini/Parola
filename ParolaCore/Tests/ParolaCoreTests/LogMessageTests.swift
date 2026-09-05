@@ -61,7 +61,11 @@ struct LogMessageTests {
             .deletingLastPathComponent()
             .appending(path: "Sources/ParolaCore/Diagnostics/LogRecord.swift")
         let text = try String(contentsOf: source, encoding: .utf8)
-        #expect(text.contains("\n    init(\n"))
-        #expect(!text.contains("public init("))
+        let start = try #require(text.range(of: "public struct LogRecord"))
+        let body = text[start.lowerBound...]
+        let end = try #require(body.range(of: "\n}\n"))
+        let declaration = body[..<end.upperBound]
+        #expect(declaration.contains("\n    init(\n"))
+        #expect(!declaration.contains("public init"))
     }
 }
