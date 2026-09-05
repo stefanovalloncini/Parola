@@ -133,7 +133,7 @@ struct SidebarGroup: Identifiable {
 enum SettingsSidebarCatalog {
     static var all: [SidebarGroup] {
         [
-            SidebarGroup(id: "start", title: nil, routes: [.general, .customization, .shortcuts, .updates]),
+            SidebarGroup(id: "start", title: "APP", routes: [.general, .customization, .shortcuts, .updates]),
             SidebarGroup(id: "capture", title: "CAPTURE", routes: [.microphone, .recordMeetings, .liveCaptions]),
             SidebarGroup(id: "dictation", title: "DICTATION", routes: [.dictation, .snippets, .corrections]),
             SidebarGroup(id: "sources", title: "SOURCES", routes: [.watchedFolders, .integrations]),
@@ -141,7 +141,7 @@ enum SettingsSidebarCatalog {
             SidebarGroup(id: "export", title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport]),
             SidebarGroup(id: "ai", title: "AI", routes: [.prompts]),
             SidebarGroup(id: "automation", title: "AUTOMATION", routes: [.automation]),
-            SidebarGroup(id: "end", title: nil, routes: [.advanced, .about])
+            SidebarGroup(id: "end", title: "SUPPORT", routes: [.advanced, .about])
         ]
     }
 

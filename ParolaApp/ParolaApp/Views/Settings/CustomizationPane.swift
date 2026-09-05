@@ -8,7 +8,7 @@ struct CustomizationPane: View {
     var body: some View {
         @Bindable var model = model
         return VStack(alignment: .leading, spacing: 12) {
-            SettingsSection {
+            SettingsSection("Theme and colors") {
                 SettingRow("Appearance",
                            description: "Follows the system unless you pick light or dark.",
                            isFirst: true) {
@@ -44,10 +44,10 @@ struct CustomizationPane: View {
             }
 
             if model.themeIsCustom {
-                SettingsSection { CustomThemeEditor() }
+                SettingsSection("Palette") { CustomThemeEditor() }
             }
 
-            SettingsSection {
+            SettingsSection("Text and density") {
                 SettingRow("Monospaced timestamps",
                            description: "Use a fixed-width font for timestamps in the transcript.",
                            isFirst: true) {

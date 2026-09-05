@@ -40,7 +40,7 @@ struct GeneralPane: View {
                 }
             }
 
-            SettingsSection {
+            SettingsSection("Transcription defaults") {
                 SettingRow("Highlight the word being spoken",
                            description: "Bolds and tints the current word as audio plays.",
                            isFirst: true) {

@@ -585,6 +585,17 @@
         }
       }
     },
+    "APP": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "APP"
+          }
+        }
+      }
+    },
     "AUTOMATION": {
       "extractionState": "manual",
       "localizations": {
@@ -6060,6 +6071,17 @@
         }
       }
     },
+    "Palette": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tavolozza"
+          }
+        }
+      }
+    },
     "Parola": {
       "localizations": {
         "it": {
@@ -7364,6 +7386,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "SORGENTI"
+          }
+        }
+      }
+    },
+    "SUPPORT": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SUPPORTO"
           }
         }
       }
@@ -8675,6 +8708,17 @@
         }
       }
     },
+    "Text and density": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testo e densità"
+          }
+        }
+      }
+    },
     "That URL isn't on a host yt-dlp can fetch.": {
       "extractionState": "manual",
       "localizations": {
@@ -8748,6 +8792,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La libreria di prompt dietro la pulizia della dettatura e il menu Trascrizione."
+          }
+        }
+      }
+    },
+    "Theme and colors": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tema e colori"
           }
         }
       }
@@ -9190,6 +9245,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dettagli trascrizione"
+          }
+        }
+      }
+    },
+    "Transcription defaults": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valori predefiniti di trascrizione"
           }
         }
       }
