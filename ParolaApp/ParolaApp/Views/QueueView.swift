@@ -93,6 +93,7 @@ struct QueueView: View {
                         section(title: "Failed", jobs: jobs, statuses: [.failed])
                         section(title: "Completed", jobs: jobs, statuses: [.done])
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, DS.Spacing.large)
                     .padding(.vertical, DS.Spacing.medium)
                 }
@@ -144,9 +145,11 @@ struct QueueView: View {
         }
     }
 
+    /// `statuses` is an order, not a set: In Progress lists the running job above the queued ones
+    /// whatever the sort picked.
     @ViewBuilder
-    private func section(title: String, jobs: [BatchJob], statuses: Set<BatchJob.Status>) -> some View {
-        let matching = jobs.filter { statuses.contains($0.status) }
+    private func section(title: String, jobs: [BatchJob], statuses: [BatchJob.Status]) -> some View {
+        let matching = statuses.flatMap { status in jobs.filter { $0.status == status } }
         if !matching.isEmpty {
             VStack(alignment: .leading, spacing: DS.Spacing.small) {
                 Text(title.uppercased())

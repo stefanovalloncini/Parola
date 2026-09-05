@@ -24,11 +24,10 @@ struct QueueRow: View {
                     ProgressView(value: job.progress)
                         .progressViewStyle(.linear)
                         .tint(DS.Color.accent)
-                        .frame(maxWidth: 320)
                         .padding(.top, 2)
                 }
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
             trailingActions
                 .opacity(hovered ? 1 : 0.55)
         }
