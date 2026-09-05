@@ -80,19 +80,6 @@ struct SidebarBadgeCountTests {
         #expect(invalidated.fired)
     }
 
-    @Test("the pinned badge follows the entries the model publishes")
-    func pinnedBadgeFollowsEntries() async {
-        let model = await makeModel()
-        model.setLibraryEntries([entry("a"), entry("b", pinned: true)])
-        #expect(model.pinnedEntryCount == 1)
-
-        model.setLibraryEntries([entry("a", pinned: true), entry("b", pinned: true)])
-        #expect(model.pinnedEntryCount == 2)
-
-        model.setLibraryEntries([entry("a"), entry("b")])
-        #expect(model.pinnedEntryCount == 0)
-    }
-
     @Test("re-listing the same deleted entries leaves the trash badge alone")
     func deletedBadgeSkipsUnchangedList() async {
         let model = await makeModel()

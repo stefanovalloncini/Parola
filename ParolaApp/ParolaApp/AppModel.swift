@@ -849,13 +849,10 @@ final class AppModel {
     var libraryEntries: [LibraryEntry] = [] {
         didSet {
             rebuildLibraryIndex()
-            let pinned = libraryEntries.count(where: \.pinned)
-            if pinned != pinnedEntryCount { pinnedEntryCount = pinned }
             libraryVersion &+= 1
         }
     }
     private(set) var libraryVersion: Int = 0
-    private(set) var pinnedEntryCount: Int = 0
     var deletedEntries: [LibraryEntry] = []
     var searchResults: [LibraryEntry]? {
         didSet { searchResultsVersion &+= 1 }
