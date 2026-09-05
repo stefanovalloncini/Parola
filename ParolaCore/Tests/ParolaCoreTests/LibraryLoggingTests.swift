@@ -1,0 +1,250 @@
+import Foundation
+import os
+import Testing
+@testable import ParolaCore
+
+@Suite("Library logging", .serialized, .logFacade, .tags(.fileSystem))
+struct LibraryLoggingTests {
+    private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
+        let sink = CapturingDiagnosticsSink()
+        ParolaLog.install(sink)
+        defer { ParolaLog.uninstall() }
+        try await body(sink)
+    }
+
+    private func records(
+        _ sink: CapturingDiagnosticsSink, _ category: LogCategory, message: String
+    ) -> [LogRecord] {
+        sink.records.filter { $0.category == category && $0.message.rendered == message }
+    }
+
+    private func waitForRecord(
+        _ sink: CapturingDiagnosticsSink, _ category: LogCategory, message: String
+    ) async -> LogRecord? {
+        let deadline = ContinuousClock.now + .seconds(5)
+        while ContinuousClock.now < deadline {
+            if let record = records(sink, category, message: message).first { return record }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return nil
+    }
+
+    private func makeLibraryURL() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-library-logging-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    private func makeAudio() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-library-logging-\(UUID().uuidString).wav")
+        try Data("RIFFfakeaudio".utf8).write(to: url)
+        return url
+    }
+
+    private func makeTranscript(_ text: String = "sprint planning") -> Transcript {
+        Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 0.5, text: text)],
+            language: "en",
+            modelName: "tiny"
+        )
+    }
+
+    private func setPermissions(_ mode: Int, on url: URL) throws {
+        try FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: url.path)
+    }
+
+    @Test("a library folder that cannot be listed is logged, and never by its path")
+    func unreadableLibraryFolder() async throws {
+        try await withSink { sink in
+            let libraryURL = try makeLibraryURL()
+            try setPermissions(0o000, on: libraryURL)
+            defer { try? setPermissions(0o700, on: libraryURL) }
+
+            let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+            #expect(await store.list().isEmpty)
+
+            let record = try #require(
+                await waitForRecord(sink, .library, message: "library folder could not be listed")
+            )
+            #expect(record.level == .error)
+            #expect(record.formattedLine.contains("/") == false)
+        }
+    }
+
+    @Test("bundles that cannot be read during a rebuild are counted once, not listed")
+    func unreadableBundlesDuringRebuild() async throws {
+        try await withSink { sink in
+            let libraryURL = try makeLibraryURL()
+            let audio = try makeAudio()
+            let seed = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+            let broken = try await seed.add(transcript: makeTranscript("first"), audioSource: audio)
+            _ = try await seed.add(transcript: makeTranscript("second"), audioSource: audio)
+            await seed.flush()
+            try Data("not json".utf8).write(to: broken.bundleURL.appendingPathComponent("transcript.json"))
+            try FileManager.default.removeItem(at: libraryURL.appendingPathComponent(".search-index.json"))
+            sink.clear()
+
+            let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+            _ = await store.search("second")
+
+            let record = try #require(
+                await waitForRecord(sink, .libraryIndex, message: "bundles skipped during index rebuild")
+            )
+            #expect(record.level == .notice)
+            #expect(record.fields[.count]?.text == "1")
+            #expect(records(sink, .libraryIndex, message: "bundles skipped during index rebuild").count == 1)
+            #expect(record.formattedLine.contains(broken.id) == false)
+        }
+    }
+
+    @Test("a transcript write that leaves disk ahead of memory is logged with its error kind")
+    func transcriptWriteFailure() async throws {
+        try await withSink { sink in
+            let libraryURL = try makeLibraryURL()
+            let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+            let entry = try await store.add(transcript: makeTranscript(), audioSource: try makeAudio())
+            try setPermissions(0o500, on: entry.bundleURL)
+            defer { try? setPermissions(0o700, on: entry.bundleURL) }
+
+            await #expect(throws: (any Error).self) {
+                try await store.updateTranscript(self.makeTranscript("edited"), for: entry.id)
+            }
+
+            let found = records(sink, .library, message: "transcript write left disk ahead of memory")
+            #expect(found.count == 1)
+            let record = try #require(found.first)
+            #expect(record.level == .error)
+            #expect(record.fields[.error] != nil)
+            #expect(record.formattedLine.contains(entry.id) == false)
+        }
+    }
+
+    @Test("a failed recache says the caches were dropped")
+    func recacheFailure() async throws {
+        try await withSink { sink in
+            let libraryURL = try makeLibraryURL()
+            let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+            let entry = try await store.add(transcript: makeTranscript(), audioSource: try makeAudio())
+            let manifestURL = entry.bundleURL.appendingPathComponent("manifest.json")
+            var manifest = try #require(
+                JSONSerialization.jsonObject(with: try Data(contentsOf: manifestURL)) as? [String: Any]
+            )
+            manifest["version"] = 99
+            try JSONSerialization.data(withJSONObject: manifest).write(to: manifestURL)
+
+            await #expect(throws: (any Error).self) {
+                try await store.setPinned(true, for: entry.id)
+            }
+
+            let record = try #require(
+                records(sink, .library, message: "entry recache failed, caches dropped").first
+            )
+            #expect(record.level == .error)
+            #expect(record.fields[.error] != nil)
+        }
+    }
+
+    @Test("adopting a bundle that cannot be copied logs the rollback")
+    func adoptRollback() async throws {
+        try await withSink { sink in
+            let sourceURL = try makeLibraryURL()
+            let source = LibraryStore(libraryURL: sourceURL, extraIndexer: nil)
+            let entry = try await source.add(transcript: makeTranscript(), audioSource: try makeAudio())
+
+            let libraryURL = try makeLibraryURL()
+            let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+            try setPermissions(0o500, on: libraryURL)
+            defer { try? setPermissions(0o700, on: libraryURL) }
+
+            await #expect(throws: (any Error).self) {
+                _ = try await store.adopt(parolaBundle: entry.bundleURL)
+            }
+
+            let record = try #require(
+                records(sink, .library, message: "adopting a bundle failed and was rolled back").first
+            )
+            #expect(record.level == .error)
+            #expect(record.fields[.error] != nil)
+            #expect(record.formattedLine.contains("parola") == false)
+        }
+    }
+
+    @Test("a purge that cannot delete reports one count and the first error")
+    func purgeFailures() async throws {
+        try await withSink { sink in
+            let libraryURL = try makeLibraryURL()
+            let audio = try makeAudio()
+            let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+            let first = try await store.add(transcript: makeTranscript("one"), audioSource: audio)
+            let second = try await store.add(transcript: makeTranscript("two"), audioSource: audio)
+            try await store.delete(first.id)
+            try await store.delete(second.id)
+            try setPermissions(0o500, on: libraryURL)
+            defer { try? setPermissions(0o700, on: libraryURL) }
+
+            await store.purgeDeletedOlderThan(days: 0, now: Date().addingTimeInterval(3600))
+
+            let found = records(sink, .library, message: "deleted entries could not be purged")
+            #expect(found.count == 1)
+            let record = try #require(found.first)
+            #expect(record.level == .error)
+            #expect(record.fields[.count]?.text == "2")
+            #expect(record.fields[.error] != nil)
+        }
+    }
+
+    @Test("a snapshot write failure is logged once per run of failures")
+    func snapshotWriteFailure() async throws {
+        try await withSink { sink in
+            let indexURL = try makeLibraryURL().appendingPathComponent("index.json")
+            let attempts = OSAllocatedUnfairLock(initialState: 0)
+            let index = LibrarySearchIndex(
+                indexURL: indexURL, saveDebounce: .seconds(60), clock: ContinuousClock()
+            ) { data, target in
+                let attempt = attempts.withLock { count -> Int in
+                    count += 1
+                    return count
+                }
+                guard attempt > 2 else { throw CocoaError(.fileWriteNoPermission) }
+                try data.write(to: target, options: .atomic)
+            }
+
+            await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
+            await index.flush()
+            await index.index(id: "e2", title: "Two", text: "retro feedback", createdAt: Date())
+            await index.flush()
+
+            let message = "search index snapshot write failed"
+            let found = records(sink, .libraryIndex, message: message)
+            #expect(found.count == 1)
+            let record = try #require(found.first)
+            #expect(record.level == .error)
+            #expect(record.fields[.error]?.text == "NSCocoaErrorDomain.513")
+            #expect(record.fields[.count]?.text == "1")
+            #expect(record.formattedLine.contains("index.json") == false)
+
+            await index.index(id: "e3", title: "Three", text: "alpha review", createdAt: Date())
+            await index.flush()
+            #expect(records(sink, .libraryIndex, message: message).count == 1)
+        }
+    }
+
+    @Test("a snapshot from an older version says it was discarded")
+    func staleSnapshotDiscarded() async throws {
+        try await withSink { sink in
+            let indexURL = try makeLibraryURL().appendingPathComponent("index.json")
+            try Data(#"{"version":1,"entries":[]}"#.utf8).write(to: indexURL)
+            let index = LibrarySearchIndex(indexURL: indexURL)
+
+            #expect(await index.needsRebuild(matching: [:]))
+
+            let record = try #require(
+                records(sink, .libraryIndex, message: "search index snapshot discarded, rebuilding").first
+            )
+            #expect(record.level == .notice)
+            #expect(record.formattedLine.contains("index.json") == false)
+        }
+    }
+}

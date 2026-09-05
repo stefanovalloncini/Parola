@@ -343,7 +343,7 @@ struct LibrarySearchIndexTests {
         let writes = OSAllocatedUnfairLock(initialState: 0)
         let index = LibrarySearchIndex(indexURL: url, saveDebounce: .seconds(60), clock: ContinuousClock()) { data, target in
             writes.withLock { $0 += 1 }
-            return (try? data.write(to: target, options: .atomic)) != nil
+            try data.write(to: target, options: .atomic)
         }
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
         await index.flush()
@@ -366,7 +366,7 @@ struct LibrarySearchIndexTests {
                 return count == 1
             }
             if isFirst { gate.wait() }
-            return (try? data.write(to: target, options: .atomic)) != nil
+            try data.write(to: target, options: .atomic)
         }
 
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
@@ -401,8 +401,8 @@ struct LibrarySearchIndexTests {
                 count += 1
                 return count
             }
-            guard attempt > 1 else { return false }
-            return (try? data.write(to: target, options: .atomic)) != nil
+            guard attempt > 1 else { throw CocoaError(.fileWriteNoPermission) }
+            try data.write(to: target, options: .atomic)
         }
 
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
@@ -426,8 +426,8 @@ struct LibrarySearchIndexTests {
                 count += 1
                 return count
             }
-            guard attempt > 1 else { return false }
-            return (try? data.write(to: target, options: .atomic)) != nil
+            guard attempt > 1 else { throw CocoaError(.fileWriteNoPermission) }
+            try data.write(to: target, options: .atomic)
         }
 
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())

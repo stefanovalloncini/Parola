@@ -1260,6 +1260,7 @@ final class AppModel {
                     autoTitleEntry(entry.id, transcript: result)
                 }
             } catch {
+                ParolaLog.error(.library, "transcript could not be saved to the library", [.error: .error(error)])
                 nonFatalWarning = "The transcript is still open, but Parola couldn't save it to your library. \(error.localizedDescription)"
             }
             if activate, let audioSource {

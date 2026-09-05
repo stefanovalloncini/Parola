@@ -94,7 +94,7 @@ public actor LibrarySearchIndex {
     private enum WriteOutcome: Sendable {
         case written
         case superseded
-        case failed
+        case failed(any Error)
     }
 
     private static let snapshotVersion = 5
@@ -110,12 +110,13 @@ public actor LibrarySearchIndex {
     private var isLoaded = false
     private var isDirty = false
     private var rebuildNeed: RebuildNeed = .none
+    private var snapshotWriteFailing = false
     private let loadTask: Task<LoadOutcome, Never>
     private let indexURL: URL
     private let saveDebounce: Duration
     private let clock: any Clock<Duration>
     private var pendingSaveTask: Task<Void, Never>?
-    private let writeSnapshotData: @Sendable (Data, URL) -> Bool
+    private let writeSnapshotData: @Sendable (Data, URL) throws -> Void
     // .default, not .utility: the quit path blocks the main thread on a plain semaphore, which donates no priority.
     private let writeQueue = DispatchQueue(label: "com.parola.search-index-write", qos: .default)
     private let latestGeneration = OSAllocatedUnfairLock(initialState: 0)
@@ -128,7 +129,7 @@ public actor LibrarySearchIndex {
         clock: any Clock<Duration> = ContinuousClock()
     ) {
         self.init(indexURL: indexURL, saveDebounce: saveDebounce, clock: clock) { data, url in
-            (try? data.write(to: url, options: .atomic)) != nil
+            try data.write(to: url, options: .atomic)
         }
     }
 
@@ -136,7 +137,7 @@ public actor LibrarySearchIndex {
         indexURL: URL,
         saveDebounce: Duration,
         clock: any Clock<Duration>,
-        writeSnapshotData: @escaping @Sendable (Data, URL) -> Bool
+        writeSnapshotData: @escaping @Sendable (Data, URL) throws -> Void
     ) {
         self.indexURL = indexURL
         self.saveDebounce = saveDebounce
@@ -271,6 +272,7 @@ public actor LibrarySearchIndex {
             inverted = state.inverted
             sortedTokens = nil
         case .staleDiscarded:
+            ParolaLog.notice(.libraryIndex, "search index snapshot discarded, rebuilding")
             rebuildNeed = .staleSnapshot
         case .missing:
             rebuildNeed = .absentSnapshot
@@ -466,8 +468,17 @@ public actor LibrarySearchIndex {
         for (id, blob) in encoded where entries[id] != nil && encodedEntries[id] == nil {
             encodedEntries[id] = blob
         }
+        if case .written = outcome { snapshotWriteFailing = false }
         // A superseded write is the newer generation's problem; a failed one dropped state nothing else holds.
-        guard case .failed = outcome else { return }
+        guard case .failed(let error) = outcome else { return }
+        // The retry runs on the debounce until the write lands, so only the first of a run is logged.
+        if !snapshotWriteFailing {
+            snapshotWriteFailing = true
+            ParolaLog.error(
+                .libraryIndex, "search index snapshot write failed",
+                [.count: .int(entries.count), .error: .error(error)]
+            )
+        }
         isDirty = true
         scheduleSave()
     }
@@ -503,7 +514,12 @@ public actor LibrarySearchIndex {
                 guard latestGeneration.withLock({ $0 }) == generation else {
                     return continuation.resume(returning: (encoded, .superseded))
                 }
-                continuation.resume(returning: (encoded, write(body, url) ? .written : .failed))
+                do {
+                    try write(body, url)
+                    continuation.resume(returning: (encoded, .written))
+                } catch {
+                    continuation.resume(returning: (encoded, .failed(error)))
+                }
             }
         }
     }

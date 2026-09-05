@@ -176,6 +176,12 @@ public actor LibraryStore {
                 )
             }
         }
+        // One count, never one record per bundle: a library whose folder went unreadable would
+        // otherwise write a line for every entry it holds.
+        let skipped = indexable.count - rebuilt.count
+        if skipped > 0 {
+            ParolaLog.notice(.libraryIndex, "bundles skipped during index rebuild", [.count: .int(skipped)])
+        }
         await searchIndex.rebuild(entries: rebuilt)
     }
 
@@ -236,7 +242,9 @@ public actor LibraryStore {
     private nonisolated func scanEntries(at libraryURL: URL) -> [LibraryEntry]? {
         let fm = FileManager.default
         guard let contents = try? fm.contentsOfDirectory(at: libraryURL, includingPropertiesForKeys: nil) else {
-            return fm.fileExists(atPath: libraryURL.path) ? nil : []
+            guard fm.fileExists(atPath: libraryURL.path) else { return [] }
+            ParolaLog.error(.library, "library folder could not be listed")
+            return nil
         }
         let decoder = Self.manifestDecoder()
         return contents
@@ -323,6 +331,7 @@ public actor LibraryStore {
                 try FileManager.default.moveItem(at: staging, to: target)
             }
         } catch {
+            ParolaLog.error(.library, "adopting a bundle failed and was rolled back", [.error: .error(error)])
             try? fm.removeItem(at: staging)
             try? fm.removeItem(at: target)
             throw error
@@ -411,6 +420,7 @@ public actor LibraryStore {
             }
         } catch {
             // transcript.json lands before the manifest, so a throw in between puts disk ahead of memory.
+            ParolaLog.error(.library, "transcript write left disk ahead of memory", [.error: .error(error)])
             invalidateListCaches()
             throw error
         }
@@ -534,6 +544,7 @@ public actor LibraryStore {
             patchCaches(with: entry)
             return entry
         } catch {
+            ParolaLog.error(.library, "entry recache failed, caches dropped", [.error: .error(error)])
             invalidateListCaches()
             cachedLoaded.removeAll()
             throw error
@@ -690,14 +701,24 @@ public actor LibraryStore {
         let cutoff = now.addingTimeInterval(-Double(days) * 86_400)
         await primeCaches()
         let toPurge = (cachedDeleted ?? []).filter { ($0.deletedAt ?? .distantFuture) < cutoff }
+        var failed = 0
+        var firstFailure: (any Error)?
         for entry in toPurge {
             do {
                 try FileManager.default.removeItem(at: entry.bundleURL)
                 cachedLoaded.remove(entry.id)
                 await deindexEntry(id: entry.id)
             } catch {
+                failed += 1
+                if firstFailure == nil { firstFailure = error }
                 continue
             }
+        }
+        if let firstFailure {
+            ParolaLog.error(
+                .library, "deleted entries could not be purged",
+                [.count: .int(failed), .error: .error(firstFailure)]
+            )
         }
         invalidateListCaches()
     }

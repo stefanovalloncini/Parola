@@ -104,7 +104,13 @@ extension AppModel {
         let url = recoveryFileURL
         let generation = activeRecoveryGeneration
         pendingRecoveryWrite = Task { [weak self] in
-            guard let data = try? await AppModel.offMainIO({ try JSONEncoder().encode(checkpoint) }) else { return }
+            let data: Data
+            do {
+                data = try await AppModel.offMainIO { try JSONEncoder().encode(checkpoint) }
+            } catch {
+                ParolaLog.error(.appRecovery, "recovery checkpoint could not be encoded", [.error: .error(error)])
+                return
+            }
             // Re-check after the encode: the recording may have ended meanwhile, and a late
             // write would resurrect a stale recovery prompt on the next launch.
             guard let self, self.activeRecoveryGeneration == generation else { return }
@@ -150,6 +156,10 @@ extension AppModel {
             try? FileManager.default.removeItem(at: recoveryFileURL)
             return
         }
+        ParolaLog.notice(
+            .appRecovery, "recovery checkpoint offered for \(checkpoint.kind)",
+            [.count: .int(checkpoint.segments.count)]
+        )
         pendingRecovery = checkpoint
     }
 
@@ -268,8 +278,12 @@ extension AppModel {
                     (url: url,
                      modified: (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast)
                 }
-                for stale in AppModel.staleInflightFiles(in: entries, keeping: keep, now: Date()) {
-                    try? fm.removeItem(at: stale)
+                let stale = AppModel.staleInflightFiles(in: entries, keeping: keep, now: Date())
+                for file in stale {
+                    try? fm.removeItem(at: file)
+                }
+                if !stale.isEmpty {
+                    ParolaLog.notice(.appRecovery, "stale in-flight takes deleted", [.count: .int(stale.count)])
                 }
             })
         }
