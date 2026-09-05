@@ -220,6 +220,24 @@ public actor LibrarySearchIndex {
         return entries.contains { fingerprints[$0.key] != $0.value.fingerprint }
     }
 
+    /// Records that an entry's bundle moved without its text changing, so the next launch does not
+    /// read the newer file as a reason to rebuild.
+    func refreshFingerprint(_ fingerprint: String, for id: String) async {
+        await ensureLoaded()
+        guard let existing = entries[id], existing.fingerprint != fingerprint else { return }
+        let updated = IndexedEntry(
+            title: existing.title,
+            excerpt: existing.excerpt,
+            tokens: existing.tokens,
+            fingerprint: fingerprint
+        )
+        entries[id] = updated
+        encodedEntries[id] = try? JSONEncoder().encode(Self.snapshotEntry(id: id, entry: updated))
+        entriesEncoded &+= 1
+        isDirty = true
+        scheduleSave()
+    }
+
     func rebuild(entries rebuilt: [RebuildEntry]) async {
         await ensureLoaded()
         entries.removeAll()

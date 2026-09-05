@@ -600,17 +600,30 @@ struct LibraryStoreTests {
         let (store, dir) = try makeTempLibrary()
         _ = try await store.add(transcript: makeTranscript(), audioSource: nil)
         await store.flush()
-        let snapshot = dir.appendingPathComponent(".search-index.json")
-        let before = try #require(
-            try snapshot.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-        )
+        let before = try #require(try snapshotWrittenAt(dir))
 
         let relaunched = LibraryStore(libraryURL: dir, extraIndexer: nil)
         #expect(await relaunched.search("hi").count == 1)
         await relaunched.flush()
 
-        let after = try snapshot.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-        #expect(after == before, "a rebuild would rewrite the snapshot")
+        #expect(try snapshotWrittenAt(dir) == before, "a rebuild would rewrite the snapshot")
+    }
+
+    @Test("a timing-only write leaves the index fresh for the next launch")
+    func timingOnlyWriteKeepsTheIndexFresh() async throws {
+        let (store, dir) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        var nudged = makeTranscript()
+        nudged.segments[0].start = 0.25
+        try await store.updateTranscript(nudged, for: entry.id, reindex: false)
+        await store.flush()
+        let before = try #require(try snapshotWrittenAt(dir))
+
+        let relaunched = LibraryStore(libraryURL: dir, extraIndexer: nil)
+        #expect(await relaunched.search("hi").count == 1)
+        await relaunched.flush()
+
+        #expect(try snapshotWrittenAt(dir) == before, "a rebuild would rewrite the snapshot")
     }
 
     @Test("a failed manifest write leaves no pre-edit document in the cache")

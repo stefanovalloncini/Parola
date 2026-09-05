@@ -332,6 +332,11 @@ public actor LibraryStore {
         let entry = try recacheEntry(at: bundleURL)
         if reindex {
             await indexEntry(entry, transcript: transcript)
+        } else {
+            // transcript.json still moved, and the snapshot's fingerprint has to follow or the
+            // next launch reads the newer file as a stale index and rebuilds the lot.
+            await ensureSearchIndexReady()
+            await searchIndex.refreshFingerprint(Self.bundleFingerprint(entry.bundleURL), for: entry.id)
         }
     }
 
