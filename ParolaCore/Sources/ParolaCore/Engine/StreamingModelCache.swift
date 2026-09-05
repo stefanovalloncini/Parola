@@ -46,7 +46,18 @@ actor StreamingModelCache {
         // Bookkeeping is detached from the borrower: a cancelled borrow returns early while
         // the load runs on, and this is what lands the finished kit in the cache.
         Task { [weak self] in
-            let kit = try? await task.value
+            let kit: SharedWhisperKit?
+            do {
+                kit = try await task.value
+            } catch {
+                kit = nil
+                if !isCancellation(error) {
+                    ParolaLog.error(
+                        .streaming, "model load failed",
+                        [.model: .safe(ModelToken(modelName)), .error: .error(error)]
+                    )
+                }
+            }
             await self?.finishLoad(modelName, epoch: myEpoch, kit: kit)
         }
         return try await Self.awaitCancellable(task)

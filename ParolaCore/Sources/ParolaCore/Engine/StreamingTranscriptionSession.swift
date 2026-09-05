@@ -45,6 +45,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     private var optionsForRun: TranscriptionOptions?
     private var speakerLabeler: (any StreamingSpeakerLabeler)?
     private var failureAudioURL: URL?
+    private var startedAt: ContinuousClock.Instant?
     nonisolated let persistAudio: Bool
 
     public init(modelStore: ModelStore = .shared, persistAudio: Bool = false, deviceUID: String? = nil) {
@@ -72,16 +73,22 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         downloadProgress: (@Sendable (Double) -> Void)? = nil
     ) async throws -> AsyncStream<StreamingEvent> {
         guard loop == nil else {
+            ParolaLog.fault(.streaming, "start called while a session was already running")
             throw ParolaError.transcriptionFailed("session already started")
         }
         failureAudioURL = nil
 
         let modelName = options.model ?? ModelCatalog.fallbackModelID
         if let variant = ModelCatalog.variant(id: modelName), variant.engineID != .whisperKit {
+            ParolaLog.notice(.streaming, "engine \(variant.engineID) cannot stream")
             throw ParolaError.unsupportedForEngine(
                 "Live transcription runs on Whisper models; \(variant.displayName) can't stream. Pick a Whisper model and try again."
             )
         }
+        ParolaLog.info(
+            .streaming, "streaming session starting on \(EngineID.whisperKit)",
+            [.model: .safe(ModelToken(modelName))]
+        )
         if !modelStore.isInstalled(modelName) {
             if await EngineRegistry.shared.registeredEngines().isEmpty {
                 await ParolaCoreBootstrap.registerBuiltInEngines()
@@ -91,6 +98,10 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
 
         let kit = try await StreamingModelCache.shared.borrow(modelName, store: modelStore).kit
         guard let tokenizer = kit.tokenizer else {
+            ParolaLog.error(
+                .streaming, "tokenizer was nil after model load",
+                [.model: .safe(ModelToken(modelName))]
+            )
             throw ParolaError.transcriptionFailed("WhisperKit tokenizer was nil after model load")
         }
 
@@ -158,6 +169,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         self.loadedModel = modelName
         self.optionsForRun = options
         self.loop = loop
+        self.startedAt = .now
         self.continuation = cont
         self.segmentContinuation = segCont
         self.speakerLabeler = speakerLabeler
@@ -221,11 +233,19 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     }
 
     private func handleStreamerFailure(_ error: Error) async {
+        ParolaLog.error(.streaming, "streaming failed", failureFields(error))
         await finishStream(failure: error.localizedDescription)
+    }
+
+    private func failureFields(_ error: any Error) -> [LogField: LogValue] {
+        var fields: [LogField: LogValue] = [.error: .error(error)]
+        if let startedAt { fields[.elapsed] = .duration(startedAt.duration(to: .now)) }
+        return fields
     }
 
     // The loop returns without failing when it can't capture (e.g. denied mic); if stop() didn't drive that return (loop still set), surface a failure so the consumer doesn't wait forever.
     private func handleStreamerEndedWithoutStop() async {
+        if loop != nil { ParolaLog.error(.streaming, "streaming loop ended without a stop request") }
         await finishStream(failure: "Couldn't start the microphone. Check Microphone access in System Settings › Privacy & Security › Microphone.")
     }
 
@@ -251,6 +271,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         consumerTask = nil
         streamerTask = nil
         loop = nil
+        startedAt = nil
         whisperKit = nil
         persister = nil
         speakerLabeler = nil

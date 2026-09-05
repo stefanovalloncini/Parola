@@ -79,10 +79,15 @@ actor StreamingRealtimeLoop {
     }
 
     func run() async -> Outcome {
-        guard await deps.requestPermission() else { return .permissionDenied }
+        guard await deps.requestPermission() else {
+            ParolaLog.notice(.streaming, "microphone permission denied")
+            return .permissionDenied
+        }
+        let startedAt = ContinuousClock.now
         do {
             try deps.startCapture { [weak self] buffer in self?.ingest(buffer) }
         } catch {
+            ParolaLog.error(.streaming, "streaming capture failed to start", [.error: .error(error)])
             stopCapture()
             return .failed(error)
         }
@@ -95,6 +100,10 @@ actor StreamingRealtimeLoop {
                 stopCapture()
                 return .cancelled
             } catch {
+                ParolaLog.error(
+                    .streaming, "streaming iteration failed",
+                    [.elapsed: .duration(startedAt.duration(to: .now)), .error: .error(error)]
+                )
                 isRunning = false
                 stopCapture()
                 return .failed(error)
