@@ -6,6 +6,13 @@ import os
 public protocol DiagnosticsSink: Sendable {
     func enqueue(_ record: LogRecord)
     func flush() async
+
+    /// Blocks until buffered records are on disk. For exit paths that have no `await` left.
+    func flushSynchronously()
+}
+
+extension DiagnosticsSink {
+    public func flushSynchronously() {}
 }
 
 public final class CapturingDiagnosticsSink: DiagnosticsSink {

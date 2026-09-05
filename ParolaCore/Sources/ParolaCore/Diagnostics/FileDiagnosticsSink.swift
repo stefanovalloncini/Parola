@@ -167,6 +167,12 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         }
     }
 
+    /// Blocks the caller until the buffer is on disk. Never call it from `fileQueue` itself:
+    /// `DispatchQueue.sync` re-entered from its own queue deadlocks.
+    public func flushSynchronously() {
+        fileQueue.sync { drainOnQueue() }
+    }
+
     private func drainOnQueue() {
         let pending: (records: [LogRecord], dropped: Int) = bufferState.withLock { current in
             guard !current.disabled else { return ([], 0) }

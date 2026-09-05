@@ -205,8 +205,17 @@ struct FileDiagnosticsSinkTests {
         #expect(text.isEmpty, "a disabled sink must stop buffering, not queue records forever")
     }
 
-    @Test("the sink never blocks a caller on its own file queue")
-    func neverBlocksOnTheFileQueue() throws {
+    @Test("a synchronous drain puts buffered records on disk without an await")
+    func flushSynchronouslyWritesTheBuffer() throws {
+        let sink = FileDiagnosticsSink(directory: tempDirectory())
+        sink.enqueue(record(.info, "breadcrumb"))
+        sink.flushSynchronously()
+        let text = try String(contentsOf: sink.currentFileURL, encoding: .utf8)
+        #expect(text.contains("breadcrumb"))
+    }
+
+    @Test("only the exit drain blocks a caller on the sink's file queue")
+    func onlyTheExitDrainBlocksOnTheFileQueue() throws {
         let source = try String(
             contentsOfFile: #filePath.replacingOccurrences(
                 of: "Tests/ParolaCoreTests/FileDiagnosticsSinkTests.swift",
@@ -215,9 +224,13 @@ struct FileDiagnosticsSinkTests {
             encoding: .utf8
         )
         #expect(
-            source.contains("fileQueue.sync") == false,
+            source.components(separatedBy: "fileQueue.sync").count - 1 == 1,
             "fileQueue.sync deadlocks when reached from inside a fileQueue closure, and puts disk I/O on the caller's thread"
         )
+        let drain = try #require(source.range(of: "func flushSynchronously()"))
+        let body = source[drain.upperBound...]
+        let end = try #require(body.range(of: "\n    }"))
+        #expect(body[..<end.lowerBound].contains("fileQueue.sync"), "the exit drain is the only allowed blocker")
     }
 
     @Test("a full buffer drops records and reports how many")

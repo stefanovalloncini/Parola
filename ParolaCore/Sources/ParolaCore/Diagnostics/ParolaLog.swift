@@ -22,6 +22,11 @@ public enum ParolaLog {
         await sink?.flush()
     }
 
+    public static func flushSynchronously() {
+        let sink = state.withLock { $0.sink }
+        sink?.flushSynchronously()
+    }
+
     public static func debug(
         _ category: LogCategory, _ message: @autoclosure () -> LogMessage,
         _ fields: @autoclosure () -> [LogField: LogValue] = [:],

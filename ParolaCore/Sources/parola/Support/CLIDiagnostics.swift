@@ -41,13 +41,6 @@ enum CLIDiagnostics {
     /// ArgumentParser hands back no hook once a subcommand's `run()` returns, so without this a
     /// one-shot command's buffered records die with the process.
     private static func installExitFlush() {
-        atexit {
-            let drained = DispatchSemaphore(value: 0)
-            Task {
-                await ParolaLog.flush()
-                drained.signal()
-            }
-            _ = drained.wait(timeout: .now() + 2)
-        }
+        atexit { ParolaLog.flushSynchronously() }
     }
 }
