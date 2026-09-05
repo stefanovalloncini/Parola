@@ -123,6 +123,7 @@ struct LibraryListView: View {
     @State private var dateRangeFilter: LibraryDateRangeFilter = .all
     @State private var entries: [LibraryRowDisplay] = []
     @State private var totalsLabel: String = ""
+    @State private var displayCache = LibraryRowDisplayCache()
 
     private var activeFilters: LibraryListContent.ActiveFilters {
         LibraryListContent.ActiveFilters(label: labelFilter, language: languageFilter, dateRange: dateRangeFilter)
@@ -151,11 +152,14 @@ struct LibraryListView: View {
         }
         let sizes = model.libraryBundleSizes
         var totalBytes: Int64 = 0
+        var cache = displayCache
+        cache.invalidate(libraryVersion: model.libraryVersion, sizesVersion: model.libraryBundleSizesVersion)
         let displays = computed.map { entry -> LibraryRowDisplay in
             let size = sizes[entry.id]
             totalBytes += size ?? 0
-            return LibraryRowDisplay(entry: entry, sizeBytes: size)
+            return cache.display(for: entry, sizeBytes: size)
         }
+        displayCache = cache
         entries = displays
         if totalBytes > 0 {
             let size = AppFormat.byteSize(totalBytes)

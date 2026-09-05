@@ -67,3 +67,25 @@ struct LibraryRowDisplay: Identifiable {
         tooltip = parts.joined(separator: "\n")
     }
 }
+
+/// Building a display formats three dates, and the list rebuilds its rows on every filter, sort and category
+/// change. The entries only change with the library version, so displays are kept until one of those moves.
+struct LibraryRowDisplayCache {
+    private(set) var libraryVersion = -1
+    private(set) var sizesVersion = -1
+    private(set) var displays: [LibraryEntry.ID: LibraryRowDisplay] = [:]
+
+    mutating func invalidate(libraryVersion: Int, sizesVersion: Int) {
+        guard self.libraryVersion != libraryVersion || self.sizesVersion != sizesVersion else { return }
+        displays.removeAll(keepingCapacity: true)
+        self.libraryVersion = libraryVersion
+        self.sizesVersion = sizesVersion
+    }
+
+    mutating func display(for entry: LibraryEntry, sizeBytes: Int64?) -> LibraryRowDisplay {
+        if let cached = displays[entry.id] { return cached }
+        let display = LibraryRowDisplay(entry: entry, sizeBytes: sizeBytes)
+        displays[entry.id] = display
+        return display
+    }
+}

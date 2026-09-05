@@ -57,6 +57,39 @@ struct LibraryEntryDisplayTests {
         return LibraryRowDisplay(entry: entry, sizeBytes: nil)
     }
 
+    @Test("row displays are reused until the library or the bundle sizes move")
+    func displayCacheHoldsUntilItsVersionsChange() {
+        let entry = display().entry
+        var cache = LibraryRowDisplayCache()
+
+        cache.invalidate(libraryVersion: 1, sizesVersion: 4)
+        _ = cache.display(for: entry, sizeBytes: nil)
+        #expect(cache.displays.count == 1)
+
+        cache.invalidate(libraryVersion: 1, sizesVersion: 4)
+        #expect(cache.displays.count == 1)
+
+        cache.invalidate(libraryVersion: 2, sizesVersion: 4)
+        #expect(cache.displays.isEmpty)
+
+        _ = cache.display(for: entry, sizeBytes: 2_000_000)
+        cache.invalidate(libraryVersion: 2, sizesVersion: 5)
+        #expect(cache.displays.isEmpty)
+    }
+
+    @Test("a cached display keeps the size it was built with")
+    func displayCacheReturnsTheSameRow() {
+        let entry = display().entry
+        var cache = LibraryRowDisplayCache()
+        cache.invalidate(libraryVersion: 1, sizesVersion: 1)
+
+        let first = cache.display(for: entry, sizeBytes: 1_000_000)
+        let second = cache.display(for: entry, sizeBytes: 9_000_000)
+
+        #expect(first.sizeLabel == second.sizeLabel)
+        #expect(second.sizeLabel == ByteCountFormatter.string(fromByteCount: 1_000_000, countStyle: .file))
+    }
+
     @Test("the row's relative and hover strings are formatted with the entry, not with every cell")
     func rowStringsAreFormattedOnce() {
         #expect(display().lastOpened == nil)
