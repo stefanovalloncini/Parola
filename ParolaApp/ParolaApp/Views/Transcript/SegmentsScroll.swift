@@ -62,7 +62,6 @@ struct SegmentsScroll: View {
                         ForEach(derived.visible) { seg in
                             SegmentCard(
                                 segment: seg,
-                                isCurrent: seg.id == model.currentSegmentID,
                                 hoveredSpeaker: $hoveredSpeaker,
                                 confidenceBucket: derived.confidenceByID[seg.id],
                                 qcIssues: qcByID[seg.id] ?? []

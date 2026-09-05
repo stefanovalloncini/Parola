@@ -3,7 +3,6 @@ import ParolaCore
 
 struct SegmentCard: View {
     let segment: TranscriptSegment
-    let isCurrent: Bool
     var hoveredSpeaker: Binding<String?> = .constant(nil)
     var confidenceBucket: SegmentConfidence.Bucket? = nil
     var qcIssues: [SubtitleQC.Issue] = []
@@ -21,6 +20,9 @@ struct SegmentCard: View {
     @FocusState private var editingFocus: Bool
 
     private let radius: CGFloat = DS.Radius.regular
+
+    /// Read here rather than passed in: the scroll's ForEach would otherwise re-walk every segment on each playback tick.
+    private var isCurrent: Bool { model.currentSegmentID == segment.id }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
