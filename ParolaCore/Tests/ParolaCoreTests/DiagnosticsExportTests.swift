@@ -103,6 +103,40 @@ struct DiagnosticsExportTests {
         #expect(text.contains("1 line skipped: unreadable or written by a newer version of Parola."))
     }
 
+    @Test("a file that ends mid-character keeps the lines before the break")
+    func keepsLinesBeforeATruncatedTail() throws {
+        let directory = try scratchDirectory()
+        var data = Data((try line(ts: "2026-08-22T13:58:02.114Z", message: "kept") + "\n").utf8)
+        data.append(contentsOf: [0x7B, 0x22, 0x74, 0xC3])
+        try data.write(to: directory.appendingPathComponent("parola-100-1755871000.jsonl"))
+
+        let reading = DiagnosticsExport.read(directory: directory)
+        #expect(reading.records.map(\.message) == ["kept"])
+        #expect(reading.skippedLines == 1)
+        #expect(reading.skippedFiles == 0)
+    }
+
+    @Test("a file that cannot be read is counted, not dropped in silence")
+    func countsUnreadableFiles() throws {
+        let directory = try scratchDirectory()
+        try write([try line(ts: "2026-08-22T13:58:02.114Z", message: "kept")],
+                  to: directory, named: "parola-100-1755871000.jsonl")
+        try write([try line(ts: "2026-08-22T13:58:03.000Z", message: "lost")],
+                  to: directory, named: "parola-200-1755871001.jsonl")
+        let blocked = directory.appendingPathComponent("parola-200-1755871001.jsonl")
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: blocked.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: blocked.path)
+        }
+
+        let reading = DiagnosticsExport.read(directory: directory)
+        #expect(reading.records.map(\.message) == ["kept"])
+        #expect(reading.skippedFiles == 1)
+
+        let text = DiagnosticsExport.render(directory: directory, environment: emptyEnvironment)
+        #expect(text.contains("1 file skipped: could not be read."))
+    }
+
     @Test("a line from a newer schema is skipped and counted")
     func skipsNewerSchema() throws {
         let directory = try scratchDirectory()

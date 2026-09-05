@@ -21,9 +21,10 @@ extension DiagnosticsExport {
         } else {
             for record in reading.records { lines += recordLines(record) }
         }
-        if reading.skippedLines > 0 {
+        let footer = footerLines(reading)
+        if !footer.isEmpty {
             lines.append("")
-            lines.append(skippedLine(reading.skippedLines))
+            lines += footer
         }
         return lines.joined(separator: "\n") + "\n"
     }
@@ -113,9 +114,19 @@ extension DiagnosticsExport {
         return String(last)
     }
 
-    private static func skippedLine(_ count: Int) -> String {
-        let lines = count == 1 ? "line" : "lines"
-        return "\(count) \(lines) skipped: unreadable or written by a newer version of Parola."
+    private static func footerLines(_ reading: DiagnosticsReading) -> [String] {
+        var footer: [String] = []
+        if reading.skippedLines > 0 {
+            let noun = reading.skippedLines == 1 ? "line" : "lines"
+            footer.append(
+                "\(reading.skippedLines) \(noun) skipped: unreadable or written by a newer version of Parola."
+            )
+        }
+        if reading.skippedFiles > 0 {
+            let noun = reading.skippedFiles == 1 ? "file" : "files"
+            footer.append("\(reading.skippedFiles) \(noun) skipped: could not be read.")
+        }
+        return footer
     }
 
     /// 1024-based, one decimal, so 34,359,738,368 bytes reads as the 32 GB the machine advertises.

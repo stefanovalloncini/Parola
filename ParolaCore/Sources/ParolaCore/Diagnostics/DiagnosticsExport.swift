@@ -119,6 +119,7 @@ struct ExportedRecord: Sendable {
 struct DiagnosticsReading: Sendable {
     var records: [ExportedRecord] = []
     var skippedLines: Int = 0
+    var skippedFiles: Int = 0
 }
 
 public enum DiagnosticsExport {
@@ -148,9 +149,13 @@ public enum DiagnosticsExport {
             }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
         for file in files {
-            guard let data = try? Data(contentsOf: file),
-                  let text = String(data: data, encoding: .utf8)
-            else { continue }
+            guard let data = try? Data(contentsOf: file) else {
+                reading.skippedFiles += 1
+                continue
+            }
+            // A crashing session's own file is the one most likely to end mid-character, so decode
+            // it leniently and let the single broken line fail JSON decode and be counted.
+            let text = String(decoding: data, as: UTF8.self)
             for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
                 if let record = decode(line: line) {
                     reading.records.append(record)
