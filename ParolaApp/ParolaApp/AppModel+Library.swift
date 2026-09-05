@@ -278,6 +278,12 @@ extension AppModel {
                         try data.write(to: url, options: .atomic)
                     }
                 } catch {
+                    // An entry id is <timestamp>-<uuid>; only the uuid half is loggable.
+                    var fields: [LogField: LogValue] = [.error: .error(error)]
+                    if let uuid = UUID(uuidString: String(entry.id.suffix(36))) {
+                        fields[.entry] = .id(uuid)
+                    }
+                    ParolaLog.error(.export, "library export failed as \(format)", fields)
                     await MainActor.run { [weak self] in
                         self?.phase = .failed(message: "Export of \(entry.title) failed: \(error.localizedDescription)")
                     }

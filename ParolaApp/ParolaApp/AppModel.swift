@@ -2704,6 +2704,7 @@ final class AppModel {
             do {
                 try await AppModel.offMainIO { _ = try ParolaDocument.write(transcript: transcript, audioURL: sourceFileURL, to: dest) }
             } catch {
+                ParolaLog.error(.export, "document save failed", [.error: .error(error)])
                 self.phase = .failed(message: "Save failed: \(error.localizedDescription)")
             }
         }
@@ -2789,6 +2790,7 @@ final class AppModel {
             ) else { self.burnTask = nil; return }
 
             self.phase = .exporting(progress: 0)
+            let startedAt = ContinuousClock.now
             do {
                 try await burn(transcript, videoURL, outputURL, style) { fraction in
                     Task { @MainActor [weak self] in
@@ -2803,6 +2805,10 @@ final class AppModel {
                 self.phase = self.transcript != nil ? .ready : .idle
                 self.drainDeferredArrivals()
             } catch {
+                ParolaLog.error(
+                    .export, "burn failed",
+                    [.elapsed: .duration(startedAt.duration(to: .now)), .error: .error(error)]
+                )
                 self.phase = .failed(message: "Burn failed: \(error.localizedDescription)")
                 self.drainDeferredArrivals()
             }
@@ -2990,6 +2996,7 @@ final class AppModel {
                     try data.write(to: url, options: .atomic)
                 }
             } catch {
+                ParolaLog.error(.export, "export failed as \(format)", [.error: .error(error)])
                 self.phase = .failed(message: Self.exportFailureMessage(for: error))
             }
         }

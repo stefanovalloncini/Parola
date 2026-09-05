@@ -39,6 +39,7 @@ extension AppModel {
                     try data.write(to: target, options: .atomic)
                 } catch {
                     // Auto-export is best-effort; primary transcription already in the library.
+                    ParolaLog.error(.export, "auto-export failed as \(format)", [.error: .error(error)])
                 }
             }
         }
