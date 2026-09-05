@@ -75,7 +75,10 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         self.maxBufferedRecords = maxBufferedRecords
         let pid = ProcessInfo.processInfo.processIdentifier
         let epoch = Int(Date().timeIntervalSince1970)
-        self.baseName = "\(Self.filePrefix)\(pid)-\(epoch)"
+        // The token keeps two sinks built in the same second apart: they would otherwise share a
+        // base name, and the trim's identity exemption would let one delete the other's open file.
+        let token = String(UInt32.random(in: 0..<0x1_0000), radix: 16)
+        self.baseName = "\(Self.filePrefix)\(pid)-\(epoch)-\(token)"
         scheduleSweep()
     }
 

@@ -134,6 +134,37 @@ struct DiagnosticsRetentionTests {
         #expect(FileManager.default.fileExists(atPath: rotations[4].path))
     }
 
+    @Test("the age cutoff counts the rotations it reclaimed as this sink's")
+    func ageCutoffCountsOwnRotations() async throws {
+        let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7)
+        try await sink.waitForInstallSweep()
+        let base = sink.currentFileURL.deletingPathExtension().lastPathComponent
+        _ = try makeFile(dir, "\(base)-1.jsonl", bytes: 10, ageDays: 9)
+        _ = try makeFile(dir, "\(base)-2.jsonl", bytes: 10, ageDays: 8)
+        _ = try makeFile(dir, "parola-\(Self.deadPID)-100.jsonl", bytes: 10, ageDays: 9)
+
+        let outcome = sink.sweep(now: Date())
+
+        #expect(outcome.deleted == 3)
+        #expect(outcome.ownRotations == 2)
+    }
+
+    @Test("a sink's trim spares the file another sink in this process holds open")
+    func sparesASiblingSinksOpenFile() async throws {
+        let dir = tempDirectory()
+        let sibling = FileDiagnosticsSink(directory: dir, retentionDays: 7, totalBudgetBytes: 100)
+        try await sibling.waitForInstallSweep()
+        try Data(repeating: 0x61, count: 600).write(to: sibling.currentFileURL)
+        let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7, totalBudgetBytes: 100)
+        try await sink.waitForInstallSweep()
+
+        let outcome = sink.sweep(now: Date())
+
+        #expect(FileManager.default.fileExists(atPath: sibling.currentFileURL.path))
+        #expect(outcome.skippedLive == 1)
+    }
+
     @Test("the over-budget notice reports the sink's own rotations next to the live skips")
     func overBudgetNoticeCountsOwnRotations() async throws {
         let dir = tempDirectory()
