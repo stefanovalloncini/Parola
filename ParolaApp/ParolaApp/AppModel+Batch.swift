@@ -257,7 +257,12 @@ extension AppModel {
         }
         let links = deferredLinks
         deferredLinks = []
-        for link in links { transcribeYouTube(urlString: link) }
+        for link in links {
+            switch link {
+            case .transcribe(let urlString): transcribeYouTube(urlString: urlString)
+            case .subtitles(let urlString): fetchYouTubeSubs(urlString: urlString)
+            }
+        }
     }
 
     var batchIsRunning: Bool {

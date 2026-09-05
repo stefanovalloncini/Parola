@@ -925,7 +925,7 @@ final class AppModel {
 
     @ObservationIgnored var liveSource: AudioSource?
     @ObservationIgnored var deferredArrivals: [URL] = []
-    @ObservationIgnored var deferredLinks: [String] = []
+    @ObservationIgnored var deferredLinks: [DeferredLink] = []
     @ObservationIgnored var pendingOpenedFiles: [URL] = []
     @ObservationIgnored var openedFilesFlushTask: Task<Void, Never>?
     @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
@@ -934,7 +934,7 @@ final class AppModel {
     @ObservationIgnored var recordingOutcomeWaiters: [CheckedContinuation<String, any Error>] = []
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>?
-    @ObservationIgnored private var youtubeSubsTask: Task<Void, Never>?
+    @ObservationIgnored private(set) var youtubeSubsTask: Task<Void, Never>?
     @ObservationIgnored private var recordingStartInFlight = false
     @ObservationIgnored private var stopRequestedDuringStart = false
     @ObservationIgnored var derivedArtifactsGeneration = 0
@@ -1776,6 +1776,12 @@ final class AppModel {
         case rejected
     }
 
+    /// A link parked by a take or a run in flight, kept with the action it was handed to.
+    enum DeferredLink: Equatable {
+        case transcribe(String)
+        case subtitles(String)
+    }
+
     @discardableResult
     func transcribeYouTube(urlString: String) -> LinkHandoff {
         guard features.isEnabled(.youtube) else {
@@ -1785,7 +1791,7 @@ final class AppModel {
         guard let url = makeYouTubeURL(urlString) else { return .rejected }
         // The download flips phase off .recording, and every stop affordance is keyed on it.
         if phaseDefersArrivals || transcribeTaskRunning {
-            deferredLinks.append(url.absoluteString)
+            deferredLinks.append(.transcribe(url.absoluteString))
             return .parked
         }
 
@@ -1827,8 +1833,13 @@ final class AppModel {
         return .started
     }
 
-    func fetchYouTubeSubs(urlString: String) {
-        guard let url = makeYouTubeURL(urlString) else { return }
+    @discardableResult
+    func fetchYouTubeSubs(urlString: String) -> LinkHandoff {
+        guard let url = makeYouTubeURL(urlString) else { return .rejected }
+        if phaseDefersArrivals || transcribeTaskRunning {
+            deferredLinks.append(.subtitles(url.absoluteString))
+            return .parked
+        }
 
         cancelTranscriptionRuns()
         youtubeSubsTask = Task { [weak self] in
@@ -1852,6 +1863,7 @@ final class AppModel {
                 self.drainDeferredArrivals()
             }
         }
+        return .started
     }
 
     private func makeYouTubeURL(_ urlString: String) -> URL? {

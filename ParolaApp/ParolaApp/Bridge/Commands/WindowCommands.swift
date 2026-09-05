@@ -103,15 +103,18 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "fetchYouTubeSubs",
                 area: .window,
-                summary: "Fetches subtitles for a YouTube URL without transcribing.",
+                summary: "Fetches subtitles for a YouTube URL without transcribing. Parks the link while a take or run is in flight.",
                 kind: .mutating,
                 args: [
                     .init(name: "url", kind: .string(), required: true, summary: "YouTube URL"),
                 ],
                 handler: { args, ctx in
                     let url = try args.string("url")
-                    ctx.model.fetchYouTubeSubs(urlString: url)
-                    return .object(["started": .bool(true)])
+                    let handoff = ctx.model.fetchYouTubeSubs(urlString: url)
+                    return .object([
+                        "started": .bool(handoff == .started),
+                        "parked": .bool(handoff == .parked),
+                    ])
                 }
             ),
 

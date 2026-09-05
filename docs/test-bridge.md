@@ -56,7 +56,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_set_route` | **route** | `transcript` / `batch` / `queue`. |
 | `parola_app_set_library_filter` | category | `transcription` / `meeting` / `dictation`, `all` for the sidebar's All row, or empty to clear. |
 | `parola_app_transcribe_youtube` | **url** | Paste a YouTube URL and start the download-then-transcribe flow. Replies `{started, parked}`: a link handed over during a recording or another run comes back `parked: true` and waits for that work to finish. |
-| `parola_app_fetch_youtube_subs` | **url** | Same input, but fetch existing captions instead of running Whisper. |
+| `parola_app_fetch_youtube_subs` | **url** | Same input, but fetch existing captions instead of running Whisper. Replies `{started, parked}` on the same terms. |
 | `parola_app_start_recording` | source, category | Start mic (default) or systemAudio. Category tags the saved entry. |
 | `parola_app_stop_recording` | — | Stop the active recording and finalize the transcript. |
 | `parola_app_set_translate` | **on** | Toggle translate-to-English. |

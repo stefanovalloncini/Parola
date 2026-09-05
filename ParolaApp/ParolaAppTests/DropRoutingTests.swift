@@ -134,7 +134,7 @@ struct DropRoutingTests {
         model.transcribeNow(urls: [Self.link])
 
         #expect(model.phase == .recording(source: .microphone))
-        #expect(model.deferredLinks == [Self.link.absoluteString])
+        #expect(model.deferredLinks == [.transcribe(Self.link.absoluteString)])
         #expect(model.transcribeTaskRunning == false)
 
         model.phase = .ready
@@ -153,8 +153,27 @@ struct DropRoutingTests {
         model.transcribeYouTube(urlString: Self.link.absoluteString)
 
         #expect(model.phase == .recording(source: .microphone))
-        #expect(model.deferredLinks == [Self.link.absoluteString])
+        #expect(model.deferredLinks == [.transcribe(Self.link.absoluteString)])
         #expect(model.transcribeTaskRunning == false)
+    }
+
+    @Test("a subtitle fetch asked for during a take waits for the take and then runs")
+    func fetchYouTubeSubsParksWhileRecording() {
+        let model = makeModel()
+        model.phase = .recording(source: .microphone)
+
+        model.fetchYouTubeSubs(urlString: Self.link.absoluteString)
+
+        #expect(model.phase == .recording(source: .microphone))
+        #expect(model.deferredLinks == [.subtitles(Self.link.absoluteString)])
+        #expect(model.transcribeTaskRunning == false)
+
+        model.phase = .ready
+        model.drainDeferredArrivals()
+
+        #expect(model.deferredLinks.isEmpty)
+        #expect(model.youtubeSubsTask != nil, "the drain must replay the fetch, not a transcription")
+        model.cancelCurrentWork()
     }
 
     @Test("the Add to Queue half parks a link rather than dropping it on the floor")
@@ -164,7 +183,7 @@ struct DropRoutingTests {
 
         model.addToQueue(urls: [Self.link])
 
-        #expect(model.deferredLinks == [Self.link.absoluteString])
+        #expect(model.deferredLinks == [.transcribe(Self.link.absoluteString)])
         #expect(model.batchJobs.isEmpty)
         #expect(model.phase == .recording(source: .microphone))
     }
