@@ -10,8 +10,6 @@ struct FormatInspector: View {
 
     var body: some View {
         VStack(spacing: DS.Spacing.medium) {
-            copyButton
-
             displayModesSection
 
             InspectorSection(title: "People") {
@@ -21,28 +19,6 @@ struct FormatInspector: View {
                     .axLeaf("Inspector.TextField.AddSpeaker")
             }
         }
-    }
-
-    private var copyButton: some View {
-        Button {
-            guard let t = model.transcript else { return }
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(t.text, forType: .string)
-        } label: {
-            HStack(spacing: DS.Spacing.small) {
-                Image(systemName: "doc.on.doc")
-                Text("Copy")
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, DS.Spacing.small)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(DS.Color.surfaceElevated)
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(model.transcript == nil)
-        .axLeaf("Inspector.Button.CopyTranscript")
     }
 
     private var displayModesSection: some View {
@@ -61,10 +37,6 @@ struct FormatInspector: View {
                     isSelected: displayMode == .segments
                 ) { model.transcriptDisplayMode = .segments }
             }
-
-            Text("Toggle between transcript and segment layouts.")
-                .font(DS.Font.caption)
-                .foregroundStyle(DS.Color.secondaryText)
 
             if displayMode == .segments {
                 Toggle(isOn: $model.showSubtitleQC) {

@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct TranscriptInspector: View {
-    @Environment(AppModel.self) private var model
     @Binding var mode: InspectorMode
     @Binding var inspectorVisible: Bool
 
@@ -17,12 +16,6 @@ struct TranscriptInspector: View {
                     switch mode {
                     case .format: FormatInspector()
                     case .info: InfoInspector()
-                    case .actions:
-                        if model.features.isEnabled(.ai) {
-                            ActionsInspector()
-                        } else {
-                            FormatInspector()
-                        }
                     }
                 }
                 .padding(DS.Spacing.regular)
@@ -37,10 +30,6 @@ struct TranscriptInspector: View {
                 .help("Format")
             InspectorModeIcon(systemName: "info.circle", label: "Info", isOn: mode == .info) { mode = .info }
                 .help("Info")
-            if model.features.isEnabled(.ai) {
-                InspectorModeIcon(systemName: "wand.and.stars", label: "Actions", isOn: mode == .actions) { mode = .actions }
-                    .help("Actions")
-            }
             Spacer()
             InspectorModeIcon(systemName: "rectangle.righthalf.filled", label: "Hide inspector", isOn: false) {
                 inspectorVisible = false

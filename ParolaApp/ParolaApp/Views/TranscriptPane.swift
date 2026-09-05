@@ -49,8 +49,15 @@ enum TranscriptDisplayMode: String, CaseIterable, Identifiable {
 enum InspectorMode: String, CaseIterable, Identifiable {
     case format
     case info
-    case actions
     var id: String { rawValue }
+
+    /// "actions" was a third tab whose sections now live in Info; a value stored by that build still has to land somewhere.
+    init(stored raw: String) {
+        switch raw {
+        case InspectorMode.info.rawValue, "actions": self = .info
+        default: self = .format
+        }
+    }
 }
 
 struct TranscriptPane: View {
@@ -200,7 +207,7 @@ struct TranscriptPane: View {
 
     private var inspectorModeBinding: Binding<InspectorMode> {
         Binding(
-            get: { InspectorMode(rawValue: inspectorModeRaw) ?? .format },
+            get: { InspectorMode(stored: inspectorModeRaw) },
             set: { inspectorModeRaw = $0.rawValue }
         )
     }

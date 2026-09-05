@@ -102,6 +102,15 @@ struct TranscriptHeaderBar: View {
             .modifier(SpeakHelpModifier(isSpeaking: speaker.isSpeaking))
             .axLeaf("HeaderBar.Button.Speak")
 
+            Button(action: copyTranscript) {
+                Image(systemName: "doc.on.doc")
+            }
+            .buttonStyle(.borderless)
+            .disabled(model.transcript == nil)
+            .help("Copy transcript")
+            .accessibilityLabel("Copy transcript")
+            .axLeaf("HeaderBar.Button.CopyTranscript")
+
             if let shareItem {
                 ShareLink(item: shareItem, preview: SharePreview(title)) {
                     Image(systemName: "square.and.arrow.up")
@@ -142,6 +151,12 @@ struct TranscriptHeaderBar: View {
     private func rebuildShareItem() {
         guard model.transcript != nil else { shareItem = nil; return }
         shareItem = TranscriptShareFile(title: title, text: model.transcriptText)
+    }
+
+    private func copyTranscript() {
+        guard model.transcript != nil else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(model.transcriptText, forType: .string)
     }
 
     private func toggleSpeak() {

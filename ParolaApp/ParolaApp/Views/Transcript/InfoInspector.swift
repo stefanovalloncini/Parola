@@ -31,7 +31,9 @@ struct InfoInspector: View {
             InspectorSection(title: "Transcription Details") {
                 InfoRow(icon: "globe", label: "Language", value: languageLabel)
                 InfoRow(icon: "cube", label: "Model", value: modelLabel)
-                InfoRow(icon: "cpu", label: "Engine", value: engineLabel)
+                if let engineLabel {
+                    InfoRow(icon: "cpu", label: "Engine", value: engineLabel)
+                }
                 InfoRow(icon: "character", label: "Characters", value: "\(charCount)")
                 InfoRow(icon: "text.word.spacing", label: "Words", value: "\(wordCount)")
                 InfoRow(icon: "text.alignleft", label: "Sentences", value: "\(sentenceCount)")
@@ -93,10 +95,10 @@ struct InfoInspector: View {
         return AppModel.modelLabel(modelName)
     }
 
-    private var engineLabel: String {
+    private var engineLabel: String? {
         guard let modelName = model.transcript?.modelName,
               let variant = ModelCatalog.variant(id: modelName) else {
-            return "—"
+            return nil
         }
         return variant.engineID.displayName
     }
