@@ -2,13 +2,13 @@ import Foundation
 import ParolaCore
 
 actor AutomationAuditLog {
-    private static let rotateThreshold: Int = 100 * 1024 * 1024
     private static let filePrefix = "automation-audit-"
 
     private let directory: URL
     private let baseName: String
     private let retentionDays: Int
     private let totalBudgetBytes: Int
+    private let rotateThreshold: Int
     private let timestampFormatter: ISO8601DateFormatter
 
     private var rotation: Int = 0
@@ -16,7 +16,12 @@ actor AutomationAuditLog {
     private var bytesWritten: Int = 0
     private var disabled: Bool = false
 
-    init(cacheDir: URL? = nil, retentionDays: Int = 7, totalBudgetBytes: Int = 10_000_000) {
+    init(
+        cacheDir: URL? = nil,
+        retentionDays: Int = 7,
+        totalBudgetBytes: Int = 10_000_000,
+        rotateThreshold: Int = 5 * 1024 * 1024
+    ) {
         let resolved: URL
         if let cacheDir {
             resolved = cacheDir
@@ -29,6 +34,7 @@ actor AutomationAuditLog {
         self.directory = resolved
         self.retentionDays = retentionDays
         self.totalBudgetBytes = totalBudgetBytes
+        self.rotateThreshold = rotateThreshold
         let pid = ProcessInfo.processInfo.processIdentifier
         let startedAtUnix = Int(Date().timeIntervalSince1970)
         self.baseName = "\(Self.filePrefix)\(pid)-\(startedAtUnix)"
@@ -76,7 +82,7 @@ actor AutomationAuditLog {
         do {
             try handle.write(contentsOf: data)
             bytesWritten += data.count
-            if bytesWritten >= Self.rotateThreshold {
+            if bytesWritten >= rotateThreshold {
                 rotate()
             }
         } catch {
@@ -118,6 +124,8 @@ actor AutomationAuditLog {
         handle = nil
         bytesWritten = 0
         rotation += 1
+        // The rotation just closed is now trimmable, and a session that never quits sweeps no other way.
+        sweep()
     }
 
     func currentFileURL() -> URL {
@@ -146,6 +154,8 @@ actor AutomationAuditLog {
         var outcome = SweepOutcome()
         var surviving: [(url: URL, date: Date, size: Int)] = []
         let cutoff = now.addingTimeInterval(-Double(retentionDays) * 86_400)
+        // Only the file still open is exempt: this process's earlier rotations are closed, complete and ours to trim.
+        let openFile = currentFileURL().lastPathComponent
         let mine = entries.filter {
             $0.lastPathComponent.hasPrefix(Self.filePrefix) && $0.pathExtension == "jsonl"
         }
@@ -154,7 +164,7 @@ actor AutomationAuditLog {
             let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
             let date = values?.contentModificationDate ?? now
             let size = values?.fileSize ?? 0
-            guard date < cutoff, !url.lastPathComponent.hasPrefix(baseName) else {
+            guard date < cutoff, url.lastPathComponent != openFile else {
                 surviving.append((url, date, size))
                 continue
             }
@@ -173,8 +183,8 @@ actor AutomationAuditLog {
             let candidate = surviving[index]
             index += 1
             let name = candidate.url.lastPathComponent
-            if name.hasPrefix(baseName) { continue }
-            if Self.isOwnedByLiveProcess(name) {
+            if name == openFile { continue }
+            if !name.hasPrefix(baseName), Self.isOwnedByLiveProcess(name) {
                 outcome.skippedLive += 1
                 continue
             }

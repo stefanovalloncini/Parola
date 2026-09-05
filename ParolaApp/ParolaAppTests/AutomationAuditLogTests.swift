@@ -217,6 +217,48 @@ struct AutomationAuditLogTests {
         #expect(FileManager.default.fileExists(atPath: own.path))
     }
 
+    @Test("the budget trim reclaims this process's own closed rotations")
+    func sweepTrimsOwnClosedRotations() async throws {
+        let dir = scratchDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let log = AutomationAuditLog(cacheDir: dir, retentionDays: 7, totalBudgetBytes: 1_000)
+        await log.record(id: "x", command: "noop", args: AutomationArgs(), ok: true, elapsedMs: 0)
+        let open = await log.currentFileURL()
+        let base = open.deletingPathExtension().lastPathComponent
+        var rotations: [URL] = []
+        for index in 1...5 {
+            rotations.append(try makeFile(dir, "\(base)-\(index).jsonl", bytes: 600, ageDays: 6 - index))
+        }
+
+        let outcome = await log.sweep(now: Date())
+
+        #expect(outcome.deleted == 4)
+        #expect(outcome.skippedLive == 0)
+        #expect(outcome.overBudget == false)
+        #expect(FileManager.default.fileExists(atPath: open.path))
+        for url in rotations.dropLast() {
+            #expect(FileManager.default.fileExists(atPath: url.path) == false)
+        }
+        #expect(FileManager.default.fileExists(atPath: rotations[4].path))
+    }
+
+    @Test("rotating past the threshold sweeps expired files")
+    func rotationSweeps() async throws {
+        let dir = scratchDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let expired = try makeFile(dir, "automation-audit-\(Self.deadPID)-100.jsonl", bytes: 10, ageDays: 9)
+        let log = AutomationAuditLog(cacheDir: dir, retentionDays: 7, totalBudgetBytes: 10_000, rotateThreshold: 200)
+        let first = await log.currentFileURL()
+
+        for index in 0..<4 {
+            await log.record(id: "\(index)", command: "noop", args: AutomationArgs(), ok: true, elapsedMs: 0)
+        }
+
+        let current = await log.currentFileURL()
+        #expect(current != first, "four records exceed a 200-byte threshold and rotate")
+        #expect(FileManager.default.fileExists(atPath: expired.path) == false)
+    }
+
     @Test("writes into the supplied cache directory, creating it on demand")
     func createsCacheDirectory() async throws {
         let dir = scratchDir()
