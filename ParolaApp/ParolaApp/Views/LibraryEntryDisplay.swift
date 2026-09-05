@@ -29,7 +29,6 @@ enum LibraryEntryDisplay {
 }
 
 /// The strings a library row draws that are costly and never age, formatted once per entry snapshot.
-/// The relative and hover strings stay lazy so only the rows actually on screen pay for them.
 struct LibraryRowDisplay: Identifiable {
     let entry: LibraryEntry
     let title: String
@@ -37,26 +36,17 @@ struct LibraryRowDisplay: Identifiable {
     let sizeLabel: String?
     let durationLabel: String?
     let languageLabel: String?
+    let lastOpened: String?
+    let tooltip: String
 
     var id: LibraryEntry.ID { entry.id }
     var pinned: Bool { entry.pinned }
     var noteCount: Int { entry.segmentNotes.count }
-    var lastOpened: String? { entry.lastOpenedAt?.formatted(.relative(presentation: .named)) }
-
-    var tooltip: String {
-        var parts = [title, AppFormat.longDateAndTime(entry.createdAt)]
-        if !entry.labels.isEmpty {
-            parts.append("Labels: \(entry.labels.joined(separator: ", "))")
-        }
-        if entry.pinned {
-            parts.append("Pinned")
-        }
-        return parts.joined(separator: "\n")
-    }
 
     init(entry: LibraryEntry, sizeBytes: Int64?) {
+        let title = LibraryEntryDisplay.title(for: entry)
         self.entry = entry
-        title = LibraryEntryDisplay.title(for: entry)
+        self.title = title
         timestamp = AppFormat.dateAndTime(entry.createdAt)
         if let sizeBytes, sizeBytes > 0 {
             sizeLabel = AppFormat.byteSize(sizeBytes)
@@ -65,5 +55,15 @@ struct LibraryRowDisplay: Identifiable {
         }
         durationLabel = entry.durationSeconds.flatMap { $0 > 0 ? Timecode.format($0) : nil }
         languageLabel = LanguageDisplay.name(for: entry.language)
+        lastOpened = entry.lastOpenedAt.map { AppFormat.relativeDate($0) }
+
+        var parts = [title, AppFormat.longDateAndTime(entry.createdAt)]
+        if !entry.labels.isEmpty {
+            parts.append("Labels: \(entry.labels.joined(separator: ", "))")
+        }
+        if entry.pinned {
+            parts.append("Pinned")
+        }
+        tooltip = parts.joined(separator: "\n")
     }
 }

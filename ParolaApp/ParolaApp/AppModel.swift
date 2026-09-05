@@ -855,7 +855,11 @@ final class AppModel {
     private(set) var libraryVersion: Int = 0
     private(set) var pinnedEntryCount: Int = 0
     var deletedEntries: [LibraryEntry] = []
-    var searchResults: [LibraryEntry]?
+    var searchResults: [LibraryEntry]? {
+        didSet { searchResultsVersion &+= 1 }
+    }
+    /// Lets a waiter tell "the query finished" from "the query returned what the last one did".
+    @ObservationIgnored private(set) var searchResultsVersion: Int = 0
     var selectedEntryID: LibraryEntry.ID?
     @ObservationIgnored private var libraryEntriesByID: [String: LibraryEntry] = [:]
 
@@ -888,6 +892,26 @@ final class AppModel {
         cachedKnownLabelsVersion = version
         return ordered
     }
+
+    @ObservationIgnored private var cachedKnownLanguages: [String] = []
+    @ObservationIgnored private var cachedKnownLanguagesVersion: Int = -1
+
+    /// Same deal as the labels: the library filter bar asks for it on every list rebuild.
+    var allKnownLanguages: [String] {
+        let version = libraryVersion
+        if cachedKnownLanguagesVersion == version { return cachedKnownLanguages }
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for entry in libraryEntries {
+            if let code = LanguageDisplay.code(for: entry.language), seen.insert(code).inserted {
+                ordered.append(code)
+            }
+        }
+        ordered.sort()
+        cachedKnownLanguages = ordered
+        cachedKnownLanguagesVersion = version
+        return ordered
+    }
     var libraryFilter: EntryCategory?
     /// True when the "All" chip is showing the flat all-categories list. Distinguishes All from Home, which both leave libraryFilter nil.
     var libraryBrowsingAll: Bool = false
@@ -898,8 +922,12 @@ final class AppModel {
             if librarySortOrder == .lastOpened { refreshLibrary() }
         }
     }
-    // Observed on purpose: LibraryRow and the list totals read these, and refreshBundleSizes fills them asynchronously, so the assignment must re-render.
-    var libraryBundleSizes: [String: Int64] = [:]
+    // Observed on purpose: the settings pane reads these, and refreshBundleSizes fills them asynchronously, so the assignment must re-render.
+    var libraryBundleSizes: [String: Int64] = [:] {
+        didSet { libraryBundleSizesVersion &+= 1 }
+    }
+    /// The library list watches this instead of diffing a dictionary with one key per entry.
+    private(set) var libraryBundleSizesVersion: Int = 0
     @ObservationIgnored var searchTask: Task<Void, Never>?
     @ObservationIgnored var libraryRefreshTask: Task<Void, Never>?
     @ObservationIgnored var pendingTranscriptSaveTask: Task<Void, Never>?

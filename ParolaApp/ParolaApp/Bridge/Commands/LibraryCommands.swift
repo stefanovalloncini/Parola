@@ -86,11 +86,12 @@ extension ParolaAutomationServer {
                 ],
                 handler: { args, ctx in
                     let query = try args.string("query")
-                    ctx.model.searchResults = nil
+                    // Clearing the results first would cost the UI a rebuild back to the unfiltered list that a real search never pays.
+                    let baseline = ctx.model.searchResultsVersion
                     ctx.model.search(query)
                     let clock = ctx.model.clock
                     var waitedMs = 0
-                    while ctx.model.searchResults == nil, waitedMs < 2000 {
+                    while ctx.model.searchResultsVersion == baseline, waitedMs < 2000 {
                         try? await Task.sleep(for: .milliseconds(50), clock: clock)
                         waitedMs += 50
                     }

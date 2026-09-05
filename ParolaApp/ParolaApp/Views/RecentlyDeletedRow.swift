@@ -8,14 +8,40 @@ struct RecentlyDeletedRow: View {
     let preview: String?
     let daysLeft: Int?
     let timeLeft: String
-    var isSelected: Bool = false
-    var isPurging: Bool = false
-    var showsSeparator: Bool = true
+    let isSelected: Bool
+    let isPurging: Bool
+    let showsSeparator: Bool
     let onRestore: () -> Void
     let onPurge: () -> Void
     let onTap: () -> Void
+    private let helpText: String
 
     @State private var hovered = false
+
+    init(
+        entry: LibraryEntry,
+        preview: String?,
+        daysLeft: Int?,
+        timeLeft: String,
+        isSelected: Bool = false,
+        isPurging: Bool = false,
+        showsSeparator: Bool = true,
+        onRestore: @escaping () -> Void,
+        onPurge: @escaping () -> Void,
+        onTap: @escaping () -> Void
+    ) {
+        self.entry = entry
+        self.preview = preview
+        self.daysLeft = daysLeft
+        self.timeLeft = timeLeft
+        self.isSelected = isSelected
+        self.isPurging = isPurging
+        self.showsSeparator = showsSeparator
+        self.onRestore = onRestore
+        self.onPurge = onPurge
+        self.onTap = onTap
+        helpText = Self.helpText(deletedAt: entry.deletedAt, daysLeft: daysLeft)
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: DS.Spacing.regular) {
@@ -157,8 +183,8 @@ struct RecentlyDeletedRow: View {
         RecentlyDeletedCopy.tier(daysLeft: daysLeft)
     }
 
-    private var helpText: String {
-        guard let deletedAt = entry.deletedAt, let daysLeft else {
+    private static func helpText(deletedAt: Date?, daysLeft: Int?) -> String {
+        guard let deletedAt, let daysLeft else {
             return String(localized: "No deadline")
         }
         let deleted = AppFormat.dateAndTime(deletedAt)

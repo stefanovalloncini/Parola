@@ -347,6 +347,9 @@ extension AppModel {
         }
     }
 
+    /// Enough to swallow a burst of keystrokes; the index itself answers well inside one.
+    static let searchDebounce = Duration.milliseconds(70)
+
     func search(_ query: String) {
         searchTask?.cancel()
         let q = query.trimmingCharacters(in: .whitespaces)
@@ -356,7 +359,7 @@ extension AppModel {
         }
         let clock = clock
         searchTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(200), clock: clock)
+            try? await Task.sleep(for: Self.searchDebounce, clock: clock)
             guard !Task.isCancelled, let self else { return }
             let matches = await library.search(q)
             guard !Task.isCancelled else { return }

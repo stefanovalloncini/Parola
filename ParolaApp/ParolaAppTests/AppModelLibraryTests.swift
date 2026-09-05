@@ -25,13 +25,14 @@ struct AppModelLibraryTests {
         title: String,
         createdAt: Date,
         lastOpenedAt: Date? = nil,
-        labels: [String] = []
+        labels: [String] = [],
+        language: String = "en"
     ) -> LibraryEntry {
         let manifest = ParolaDocument.Manifest(
             createdAt: createdAt,
             originalAudioName: "\(title).m4a",
             modelName: "stub",
-            language: "en",
+            language: language,
             lastOpenedAt: lastOpenedAt,
             labels: labels
         )
@@ -387,6 +388,52 @@ struct AppModelLibraryTests {
         model.libraryEntries = [Self.entry(id: "1", title: "x", createdAt: Self.baseDate, labels: ["draft", "final"])]
 
         #expect(model.allKnownLabels == ["draft", "final"])
+    }
+
+    @Test("allKnownLanguages deduplicates the codes the entries carry and sorts them")
+    func knownLanguages() {
+        let model = makeModel()
+        model.libraryEntries = [
+            Self.entry(id: "1", title: "x", createdAt: Self.baseDate, language: "it"),
+            Self.entry(id: "2", title: "y", createdAt: Self.baseDate, language: "IT"),
+            Self.entry(id: "3", title: "z", createdAt: Self.baseDate, language: "en"),
+            Self.entry(id: "4", title: "w", createdAt: Self.baseDate, language: ""),
+        ]
+
+        #expect(model.allKnownLanguages == ["EN", "IT"])
+    }
+
+    @Test("allKnownLanguages follows the library instead of a stale cache")
+    func knownLanguagesFollowMutations() {
+        let model = makeModel()
+        model.libraryEntries = [Self.entry(id: "1", title: "x", createdAt: Self.baseDate, language: "en")]
+        #expect(model.allKnownLanguages == ["EN"])
+
+        model.libraryEntries = [Self.entry(id: "1", title: "x", createdAt: Self.baseDate, language: "fr")]
+
+        #expect(model.allKnownLanguages == ["FR"])
+    }
+
+    @Test("the search debounce stays short enough to feel immediate")
+    func searchDebounceIsShort() {
+        #expect(AppModel.searchDebounce == .milliseconds(70))
+    }
+
+    /// The bridge's search waiter counts versions rather than clearing the results first, so a repeat query has to bump it too.
+    @Test("every search result assignment is a new version")
+    func searchResultsVersionBumps() {
+        let model = makeModel()
+        let hit = [Self.entry(id: "a", title: "A", createdAt: Self.baseDate)]
+        let start = model.searchResultsVersion
+
+        model.searchResults = hit
+        #expect(model.searchResultsVersion == start + 1)
+
+        model.searchResults = hit
+        #expect(model.searchResultsVersion == start + 2)
+
+        model.searchResults = nil
+        #expect(model.searchResultsVersion == start + 3)
     }
 
     @Test("search with an empty query clears searchResults and skips the debounce")

@@ -74,8 +74,6 @@ struct LibraryListView: View {
     @State private var dateRangeFilter: LibraryDateRangeFilter = .all
     @State private var entries: [LibraryRowDisplay] = []
     @State private var totalsLabel: String = ""
-    @State private var labelOptions: [String] = []
-    @State private var languageOptions: [String] = []
 
     @discardableResult
     private func recomputeEntries() -> [LibraryRowDisplay] {
@@ -106,23 +104,6 @@ struct LibraryListView: View {
             totalsLabel = "\(displays.count)"
         }
         return displays
-    }
-
-    private func recomputeFilterOptions() {
-        var seenLabels = Set<String>()
-        var labels: [String] = []
-        var seenLanguages = Set<String>()
-        var languages: [String] = []
-        for entry in model.libraryEntries where category == nil || entry.category == category {
-            for label in entry.labels {
-                if seenLabels.insert(label).inserted { labels.append(label) }
-            }
-            if let code = LanguageDisplay.code(for: entry.language), seenLanguages.insert(code).inserted {
-                languages.append(code)
-            }
-        }
-        labelOptions = labels.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
-        languageOptions = languages.sorted()
     }
 
     var body: some View {
@@ -189,26 +170,21 @@ struct LibraryListView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            recomputeEntries()
-            recomputeFilterOptions()
-        }
+        .onAppear { recomputeEntries() }
         .onChange(of: model.libraryVersion) { _, _ in
             let newEntries = recomputeEntries()
-            recomputeFilterOptions()
             selection = selection.intersection(Set(newEntries.map(\.id)))
         }
         .onChange(of: labelFilter) { _, _ in recomputeEntries() }
         .onChange(of: languageFilter) { _, _ in recomputeEntries() }
         .onChange(of: dateRangeFilter) { _, _ in recomputeEntries() }
-        .onChange(of: model.libraryBundleSizes) { _, _ in recomputeEntries() }
+        .onChange(of: model.libraryBundleSizesVersion) { _, _ in recomputeEntries() }
         .onChange(of: searchResults) { _, _ in
             let newEntries = recomputeEntries()
             selection = selection.intersection(Set(newEntries.map(\.id)))
         }
         .onChange(of: category) { _, _ in
             let newEntries = recomputeEntries()
-            recomputeFilterOptions()
             selection = selection.intersection(Set(newEntries.map(\.id)))
         }
         .alert("Delete \(selection.count) entries?", isPresented: $pendingBulkDelete) {
@@ -247,8 +223,8 @@ struct LibraryListView: View {
                     labelFilter: $labelFilter,
                     languageFilter: $languageFilter,
                     dateRangeFilter: $dateRangeFilter,
-                    labelOptions: labelOptions,
-                    languageOptions: languageOptions
+                    labelOptions: model.allKnownLabels,
+                    languageOptions: model.allKnownLanguages
                 )
             }
             Spacer()

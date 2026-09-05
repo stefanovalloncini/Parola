@@ -7,7 +7,7 @@ struct ModelPickerView: View {
     @State private var searchText = ""
     @State private var installedOnly = false
 
-    private let groups: [(ModelCategory, [ModelVariant])] = ModelCatalog.groupedForPicker()
+    private static let groups: [(ModelCategory, [ModelVariant])] = ModelCatalog.groupedForPicker()
 
     var body: some View {
         PillPickerButton(icon: "cpu", caption: "Model", value: currentLabel) {
@@ -139,7 +139,7 @@ struct ModelPickerView: View {
 
     private var filteredGroups: [(ModelCategory, [ModelVariant])] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return groups.compactMap { category, variants in
+        return Self.groups.compactMap { category, variants in
             let matches = variants.filter { variant in
                 if installedOnly && !isInstalled(variant) { return false }
                 if query.isEmpty { return true }
