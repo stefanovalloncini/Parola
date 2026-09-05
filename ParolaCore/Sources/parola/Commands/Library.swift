@@ -22,6 +22,7 @@ struct Library: AsyncParsableCommand {
         var library: String?
 
         func run() async throws {
+            CLIDiagnostics.installIfWanted(alwaysOn: false)
             let store = library.map {
                 LibraryStore(libraryURL: URL(fileURLWithPath: $0, isDirectory: true), extraIndexer: nil)
             } ?? LibraryStore.shared

@@ -9,6 +9,8 @@ struct MCP: AsyncParsableCommand {
     )
 
     func run() async throws {
+        CLIDiagnostics.installIfWanted(alwaysOn: true)
         await StdioRunner.run()
+        await CLIDiagnostics.flush()
     }
 }

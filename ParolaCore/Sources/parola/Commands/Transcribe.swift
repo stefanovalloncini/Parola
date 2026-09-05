@@ -57,6 +57,7 @@ struct Transcribe: AsyncParsableCommand {
     var mcp: Bool = false
 
     func run() async throws {
+        CLIDiagnostics.installIfWanted(alwaysOn: false)
         guard !inputs.isEmpty else {
             throw ValidationError("At least one input file is required.")
         }

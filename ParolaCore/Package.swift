@@ -56,13 +56,14 @@ let package = Package(
         ),
         .executableTarget(
             name: "parola-mcp",
-            dependencies: ["ParolaMCP"]
+            dependencies: ["ParolaCore", "ParolaMCP"]
         ),
         .testTarget(
             name: "ParolaCoreTests",
             dependencies: [
                 "ParolaCore",
                 "ParolaDictation",
+                "parola",
                 .product(name: "Clocks", package: "swift-clocks"),
             ],
             resources: [

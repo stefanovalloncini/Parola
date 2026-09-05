@@ -27,6 +27,7 @@ struct Burn: AsyncParsableCommand {
     var fontSize: Double = 28
 
     func run() async throws {
+        CLIDiagnostics.installIfWanted(alwaysOn: false)
         let videoURL = URL(fileURLWithPath: video).resolvingSymlinksInPath()
         let outputURL = URL(fileURLWithPath: output)
         let style = SubtitleBurner.Style(fontName: font, fontSize: CGFloat(fontSize))

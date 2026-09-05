@@ -18,6 +18,7 @@ struct Open: AsyncParsableCommand {
     var output: String?
 
     func run() async throws {
+        CLIDiagnostics.installIfWanted(alwaysOn: false)
         let url = URL(fileURLWithPath: input).resolvingSymlinksInPath()
         let doc = try ParolaDocument.read(at: url)
         let exporter = Exporters.exporter(for: format)

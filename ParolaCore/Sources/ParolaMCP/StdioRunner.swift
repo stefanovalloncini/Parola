@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import ParolaCore
 
 /// Drives an `MCPServer` from line-delimited JSON-RPC over stdin/stdout.
 public enum StdioRunner {
@@ -42,6 +43,7 @@ public enum StdioRunner {
 
         await dispatcher.cancelAll()
         drainOutput()
+        await ParolaLog.flush()
     }
 
     /// Second-pass parse so a malformed body still surfaces the envelope id, letting the client correlate the error.

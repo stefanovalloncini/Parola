@@ -22,6 +22,7 @@ struct Models: AsyncParsableCommand {
         var flat: Bool = false
 
         func run() async throws {
+            CLIDiagnostics.installIfWanted(alwaysOn: false)
             let store = ModelStore.shared
             let entries = store.catalog()
 
@@ -108,6 +109,7 @@ struct Models: AsyncParsableCommand {
         var name: String
 
         func run() async throws {
+            CLIDiagnostics.installIfWanted(alwaysOn: false)
             let store = ModelStore.shared
             if store.isInstalled(name) {
                 let path = store.installedURL(for: name).path
@@ -138,6 +140,7 @@ struct Models: AsyncParsableCommand {
         var leftovers: Bool = false
 
         func run() async throws {
+            CLIDiagnostics.installIfWanted(alwaysOn: false)
             let store = ModelStore.shared
             if leftovers {
                 try store.deleteLeftovers(variant: name)
@@ -156,6 +159,7 @@ struct Models: AsyncParsableCommand {
         )
 
         func run() async throws {
+            CLIDiagnostics.installIfWanted(alwaysOn: false)
             let store = ModelStore.shared
             print(store.directory.path)
         }

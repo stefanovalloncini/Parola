@@ -25,6 +25,7 @@ struct Engines: AsyncParsableCommand {
         var format: Format = .text
 
         func run() async throws {
+            CLIDiagnostics.installIfWanted(alwaysOn: false)
             let rows = await engineRows()
             switch format {
             case .text: printText(rows)

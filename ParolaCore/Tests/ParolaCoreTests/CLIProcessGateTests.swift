@@ -2,48 +2,11 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-/// End-to-end proof that the parola binary honors the managed allowlist: the test
-/// runner writes a defaults suite, spawns the real executable with the suite
-/// override, and reads its output. Skips (visibly) when the binary isn't built,
-/// e.g. under xcodebuild where the CLI product isn't in the products directory.
-private let parolaBinaryURL: URL? = {
-    var candidates: [URL] = []
-    for bundle in Bundle.allBundles where bundle.bundlePath.hasSuffix(".xctest") {
-        candidates.append(bundle.bundleURL.deletingLastPathComponent().appendingPathComponent("parola"))
-    }
-    if let main = Bundle.main.executableURL {
-        var dir = main.deletingLastPathComponent()
-        for _ in 0..<5 {
-            candidates.append(dir.appendingPathComponent("parola"))
-            dir.deleteLastPathComponent()
-        }
-    }
-    let sourceFile = URL(fileURLWithPath: #filePath)
-    let packageRoot = sourceFile
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-    candidates.append(packageRoot.appendingPathComponent(".build/debug/parola"))
-    return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
-}()
-
 @Suite("CLI process gating", .serialized, .enabled(if: parolaBinaryURL != nil))
 struct CLIProcessGateTests {
     private func runParola(_ arguments: [String], plist: String) throws -> (output: String, status: Int32) {
-        let binary = try #require(parolaBinaryURL)
-        let process = Process()
-        process.executableURL = binary
-        process.arguments = arguments
-        var environment = ProcessInfo.processInfo.environment
-        environment["PAROLA_MANAGED_PLIST"] = plist
-        process.environment = environment
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-        try process.run()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return (String(decoding: data, as: UTF8.self), process.terminationStatus)
+        let run = try ParolaCoreTests.runParola(arguments, environment: ["PAROLA_MANAGED_PLIST": plist])
+        return (run.output, run.status)
     }
 
     /// The managed dict travels as a plist file: cfprefsd refuses to relay defaults

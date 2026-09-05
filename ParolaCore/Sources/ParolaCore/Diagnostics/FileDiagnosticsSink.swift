@@ -23,6 +23,14 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     /// same names the export reader does.
     public static let filePrefix = "parola-"
 
+    /// Where every Parola process writes its diagnostics: one shared folder, one file per process.
+    public static var defaultDirectory: URL {
+        let caches = (try? FileManager.default.url(
+            for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: true
+        )) ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Caches")
+        return caches.appendingPathComponent("Parola/diagnostics", isDirectory: true)
+    }
+
     private let bufferState = OSAllocatedUnfairLock(initialState: BufferState())
     private let rotationState = OSAllocatedUnfairLock(initialState: 0)
     private let sweepState = OSAllocatedUnfairLock(initialState: 0)

@@ -21,6 +21,7 @@ struct Bench: AsyncParsableCommand {
     var snapshot: String?
 
     func run() async throws {
+        CLIDiagnostics.installIfWanted(alwaysOn: false)
         let modelIDs = try resolveModels()
         let audioFiles = try await prepareCorpus()
         guard !audioFiles.isEmpty else {
