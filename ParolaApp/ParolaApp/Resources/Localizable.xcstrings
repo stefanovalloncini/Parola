@@ -3401,17 +3401,6 @@
         }
       }
     },
-    "Export to folder of audio file": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salva nella cartella del file audio"
-          }
-        }
-      }
-    },
     "Export…": {
       "extractionState": "manual",
       "localizations": {
@@ -4888,13 +4877,13 @@
         }
       }
     },
-    "Menu equivalents are fixed. Dictation needs Input Monitoring permission.": {
+    "Menu equivalents are fixed. Global hotkeys need Input Monitoring permission. The full list is under Help > Keyboard Shortcuts.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gli equivalenti menu sono fissi. La dettatura richiede il permesso di Monitoraggio Input."
+            "value": "Gli equivalenti menu sono fissi. Le scorciatoie globali richiedono il permesso di Monitoraggio Input. L'elenco completo è in Aiuto > Scorciatoie da tastiera."
           }
         }
       }
@@ -7473,6 +7462,17 @@
         }
       }
     },
+    "Save next to the audio file": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva accanto al file audio"
+          }
+        }
+      }
+    },
     "Save your settings to a `.parola-settings` file, or restore one. Downloaded models and the prompt library are not included.": {
       "extractionState": "manual",
       "localizations": {
@@ -7480,17 +7480,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salva le tue impostazioni in un file `.parola-settings`, o ripristinane uno. I modelli scaricati e la libreria dei prompt non sono inclusi."
-          }
-        }
-      }
-    },
-    "Saves the %@ next to each transcribed file.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salva il %@ accanto a ogni file trascritto."
           }
         }
       }

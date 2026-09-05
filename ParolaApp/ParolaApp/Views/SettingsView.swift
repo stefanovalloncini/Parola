@@ -367,7 +367,6 @@ struct SettingHelper: View {
     var body: some View {
         Text(text)
             .font(DS.Font.caption)
-            .italic()
             .foregroundStyle(.secondary)
             .padding(.horizontal, 4)
     }

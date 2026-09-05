@@ -81,10 +81,7 @@ struct BatchFormatCard: View {
                 VStack(alignment: .leading, spacing: DS.Spacing.small) {
                     Divider()
                         .padding(.vertical, DS.Spacing.tight)
-                    BatchSettingRow(
-                        title: "Export to folder of audio file",
-                        description: "Saves the \(format.fileExtension.uppercased()) next to each transcribed file."
-                    ) {
+                    BatchSettingRow(title: "Save next to the audio file") {
                         Toggle("", isOn: writeToSourceFolder)
                             .labelsHidden()
                             .accessibilityIdentifier("batch.format.\(format.fileExtension).toggle")
@@ -150,10 +147,10 @@ struct BatchFormatChip: View {
 
 struct BatchSettingRow<Control: View>: View {
     let title: LocalizedStringKey
-    let description: LocalizedStringKey
+    let description: LocalizedStringKey?
     @ViewBuilder var control: Control
 
-    init(title: LocalizedStringKey, description: LocalizedStringKey, @ViewBuilder control: () -> Control) {
+    init(title: LocalizedStringKey, description: LocalizedStringKey? = nil, @ViewBuilder control: () -> Control) {
         self.title = title
         self.description = description
         self.control = control()
@@ -165,10 +162,12 @@ struct BatchSettingRow<Control: View>: View {
                 Text(title)
                     .font(DS.Font.body)
                     .foregroundStyle(DS.Color.primaryText)
-                Text(description)
-                    .font(DS.Font.caption)
-                    .foregroundStyle(DS.Color.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let description {
+                    Text(description)
+                        .font(DS.Font.caption)
+                        .foregroundStyle(DS.Color.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: DS.Spacing.small)
             control
