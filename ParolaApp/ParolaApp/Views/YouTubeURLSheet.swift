@@ -16,6 +16,7 @@ struct YouTubeURLSheet: View {
             content: { contentBody },
             footer: { footerBody }
         )
+        .hidesCloseButton()
         .onAppear {
             model.youtubeURLError = nil
             model.refreshYtDlpAvailability()
@@ -32,7 +33,7 @@ struct YouTubeURLSheet: View {
     private var contentBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.regular) {
-                Text("Paste a link from YouTube, Vimeo, X, TikTok, SoundCloud, or any yt-dlp source. Parola downloads the audio locally.")
+                Text("Paste a link from YouTube, Vimeo, X, TikTok, SoundCloud, or any supported site. Parola downloads the audio locally.")
                     .font(DS.Font.body)
                     .foregroundStyle(DS.Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -63,14 +64,21 @@ struct YouTubeURLSheet: View {
 
     private var footerBody: some View {
         HStack(spacing: DS.Spacing.small) {
+            if !model.ytDlpAvailable {
+                Text("Install yt-dlp to transcribe a link.")
+                    .font(DS.Font.caption)
+                    .foregroundStyle(DS.Color.secondaryText)
+                    .axLeaf("YouTube.Text.DownloaderMissing")
+            }
+
+            Spacer(minLength: DS.Spacing.small)
+
             Button("Cancel") { dismiss() }
                 .sheetSecondaryAction()
                 .keyboardShortcut(.cancelAction)
                 .axLeaf("YouTube.Button.Cancel")
 
-            Spacer()
-
-            Button("Use captions") { submit(prefersExistingSubs: true) }
+            Button("Use Captions") { submit(prefersExistingSubs: true) }
                 .sheetSecondaryAction()
                 .disabled(disabled || !model.ytDlpAvailable)
                 .axLeaf("YouTube.Button.UseCaptions")

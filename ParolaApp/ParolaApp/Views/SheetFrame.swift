@@ -12,12 +12,21 @@ struct SheetFrame<Content: View, Footer: View>: View {
     private var maxHeight: CGFloat = 640
     private var closeAXLeaf = "Sheet.Button.Close"
     private var accessory: AnyView?
+    private var showsClose = true
 
     func sheetSize(width: CGFloat, minHeight: CGFloat = 220, maxHeight: CGFloat = 640) -> SheetFrame {
         var copy = self
         copy.width = width
         copy.minHeight = minHeight
         copy.maxHeight = maxHeight
+        return copy
+    }
+
+    /// For sheets whose footer already ends in Cancel: two dismiss controls, and two
+    /// `.cancelAction` shortcuts, is one too many.
+    func hidesCloseButton() -> SheetFrame {
+        var copy = self
+        copy.showsClose = false
         return copy
     }
 
@@ -103,18 +112,20 @@ struct SheetFrame<Content: View, Footer: View>: View {
                 accessory
             }
 
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(DS.Font.subheadlineBold)
-                    .foregroundStyle(DS.Color.secondaryText)
-                    .frame(width: 22, height: 22)
-                    .background(DS.Color.surfaceElevated)
-                    .clipShape(Circle())
+            if showsClose {
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(DS.Font.subheadlineBold)
+                        .foregroundStyle(DS.Color.secondaryText)
+                        .frame(width: 22, height: 22)
+                        .background(DS.Color.surfaceElevated)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .accessibilityLabel("Close")
+                .axLeaf(closeAXLeaf)
             }
-            .buttonStyle(.plain)
-            .keyboardShortcut(.cancelAction)
-            .accessibilityLabel("Close")
-            .axLeaf(closeAXLeaf)
         }
         .padding(.horizontal, DS.Spacing.regular)
         .padding(.vertical, 12)

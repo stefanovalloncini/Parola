@@ -217,14 +217,13 @@ struct ResetPaneButton: View {
             EmptyView()
         } else {
             HStack {
-                Spacer()
                 Button("Reset to defaults") {
                     confirming = true
                 }
                 .controlSize(.small)
-                .buttonStyle(.borderless)
-                .foregroundStyle(.secondary)
+                .buttonStyle(.bordered)
                 .axLeaf("Pane.Button.ResetToDefaults.\(scope.rawValue)")
+                Spacer()
             }
             .confirmationDialog(
                 String(localized: "Reset \(scope.localizedLabel) to defaults?"),

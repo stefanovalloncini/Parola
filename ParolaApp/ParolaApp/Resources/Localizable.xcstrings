@@ -4193,6 +4193,17 @@
         }
       }
     },
+    "Install yt-dlp to transcribe a link.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installa yt-dlp per trascrivere un link."
+          }
+        }
+      }
+    },
     "Installed": {
       "extractionState": "manual",
       "localizations": {
@@ -6214,13 +6225,13 @@
         }
       }
     },
-    "Paste a link from YouTube, Vimeo, X, TikTok, SoundCloud, or any yt-dlp source. Parola downloads the audio locally.": {
+    "Paste a link from YouTube, Vimeo, X, TikTok, SoundCloud, or any supported site. Parola downloads the audio locally.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Incolla un link da YouTube, Vimeo, X, TikTok, SoundCloud o qualsiasi sorgente yt-dlp. Parola scarica l'audio in locale."
+            "value": "Incolla un link da YouTube, Vimeo, X, TikTok, SoundCloud o qualsiasi altro sito supportato. Parola scarica l'audio in locale."
           }
         }
       }
@@ -9539,6 +9550,17 @@
         }
       }
     },
+    "Use Captions": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa i sottotitoli"
+          }
+        }
+      }
+    },
     "Use Default": {
       "extractionState": "manual",
       "localizations": {
@@ -9557,17 +9579,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Usa un font a larghezza fissa per i timestamp nella trascrizione."
-          }
-        }
-      }
-    },
-    "Use captions": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Usa i sottotitoli"
           }
         }
       }
