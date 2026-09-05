@@ -69,4 +69,8 @@ final class DiagnosticsInstaller {
     nonisolated func flushForTermination() async {
         await sink.flush()
     }
+
+    nonisolated func startNewFile() async {
+        await sink.startNewFile()
+    }
 }

@@ -130,6 +130,9 @@ struct ParolaApp: App {
                         NSWorkspace.shared.open(url)
                     }
                 }
+                Button("Export Diagnostics…") {
+                    Task { await model.exportDiagnostics() }
+                }
             }
             CommandGroup(replacing: .newItem) {
                 Button("Open Audio…") { model.presentOpenPanel() }

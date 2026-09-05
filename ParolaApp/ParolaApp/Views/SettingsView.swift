@@ -75,7 +75,7 @@ enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     var extraSearchKeywords: [String] {
         switch self {
         case .localModels: return ["model", "whisper", "parakeet", "apple speech", "download", "storage", "delete", "activate"]
-        case .about: return ["version", "repository"]
+        case .about: return ["version", "repository", "diagnostics"]
         default: return []
         }
     }

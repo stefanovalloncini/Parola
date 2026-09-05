@@ -141,6 +141,22 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         }
     }
 
+    /// Writes what is buffered, then closes the current file and points the sink at a fresh one.
+    /// A caller that deletes the files on disk has to call this first: the sink holds its file
+    /// open, so deleting underneath it would send every later record into an unlinked inode.
+    public func startNewFile() async {
+        await withCheckedContinuation { continuation in
+            fileQueue.async {
+                self.drainOnQueue()
+                try? self.fileState.handle?.close()
+                self.fileState.handle = nil
+                self.fileState.bytesWritten = 0
+                self.rotationState.withLock { $0 += 1 }
+                continuation.resume()
+            }
+        }
+    }
+
     private func drainOnQueue() {
         let pending: (records: [LogRecord], dropped: Int) = bufferState.withLock { current in
             guard !current.disabled else { return ([], 0) }

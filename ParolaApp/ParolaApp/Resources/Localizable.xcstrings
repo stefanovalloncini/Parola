@@ -2505,6 +2505,17 @@
         }
       }
     },
+    "Delete Diagnostics": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina diagnostica"
+          }
+        }
+      }
+    },
     "Delete from disk": {
       "extractionState": "manual",
       "localizations": {
@@ -2668,6 +2679,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lingua rilevata"
+          }
+        }
+      }
+    },
+    "Diagnostics": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostica"
           }
         }
       }
@@ -3231,6 +3253,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esporta come"
+          }
+        }
+      }
+    },
+    "Export Diagnostics…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta diagnostica…"
           }
         }
       }
@@ -4258,6 +4291,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salta al tempo"
+          }
+        }
+      }
+    },
+    "Kept for 7 days, up to 10 MB. No transcript text, file names, or paths.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conservata per 7 giorni, fino a 10 MB. Nessun testo delle trascrizioni, nome di file o percorso."
           }
         }
       }

@@ -67,6 +67,7 @@ final class ParolaAutomationServer {
             server.waitCommands(),
             server.lifecycleCommands(),
             server.revisionLogCommands(),
+            server.diagnosticsCommands(),
             server.simulationCommands(),
             server.mockCommands(),
             server.accessibilityCommands(),

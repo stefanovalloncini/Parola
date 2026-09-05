@@ -62,6 +62,24 @@ struct FileDiagnosticsSinkTests {
         #expect(after.contains("buffered"))
     }
 
+    @Test("a new file survives having the old one deleted underneath the sink")
+    func startNewFileAfterDeletion() async throws {
+        let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir)
+        sink.enqueue(record(.error, "before"))
+        try await waitForContent("before", in: sink.currentFileURL)
+
+        await sink.startNewFile()
+        for url in try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
+            try FileManager.default.removeItem(at: url)
+        }
+
+        sink.enqueue(record(.error, "after"))
+        try await waitForContent("after", in: sink.currentFileURL)
+        let names = try FileManager.default.contentsOfDirectory(atPath: dir.path)
+        #expect(names.count == 1)
+    }
+
     @Test("debug records are dropped below the minimum level")
     func debugDropped() async throws {
         let dir = tempDirectory()
