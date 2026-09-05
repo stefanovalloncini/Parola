@@ -9,15 +9,14 @@ struct HallucinationPhrasesTests {
         TranscriptSegment(id: id, start: Double(id), end: Double(id) + 1, text: text)
     }
 
-    @Test("stock whisper filler is dropped in several languages")
+    @Test("subtitle credits are dropped in several languages")
     func dropsKnownFiller() {
         let input = [
             seg(0, "Allora, ricominciamo"),
-            seg(1, "Thank you."),
-            seg(2, "시청해주셔서 감사합니다."),
-            seg(3, "Sottotitoli e revisione a cura di QTSS"),
-            seg(4, "ご視聴ありがとうございました"),
-            seg(5, "Продолжение следует...")
+            seg(1, "Subtitles by the Amara.org community"),
+            seg(2, "Sottotitoli e revisione a cura di QTSS"),
+            seg(3, "Untertitel der Amara.org-Community"),
+            seg(4, "字幕由Amara.org社区提供")
         ]
 
         let out = IgnoredSegments.applyBuiltInDefaults(to: input)
@@ -27,20 +26,54 @@ struct HallucinationPhrasesTests {
 
     @Test("trailing punctuation does not decide the match")
     func punctuationInsensitive() {
-        let input = [seg(0, "Thanks for watching"), seg(1, "Thanks for watching!"), seg(2, "ok")]
+        let input = [
+            seg(0, "Sottotitoli a cura di QTSS"),
+            seg(1, "Sottotitoli a cura di QTSS."),
+            seg(2, "ok")
+        ]
 
         let out = IgnoredSegments.applyBuiltInDefaults(to: input)
 
         #expect(out.map(\.text) == ["ok"])
     }
 
-    @Test("filler inside a longer sentence is left alone")
+    @Test("a credit inside a longer sentence is left alone")
     func keepsSpokenContext() {
-        let input = [seg(0, "Thank you for the coffee."), seg(1, "E quindi thank you.")]
+        let input = [
+            seg(0, "Subtitles by the Amara.org community, as always."),
+            seg(1, "E i sottotitoli a cura di QTSS li rifacciamo.")
+        ]
 
         let out = IgnoredSegments.applyBuiltInDefaults(to: input)
 
         #expect(out.count == 2)
+    }
+
+    @Test("spoken thanks and outros survive the filter")
+    func keepsSpokenThanks() {
+        let input = [
+            seg(0, "Thank you."),
+            seg(1, "Thanks for watching."),
+            seg(2, "谢谢观看"),
+            seg(3, "ご視聴ありがとうございました。")
+        ]
+
+        let out = IgnoredSegments.applyBuiltInDefaults(to: input)
+
+        #expect(out.count == 4)
+    }
+
+    @Test("cleanup keeps a spoken thanks")
+    func cleanupKeepsSpokenThanks() {
+        let transcript = Transcript(
+            segments: [seg(0, "Grazie a tutti."), seg(1, "Thank you.")],
+            language: "it",
+            modelName: "openai_whisper-tiny"
+        )
+
+        let out = TranscriptCleanup.apply(to: transcript)
+
+        #expect(out.segments.map(\.text) == ["Grazie a tutti.", "Thank you."])
     }
 
     @Test("user rules do not pick up the built-in list")
@@ -82,11 +115,11 @@ struct TranscriptionSessionHallucinationTests {
 
     private let seeds = [
         TranscriptSegmentSeed(start: 0, end: 1, text: "Buongiorno a tutti."),
-        TranscriptSegmentSeed(start: 4, end: 5, text: "시청해주셔서 감사합니다."),
+        TranscriptSegmentSeed(start: 4, end: 5, text: "Sottotitoli a cura di QTSS"),
         TranscriptSegmentSeed(start: 8, end: 9, text: "Riprendiamo da qui.")
     ]
 
-    @Test("the CLI and MCP path drops stock filler without any user rules")
+    @Test("the CLI and MCP path drops subtitle credits without any user rules")
     func filtersByDefault() async throws {
         let (session, audioURL) = try await makeSession(segments: seeds)
 
