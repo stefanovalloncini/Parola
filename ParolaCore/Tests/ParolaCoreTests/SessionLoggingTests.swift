@@ -30,11 +30,11 @@ struct SessionLoggingTests {
         }
     }
 
-    private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
-        let sink = CapturingDiagnosticsSink()
+    private func withSink(_ body: (ScopedCapturingSink) async throws -> Void) async rethrows {
+        let sink = ScopedCapturingSink()
         ParolaLog.install(sink)
         defer { ParolaLog.uninstall() }
-        try await body(sink)
+        try await sink.scope { try await body(sink) }
     }
 
     private func managedConfiguration(_ managed: [String: Any]) -> ManagedConfiguration {
@@ -70,7 +70,7 @@ struct SessionLoggingTests {
     }
 
     private func modelRecords(
-        _ sink: CapturingDiagnosticsSink, message: String
+        _ sink: ScopedCapturingSink, message: String
     ) -> [LogRecord] {
         sink.records.filter { $0.category == .models && $0.message.rendered == message }
     }

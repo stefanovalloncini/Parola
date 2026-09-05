@@ -4,15 +4,15 @@ import Testing
 
 @Suite("Batch logging", .serialized, .logFacade)
 struct BatchLoggingTests {
-    private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
-        let sink = CapturingDiagnosticsSink()
+    private func withSink(_ body: (ScopedCapturingSink) async throws -> Void) async rethrows {
+        let sink = ScopedCapturingSink()
         ParolaLog.install(sink)
         defer { ParolaLog.uninstall() }
-        try await body(sink)
+        try await sink.scope { try await body(sink) }
     }
 
     private func batchRecords(
-        _ sink: CapturingDiagnosticsSink, message: String
+        _ sink: ScopedCapturingSink, message: String
     ) -> [LogRecord] {
         sink.records.filter { $0.category == .batch && $0.message.rendered == message }
     }
