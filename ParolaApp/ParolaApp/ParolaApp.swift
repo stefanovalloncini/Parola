@@ -150,10 +150,7 @@ struct ParolaApp: App {
             CommandGroup(after: .sidebar) {
                 @Bindable var model = model
                 Button("Toggle Inspector") {
-                    // Same unset-key fallback as TranscriptPane's @AppStorage default (true),
-                    // or the first toggle is a no-op.
-                    let visible = (DefaultsStore.current.object(forKey: "inspectorVisible") as? Bool) ?? true
-                    DefaultsStore.current.set(!visible, forKey: "inspectorVisible")
+                    InspectorVisibility.toggle(in: DefaultsStore.current, isNarrow: model.transcriptPaneIsNarrow)
                 }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
                 .disabled(!model.hasTranscript)

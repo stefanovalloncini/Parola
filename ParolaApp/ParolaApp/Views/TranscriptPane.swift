@@ -55,12 +55,14 @@ enum InspectorMode: String, CaseIterable, Identifiable {
 
 struct TranscriptPane: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("inspectorVisible", store: DefaultsStore.current) private var inspectorVisible: Bool = true
+    @AppStorage(InspectorVisibility.preferenceKey, store: DefaultsStore.current) private var inspectorVisible: Bool = true
     @AppStorage("inspectorMode", store: DefaultsStore.current) private var inspectorModeRaw: String = InspectorMode.format.rawValue
     @State private var summarySheetOpen = false
     @State private var chatSheetOpen = false
-    // Persisted so a window that was narrow when the app quit still gets its inspector back once it widens.
-    @AppStorage("inspectorCollapsedByWidth", store: DefaultsStore.current) private var inspectorCollapsedByWidth = false
+    // Persisted: the pane is rebuilt on every phase and route change, and the ask has to outlive that.
+    @AppStorage(InspectorVisibility.forcedAtNarrowWidthKey, store: DefaultsStore.current)
+    private var inspectorForcedAtNarrowWidth = false
+    @State private var paneIsNarrow = false
 
     private var displayMode: TranscriptDisplayMode {
         model.transcriptDisplayMode
@@ -85,30 +87,20 @@ struct TranscriptPane: View {
                 transcriptColumn
                     .frame(minWidth: MainWindowLayout.transcriptMinWidth, maxWidth: .infinity)
 
-                if inspectorVisible {
+                if showsInspector {
                     Divider()
                     TranscriptInspector(
                         mode: inspectorModeBinding,
-                        inspectorVisible: $inspectorVisible
+                        inspectorVisible: inspectorVisibleBinding
                     )
                     .frame(width: MainWindowLayout.inspectorWidth)
                 }
             }
             // Measured on the whole pane, not the reading column, so hiding the inspector can't re-widen it into a loop.
-            .onGeometryChange(for: Bool.self) { proxy in
-                proxy.size.width < MainWindowLayout.inspectorCollapseWidth
-            } action: { isNarrow in
-                if isNarrow {
-                    if inspectorVisible {
-                        inspectorVisible = false
-                        inspectorCollapsedByWidth = true
-                    }
-                } else if inspectorCollapsedByWidth {
-                    inspectorVisible = true
-                }
-            }
-            .onChange(of: inspectorVisible) { _, visible in
-                if visible { inspectorCollapsedByWidth = false }
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { width in
+                applyPaneWidth(width)
             }
         }
         .sheet(isPresented: $summarySheetOpen) {
@@ -176,6 +168,34 @@ struct TranscriptPane: View {
                 ContinuousTranscriptView()
             }
         }
+    }
+
+    private var showsInspector: Bool {
+        InspectorVisibility.isVisible(
+            preference: inspectorVisible,
+            forcedAtNarrowWidth: inspectorForcedAtNarrowWidth,
+            isNarrow: paneIsNarrow
+        )
+    }
+
+    private var inspectorVisibleBinding: Binding<Bool> {
+        Binding(
+            get: { showsInspector },
+            set: { shown in
+                if paneIsNarrow {
+                    inspectorForcedAtNarrowWidth = shown
+                } else {
+                    inspectorVisible = shown
+                }
+            }
+        )
+    }
+
+    private func applyPaneWidth(_ width: CGFloat) {
+        let narrow = width < MainWindowLayout.inspectorCollapseWidth
+        if paneIsNarrow != narrow { paneIsNarrow = narrow }
+        if model.transcriptPaneIsNarrow != narrow { model.transcriptPaneIsNarrow = narrow }
+        if !narrow, inspectorForcedAtNarrowWidth { inspectorForcedAtNarrowWidth = false }
     }
 
     private var inspectorModeBinding: Binding<InspectorMode> {

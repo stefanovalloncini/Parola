@@ -55,6 +55,41 @@ struct RouteLayoutTests {
         return names
     }
 
+    private func makeReadyModel(_ defaults: UserDefaults) -> AppModel {
+        let model = makeModel(defaults, jobs: 0)
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 4, text: "the inspector folds away")],
+            language: "en",
+            modelName: "stub"
+        )
+        model.phase = .ready
+        return model
+    }
+
+    /// The pane reads its width during layout and hides the inspector from the pass after that, so give it two.
+    private func settle(_ host: NSView, width: CGFloat, height: CGFloat) {
+        host.frame = NSRect(x: 0, y: 0, width: width, height: height)
+        host.layoutSubtreeIfNeeded()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        host.layoutSubtreeIfNeeded()
+    }
+
+    private func hasInspectorColumn(_ host: NSView) -> Bool {
+        var found = false
+        func walk(_ view: NSView) {
+            for sub in view.subviews {
+                let frame = sub.convert(sub.bounds, to: host)
+                if abs(frame.width - MainWindowLayout.inspectorWidth) < 0.5,
+                   abs(frame.maxX - host.bounds.width) < 0.5 {
+                    found = true
+                }
+                walk(sub)
+            }
+        }
+        walk(host)
+        return found
+    }
+
     @Test("the batch queue and its export panel fit the smallest window")
     func batchColumnsFitTheSmallestWindow() {
         #expect(MainWindowLayout.sidebarMaxWidth + MainWindowLayout.batchPaneMinWidth <= MainWindowLayout.minimumWidth)
@@ -104,26 +139,73 @@ struct RouteLayoutTests {
     @Test("the inspector folds away on a narrow window and comes back when it widens")
     func inspectorFoldsAwayOnNarrowWindows() {
         withIsolatedDefaults { defaults in
-            defaults.set(true, forKey: "inspectorVisible")
-            let model = makeModel(defaults, jobs: 0)
-            model.transcript = Transcript(
-                segments: [TranscriptSegment(id: 0, start: 0, end: 4, text: "the inspector folds away")],
-                language: "en",
-                modelName: "stub"
-            )
-            model.phase = .ready
+            let model = makeReadyModel(defaults)
             let host = NSHostingView(rootView: ContentView().environment(model))
-            host.frame = NSRect(x: 0, y: 0, width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight)
-            host.layoutSubtreeIfNeeded()
-            #expect(defaults.bool(forKey: "inspectorVisible") == false)
+            settle(host, width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight)
+            #expect(hasInspectorColumn(host) == false)
 
-            defaults.set(true, forKey: "inspectorVisible")
-            host.layoutSubtreeIfNeeded()
-            #expect(defaults.bool(forKey: "inspectorVisible") == true, "asking for it back at a narrow width must stick")
+            settle(host, width: 1400, height: MainWindowLayout.minimumHeight)
+            #expect(hasInspectorColumn(host), "widening must bring the inspector back with no user toggle")
+        }
+    }
 
-            host.frame = NSRect(x: 0, y: 0, width: 1400, height: MainWindowLayout.minimumHeight)
-            host.layoutSubtreeIfNeeded()
-            #expect(defaults.bool(forKey: "inspectorVisible") == true)
+    @Test("layout never writes the inspector preference")
+    func foldingAwayLeavesThePreferenceAlone() {
+        withIsolatedDefaults { defaults in
+            defaults.set(true, forKey: InspectorVisibility.preferenceKey)
+            let model = makeReadyModel(defaults)
+            let host = NSHostingView(rootView: ContentView().environment(model))
+            settle(host, width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight)
+            #expect(defaults.object(forKey: InspectorVisibility.preferenceKey) as? Bool == true)
+            #expect(hasInspectorColumn(host) == false)
+        }
+    }
+
+    @Test("asking for the inspector at a narrow width survives a rebuilt pane, and widening forgets it")
+    func inspectorOverrideSurvivesARebuild() {
+        withIsolatedDefaults { defaults in
+            let model = makeReadyModel(defaults)
+            let host = NSHostingView(rootView: ContentView().environment(model))
+            settle(host, width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight)
+            #expect(hasInspectorColumn(host) == false)
+
+            InspectorVisibility.toggle(in: defaults, isNarrow: model.transcriptPaneIsNarrow)
+            settle(host, width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight)
+            #expect(hasInspectorColumn(host), "an explicit ask at a narrow width shows the inspector")
+
+            let rebuilt = NSHostingView(rootView: ContentView().environment(model))
+            settle(rebuilt, width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight)
+            #expect(hasInspectorColumn(rebuilt), "the ask outlives the pane it was made in")
+
+            settle(rebuilt, width: 1400, height: MainWindowLayout.minimumHeight)
+            #expect(defaults.bool(forKey: InspectorVisibility.forcedAtNarrowWidthKey) == false)
+        }
+    }
+
+    @Test("the toggle flips the key that the current width answers to")
+    func toggleFlipsTheKeyForTheWidth() {
+        let defaults = UserDefaults(suiteName: "test-inspector-\(UUID())")!
+        InspectorVisibility.toggle(in: defaults, isNarrow: true)
+        #expect(defaults.bool(forKey: InspectorVisibility.forcedAtNarrowWidthKey) == true)
+        #expect(InspectorVisibility.preference(in: defaults) == true)
+
+        InspectorVisibility.toggle(in: defaults, isNarrow: false)
+        #expect(InspectorVisibility.preference(in: defaults) == false)
+        #expect(defaults.bool(forKey: InspectorVisibility.forcedAtNarrowWidthKey) == true)
+    }
+
+    @Test(
+        "a populated route asks for no more room than the smallest window has",
+        arguments: [AppModel.Route.queue, .batch]
+    )
+    func populatedRoutesFitTheSmallestWindow(route: AppModel.Route) {
+        withIsolatedDefaults { defaults in
+            let model = makeModel(defaults, jobs: 3)
+            model.route = route
+            let host = NSHostingView(rootView: ContentView().environment(model))
+            let wanted = host.fittingSize
+            #expect(wanted.width <= MainWindowLayout.minimumWidth, "\(route) wants \(wanted.width)pt of width")
+            #expect(wanted.height <= MainWindowLayout.minimumHeight, "\(route) wants \(wanted.height)pt of height")
         }
     }
 
@@ -136,7 +218,9 @@ struct RouteLayoutTests {
             let model = makeModel(defaults, jobs: 0)
             model.route = route
             let host = NSHostingView(rootView: ContentView().environment(model))
-            #expect(host.fittingSize.height <= MainWindowLayout.minimumHeight, "\(route) wants \(host.fittingSize.height)pt")
+            let wanted = host.fittingSize
+            #expect(wanted.width <= MainWindowLayout.minimumWidth, "\(route) wants \(wanted.width)pt of width")
+            #expect(wanted.height <= MainWindowLayout.minimumHeight, "\(route) wants \(wanted.height)pt of height")
         }
     }
 }
