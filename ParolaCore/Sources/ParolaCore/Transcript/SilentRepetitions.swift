@@ -48,6 +48,10 @@ enum SilentRepetitions {
                 continue
             }
             quiet.insert(index)
+            ParolaLog.debug(
+                .engineWhisperKit, "dropping a repeated line over silence",
+                [.offset: .seconds(segment.start), .energy: .double(energy), .floor: .double(floor)]
+            )
         }
         guard !quiet.isEmpty else { return segments }
         ParolaLog.info(

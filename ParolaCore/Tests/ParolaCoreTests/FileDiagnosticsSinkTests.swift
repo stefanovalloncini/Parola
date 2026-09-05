@@ -176,8 +176,9 @@ struct FileDiagnosticsSinkTests {
         let object = try JSONSerialization.jsonObject(with: Data(first.utf8)) as! [String: Any]
         let keys = try #require(object["fields"] as? [String: String]).keys
         #expect(keys.sorted() == [
-            "attempt", "audioSeconds", "bytes", "count", "elapsed", "engine", "entry", "error",
-            "feature", "format", "job", "language", "mode", "model", "rotations", "stage",
+            "attempt", "audioSeconds", "bytes", "count", "elapsed", "energy", "engine", "entry",
+            "error", "feature", "floor", "format", "job", "language", "mode", "model", "offset",
+            "rotations", "stage",
         ])
     }
 

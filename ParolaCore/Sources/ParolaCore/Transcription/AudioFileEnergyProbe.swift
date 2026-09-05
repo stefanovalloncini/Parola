@@ -9,11 +9,14 @@ final class AudioFileEnergyProbe: SegmentEnergyProbe {
     private var windows: [Double]?
 
     init?(url: URL) {
-        guard let file = try? AVAudioFile(forReading: url) else { return nil }
-        let sampleRate = file.processingFormat.sampleRate
-        guard sampleRate > 0, file.length > 0 else { return nil }
+        guard let file = try? AVAudioFile(forReading: url),
+              file.processingFormat.sampleRate > 0,
+              file.length > 0 else {
+            ParolaLog.notice(.engineWhisperKit, "no energy probe: the audio would not open")
+            return nil
+        }
         self.file = file
-        duration = Double(file.length) / sampleRate
+        duration = Double(file.length) / file.processingFormat.sampleRate
     }
 
     /// Measured over windows spread across the whole recording rather than over the segments in

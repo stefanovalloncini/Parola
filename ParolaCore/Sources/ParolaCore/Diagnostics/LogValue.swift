@@ -2,7 +2,7 @@ import Foundation
 
 public struct LogValue: Sendable, Equatable {
     enum Kind: String, Sendable, Equatable {
-        case int, seconds, bytes, flag, token
+        case int, double, seconds, bytes, flag, token
     }
 
     /// Not persisted: the exported log stays flat, and `LogField` is closed, so a renderer can
@@ -17,6 +17,12 @@ public struct LogValue: Sendable, Equatable {
 
     public static func int(_ value: Int) -> LogValue {
         LogValue(kind: .int, text: String(value))
+    }
+
+    /// Four places, not the two a duration gets: the levels this carries are fractions of full
+    /// scale and round to nothing at two.
+    public static func double(_ value: Double) -> LogValue {
+        LogValue(kind: .double, text: String(format: "%.4f", value))
     }
 
     public static func bytes(_ value: Int64) -> LogValue {
@@ -70,15 +76,18 @@ public enum LogField: String, Sendable, CaseIterable, Comparable {
     case bytes
     case count
     case elapsed
+    case energy
     case engine
     case entry
     case error
     case feature
+    case floor
     case format
     case job
     case language
     case mode
     case model
+    case offset
     case rotations
     case stage
 

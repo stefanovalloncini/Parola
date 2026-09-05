@@ -280,3 +280,47 @@ struct SessionSilentRepetitionsTests {
         )
     }
 }
+
+@Suite("Repeated line diagnostics", .serialized, .logFacade)
+struct SilentRepetitionsLoggingTests {
+    @Test("every drop reports its offset, its level and the floor")
+    func logsEveryDrop() throws {
+        let sink = CapturingDiagnosticsSink()
+        ParolaLog.install(sink)
+        defer { ParolaLog.uninstall() }
+
+        let segments = (0..<3).map {
+            TranscriptSegment(id: $0, start: Double($0) * 20, end: Double($0) * 20 + 19, text: "Grazie.")
+        }
+        #expect(SilentRepetitions.dropped(from: segments, probe: StubEnergyProbe()).isEmpty)
+
+        let drops = sink.records.filter { $0.message.rendered == "dropping a repeated line over silence" }
+        #expect(drops.map { $0.fields[.offset]?.text } == ["0.00", "20.00", "40.00"])
+        #expect(drops.allSatisfy { $0.level == .debug && $0.category == .engineWhisperKit })
+        let first = try #require(drops.first)
+        #expect(first.fields[.energy]?.text == "0.0000")
+        #expect(first.fields[.floor]?.text == "0.0500")
+
+        let counted = try #require(
+            sink.records.first { $0.message.rendered == "dropped repeated lines that sit on silence" }
+        )
+        #expect(counted.fields[.count]?.text == "3")
+    }
+
+    @Test("audio the probe cannot open is reported once")
+    func reportsAMissingProbe() throws {
+        let sink = CapturingDiagnosticsSink()
+        ParolaLog.install(sink)
+        defer { ParolaLog.uninstall() }
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-not-audio-\(UUID().uuidString).wav")
+        try Data("RIFFstub".utf8).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        #expect(AudioFileEnergyProbe(url: url) == nil)
+        #expect(sink.records.contains {
+            $0.level == .notice && $0.message.rendered == "no energy probe: the audio would not open"
+        })
+    }
+}
