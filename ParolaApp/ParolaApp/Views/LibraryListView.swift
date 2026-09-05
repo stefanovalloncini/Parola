@@ -179,7 +179,7 @@ struct LibraryListView: View {
             } else {
                 List(entries, id: \.id, selection: $selection) { row in
                     let entry = row.entry
-                    LibraryRow(display: row)
+                    LibraryRow(display: row, match: model.searchMatches[row.id])
                         .contentShape(Rectangle())
                         .draggable(entry.bundleURL)
                         .onTapGesture(count: 2) {
@@ -302,6 +302,10 @@ struct LibraryListView: View {
                     labelOptions: model.knownLabels(in: category),
                     languageOptions: model.knownLanguages(in: category)
                 )
+            } else {
+                Button("Clear") { model.clearSearch() }
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .axLeaf("Search.Button.Clear")
             }
             Spacer()
             if !selection.isEmpty {
@@ -409,7 +413,10 @@ struct LibraryListView: View {
     }
 
     private var headerTitle: LocalizedStringKey {
-        if searchResults != nil { return "Search results" }
+        if searchResults != nil {
+            let query = model.searchQuery.trimmingCharacters(in: .whitespaces)
+            return query.isEmpty ? "Search results" : "Results for “\(query)”"
+        }
         switch category {
         case .transcription: return "Transcriptions"
         case .meeting: return "Meetings"
@@ -473,6 +480,7 @@ struct LibraryRow: View {
 
     let display: LibraryRowDisplay
     var style: Style = .library
+    var match: LibrarySearchIndex.Match?
 
     @Environment(AppModel.self) private var model
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -541,6 +549,13 @@ struct LibraryRow: View {
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.secondaryText)
                 .lineLimit(1)
+                if let match, !match.snippet.isEmpty {
+                    Text(SearchSnippetText.attributed(match))
+                        .font(DS.Font.caption)
+                        .foregroundStyle(DS.Color.secondaryText)
+                        .lineLimit(2)
+                        .padding(.top, 1)
+                }
             }
             Spacer(minLength: DS.Spacing.regular)
             labelChips

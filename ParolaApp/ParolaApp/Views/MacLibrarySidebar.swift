@@ -3,7 +3,6 @@ import ParolaCore
 
 struct MacLibrarySidebar: View {
     @Environment(AppModel.self) private var model
-    @State private var searchText = ""
 
     private var selectedRoute: SidebarRoute {
         switch model.route {
@@ -31,9 +30,13 @@ struct MacLibrarySidebar: View {
         }
     }
 
+    private var searchBinding: Binding<String> {
+        Binding(get: { model.searchQuery }, set: { model.search($0) })
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            SearchPill(text: $searchText, placeholder: "Search history…")
+            SearchPill(text: searchBinding, placeholder: "Search history…")
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
                 .padding(.bottom, 10)
@@ -124,7 +127,6 @@ struct MacLibrarySidebar: View {
             ideal: MainWindowLayout.sidebarIdealWidth,
             max: MainWindowLayout.sidebarMaxWidth
         )
-        .onChange(of: searchText) { _, newValue in model.search(newValue) }
     }
 
     private var activeQueueBadge: Int? {

@@ -7353,6 +7353,16 @@
         }
       }
     },
+    "Results for “%@”": {
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Risultati per “%@”"
+          }
+        }
+      }
+    },
     "Retry": {
       "extractionState": "manual",
       "localizations": {

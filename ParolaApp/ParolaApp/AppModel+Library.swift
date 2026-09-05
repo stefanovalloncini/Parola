@@ -324,6 +324,7 @@ extension AppModel {
                 libraryFilter = nil
                 libraryBrowsingAll = false
                 searchResults = nil
+                searchMatches = [:]
                 try? await library.markOpened(id: id)
                 refreshLibrary()
             } catch {
@@ -352,9 +353,11 @@ extension AppModel {
 
     func search(_ query: String) {
         searchTask?.cancel()
+        searchQuery = query
         let q = query.trimmingCharacters(in: .whitespaces)
         if q.isEmpty {
             searchResults = nil
+            searchMatches = [:]
             return
         }
         let clock = clock
@@ -363,12 +366,17 @@ extension AppModel {
             guard !Task.isCancelled, let self else { return }
             let matches = await library.search(q)
             guard !Task.isCancelled else { return }
-            let scoreByID = Dictionary(uniqueKeysWithValues: matches.map { ($0.entryID, $0.score) })
+            let matchByID = Dictionary(uniqueKeysWithValues: matches.map { ($0.entryID, $0) })
             let active = await library.list()
             guard !Task.isCancelled else { return }
+            searchMatches = matchByID
             searchResults = active
-                .filter { scoreByID[$0.id] != nil }
-                .sorted { (scoreByID[$0.id] ?? 0) > (scoreByID[$1.id] ?? 0) }
+                .filter { matchByID[$0.id] != nil }
+                .sorted { (matchByID[$0.id]?.score ?? 0) > (matchByID[$1.id]?.score ?? 0) }
         }
+    }
+
+    func clearSearch() {
+        search("")
     }
 }

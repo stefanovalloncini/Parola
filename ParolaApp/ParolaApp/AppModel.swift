@@ -862,6 +862,9 @@ final class AppModel {
     }
     /// Lets a waiter tell "the query finished" from "the query returned what the last one did".
     @ObservationIgnored private(set) var searchResultsVersion: Int = 0
+    var searchQuery: String = ""
+    /// Why each result matched, keyed by entry: the snippet the results list shows under the row.
+    var searchMatches: [String: LibrarySearchIndex.Match] = [:]
     var selectedEntryID: LibraryEntry.ID?
     @ObservationIgnored private var libraryEntriesByID: [String: LibraryEntry] = [:]
 
