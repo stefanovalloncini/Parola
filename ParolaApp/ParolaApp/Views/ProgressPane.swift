@@ -20,22 +20,18 @@ struct ProgressPane: View {
                     .axLeaf("Progress.Button.Cancel")
             }
             if let progress {
-                ProgressView(value: progress)
-                    .progressViewStyle(.linear)
-                    .tint(DS.Color.accent)
+                DSProgressBar(value: progress)
                     .frame(width: 280)
-                HStack(spacing: 8) {
+                HStack(spacing: DS.Spacing.tight) {
                     Text("\(Int(progress * 100))%")
-                        .font(DS.Font.captionMono)
-                        .foregroundStyle(DS.Color.secondaryText)
+                        .contentTransition(.numericText())
                     if let etaLabel {
                         Text(verbatim: "·")
-                            .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
+                            .foregroundStyle(DS.Color.onAccent.opacity(0.6))
                         Text("\(etaLabel) left")
-                            .font(DS.Font.captionMono)
-                            .foregroundStyle(DS.Color.secondaryText)
                     }
                 }
+                .accentPill()
             } else {
                 ProgressView()
                     .progressViewStyle(.linear)
@@ -43,10 +39,9 @@ struct ProgressPane: View {
                     .frame(width: 280)
                 TimelineView(.periodic(from: startDate, by: 1)) { context in
                     Text("\(ETACalculator.format(context.date.timeIntervalSince(startDate))) elapsed")
-                        .font(DS.Font.captionMono)
-                        .foregroundStyle(DS.Color.secondaryText)
                         .monospacedDigit()
                 }
+                .accentPill()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

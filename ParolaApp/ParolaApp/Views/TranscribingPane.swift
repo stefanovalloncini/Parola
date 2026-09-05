@@ -16,6 +16,7 @@ struct TranscribingPane: View {
     @State private var bodyText = AttributedString()
     @State private var isFinishing = false
     @State private var isPreparing = false
+    @State private var streamedTextHeight: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
@@ -47,7 +48,11 @@ struct TranscribingPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             header
+            // Priority over the spacer, or the stack splits the leftover height between them and
+            // the box lands at half the pane instead of at its own.
             transcriptBox
+                .layoutPriority(1)
+            Spacer(minLength: 0)
         }
         .padding(DS.Spacing.large)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -98,49 +103,45 @@ struct TranscribingPane: View {
                     .foregroundStyle(DS.Color.primaryText)
                     .contentTransition(.interpolate)
                 Spacer()
-                if isFinishing {
-                    Text("Finishing…")
-                        .font(DS.Font.captionMono)
-                        .foregroundStyle(DS.Color.secondaryText)
-                        .transition(.opacity)
-                } else if let progress {
-                    Text("\(Int(progress * 100))%")
-                        .font(DS.Font.captionMono)
-                        .foregroundStyle(DS.Color.secondaryText)
-                        .contentTransition(.numericText())
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.5), value: progress)
-                    if let etaDeadline {
-                        Text(verbatim: "·")
-                            .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
-                        TimelineView(.periodic(from: startDate, by: 1)) { context in
-                            let remaining = max(0, etaDeadline.timeIntervalSince(context.date))
-                            Text("\(ETACalculator.format(remaining)) left")
-                                .font(DS.Font.captionMono)
-                                .foregroundStyle(DS.Color.secondaryText)
-                                .monospacedDigit()
-                        }
-                    }
-                } else {
-                    TimelineView(.periodic(from: startDate, by: 1)) { context in
-                        Text("\(ETACalculator.format(context.date.timeIntervalSince(startDate))) elapsed")
-                            .font(DS.Font.captionMono)
-                            .foregroundStyle(DS.Color.secondaryText)
-                            .monospacedDigit()
-                    }
-                }
+                readout.accentPill()
                 Button("Cancel") { model.cancelCurrentWork() }
                     .controlSize(.small)
                     .axLeaf("Transcribing.Button.Cancel")
             }
             if let progress, !isFinishing {
-                ProgressView(value: progress)
-                    .progressViewStyle(.linear)
-                    .tint(DS.Color.accent)
-                    .animation(.easeOut(duration: 0.5), value: progress)
+                DSProgressBar(value: progress)
             } else {
                 ProgressView()
                     .progressViewStyle(.linear)
                     .tint(DS.Color.accent)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var readout: some View {
+        if isFinishing {
+            Text("Finishing…")
+                .transition(.opacity)
+        } else if let progress {
+            HStack(spacing: DS.Spacing.tight) {
+                Text("\(Int(progress * 100))%")
+                    .contentTransition(.numericText())
+                    .animation(reduceMotion ? nil : DS.Motion.progress, value: progress)
+                if let etaDeadline {
+                    Text(verbatim: "·")
+                        .foregroundStyle(DS.Color.onAccent.opacity(0.6))
+                    TimelineView(.periodic(from: startDate, by: 1)) { context in
+                        let remaining = max(0, etaDeadline.timeIntervalSince(context.date))
+                        Text("\(ETACalculator.format(remaining)) left")
+                            .monospacedDigit()
+                    }
+                }
+            }
+        } else {
+            TimelineView(.periodic(from: startDate, by: 1)) { context in
+                Text("\(ETACalculator.format(context.date.timeIntervalSince(startDate))) elapsed")
+                    .monospacedDigit()
             }
         }
     }
@@ -201,6 +202,11 @@ struct TranscribingPane: View {
                 }
                 .padding(DS.Spacing.large)
                 .animation(.easeOut(duration: 0.28), value: hasText)
+                .background(
+                    GeometryReader { geometry in
+                        Color.clear.preference(key: StreamedTextHeight.self, value: geometry.size.height)
+                    }
+                )
             }
             .scrollBounceBehavior(.basedOnSize)
             .onChange(of: partial) { _, newValue in
@@ -211,7 +217,15 @@ struct TranscribingPane: View {
             }
             .mask { topFadeMask }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onPreferenceChange(StreamedTextHeight.self) { streamedTextHeight = $0 }
+        // maxHeight tracks the text so the box grows with the run; the pane still clamps it to
+        // whatever height is left, and the ScrollView takes over from there.
+        .frame(
+            maxWidth: .infinity,
+            minHeight: DS.Size.liveTranscriptMinHeight,
+            maxHeight: max(DS.Size.liveTranscriptMinHeight, streamedTextHeight)
+        )
+        .animation(reduceMotion ? nil : DS.Motion.resize, value: streamedTextHeight)
         .cardBackground(radius: DS.Radius.large)
     }
 
@@ -225,5 +239,12 @@ struct TranscribingPane: View {
         } else {
             Color.black
         }
+    }
+}
+
+private struct StreamedTextHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

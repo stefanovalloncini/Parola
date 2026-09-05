@@ -28,6 +28,13 @@ enum DS {
         static let route = SwiftUI.Animation.easeInOut(duration: 0.2)
         static let rowState = SwiftUI.Animation.easeOut(duration: 0.12)
         static let listRows = SwiftUI.Animation.easeOut(duration: 0.22)
+        static let progress = SwiftUI.Animation.easeOut(duration: 0.5)
+        static let resize = SwiftUI.Animation.easeOut(duration: 0.25)
+    }
+
+    enum Size {
+        static let progressBarHeight: CGFloat = 6
+        static let liveTranscriptMinHeight: CGFloat = 180
     }
 
     /// Text-style-based scale so every label tracks the user's text-size / "Larger Text"
@@ -219,6 +226,15 @@ extension View {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
                 .strokeBorder(DS.Palette.divider, lineWidth: bordered ? 1 : 0)
         )
+    }
+
+    /// A live readout that has to hold the accent on video: accent fill, `onAccent` text.
+    func accentPill() -> some View {
+        font(DS.Font.captionMono)
+            .foregroundStyle(DS.Color.onAccent)
+            .padding(.horizontal, DS.Spacing.small)
+            .padding(.vertical, 2)
+            .background(Capsule(style: .continuous).fill(DS.Color.accent))
     }
 
     func pillStyle(bordered: Bool = true) -> some View {
