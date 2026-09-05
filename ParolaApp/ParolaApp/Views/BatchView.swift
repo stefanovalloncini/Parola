@@ -3,10 +3,14 @@ import ParolaCore
 
 enum BatchProgress {
     /// Nothing queued or running means the batch is settled, and a frozen "3 of 3" would only add noise.
-    static func label(for jobs: [BatchJob]) -> String? {
+    static func counts(for jobs: [BatchJob]) -> (finished: Int, total: Int)? {
         guard jobs.contains(where: { $0.status == .pending || $0.status == .transcribing }) else { return nil }
-        let finished = jobs.count { $0.status == .done }
-        return String(localized: "\(finished) of \(jobs.count)")
+        return (jobs.count { $0.status == .done }, jobs.count)
+    }
+
+    static func label(for jobs: [BatchJob]) -> String? {
+        guard let counts = counts(for: jobs) else { return nil }
+        return String(localized: "\(counts.finished) of \(counts.total)")
     }
 }
 

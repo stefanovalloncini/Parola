@@ -24,34 +24,35 @@ struct BatchJobDetail: View {
         }
     }
 
+    // Every state keeps the bar's 3 pt so a queue of mixed states is a column of one row height.
     @ViewBuilder
     private var progressBar: some View {
         switch job.status {
         case .pending:
-            EmptyView()
+            Color.clear.frame(height: 3)
         case .transcribing:
             if job.progress > 0 {
                 ProgressView(value: job.progress)
                     .progressViewStyle(.linear)
-                    .tint(DS.Color.accent)
+                    .tint(statusFill)
                     .frame(height: 3)
             } else {
                 ProgressView()
                     .progressViewStyle(.linear)
-                    .tint(DS.Color.accent)
+                    .tint(statusFill)
                     .frame(height: 3)
             }
         case .done:
-            EmptyView()
+            Color.clear.frame(height: 3)
         case .failed:
             ProgressView(value: 1)
                 .progressViewStyle(.linear)
-                .tint(DS.Color.danger)
+                .tint(statusFill)
                 .frame(height: 3)
         case .cancelled:
             ProgressView(value: job.progress)
                 .progressViewStyle(.linear)
-                .tint(DS.Color.secondaryText)
+                .tint(statusFill)
                 .frame(height: 3)
         }
     }
