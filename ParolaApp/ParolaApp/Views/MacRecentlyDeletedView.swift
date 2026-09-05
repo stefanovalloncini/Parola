@@ -55,6 +55,7 @@ struct MacRecentlyDeletedView: View {
         }
         .frame(minWidth: 760, idealWidth: 920, minHeight: 560, idealHeight: 720)
         .background(DS.Color.surface)
+        .tint(DS.Color.accent)
         .ignoresSafeArea(.container, edges: .top)
         .confirmationDialog(
             "Delete permanently?",

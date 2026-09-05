@@ -38,8 +38,9 @@ struct YouTubeURLSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 TextField("https://www.youtube.com/watch?v=…", text: $urlDraft)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
                     .focused($fieldFocused)
+                    .fieldChrome(focused: fieldFocused)
                     .onSubmit { submit(prefersExistingSubs: false) }
                     .onChange(of: urlDraft) { _, _ in model.youtubeURLError = nil }
                     .axLeaf("YouTube.TextField.URL")

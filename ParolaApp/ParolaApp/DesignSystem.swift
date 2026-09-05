@@ -246,6 +246,21 @@ extension View {
             .background(Capsule(style: .continuous).fill(DS.Color.accent))
     }
 
+    /// A text field's border and focus ring, drawn by us. AppKit draws `.roundedBorder`'s ring with
+    /// `NSColor.controlAccentColor`, which comes from the AccentColor asset and ignores the palette.
+    func fieldChrome(focused: Bool) -> some View {
+        padding(.horizontal, DS.Spacing.small)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                    .fill(DS.Palette.subtleFill)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                    .strokeBorder(focused ? DS.Color.accent : DS.Palette.divider, lineWidth: focused ? 2 : 1)
+            )
+    }
+
     func pillStyle(bordered: Bool = true) -> some View {
         padding(.horizontal, DS.Spacing.regular)
             .padding(.vertical, DS.Spacing.small)

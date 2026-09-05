@@ -81,6 +81,7 @@ struct SheetFrame<Content: View, Footer: View>: View {
         .frame(width: width)
         .frame(minHeight: minHeight, maxHeight: maxHeight)
         .background(DS.Color.surface)
+        .tint(DS.Color.accent)
     }
 
     private var header: some View {

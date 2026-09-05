@@ -313,5 +313,6 @@ private struct PromptEditor: View {
         }
         .padding(20)
         .frame(width: 480)
+        .tint(DS.Color.accent)
     }
 }
