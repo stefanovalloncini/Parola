@@ -34,8 +34,7 @@ struct ModelDownloadLoggingTests {
         )
     }
 
-    /// Removing an entry needs write permission on its parent, so a read-only parent is the
-    /// portable way to make `removeItem` and `createDirectory` fail.
+    // Removing an entry needs write permission on its parent, not on the entry itself.
     private func withReadOnly(_ directory: URL, _ body: () throws -> Void) throws {
         let manager = FileManager.default
         try manager.setAttributes([.posixPermissions: 0o500], ofItemAtPath: directory.path)
@@ -273,23 +272,31 @@ struct ModelDownloadLoggingTests {
         }
     }
 
-    // The HuggingFace path inside ModelStore builds its own URLSession, so the one download
-    // failure it reports is pinned in source rather than driven.
     @Test("the store reports a failed snapshot with the model and the error kind")
-    func snapshotFailureSite() throws {
-        let path = #filePath.replacingOccurrences(
-            of: "Tests/ParolaCoreTests/ModelDownloadLoggingTests.swift",
-            with: "Sources/ParolaCore/Models/ModelStore.swift"
-        )
-        let source = try String(contentsOfFile: path, encoding: .utf8)
-            .split(whereSeparator: \.isWhitespace)
-            .joined(separator: " ")
-        #expect(source.contains(
-            #"ParolaLog.error( .models, "download failed", [ .model: .safe(ModelToken(variant)), "#
-            + #".elapsed: .duration(startedAt.duration(to: .now)), .error: .error(error), ]"#
-        ))
-        #expect(source.contains("localizedDescription)]") == false)
-        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 10)
+    func snapshotFailure() async throws {
+        try await withSink { sink in
+            let store = try makeStore()
+            // A registered engine keeps downloadNow from bootstrapping the built-in downloaders.
+            let registry = EngineRegistry()
+            await registry.register(
+                engineID: .parakeet,
+                capabilities: .whisperKitDefaults,
+                factory: { _ in StubTranscriber() }
+            )
+            await #expect(throws: ParolaError.self) {
+                _ = try await store.download(
+                    variant: Self.tiny,
+                    registry: registry,
+                    urlSession: Self.session(tree: "[]")
+                )
+            }
+            let record = try #require(modelRecords(sink, message: "download failed").first)
+            #expect(record.level == .error)
+            #expect(record.fields[.model]?.text == Self.tiny)
+            #expect(record.fields[.elapsed] != nil)
+            #expect(record.fields[.error]?.text == "ParolaError.modelDownloadFailed(unrecognized)")
+            #expect(record.formattedLine.contains("huggingface") == false)
+        }
     }
 
     private static func tree(size: Int64, sha256: String? = nil) -> String {

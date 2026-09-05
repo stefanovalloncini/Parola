@@ -450,7 +450,8 @@ public final class ModelStore: Sendable {
     public func download(
         variant: String,
         progress: (@Sendable (Double) -> Void)? = nil,
-        registry: EngineRegistry = .shared
+        registry: EngineRegistry = .shared,
+        urlSession: URLSession = .shared
     ) async throws -> URL {
         if isInstalled(variant) {
             progress?(1.0)
@@ -468,7 +469,12 @@ public final class ModelStore: Sendable {
                 "download starting for \(ModelToken(variant))",
                 Self.catalogSizeFields(variant)
             )
-            return try await self.downloadNow(variant: variant, progress: progress, registry: registry)
+            return try await self.downloadNow(
+                variant: variant,
+                progress: progress,
+                registry: registry,
+                urlSession: urlSession
+            )
         }
     }
 
@@ -495,7 +501,8 @@ public final class ModelStore: Sendable {
     private func downloadNow(
         variant: String,
         progress: (@Sendable (Double) -> Void)?,
-        registry: EngineRegistry
+        registry: EngineRegistry,
+        urlSession: URLSession
     ) async throws -> URL {
         if isInstalled(variant) {
             progress?(1.0)
@@ -527,7 +534,12 @@ public final class ModelStore: Sendable {
             ParolaLog.error(.models, "no downloader registered for \(engineID)")
             throw ParolaError.engineNotRegistered(engineID.rawValue)
         }
-        return try await downloadViaHuggingFace(variant: variant, source: source, progress: progress)
+        return try await downloadViaHuggingFace(
+            variant: variant,
+            source: source,
+            progress: progress,
+            urlSession: urlSession
+        )
     }
 
     /// Wraps an engine-supplied downloader in the same sidecar protocol the HuggingFace path
@@ -573,7 +585,8 @@ public final class ModelStore: Sendable {
     private func downloadViaHuggingFace(
         variant: String,
         source: ModelDownloadSource,
-        progress: (@Sendable (Double) -> Void)?
+        progress: (@Sendable (Double) -> Void)?,
+        urlSession: URLSession
     ) async throws -> URL {
         let startedAt = ContinuousClock.now
         let destination = installedURL(for: source)
@@ -590,6 +603,7 @@ public final class ModelStore: Sendable {
                 repo: source.huggingFaceRepo,
                 subpath: source.subpath.isEmpty ? nil : source.subpath,
                 destination: destination,
+                urlSession: urlSession,
                 progress: progress
             )
             progress?(1.0)

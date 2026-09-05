@@ -81,8 +81,7 @@ struct CaptureLoggingTests {
         }
     }
 
-    // The capture sources need a microphone, a display or a process tap to reach their failure
-    // branches, so their sites are pinned in source the way EngineLoggingTests pins the engines'.
+    // The live sources need real hardware to fail, so their sites are pinned in source instead.
     private func audioSource(_ name: String) throws -> String {
         let path = #filePath.replacingOccurrences(
             of: "Tests/ParolaCoreTests/CaptureLoggingTests.swift",
@@ -136,8 +135,7 @@ struct CaptureLoggingTests {
         #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 2)
     }
 
-    // The one call in each of these files is the latch and the scratch directory, so the counts
-    // pinned here are also what rules out a per-buffer or per-take record appearing later.
+    // The pinned counts are also what rules out a per-buffer record appearing later.
     @Test("the writer and the scratch directory log once each")
     func writerAndScratchSites() throws {
         let writer = try audioSource("CaptureFileWriter")

@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-// .logFacade is the gate CaptureLoggingTests holds while it points the same process-wide
-// scratch override at a directory it cannot create.
+// .logFacade: CaptureLoggingTests drives the same process-wide override under that gate.
 @Suite("RecordingScratch", .serialized, .logFacade)
 struct RecordingScratchTests {
 
