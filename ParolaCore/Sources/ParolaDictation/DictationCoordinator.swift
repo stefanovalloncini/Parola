@@ -272,6 +272,10 @@ public actor DictationCoordinator {
         do {
             try await recorder.start()
         } catch {
+            ParolaLog.error(
+                .dictation, "dictation recorder failed to start in \(mode)",
+                [.error: .error(error)]
+            )
             startInFlight = false
             guard myGeneration == generation else { return }
             await mediaSession?.exitRecording()
@@ -306,6 +310,7 @@ public actor DictationCoordinator {
         hybridLocked = false
         await setState(.transcribing)
         await mediaSession?.exitRecording()
+        let startedAt = ContinuousClock.now
         do {
             let raw = try await recorder.stopAndTranscribe()
             let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -318,11 +323,16 @@ public actor DictationCoordinator {
             }
             await setState(.idle)
         } catch {
+            ParolaLog.error(
+                .dictation, "dictation finish failed in \(mode)",
+                [.elapsed: .duration(startedAt.duration(to: .now)), .error: .error(error)]
+            )
             await setState(.failed(error.localizedDescription))
         }
     }
 
     private func setState(_ new: State) async {
+        ParolaLog.debug(.dictation, "dictation state → \(new)")
         state = new
         await onStateChange(new)
     }

@@ -22,7 +22,10 @@ struct ClipboardPasteInserter: TextInserter {
             let prior = PasteboardSnapshot.capture(from: pasteboard)
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
-            guard trustCheck() else { throw TextInsertionError.accessibilityDenied }
+            guard trustCheck() else {
+                ParolaLog.notice(.appPermissions, "text insertion blocked: accessibility not granted")
+                throw TextInsertionError.accessibilityDenied
+            }
             let changeCountAfterWrite = pasteboard.changeCount
             postCmdV()
             Task { @MainActor in

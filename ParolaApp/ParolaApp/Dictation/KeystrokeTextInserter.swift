@@ -31,6 +31,7 @@ struct KeystrokeTextInserter: TextInserter {
 
     func insert(_ text: String) async throws {
         guard trustCheck() else {
+            ParolaLog.notice(.appPermissions, "keystroke insertion blocked: accessibility not granted")
             await MainActor.run {
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
