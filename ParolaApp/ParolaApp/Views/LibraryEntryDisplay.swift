@@ -42,6 +42,7 @@ struct LibraryRowDisplay: Identifiable {
     var id: LibraryEntry.ID { entry.id }
     var pinned: Bool { entry.pinned }
     var noteCount: Int { entry.segmentNotes.count }
+    var labels: [String] { entry.labels }
 
     init(entry: LibraryEntry, sizeBytes: Int64?) {
         let title = LibraryEntryDisplay.title(for: entry)

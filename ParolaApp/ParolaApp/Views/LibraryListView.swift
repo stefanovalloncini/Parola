@@ -543,10 +543,36 @@ struct LibraryRow: View {
                 .foregroundStyle(DS.Color.secondaryText)
                 .lineLimit(1)
             }
-            Spacer()
+            Spacer(minLength: DS.Spacing.regular)
+            labelChips
         }
         .padding(.vertical, compact ? DS.Spacing.tight / 2 : DS.Spacing.tight)
         .frame(height: rowHeight)
         .help(display.tooltip)
+    }
+
+    @ViewBuilder
+    private var labelChips: some View {
+        let shown = Array(display.labels.prefix(2))
+        let hidden = display.labels.count - shown.count
+        if !shown.isEmpty {
+            HStack(spacing: 4) {
+                ForEach(shown, id: \.self) { label in
+                    chip(Text(verbatim: label))
+                }
+                if hidden > 0 {
+                    chip(Text(verbatim: "+\(hidden)"))
+                }
+            }
+            .help(display.labels.joined(separator: ", "))
+        }
+    }
+
+    private func chip(_ label: Text) -> some View {
+        label
+            .font(DS.Font.caption)
+            .foregroundStyle(DS.Color.secondaryText)
+            .lineLimit(1)
+            .chipChrome(isSelected: false, size: .regular)
     }
 }
