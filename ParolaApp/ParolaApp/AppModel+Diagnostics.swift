@@ -8,47 +8,61 @@ extension AppModel {
         DiagnosticsInstaller.current?.directory ?? DiagnosticsInstaller.defaultDirectory
     }
 
+    /// nil means the save panel was dismissed; a thrown error means the report could not be written.
     @discardableResult
-    func exportDiagnostics(directory: URL = AppModel.diagnosticsDirectory) async -> URL? {
+    func exportDiagnostics(directory: URL = AppModel.diagnosticsDirectory) async throws -> URL? {
         let stamp = Date().formatted(.iso8601.year().month().day().dateSeparator(.dash))
         guard let destination = await filePicker.chooseSaveDestination(
             suggestedName: "Parola-Diagnostics-\(stamp).txt",
             allowedTypes: [.plainText]
         ) else { return nil }
         let environment = await diagnosticsEnvironment()
-        let text = await Task.detached(priority: .userInitiated) {
-            DiagnosticsExport.render(directory: directory, environment: environment)
-        }.value
         do {
-            try text.write(to: destination, atomically: true, encoding: .utf8)
+            try await Self.offMainIO {
+                let text = DiagnosticsExport.render(directory: directory, environment: environment)
+                try text.write(to: destination, atomically: true, encoding: .utf8)
+            }
         } catch {
-            ParolaLog.error(.export, "diagnostics export failed", [.error: .error(error)])
-            return nil
+            ParolaLog.error(.diagnostics, "diagnostics export failed", [.error: .error(error)])
+            throw error
         }
         return destination
     }
 
-    func revealDiagnostics(directory: URL = AppModel.diagnosticsDirectory) {
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    nonisolated static func diagnosticsExportFailureMessage(
+        for error: any Error,
+        bundle: Bundle = .main
+    ) -> String {
+        String(localized: "Couldn't export diagnostics: \(error.localizedDescription)", bundle: bundle)
+    }
+
+    func revealDiagnostics(directory: URL = AppModel.diagnosticsDirectory) async {
+        try? await Self.offMainIO {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
         NSWorkspace.shared.activateFileViewerSelecting([directory])
     }
 
     func deleteDiagnostics(directory: URL = AppModel.diagnosticsDirectory) async {
         await DiagnosticsInstaller.current?.startNewFile()
-        let manager = FileManager.default
-        let entries = (try? manager.contentsOfDirectory(
-            at: directory, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
-        )) ?? []
-        for url in entries where url.pathExtension == "jsonl" {
-            try? manager.removeItem(at: url)
+        try? await Self.offMainIO {
+            for url in Self.diagnosticsFiles(in: directory) {
+                try? FileManager.default.removeItem(at: url)
+            }
         }
     }
 
-    func diagnosticsRecordsExist(directory: URL = AppModel.diagnosticsDirectory) -> Bool {
+    func diagnosticsRecordsExist(directory: URL = AppModel.diagnosticsDirectory) async -> Bool {
+        (try? await Self.offMainIO { !Self.diagnosticsFiles(in: directory).isEmpty }) ?? false
+    }
+
+    private nonisolated static func diagnosticsFiles(in directory: URL) -> [URL] {
         let entries = (try? FileManager.default.contentsOfDirectory(
             at: directory, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
         )) ?? []
-        return entries.contains { $0.pathExtension == "jsonl" }
+        return entries.filter {
+            $0.lastPathComponent.hasPrefix(FileDiagnosticsSink.filePrefix) && $0.pathExtension == "jsonl"
+        }
     }
 
     func diagnosticsEnvironment() async -> DiagnosticsEnvironment {
@@ -60,14 +74,10 @@ extension AppModel {
         let systemAudio = Self.diagnosticsPermission(for: capturePermissions.systemAudioStatus)
         let accessibility = Self.diagnosticsPermission(granted: dictationPermissions.accessibilityGranted)
 
-        let registry = EngineRegistry.shared
-        await ParolaCoreBootstrap.registerBuiltInEngines(registry: registry)
-        var engines: [EngineID: Bool] = [:]
-        for id in [EngineID.whisperKit, .parakeet, .appleSpeech] {
-            engines[id] = await registry.isRegistered(id)
-        }
+        await ParolaCoreBootstrap.registerBuiltInEngines()
+        let engines = await Self.diagnosticsEngines(registry: .shared)
 
-        let models = await Task.detached(priority: .userInitiated) {
+        let models = try? await Self.offMainIO {
             let store = ModelStore.shared
             return store.scan().installed.map { info in
                 DiagnosticsEnvironment.InstalledModel(
@@ -75,7 +85,7 @@ extension AppModel {
                     bytes: info.installedURL.flatMap { store.sizeOnDisk(at: $0) }.map(UInt64.init)
                 )
             }
-        }.value
+        }
 
         return DiagnosticsEnvironment(
             appVersion: AboutInfo.versionString,
@@ -84,11 +94,19 @@ extension AppModel {
             systemAudio: systemAudio,
             accessibility: accessibility,
             engines: engines,
-            models: models,
+            models: models ?? [],
             libraryEntryCount: await library.list().count,
             libraryBytes: await library.sizeOnDisk(),
             features: features
         )
+    }
+
+    static func diagnosticsEngines(registry: EngineRegistry) async -> [EngineID: Bool] {
+        var engines: [EngineID: Bool] = [:]
+        for id in [EngineID.whisperKit, .parakeet, .appleSpeech] {
+            engines[id] = await registry.isRegistered(id)
+        }
+        return engines
     }
 
     static func diagnosticsPermission(

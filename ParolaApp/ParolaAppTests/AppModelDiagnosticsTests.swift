@@ -56,7 +56,7 @@ struct AppModelDiagnosticsTests {
         )
         try await queueDestination(model, destination)
 
-        let written = try #require(await model.exportDiagnostics(directory: source))
+        let written = try #require(try await model.exportDiagnostics(directory: source))
         #expect(written == destination)
 
         let text = try String(contentsOf: destination, encoding: .utf8)
@@ -81,7 +81,7 @@ struct AppModelDiagnosticsTests {
         try await queueDestination(model, destination)
 
         let absent = scratchDirectory()
-        let written = try #require(await model.exportDiagnostics(directory: absent))
+        let written = try #require(try await model.exportDiagnostics(directory: absent))
 
         let text = try String(contentsOf: written, encoding: .utf8)
         #expect(text.hasPrefix("Parola Diagnostics — generated "))
@@ -93,7 +93,21 @@ struct AppModelDiagnosticsTests {
         let model = makeModel()
         let source = scratchDirectory()
         try seedRecord(in: source, message: "not exported")
-        #expect(await model.exportDiagnostics(directory: source) == nil)
+        #expect(try await model.exportDiagnostics(directory: source) == nil)
+    }
+
+    @Test("a destination that cannot be written throws instead of reporting a cancel")
+    func exportWriteFailureThrows() async throws {
+        let model = makeModel()
+        let source = scratchDirectory()
+        try seedRecord(in: source, message: "not written")
+        let destination = scratchDirectory().appendingPathComponent("missing/report.txt")
+        try await queueDestination(model, destination)
+
+        await #expect(throws: (any Error).self) {
+            try await model.exportDiagnostics(directory: source)
+        }
+        #expect(FileManager.default.fileExists(atPath: destination.path) == false)
     }
 
     @Test("delete removes the sink files and tolerates a directory that is not there")
@@ -101,21 +115,35 @@ struct AppModelDiagnosticsTests {
         let model = makeModel()
         let directory = scratchDirectory()
         try seedRecord(in: directory, message: "deleted record")
-        #expect(model.diagnosticsRecordsExist(directory: directory))
+        #expect(await model.diagnosticsRecordsExist(directory: directory))
 
         await model.deleteDiagnostics(directory: directory)
-        #expect(model.diagnosticsRecordsExist(directory: directory) == false)
+        #expect(await model.diagnosticsRecordsExist(directory: directory) == false)
 
         let absent = scratchDirectory()
         await model.deleteDiagnostics(directory: absent)
-        #expect(model.diagnosticsRecordsExist(directory: absent) == false)
+        #expect(await model.diagnosticsRecordsExist(directory: absent) == false)
+    }
+
+    @Test("delete leaves files the sink did not write")
+    func deleteMatchesTheSinkPrefix() async throws {
+        let model = makeModel()
+        let directory = scratchDirectory()
+        try seedRecord(in: directory, message: "sink record")
+        let stranger = directory.appendingPathComponent("notes.jsonl")
+        try "{}\n".write(to: stranger, atomically: true, encoding: .utf8)
+
+        await model.deleteDiagnostics(directory: directory)
+
+        #expect(FileManager.default.fileExists(atPath: stranger.path))
+        #expect(await model.diagnosticsRecordsExist(directory: directory) == false)
     }
 
     @Test("reveal creates the directory so Finder always has something to show")
-    func revealCreatesTheDirectory() throws {
+    func revealCreatesTheDirectory() async throws {
         let model = makeModel()
         let directory = scratchDirectory()
-        model.revealDiagnostics(directory: directory)
+        await model.revealDiagnostics(directory: directory)
         #expect(FileManager.default.fileExists(atPath: directory.path))
     }
 
@@ -138,7 +166,6 @@ struct AppModelDiagnosticsTests {
         #expect(environment.appVersion == AboutInfo.versionString)
         #expect(environment.engines.keys.sorted { $0.rawValue < $1.rawValue }
             == [EngineID.appleSpeech, .parakeet, .whisperKit])
-        #expect(environment.engines[.whisperKit] == true)
         #expect(environment.libraryEntryCount == 0)
     }
 
@@ -162,6 +189,44 @@ struct AppModelDiagnosticsTests {
         #expect(reply == .object(["path": .string(destination.path)]))
         let text = try String(contentsOf: destination, encoding: .utf8)
         #expect(text.hasPrefix("Parola Diagnostics — generated "))
+    }
+
+    @Test("the bridge separates a dismissed panel from a failed write")
+    func bridgeSeparatesCancelFromFailure() async throws {
+        let model = makeModel()
+        let server = try ParolaAutomationServer(model: model)
+        let context = AutomationContext(model: model, server: server)
+        let command = try #require(
+            server.diagnosticsCommands().first { $0.name == "exportDiagnostics" }
+        )
+
+        do {
+            _ = try await command.handler(AutomationArgs(), context)
+            Issue.record("expected the handler to throw")
+        } catch let error as AutomationError {
+            #expect(error.code == "PRECONDITION")
+        }
+
+        try await queueDestination(model, scratchDirectory().appendingPathComponent("missing/x.txt"))
+        do {
+            _ = try await command.handler(AutomationArgs(), context)
+            Issue.record("expected the handler to throw")
+        } catch let error as AutomationError {
+            #expect(error.code == "INTERNAL")
+        }
+        withExtendedLifetime(server) {}
+    }
+
+    @Test("an engine the registry does not know reports unavailable")
+    func enginesReflectTheRegistry() async {
+        let registry = EngineRegistry()
+        let unknown = await AppModel.diagnosticsEngines(registry: registry)
+        #expect(unknown == [.whisperKit: false, .parakeet: false, .appleSpeech: false])
+
+        await ParolaCoreBootstrap.registerBuiltInEngines(registry: registry)
+        let known = await AppModel.diagnosticsEngines(registry: registry)
+        #expect(known[.whisperKit] == true)
+        #expect(known[.parakeet] == true)
     }
 
     @Test("the About pane tags the diagnostics group for the bridge")

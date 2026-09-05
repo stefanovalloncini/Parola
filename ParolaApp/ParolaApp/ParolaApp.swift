@@ -131,7 +131,15 @@ struct ParolaApp: App {
                     }
                 }
                 Button("Export Diagnostics…") {
-                    Task { await model.exportDiagnostics() }
+                    Task {
+                        do {
+                            try await model.exportDiagnostics()
+                        } catch {
+                            model.phase = .failed(
+                                message: AppModel.diagnosticsExportFailureMessage(for: error)
+                            )
+                        }
+                    }
                 }
             }
             CommandGroup(replacing: .newItem) {

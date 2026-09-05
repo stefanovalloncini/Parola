@@ -71,7 +71,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_download_model` | **name** | Trigger a download from inside the app. Progress shows in the UI. |
 | `parola_app_delete_model` | **name** | Delete a downloaded model. |
 | `parola_app_export_transcript` | **format** | txt / md / html / docx / pdf / csv / srt / vtt / json. The app's save panel handles the destination. |
-| `exportDiagnostics` | — | Render the diagnostics report and write it to the save destination. Returns `{path}`. In test mode, queue the destination with `queueSaveDestination` first. |
+| `exportDiagnostics` | — | Render the diagnostics report and write it to the save destination. Returns `{path}`. In test mode, queue the destination with `queueSaveDestination` first. A dismissed panel is `PRECONDITION`; a failed write is `INTERNAL`. |
 | `parola_app_dismiss_error` | — | Clear a failed phase (equivalent to clicking "Try again"). |
 | `parola_app_screenshot` | path | Capture the main window to PNG via ScreenCaptureKit (needs Screen Recording permission). `path` is a bare filename stored under `Caches/Parola/Screenshots`. |
 | `parola_app_list_windows` | — | Visible NSWindows: title, size, key/main flags. |

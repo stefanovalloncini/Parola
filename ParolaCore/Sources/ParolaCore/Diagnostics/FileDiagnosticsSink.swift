@@ -19,7 +19,9 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     /// file from an older build knows what shape to expect.
     public static let schemaVersion = 1
 
-    static let filePrefix = "parola-"
+    /// Every file the sink writes starts with this, so a frontend deleting the store matches the
+    /// same names the export reader does.
+    public static let filePrefix = "parola-"
 
     private let bufferState = OSAllocatedUnfairLock(initialState: BufferState())
     private let rotationState = OSAllocatedUnfairLock(initialState: 0)

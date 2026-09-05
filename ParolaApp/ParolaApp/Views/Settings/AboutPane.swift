@@ -6,6 +6,7 @@ struct AboutPane: View {
     @Environment(AppModel.self) private var model
     @State private var copiedVersion = false
     @State private var hasDiagnostics = false
+    @State private var diagnosticsFailure: String?
 
     var body: some View {
         VStack(spacing: 16) {
@@ -44,33 +45,59 @@ struct AboutPane: View {
                         .foregroundStyle(.secondary)
                         .axLeaf("About.Text.DiagnosticsRetention")
                     HStack(spacing: 8) {
-                        Button("Export…") {
-                            Task { await model.exportDiagnostics() }
-                        }
-                        .axLeaf("About.Button.ExportDiagnostics")
+                        Button("Export…") { exportDiagnostics() }
+                            .axLeaf("About.Button.ExportDiagnostics")
                         Button("Reveal in Finder") {
-                            model.revealDiagnostics()
+                            Task { await model.revealDiagnostics() }
                         }
                         .axLeaf("About.Button.RevealDiagnostics")
-                        Button("Delete Diagnostics") {
+                        Button("Delete Diagnostics", role: .destructive) {
                             Task {
                                 await model.deleteDiagnostics()
-                                hasDiagnostics = model.diagnosticsRecordsExist()
+                                hasDiagnostics = await model.diagnosticsRecordsExist()
                             }
                         }
                         .axLeaf("About.Button.DeleteDiagnostics")
                         .disabled(!hasDiagnostics)
                     }
                     .controlSize(.small)
+                    .alert(
+                        Text("Couldn't export diagnostics"),
+                        isPresented: Binding(
+                            get: { diagnosticsFailure != nil },
+                            set: { if !$0 { diagnosticsFailure = nil } }
+                        ),
+                        presenting: diagnosticsFailure
+                    ) { _ in
+                        Button("OK") {}
+                    } message: { message in
+                        Text(message)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
             }
-            .onAppear { hasDiagnostics = model.diagnosticsRecordsExist() }
+            .task {
+                while !Task.isCancelled {
+                    hasDiagnostics = await model.diagnosticsRecordsExist()
+                    try? await Task.sleep(for: .seconds(2))
+                }
+            }
 
             Spacer()
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
+    }
+
+    private func exportDiagnostics() {
+        Task {
+            do {
+                try await model.exportDiagnostics()
+            } catch {
+                diagnosticsFailure = error.localizedDescription
+            }
+            hasDiagnostics = await model.diagnosticsRecordsExist()
+        }
     }
 }
