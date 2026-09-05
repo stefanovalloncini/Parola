@@ -96,10 +96,28 @@ extension AppModel {
         if chaptersError != nil { chaptersError = nil }
     }
 
+    /// The one way a stored document takes over the pane: drop what the last transcript derived, then adopt what this one saved.
+    func installStoredTranscript(_ stored: Transcript) {
+        clearDerivedArtifacts()
+        transcript = stored
+        adoptSavedChapters()
+    }
+
     /// Call after the transcript installs — `clearDerivedArtifacts()` runs before it, and Chapters reads runtime state only.
     func adoptSavedChapters() {
         let saved = transcript?.summary?.chapters ?? []
         if smartChapters != saved { smartChapters = saved }
+    }
+
+    /// Keeps a saved summary's chapters in step with the runtime list, so reopening the entry can't resurrect the old one.
+    /// Entries with no saved summary keep their chapters in memory, as they did before.
+    func persistChapters(_ chapters: [Chapter]) {
+        guard transcript?.summary != nil, transcript?.summary?.chapters != chapters else { return }
+        transcript?.summary?.chapters = chapters
+        guard let entryID = selectedEntryID, let updated = transcript else { return }
+        Task { [library] in
+            try? await library.updateTranscript(updated, for: entryID, reindex: false)
+        }
     }
 
     /// Re-reads whether Apple Intelligence can serve a request, so AI affordances can gate on it
@@ -126,6 +144,7 @@ extension AppModel {
                 let chapters = try await SmartChapters.generate(for: transcript, model: model)
                 if generation == derivedArtifactsGeneration {
                     smartChapters = chapters
+                    persistChapters(chapters)
                 }
             } catch {
                 if generation == derivedArtifactsGeneration {
@@ -139,6 +158,7 @@ extension AppModel {
 
     func clearSmartChapters() {
         smartChapters = []
+        persistChapters([])
     }
 
     /// Replaces a freshly-saved entry's filename-derived title with a short LLM-written one.

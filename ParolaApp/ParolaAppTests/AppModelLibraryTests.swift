@@ -118,20 +118,26 @@ struct AppModelLibraryTests {
         #expect(model.smartChapters.isEmpty)
     }
 
+    private static func transcriptWithSavedChapters(
+        _ chapters: [Chapter] = [Chapter(title: "Opening", start: 0), Chapter(title: "Wrap up", start: 40)]
+    ) -> Transcript {
+        Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+            language: "en",
+            modelName: "stub",
+            summary: Summary(text: "recap", chapters: chapters)
+        )
+    }
+
     @Test("loadEntry seeds smartChapters from the saved summary")
     func loadEntryAdoptsSavedChapters() async throws {
         let model = makeModel()
         let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
-        var saved = Transcript(
-            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
-            language: "en",
-            modelName: "stub"
+        let seeded = try await seedStore.add(
+            transcript: Self.transcriptWithSavedChapters(),
+            audioSource: nil,
+            category: .transcription
         )
-        saved.summary = Summary(
-            text: "recap",
-            chapters: [Chapter(title: "Opening", start: 0), Chapter(title: "Wrap up", start: 40)]
-        )
-        let seeded = try await seedStore.add(transcript: saved, audioSource: nil, category: .transcription)
 
         model.loadEntry(seeded.id)
         for _ in 0..<200 where model.selectedEntryID != seeded.id {
@@ -164,33 +170,69 @@ struct AppModelLibraryTests {
         #expect(model.smartChapters.isEmpty)
     }
 
-    @Test("freshly generated chapters replace the ones the entry saved")
-    func generatedChaptersOverrideSavedOnes() {
+    @Test("cleared chapters stay cleared after closing and reopening the entry")
+    func clearedChaptersDoNotComeBackOnReload() async throws {
         let model = makeModel()
-        var saved = Transcript(
-            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
-            language: "en",
-            modelName: "stub"
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Self.transcriptWithSavedChapters(),
+            audioSource: nil,
+            category: .transcription
         )
-        saved.summary = Summary(text: "recap", chapters: [Chapter(title: "Opening", start: 0)])
-        model.transcript = saved
-        model.adoptSavedChapters()
 
-        model.smartChapters = [Chapter(title: "Fresh chapter", start: 5)]
+        model.loadEntry(seeded.id)
+        for _ in 0..<200 where model.selectedEntryID != seeded.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.smartChapters.map(\.title) == ["Opening", "Wrap up"])
 
-        #expect(model.smartChapters.map(\.title) == ["Fresh chapter"])
+        model.clearSmartChapters()
+        #expect(model.smartChapters.isEmpty)
+
+        var persisted = false
+        for _ in 0..<200 {
+            let stored = try? await model.library.load(seeded.id).document.transcript
+            if stored?.summary?.chapters.isEmpty == true { persisted = true; break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(persisted)
+
+        model.clearLoadedEntry()
+        model.loadEntry(seeded.id)
+        for _ in 0..<200 where model.selectedEntryID != seeded.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(model.smartChapters.isEmpty)
+    }
+
+    @Test("summarizing the latest entry adopts its chapters, not the previous entry's")
+    func summarizeLatestEntryAdoptsItsOwnChapters() async throws {
+        // Seed before the model exists: its init primes the store's list cache, and an empty one never refills.
+        let libraryURL = makeTempLibraryURL("summarize-latest")
+        let seedStore = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Self.transcriptWithSavedChapters(),
+            audioSource: nil,
+            category: .transcription
+        )
+        let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: libraryURL)
+        model.summariseOperation = { _ in Summary(text: "recap") }
+        model.smartChapters = [Chapter(title: "stale chapter", start: 0)]
+
+        model.summarizeLatestEntry()
+        for _ in 0..<200 where model.selectedEntryID != seeded.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(model.selectedEntryID == seeded.id)
+        #expect(model.smartChapters.map(\.title) == ["Opening", "Wrap up"])
     }
 
     @Test("clearing the loaded entry drops the adopted chapters")
     func clearLoadedEntryDropsAdoptedChapters() {
         let model = makeModel()
-        var saved = Transcript(
-            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
-            language: "en",
-            modelName: "stub"
-        )
-        saved.summary = Summary(text: "recap", chapters: [Chapter(title: "Opening", start: 0)])
-        model.transcript = saved
+        model.transcript = Self.transcriptWithSavedChapters([Chapter(title: "Opening", start: 0)])
         model.adoptSavedChapters()
         #expect(!model.smartChapters.isEmpty)
 

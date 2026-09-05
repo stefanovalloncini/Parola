@@ -2679,11 +2679,9 @@ final class AppModel {
                     try? await library.updateTranscript(pending.transcript, for: pending.id)
                 }
             }
-            clearDerivedArtifacts()
             selectedEntryID = nil
             sourceFileURL = doc.audioURL
-            transcript = doc.transcript
-            adoptSavedChapters()
+            installStoredTranscript(doc.transcript)
             if let audio = doc.audioURL {
                 installPlayer(for: audio)
                 adoptLoadedMediaDuration()

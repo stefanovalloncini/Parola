@@ -21,7 +21,7 @@ extension AppModel {
             guard let latest = entries.first else { return }
             do {
                 let loaded = try await library.load(latest.id)
-                self.transcript = loaded.document.transcript
+                self.installStoredTranscript(loaded.document.transcript)
                 self.selectedEntryID = latest.id
                 self.summariseTranscript()
             } catch { }

@@ -298,9 +298,7 @@ extension AppModel {
                 // Two quick clicks race across the load await; the slower load would otherwise
                 // finish last and install the entry the user already navigated away from.
                 guard generation == loadEntryGeneration else { return }
-                clearDerivedArtifacts()
-                transcript = loaded.document.transcript
-                adoptSavedChapters()
+                installStoredTranscript(loaded.document.transcript)
                 sourceFileURL = loaded.document.audioURL
                 selectedEntryID = id
                 if let audioURL = loaded.document.audioURL {
