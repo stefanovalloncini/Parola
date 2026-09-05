@@ -214,7 +214,7 @@ struct ContinuousChunks: View {
         for seg in segments {
             let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !body.isEmpty else { continue }
-            let pauseBreak = lastEnd.map { seg.start - $0 >= paragraphPause } ?? false
+            let pauseBreak = TranscriptParagraphs.breaksParagraph(after: lastEnd, start: seg.start, pause: paragraphPause)
             lastEnd = seg.end
             let baseColor: Color? = useSpeakerColor ? seg.speaker.map(DS.speakerColor(for:)) : nil
             if let label = useSpeakerColor ? SegmentCard.speakerLabel(for: seg.speaker) : nil,

@@ -154,9 +154,23 @@ struct TranscriptHeaderBar: View {
     }
 
     private func copyTranscript() {
-        guard model.transcript != nil else { return }
+        guard let segments = model.transcript?.segments else { return }
+        let labelled = model.transcriptSpeakers.count >= 2
+        guard segments.count > TranscriptDerive.synchronousCap else {
+            writeToPasteboard(TranscriptParagraphs.plainText(segments: segments, includeSpeakerLabels: labelled))
+            return
+        }
+        Task {
+            let text = await Task.detached(priority: .userInitiated) {
+                TranscriptParagraphs.plainText(segments: segments, includeSpeakerLabels: labelled)
+            }.value
+            writeToPasteboard(text)
+        }
+    }
+
+    private func writeToPasteboard(_ text: String) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(model.transcriptText, forType: .string)
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     private func toggleSpeak() {
