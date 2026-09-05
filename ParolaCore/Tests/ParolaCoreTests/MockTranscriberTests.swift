@@ -110,6 +110,34 @@ struct MockTranscriberTests {
         }
     }
 
+    @Test("cancelling a run parked at the gate throws instead of hanging", .timeLimit(.minutes(1)))
+    func cancellingAGatedRunReturns() async throws {
+        let gate = MockTranscriberGate()
+        let response = MockTranscriberResponse(
+            segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "hello")],
+            language: "en",
+            modelName: "mock-tiny",
+            gate: gate
+        )
+        let mock = MockTranscriber.make(response: response, clock: ImmediateClock())
+        let atTheGate = LockedBox(value: false)
+
+        let run = Task {
+            try await mock.transcribe(
+                url: URL(fileURLWithPath: "/tmp/mock-input.wav"),
+                options: .default,
+                handlers: TranscribeHandlers(onStage: { stage in
+                    if stage == .transcribing { atTheGate.mutate { $0 = true } }
+                })
+            )
+        }
+        while !atTheGate.value { await Task.yield() }
+        await Task.yield()
+        run.cancel()
+
+        await #expect(throws: CancellationError.self) { try await run.value }
+    }
+
     @Test("registry install + resolve only matches the engine the mock was installed for")
     func registryResolvesPerEngine() async {
         let registry = MockTranscriberRegistry()

@@ -85,14 +85,26 @@ public actor MockTranscriberGate {
 
     public func open() {
         isOpen = true
+        wakeWaiters()
+    }
+
+    func wait() async throws {
+        while !isOpen {
+            try Task.checkCancellation()
+            // On cancel, wake every waiter: the cancelled one re-loops into the check above and
+            // throws; the rest re-queue.
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { waiters.append($0) }
+            } onCancel: {
+                Task { await self.wakeWaiters() }
+            }
+        }
+    }
+
+    private func wakeWaiters() {
         let pending = waiters
         waiters.removeAll()
         for waiter in pending { waiter.resume() }
-    }
-
-    func wait() async {
-        guard !isOpen else { return }
-        await withCheckedContinuation { waiters.append($0) }
     }
 }
 
@@ -208,7 +220,7 @@ public actor MockTranscriber: Transcriber {
             if response.delayMs > 0 {
                 try? await sleeper(response.delayMs)
             }
-            await response.gate?.wait()
+            try await response.gate?.wait()
             throw failure.asError()
         }
 
@@ -241,7 +253,7 @@ public actor MockTranscriber: Transcriber {
             handlers.onStage?(.transcribing)
         }
 
-        await response.gate?.wait()
+        try await response.gate?.wait()
         try Task.checkCancellation()
         return response.materialise(sourceURL: url)
     }

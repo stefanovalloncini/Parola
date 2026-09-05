@@ -132,14 +132,14 @@ struct CapabilityGuardTests {
     }
 
     @Test("variantSupporting prefers the requested engine, then the recommended model")
-    func variantSupportingPrefersSameEngine() {
+    func variantSupportingPrefersSameEngine() throws {
         #expect(ModelCatalog.variantSupporting(language: "it", preferring: .whisperKit)?.id
             == "openai_whisper-large-v3_turbo")
         #expect(ModelCatalog.variantSupporting(language: "en", preferring: .parakeet)?.id
             == "nvidia_parakeet-tdt-0.6b-v2")
-        let fallback = try? #require(ModelCatalog.variantSupporting(language: "it", preferring: .parakeet))
-        #expect(fallback?.engineID != .parakeet)
-        #expect(fallback?.category == .recommended)
+        let fallback = try #require(ModelCatalog.variantSupporting(language: "it", preferring: .parakeet))
+        #expect(fallback.engineID != .parakeet)
+        #expect(fallback.category == .recommended)
     }
 
     @Test("Parakeet rejects translate task")
