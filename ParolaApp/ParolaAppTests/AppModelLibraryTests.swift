@@ -118,6 +118,87 @@ struct AppModelLibraryTests {
         #expect(model.smartChapters.isEmpty)
     }
 
+    @Test("loadEntry seeds smartChapters from the saved summary")
+    func loadEntryAdoptsSavedChapters() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        var saved = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+            language: "en",
+            modelName: "stub"
+        )
+        saved.summary = Summary(
+            text: "recap",
+            chapters: [Chapter(title: "Opening", start: 0), Chapter(title: "Wrap up", start: 40)]
+        )
+        let seeded = try await seedStore.add(transcript: saved, audioSource: nil, category: .transcription)
+
+        model.loadEntry(seeded.id)
+        for _ in 0..<200 where model.selectedEntryID != seeded.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(model.smartChapters.map(\.title) == ["Opening", "Wrap up"])
+    }
+
+    @Test("loadEntry leaves smartChapters empty when the entry saved none")
+    func loadEntryWithoutSavedChaptersLeavesChaptersEmpty() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        model.smartChapters = [Chapter(title: "stale chapter", start: 0)]
+
+        model.loadEntry(seeded.id)
+        for _ in 0..<200 where model.selectedEntryID != seeded.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(model.smartChapters.isEmpty)
+    }
+
+    @Test("freshly generated chapters replace the ones the entry saved")
+    func generatedChaptersOverrideSavedOnes() {
+        let model = makeModel()
+        var saved = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+            language: "en",
+            modelName: "stub"
+        )
+        saved.summary = Summary(text: "recap", chapters: [Chapter(title: "Opening", start: 0)])
+        model.transcript = saved
+        model.adoptSavedChapters()
+
+        model.smartChapters = [Chapter(title: "Fresh chapter", start: 5)]
+
+        #expect(model.smartChapters.map(\.title) == ["Fresh chapter"])
+    }
+
+    @Test("clearing the loaded entry drops the adopted chapters")
+    func clearLoadedEntryDropsAdoptedChapters() {
+        let model = makeModel()
+        var saved = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+            language: "en",
+            modelName: "stub"
+        )
+        saved.summary = Summary(text: "recap", chapters: [Chapter(title: "Opening", start: 0)])
+        model.transcript = saved
+        model.adoptSavedChapters()
+        #expect(!model.smartChapters.isEmpty)
+
+        model.clearLoadedEntry()
+
+        #expect(model.smartChapters.isEmpty)
+    }
+
     @Test("newest sort orders by createdAt descending")
     func sortNewest() {
         let model = makeModel()

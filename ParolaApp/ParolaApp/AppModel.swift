@@ -2683,6 +2683,7 @@ final class AppModel {
             selectedEntryID = nil
             sourceFileURL = doc.audioURL
             transcript = doc.transcript
+            adoptSavedChapters()
             if let audio = doc.audioURL {
                 installPlayer(for: audio)
                 adoptLoadedMediaDuration()

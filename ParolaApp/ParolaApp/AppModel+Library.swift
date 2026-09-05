@@ -300,6 +300,7 @@ extension AppModel {
                 guard generation == loadEntryGeneration else { return }
                 clearDerivedArtifacts()
                 transcript = loaded.document.transcript
+                adoptSavedChapters()
                 sourceFileURL = loaded.document.audioURL
                 selectedEntryID = id
                 if let audioURL = loaded.document.audioURL {

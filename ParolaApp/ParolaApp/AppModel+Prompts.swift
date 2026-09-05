@@ -96,6 +96,12 @@ extension AppModel {
         if chaptersError != nil { chaptersError = nil }
     }
 
+    /// Call after the transcript installs — `clearDerivedArtifacts()` runs before it, and Chapters reads runtime state only.
+    func adoptSavedChapters() {
+        let saved = transcript?.summary?.chapters ?? []
+        if smartChapters != saved { smartChapters = saved }
+    }
+
     /// Re-reads whether Apple Intelligence can serve a request, so AI affordances can gate on it
     /// before the user clicks. Safe to call from `.task` — it doesn't load the model.
     func refreshAIAvailability() {
