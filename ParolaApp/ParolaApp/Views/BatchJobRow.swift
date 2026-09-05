@@ -72,13 +72,18 @@ enum BatchMediaKind {
     case audio
     case video
 
-    // `.audio` conforms to `.audiovisualContent` too, so only the movie/video branches mean video.
+    /// Intake's lists win: `UTType(filenameExtension: "mkv")` is dynamic and conforms to neither `.movie` nor `.video`.
     init(url: URL) {
-        guard let type = UTType(filenameExtension: url.pathExtension) else {
+        let ext = url.pathExtension.lowercased()
+        if FolderWatcher.videoExtensions.contains(ext) {
+            self = .video
+        } else if FolderWatcher.audioExtensions.contains(ext) {
             self = .audio
-            return
+        } else if let type = UTType(filenameExtension: ext) {
+            self = type.conforms(to: .movie) || type.conforms(to: .video) ? .video : .audio
+        } else {
+            self = .audio
         }
-        self = type.conforms(to: .movie) || type.conforms(to: .video) ? .video : .audio
     }
 
     var symbolName: String {
