@@ -106,7 +106,7 @@ public actor TranscriptionSession {
             to: transcript,
             options: TranscriptCleanupOptions(
                 filtersHallucinations: options.filtersHallucinations,
-                mergesSentences: engineID == .whisperKit
+                mergesSentences: false
             )
         )
         if options.diarize {
@@ -117,6 +117,15 @@ public actor TranscriptionSession {
                 numberOfSpeakers: options.expectedSpeakers
             )
         }
+        // After the diarizer, so the merger's speaker guard can see the labels and stop a
+        // merge at a turn boundary.
+        transcript = TranscriptCleanup.apply(
+            to: transcript,
+            options: TranscriptCleanupOptions(
+                filtersHallucinations: false,
+                mergesSentences: engineID == .whisperKit
+            )
+        )
         ParolaLog.info(
             .models, "transcribe finished",
             [

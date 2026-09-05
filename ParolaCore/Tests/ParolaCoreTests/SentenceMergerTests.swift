@@ -1,6 +1,7 @@
 import Clocks
 import Foundation
 import Testing
+@preconcurrency import SpeakerKit
 @testable import ParolaCore
 
 @Suite("Sentence-aware segment merging")
@@ -229,5 +230,52 @@ struct TranscriptionSessionMergeTests {
         await session.unloadModel()
 
         #expect(transcript.segments.count == 3)
+    }
+}
+
+@Suite("Merging around diarization")
+struct DiarizedMergeTests {
+    private let fragments = [
+        TranscriptSegment(id: 0, start: 0.0, end: 1.0, text: "e questo"),
+        TranscriptSegment(id: 1, start: 1.3, end: 2.0, text: "è quanto"),
+        TranscriptSegment(id: 2, start: 2.3, end: 3.0, text: "sì certo"),
+        TranscriptSegment(id: 3, start: 3.3, end: 4.0, text: "come dicevi")
+    ]
+
+    private var alternatingSpeakers: DiarizationResult {
+        DiarizationResult(
+            speakerCount: 2,
+            totalFrames: 450,
+            frameRate: 100,
+            segments: [
+                SpeakerSegment(speaker: .speakerId(0), startTime: 0, endTime: 1.15, frameRate: 100),
+                SpeakerSegment(speaker: .speakerId(1), startTime: 1.15, endTime: 2.15, frameRate: 100),
+                SpeakerSegment(speaker: .speakerId(0), startTime: 2.15, endTime: 3.15, frameRate: 100),
+                SpeakerSegment(speaker: .speakerId(1), startTime: 3.15, endTime: 4.5, frameRate: 100)
+            ]
+        )
+    }
+
+    @Test("the merge the session runs after diarization stops at every speaker change")
+    func mergeAfterDiarizationKeepsTurns() {
+        let transcript = Transcript(segments: fragments, language: "it", modelName: "mock")
+
+        let dropped = TranscriptCleanup.apply(
+            to: transcript,
+            options: TranscriptCleanupOptions(mergesSentences: false)
+        )
+        let diarized = DiarizationService.merge(transcript: dropped, diarization: alternatingSpeakers)
+        let out = TranscriptCleanup.apply(
+            to: diarized,
+            options: TranscriptCleanupOptions(filtersHallucinations: false, mergesSentences: true)
+        )
+
+        #expect(out.segments.map(\.text) == fragments.map(\.text))
+        #expect(out.segments.map(\.speaker) == ["Speaker 1", "Speaker 2", "Speaker 1", "Speaker 2"])
+    }
+
+    @Test("merging first would have joined the whole exchange into one turn")
+    func mergeBeforeDiarizationStraddlesTurns() {
+        #expect(SentenceMerger.merged(fragments).count == 1)
     }
 }
