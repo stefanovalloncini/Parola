@@ -27,6 +27,10 @@ extension EngineID: LogSafe {
     public var logToken: String { LogAllowlist.engineID(rawValue) }
 }
 
+extension CloudLLMProviderID: LogSafe {
+    public var logToken: String { LogAllowlist.providerID(rawValue) }
+}
+
 extension ParolaFeature: LogSafe {
     public var logToken: String { rawValue }
 }

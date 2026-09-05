@@ -50,6 +50,7 @@ public actor SummaryService {
             do {
                 return SummaryService.parse(try await model.respond(to: prompt))
             } catch {
+                ParolaLog.error(.ai, "summary model failed", [.error: .error(error)])
                 throw FailureReason.modelError(error.localizedDescription)
             }
         }
@@ -96,6 +97,7 @@ public actor SummaryService {
                 let response = try await session.respond(to: prompt, generating: GenerableSummary.self)
                 return response.content.toSummary()
             } catch {
+                ParolaLog.error(.ai, "on-device summary model failed", [.error: .error(error)])
                 throw FailureReason.modelError(error.localizedDescription)
             }
         }

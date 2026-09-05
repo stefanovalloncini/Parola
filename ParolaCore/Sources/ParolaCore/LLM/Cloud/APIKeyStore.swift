@@ -31,6 +31,7 @@ public actor KeychainAPIKeyStore: APIKeyStore {
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess else {
+            ParolaLog.error(.ai, "keychain read failed with OSStatus \(Int(status))")
             throw ParolaError.ioError("Keychain read failed: \(status)")
         }
         guard let data = item as? Data, let value = String(data: data, encoding: .utf8) else {
@@ -57,17 +58,21 @@ public actor KeychainAPIKeyStore: APIKeyStore {
                 if addStatus == errSecDuplicateItem {
                     let retry = SecItemUpdate(baseQuery as CFDictionary, attributes as CFDictionary)
                     guard retry == errSecSuccess else {
+                        ParolaLog.error(.ai, "keychain update failed with OSStatus \(Int(retry))")
                         throw ParolaError.ioError("Keychain update failed: \(retry)")
                     }
                 } else if addStatus != errSecSuccess {
+                    ParolaLog.error(.ai, "keychain add failed with OSStatus \(Int(addStatus))")
                     throw ParolaError.ioError("Keychain add failed: \(addStatus)")
                 }
             } else if status != errSecSuccess {
+                ParolaLog.error(.ai, "keychain update failed with OSStatus \(Int(status))")
                 throw ParolaError.ioError("Keychain update failed: \(status)")
             }
         } else {
             let status = SecItemDelete(baseQuery as CFDictionary)
             if status != errSecSuccess && status != errSecItemNotFound {
+                ParolaLog.error(.ai, "keychain delete failed with OSStatus \(Int(status))")
                 throw ParolaError.ioError("Keychain delete failed: \(status)")
             }
         }

@@ -50,6 +50,7 @@ public actor YouTubeAudioSource: AudioSource {
     public init(url: URL, timeoutSeconds: Int = 120, features: FeatureSet = .resolve()) throws {
         try features.require(.youtube)
         guard url.isYtDlpSupported else {
+            ParolaLog.notice(.youtube, "URL is not on a host yt-dlp can fetch from")
             throw ParolaError.captureUnavailable("URL not supported by yt-dlp: \(url.absoluteString)")
         }
         self.url = url
@@ -133,6 +134,7 @@ public actor YouTubeAudioSource: AudioSource {
         do {
             try process.run()
         } catch {
+            ParolaLog.error(.youtube, "yt-dlp could not be launched", [.error: .error(error)])
             throw ParolaError.captureUnavailable("could not launch yt-dlp: \(error.localizedDescription)")
         }
         runningProcess = process
@@ -146,6 +148,7 @@ public actor YouTubeAudioSource: AudioSource {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard process.terminationStatus == 0 else {
+            ParolaLog.error(.youtube, "yt-dlp exited with status \(Int(process.terminationStatus))")
             throw ParolaError.captureUnavailable("yt-dlp failed: \(errText.isEmpty ? outText : errText)")
         }
 

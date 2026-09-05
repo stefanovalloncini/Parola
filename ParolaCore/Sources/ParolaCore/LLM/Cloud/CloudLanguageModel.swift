@@ -49,6 +49,7 @@ struct CloudLanguageModel: LanguageModel {
             throw CloudLLMError.malformedResponse(provider: provider)
         }
         guard (200..<300).contains(http.statusCode) else {
+            ParolaLog.error(.ai, "\(provider) request failed with HTTP \(http.statusCode)")
             let body = String(data: data, encoding: .utf8) ?? ""
             throw CloudLLMError.requestFailed(provider: provider, status: http.statusCode, body: body)
         }
@@ -87,6 +88,11 @@ struct CloudLanguageModel: LanguageModel {
                     }
                     continuation.finish()
                 } catch {
+                    if !(error is CancellationError) {
+                        ParolaLog.error(
+                            .ai, "\(provider) stream failed", [.error: .error(error)]
+                        )
+                    }
                     continuation.finish(throwing: error)
                 }
             }

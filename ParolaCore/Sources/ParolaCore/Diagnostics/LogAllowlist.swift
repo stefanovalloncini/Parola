@@ -7,12 +7,18 @@ enum LogAllowlist {
         EngineID.whisperKit.rawValue, EngineID.parakeet.rawValue, EngineID.appleSpeech.rawValue,
     ]
 
+    private static let knownProviderIDs: Set<String> = Set(CloudLLMProviderID.allKnown.map(\.rawValue))
+
     static func modelID(_ id: String) -> String {
         ModelCatalog.variant(id: id) != nil ? id : unrecognized
     }
 
     static func engineID(_ id: String) -> String {
         knownEngineIDs.contains(id) ? id : unrecognized
+    }
+
+    static func providerID(_ id: String) -> String {
+        knownProviderIDs.contains(id) ? id : unrecognized
     }
 
     static func languageCode(_ code: String) -> String {

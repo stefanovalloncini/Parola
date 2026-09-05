@@ -14,6 +14,7 @@ enum YouTubeProcess {
             group.addTask {
                 try await Task.sleep(for: .seconds(seconds), clock: clock)
                 if process.isRunning { process.terminate() }
+                ParolaLog.error(.youtube, "yt-dlp timed out after \(seconds)s")
                 throw ParolaError.captureUnavailable("yt-dlp exceeded \(seconds)s timeout")
             }
             try await group.next()

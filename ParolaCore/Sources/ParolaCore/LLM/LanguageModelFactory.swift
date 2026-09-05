@@ -53,6 +53,37 @@ public enum LanguageModelFactory {
         return OllamaLanguageModel(model: model, endpoint: endpoint, instructions: instructions, contextTokens: contextTokens)
     }
 
+    /// Why the on-device model is unavailable, in a form safe to log: `unavailableMessage`'s copy
+    /// is written for a person, not for an export.
+    enum OnDeviceUnavailability: String, LogSafe {
+        case deviceNotEligible
+        case notEnabled
+        case modelNotReady
+        case osTooOld
+        case unknown
+
+        var logToken: String { rawValue }
+    }
+
+    static func unavailability() -> OnDeviceUnavailability {
+        #if canImport(FoundationModels)
+        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
+            switch SystemLanguageModel.default.availability {
+            case .available:
+                return .unknown
+            case .unavailable(let reason):
+                switch reason {
+                case .deviceNotEligible: return .deviceNotEligible
+                case .appleIntelligenceNotEnabled: return .notEnabled
+                case .modelNotReady: return .modelNotReady
+                @unknown default: return .unknown
+                }
+            }
+        }
+        #endif
+        return .osTooOld
+    }
+
     /// Whether the on-device model can serve a request right now, and why not when it can't.
     public enum OnDeviceAvailability: Sendable, Equatable {
         case available
@@ -97,6 +128,7 @@ public enum LanguageModelFactory {
             return MockLanguageModel.make(response: mock, clock: clock)
         }
         if let reason = await onDeviceAvailability().reason {
+            ParolaLog.notice(.ai, "on-device model unavailable: \(Self.unavailability())")
             throw Failure.notAvailable(reason)
         }
         #if canImport(FoundationModels)
