@@ -1,4 +1,5 @@
 import AVFoundation
+import Clocks
 import Foundation
 import Testing
 
@@ -216,5 +217,66 @@ private struct StubEnergyProbe: SegmentEnergyProbe {
 
     func energy(from start: Double, to end: Double) -> Double? {
         start < quietBefore ? 0 : speechEnergy
+    }
+}
+
+@Suite("Repeated lines over silence in a session")
+struct SessionSilentRepetitionsTests {
+    private let seeds =
+        (0..<3).map {
+            TranscriptSegmentSeed(start: Double($0) * 18, end: Double($0) * 18 + 17, text: "Grazie.")
+        } + [TranscriptSegmentSeed(start: 160, end: 175, text: "Ecco, ci siamo.")]
+
+    @Test("a Whisper run drops the copies over the lead-in")
+    func whisperRunDropsTheCopies() async throws {
+        let (session, audioURL) = try await makeSession(engineID: .whisperKit, model: "openai_whisper-tiny")
+        defer { try? FileManager.default.removeItem(at: audioURL) }
+
+        let transcript = try await session.transcribe(
+            source: FileAudioSource(url: audioURL),
+            options: TranscriptionOptions(model: "openai_whisper-tiny")
+        )
+        await session.unloadModel()
+
+        #expect(transcript.segments.map(\.text) == ["Ecco, ci siamo."])
+    }
+
+    @Test("another engine's repetitions are left as the engine made them")
+    func otherEnginesKeepTheirRepetitions() async throws {
+        let (session, audioURL) = try await makeSession(
+            engineID: .parakeet, model: "nvidia_parakeet-tdt-0.6b-v2"
+        )
+        defer { try? FileManager.default.removeItem(at: audioURL) }
+
+        let transcript = try await session.transcribe(
+            source: FileAudioSource(url: audioURL),
+            options: TranscriptionOptions(model: "nvidia_parakeet-tdt-0.6b-v2", language: "en")
+        )
+        await session.unloadModel()
+
+        #expect(transcript.segments.count == 4)
+    }
+
+    private func makeSession(
+        engineID: EngineID,
+        model: String
+    ) async throws -> (session: TranscriptionSession, audioURL: URL) {
+        let registry = EngineRegistry()
+        let response = MockTranscriberResponse(segments: seeds, language: "it", modelName: "mock")
+        await registry.register(
+            engineID: engineID,
+            capabilities: .whisperKitDefaults,
+            factory: { _ in MockTranscriber.make(response: response, clock: ImmediateClock()) }
+        )
+
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-repetition-session-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let store = ModelStore(modelsDirectory: dir)
+        try store.seedInstalledModel(model)
+        return (
+            TranscriptionSession(modelStore: store, registry: registry),
+            try LeadInSilenceFixture.write()
+        )
     }
 }

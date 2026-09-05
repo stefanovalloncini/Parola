@@ -111,7 +111,7 @@ public actor TranscriptionSession {
                 filtersHallucinations: options.filtersHallucinations,
                 mergesSentences: false
             ),
-            energy: AudioFileEnergyProbe(url: audioURL)
+            energy: engineID == .whisperKit ? AudioFileEnergyProbe(url: audioURL) : nil
         )
         if options.diarize {
             try Task.checkCancellation()
