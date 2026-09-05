@@ -38,6 +38,18 @@ extension AppModel {
         transcript = patched
         // The assignment clears the flag through didSet, and the patched transcript still describes this media.
         transcriptMatchesLoadedMedia = true
+        persistCorrectedDuration(duration)
+    }
+
+    // The manifest alone: rewriting transcript.json would move updatedAt for an edit the user never made.
+    private func persistCorrectedDuration(_ seconds: Double) {
+        guard let id = selectedEntryID else { return }
+        let bundleURL = library.libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        Task {
+            try? await Self.offMainIO {
+                try ParolaDocument.updateManifest(at: bundleURL) { $0.durationSeconds = seconds }
+            }
+        }
     }
 
     func installPlayer(for url: URL) {

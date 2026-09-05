@@ -76,14 +76,19 @@ struct EntryDurationTests {
         return await waitUntil { model.selectedEntryID == id && model.player != nil }
     }
 
+    private func manifest(of entry: LibraryEntry) throws -> ParolaDocument.Manifest {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let data = try Data(contentsOf: entry.bundleURL.appendingPathComponent("manifest.json"))
+        return try decoder.decode(ParolaDocument.Manifest.self, from: data)
+    }
+
     private func persistedDurations(of entry: LibraryEntry) throws -> (transcript: Double?, manifest: Double?) {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let transcriptData = try Data(contentsOf: entry.bundleURL.appendingPathComponent("transcript.json"))
-        let manifestData = try Data(contentsOf: entry.bundleURL.appendingPathComponent("manifest.json"))
         let transcript = try decoder.decode(Transcript.self, from: transcriptData)
-        let manifest = try decoder.decode(ParolaDocument.Manifest.self, from: manifestData)
-        return (transcript.durationSeconds, manifest.durationSeconds)
+        return (transcript.durationSeconds, try manifest(of: entry).durationSeconds)
     }
 
     @Test("an entry with no recorded duration takes it from its own audio")
@@ -136,5 +141,26 @@ struct EntryDurationTests {
         #expect(await openEntry(entry.id, in: model))
         let healed = await waitUntil { abs((model.transcript?.durationSeconds ?? 0) - 1) < 0.05 }
         #expect(healed, "duration was \(String(describing: model.transcript?.durationSeconds))")
+    }
+
+    @Test("the corrected duration reaches the manifest and leaves the transcript alone")
+    func correctedDurationReachesTheManifest() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, mediaSeconds: 1, transcriptDuration: 2134.272, text: "corrupted take")
+        let transcriptURL = entry.bundleURL.appendingPathComponent("transcript.json")
+        let transcriptBefore = try Data(contentsOf: transcriptURL)
+        let updatedAtBefore = try manifest(of: entry).updatedAt
+
+        #expect(await openEntry(entry.id, in: model))
+        let persisted = await waitUntil {
+            let stored = (try? self.persistedDurations(of: entry).manifest) ?? nil
+            return abs((stored ?? 0) - 1) < 0.05
+        }
+
+        let stored = try manifest(of: entry)
+        let transcriptAfter = try Data(contentsOf: transcriptURL)
+        #expect(persisted, "manifest says \(String(describing: stored.durationSeconds))")
+        #expect(transcriptAfter == transcriptBefore, "transcript.json was rewritten")
+        #expect(stored.updatedAt == updatedAtBefore)
     }
 }
