@@ -59,6 +59,8 @@ struct TranscriptPane: View {
     @AppStorage("inspectorMode", store: DefaultsStore.current) private var inspectorModeRaw: String = InspectorMode.format.rawValue
     @State private var summarySheetOpen = false
     @State private var chatSheetOpen = false
+    // Persisted so a window that was narrow when the app quit still gets its inspector back once it widens.
+    @AppStorage("inspectorCollapsedByWidth", store: DefaultsStore.current) private var inspectorCollapsedByWidth = false
 
     private var displayMode: TranscriptDisplayMode {
         model.transcriptDisplayMode
@@ -91,6 +93,22 @@ struct TranscriptPane: View {
                     )
                     .frame(width: MainWindowLayout.inspectorWidth)
                 }
+            }
+            // Measured on the whole pane, not the reading column, so hiding the inspector can't re-widen it into a loop.
+            .onGeometryChange(for: Bool.self) { proxy in
+                proxy.size.width < MainWindowLayout.inspectorCollapseWidth
+            } action: { isNarrow in
+                if isNarrow {
+                    if inspectorVisible {
+                        inspectorVisible = false
+                        inspectorCollapsedByWidth = true
+                    }
+                } else if inspectorCollapsedByWidth {
+                    inspectorVisible = true
+                }
+            }
+            .onChange(of: inspectorVisible) { _, visible in
+                if visible { inspectorCollapsedByWidth = false }
             }
         }
         .sheet(isPresented: $summarySheetOpen) {

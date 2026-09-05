@@ -88,6 +88,32 @@ struct RouteLayoutTests {
         }
     }
 
+    @Test("the inspector folds away on a narrow window and comes back when it widens")
+    func inspectorFoldsAwayOnNarrowWindows() {
+        withIsolatedDefaults { defaults in
+            defaults.set(true, forKey: "inspectorVisible")
+            let model = makeModel(defaults, jobs: 0)
+            model.transcript = Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 4, text: "the inspector folds away")],
+                language: "en",
+                modelName: "stub"
+            )
+            model.phase = .ready
+            let host = NSHostingView(rootView: ContentView().environment(model))
+            host.frame = NSRect(x: 0, y: 0, width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight)
+            host.layoutSubtreeIfNeeded()
+            #expect(defaults.bool(forKey: "inspectorVisible") == false)
+
+            defaults.set(true, forKey: "inspectorVisible")
+            host.layoutSubtreeIfNeeded()
+            #expect(defaults.bool(forKey: "inspectorVisible") == true, "asking for it back at a narrow width must stick")
+
+            host.frame = NSRect(x: 0, y: 0, width: 1400, height: MainWindowLayout.minimumHeight)
+            host.layoutSubtreeIfNeeded()
+            #expect(defaults.bool(forKey: "inspectorVisible") == true)
+        }
+    }
+
     @Test(
         "an empty route asks for no more height than the smallest window has",
         arguments: [AppModel.Route.queue, .batch, .transcript]

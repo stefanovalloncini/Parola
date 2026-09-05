@@ -15,6 +15,13 @@ enum MainWindowLayout {
     static let batchQueueMinWidth: CGFloat = 280
     static let batchExportPaneWidth: CGFloat = 300
 
+    static let transcriptReadableWidth: CGFloat = 520
+
+    /// Panes narrower than this fold the inspector away instead of squeezing the reading column.
+    static var inspectorCollapseWidth: CGFloat {
+        transcriptReadableWidth + dividerWidth + inspectorWidth
+    }
+
     static var transcriptPaneMinWidth: CGFloat {
         transcriptMinWidth + dividerWidth + inspectorWidth
     }
