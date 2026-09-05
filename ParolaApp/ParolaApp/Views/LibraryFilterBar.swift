@@ -48,8 +48,10 @@ struct LibraryFilterBar: View {
                         Text(labelFilter ?? "All labels")
                     }
                     .font(DS.Font.subheadlineMedium)
-                    .foregroundStyle(labelFilter == nil ? .secondary : DS.Color.accentText)
                 }
+                // A borderless menu paints its label with the tint and ignores foregroundStyle, so
+                // the tint is the only way to say what colour this control is.
+                .tint(labelFilter == nil ? Color.secondary : DS.Color.accentText)
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
@@ -70,8 +72,8 @@ struct LibraryFilterBar: View {
                         Text(languageFilter.map { languageName($0) } ?? String(localized: "All languages"))
                     }
                     .font(DS.Font.subheadlineMedium)
-                    .foregroundStyle(languageFilter == nil ? .secondary : DS.Color.accentText)
                 }
+                .tint(languageFilter == nil ? Color.secondary : DS.Color.accentText)
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
@@ -88,8 +90,8 @@ struct LibraryFilterBar: View {
                     Text(dateRangeFilter.label)
                 }
                 .font(DS.Font.subheadlineMedium)
-                .foregroundStyle(dateRangeFilter == .all ? .secondary : DS.Color.accentText)
             }
+            .tint(dateRangeFilter == .all ? Color.secondary : DS.Color.accentText)
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
