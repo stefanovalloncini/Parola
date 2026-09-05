@@ -52,6 +52,9 @@ struct CopyCasingTests {
         for filter in RecentlyDeletedCategoryFilter.allCases {
             #expect(isTitleCase(filter.title), "kind filter \(filter.title)")
         }
+        for option in RecentlyDeletedSort.allCases {
+            #expect(isTitleCase(option.title), "sort option \(option.title)")
+        }
     }
 
     @Test("the casing rule itself rejects sentence case")

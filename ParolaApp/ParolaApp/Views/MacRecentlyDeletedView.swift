@@ -60,7 +60,7 @@ struct MacRecentlyDeletedView: View {
             "Delete permanently?",
             isPresented: isPurgingSingle
         ) {
-            Button("Delete permanently", role: .destructive) {
+            Button("Delete Permanently", role: .destructive) {
                 if let id = confirmingPurge { purge([id]) }
                 confirmingPurge = nil
             }
@@ -72,7 +72,7 @@ struct MacRecentlyDeletedView: View {
             RecentlyDeletedCopy.bulkPurgeTitle(confirmingPurgeBulk.count),
             isPresented: isPurgingBulk
         ) {
-            Button("Delete permanently", role: .destructive) {
+            Button("Delete Permanently", role: .destructive) {
                 purge(Array(confirmingPurgeBulk))
                 confirmingPurgeBulk = []
                 selection = []
@@ -103,12 +103,12 @@ struct MacRecentlyDeletedView: View {
             Button("Restore") { restore(Array(selection)) }
                 .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
                 .axLeaf("Selection.Button.Restore")
-            Button("Delete permanently") { confirmingPurgeBulk = selection }
+            Button("Delete Permanently") { confirmingPurgeBulk = selection }
                 .buttonStyle(.plain)
                 .font(DS.Font.subheadlineMedium)
                 .foregroundStyle(DS.Color.danger)
                 .axLeaf("Selection.Button.DeletePermanently")
-            Button("Clear selection") { selection = [] }
+            Button("Clear Selection") { selection = [] }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .axLeaf("Selection.Button.ClearSelection")
@@ -244,7 +244,7 @@ struct MacRecentlyDeletedView: View {
                         .frame(maxWidth: 320)
                 }
             }
-            Button("Clear filters") {
+            Button("Clear Filters") {
                 searchText = ""
                 dateFilter = .all
                 categoryFilter = .all

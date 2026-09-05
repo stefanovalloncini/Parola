@@ -49,7 +49,7 @@ struct RecentlyDeletedRow: View {
             }
             .axLeaf("Row.ContextMenuItem.Restore")
             Button(role: .destructive) { onPurge() } label: {
-                Label("Delete permanently", systemImage: "trash")
+                Label("Delete Permanently", systemImage: "trash")
             }
             .axLeaf("Row.ContextMenuItem.Purge")
         }
@@ -87,7 +87,7 @@ struct RecentlyDeletedRow: View {
             .opacity(revealed ? 1 : 0.55)
             RecentlyDeletedCardIconButton(
                 systemName: "trash",
-                help: "Delete permanently",
+                help: "Delete Permanently",
                 tint: DS.Color.danger,
                 action: onPurge
             )

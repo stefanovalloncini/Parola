@@ -22,7 +22,7 @@ enum RecentlyDeletedCategoryFilter: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .all: return "All Kinds"
+        case .all: return "All"
         case .transcriptions: return "Transcriptions"
         case .meetings: return "Meetings"
         case .dictations: return "Dictations"
@@ -50,8 +50,8 @@ enum RecentlyDeletedSort: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .recentlyDeleted: return "Most time left"
-        case .deletedEarliest: return "Expiring first"
+        case .recentlyDeleted: return "Most Time Left"
+        case .deletedEarliest: return "Expiring First"
         case .titleAZ: return "Title A→Z"
         case .titleZA: return "Title Z→A"
         }
@@ -191,6 +191,7 @@ struct RecentlyDeletedFilterBar: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
+                caption("When")
                 ForEach(RecentlyDeletedDateFilter.allCases) { option in
                     Chip(
                         title: LocalizedStringKey(option.title),
@@ -202,10 +203,8 @@ struct RecentlyDeletedFilterBar: View {
                     }
                 }
 
-                Rectangle()
-                    .fill(DS.Color.separator)
-                    .frame(width: 1, height: 14)
-                    .padding(.horizontal, DS.Spacing.small)
+                caption("Kind")
+                    .padding(.leading, DS.Spacing.tight)
 
                 ForEach(RecentlyDeletedCategoryFilter.allCases) { option in
                     Chip(
@@ -222,6 +221,14 @@ struct RecentlyDeletedFilterBar: View {
             .padding(.horizontal, DS.Spacing.regular)
             .padding(.vertical, DS.Spacing.small)
         }
+    }
+
+    private func caption(_ text: LocalizedStringKey) -> some View {
+        Text(text)
+            .font(DS.Font.caption2Emphasized)
+            .textCase(.uppercase)
+            .tracking(0.6)
+            .foregroundStyle(DS.Color.secondaryText)
     }
 
     private func dot(for option: RecentlyDeletedCategoryFilter) -> Color? {
