@@ -24,7 +24,7 @@ struct Diagnostics: AsyncParsableCommand {
         if stdout, output != nil {
             throw ValidationError("--stdout and --output can't be combined.")
         }
-        let directory = FileDiagnosticsSink.defaultDirectory
+        let directory = DiagnosticsBootstrap.defaultDirectory
         // Listed before the render so --clear deletes what the report covers, never a file another
         // process wrote while it ran.
         let files = Self.sinkFiles(in: directory)

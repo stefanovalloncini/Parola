@@ -1,46 +1,31 @@
 import Foundation
+import os
 import ParolaCore
 
-/// Installs the CLI's diagnostics sink and gets its records to disk. Long-running commands always
-/// install one; a one-shot only does under `PAROLA_DIAGNOSTICS=1`, so scripted runs stay clean.
+/// Which commands get a diagnostics sink. Long-running ones always do; a one-shot only under
+/// `PAROLA_DIAGNOSTICS=1`, so scripted runs do not accrete files.
 enum CLIDiagnostics {
+    private static let installed = OSAllocatedUnfairLock<DiagnosticsBootstrap?>(initialState: nil)
+
     static func shouldInstall(alwaysOn: Bool, environment: [String: String]) -> Bool {
         alwaysOn || environment["PAROLA_DIAGNOSTICS"] == "1"
-    }
-
-    static func minimumLevel(environment: [String: String]) -> LogLevel {
-        environment["PAROLA_LOG_LEVEL"].flatMap(LogLevel.init(name:)) ?? .info
     }
 
     static func installIfWanted(
         alwaysOn: Bool,
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        directory: URL = FileDiagnosticsSink.defaultDirectory
+        directory: URL = DiagnosticsBootstrap.defaultDirectory
     ) {
         guard shouldInstall(alwaysOn: alwaysOn, environment: environment) else { return }
-        let sink = FileDiagnosticsSink(
+        let bootstrap = DiagnosticsBootstrap(
             directory: directory,
-            minimumLevel: minimumLevel(environment: environment)
+            environment: environment,
+            periodicFlush: alwaysOn
         )
-        ParolaLog.install(sink)
-        ParolaLog.info(.cli, "diagnostics sink installed")
-        installExitFlush()
-        guard alwaysOn else { return }
-        Task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
-                await ParolaLog.flush()
-            }
-        }
+        installed.withLock { $0 = bootstrap }
     }
 
     static func flush() async {
         await ParolaLog.flush()
-    }
-
-    /// ArgumentParser hands back no hook once a subcommand's `run()` returns, so without this a
-    /// one-shot command's buffered records die with the process.
-    private static func installExitFlush() {
-        atexit { ParolaLog.flushSynchronously() }
     }
 }
