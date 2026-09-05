@@ -20,16 +20,31 @@ extension FileDiagnosticsSink {
 /// that transcribes or runs a batch queue in parallel lands its records in whichever sink is
 /// installed — and a plain capture reads them as if they were its own.
 final class ScopedCapturingSink: DiagnosticsSink {
+    private struct Capture {
+        var records: [LogRecord] = []
+        var dropped = 0
+    }
+
     @TaskLocal private static var capturing: UUID?
 
     private let token = UUID()
-    private let storage = OSAllocatedUnfairLock<[LogRecord]>(initialState: [])
+    private let storage = OSAllocatedUnfairLock(initialState: Capture())
 
-    var records: [LogRecord] { storage.withLock { $0 } }
+    var records: [LogRecord] { storage.withLock { $0.records } }
+
+    /// Records that arrived from outside `scope`, so a test can tell "nobody logged this" apart from
+    /// "the filter ate it".
+    var droppedCount: Int { storage.withLock { $0.dropped } }
 
     func enqueue(_ record: LogRecord) {
-        guard Self.capturing == token else { return }
-        storage.withLock { $0.append(record) }
+        let mine = Self.capturing == token
+        storage.withLock {
+            if mine {
+                $0.records.append(record)
+            } else {
+                $0.dropped += 1
+            }
+        }
     }
 
     func flush() async {}
