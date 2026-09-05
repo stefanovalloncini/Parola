@@ -5,7 +5,7 @@ import ParolaCore
 struct Diagnostics: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "diagnostics",
-        abstract: "Write a report about this Mac and Parola's recent errors, for a bug report."
+        abstract: "Write a report about this Mac and Parola's recent errors, to attach to a bug report."
     )
 
     @Option(
@@ -17,13 +17,16 @@ struct Diagnostics: AsyncParsableCommand {
     @Flag(name: .long, help: "Print the report instead of writing a file.")
     var stdout: Bool = false
 
-    @Flag(name: .long, help: "Delete the recorded diagnostics once the report is written.")
+    @Flag(name: .long, help: "Delete the recorded diagnostics once the report is out.")
     var clear: Bool = false
 
-    func run() async throws {
+    func validate() throws {
         if stdout, output != nil {
             throw ValidationError("--stdout and --output can't be combined.")
         }
+    }
+
+    func run() async throws {
         let directory = DiagnosticsBootstrap.defaultDirectory
         // Listed before the render so the report and --clear see the same files.
         let files = Self.sinkFiles(in: directory)
@@ -76,9 +79,14 @@ struct Diagnostics: AsyncParsableCommand {
 
     private static func reportURL(_ output: String?) -> URL {
         if let output { return URL(fileURLWithPath: output) }
-        let day = Date().formatted(.iso8601.year().month().day().dateSeparator(.dash))
         return URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appendingPathComponent("Parola-Diagnostics-\(day).txt")
+            .appendingPathComponent("Parola-Diagnostics-\(today()).txt")
+    }
+
+    /// The user's own calendar day, not UTC: an evening run in Rome should not be named tomorrow.
+    private static func today() -> String {
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 
     private static func sinkFiles(in directory: URL) -> [URL] {
