@@ -103,7 +103,7 @@ struct QueueView: View {
     private var empty: some View {
         EmptyStateView(
             systemImage: "list.bullet.indent",
-            title: "No jobs yet",
+            title: "No Jobs Yet",
             message: "Batch transcriptions appear here. They stay until you clear them."
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)

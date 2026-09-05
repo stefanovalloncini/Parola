@@ -15,7 +15,7 @@ struct ShortcutsPane: View {
                 SettingRow("Export as TXT") { Text("⌘E").foregroundStyle(.secondary) }
             }
             SettingsSection("Customizable") {
-                SettingRow("Dictation hotkey",
+                SettingRow("Dictation Hotkey",
                            description: "Same control as the Dictation pane. Records any key combo.",
                            isFirst: true) {
                     HotkeyRecorder(
@@ -23,7 +23,7 @@ struct ShortcutsPane: View {
                         modifierRawValue: $model.dictationKeyModifiers
                     )
                 }
-                SettingRow("Mic recording hotkey",
+                SettingRow("Mic Recording Hotkey",
                            description: "Start or stop mic recording from anywhere. Off by default.") {
                     HStack(spacing: 8) {
                         Toggle("", isOn: $model.micHotkeyEnabled).labelsHidden()

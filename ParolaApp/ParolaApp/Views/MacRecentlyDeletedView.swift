@@ -214,7 +214,7 @@ struct MacRecentlyDeletedView: View {
                 collapsed: true
             )
             VStack(spacing: DS.Spacing.small) {
-                Text("Nothing's been deleted")
+                Text("Nothing's Been Deleted")
                     .font(DS.Font.title3)
                     .foregroundStyle(DS.Color.primaryText)
                 Text("Deleted transcripts appear here for \(AppModel.trashRetentionDays) days.")
@@ -257,7 +257,7 @@ struct MacRecentlyDeletedView: View {
     }
 
     private var noMatchesTitle: LocalizedStringKey {
-        searchText.isEmpty ? "No items match these filters" : "No matches"
+        searchText.isEmpty ? "No Items Match These Filters" : "No Matches"
     }
 
     private var filtered: [LibraryEntry] {

@@ -186,7 +186,7 @@ struct ModelsSettingsPane: View {
 
     private func orphansSection(_ entries: [ModelInfo]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Other Files on Disk", count: entries.count)
+            sectionHeader("Other files on disk", count: entries.count)
             Text("These directories aren't in the current model catalog — usually leftovers from older app versions. Safe to delete.")
                 .font(DS.Font.caption)
                 .foregroundStyle(.secondary)
@@ -245,7 +245,7 @@ struct ModelsSettingsPane: View {
 
     private func recommendedSection(_ variants: [ModelVariant]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Recommended Models", count: variants.count)
+            sectionHeader("Recommended models", count: variants.count)
             LazyVStack(spacing: 10) {
                 ForEach(variants) { variant in
                     LiveRecommendedRow(variant: variant)
@@ -353,7 +353,7 @@ struct ModelsSettingsPane: View {
         }
     }
 
-    private func sectionHeader(_ title: String, count: Int?) -> some View {
+    private func sectionHeader(_ title: LocalizedStringKey, count: Int?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(title)
                 .font(DS.Font.title3)

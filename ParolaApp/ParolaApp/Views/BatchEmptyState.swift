@@ -6,16 +6,16 @@ struct BatchEmptyState: View {
     var body: some View {
         EmptyStateView(
             systemImage: "square.stack.3d.up",
-            title: "Batch Mode",
+            title: "Batch",
             message: "Transcribe and export multiple files at once. Select files or drag them onto the app."
         ) {
             Button {
                 model.presentBatchOpenPanel()
             } label: {
-                Text("Open Files")
+                Text("Add Files")
             }
             .buttonStyle(DSPillButtonStyle(kind: .primary))
-            .accessibilityIdentifier("batch.openFiles")
+            .accessibilityIdentifier("batch.addFiles")
         }
     }
 }

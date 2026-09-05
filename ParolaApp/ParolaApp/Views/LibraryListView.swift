@@ -21,6 +21,17 @@ enum LibraryListContent {
         return actions
     }
 
+    /// The source keys, not `LocalizedStringKey`, so the casing rule can be asserted over them.
+    static func emptyTitle(for category: EntryCategory?, isSearch: Bool) -> String {
+        if isSearch { return "No Matches" }
+        switch category {
+        case .transcription: return "No Transcriptions Yet"
+        case .meeting: return "No Meetings Yet"
+        case .dictation: return "No Dictations Yet"
+        case nil: return "No Entries Yet"
+        }
+    }
+
     static func rows(
         from entries: [LibraryEntry],
         category: EntryCategory?,
@@ -318,13 +329,7 @@ struct LibraryListView: View {
     }
 
     private var emptyTitle: LocalizedStringKey {
-        if searchResults != nil { return "No matches" }
-        switch category {
-        case .transcription: return "No transcriptions yet"
-        case .meeting: return "No meetings yet"
-        case .dictation: return "No dictations yet"
-        case nil: return "No entries yet"
-        }
+        LocalizedStringKey(LibraryListContent.emptyTitle(for: category, isSearch: searchResults != nil))
     }
 
     private var emptyIcon: String {

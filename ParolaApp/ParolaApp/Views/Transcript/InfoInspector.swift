@@ -21,7 +21,7 @@ struct InfoInspector: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.large) {
             InspectorSection(title: "Properties") {
-                InfoRow(icon: "clock", label: "Audio Duration", value: durationLabel)
+                InfoRow(icon: "clock", label: "Audio duration", value: durationLabel)
                 InfoRow(icon: "calendar", label: "Created", value: dateLabel(entry?.createdAt))
                 if let updated = entry?.updatedAt {
                     InfoRow(icon: "calendar.badge.clock", label: "Updated", value: dateLabel(updated))

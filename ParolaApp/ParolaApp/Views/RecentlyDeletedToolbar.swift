@@ -11,7 +11,7 @@ enum RecentlyDeletedDateFilter: String, CaseIterable, Identifiable {
         case .today: return "Today"
         case .week: return "This Week"
         case .month: return "This Month"
-        case .older: return "Past deadline"
+        case .older: return "Past Deadline"
         }
     }
 }
