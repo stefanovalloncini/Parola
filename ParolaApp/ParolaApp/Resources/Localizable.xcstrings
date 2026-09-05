@@ -10078,6 +10078,16 @@
         }
       }
     },
+    "Your transcriptions show up here.": {
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qui compaiono le tue trascrizioni."
+          }
+        }
+      }
+    },
     "any": {
       "extractionState": "manual",
       "localizations": {

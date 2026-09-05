@@ -50,8 +50,7 @@ struct EmptyDropZone: View {
             }
 
             if model.libraryEntries.isEmpty {
-                EmptyStateView(systemImage: "clock", title: "No Transcriptions Yet")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                emptyLibraryState
             } else {
                 recentSection
             }
@@ -107,6 +106,32 @@ struct EmptyDropZone: View {
             repeating: GridItem(.flexible(maximum: 420), spacing: DS.Spacing.regular),
             count: max(1, min(count, 4))
         )
+    }
+
+    private var emptyLibraryState: some View {
+        EmptyStateView(
+            systemImage: "text.alignleft",
+            title: "No Transcriptions Yet",
+            message: "Your transcriptions show up here."
+        ) {
+            Button {
+                model.presentOpenPanel()
+            } label: {
+                Label("Open Audio…", systemImage: "doc.badge.plus")
+            }
+            .buttonStyle(DSPillButtonStyle(kind: .primary))
+            .axLeaf("Home.Empty.OpenAudio")
+            if model.features.isEnabled(.micRecording) {
+                Button {
+                    model.startRecording(source: .microphone)
+                } label: {
+                    Label("Record", systemImage: "mic.fill")
+                }
+                .buttonStyle(DSPillButtonStyle(kind: .secondary))
+                .axLeaf("Home.Empty.Record")
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
