@@ -55,7 +55,10 @@ struct JsonLinesExporterTests {
 
         let lines = String(decoding: data, as: UTF8.self)
             .split(separator: "\n", omittingEmptySubsequences: true)
-        #expect(lines.count == 2)
+        let decoded = try lines.map {
+            try JSONDecoder().decode(TranscriptSegment.self, from: Data(String($0).utf8))
+        }
+        #expect(decoded.map(\.text) == ["hello", "world"])
     }
 
     @Test("registered in Exporters")
