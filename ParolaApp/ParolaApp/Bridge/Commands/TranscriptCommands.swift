@@ -29,7 +29,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "transcribeYouTube",
                 area: .transcript,
-                summary: "Downloads + transcribes the given YouTube URL.",
+                summary: "Downloads + transcribes the given YouTube URL. Parks the link while a take or run is in flight.",
                 kind: .mutating,
                 args: [
                     .init(name: "url", kind: .string(), required: true, summary: "YouTube URL"),
@@ -38,8 +38,11 @@ extension ParolaAutomationServer {
                 handler: { args, ctx in
                     try ctx.require(.youtube)
                     let url = try args.string("url")
-                    ctx.model.transcribeYouTube(urlString: url)
-                    return .object(["started": .bool(true)])
+                    let handoff = ctx.model.transcribeYouTube(urlString: url)
+                    return .object([
+                        "started": .bool(handoff == .started),
+                        "parked": .bool(handoff == .parked),
+                    ])
                 }
             ),
 

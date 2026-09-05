@@ -1769,16 +1769,24 @@ final class AppModel {
         }
     }
 
-    func transcribeYouTube(urlString: String) {
+    /// What became of a handed-over link: a run started, the link waits for the current work to end, or it was refused.
+    enum LinkHandoff {
+        case started
+        case parked
+        case rejected
+    }
+
+    @discardableResult
+    func transcribeYouTube(urlString: String) -> LinkHandoff {
         guard features.isEnabled(.youtube) else {
             phase = .failed(message: ParolaError.featureDisabled(.youtube).description)
-            return
+            return .rejected
         }
-        guard let url = makeYouTubeURL(urlString) else { return }
+        guard let url = makeYouTubeURL(urlString) else { return .rejected }
         // The download flips phase off .recording, and every stop affordance is keyed on it.
         if phaseDefersArrivals || transcribeTaskRunning {
             deferredLinks.append(url.absoluteString)
-            return
+            return .parked
         }
 
         cancelTranscriptionRuns()
@@ -1816,6 +1824,7 @@ final class AppModel {
                 self.drainDeferredArrivals()
             }
         }
+        return .started
     }
 
     func fetchYouTubeSubs(urlString: String) {
