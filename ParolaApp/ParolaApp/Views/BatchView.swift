@@ -9,8 +9,7 @@ struct BatchView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            // Not an HSplitView: it lays its panes out at their combined ideal width and clips both
-            // window edges at the minimum width instead of compressing.
+            // Not an HSplitView: it lays out at its panes' combined ideal width and clips both window edges.
             HStack(spacing: 0) {
                 queuePane
                     .frame(minWidth: MainWindowLayout.batchQueueMinWidth, maxWidth: .infinity)
