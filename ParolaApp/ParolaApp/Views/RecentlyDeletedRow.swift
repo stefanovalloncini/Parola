@@ -113,7 +113,7 @@ struct RecentlyDeletedRow: View {
                 Text(verbatim: "·")
                     .font(DS.Font.caption2Mono)
                     .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
-                Text("Deleted \(deletedAt.formatted(.dateTime.month(.abbreviated).day()))")
+                Text("Deleted \(AppFormat.dayAndMonth(deletedAt))")
                     .font(DS.Font.caption2Mono)
                     .foregroundStyle(DS.Color.secondaryText.opacity(0.75))
             } else {
@@ -161,10 +161,10 @@ struct RecentlyDeletedRow: View {
         guard let deletedAt = entry.deletedAt, let daysLeft else {
             return String(localized: "No deadline")
         }
-        let deleted = deletedAt.formatted(date: .abbreviated, time: .shortened)
-        let due = RecentlyDeletedCopy
-            .deadline(deletedAt: deletedAt, retentionDays: AppModel.trashRetentionDays)
-            .formatted(date: .abbreviated, time: .omitted)
+        let deleted = AppFormat.dateAndTime(deletedAt)
+        let due = AppFormat.day(
+            RecentlyDeletedCopy.deadline(deletedAt: deletedAt, retentionDays: AppModel.trashRetentionDays)
+        )
         return daysLeft < 0
             ? String(localized: "Deleted \(deleted) · was due \(due) · removed the next time Parola opens")
             : String(localized: "Deleted \(deleted) · due \(due)")

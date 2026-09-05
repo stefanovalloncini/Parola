@@ -8,7 +8,7 @@ enum LibraryEntryDisplay {
 
     static func title(raw: String, createdAt: Date) -> String {
         guard isMachineName(raw) else { return raw }
-        let stamp = createdAt.formatted(date: .abbreviated, time: .shortened)
+        let stamp = AppFormat.dateAndTime(createdAt)
         return String(localized: "Recording — \(stamp)")
     }
 
@@ -44,7 +44,7 @@ struct LibraryRowDisplay: Identifiable {
     var lastOpened: String? { entry.lastOpenedAt?.formatted(.relative(presentation: .named)) }
 
     var tooltip: String {
-        var parts = [title, entry.createdAt.formatted(Self.longStamp)]
+        var parts = [title, AppFormat.longDateAndTime(entry.createdAt)]
         if !entry.labels.isEmpty {
             parts.append("Labels: \(entry.labels.joined(separator: ", "))")
         }
@@ -57,16 +57,13 @@ struct LibraryRowDisplay: Identifiable {
     init(entry: LibraryEntry, sizeBytes: Int64?) {
         self.entry = entry
         title = LibraryEntryDisplay.title(for: entry)
-        timestamp = entry.createdAt.formatted(Self.shortStamp)
+        timestamp = AppFormat.dateAndTime(entry.createdAt)
         if let sizeBytes, sizeBytes > 0 {
-            sizeLabel = ByteCountFormatter.string(fromByteCount: sizeBytes, countStyle: .file)
+            sizeLabel = AppFormat.byteSize(sizeBytes)
         } else {
             sizeLabel = nil
         }
         durationLabel = entry.durationSeconds.flatMap { $0 > 0 ? Timecode.format($0) : nil }
         languageLabel = LanguageDisplay.name(for: entry.language)
     }
-
-    private static let shortStamp = Date.FormatStyle(date: .abbreviated, time: .shortened)
-    private static let longStamp = Date.FormatStyle(date: .long, time: .shortened)
 }

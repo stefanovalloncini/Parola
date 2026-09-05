@@ -148,7 +148,7 @@ struct ModelCardRow: View {
     private var meta: String {
         let sizeBytes = actualSizeBytes.map { Int($0) } ?? Int(variant.sizeBytes)
         guard sizeBytes > 0 else { return engineLabel }
-        return "\(engineLabel) · \(DS.formatBytes(sizeBytes))"
+        return "\(engineLabel) · \(AppFormat.byteSize(sizeBytes))"
     }
 
     private var engineLabel: String {

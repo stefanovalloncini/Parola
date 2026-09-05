@@ -87,7 +87,7 @@ struct ModelPickerView: View {
 
     /// Built-in engines report no download size; "Zero kB" reads like a bug next to real sizes.
     static func sizeLabel(_ variant: ModelVariant) -> String {
-        variant.sizeBytes > 0 ? DS.formatBytes(Int(variant.sizeBytes)) : String(localized: "Built in")
+        variant.sizeBytes > 0 ? AppFormat.byteSize(variant.sizeBytes) : String(localized: "Built in")
     }
 
     /// English-only models silently disable the language picker, so say so before the pick.

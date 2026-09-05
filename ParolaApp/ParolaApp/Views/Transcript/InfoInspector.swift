@@ -110,7 +110,7 @@ struct InfoInspector: View {
 
     private func dateLabel(_ date: Date?) -> String {
         guard let date else { return "—" }
-        return date.formatted(date: .abbreviated, time: .shortened)
+        return AppFormat.dateAndTime(date)
     }
 
     private var charCount: Int { derived.text.charCount }

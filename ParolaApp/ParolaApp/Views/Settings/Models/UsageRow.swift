@@ -13,7 +13,8 @@ struct UsageRow: View {
                 .font(DS.Font.calloutMedium)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(DS.Font.calloutMono)
+                .font(DS.Font.callout)
+                .monospacedDigit()
                 .foregroundStyle(.primary)
             Spacer()
         }

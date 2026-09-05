@@ -304,7 +304,7 @@ extension AppModel {
             warnings.append(String(localized: "Streaming is off in General settings, so dictation shows no live preview."))
         }
         if let variant, !isInstalled {
-            warnings.append(String(localized: "\(label) isn't installed. The first dictation press downloads \(DS.formatBytes(Int(variant.sizeBytes)))."))
+            warnings.append(String(localized: "\(label) isn't installed. The first dictation press downloads \(AppFormat.byteSize(variant.sizeBytes))."))
         }
         return warnings
     }

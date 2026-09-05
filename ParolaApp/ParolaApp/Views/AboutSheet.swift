@@ -72,7 +72,7 @@ struct AboutInfoView: View {
     private var modelsOnDiskLabel: String {
         let summary = model.modelsOnDiskSummary
         if summary.bytes == 0 { return "—" }
-        return "\(summary.count) · \(ByteCountFormatter.string(fromByteCount: summary.bytes, countStyle: .file))"
+        return "\(summary.count) · \(AppFormat.byteSize(summary.bytes))"
     }
 
     private func creditRow(title: LocalizedStringKey, value: String) -> some View {

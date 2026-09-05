@@ -16,7 +16,7 @@ struct OrphansRow: View {
                 Text(entry.name)
                     .font(DS.Font.subheadline)
                 if let bytes = displaySize {
-                    Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
+                    Text(AppFormat.byteSize(bytes))
                         .font(DS.Font.caption)
                         .foregroundStyle(.secondary)
                 }

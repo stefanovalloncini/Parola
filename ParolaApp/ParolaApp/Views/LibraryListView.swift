@@ -95,7 +95,7 @@ struct LibraryListView: View {
         }
         entries = displays
         if totalBytes > 0 {
-            let size = ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
+            let size = AppFormat.byteSize(totalBytes)
             totalsLabel = "\(displays.count) · \(size)"
         } else {
             totalsLabel = "\(displays.count)"
@@ -271,7 +271,8 @@ struct LibraryListView: View {
                 .axLeaf("Header.Button.BulkDelete")
             }
             Text(totalsLabel)
-                .font(DS.Font.captionMono)
+                .font(DS.Font.caption)
+                .monospacedDigit()
                 .foregroundStyle(DS.Color.secondaryText)
         }
         .padding(.horizontal, DS.Spacing.large)

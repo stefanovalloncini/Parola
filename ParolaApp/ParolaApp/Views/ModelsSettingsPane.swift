@@ -67,7 +67,7 @@ struct ModelsSettingsPane: View {
             Button("Cancel", role: .cancel) { pendingDeletion = nil }
         } message: { item in
             if let bytes = item.sizeBytes {
-                Text("This will remove \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)) from disk. You can re-download it later.")
+                Text("This will remove \(AppFormat.byteSize(bytes)) from disk. You can re-download it later.")
             } else {
                 Text("This will remove the model from disk. You can re-download it later.")
             }
@@ -91,7 +91,7 @@ struct ModelsSettingsPane: View {
         return UsageRow(
             icon: "cpu",
             label: "Models on disk:",
-            value: "\(summary.count) installed · \(ByteCountFormatter.string(fromByteCount: summary.bytes, countStyle: .file))"
+            value: "\(summary.count) installed · \(AppFormat.byteSize(summary.bytes))"
         )
     }
 
@@ -100,7 +100,7 @@ struct ModelsSettingsPane: View {
         return UsageRow(
             icon: "tray.full",
             label: "Library:",
-            value: "\(model.libraryEntries.count) entries · \(ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file))"
+            value: "\(model.libraryEntries.count) entries · \(AppFormat.byteSize(totalBytes))"
         )
     }
 

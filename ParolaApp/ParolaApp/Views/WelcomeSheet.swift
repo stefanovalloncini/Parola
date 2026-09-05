@@ -14,7 +14,7 @@ struct WelcomeSheet: View {
         let installed = model.availableModels.first(where: { $0.name == model.selectedModel })?.isInstalled ?? false
         guard !installed, let variant = ModelCatalog.variant(id: model.selectedModel) else { return nil }
         let label = AppModel.modelLabel(model.selectedModel)
-        let size = DS.formatBytes(Int(variant.sizeBytes))
+        let size = AppFormat.byteSize(variant.sizeBytes)
         return String(localized: "No speech model is installed yet — your first transcription downloads \(label) (\(size)).")
     }
 
