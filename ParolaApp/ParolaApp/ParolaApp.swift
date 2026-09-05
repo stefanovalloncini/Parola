@@ -73,9 +73,7 @@ struct ParolaApp: App {
         let bootstrap = AppBootstrap.test(from: CommandLine.arguments) ?? .normal
         // First, so everything AppModel.init reaches — settings, features, models, the batch
         // queue — happens inside the sink's lifetime.
-        if bootstrap.sideEffects.contains(.diagnosticsLog) {
-            DiagnosticsInstaller.current = DiagnosticsInstaller()
-        }
+        DiagnosticsInstaller.installIfWanted(sideEffects: bootstrap.sideEffects)
         DefaultsStore.current = bootstrap.defaults
         ManagedConfiguration.userSettingsStore = bootstrap.defaults
         // Must precede AppModel, whose refreshModelList() is the first touch of ModelStore.shared.

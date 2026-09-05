@@ -41,6 +41,21 @@ final class DiagnosticsInstaller {
         }
     }
 
+    /// A unit-test host must not install the sink: seeded failures and mock records would land in
+    /// the store the user exports to support, and the budget trim would evict their real records.
+    @discardableResult
+    static func installIfWanted(
+        sideEffects: Set<BootstrapSideEffect>,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> DiagnosticsInstaller? {
+        guard sideEffects.contains(.diagnosticsLog),
+              environment["XCTestConfigurationFilePath"] == nil
+        else { return nil }
+        let installer = DiagnosticsInstaller(environment: environment)
+        current = installer
+        return installer
+    }
+
     nonisolated static func minimumLevel(environment: [String: String]) -> LogLevel {
         environment["PAROLA_LOG_LEVEL"].flatMap(LogLevel.init(name:)) ?? .info
     }

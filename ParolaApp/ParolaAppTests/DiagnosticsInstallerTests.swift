@@ -34,6 +34,28 @@ struct DiagnosticsInstallerTests {
     }
 
     @MainActor
+    @Test("a unit-test host installs no sink, whatever the bootstrap asks for")
+    func testHostInstallsNoSink() {
+        #expect(DiagnosticsInstaller.installIfWanted(
+            sideEffects: BootstrapSideEffect.all,
+            environment: ["XCTestConfigurationFilePath": "/tmp/whatever.xctestconfiguration"]
+        ) == nil)
+        #expect(DiagnosticsInstaller.installIfWanted(
+            sideEffects: BootstrapSideEffect.testing, environment: [:]
+        ) == nil)
+
+        let installer = DiagnosticsInstaller.installIfWanted(sideEffects: AppBootstrap.normal.sideEffects)
+        // Only reached if the guard regressed, and then it must not leave a sink writing into the
+        // user's own diagnostics store for the rest of the run.
+        if let installer {
+            installer.stopPeriodicFlush()
+            DiagnosticsInstaller.current = nil
+            ParolaLog.uninstall()
+        }
+        #expect(installer == nil)
+    }
+
+    @MainActor
     @Test("the installed sink takes records emitted through the facade")
     func installsTheSink() async throws {
         let directory = scratchDirectory()
