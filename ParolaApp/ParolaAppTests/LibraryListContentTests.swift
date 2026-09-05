@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import ParolaCore
 @testable import Parola
@@ -159,6 +161,25 @@ struct LibraryListContentTests {
         selection = ["a", "b", "c"]
         selection.formIntersection(ids(nil))
         #expect(selection == ["a", "b", "c"])
+    }
+
+    private func rowHeight(density: String, style: LibraryRow.Style) async -> CGFloat {
+        let model = await makeModel()
+        model.sidebarDensity = density
+        let display = LibraryRowDisplay(entry: entry(id: "a", title: "Alpha", offset: 0), sizeBytes: 1_000_000)
+        let host = NSHostingView(rootView: LibraryRow(display: display, style: style).environment(model))
+        host.frame = NSRect(x: 0, y: 0, width: 480, height: 200)
+        host.layoutSubtreeIfNeeded()
+        return host.fittingSize.height
+    }
+
+    /// The home style carries the same content without the declared height, so it measures what the library row is pinned to.
+    @Test("the declared library row height is the height the row would have measured")
+    func rowHeightMatchesMeasuredContent() async {
+        #expect(await rowHeight(density: "comfortable", style: .library) == 39)
+        #expect(await rowHeight(density: "comfortable", style: .home) == 39)
+        #expect(await rowHeight(density: "compact", style: .library) == 35)
+        #expect(await rowHeight(density: "compact", style: .home) == 35)
     }
 
     @Test("each filter's empty state leads with an action that produces that kind of entry")

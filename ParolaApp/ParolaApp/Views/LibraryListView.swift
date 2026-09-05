@@ -395,7 +395,16 @@ struct LibraryRow: View {
     var style: Style = .library
 
     @Environment(AppModel.self) private var model
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .body) private var compactHeight: CGFloat = 35
+    @ScaledMetric(relativeTo: .body) private var regularHeight: CGFloat = 39
     private var compact: Bool { model.sidebarDensity == "compact" }
+
+    /// Declaring the height keeps NSTableView off its uncached automatic-row-height path; accessibility sizes outgrow the constant, so they go back to measuring.
+    private var rowHeight: CGFloat? {
+        guard style == .library, !typeSize.isAccessibilitySize else { return nil }
+        return compact ? compactHeight : regularHeight
+    }
 
     var body: some View {
         HStack(spacing: DS.Spacing.regular) {
@@ -456,6 +465,7 @@ struct LibraryRow: View {
             Spacer()
         }
         .padding(.vertical, compact ? DS.Spacing.tight / 2 : DS.Spacing.tight)
+        .frame(height: rowHeight)
         .help(display.tooltip)
     }
 }

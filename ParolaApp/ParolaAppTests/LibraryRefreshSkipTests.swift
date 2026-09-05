@@ -13,7 +13,8 @@ struct LibraryRefreshSkipTests {
         title: String = "Entry",
         pinned: Bool = false,
         labels: [String] = [],
-        segmentNotes: [String: String] = [:]
+        segmentNotes: [String: String] = [:],
+        lastOpenedAt: Date? = nil
     ) -> LibraryEntry {
         let manifest = ParolaDocument.Manifest(
             createdAt: Self.baseDate,
@@ -21,6 +22,7 @@ struct LibraryRefreshSkipTests {
             title: title,
             modelName: "stub",
             language: "en",
+            lastOpenedAt: lastOpenedAt,
             labels: labels,
             segmentNotes: segmentNotes,
             pinned: pinned
@@ -88,6 +90,72 @@ struct LibraryRefreshSkipTests {
         }
 
         #expect(model.libraryVersion > version)
+    }
+
+    @Test("a fresh lastOpenedAt is not a change unless the list is sorted by it")
+    func lastOpenedAloneIsNotAChange() {
+        let opened = Self.baseDate.addingTimeInterval(500)
+        let before = [entry(id: "a"), entry(id: "b")]
+        let after = [entry(id: "a", lastOpenedAt: opened), entry(id: "b")]
+
+        #expect(AppModel.sameEntries(after, before, comparingLastOpened: false))
+        #expect(!AppModel.sameEntries(after, before, comparingLastOpened: true))
+        #expect(!AppModel.sameEntries(
+            [entry(id: "a", title: "Renamed", lastOpenedAt: opened), entry(id: "b")],
+            before,
+            comparingLastOpened: false
+        ))
+    }
+
+    @Test("the last-opened sort still repaints when a row is opened")
+    func lastOpenedSortStillRepaints() async {
+        let model = await makeModel()
+        model.setLibraryEntries([entry(id: "a"), entry(id: "b")])
+        let quiet = model.libraryVersion
+
+        model.setLibraryEntries([entry(id: "a", lastOpenedAt: Self.baseDate.addingTimeInterval(500)), entry(id: "b")])
+        #expect(model.libraryVersion == quiet)
+
+        model.librarySortOrder = .lastOpened
+        let sorting = model.libraryVersion
+        model.setLibraryEntries([entry(id: "a", lastOpenedAt: Self.baseDate.addingTimeInterval(900)), entry(id: "b")])
+
+        #expect(model.libraryVersion > sorting)
+    }
+
+    @Test("opening an entry does not rebuild the list")
+    func openingAnEntryLeavesTheVersionAlone() async throws {
+        let libraryURL = makeTempLibraryURL("refreshskip-open")
+        let seedStore = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        let model = AppModel(
+            skipBootstrap: true,
+            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            libraryURL: libraryURL
+        )
+        model.refreshLibrary()
+        for _ in 0..<200 where model.libraryEntries.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let version = model.libraryVersion
+
+        model.loadEntry(seeded.id)
+        for _ in 0..<200 where model.selectedEntryID != seeded.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        await model.libraryRefreshTask?.value
+        try await Task.sleep(for: .milliseconds(100))
+
+        #expect(model.selectedEntryID == seeded.id)
+        #expect(model.libraryVersion == version)
     }
 
     @Test("a refresh that finds nothing new leaves the version alone")

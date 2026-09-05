@@ -44,18 +44,25 @@ extension AppModel {
 
     /// A refresh runs on every library touch, most of which change nothing, and reassigning anyway repaints every reader.
     func setLibraryEntries(_ entries: [LibraryEntry]) {
-        guard !Self.sameEntries(entries, libraryEntries) else { return }
+        guard !Self.sameEntries(entries, libraryEntries, comparingLastOpened: librarySortOrder == .lastOpened) else { return }
         libraryEntries = entries
     }
 
     func setDeletedEntries(_ entries: [LibraryEntry]) {
-        guard !Self.sameEntries(entries, deletedEntries) else { return }
+        guard !Self.sameEntries(entries, deletedEntries, comparingLastOpened: false) else { return }
         deletedEntries = entries
     }
 
-    /// LibraryEntry equality is id-only, so a rename or a pin would slip through without comparing manifests.
-    static func sameEntries(_ lhs: [LibraryEntry], _ rhs: [LibraryEntry]) -> Bool {
-        lhs.count == rhs.count && zip(lhs, rhs).allSatisfy { $0.id == $1.id && $0.manifest == $1.manifest }
+    /// LibraryEntry equality is id-only, so a rename or a pin would slip through without comparing manifests; `lastOpenedAt` alone counts only where the sort reads it.
+    static func sameEntries(_ lhs: [LibraryEntry], _ rhs: [LibraryEntry], comparingLastOpened: Bool) -> Bool {
+        lhs.count == rhs.count && zip(lhs, rhs).allSatisfy { left, right in
+            guard left.id == right.id else { return false }
+            if left.manifest == right.manifest { return true }
+            guard !comparingLastOpened else { return false }
+            var masked = right.manifest
+            masked.lastOpenedAt = left.manifest.lastOpenedAt
+            return left.manifest == masked
+        }
     }
 
     func reapplyLibrarySort() {

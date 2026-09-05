@@ -892,7 +892,11 @@ final class AppModel {
     /// True when the "All" chip is showing the flat all-categories list. Distinguishes All from Home, which both leave libraryFilter nil.
     var libraryBrowsingAll: Bool = false
     var librarySortOrder: LibrarySortOrder = .newest {
-        didSet { reapplyLibrarySort() }
+        didSet {
+            reapplyLibrarySort()
+            // Opening an entry no longer reassigns the list, so this order needs the manifests re-read before it sorts by them.
+            if librarySortOrder == .lastOpened { refreshLibrary() }
+        }
     }
     // Observed on purpose: LibraryRow and the list totals read these, and refreshBundleSizes fills them asynchronously, so the assignment must re-render.
     var libraryBundleSizes: [String: Int64] = [:]
