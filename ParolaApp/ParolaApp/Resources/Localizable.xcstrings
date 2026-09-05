@@ -5301,6 +5301,17 @@
         }
       }
     },
+    "No Matches for This Filter": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun risultato per questo filtro"
+          }
+        }
+      }
+    },
     "No Meetings Yet": {
       "extractionState": "manual",
       "localizations": {

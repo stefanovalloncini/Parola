@@ -182,6 +182,71 @@ struct LibraryListContentTests {
         #expect(await rowHeight(density: "compact", style: .home) == 35)
     }
 
+    private func mixedLibrary() -> [LibraryEntry] {
+        [
+            entry(id: "t1", title: "Alpha", offset: 100, labels: ["draft"], language: "it"),
+            entry(id: "t2", title: "Beta", offset: 200, labels: ["draft", "shared"], language: "en"),
+            entry(id: "m1", title: "Gamma", offset: 300, category: .meeting, labels: ["recap"], language: "en"),
+            entry(id: "m2", title: "Delta", offset: 400, category: .meeting, labels: ["shared"], language: "en"),
+        ]
+    }
+
+    @Test("a filter the new category has no row for is dropped on the way in")
+    func filtersDroppedOnCategorySwitch() {
+        let entries = mixedLibrary()
+        let carried = LibraryListContent.ActiveFilters(label: "draft", language: "IT", dateRange: .today)
+
+        let intoMeetings = LibraryListContent.filters(carried, survivingIn: .meeting, entries: entries)
+        #expect(intoMeetings == LibraryListContent.ActiveFilters())
+
+        let kept = LibraryListContent.filters(
+            LibraryListContent.ActiveFilters(label: "shared", language: "EN"),
+            survivingIn: .meeting,
+            entries: entries
+        )
+        #expect(kept.label == "shared")
+        #expect(kept.language == "EN")
+    }
+
+    @Test("a filter that survives on its own is kept even when combined it matches nothing")
+    func combinedFiltersAreLeftToTheEmptyState() {
+        let kept = LibraryListContent.filters(
+            LibraryListContent.ActiveFilters(label: "recap", language: "IT"),
+            survivingIn: .meeting,
+            entries: mixedLibrary()
+        )
+
+        #expect(kept.label == "recap")
+        #expect(kept.language == nil)
+    }
+
+    @Test("an empty filtered list is told apart from an empty category")
+    func filteredEmptyIsNotAnEmptyCategory() {
+        let entries = mixedLibrary()
+
+        #expect(LibraryListContent.filtersHideEverything(
+            LibraryListContent.ActiveFilters(label: "recap", language: "IT"),
+            category: .meeting,
+            entries: entries
+        ))
+        #expect(!LibraryListContent.filtersHideEverything(
+            LibraryListContent.ActiveFilters(label: "recap"),
+            category: .meeting,
+            entries: entries
+        ))
+        #expect(!LibraryListContent.filtersHideEverything(
+            LibraryListContent.ActiveFilters(),
+            category: .meeting,
+            entries: entries
+        ))
+        // Nothing in Dictations at all: that is the "no dictations yet" state, not a filter problem.
+        #expect(!LibraryListContent.filtersHideEverything(
+            LibraryListContent.ActiveFilters(label: "recap"),
+            category: .dictation,
+            entries: entries
+        ))
+    }
+
     @Test("each filter's empty state leads with an action that produces that kind of entry")
     func emptyActionsMatchTheFilter() {
         #expect(LibraryListContent.emptyActions(for: .dictation, features: .all).first == .startDictation)

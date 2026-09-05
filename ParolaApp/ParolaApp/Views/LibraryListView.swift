@@ -32,9 +32,58 @@ enum LibraryListContent {
         }
     }
 
+    /// Shown instead of `emptyTitle` when the category has rows and the filters are what hid them.
+    static let filteredEmptyTitle = "No Matches for This Filter"
+
     /// Search results replace the category rows, so the list runs without a category while they are showing.
     static func browseCategory(filter: EntryCategory?, searching: Bool) -> EntryCategory? {
         searching ? nil : filter
+    }
+
+    struct ActiveFilters: Equatable {
+        var label: String? = nil
+        var language: String? = nil
+        var dateRange: LibraryDateRangeFilter = .all
+
+        var isEmpty: Bool { label == nil && language == nil && dateRange == .all }
+    }
+
+    /// The list keeps its filters across a category switch, but a filter the new category has no row for is
+    /// dropped: carrying it over would show an empty list that reads as "this category is empty".
+    static func filters(
+        _ active: ActiveFilters,
+        survivingIn category: EntryCategory?,
+        entries: [LibraryEntry]
+    ) -> ActiveFilters {
+        func matchesSomething(label: String? = nil, language: String? = nil, dateRange: LibraryDateRangeFilter = .all) -> Bool {
+            !rows(from: entries, category: category, labelFilter: label, languageFilter: language, dateRange: dateRange).isEmpty
+        }
+        var kept = active
+        if kept.label != nil, !matchesSomething(label: kept.label) { kept.label = nil }
+        if kept.language != nil, !matchesSomething(language: kept.language) { kept.language = nil }
+        if kept.dateRange != .all,
+           !matchesSomething(label: kept.label, language: kept.language, dateRange: kept.dateRange) {
+            kept.dateRange = .all
+        }
+        return kept
+    }
+
+    /// True when the rows are empty only because of the filters — the category itself has entries to show.
+    static func filtersHideEverything(
+        _ active: ActiveFilters,
+        category: EntryCategory?,
+        entries: [LibraryEntry]
+    ) -> Bool {
+        guard !active.isEmpty else { return false }
+        let filtered = rows(
+            from: entries,
+            category: category,
+            labelFilter: active.label,
+            languageFilter: active.language,
+            dateRange: active.dateRange
+        )
+        guard filtered.isEmpty else { return false }
+        return !rows(from: entries, category: category, labelFilter: nil, languageFilter: nil, dateRange: .all).isEmpty
     }
 
     static func rows(
@@ -75,8 +124,19 @@ struct LibraryListView: View {
     @State private var entries: [LibraryRowDisplay] = []
     @State private var totalsLabel: String = ""
 
+    private var activeFilters: LibraryListContent.ActiveFilters {
+        LibraryListContent.ActiveFilters(label: labelFilter, language: languageFilter, dateRange: dateRangeFilter)
+    }
+
     @discardableResult
     private func recomputeEntries() -> [LibraryRowDisplay] {
+        recomputeEntries(with: activeFilters)
+    }
+
+    /// Takes the filters explicitly so a category switch can recompute with the ones it just dropped, without
+    /// reading `@State` it wrote in the same pass.
+    @discardableResult
+    private func recomputeEntries(with filters: LibraryListContent.ActiveFilters) -> [LibraryRowDisplay] {
         let computed: [LibraryEntry]
         if let searchResults {
             computed = searchResults
@@ -84,9 +144,9 @@ struct LibraryListView: View {
             computed = LibraryListContent.rows(
                 from: model.libraryEntries,
                 category: category,
-                labelFilter: labelFilter,
-                languageFilter: languageFilter,
-                dateRange: dateRangeFilter
+                labelFilter: filters.label,
+                languageFilter: filters.language,
+                dateRange: filters.dateRange
             )
         }
         let sizes = model.libraryBundleSizes
@@ -183,8 +243,16 @@ struct LibraryListView: View {
             let newEntries = recomputeEntries()
             selection = selection.intersection(Set(newEntries.map(\.id)))
         }
-        .onChange(of: category) { _, _ in
-            let newEntries = recomputeEntries()
+        .onChange(of: category) { _, newCategory in
+            let kept = LibraryListContent.filters(
+                activeFilters,
+                survivingIn: newCategory,
+                entries: model.libraryEntries
+            )
+            labelFilter = kept.label
+            languageFilter = kept.language
+            dateRangeFilter = kept.dateRange
+            let newEntries = recomputeEntries(with: kept)
             selection = selection.intersection(Set(newEntries.map(\.id)))
         }
         .alert("Delete \(selection.count) entries?", isPresented: $pendingBulkDelete) {
@@ -275,18 +343,47 @@ struct LibraryListView: View {
         )
     }
 
+    @ViewBuilder
     private var emptyState: some View {
-        EmptyStateView(systemImage: emptyIcon, title: emptyTitle) {
-            let actions = LibraryListContent.emptyActions(for: category, features: model.features)
-            ForEach(Array(actions.enumerated()), id: \.offset) { index, action in
-                Button {
-                    perform(action)
-                } label: {
-                    Label(action.title, systemImage: action.systemImage)
+        if filterHidesEverything {
+            filteredEmptyState
+        } else {
+            EmptyStateView(systemImage: emptyIcon, title: emptyTitle) {
+                let actions = LibraryListContent.emptyActions(for: category, features: model.features)
+                ForEach(Array(actions.enumerated()), id: \.offset) { index, action in
+                    Button {
+                        perform(action)
+                    } label: {
+                        Label(action.title, systemImage: action.systemImage)
+                    }
+                    .buttonStyle(DSPillButtonStyle(kind: index == 0 ? .primary : .secondary))
+                    .axLeaf(action.axIdentifier)
                 }
-                .buttonStyle(DSPillButtonStyle(kind: index == 0 ? .primary : .secondary))
-                .axLeaf(action.axIdentifier)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    /// The category has rows; the filters are what emptied it. Offering "Record" here would be a lie.
+    private var filterHidesEverything: Bool {
+        searchResults == nil
+            && LibraryListContent.filtersHideEverything(activeFilters, category: category, entries: model.libraryEntries)
+    }
+
+    private var filteredEmptyState: some View {
+        EmptyStateView(
+            systemImage: "line.3.horizontal.decrease.circle",
+            title: LocalizedStringKey(LibraryListContent.filteredEmptyTitle)
+        ) {
+            Button {
+                labelFilter = nil
+                languageFilter = nil
+                dateRangeFilter = .all
+            } label: {
+                Label("Clear Filters", systemImage: "xmark.circle")
+            }
+            .buttonStyle(DSPillButtonStyle(kind: .primary))
+            .axLeaf("Empty.Button.ClearFilters")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

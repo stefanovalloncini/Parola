@@ -35,7 +35,10 @@ struct CopyCasingTests {
 
     @Test("library empty states title in Title Case")
     func libraryEmptyTitlesAreTitleCase() {
-        var titles = [LibraryListContent.emptyTitle(for: nil, isSearch: true)]
+        var titles = [
+            LibraryListContent.emptyTitle(for: nil, isSearch: true),
+            LibraryListContent.filteredEmptyTitle,
+        ]
         for category in [EntryCategory?.none, .transcription, .meeting, .dictation] {
             titles.append(LibraryListContent.emptyTitle(for: category, isSearch: false))
         }
