@@ -4,7 +4,7 @@ import Testing
 @testable import Parola
 import ParolaCore
 
-@Suite("Dictation insertion logging", .serialized)
+@Suite("Dictation insertion logging", .serialized, .logFacade)
 struct DictationInsertionLoggingTests {
     private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
         let sink = CapturingDiagnosticsSink()
@@ -13,8 +13,7 @@ struct DictationInsertionLoggingTests {
         try await body(sink)
     }
 
-    /// Both inserters leave the dictated text on the clipboard when they give up, so the
-    /// tests below have to hand the machine's own clipboard back.
+    // Both inserters leave the dictated text on the clipboard when they give up, so the tests hand it back.
     private func withPasteboardRestored(_ body: () async throws -> Void) async rethrows {
         let pasteboard = NSPasteboard.general
         let saved = pasteboard.string(forType: .string)

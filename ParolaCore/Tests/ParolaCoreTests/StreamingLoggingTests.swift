@@ -201,8 +201,7 @@ struct StreamingLoggingTests {
 
     // MARK: - Source pins
 
-    // The live-session seams need a loaded WhisperKit model and a running mic, so they are pinned
-    // in source the way EngineLoggingTests pins the engine sites it cannot reach.
+    // The live-session seams need a loaded WhisperKit model and a running mic, so they are pinned in source.
     private func streamingSource(_ name: String) throws -> String {
         let path = #filePath.replacingOccurrences(
             of: "Tests/ParolaCoreTests/StreamingLoggingTests.swift",

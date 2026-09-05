@@ -6,7 +6,7 @@ import ParolaCore
 private let exportFailureDomain = "parola-export-logging"
 
 @MainActor
-@Suite("Export logging", .serialized)
+@Suite("Export logging", .serialized, .logFacade)
 struct ExportLoggingTests {
     private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
         let sink = CapturingDiagnosticsSink()
@@ -136,8 +136,7 @@ struct ExportLoggingTests {
         }
     }
 
-    // The bulk library export runs an NSOpenPanel modally, so its catch is pinned in source
-    // the way ParolaCore's logging suites pin the sites they cannot drive.
+    // The bulk library export runs an NSOpenPanel modally, so its catch is pinned in source.
     private func appSource(_ name: String) throws -> String {
         let path = #filePath.replacingOccurrences(
             of: "ParolaAppTests/ExportLoggingTests.swift",
