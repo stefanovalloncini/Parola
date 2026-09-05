@@ -523,6 +523,8 @@ public final class ModelStore: Sendable {
         if let downloader {
             return try await downloadViaRegistry(
                 downloader,
+                variant: variant,
+                engineID: engineID,
                 name: source.downloadName(defaultingTo: variant),
                 source: source,
                 progress: progress
@@ -546,6 +548,8 @@ public final class ModelStore: Sendable {
     /// uses, so an interrupted fetch is never mistaken for an installed model.
     private func downloadViaRegistry(
         _ downloader: EngineRegistry.Downloader,
+        variant: String,
+        engineID: EngineID,
         name: String,
         source: ModelDownloadSource,
         progress: (@Sendable (Double) -> Void)?
@@ -558,7 +562,23 @@ public final class ModelStore: Sendable {
             let placeholder = DownloadSidecar(repo: source.huggingFaceRepo, revision: "main", files: [:])
             try? placeholder.write(to: sidecar)
         }
-        let result = try await downloader(name, self, progress)
+        let result: URL
+        do {
+            result = try await downloader(name, self, progress)
+        } catch {
+            if isCancellation(error) { throw CancellationError() }
+            ParolaLog.error(
+                .models,
+                "download failed",
+                [
+                    .model: .safe(ModelToken(variant)),
+                    .engine: .safe(engineID),
+                    .elapsed: .duration(startedAt.duration(to: .now)),
+                    .error: .error(error),
+                ]
+            )
+            throw error
+        }
         // WhisperKit's HubApi returns success when cancelled between files; keep the sidecar then.
         try Task.checkCancellation()
         try? FileManager.default.removeItem(at: sidecar)

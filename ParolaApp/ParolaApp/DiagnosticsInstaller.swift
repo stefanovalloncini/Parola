@@ -17,6 +17,8 @@ final class DiagnosticsInstaller {
         flushInterval: Duration = .seconds(2)
     ) {
         self.directory = directory
+        // The bootstrap also registers an atexit drain, which backs up the 2s terminate barrier
+        // when it runs out of time; `stopPeriodicFlush` runs before that barrier, so they never race.
         self.bootstrap = DiagnosticsBootstrap(
             directory: directory,
             environment: environment,

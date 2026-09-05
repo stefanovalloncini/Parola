@@ -131,6 +131,51 @@ struct ModelDownloadLoggingTests {
         }
     }
 
+    @Test("a registry downloader that throws is reported with its engine and model")
+    func registryDownloadFailure() async throws {
+        try await withSink { sink in
+            let store = try makeStore()
+            let registry = EngineRegistry()
+            await registry.register(
+                engineID: .whisperKit,
+                capabilities: .whisperKitDefaults,
+                factory: { _ in StubTranscriber() },
+                downloader: { _, _, _ in throw CocoaError(.fileWriteNoPermission) }
+            )
+
+            await #expect(throws: (any Error).self) {
+                _ = try await store.download(variant: Self.tiny, registry: registry)
+            }
+
+            let record = try #require(modelRecords(sink, message: "download failed").first)
+            #expect(record.level == .error)
+            #expect(record.fields[.model]?.text == Self.tiny)
+            #expect(record.fields[.engine]?.text == "whisperkit")
+            #expect(record.fields[.elapsed] != nil)
+            #expect(record.fields[.error]?.text == "NSCocoaErrorDomain.513")
+        }
+    }
+
+    @Test("a cancelled registry download is not filed as a failure")
+    func registryDownloadCancellation() async throws {
+        try await withSink { sink in
+            let store = try makeStore()
+            let registry = EngineRegistry()
+            await registry.register(
+                engineID: .whisperKit,
+                capabilities: .whisperKitDefaults,
+                factory: { _ in StubTranscriber() },
+                downloader: { _, _, _ in throw CancellationError() }
+            )
+
+            await #expect(throws: CancellationError.self) {
+                _ = try await store.download(variant: Self.tiny, registry: registry)
+            }
+
+            #expect(modelRecords(sink, message: "download failed").isEmpty)
+        }
+    }
+
     @Test("an engine with no downloader is reported instead of taking the generic snapshot")
     func missingDownloader() async throws {
         try await withSink { sink in

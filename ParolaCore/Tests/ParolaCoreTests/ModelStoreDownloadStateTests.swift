@@ -61,7 +61,9 @@ private final class DownloadProbe: @unchecked Sendable {
     }
 }
 
-@Suite("Model store download state")
+// Gated: its downloader throws on purpose, and that failure is now logged — an error record
+// drains whatever file sink another suite has installed.
+@Suite("Model store download state", .logFacade)
 struct ModelStoreDownloadStateTests {
     private static let variant = "openai_whisper-tiny"
 
