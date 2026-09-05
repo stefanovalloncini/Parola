@@ -64,17 +64,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        guard let model else { return }
-        let pending = model.cancelAndDrainPendingTranscriptSave()
-        let library = model.library
         let diagnostics = DiagnosticsInstaller.current
         diagnostics?.stopPeriodicFlush()
+        let pending = model?.cancelAndDrainPendingTranscriptSave()
+        let library = model?.library
         let semaphore = DispatchSemaphore(value: 0)
         Task.detached {
-            if let pending {
-                try? await library.updateTranscript(pending.transcript, for: pending.id)
+            if let library {
+                if let pending {
+                    try? await library.updateTranscript(pending.transcript, for: pending.id)
+                }
+                await library.flush()
             }
-            await library.flush()
             await diagnostics?.flushForTermination()
             semaphore.signal()
         }
