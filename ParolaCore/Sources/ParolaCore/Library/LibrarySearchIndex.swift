@@ -392,19 +392,24 @@ public actor LibrarySearchIndex {
         } else {
             snippetRange = text.startIndex..<(text.index(text.startIndex, offsetBy: 80, limitedBy: text.endIndex) ?? text.endIndex)
         }
-        let snippet = String(text[snippetRange])
+        let body = String(text[snippetRange])
         var highlights: [Highlight] = []
         for token in Set(tokens) {
-            var cursor = snippet.startIndex
-            while let hit = snippet.range(of: token, options: .caseInsensitive, range: cursor..<snippet.endIndex) {
-                let start = snippet.distance(from: snippet.startIndex, to: hit.lowerBound)
-                let length = snippet.distance(from: hit.lowerBound, to: hit.upperBound)
+            var cursor = body.startIndex
+            while let hit = body.range(of: token, options: .caseInsensitive, range: cursor..<body.endIndex) {
+                let start = body.distance(from: body.startIndex, to: hit.lowerBound)
+                let length = body.distance(from: hit.lowerBound, to: hit.upperBound)
                 highlights.append(Highlight(start: start, length: length))
                 cursor = hit.upperBound
             }
         }
         highlights.sort { $0.start < $1.start }
-        return (snippet, mergeOverlapping(highlights))
+        // An ellipsis says the line was cut out of a longer one; the leading one shifts every offset.
+        let leading = snippetRange.lowerBound == text.startIndex ? "" : "…"
+        let trailing = snippetRange.upperBound == text.endIndex ? "" : "…"
+        let shift = leading.count
+        let shifted = shift == 0 ? highlights : highlights.map { Highlight(start: $0.start + shift, length: $0.length) }
+        return (leading + body + trailing, mergeOverlapping(shifted))
     }
 
     private static func mergeOverlapping(_ highlights: [Highlight]) -> [Highlight] {

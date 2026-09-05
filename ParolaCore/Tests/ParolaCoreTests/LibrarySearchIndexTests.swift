@@ -132,6 +132,30 @@ struct LibrarySearchIndexTests {
         }
     }
 
+    @Test("a snippet cut out of a longer line is marked at both ends")
+    func snippetMarksWhereItWasCut() async throws {
+        let (index, _) = makeTempIndex()
+        let body = String(repeating: "ab ", count: 20) + "sprint" + String(repeating: " cd", count: 34)
+        await index.index(id: "e1", title: "Notes", text: body, createdAt: Date())
+        let match = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
+        #expect(match.snippet.hasPrefix("…"))
+        #expect(match.snippet.hasSuffix("…"))
+        for highlight in match.highlights {
+            let start = match.snippet.index(match.snippet.startIndex, offsetBy: highlight.start)
+            let end = match.snippet.index(start, offsetBy: highlight.length)
+            #expect(match.snippet[start..<end].lowercased() == "sprint")
+        }
+    }
+
+    @Test("a snippet that is the whole line carries no ellipsis")
+    func wholeLineSnippetIsNotMarked() async throws {
+        let (index, _) = makeTempIndex()
+        await index.index(id: "e1", title: "Notes", text: "sprint retro", createdAt: Date())
+        let match = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
+        #expect(!match.snippet.contains("…"))
+        #expect(match.snippet == "sprint retro")
+    }
+
     @Test("snippet surfaces the hit when text changes length when lowercased")
     func snippetNonASCIICaseFold() async throws {
         let (index, _) = makeTempIndex()
