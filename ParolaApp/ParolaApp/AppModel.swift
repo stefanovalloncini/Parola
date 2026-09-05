@@ -58,7 +58,9 @@ final class AppModel {
     var dropDragPayload: DroppedFiles.Kind?
     var dropHighlight: DropHalf?
     var dragOverComposer = false
-    var phase: Phase = .idle
+    var phase: Phase = .idle {
+        didSet { forgetFailedSource() }
+    }
     var transcript: Transcript? {
         didSet {
             transcriptMatchesLoadedMedia = false
@@ -223,6 +225,14 @@ final class AppModel {
     @ObservationIgnored var liveRecordingAudioURL: URL?
     @ObservationIgnored var recordingWatchTask: Task<Void, Never>?
     @ObservationIgnored var pendingRecoveryWrite: Task<Void, Never>?
+    enum FailureKind {
+        case transcription
+        case other
+    }
+
+    /// What the current `.failed` phase was doing. Every phase change resets it, so only the
+    /// transcription paths that opt back in get the file-naming, Retry and Reveal card.
+    private(set) var failureKind: FailureKind = .other
     /// A recorded take whose transcription failed; the file backs the error pane's Retry.
     var failedTakeAudioURL: URL?
     /// The file a failed file transcription was reading; the error card retries and reveals it.
@@ -1618,6 +1628,12 @@ final class AppModel {
             addBatchFiles([fileURL])
             return
         }
+        startFileTranscription(fileURL: fileURL, translateOverride: translateOverride)
+    }
+
+    /// The run itself, past the routing an arriving file goes through: Retry asks for this file now,
+    /// not for a place in the batch a drop would have joined.
+    private func startFileTranscription(fileURL: URL, translateOverride: Bool?) {
         noteRecentFile(fileURL)
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
@@ -1667,7 +1683,6 @@ final class AppModel {
                 fileTranscribeFraction = nil
                 fileTranscribeStage = nil
                 endRecovery(recoveryToken)
-                failedFileURL = nil
                 phase = .ready
                 persistToLibrary(processed, audioSource: fileURL)
             } catch {
@@ -1940,12 +1955,10 @@ final class AppModel {
         if error is CancellationError || Task.isCancelled {
             phase = .idle
         } else {
-            // Only one file sits behind the error card, so a fresh failure replaces the last.
-            failedTakeAudioURL = nil
-            failedTakeTitle = nil
-            failedTakeCategory = nil
-            failedFileURL = source
             phase = .failed(message: Self.transcriptionFailureMessage(for: error))
+            // After the phase: its didSet forgets whatever the last failure left behind.
+            failureKind = .transcription
+            failedFileURL = source
         }
     }
 
@@ -2037,10 +2050,6 @@ final class AppModel {
     func dismissError() {
         // Back to the transcript when one is loaded: a failed export or prompt shouldn't cost the user their place.
         phase = transcript == nil ? .idle : .ready
-        failedFileURL = nil
-        failedTakeAudioURL = nil
-        failedTakeTitle = nil
-        failedTakeCategory = nil
     }
 
     var cacheDirectoryDisplayPath: String {
@@ -2373,9 +2382,10 @@ final class AppModel {
             teardownStreaming()
             let audioURL = await streaming?.recordingAudioURL()
             var message = msg
-            if !confirmed.isEmpty || audioURL != nil {
-                let takeCategory = pendingRecordingCategory
-                let takeTitle = Self.liveRecordingTitle(category: takeCategory, endedAt: Date())
+            let takeCategory = pendingRecordingCategory
+            let takeTitle = Self.liveRecordingTitle(category: takeCategory, endedAt: Date())
+            let savedPartial = !confirmed.isEmpty || audioURL != nil
+            if savedPartial {
                 let partial = Transcript(
                     segments: confirmed,
                     language: currentOptions.language ?? "auto",
@@ -2389,17 +2399,18 @@ final class AppModel {
                     title: takeTitle + " (interrupted)",
                     activate: false
                 )
-                if let audioURL {
-                    failedFileURL = nil
-                    failedTakeAudioURL = audioURL
-                    failedTakeTitle = takeTitle
-                    failedTakeCategory = takeCategory
-                }
                 message += " " + String(localized: "The recording up to this point was saved to your library.")
             }
             liveSegments = []
             livePartialText = ""
             phase = .failed(message: message)
+            // After the phase: its didSet forgets whatever the last failure left behind.
+            if savedPartial, let audioURL {
+                failureKind = .transcription
+                failedTakeAudioURL = audioURL
+                failedTakeTitle = takeTitle
+                failedTakeCategory = takeCategory
+            }
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
             drainDeferredArrivals()
         case .finished(let transcript):
@@ -2501,21 +2512,15 @@ final class AppModel {
             transcript = processed
             adoptLoadedMediaDuration()
             endRecovery(recoveryToken)
-            failedFileURL = nil
-            failedTakeAudioURL = nil
-            failedTakeTitle = nil
-            failedTakeCategory = nil
             phase = .ready
             persistToLibrary(processed, audioSource: url, title: title)
             resolveRecordingOutcome(.success(processed.text))
         } catch {
             endRecovery(recoveryToken)
             var message = Self.transcriptionFailureMessage(for: error)
-            if !(error is CancellationError), !Task.isCancelled {
-                failedFileURL = nil
-                failedTakeCategory = pendingRecordingCategory
-                failedTakeAudioURL = url
-                failedTakeTitle = title
+            let recoverable = !(error is CancellationError) && !Task.isCancelled
+            if recoverable {
+                let category = pendingRecordingCategory
                 persistToLibrary(
                     Transcript(
                         segments: [],
@@ -2528,18 +2533,35 @@ final class AppModel {
                     activate: false
                 )
                 message += " " + String(localized: "The audio was saved to your library.")
+                phase = .failed(message: message)
+                // After the phase: its didSet forgets whatever the last failure left behind.
+                failureKind = .transcription
+                failedTakeAudioURL = url
+                failedTakeTitle = title
+                failedTakeCategory = category
+            } else {
+                phase = .failed(message: message)
             }
-            phase = .failed(message: message)
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
         }
     }
 
+    /// A phase change means the last failure's file is no longer what the error card is about.
+    private func forgetFailedSource() {
+        failureKind = .other
+        if failedFileURL != nil { failedFileURL = nil }
+        if failedTakeAudioURL != nil { failedTakeAudioURL = nil }
+        failedTakeTitle = nil
+        failedTakeCategory = nil
+    }
+
     var canRetryFailedTranscription: Bool {
-        failedTakeAudioURL != nil || failedFileURL != nil
+        failureKind == .transcription && (failedTakeAudioURL != nil || failedFileURL != nil)
     }
 
     /// What the error card names: a recorded take by its title, an opened file by its file name.
     var failedSourceName: String? {
+        guard failureKind == .transcription else { return nil }
         if failedTakeAudioURL != nil { return failedTakeTitle }
         return failedFileURL?.lastPathComponent
     }
@@ -2550,8 +2572,7 @@ final class AppModel {
             return
         }
         guard let url = failedFileURL else { return }
-        failedFileURL = nil
-        transcribe(fileURL: url)
+        startFileTranscription(fileURL: url, translateOverride: nil)
     }
 
     func revealFailedFile() {
