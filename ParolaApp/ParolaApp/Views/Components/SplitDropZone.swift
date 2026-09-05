@@ -107,6 +107,8 @@ private struct SplitDropOverlay: View {
                 header
                 zones
             }
+            .frame(maxWidth: isSingleZone ? Self.singleZoneSide.width : .infinity,
+                   maxHeight: isSingleZone ? Self.singleZoneSide.height : .infinity)
             .padding(.horizontal, isSingleZone ? DS.Spacing.xlarge * 2 : DS.Spacing.medium)
             .padding(.vertical, isSingleZone ? DS.Spacing.xlarge : DS.Spacing.medium)
         }
@@ -198,6 +200,9 @@ private struct SplitDropOverlay: View {
         if case .queueOnly = plan { return "Starts when the current job finishes" }
         return "Transcribe later"
     }
+
+    // A lone zone stops growing here: stretched over a 1600 pt window it reads as a wash, not a target.
+    private static let singleZoneSide = CGSize(width: 620, height: 380)
 
     private var isSingleZone: Bool {
         if case .split = plan { return false }
