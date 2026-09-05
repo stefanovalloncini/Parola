@@ -9,7 +9,7 @@ struct SegmentEditingTests {
     let model: AppModel
 
     init() {
-        model = AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("segmentedit"))
+        model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("segmentedit"))
         model.transcript = Self.makeTranscript()
     }
 

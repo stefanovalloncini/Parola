@@ -44,7 +44,7 @@ private func makeRecordingModel(clock: any Clock<Duration> = ContinuousClock()) 
     let bootstrap = AppBootstrap(
         mode: .test,
         library: makeTempLibraryURL("recopt"),
-        defaultsOverride: UserDefaults(suiteName: "test-\(UUID())")!,
+        defaultsOverride: temporaryDefaults(),
         sideEffects: [],
         filePicker: TestFilePicker(),
         clock: clock
@@ -56,7 +56,7 @@ private func makeRecordingModel(clock: any Clock<Duration> = ContinuousClock()) 
 @Suite("Recording media-session config")
 struct RecordingMediaSessionConfigTests {
     private func makeModel() -> AppModel {
-        AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("mediacfg"))
+        AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("mediacfg"))
     }
 
     @Test("auto-mute mutes only when the source is the microphone")

@@ -7,7 +7,7 @@ import ParolaCore
 @Suite("Language mismatch warning")
 struct LanguageMismatchTests {
     private func makeModel() -> AppModel {
-        AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("langmismatch"))
+        AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("langmismatch"))
     }
 
     @Test("an English-only model with a non-English language warns and suggests a multilingual model")
@@ -48,7 +48,7 @@ struct LanguageMismatchTests {
 @Suite("Assumed language notice")
 struct AssumedLanguageNoticeTests {
     private func makeModel() -> AppModel {
-        AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("assumedlang"))
+        AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("assumedlang"))
     }
 
     private func transcript(_ detection: LanguageDetection?) -> Transcript {

@@ -13,7 +13,7 @@ struct DropCommandsTests {
         let bootstrap = AppBootstrap(
             mode: mode,
             library: makeTempLibraryURL("dropcommands"),
-            defaultsOverride: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaultsOverride: temporaryDefaults(),
             sideEffects: [],
             filePicker: SystemFilePicker(),
             enabledFeaturesOverride: Set(ParolaFeature.allCases)

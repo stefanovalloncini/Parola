@@ -45,7 +45,7 @@ struct SubtitleQCBadgeTests {
 
     @Test("showSubtitleQC defaults to off, persists, and reloads")
     func persistsAndReloads() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let first = makeModel(defaults)
         #expect(first.showSubtitleQC == false)
 

@@ -131,7 +131,7 @@ struct ModelCatalogTests {
 @Suite("Model catalog lookup")
 struct ModelCatalogLookupTests {
     private func makeConfig(_ managed: [String: Any]) -> ManagedConfiguration {
-        let storage = UserDefaults(suiteName: "parola-catalog-test-\(UUID().uuidString)")!
+        let storage = temporaryDefaults("parola-catalog-test-")
         storage.set(managed, forKey: "com.apple.configuration.managed")
         return ManagedConfiguration(storage: storage)
     }

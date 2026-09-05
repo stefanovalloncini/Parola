@@ -6,7 +6,7 @@ import Clocks
 @Suite("Model store policy and download coordination")
 struct ModelStorePolicyTests {
     private func makeConfig(_ managed: [String: Any]) -> ManagedConfiguration {
-        let storage = UserDefaults(suiteName: "parola-store-policy-\(UUID().uuidString)")!
+        let storage = temporaryDefaults("parola-store-policy-")
         storage.set(managed, forKey: "com.apple.configuration.managed")
         return ManagedConfiguration(storage: storage)
     }
@@ -121,7 +121,7 @@ struct ModelStorePolicyTests {
 @Suite("Transcription session policy")
 struct TranscriptionSessionPolicyTests {
     private func makeConfig(_ managed: [String: Any]) -> ManagedConfiguration {
-        let storage = UserDefaults(suiteName: "parola-session-policy-\(UUID().uuidString)")!
+        let storage = temporaryDefaults("parola-session-policy-")
         storage.set(managed, forKey: "com.apple.configuration.managed")
         return ManagedConfiguration(storage: storage)
     }

@@ -9,7 +9,7 @@ import ParolaDictation
 struct AppModelSnippetsTests {
 
     private func makeModel(_ defaults: UserDefaults? = nil) -> AppModel {
-        AppModel(skipBootstrap: true, defaults: defaults ?? UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("snippets"))
+        AppModel(skipBootstrap: true, defaults: defaults ?? temporaryDefaults(), libraryURL: makeTempLibraryURL("snippets"))
     }
 
     @Test("setting snippets persists them under the snippets key")
@@ -26,7 +26,7 @@ struct AppModelSnippetsTests {
 
     @Test("a fresh model reloads the snippets a prior model saved")
     func snippetsRoundTrip() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let first = makeModel(defaults)
         first.snippets = [Snippet(trigger: "sig", replacement: "Best,\nStefano")]
 
@@ -84,7 +84,7 @@ struct AppModelSnippetsTests {
 
     @Test("a fresh model reloads the correction rules a prior model saved")
     func correctionRulesRoundTrip() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let first = makeModel(defaults)
         first.correctionRules = [CorrectionRule(from: "macos", to: "macOS", caseSensitive: true)]
 

@@ -10,7 +10,7 @@ struct AppModelAIFailureTests {
     private func makeModel() -> AppModel {
         let model = AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaults: temporaryDefaults(),
             libraryURL: makeTempLibraryURL("ai-failure")
         )
         model.transcript = Transcript(

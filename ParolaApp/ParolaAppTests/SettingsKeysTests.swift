@@ -209,7 +209,7 @@ struct SettingsResetServiceTests {
 struct SettingsExportServiceTests {
 
     private func makeSuite() -> (UserDefaults, String) {
-        let name = "parola.test.export.\(UUID().uuidString)"
+        let name = temporarySuiteName("parola.test.export.")
         return (UserDefaults(suiteName: name)!, name)
     }
 

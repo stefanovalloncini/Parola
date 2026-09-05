@@ -5,15 +5,14 @@ import Testing
 @Suite("Managed configuration (MDM)")
 struct ManagedConfigurationTests {
     private func makeStorage(_ managed: [String: Any]) -> UserDefaults {
-        let suiteName = "parola-mdm-test-\(UUID().uuidString)"
-        let storage = UserDefaults(suiteName: suiteName)!
+        let storage = temporaryDefaults("parola-mdm-test-")
         storage.set(managed, forKey: "com.apple.configuration.managed")
         return storage
     }
 
     @Test("no managed dict means everything is unset and isActive is false")
     func emptyManaged() {
-        let storage = UserDefaults(suiteName: "parola-mdm-empty-\(UUID().uuidString)")!
+        let storage = temporaryDefaults("parola-mdm-empty-")
         let config = ManagedConfiguration(storage: storage)
         #expect(config.isActive == false)
         #expect(config.defaultModel == nil)
@@ -69,7 +68,7 @@ struct ManagedConfigurationTests {
 
     @Test("disableCloudLLM reads user privacy mode through the injected storage")
     func privacyModeFromStorage() {
-        let storage = UserDefaults(suiteName: "parola-mdm-privacy-\(UUID().uuidString)")!
+        let storage = temporaryDefaults("parola-mdm-privacy-")
         storage.set(true, forKey: ManagedConfiguration.userPrivacyModeKey)
         let config = ManagedConfiguration(storage: storage)
         #expect(config.disableCloudLLM == true)
@@ -87,7 +86,7 @@ struct ManagedConfigurationTests {
 
     @Test("filterAllowed is a no-op when no allowlist")
     func filterAllowedNoop() {
-        let storage = UserDefaults(suiteName: "parola-mdm-noop-\(UUID().uuidString)")!
+        let storage = temporaryDefaults("parola-mdm-noop-")
         let config = ManagedConfiguration(storage: storage)
         let filtered = config.filterAllowed(ModelCatalog.all)
         #expect(filtered.count == ModelCatalog.all.count)

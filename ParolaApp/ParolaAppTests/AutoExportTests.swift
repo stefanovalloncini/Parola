@@ -75,7 +75,7 @@ struct AutoExportTests {
     @MainActor
     @Test("auto-export rules round-trip through the JSON helpers")
     func rulesRoundTripThroughUserDefaults() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("autoexport"))
         let key = "autoExportTests.rules"
 
@@ -95,7 +95,7 @@ struct AutoExportTests {
     @MainActor
     @Test("readJSON returns nil when the defaults key is absent")
     func readJSONMissingKey() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("autoexport"))
         let key = "autoExportTests.absent"
         let result = model.readJSON([AutoExportRule].self, forKey: key)

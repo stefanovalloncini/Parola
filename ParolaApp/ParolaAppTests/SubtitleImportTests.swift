@@ -8,7 +8,7 @@ import ParolaCore
 struct SubtitleImportTests {
 
     private func makeIsolatedDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "test-\(UUID())")!
+        temporaryDefaults()
     }
 
     private func makeModel() -> AppModel {

@@ -10,7 +10,7 @@ import ParolaDictation
 struct AppModelDictationTests {
 
     private func makeIsolatedDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "test-\(UUID())")!
+        temporaryDefaults()
     }
 
     private func makeModel() -> AppModel {

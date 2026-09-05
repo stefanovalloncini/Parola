@@ -19,7 +19,7 @@ struct FindAndReplaceTests {
     let model: AppModel
 
     init() {
-        model = AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("findreplace"))
+        model = AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("findreplace"))
         model.transcript = Self.makeTranscript()
     }
 
@@ -173,7 +173,7 @@ struct FindAndReplaceTests {
         let bootstrap = AppBootstrap(
             mode: .test,
             library: makeTempLibraryURL("findword"),
-            defaultsOverride: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaultsOverride: temporaryDefaults(),
             sideEffects: [],
             filePicker: TestFilePicker(),
             clock: ImmediateClock()

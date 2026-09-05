@@ -13,7 +13,7 @@ struct ReloadSettingsTests {
 
     @Test("re-reads changed keys into observed properties without a relaunch")
     func reReadsChangedKeys() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
         #expect(model.useStreaming == true)
 
@@ -29,7 +29,7 @@ struct ReloadSettingsTests {
 
     @Test("picks up appAccentColor via its storage key (which maps to appAccentRaw)")
     func accentKeyDrift() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
 
         defaults.set("ocean", forKey: AppAccent.storageKey)
@@ -40,7 +40,7 @@ struct ReloadSettingsTests {
 
     @Test("reloading to an uninstalled model resets it to a valid one (refreshModelList ran)")
     func uninstalledModelResets() async {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
         await model.awaitModelListRefresh()
 
@@ -54,7 +54,7 @@ struct ReloadSettingsTests {
 
     @Test("the model list lands even when the first scan has to go to disk")
     func modelListLandsAfterOffMainScan() async {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
 
         model.refreshModelList()
@@ -65,7 +65,7 @@ struct ReloadSettingsTests {
 
     @Test("reloadObservedSetting syncs an arbitrary writable key into its live property")
     func reloadObservedSettingSyncsAnyKey() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
         #expect(model.autoTitleEntries == false)
         #expect(model.wordTimestamps == false)
@@ -86,7 +86,7 @@ struct ReloadSettingsTests {
 
     @Test("inputDeviceUID persists to defaults and reloadSettings re-reads it")
     func inputDeviceUIDPersistsAndReloads() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
         #expect(model.inputDeviceUID == "")
         #expect(model.preferredInputDeviceUID == nil)
@@ -103,7 +103,7 @@ struct ReloadSettingsTests {
 
     @Test("preferredInputDeviceUID maps an empty selection to nil (system default)")
     func preferredInputDeviceUIDMapsEmptyToNil() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
 
         model.inputDeviceUID = ""
@@ -116,7 +116,7 @@ struct ReloadSettingsTests {
 
     @Test("resetTestState restores inputDeviceUID to the system default")
     func resetTestStateRestoresInputDevice() async throws {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let bootstrap = AppBootstrap(
             mode: .test,
             library: makeTempLibraryURL("reset-mic"),
@@ -141,7 +141,7 @@ struct ReloadSettingsTests {
 
     @Test("resetTestState restores live settings properties, not just UserDefaults")
     func resetTestStateRestoresLiveSettings() async throws {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let bootstrap = AppBootstrap(
             mode: .test,
             library: makeTempLibraryURL("reset-live"),
@@ -170,7 +170,7 @@ struct ReloadSettingsTests {
 
     @Test("the microphone recording options persist through their didSets")
     func recordingOptionsPersist() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
 
         model.recordingMaxMinutes = 30
@@ -186,7 +186,7 @@ struct ReloadSettingsTests {
 
     @Test("reloadSettings re-reads the microphone recording options")
     func reloadReadsRecordingOptions() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
         #expect(model.recordingMaxMinutes == 0)
         #expect(model.autoMuteWhileRecording == false)
@@ -205,7 +205,7 @@ struct ReloadSettingsTests {
 
     @Test("resetTestState restores the microphone recording options to their defaults")
     func resetTestStateRestoresRecordingOptions() async throws {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let bootstrap = AppBootstrap(
             mode: .test,
             library: makeTempLibraryURL("reset-recopt"),
@@ -234,7 +234,7 @@ struct ReloadSettingsTests {
 
     @Test("turning karaoke off leaves wordTimestamps as the user set it")
     func karaokeOffKeepsWordTimestamps() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
         model.wordTimestamps = true
 
@@ -258,7 +258,7 @@ struct ReloadSettingsTests {
 
     @Test("reloadSettings leaves the test-mode bridge alone")
     func reloadKeepsTestModeBridge() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         defaults.set(false, forKey: "automationBridgeEnabled")
         let bootstrap = AppBootstrap(
             mode: .test,
@@ -278,7 +278,7 @@ struct ReloadSettingsTests {
 
     @Test("reloadSettings never starts the bridge when the launch didn't wire it")
     func reloadWithoutBridgeSideEffectDoesNotStart() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
         defaults.set(true, forKey: "automationBridgeEnabled")
 
@@ -289,7 +289,7 @@ struct ReloadSettingsTests {
 
     @Test("reloading clears in-memory snippets once the defaults key is gone")
     func snippetsResetWhenKeyAbsent() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
         model.snippets = [Snippet(trigger: "omw", replacement: "on my way")]
 
@@ -301,7 +301,7 @@ struct ReloadSettingsTests {
 
     @Test("reloading clears in-memory correction rules once the defaults key is gone")
     func correctionRulesResetWhenKeyAbsent() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
         model.correctionRules = [CorrectionRule(from: "teh", to: "the")]
 
@@ -313,7 +313,7 @@ struct ReloadSettingsTests {
 
     @Test("reloading clears in-memory auto-export rules once the defaults key is gone")
     func autoExportRulesResetWhenKeyAbsent() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
         model.autoExportRules = [AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.txt])]
 

@@ -5,9 +5,7 @@ import Testing
 @Suite("FeatureSet resolution")
 struct FeatureSetTests {
     private func makeManaged(_ dict: [String: Any]?) -> ManagedConfiguration {
-        let suite = "feature-set-tests-\(UUID().uuidString)"
-        let store = UserDefaults(suiteName: suite)!
-        store.removePersistentDomain(forName: suite)
+        let store = temporaryDefaults("feature-set-tests-")
         if let dict { store.set(dict, forKey: "test.managed") }
         return ManagedConfiguration(storage: store, domainKey: "test.managed")
     }
@@ -65,11 +63,9 @@ struct FeatureSetTests {
     }
 
     @Test func appDomainResolutionHonorsSuiteOverride() {
-        let suite = "feature-set-env-\(UUID().uuidString)"
+        let suite = temporarySuiteName("feature-set-env-")
         let store = UserDefaults(suiteName: suite)!
-        store.removePersistentDomain(forName: suite)
         store.set(["enabledFeatures": ["batch"]], forKey: "com.apple.configuration.managed")
-        defer { store.removePersistentDomain(forName: suite) }
         let set = FeatureSet.resolveFromAppDomain(environment: ["PAROLA_MANAGED_SUITE": suite])
         #expect(set.enabled == [.batch])
     }

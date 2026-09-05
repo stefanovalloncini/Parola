@@ -14,7 +14,7 @@ struct SettingsAccessoryAlignmentTests {
 
     private func withIsolatedDefaults(_ body: (UserDefaults) throws -> Void) rethrows {
         let previous = DefaultsStore.current
-        let suite = UserDefaults(suiteName: "test-settings-alignment-\(UUID())")!
+        let suite = temporaryDefaults("test-settings-alignment-")
         DefaultsStore.current = suite
         defer { DefaultsStore.current = previous }
         try body(suite)

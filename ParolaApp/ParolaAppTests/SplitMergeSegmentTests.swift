@@ -12,7 +12,7 @@ struct SplitMergeSegmentTests {
     init() {
         model = AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaults: temporaryDefaults(),
             libraryURL: makeTempLibraryURL("splitmerge")
         )
         undo.groupsByEvent = false

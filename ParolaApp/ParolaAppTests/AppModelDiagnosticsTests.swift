@@ -11,7 +11,7 @@ struct AppModelDiagnosticsTests {
         let bootstrap = AppBootstrap(
             mode: .test,
             library: makeTempLibraryURL("diagnostics"),
-            defaultsOverride: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaultsOverride: temporaryDefaults(),
             sideEffects: [],
             filePicker: TestFilePicker()
         )

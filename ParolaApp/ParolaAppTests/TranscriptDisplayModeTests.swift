@@ -12,13 +12,13 @@ struct TranscriptDisplayModeTests {
 
     @Test("default display mode is the continuous transcript")
     func defaultsToTranscript() {
-        let model = makeModel(UserDefaults(suiteName: "test-\(UUID())")!)
+        let model = makeModel(temporaryDefaults())
         #expect(model.transcriptDisplayMode == .transcript)
     }
 
     @Test("setting the mode persists to the model's defaults under transcriptDisplayMode")
     func writePersists() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
 
         model.transcriptDisplayMode = .segments
@@ -29,7 +29,7 @@ struct TranscriptDisplayModeTests {
 
     @Test("a persisted value is read back at bootstrap")
     func readsPersistedValueOnInit() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         defaults.set(TranscriptDisplayMode.segments.rawValue, forKey: "transcriptDisplayMode")
 
         let model = makeModel(defaults)
@@ -39,7 +39,7 @@ struct TranscriptDisplayModeTests {
 
     @Test("reloadObservedSetting reflects an external default write into the live property")
     func externalWriteReflectsAfterReload() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
         #expect(model.transcriptDisplayMode == .transcript)
 
@@ -51,7 +51,7 @@ struct TranscriptDisplayModeTests {
 
     @Test("an unknown persisted value falls back to the continuous transcript")
     func unknownRawFallsBack() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         defaults.set("garbage", forKey: "transcriptDisplayMode")
 
         let model = makeModel(defaults)

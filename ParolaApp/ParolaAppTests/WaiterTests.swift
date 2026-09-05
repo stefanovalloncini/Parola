@@ -9,7 +9,7 @@ import ParolaDictation
 struct WaiterTests {
 
     private func makeIsolatedDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "test-\(UUID())")!
+        temporaryDefaults()
     }
 
     private func makeRig() throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {

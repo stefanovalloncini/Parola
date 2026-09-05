@@ -10,7 +10,7 @@ struct SettingsCommandsTests {
     private func makeRig() throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
         let model = AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaults: temporaryDefaults(),
             libraryURL: makeTempLibraryURL("settingscommands")
         )
         let server = try ParolaAutomationServer(model: model)

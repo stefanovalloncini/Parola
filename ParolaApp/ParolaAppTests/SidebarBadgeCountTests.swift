@@ -17,7 +17,7 @@ struct SidebarBadgeCountTests {
     private func makeModel() async -> AppModel {
         let model = AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaults: temporaryDefaults(),
             libraryURL: makeTempLibraryURL("badges")
         )
         await model.libraryRefreshTask?.value

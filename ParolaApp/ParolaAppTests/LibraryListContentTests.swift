@@ -48,7 +48,7 @@ struct LibraryListContentTests {
     private func makeModel() async -> AppModel {
         let model = AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaults: temporaryDefaults(),
             libraryURL: makeTempLibraryURL("listcontent")
         )
         await model.libraryRefreshTask?.value

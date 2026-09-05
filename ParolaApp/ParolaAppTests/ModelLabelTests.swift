@@ -49,7 +49,7 @@ struct EngineStreamsPartialsTests {
 @Suite("Preparing label stage gate")
 struct PreparingStageGateTests {
     private func makeIsolatedDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "test-\(UUID())")!
+        temporaryDefaults()
     }
 
     @Test("a reported preparingAudio stage shows the label without waiting for the heuristic")

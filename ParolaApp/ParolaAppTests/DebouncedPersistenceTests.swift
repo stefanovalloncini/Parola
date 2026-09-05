@@ -45,7 +45,7 @@ private struct ImmediateClock: Clock {
 struct DebouncedPersistenceTests {
 
     private func makeIsolatedDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "test-\(UUID())")!
+        temporaryDefaults()
     }
 
     private func makeModel() -> AppModel {

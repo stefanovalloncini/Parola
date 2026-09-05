@@ -8,7 +8,7 @@ import ParolaCore
 struct SettingsPaneRoutingTests {
 
     private func makeModel(mode: AppBootstrap.Mode, features: Set<ParolaFeature>?) -> AppModel {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let library = makeTempLibraryURL("settingsrouting")
         switch mode {
         case .normal:

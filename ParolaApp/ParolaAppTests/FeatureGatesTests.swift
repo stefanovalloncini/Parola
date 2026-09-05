@@ -8,7 +8,7 @@ import ParolaCore
 @MainActor
 struct FeatureGatesTests {
     private func makeIsolatedDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "test-\(UUID())")!
+        temporaryDefaults()
     }
 
     private func makeTempLibraryURL(_ tag: String) -> URL {

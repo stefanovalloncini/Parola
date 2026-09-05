@@ -48,7 +48,7 @@ struct AppModelLibraryTests {
     }
 
     private func makeIsolatedDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "test-\(UUID())")!
+        temporaryDefaults()
     }
 
     private func makeModel() -> AppModel {

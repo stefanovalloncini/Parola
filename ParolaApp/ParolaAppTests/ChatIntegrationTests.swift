@@ -17,7 +17,7 @@ struct ChatIntegrationTests {
     }
 
     private func makeIsolatedDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "test-\(UUID())")!
+        temporaryDefaults()
     }
 
     private func makeModel(entryID: LibraryEntry.ID, transcript: Transcript) -> AppModel {

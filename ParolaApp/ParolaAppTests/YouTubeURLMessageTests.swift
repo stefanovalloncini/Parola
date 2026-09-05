@@ -21,7 +21,7 @@ struct YouTubeURLMessageTests {
 @Suite("YouTube task lifecycle")
 struct YouTubeTaskLifecycleTests {
     private func makeModel() -> AppModel {
-        AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("yt"))
+        AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("yt"))
     }
 
     @Test("cancelled task leaves the replacement's handle intact")

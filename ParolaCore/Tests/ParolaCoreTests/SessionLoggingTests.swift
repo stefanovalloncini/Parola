@@ -38,7 +38,7 @@ struct SessionLoggingTests {
     }
 
     private func managedConfiguration(_ managed: [String: Any]) -> ManagedConfiguration {
-        let storage = UserDefaults(suiteName: "parola-session-logging-\(UUID().uuidString)")!
+        let storage = temporaryDefaults("parola-session-logging-")
         storage.set(managed, forKey: "com.apple.configuration.managed")
         return ManagedConfiguration(storage: storage)
     }

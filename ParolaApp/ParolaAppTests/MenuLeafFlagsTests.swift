@@ -9,7 +9,7 @@ struct MenuLeafFlagsTests {
     private func makeModel(_ label: String) -> AppModel {
         AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaults: temporaryDefaults(),
             libraryURL: makeTempLibraryURL(label)
         )
     }

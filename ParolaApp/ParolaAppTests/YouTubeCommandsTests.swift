@@ -11,7 +11,7 @@ struct YouTubeCommandsTests {
         let bootstrap = AppBootstrap(
             mode: .test,
             library: makeTempLibraryURL("youtubecommands"),
-            defaultsOverride: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaultsOverride: temporaryDefaults(),
             sideEffects: [],
             filePicker: SystemFilePicker(),
             enabledFeaturesOverride: Set(ParolaFeature.allCases)

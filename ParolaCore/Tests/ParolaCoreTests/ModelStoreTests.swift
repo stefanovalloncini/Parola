@@ -271,7 +271,7 @@ struct ModelStoreTests {
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmp) }
 
-        let storage = try #require(UserDefaults(suiteName: "parola-scan-cache-\(UUID().uuidString)"))
+        let storage = temporaryDefaults("parola-scan-cache-")
         let warm = ModelStore(modelsDirectory: tmp, managedConfiguration: ManagedConfiguration(storage: storage))
         let unrestricted = warm.catalog()
         #expect(unrestricted.contains { $0.name == "openai_whisper-tiny" })

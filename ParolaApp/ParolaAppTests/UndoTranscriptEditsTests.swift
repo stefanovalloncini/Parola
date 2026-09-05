@@ -22,7 +22,7 @@ struct UndoTranscriptEditsTests {
     init() {
         model = AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaults: temporaryDefaults(),
             libraryURL: makeTempLibraryURL("undo")
         )
         // No run loop in tests, so the per-event group would never close; explicit groups in the seam keep each edit one step.
@@ -239,7 +239,7 @@ struct UndoTranscriptEditsTests {
         let bootstrap = AppBootstrap(
             mode: .test,
             library: makeTempLibraryURL("undo-reindex"),
-            defaultsOverride: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaultsOverride: temporaryDefaults(),
             sideEffects: [],
             filePicker: TestFilePicker(),
             clock: ImmediateClock()

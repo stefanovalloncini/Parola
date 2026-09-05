@@ -7,7 +7,7 @@ import ParolaCore
 @Suite("AppModel transcript empty state")
 struct TranscriptEmptyStateTests {
     private func makeModel() -> AppModel {
-        AppModel(skipBootstrap: true, defaults: UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("emptystate"))
+        AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("emptystate"))
     }
 
     @Test("no loaded transcript is not flagged empty")

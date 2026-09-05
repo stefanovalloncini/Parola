@@ -36,7 +36,7 @@ struct LibraryRefreshSkipTests {
     private func makeModel() async -> AppModel {
         let model = AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaults: temporaryDefaults(),
             libraryURL: makeTempLibraryURL("refreshskip")
         )
         await model.libraryRefreshTask?.value
@@ -106,7 +106,7 @@ struct LibraryRefreshSkipTests {
         )
         let model = AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaults: temporaryDefaults(),
             libraryURL: libraryURL
         )
 

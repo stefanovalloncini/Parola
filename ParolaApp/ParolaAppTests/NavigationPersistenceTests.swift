@@ -10,7 +10,7 @@ struct NavigationPersistenceTests {
     private func makeModel() -> AppModel {
         AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaults: temporaryDefaults(),
             libraryURL: makeTempLibraryURL("navigation")
         )
     }

@@ -32,7 +32,7 @@ struct EntryDurationTests {
         let bootstrap = AppBootstrap(
             mode: .test,
             library: makeTempLibraryURL("duration"),
-            defaultsOverride: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaultsOverride: temporaryDefaults(),
             sideEffects: [],
             filePicker: TestFilePicker(),
             clock: ContinuousClock()

@@ -5,10 +5,7 @@ import Testing
 @Suite("ModelStore storage override")
 struct ModelStorageLocationTests {
     private func makeDefaults() throws -> UserDefaults {
-        let name = "test-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: name))
-        defaults.removePersistentDomain(forName: name)
-        return defaults
+        try #require(UserDefaults(suiteName: temporarySuiteName("test-")))
     }
 
     private func missingFile() -> URL {

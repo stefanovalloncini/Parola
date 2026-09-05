@@ -42,7 +42,7 @@ extension TranscriberMockSuites {
             let bootstrap = AppBootstrap(
                 mode: .test,
                 library: makeTempLibraryURL("diskguard"),
-                defaultsOverride: UserDefaults(suiteName: "test-\(UUID())")!,
+                defaultsOverride: temporaryDefaults(),
                 sideEffects: [],
                 filePicker: TestFilePicker(),
                 clock: clock

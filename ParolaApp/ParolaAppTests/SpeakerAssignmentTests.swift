@@ -12,7 +12,7 @@ struct SpeakerAssignmentTests {
     init() {
         model = AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaults: temporaryDefaults(),
             libraryURL: makeTempLibraryURL("assignspeaker")
         )
         undo.groupsByEvent = false
@@ -105,7 +105,7 @@ struct ExpectedSpeakersTests {
 
     @Test("defaults to Auto, which threads nil into the transcription options")
     func defaultsToAuto() {
-        let model = makeModel(UserDefaults(suiteName: "test-\(UUID())")!)
+        let model = makeModel(temporaryDefaults())
 
         #expect(model.expectedSpeakersRaw == 0)
         #expect(model.currentOptions.expectedSpeakers == nil)
@@ -113,7 +113,7 @@ struct ExpectedSpeakersTests {
 
     @Test("a positive count threads into the transcription options")
     func countThreadsIntoOptions() {
-        let model = makeModel(UserDefaults(suiteName: "test-\(UUID())")!)
+        let model = makeModel(temporaryDefaults())
         model.expectedSpeakersRaw = 3
 
         #expect(model.currentOptions.expectedSpeakers == 3)
@@ -121,7 +121,7 @@ struct ExpectedSpeakersTests {
 
     @Test("the count persists in defaults and reloads")
     func persistsAndReloads() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let first = makeModel(defaults)
         first.expectedSpeakersRaw = 4
 

@@ -74,7 +74,7 @@ struct CurrentTranscriptTitleTests {
     private func makeModel() -> AppModel {
         AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-\(UUID().uuidString)")!,
+            defaults: temporaryDefaults(),
             libraryURL: makeTempLibraryURL("current-title")
         )
     }

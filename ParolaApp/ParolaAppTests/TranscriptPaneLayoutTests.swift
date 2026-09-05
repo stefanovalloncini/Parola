@@ -11,7 +11,7 @@ struct TranscriptPaneLayoutTests {
 
     private func withIsolatedDefaults(_ body: (UserDefaults) throws -> Void) rethrows {
         let previous = DefaultsStore.current
-        let suite = UserDefaults(suiteName: "test-pane-layout-\(UUID())")!
+        let suite = temporaryDefaults("test-pane-layout-")
         DefaultsStore.current = suite
         defer { DefaultsStore.current = previous }
         try body(suite)

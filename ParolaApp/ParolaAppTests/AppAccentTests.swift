@@ -7,7 +7,7 @@ struct AppAccentTests {
 
     private func withDefaults(_ body: (UserDefaults) throws -> Void) rethrows {
         let previous = DefaultsStore.current
-        let suite = UserDefaults(suiteName: "test-accent-\(UUID())")!
+        let suite = temporaryDefaults("test-accent-")
         DefaultsStore.current = suite
         defer { DefaultsStore.current = previous }
         try body(suite)

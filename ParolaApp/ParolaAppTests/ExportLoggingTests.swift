@@ -35,7 +35,7 @@ struct ExportLoggingTests {
     private func makeModel(filePicker: FilePicker? = nil) -> AppModel {
         AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "export-logging-\(UUID().uuidString)")!,
+            defaults: temporaryDefaults("export-logging-"),
             filePicker: filePicker ?? TestFilePicker(),
             libraryURL: makeTempLibraryURL("export-logging")
         )

@@ -11,7 +11,7 @@ struct RouteLayoutTests {
 
     private func withIsolatedDefaults(_ body: (UserDefaults) throws -> Void) rethrows {
         let previous = DefaultsStore.current
-        let suite = UserDefaults(suiteName: "test-route-layout-\(UUID())")!
+        let suite = temporaryDefaults("test-route-layout-")
         DefaultsStore.current = suite
         defer { DefaultsStore.current = previous }
         try body(suite)
@@ -184,7 +184,7 @@ struct RouteLayoutTests {
 
     @Test("the toggle flips the key that the current width answers to")
     func toggleFlipsTheKeyForTheWidth() {
-        let defaults = UserDefaults(suiteName: "test-inspector-\(UUID())")!
+        let defaults = temporaryDefaults("test-inspector-")
         InspectorVisibility.toggle(in: defaults, isNarrow: true)
         #expect(defaults.bool(forKey: InspectorVisibility.forcedAtNarrowWidthKey) == true)
         #expect(InspectorVisibility.preference(in: defaults) == true)

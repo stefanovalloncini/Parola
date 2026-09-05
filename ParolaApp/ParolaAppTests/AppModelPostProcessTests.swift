@@ -8,7 +8,7 @@ import ParolaCore
 struct AppModelPostProcessTests {
 
     private func makeModel(_ defaults: UserDefaults? = nil) -> AppModel {
-        AppModel(skipBootstrap: true, defaults: defaults ?? UserDefaults(suiteName: "test-\(UUID())")!, libraryURL: makeTempLibraryURL("postprocess"))
+        AppModel(skipBootstrap: true, defaults: defaults ?? temporaryDefaults(), libraryURL: makeTempLibraryURL("postprocess"))
     }
 
     private static func transcript(_ texts: [String]) -> Transcript {
@@ -86,7 +86,7 @@ struct AppModelPostProcessTests {
 
     @Test("a fresh model reloads the ignored-segment rules a prior model saved")
     func ignoredRulesRoundTrip() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let first = makeModel(defaults)
         first.ignoredSegmentRules = [
             IgnoredSegmentRule(pattern: "um"),
@@ -101,7 +101,7 @@ struct AppModelPostProcessTests {
 
     @Test("a fresh model reloads the find/replace rules a prior model saved")
     func findReplaceRulesRoundTrip() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let first = makeModel(defaults)
         first.findReplaceRules = [
             FindReplaceRule(find: "gmt", replace: "GMT"),
@@ -116,7 +116,7 @@ struct AppModelPostProcessTests {
 
     @Test("reloading clears in-memory ignore rules once the defaults key is gone")
     func ignoredRulesResetWhenKeyAbsent() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
         model.ignoredSegmentRules = [IgnoredSegmentRule(pattern: "secret")]
 
@@ -128,7 +128,7 @@ struct AppModelPostProcessTests {
 
     @Test("reloading clears in-memory find/replace rules once the defaults key is gone")
     func findReplaceRulesResetWhenKeyAbsent() {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let defaults = temporaryDefaults()
         let model = makeModel(defaults)
         model.findReplaceRules = [FindReplaceRule(find: "color", replace: "colour")]
 

@@ -171,7 +171,7 @@ struct CloudLanguageModelTests {
     @Test("Factory throws missingAPIKey when no key configured")
     func factoryMissingKey() async {
         let store = InMemoryAPIKeyStore()
-        let managed = ManagedConfiguration(storage: UserDefaults(suiteName: "parola-cloud-test-\(UUID().uuidString)")!)
+        let managed = ManagedConfiguration(storage: temporaryDefaults("parola-cloud-test-"))
         var thrown: CloudLLMError?
         do {
             _ = try await LanguageModelFactory.makeBYOKCloud(provider: .openAI, keyStore: store, managed: managed)
@@ -188,7 +188,7 @@ struct CloudLanguageModelTests {
     func factoryDisabledByPolicy() async throws {
         let store = InMemoryAPIKeyStore()
         try await store.set("sk-test", for: .openAI)
-        let storage = UserDefaults(suiteName: "parola-cloud-test-\(UUID().uuidString)")!
+        let storage = temporaryDefaults("parola-cloud-test-")
         storage.set(["disableCloudLLM": true], forKey: "com.apple.configuration.managed")
         let managed = ManagedConfiguration(storage: storage)
 
@@ -208,7 +208,7 @@ struct CloudLanguageModelTests {
     func factoryUnsupportedProvider() async throws {
         let store = InMemoryAPIKeyStore()
         try await store.set("k", for: CloudLLMProviderID("vapor-cloud"))
-        let managed = ManagedConfiguration(storage: UserDefaults(suiteName: "parola-cloud-test-\(UUID().uuidString)")!)
+        let managed = ManagedConfiguration(storage: temporaryDefaults("parola-cloud-test-"))
         var thrown: CloudLLMError?
         do {
             _ = try await LanguageModelFactory.makeBYOKCloud(

@@ -10,7 +10,7 @@ struct BridgeStateDetailTests {
     private func makeRig() throws -> (AppModel, ParolaAutomationServer) {
         let model = AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaults: temporaryDefaults(),
             libraryURL: makeTempLibraryURL("statedetail")
         )
         return (model, try ParolaAutomationServer(model: model))
