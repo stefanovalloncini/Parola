@@ -37,20 +37,17 @@ struct Chip: View {
                         .frame(width: 8, height: 8)
                 }
                 titleLabel
-                    .font(font)
+                    .font(size.font(weight: weight))
                     .foregroundStyle(foreground)
             }
-            .padding(.horizontal, horizontalPadding)
-            .frame(height: height)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(background)
+            .chipChrome(
+                isSelected: isSelected,
+                size: size,
+                style: style,
+                hovering: hovering,
+                selectedFill: selectedFill,
+                bordered: bordered
             )
-            .overlay(
-                Capsule(style: .continuous)
-                    .strokeBorder(border, lineWidth: 0.5)
-            )
-            .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -66,30 +63,6 @@ struct Chip: View {
         return Text(title)
     }
 
-    private var font: Font {
-        switch size {
-        case .compact: return DS.Font.subheadline.weight(weight)
-        case .regular: return DS.Font.caption.weight(weight)
-        case .prominent: return DS.Font.callout.weight(weight)
-        }
-    }
-
-    private var horizontalPadding: CGFloat {
-        switch size {
-        case .compact: return 10
-        case .regular: return 10
-        case .prominent: return 12
-        }
-    }
-
-    private var height: CGFloat {
-        switch size {
-        case .compact: return 22
-        case .regular: return 24
-        case .prominent: return 28
-        }
-    }
-
     private var foreground: Color {
         switch style {
         case .elevated:
@@ -99,20 +72,76 @@ struct Chip: View {
         }
     }
 
-    private var background: Color {
-        if isSelected { return selectedFill }
-        switch style {
-        case .elevated:
-            return hovering ? DS.Color.surfaceElevated : DS.Color.surfaceElevated.opacity(0.6)
-        case .subtle:
-            return hovering ? DS.Color.surfaceElevated : Color.primary.opacity(0.06)
+}
+
+extension View {
+    /// The capsule every filter control wears: `Chip` for buttons, `LibraryFilterBar` for pull-downs.
+    func chipChrome(
+        isSelected: Bool,
+        size: Chip.Size = .compact,
+        style: Chip.Style = .elevated,
+        hovering: Bool = false,
+        selectedFill: Color = DS.Color.accent,
+        bordered: Bool = true
+    ) -> some View {
+        let fill: Color
+        if isSelected {
+            fill = selectedFill
+        } else {
+            switch style {
+            case .elevated: fill = hovering ? DS.Color.surfaceElevated : DS.Color.surfaceElevated.opacity(0.6)
+            case .subtle: fill = hovering ? DS.Color.surfaceElevated : Color.primary.opacity(0.06)
+            }
+        }
+        let border: Color = bordered
+            ? (isSelected ? selectedFill.opacity(0.45) : DS.Color.separator.opacity(0.4))
+            : .clear
+        return padding(.horizontal, size.horizontalPadding)
+            .frame(height: size.height)
+            .background(Capsule(style: .continuous).fill(fill))
+            .overlay(Capsule(style: .continuous).strokeBorder(border, lineWidth: 0.5))
+            .contentShape(Capsule(style: .continuous))
+    }
+}
+
+/// A pull-down menu that has to read as a filter chip: `.menuStyle(.button)` keeps the label
+/// view, which `.borderlessButton` replaces with an AppKit-drawn title.
+struct ChipButtonStyle: ButtonStyle {
+    var isSelected: Bool
+    var size: Chip.Size = .compact
+    var weight: Font.Weight = .medium
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(size.font(weight: weight))
+            .foregroundStyle(isSelected ? DS.Color.onAccent : Color.primary.opacity(0.85))
+            .chipChrome(isSelected: isSelected, size: size, hovering: configuration.isPressed)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+    }
+}
+
+extension Chip.Size {
+    func font(weight: Font.Weight) -> Font {
+        switch self {
+        case .compact: return DS.Font.subheadline.weight(weight)
+        case .regular: return DS.Font.caption.weight(weight)
+        case .prominent: return DS.Font.callout.weight(weight)
         }
     }
 
-    private var border: Color {
-        guard bordered else { return .clear }
-        if isSelected { return selectedFill.opacity(0.45) }
-        return DS.Color.separator.opacity(0.4)
+    var horizontalPadding: CGFloat {
+        switch self {
+        case .compact, .regular: return 10
+        case .prominent: return 12
+        }
+    }
+
+    var height: CGFloat {
+        switch self {
+        case .compact: return 22
+        case .regular: return 24
+        case .prominent: return 28
+        }
     }
 }
 

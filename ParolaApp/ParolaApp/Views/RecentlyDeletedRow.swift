@@ -208,13 +208,7 @@ struct RecentlyDeletedRow: View {
         }
     }
 
-    var categoryIcon: String {
-        switch entry.category {
-        case .transcription: return "waveform"
-        case .meeting: return "video.fill"
-        case .dictation: return "text.bubble.fill"
-        }
-    }
+    var categoryIcon: String { DS.categorySymbol(for: entry.category) }
 
     var categoryTint: Color {
         DS.categoryTint(for: entry.category)

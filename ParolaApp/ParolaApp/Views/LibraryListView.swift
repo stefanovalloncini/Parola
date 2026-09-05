@@ -124,6 +124,7 @@ struct LibraryListView: View {
     @State private var dateRangeFilter: LibraryDateRangeFilter = .all
     @State private var entries: [LibraryRowDisplay] = []
     @State private var totalsLabel: String = ""
+    @State private var totalsHelp: String?
     @State private var displayCache = LibraryRowDisplayCache()
     @State private var animatesRows = false
 
@@ -163,12 +164,10 @@ struct LibraryListView: View {
         }
         displayCache = cache
         entries = displays
-        if totalBytes > 0 {
-            let size = AppFormat.byteSize(totalBytes)
-            totalsLabel = "\(displays.count) · \(size)"
-        } else {
-            totalsLabel = "\(displays.count)"
-        }
+        // One shape everywhere: the count alone. Bundle sizes arrive later and only for entries
+        // that carry audio, so folding them in here made the header change shape as a pane settled.
+        totalsLabel = displays.isEmpty ? "" : "\(displays.count)"
+        totalsHelp = totalBytes > 0 ? String(localized: "Total size: \(AppFormat.byteSize(totalBytes))") : nil
         return displays
     }
 
@@ -329,10 +328,13 @@ struct LibraryListView: View {
                 .controlSize(.small)
                 .axLeaf("Header.Button.BulkDelete")
             }
-            Text(totalsLabel)
-                .font(DS.Font.caption)
-                .monospacedDigit()
-                .foregroundStyle(DS.Color.secondaryText)
+            if !totalsLabel.isEmpty {
+                Text(totalsLabel)
+                    .font(DS.Font.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(DS.Color.secondaryText)
+                    .modifier(OptionalHelp(help: totalsHelp))
+            }
         }
         .padding(.horizontal, DS.Spacing.large)
         .padding(.vertical, DS.Spacing.regular)
@@ -422,12 +424,8 @@ struct LibraryListView: View {
     }
 
     private var emptyIcon: String {
-        switch category {
-        case .transcription: return "text.alignleft"
-        case .meeting: return "person.2"
-        case .dictation: return "text.cursor"
-        case nil: return searchResults != nil ? "magnifyingglass" : "tray"
-        }
+        guard let category else { return searchResults != nil ? "magnifyingglass" : "tray" }
+        return DS.categorySymbol(for: category)
     }
 }
 

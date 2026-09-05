@@ -43,16 +43,10 @@ struct LibraryFilterBar: View {
                             .axLeaf("Filter.MenuItem.Label.\(label)")
                     }
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "tag")
-                        Text(labelFilter ?? "All labels")
-                    }
-                    .font(DS.Font.subheadlineMedium)
+                    pill(systemImage: "tag", label: labelFilter.map { Text(verbatim: $0) } ?? Text("All labels"))
                 }
-                // A borderless menu paints its label with the tint and ignores foregroundStyle, so
-                // the tint is the only way to say what colour this control is.
-                .tint(labelFilter == nil ? DS.Color.secondaryText : DS.Color.accentText)
-                .menuStyle(.borderlessButton)
+                .menuStyle(.button)
+                .buttonStyle(ChipButtonStyle(isSelected: labelFilter != nil))
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .axLeaf("Filter.Menu.Label")
@@ -67,14 +61,13 @@ struct LibraryFilterBar: View {
                             .axLeaf("Filter.MenuItem.Language.\(code)")
                     }
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "globe")
-                        Text(languageFilter.map { languageName($0) } ?? String(localized: "All languages"))
-                    }
-                    .font(DS.Font.subheadlineMedium)
+                    pill(
+                        systemImage: "globe",
+                        label: languageFilter.map { Text(verbatim: languageName($0)) } ?? Text("All languages")
+                    )
                 }
-                .tint(languageFilter == nil ? DS.Color.secondaryText : DS.Color.accentText)
-                .menuStyle(.borderlessButton)
+                .menuStyle(.button)
+                .buttonStyle(ChipButtonStyle(isSelected: languageFilter != nil))
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .axLeaf("Filter.Menu.Language")
@@ -85,17 +78,20 @@ struct LibraryFilterBar: View {
                         .axLeaf("Filter.MenuItem.Date.\(option.rawValue)")
                 }
             } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "calendar")
-                    Text(dateRangeFilter.label)
-                }
-                .font(DS.Font.subheadlineMedium)
+                pill(systemImage: "calendar", label: Text(dateRangeFilter.label))
             }
-            .tint(dateRangeFilter == .all ? DS.Color.secondaryText : DS.Color.accentText)
-            .menuStyle(.borderlessButton)
+            .menuStyle(.button)
+            .buttonStyle(ChipButtonStyle(isSelected: dateRangeFilter != .all))
             .menuIndicator(.hidden)
             .fixedSize()
             .axLeaf("Filter.Menu.Date")
+        }
+    }
+
+    private func pill(systemImage: String, label: Text) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: systemImage)
+            label
         }
     }
 

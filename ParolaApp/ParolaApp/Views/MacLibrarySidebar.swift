@@ -17,16 +17,18 @@ struct MacLibrarySidebar: View {
     }
 
     private var categories: [(title: LocalizedStringKey, id: String, systemImage: String, category: EntryCategory)] {
-        var rows: [(LocalizedStringKey, String, String, EntryCategory)] = [
-            ("Transcriptions", "transcriptions", "text.alignleft", .transcription)
+        var rows: [(LocalizedStringKey, String, EntryCategory)] = [
+            ("Transcriptions", "transcriptions", .transcription)
         ]
         if model.features.isEnabled(.meetings) {
-            rows.append(("Meetings", "meetings", "person.2", .meeting))
+            rows.append(("Meetings", "meetings", .meeting))
         }
         if model.features.isEnabled(.dictation) {
-            rows.append(("Dictations", "dictations", "text.cursor", .dictation))
+            rows.append(("Dictations", "dictations", .dictation))
         }
-        return rows.map { (title: $0.0, id: $0.1, systemImage: $0.2, category: $0.3) }
+        return rows.map {
+            (title: $0.0, id: $0.1, systemImage: DS.categorySymbol(for: $0.2), category: $0.2)
+        }
     }
 
     var body: some View {
