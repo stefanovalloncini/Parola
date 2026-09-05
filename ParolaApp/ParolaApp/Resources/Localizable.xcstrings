@@ -1796,6 +1796,16 @@
         }
       }
     },
+    "Choose Files…": {
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli i file…"
+          }
+        }
+      }
+    },
     "Choose a completed file to see its transcript.": {
       "extractionState": "manual",
       "localizations": {

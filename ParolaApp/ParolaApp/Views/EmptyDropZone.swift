@@ -152,15 +152,11 @@ struct EmptyDropZone: View {
                     .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.primaryText)
                 Spacer(minLength: 0)
-                Button("View all (\(model.libraryEntries.count))") {
+                ViewAllButton(count: model.libraryEntries.count) {
                     model.libraryFilter = nil
                     model.libraryBrowsingAll = true
                     model.route = .transcript
                 }
-                .buttonStyle(.plain)
-                .font(DS.Font.subheadlineMedium)
-                .foregroundStyle(DS.Color.accent)
-                .axLeaf("Empty.Button.ViewAll")
             }
             // Color.clear takes the leftover height, so the row count follows the space the
             // window has rather than feeding back into it.
@@ -191,6 +187,30 @@ struct EmptyDropZone: View {
     }
 }
 
+private struct ViewAllButton: View {
+    let count: Int
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Text("View all (\(count))")
+                    .underline(isHovering)
+                Image(systemName: "chevron.right")
+                    .font(DS.Font.caption2Emphasized)
+            }
+            .font(DS.Font.subheadlineMedium)
+            .foregroundStyle(DS.Color.accentText)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .axLeaf("Empty.Button.ViewAll")
+    }
+}
+
 /// The resting half of the split drop zone: the window says a drop is welcome before a drag ever starts.
 private struct IntakeDropWell: View {
     @Environment(AppModel.self) private var model
@@ -214,6 +234,14 @@ private struct IntakeDropWell: View {
                         .foregroundStyle(DS.Color.secondaryText)
                 }
                 Spacer(minLength: DS.Spacing.regular)
+                // A shape, not just the accent: under the Mono accent the dashed well alone reads as disabled.
+                Label("Choose Files…", systemImage: "folder")
+                    .font(DS.Font.subheadlineMedium)
+                    .foregroundStyle(DS.Color.primaryText)
+                    .padding(.horizontal, 14)
+                    .frame(height: 28)
+                    .background(Capsule(style: .continuous).fill(DS.Palette.pillFill))
+                    .overlay(Capsule(style: .continuous).strokeBorder(DS.Color.separator, lineWidth: 0.5))
             }
             .padding(.horizontal, DS.Spacing.large)
             .padding(.vertical, DS.Spacing.regular)

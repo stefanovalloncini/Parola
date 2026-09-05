@@ -225,7 +225,7 @@ final class AppModel {
     @ObservationIgnored var pendingRecoveryWrite: Task<Void, Never>?
     /// A recorded take whose transcription failed; the file backs the error pane's Retry.
     var failedTakeAudioURL: URL?
-    /// The file a failed file transcription was reading; backs the error banner's Retry and Show in Finder.
+    /// The file a failed file transcription was reading; the error card retries and reveals it.
     var failedFileURL: URL?
     @ObservationIgnored var failedTakeTitle: String?
     @ObservationIgnored var failedTakeCategory: EntryCategory?
