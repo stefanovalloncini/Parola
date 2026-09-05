@@ -999,6 +999,17 @@
         }
       }
     },
+    "All Kinds": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutti i tipi"
+          }
+        }
+      }
+    },
     "All labels": {
       "extractionState": "manual",
       "localizations": {
@@ -2527,6 +2538,17 @@
         }
       }
     },
+    "Delete All Now": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina tutto ora"
+          }
+        }
+      }
+    },
     "Delete Diagnostics": {
       "extractionState": "manual",
       "localizations": {
@@ -2534,6 +2556,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Elimina diagnostica"
+          }
+        }
+      }
+    },
+    "Delete all items now?": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminare tutti gli elementi adesso?"
+          }
+        }
+      }
+    },
+    "Delete every item in Recently Deleted": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina ogni elemento in Eliminati di recente"
           }
         }
       }
@@ -3032,39 +3076,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Modifica prompt"
-          }
-        }
-      }
-    },
-    "Empty": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Svuota"
-          }
-        }
-      }
-    },
-    "Empty Recently Deleted": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Svuota Eliminati di recente"
-          }
-        }
-      }
-    },
-    "Empty Recently Deleted?": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Svuotare Eliminati di recente?"
           }
         }
       }

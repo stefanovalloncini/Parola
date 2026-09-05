@@ -82,10 +82,10 @@ struct MacRecentlyDeletedView: View {
             Text("This can't be undone.")
         }
         .confirmationDialog(
-            "Empty Recently Deleted?",
+            "Delete all items now?",
             isPresented: $confirmingEmpty
         ) {
-            Button("Empty", role: .destructive) {
+            Button("Delete All Now", role: .destructive) {
                 purge(model.deletedEntries.map(\.id))
             }
             Button("Cancel", role: .cancel) {}
@@ -187,12 +187,11 @@ struct MacRecentlyDeletedView: View {
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.secondaryText)
             Spacer(minLength: DS.Spacing.regular)
-            Button("Empty") { confirmingEmpty = true }
-                .buttonStyle(.plain)
-                .font(DS.Font.subheadlineMedium)
-                .foregroundStyle(model.deletedEntries.isEmpty ? DS.Color.secondaryText.opacity(0.5) : DS.Color.danger)
+            Button("Delete All Now", role: .destructive) { confirmingEmpty = true }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
                 .disabled(model.deletedEntries.isEmpty)
-                .help("Empty Recently Deleted")
+                .help("Delete every item in Recently Deleted")
                 .axLeaf("Toolbar.Button.EmptyTrash")
         }
         .padding(.horizontal, DS.Spacing.regular)

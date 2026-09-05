@@ -22,7 +22,7 @@ enum RecentlyDeletedCategoryFilter: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .all: return "All"
+        case .all: return "All Kinds"
         case .transcriptions: return "Transcriptions"
         case .meetings: return "Meetings"
         case .dictations: return "Dictations"
@@ -164,7 +164,7 @@ struct RecentlyDeletedToolbar: View {
             .disabled(model.deletedEntries.isEmpty)
             .axLeaf("Toolbar.MenuItem.RestoreAll")
             Divider()
-            Button("Empty Recently Deleted", role: .destructive) {
+            Button("Delete All Now", role: .destructive) {
                 confirmingEmpty = true
             }
             .disabled(model.deletedEntries.isEmpty)
