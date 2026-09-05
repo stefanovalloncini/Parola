@@ -46,9 +46,7 @@ struct ModelsSettingsPane: View {
             if let error = model.modelActionError {
                 modelErrorBanner(error)
             }
-            StorageRow()
-            modelsUsageRow
-            libraryUsageRow
+            usageCard
             controls
             content
         }
@@ -83,6 +81,20 @@ struct ModelsSettingsPane: View {
         Binding(
             get: { pendingDeletion != nil },
             set: { if !$0 { pendingDeletion = nil } }
+        )
+    }
+
+    private var usageCard: some View {
+        VStack(spacing: 0) {
+            StorageRow()
+            Divider()
+            modelsUsageRow
+            Divider()
+            libraryUsageRow
+        }
+        .background(
+            RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
+                .fill(DS.Color.surfaceElevated)
         )
     }
 

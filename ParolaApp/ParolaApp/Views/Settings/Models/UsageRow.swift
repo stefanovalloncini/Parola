@@ -20,9 +20,5 @@ struct UsageRow: View {
         }
         .padding(.horizontal, DS.Spacing.medium)
         .padding(.vertical, DS.Spacing.small)
-        .background(
-            RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                .fill(DS.Color.surfaceElevated)
-        )
     }
 }

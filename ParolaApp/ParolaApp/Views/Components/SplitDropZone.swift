@@ -101,13 +101,14 @@ private struct SplitDropOverlay: View {
 
     var body: some View {
         ZStack {
-            DS.Palette.canvas.opacity(0.96)
+            DS.Palette.canvas
                 .ignoresSafeArea()
             VStack(spacing: DS.Spacing.small) {
                 header
                 zones
             }
-            .padding(DS.Spacing.medium)
+            .padding(.horizontal, isSingleZone ? DS.Spacing.xlarge * 2 : DS.Spacing.medium)
+            .padding(.vertical, isSingleZone ? DS.Spacing.xlarge : DS.Spacing.medium)
         }
         .axBranch("SplitDrop")
     }
@@ -196,6 +197,11 @@ private struct SplitDropOverlay: View {
     private var queueSubtitle: LocalizedStringKey {
         if case .queueOnly = plan { return "Starts when the current job finishes" }
         return "Transcribe later"
+    }
+
+    private var isSingleZone: Bool {
+        if case .split = plan { return false }
+        return true
     }
 
     private var showsIntakeState: Bool {
