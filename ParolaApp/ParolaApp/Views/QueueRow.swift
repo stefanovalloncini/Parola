@@ -84,13 +84,9 @@ struct QueueRow: View {
 
     private var kind: BatchMediaKind { BatchMediaKind(url: job.url) }
 
-    private var iconTint: Color {
-        kind == .video ? .green : .teal
-    }
+    private var iconTint: Color { DS.mediaTint(for: kind) }
 
-    private var iconName: String {
-        kind == .video ? "film" : "waveform"
-    }
+    private var iconName: String { kind.symbolName }
 
     private var showsProgressBar: Bool {
         switch job.status {

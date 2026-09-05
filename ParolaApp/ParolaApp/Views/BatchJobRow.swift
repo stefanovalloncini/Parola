@@ -12,12 +12,7 @@ struct BatchJobRow: View {
         DS.mediaTint(for: kind)
     }
 
-    private var iconSymbol: String {
-        switch kind {
-        case .video: return "play.rectangle.fill"
-        case .audio: return "waveform"
-        }
-    }
+    private var iconSymbol: String { kind.symbolName }
 
     var body: some View {
         HStack(spacing: DS.Spacing.regular) {
@@ -77,15 +72,19 @@ enum BatchMediaKind {
     case audio
     case video
 
+    // `.audio` conforms to `.audiovisualContent` too, so only the movie/video branches mean video.
     init(url: URL) {
         guard let type = UTType(filenameExtension: url.pathExtension) else {
             self = .audio
             return
         }
-        if type.conforms(to: .movie) || type.conforms(to: .audiovisualContent) {
-            self = .video
-        } else {
-            self = .audio
+        self = type.conforms(to: .movie) || type.conforms(to: .video) ? .video : .audio
+    }
+
+    var symbolName: String {
+        switch self {
+        case .video: return "play.rectangle.fill"
+        case .audio: return "waveform"
         }
     }
 }

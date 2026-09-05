@@ -185,7 +185,7 @@ private struct SplitDropOverlay: View {
 
     private var queueZone: some View {
         DropZonePanel(
-            systemImage: "square.stack.3d.up",
+            systemImage: "list.bullet.indent",
             title: "Add to Queue",
             subtitle: queueSubtitle,
             isHot: highlight == .queue
