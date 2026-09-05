@@ -19,7 +19,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     /// file from an older build knows what shape to expect.
     public static let schemaVersion = 1
 
-    private static let filePrefix = "parola-"
+    static let filePrefix = "parola-"
 
     private let bufferState = OSAllocatedUnfairLock(initialState: BufferState())
     private let rotationState = OSAllocatedUnfairLock(initialState: 0)

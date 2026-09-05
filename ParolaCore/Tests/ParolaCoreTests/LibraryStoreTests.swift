@@ -937,4 +937,26 @@ struct LibraryStoreTests {
             Issue.record("expected versionTooNew issue")
         }
     }
+
+    @Test("sizeOnDisk sums the bundles and nothing else")
+    func sizeOnDiskSumsBundles() async throws {
+        let (store, libraryURL) = try makeTempLibrary()
+        let bundle = libraryURL.appendingPathComponent("entry.parola", isDirectory: true)
+        try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
+        try Data(repeating: 0x61, count: 2_000).write(to: bundle.appendingPathComponent("audio.wav"))
+        try Data(repeating: 0x62, count: 400_000).write(to: libraryURL.appendingPathComponent(".search-index.json"))
+
+        let bytes = try #require(await store.sizeOnDisk())
+        #expect(bytes >= 2_000)
+        #expect(bytes < 400_000)
+    }
+
+    @Test("sizeOnDisk reports nothing when the library cannot be listed")
+    func sizeOnDiskIsNilWithoutADirectory() async throws {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-library-tests-\(UUID().uuidString).txt")
+        try Data("not a library".utf8).write(to: file)
+        let store = LibraryStore(libraryURL: file, extraIndexer: nil)
+        #expect(await store.sizeOnDisk() == nil)
+    }
 }

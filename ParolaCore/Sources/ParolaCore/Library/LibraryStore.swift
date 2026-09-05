@@ -81,6 +81,33 @@ public actor LibraryStore {
         await searchIndex.flush()
     }
 
+    /// Bytes held by every bundle in the library, deleted ones included. nil when the directory
+    /// cannot be listed.
+    public func sizeOnDisk() async -> UInt64? {
+        let url = libraryURL
+        return await offActorIO(qos: .utility) { Self.bundleBytes(in: url) }
+    }
+
+    private static func bundleBytes(in libraryURL: URL) -> UInt64? {
+        let manager = FileManager.default
+        guard let contents = try? manager.contentsOfDirectory(
+            at: libraryURL,
+            includingPropertiesForKeys: nil
+        ) else { return nil }
+        var total: UInt64 = 0
+        for bundle in contents where bundle.pathExtension == "parola" {
+            guard let files = manager.enumerator(
+                at: bundle,
+                includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileSizeKey]
+            ) else { continue }
+            for case let file as URL in files {
+                let values = try? file.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileSizeKey])
+                total += UInt64(max(0, values?.totalFileAllocatedSize ?? values?.fileSize ?? 0))
+            }
+        }
+        return total
+    }
+
     private func ensureSearchIndexReady() async {
         if indexReadyTask == nil {
             indexReadyTask = Task { await self.rebuildSearchIndexIfStale() }
