@@ -44,6 +44,23 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "toggleInspector",
+                area: .transcript,
+                summary: "Toggles the transcript inspector, the same way ⌘⇧I does.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    let isNarrow = ctx.model.transcriptPaneIsNarrow
+                    InspectorVisibility.toggle(in: ctx.model.defaults, isNarrow: isNarrow)
+                    let visible = InspectorVisibility.isVisible(
+                        preference: InspectorVisibility.preference(in: ctx.model.defaults),
+                        forcedAtNarrowWidth: ctx.model.defaults.bool(forKey: InspectorVisibility.forcedAtNarrowWidthKey),
+                        isNarrow: isNarrow
+                    )
+                    return .object(["visible": .bool(visible), "narrow": .bool(isNarrow)])
+                }
+            ),
+
+            AutomationCommand(
                 name: "clearTranscript",
                 area: .transcript,
                 summary: "Clears the loaded transcript and returns to idle.",
