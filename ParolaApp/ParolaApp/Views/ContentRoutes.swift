@@ -40,8 +40,8 @@ struct ContentRoutes: View {
         }
     }
 
-    /// Coarse enough that the phase machine keeps its own cross-fade: everything `phaseContent`
-    /// covers collapses to a single case here.
+    /// Coarse on purpose: the phase machine keeps its own cross-fade, and every library filter is one
+    /// case so switching category keeps the list's identity and its `onChange` handlers.
     private var routeID: RouteID {
         if model.mode == .test, model.settingsRoutePreview { return .settingsPreview }
         switch model.route {
@@ -49,10 +49,7 @@ struct ContentRoutes: View {
         case .queue: return .queue
         case .transcript:
             if !model.batchJobs.isEmpty { return .batchDetail }
-            guard showsLibraryBrowse else { return .phase }
-            if model.searchResults != nil { return .search }
-            if let filter = model.libraryFilter { return .category(filter) }
-            return .allEntries
+            return showsLibraryBrowse ? .library : .phase
         }
     }
 
@@ -61,9 +58,7 @@ struct ContentRoutes: View {
         case batch
         case queue
         case batchDetail
-        case search
-        case category(EntryCategory)
-        case allEntries
+        case library
         case phase
     }
 

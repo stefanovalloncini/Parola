@@ -125,6 +125,7 @@ struct LibraryListView: View {
     @State private var entries: [LibraryRowDisplay] = []
     @State private var totalsLabel: String = ""
     @State private var displayCache = LibraryRowDisplayCache()
+    @State private var animatesRows = false
 
     private var activeFilters: LibraryListContent.ActiveFilters {
         LibraryListContent.ActiveFilters(label: labelFilter, language: languageFilter, dateRange: dateRangeFilter)
@@ -227,7 +228,7 @@ struct LibraryListView: View {
                 }
                 .listStyle(.inset)
                 .tint(DS.Color.accent)
-                .animation(reduceMotion ? nil : DS.Motion.listRows, value: entries.map(\.id))
+                .animation(animatesRows ? DS.Motion.listRows : nil, value: entries.map(\.id))
                 .onKeyPress(.return) {
                     guard selection.count == 1, let id = selection.first else { return .ignored }
                     model.loadEntry(id)
@@ -237,6 +238,9 @@ struct LibraryListView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { recomputeEntries() }
+        // A later transaction than onAppear's first fill, so the rows the route opens with don't
+        // animate in; everything after that does.
+        .task { animatesRows = !reduceMotion }
         .onChange(of: model.libraryVersion) { _, _ in
             let newEntries = recomputeEntries()
             selection = selection.intersection(Set(newEntries.map(\.id)))
