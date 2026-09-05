@@ -9,12 +9,15 @@ struct BatchView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            HSplitView {
+            // Not an HSplitView: it lays its panes out at their combined ideal width and clips both
+            // window edges at the minimum width instead of compressing.
+            HStack(spacing: 0) {
                 queuePane
-                    .frame(minWidth: 360, idealWidth: 560)
+                    .frame(minWidth: MainWindowLayout.batchQueueMinWidth, maxWidth: .infinity)
                 if exportPaneVisible {
+                    Divider()
                     exportPane
-                        .frame(minWidth: 280, idealWidth: 380)
+                        .frame(width: MainWindowLayout.batchExportPaneWidth)
                 }
             }
         }

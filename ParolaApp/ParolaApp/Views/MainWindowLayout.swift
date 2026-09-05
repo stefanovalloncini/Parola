@@ -12,7 +12,14 @@ enum MainWindowLayout {
     static let inspectorWidth: CGFloat = 300
     static let dividerWidth: CGFloat = 1
 
+    static let batchQueueMinWidth: CGFloat = 280
+    static let batchExportPaneWidth: CGFloat = 300
+
     static var transcriptPaneMinWidth: CGFloat {
         transcriptMinWidth + dividerWidth + inspectorWidth
+    }
+
+    static var batchPaneMinWidth: CGFloat {
+        batchQueueMinWidth + dividerWidth + batchExportPaneWidth
     }
 }
