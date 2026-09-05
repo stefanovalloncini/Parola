@@ -1353,8 +1353,7 @@ final class AppModel {
                 // One row per model here and no leftovers list, so Delete frees every copy —
                 // the CLI splits the two into `models rm` and `models rm --leftovers`.
                 try await AppModel.offMainIO {
-                    try? store.deleteLeftovers(variant: name)
-                    try store.deleteAny(idOrPath: name)
+                    try AppModel.removeModelCopies(name, using: store)
                 }
                 failure = nil
             } catch {
@@ -1362,13 +1361,22 @@ final class AppModel {
             }
             guard let self else { return }
             self.modelsBeingDeleted.remove(name)
+            self.refreshModelList()
             if let failure {
                 let message = "Could not delete \(name): \(failure.localizedDescription)"
                 self.phase = .failed(message: message)
                 self.modelActionError = message
-            } else {
-                self.refreshModelList()
             }
+        }
+    }
+
+    // Freeing the superseded copy alone still frees the disk, so only both removals failing is a failure.
+    nonisolated static func removeModelCopies(_ name: String, using store: ModelStore) throws {
+        let freedLeftovers = (try? store.deleteLeftovers(variant: name)) != nil
+        do {
+            try store.deleteAny(idOrPath: name)
+        } catch {
+            if !freedLeftovers { throw error }
         }
     }
 

@@ -82,3 +82,39 @@ struct PreparingStageGateTests {
         #expect(!TranscribingPane.showsPreparing(stage: model.fileTranscribeStage, heuristic: false, awaitingFirstOutput: true))
     }
 }
+
+@Suite("Model deletion")
+struct ModelDeletionTests {
+    private static let variant = "openai_whisper-large-v3_turbo"
+
+    private func makeStore(withSupersededCopyOf variant: String) throws -> (ModelStore, URL, URL) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ModelDeletionTests-\(UUID().uuidString)", isDirectory: true)
+        let superseded = root
+            .appendingPathComponent("models/argmaxinc/whisperkit-coreml", isDirectory: true)
+            .appendingPathComponent(variant, isDirectory: true)
+        try FileManager.default.createDirectory(at: superseded, withIntermediateDirectories: true)
+        try Data("weights".utf8).write(to: superseded.appendingPathComponent("model.mlmodelc"))
+        return (ModelStore(modelsDirectory: root), root, superseded)
+    }
+
+    @Test("deleting a model whose only copy is the superseded one reports success")
+    func leftoverOnlyDeletionSucceeds() throws {
+        let (store, root, superseded) = try makeStore(withSupersededCopyOf: Self.variant)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        #expect(throws: Never.self) { try AppModel.removeModelCopies(Self.variant, using: store) }
+        #expect(FileManager.default.fileExists(atPath: superseded.path) == false)
+    }
+
+    @Test("deleting a model with no copies at all still reports the failure")
+    func missingModelStillFails() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ModelDeletionTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ModelStore(modelsDirectory: root)
+
+        #expect(throws: (any Error).self) { try AppModel.removeModelCopies(Self.variant, using: store) }
+    }
+}
