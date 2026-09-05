@@ -11,6 +11,21 @@ struct ContinuousChunksTests {
         TranscriptSegment(id: id, start: Double(id), end: Double(id) + 1, text: text, speaker: speaker)
     }
 
+    private func timed(
+        _ id: Int,
+        _ text: String,
+        start: Double,
+        end: Double,
+        speaker: String? = nil
+    ) -> TranscriptSegment {
+        TranscriptSegment(id: id, start: start, end: end, text: text, speaker: speaker)
+    }
+
+    /// Segments back to back, then one that starts `gap` seconds after the previous ends.
+    private func pairSeparatedBy(_ gap: Double) -> [TranscriptSegment] {
+        [timed(0, "First.", start: 0, end: 4), timed(1, "Second.", start: 4 + gap, end: 8 + gap)]
+    }
+
     private func build(
         _ segments: [TranscriptSegment],
         useSpeakerColor: Bool = false,
@@ -144,6 +159,79 @@ struct ContinuousChunksTests {
             segment(1, "Yo.", speaker: "Bob")
         ]
         #expect(plainTexts(segments, useSpeakerColor: false) == ["Hi. Yo."])
+    }
+
+    // MARK: - Paragraphs
+
+    @Test("a pause at the threshold starts a new paragraph")
+    func pauseAtThresholdBreaksParagraph() {
+        let texts = plainTexts(pairSeparatedBy(TranscriptDerive.paragraphPauseSeconds))
+        #expect(texts == ["First.\n\nSecond."])
+    }
+
+    @Test("a long pause starts a new paragraph")
+    func longPauseBreaksParagraph() {
+        #expect(plainTexts(pairSeparatedBy(4)) == ["First.\n\nSecond."])
+    }
+
+    @Test("a pause under the threshold keeps one paragraph")
+    func shortPauseKeepsOneParagraph() {
+        #expect(plainTexts(pairSeparatedBy(1.4)) == ["First. Second."])
+    }
+
+    @Test("back-to-back segments keep one paragraph")
+    func noGapKeepsOneParagraph() {
+        #expect(plainTexts(pairSeparatedBy(0)) == ["First. Second."])
+    }
+
+    @Test("a paragraph break lands in the copied text as a blank line")
+    func paragraphBreakSurvivesCopy() {
+        let copied = plainTexts(pairSeparatedBy(3)).joined(separator: "\n\n")
+        #expect(copied.components(separatedBy: "\n\n") == ["First.", "Second."])
+    }
+
+    @Test("run offsets stay aligned across a paragraph break")
+    func runOffsetsSurviveParagraphBreak() {
+        let chunks = build(pairSeparatedBy(3))
+        #expect(chunks.count == 1)
+        #expect(runText(in: chunks[0], id: 0) == "First.")
+        #expect(runText(in: chunks[0], id: 1) == "Second.")
+    }
+
+    @Test("a whitespace-only segment does not swallow the pause around it")
+    func blankSegmentKeepsThePause() {
+        let segments = [
+            timed(0, "First.", start: 0, end: 4),
+            timed(1, "   ", start: 4, end: 5),
+            timed(2, "Second.", start: 8, end: 12)
+        ]
+        #expect(plainTexts(segments) == ["First.\n\nSecond."])
+    }
+
+    @Test("a speaker change opens a chunk rather than a paragraph break")
+    func speakerChangeWinsOverPause() {
+        let segments = [
+            timed(0, "Hi.", start: 0, end: 4, speaker: "Alice"),
+            timed(1, "Yo.", start: 8, end: 12, speaker: "Bob")
+        ]
+        #expect(plainTexts(segments, useSpeakerColor: true) == ["Alice\nHi.", "Bob\nYo."])
+    }
+
+    @Test("past the soft cap a pause closes the chunk instead of adding a blank line")
+    func pastSoftCapPauseClosesTheChunk() {
+        let segments = [
+            timed(0, "a", start: 0, end: 1),
+            timed(1, "b", start: 1, end: 2),
+            timed(2, "c", start: 2, end: 3),
+            timed(3, "d", start: 6, end: 7)
+        ]
+        #expect(plainTexts(segments, softCap: 3, hardCap: 6) == ["a b c", "d"])
+    }
+
+    @Test("a pause right after a chunk break adds no leading blank line")
+    func pauseAfterChunkBreakAddsNoLeadingBlankLine() {
+        let segments = (0..<4).map { timed($0, "word\($0)", start: Double($0) * 10, end: Double($0) * 10 + 1) }
+        #expect(plainTexts(segments, softCap: 2, hardCap: 2) == ["word0\n\nword1", "word2\n\nword3"])
     }
 
     // MARK: - Caps

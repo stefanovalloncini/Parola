@@ -102,7 +102,7 @@ struct ContinuousChunks: View {
         let useSpeakerColor = model.transcriptSpeakers.count >= 2
         let segments = transcript.segments
         // transcriptVersion also bumps for mutations that can't change the rendered text
-        // (timing nudges, duration backfill); skip the expensive rebuild for those.
+        // (duration backfill, playback bookkeeping); skip the expensive rebuild for those.
         let signature = Self.contentSignature(segments: segments, useSpeakerColor: useSpeakerColor)
         guard gate.needsRebuild(for: signature) else { return }
         buildTask?.cancel()
@@ -156,6 +156,9 @@ struct ContinuousChunks: View {
             hasher.combine(seg.id)
             hasher.combine(seg.text)
             hasher.combine(seg.speaker)
+            // Timings are part of the render: a gap between two segments decides where a paragraph breaks.
+            hasher.combine(seg.start)
+            hasher.combine(seg.end)
         }
         return hasher.finalize()
     }
@@ -187,7 +190,8 @@ struct ContinuousChunks: View {
         useSpeakerColor: Bool,
         primaryText: Color,
         softCap: Int = ContinuousChunks.softSegmentCap,
-        hardCap: Int = ContinuousChunks.hardSegmentCap
+        hardCap: Int = ContinuousChunks.hardSegmentCap,
+        paragraphPause: TimeInterval = TranscriptDerive.paragraphPauseSeconds
     ) -> [Chunk] {
         var chunks: [Chunk] = []
         var text = AttributedString()
@@ -196,6 +200,7 @@ struct ContinuousChunks: View {
         var segmentCount = 0
         var lastEndedSentence = false
         var shownSpeaker: String?
+        var lastEnd: Double?
 
         func closeChunk() {
             guard !text.characters.isEmpty else { return }
@@ -209,6 +214,8 @@ struct ContinuousChunks: View {
         for seg in segments {
             let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !body.isEmpty else { continue }
+            let pauseBreak = lastEnd.map { seg.start - $0 >= paragraphPause } ?? false
+            lastEnd = seg.end
             let baseColor: Color? = useSpeakerColor ? seg.speaker.map(DS.speakerColor(for:)) : nil
             if let label = useSpeakerColor ? SegmentCard.speakerLabel(for: seg.speaker) : nil,
                label != shownSpeaker {
@@ -219,8 +226,13 @@ struct ContinuousChunks: View {
                 offset += heading.characters.count
                 text.append(heading)
                 shownSpeaker = label
-            } else if segmentCount >= hardCap || (segmentCount >= softCap && lastEndedSentence) {
+            } else if segmentCount >= hardCap || (segmentCount >= softCap && (lastEndedSentence || pauseBreak)) {
                 closeChunk()
+            } else if pauseBreak, !text.characters.isEmpty {
+                // A blank line, not padding between views: the break has to land in the copied text too.
+                let separator = AttributedString("\n\n")
+                offset += separator.characters.count
+                text.append(separator)
             }
             let startsLine = text.characters.isEmpty || text.characters.last == "\n"
             var piece = AttributedString(startsLine ? body : " " + body)
