@@ -63,6 +63,14 @@ struct RGBA: Sendable, Codable, Equatable {
     /// Max-min RGB spread — a cheap saturation proxy, near zero for greys.
     var chroma: Double { Swift.max(r, g, b) - Swift.min(r, g, b) }
 
+    /// WCAG contrast ratio, 1 (identical) to 21 (black on white). Alpha is ignored: every pair the
+    /// app measures is an opaque token on an opaque surface.
+    func contrast(against other: RGBA) -> Double {
+        let (high, low) = (Swift.max(relativeLuminance, other.relativeLuminance),
+                           Swift.min(relativeLuminance, other.relativeLuminance))
+        return (high + 0.05) / (low + 0.05)
+    }
+
     /// Parses `#RRGGBB` / `#RRGGBBAA` (with or without the leading `#`). Returns nil on malformed input.
     init?(hex: String) {
         var s = hex.trimmingCharacters(in: .whitespaces)

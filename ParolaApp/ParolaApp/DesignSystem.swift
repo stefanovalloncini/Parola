@@ -177,15 +177,19 @@ enum DS {
         }
     }
 
-    static let speakerPalette: [SwiftUI.Color] = [
-        SwiftUI.Color(red: 0.30, green: 0.45, blue: 0.68),  // dusty blue
-        SwiftUI.Color(red: 0.62, green: 0.42, blue: 0.30),  // warm tan
-        SwiftUI.Color(red: 0.42, green: 0.52, blue: 0.36),  // sage
-        SwiftUI.Color(red: 0.58, green: 0.38, blue: 0.52),  // mauve
-        SwiftUI.Color(red: 0.46, green: 0.50, blue: 0.58),  // slate
-        SwiftUI.Color(red: 0.66, green: 0.50, blue: 0.34),  // ochre
-        SwiftUI.Color(red: 0.36, green: 0.50, blue: 0.50),  // teal-grey
+    /// One pair per hue: the single shared value read at 3.2-4.7 against the segment card in both
+    /// schemes. Each variant here clears 5.0 on `surfaceElevated` — see `SpeakerPaletteTests`.
+    static let speakerTints: [ThemeColor] = [
+        .dynamic(light: RGBA(0.272, 0.407, 0.616), dark: RGBA(0.538, 0.640, 0.796)),  // dusty blue
+        .dynamic(light: RGBA(0.539, 0.365, 0.261), dark: RGBA(0.761, 0.601, 0.506)),  // warm tan
+        .dynamic(light: RGBA(0.346, 0.428, 0.297), dark: RGBA(0.568, 0.662, 0.512)),  // sage
+        .dynamic(light: RGBA(0.529, 0.347, 0.475), dark: RGBA(0.733, 0.593, 0.691)),  // mauve
+        .dynamic(light: RGBA(0.370, 0.406, 0.476), dark: RGBA(0.606, 0.635, 0.694)),  // slate
+        .dynamic(light: RGBA(0.503, 0.381, 0.259), dark: RGBA(0.736, 0.612, 0.488)),  // ochre
+        .dynamic(light: RGBA(0.307, 0.426, 0.426), dark: RGBA(0.526, 0.659, 0.659)),  // teal-grey
     ]
+
+    static let speakerPalette: [SwiftUI.Color] = speakerTints.map(\.color)
 
     static func categoryTint(for category: EntryCategory) -> SwiftUI.Color {
         switch category {
