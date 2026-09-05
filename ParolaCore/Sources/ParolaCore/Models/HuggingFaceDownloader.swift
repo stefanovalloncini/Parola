@@ -19,6 +19,7 @@ enum HuggingFaceDownloader {
     ) async throws {
         let files = try await listFiles(repo: repo, path: subpath, revision: revision, urlSession: urlSession)
         guard !files.isEmpty else {
+            ParolaLog.error(.models, "repo listing was empty")
             throw ParolaError.modelDownloadFailed(repo, underlying: "No files listed for repo")
         }
 
@@ -70,6 +71,11 @@ enum HuggingFaceDownloader {
             }
             let httpStatus = (response as? HTTPURLResponse)?.statusCode
             guard let httpStatus, (200..<300).contains(httpStatus) else {
+                ParolaLog.error(
+                    .models,
+                    "file download returned HTTP \(httpStatus ?? -1)",
+                    [.count: .int(sidecar.files.values.filter(\.complete).count)]
+                )
                 throw ParolaError.modelDownloadFailed(
                     repo,
                     underlying: "HTTP \(httpStatus ?? -1) for \(entry.path)"
@@ -80,6 +86,11 @@ enum HuggingFaceDownloader {
             if let expected = entry.expectedSHA256 {
                 let actual = try sha256Hex(of: localURL)
                 if actual.caseInsensitiveCompare(expected) != .orderedSame {
+                    ParolaLog.fault(
+                        .models,
+                        "checksum mismatch, file discarded",
+                        [.bytes: .bytes(fileSize(at: localURL))]
+                    )
                     try? FileManager.default.removeItem(at: localURL)
                     sidecar.files[entry.relativeName] = nil
                     try? sidecar.write(to: sidecarURL)
@@ -94,6 +105,7 @@ enum HuggingFaceDownloader {
                 // recorded complete. Reject a short file and keep the sidecar so it re-fetches.
                 let actual = (try? FileManager.default.attributesOfItem(atPath: localURL.path)[.size] as? Int64) ?? -1
                 if actual != expected {
+                    ParolaLog.error(.models, "short file rejected", [.bytes: .bytes(actual)])
                     try? FileManager.default.removeItem(at: localURL)
                     sidecar.files[entry.relativeName] = nil
                     try? sidecar.write(to: sidecarURL)
@@ -121,6 +133,10 @@ enum HuggingFaceDownloader {
         }
 
         try? FileManager.default.removeItem(at: sidecarURL)
+    }
+
+    private static func fileSize(at url: URL) -> Int64 {
+        (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
     }
 
     private struct LFSMeta: Decodable {

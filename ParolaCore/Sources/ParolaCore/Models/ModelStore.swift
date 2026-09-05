@@ -89,7 +89,14 @@ public final class ModelStore: Sendable {
         } else {
             self.modelsDirectory = Self.defaultDirectory
         }
-        try? FileManager.default.createDirectory(at: self.modelsDirectory, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(
+                at: self.modelsDirectory,
+                withIntermediateDirectories: true
+            )
+        } catch {
+            ParolaLog.error(.models, "could not create the models directory", [.error: .error(error)])
+        }
     }
 
     /// Cross-process home of the storage override. The app writes it whenever the setting
@@ -408,6 +415,11 @@ public final class ModelStore: Sendable {
                     try FileManager.default.removeItem(at: candidate)
                     return
                 } catch {
+                    ParolaLog.error(
+                        .models,
+                        "delete failed for \(ModelToken(name))",
+                        [.error: .error(error)]
+                    )
                     throw ParolaError.ioError("Failed to delete \(name): \(error.localizedDescription)")
                 }
             }
@@ -447,20 +459,33 @@ public final class ModelStore: Sendable {
         try checkDownloadPolicy(variant: variant)
         if ModelCatalog.variant(id: variant) == nil,
            let suggestion = ModelCatalog.closestMatch(for: variant) {
+            ParolaLog.error(.models, "unknown model \(ModelToken(variant))")
             throw ParolaError.unknownModel(variant, suggestion: suggestion.id)
         }
         return try await downloadGate.serialized(variant) {
-            try await self.downloadNow(variant: variant, progress: progress, registry: registry)
+            ParolaLog.info(
+                .models,
+                "download starting for \(ModelToken(variant))",
+                Self.catalogSizeFields(variant)
+            )
+            return try await self.downloadNow(variant: variant, progress: progress, registry: registry)
         }
+    }
+
+    private static func catalogSizeFields(_ variant: String) -> [LogField: LogValue] {
+        guard let size = ModelCatalog.variant(id: variant)?.sizeBytes else { return [:] }
+        return [.bytes: .bytes(size)]
     }
 
     private func checkDownloadPolicy(variant: String) throws {
         if managedConfiguration.disableModelDownloads {
+            ParolaLog.notice(.models, "download blocked by policy")
             throw ParolaError.policyRestricted("Model downloads are disabled by a managed policy.")
         }
         if let entry = ModelCatalog.variant(id: variant),
            let allowed = managedConfiguration.allowedEngines,
            !allowed.contains(entry.engineID) {
+            ParolaLog.notice(.models, "download blocked by policy for \(entry.engineID)")
             throw ParolaError.policyRestricted(
                 "The \(entry.engineID.displayName) engine is disabled by a managed policy."
             )
@@ -499,9 +524,10 @@ public final class ModelStore: Sendable {
         // The generic snapshot only reproduces WhisperKit's repo-per-subpath layout. Taking it for
         // another engine downloads a directory that engine will never read, so refuse instead.
         guard engineID == .whisperKit else {
+            ParolaLog.error(.models, "no downloader registered for \(engineID)")
             throw ParolaError.engineNotRegistered(engineID.rawValue)
         }
-        return try await downloadViaHuggingFace(source: source, progress: progress)
+        return try await downloadViaHuggingFace(variant: variant, source: source, progress: progress)
     }
 
     /// Wraps an engine-supplied downloader in the same sidecar protocol the HuggingFace path
@@ -512,6 +538,7 @@ public final class ModelStore: Sendable {
         source: ModelDownloadSource,
         progress: (@Sendable (Double) -> Void)?
     ) async throws -> URL {
+        let startedAt = ContinuousClock.now
         let destination = installedURL(for: source)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
         let sidecar = destination.appendingPathComponent(HuggingFaceDownloader.sidecarFilename)
@@ -525,13 +552,30 @@ public final class ModelStore: Sendable {
         try? FileManager.default.removeItem(at: sidecar)
         // Engine downloaders report their own coarse fractions and rarely end at 1.0.
         progress?(1.0)
+        ParolaLog.info(
+            .models,
+            "download finished for \(ModelToken(name))",
+            self.installedSizeFields(at: result, startedAt: startedAt)
+        )
         return result
     }
 
+    /// Walks the finished install, so it only runs when the fields autoclosure is evaluated.
+    private func installedSizeFields(
+        at url: URL,
+        startedAt: ContinuousClock.Instant
+    ) -> [LogField: LogValue] {
+        var fields: [LogField: LogValue] = [.elapsed: .duration(startedAt.duration(to: .now))]
+        if let bytes = sizeOnDisk(at: url) { fields[.bytes] = .bytes(Int64(bytes)) }
+        return fields
+    }
+
     private func downloadViaHuggingFace(
+        variant: String,
         source: ModelDownloadSource,
         progress: (@Sendable (Double) -> Void)?
     ) async throws -> URL {
+        let startedAt = ContinuousClock.now
         let destination = installedURL(for: source)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
         // A directory left over from an earlier attempt gets a sidecar too: without one, an
@@ -552,6 +596,15 @@ public final class ModelStore: Sendable {
             return destination
         } catch {
             if isCancellation(error) { throw CancellationError() }
+            ParolaLog.error(
+                .models,
+                "download failed",
+                [
+                    .model: .safe(ModelToken(variant)),
+                    .elapsed: .duration(startedAt.duration(to: .now)),
+                    .error: .error(error),
+                ]
+            )
             throw ParolaError.modelDownloadFailed(source.huggingFaceRepo, underlying: String(describing: error))
         }
     }
@@ -578,6 +631,11 @@ public final class ModelStore: Sendable {
             do {
                 try FileManager.default.removeItem(at: url)
             } catch {
+                ParolaLog.error(
+                    .models,
+                    "delete failed for \(ModelToken(variant))",
+                    [.error: .error(error)]
+                )
                 throw ParolaError.ioError("Failed to delete \(variant): \(error.localizedDescription)")
             }
         }
