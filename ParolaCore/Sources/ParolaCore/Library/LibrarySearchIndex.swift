@@ -32,12 +32,20 @@ public actor LibrarySearchIndex {
         let title: String
         let text: String
         let auxiliaryText: String
+        let fingerprint: String
 
-        init(id: String, title: String, text: String, auxiliaryText: String = "") {
+        init(
+            id: String,
+            title: String,
+            text: String,
+            auxiliaryText: String = "",
+            fingerprint: String = ""
+        ) {
             self.id = id
             self.title = title
             self.text = text
             self.auxiliaryText = auxiliaryText
+            self.fingerprint = fingerprint
         }
     }
 
@@ -45,6 +53,7 @@ public actor LibrarySearchIndex {
         let title: String
         let excerpt: String
         let tokens: [String]
+        let fingerprint: String
     }
 
     private struct SnapshotEntry: Codable, Sendable {
@@ -52,6 +61,7 @@ public actor LibrarySearchIndex {
         let title: String
         let excerpt: String
         let tokens: [String]
+        let fingerprint: String
     }
 
     private struct Snapshot: Decodable {
@@ -87,7 +97,7 @@ public actor LibrarySearchIndex {
         case failed
     }
 
-    private static let snapshotVersion = 4
+    private static let snapshotVersion = 5
     private static let excerptLength = 200
     private static let snapshotPrefix = Data(#"{"version":\#(snapshotVersion),"entries":["#.utf8)
     private static let snapshotSeparator = Data(",".utf8)
@@ -138,10 +148,19 @@ public actor LibrarySearchIndex {
     }
 
     /// Indexes an entry. `auxiliaryText` (summary, notes, speaker names) is tokenized for search but never shown in snippets.
-    public func index(id: String, title: String, text: String, auxiliaryText: String = "", createdAt: Date) async {
+    /// `fingerprint` records the state of the bundle this text came from, so a later launch can tell
+    /// whether the library still holds what was indexed.
+    public func index(
+        id: String,
+        title: String,
+        text: String,
+        auxiliaryText: String = "",
+        fingerprint: String = "",
+        createdAt: Date
+    ) async {
         await ensureLoaded()
         removeFromIndex(id)
-        addToIndex(id: id, title: title, text: text, auxiliaryText: auxiliaryText)
+        addToIndex(id: id, title: title, text: text, auxiliaryText: auxiliaryText, fingerprint: fingerprint)
         scheduleSave()
     }
 
@@ -192,9 +211,13 @@ public actor LibrarySearchIndex {
         await drainWrites()
     }
 
-    func needsRebuild() async -> Bool {
+    /// True when the snapshot is unusable, or when it was built from a different set of bundles
+    /// than `fingerprints` describes — bundles added, removed or rewritten behind the app included.
+    func needsRebuild(matching fingerprints: [String: String]) async -> Bool {
         await ensureLoaded()
-        return rebuildNeed != .none
+        guard rebuildNeed == .none else { return true }
+        guard entries.count == fingerprints.count else { return true }
+        return entries.contains { fingerprints[$0.key] != $0.value.fingerprint }
     }
 
     func rebuild(entries rebuilt: [RebuildEntry]) async {
@@ -203,7 +226,13 @@ public actor LibrarySearchIndex {
         encodedEntries.removeAll()
         inverted.removeAll()
         for entry in rebuilt {
-            addToIndex(id: entry.id, title: entry.title, text: entry.text, auxiliaryText: entry.auxiliaryText)
+            addToIndex(
+                id: entry.id,
+                title: entry.title,
+                text: entry.text,
+                auxiliaryText: entry.auxiliaryText,
+                fingerprint: entry.fingerprint
+            )
         }
         rebuildNeed = .none
         // A library with nothing to index still needs its empty snapshot on disk, or every launch rescans.
@@ -240,7 +269,12 @@ public actor LibrarySearchIndex {
         var inverted: [String: Set<String>] = [:]
         entries.reserveCapacity(snapshot.entries.count)
         for entry in snapshot.entries {
-            entries[entry.id] = IndexedEntry(title: entry.title, excerpt: entry.excerpt, tokens: entry.tokens)
+            entries[entry.id] = IndexedEntry(
+                title: entry.title,
+                excerpt: entry.excerpt,
+                tokens: entry.tokens,
+                fingerprint: entry.fingerprint
+            )
             for token in entry.tokens {
                 inverted[token, default: []].insert(entry.id)
             }
@@ -248,12 +282,19 @@ public actor LibrarySearchIndex {
         return .loaded(LoadedState(entries: entries, inverted: inverted))
     }
 
-    private func addToIndex(id: String, title: String, text: String, auxiliaryText: String) {
+    private func addToIndex(
+        id: String,
+        title: String,
+        text: String,
+        auxiliaryText: String,
+        fingerprint: String
+    ) {
         let tokens = Set(Self.tokenize(title) + Self.tokenize(text) + Self.tokenize(auxiliaryText)).sorted()
         let entry = IndexedEntry(
             title: title,
             excerpt: String(text.prefix(Self.excerptLength)),
-            tokens: tokens
+            tokens: tokens,
+            fingerprint: fingerprint
         )
         entries[id] = entry
         encodedEntries[id] = try? JSONEncoder().encode(Self.snapshotEntry(id: id, entry: entry))
@@ -282,7 +323,13 @@ public actor LibrarySearchIndex {
     }
 
     private static func snapshotEntry(id: String, entry: IndexedEntry) -> SnapshotEntry {
-        SnapshotEntry(id: id, title: entry.title, excerpt: entry.excerpt, tokens: entry.tokens)
+        SnapshotEntry(
+            id: id,
+            title: entry.title,
+            excerpt: entry.excerpt,
+            tokens: entry.tokens,
+            fingerprint: entry.fingerprint
+        )
     }
 
     private static func firstIndex(in sorted: [String], atLeast key: String) -> Int {

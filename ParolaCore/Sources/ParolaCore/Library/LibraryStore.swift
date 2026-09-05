@@ -89,24 +89,54 @@ public actor LibraryStore {
     }
 
     private func rebuildSearchIndexIfStale() async {
-        guard await searchIndex.needsRebuild() else { return }
         let url = libraryURL
-        let rebuilt = await offActorIO(qos: .utility) { [self] in
-            scanEntries(at: url)?.compactMap { entry -> LibrarySearchIndex.RebuildEntry? in
+        let scan = await offActorIO(qos: .utility) { [self] in indexScan(at: url) }
+        guard let scan else {
+            indexReadyTask = nil
+            return
+        }
+        guard await searchIndex.needsRebuild(matching: scan.fingerprints) else { return }
+        let rebuilt = await offActorIO(qos: .utility) {
+            scan.entries.compactMap { entry -> LibrarySearchIndex.RebuildEntry? in
                 guard let doc = try? ParolaDocument.read(at: entry.bundleURL) else { return nil }
                 return .init(
                     id: entry.id,
                     title: entry.title,
                     text: doc.transcript.text,
-                    auxiliaryText: Self.searchAuxiliaryText(notes: entry.segmentNotes, transcript: doc.transcript)
+                    auxiliaryText: Self.searchAuxiliaryText(notes: entry.segmentNotes, transcript: doc.transcript),
+                    fingerprint: scan.fingerprints[entry.id] ?? ""
                 )
             }
         }
-        guard let rebuilt else {
-            indexReadyTask = nil
-            return
-        }
         await searchIndex.rebuild(entries: rebuilt)
+    }
+
+    private struct IndexScan: Sendable {
+        let entries: [LibraryEntry]
+        let fingerprints: [String: String]
+    }
+
+    /// Soft-deleted bundles stay on disk but leave the index, so the scan the snapshot is measured
+    /// against leaves them out too.
+    private nonisolated func indexScan(at libraryURL: URL) -> IndexScan? {
+        guard let scanned = scanEntries(at: libraryURL) else { return nil }
+        let active = scanned.filter { $0.deletedAt == nil }
+        return IndexScan(
+            entries: active,
+            fingerprints: Dictionary(
+                active.map { ($0.id, Self.bundleFingerprint($0.bundleURL)) },
+                uniquingKeysWith: { first, _ in first }
+            )
+        )
+    }
+
+    /// The transcript's size and modification time. A bundle written straight into the library
+    /// folder never passes through `index`, so the snapshot is checked against the files themselves.
+    nonisolated static func bundleFingerprint(_ bundleURL: URL) -> String {
+        let url = bundleURL.appendingPathComponent("transcript.json")
+        let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+        guard let modified = values?.contentModificationDate else { return "absent" }
+        return "\(Int(modified.timeIntervalSince1970 * 1000))-\(values?.fileSize ?? 0)"
     }
 
     private func primeCaches() async {
@@ -229,6 +259,7 @@ public actor LibraryStore {
             title: entry.title,
             text: text,
             auxiliaryText: Self.searchAuxiliaryText(notes: entry.segmentNotes, transcript: transcript),
+            fingerprint: Self.bundleFingerprint(entry.bundleURL),
             createdAt: entry.createdAt
         )
         guard let extraIndexer else { return }

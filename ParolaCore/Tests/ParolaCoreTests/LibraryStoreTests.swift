@@ -502,6 +502,87 @@ struct LibraryStoreTests {
         #expect(loaded.document.transcript.segments.map(\.id) == [0, 1])
     }
 
+    private func makeTempLibraryDirectory() throws -> URL {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-library-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        return tmp
+    }
+
+    private func seedBundle(in dir: URL, named name: String, text: String) throws {
+        _ = try ParolaDocument.write(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: text)],
+                language: "en",
+                modelName: "tiny"
+            ),
+            audioURL: nil,
+            to: dir.appendingPathComponent(name)
+        )
+    }
+
+    @Test("a bundle written straight into the library folder turns up in search")
+    func indexesBundlesAddedBehindTheApp() async throws {
+        let (store, dir) = try makeTempLibrary()
+        _ = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        _ = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        #expect(await store.search("zzyzxmarker").isEmpty)
+        await store.flush()
+        try seedBundle(in: dir, named: "seeded", text: "zzyzxmarker in the minutes")
+
+        let relaunched = LibraryStore(libraryURL: dir, extraIndexer: nil)
+
+        #expect(await relaunched.search("zzyzxmarker").map(\.entryID) == ["seeded"])
+    }
+
+    @Test("a bundle removed behind the app stops matching")
+    func dropsBundlesRemovedBehindTheApp() async throws {
+        let dir = try makeTempLibraryDirectory()
+        try seedBundle(in: dir, named: "seeded", text: "zzyzxmarker in the minutes")
+        let staged = LibraryStore(libraryURL: dir, extraIndexer: nil)
+        #expect(await staged.search("zzyzxmarker").count == 1)
+        await staged.flush()
+
+        try FileManager.default.removeItem(at: dir.appendingPathComponent("seeded.parola"))
+        let relaunched = LibraryStore(libraryURL: dir, extraIndexer: nil)
+
+        #expect(await relaunched.search("zzyzxmarker").isEmpty)
+    }
+
+    @Test("a bundle rewritten behind the app is reindexed from its new transcript")
+    func reindexesBundlesRewrittenBehindTheApp() async throws {
+        let dir = try makeTempLibraryDirectory()
+        try seedBundle(in: dir, named: "seeded", text: "zzyzxmarker in the minutes")
+        let staged = LibraryStore(libraryURL: dir, extraIndexer: nil)
+        #expect(await staged.search("zzyzxmarker").count == 1)
+        await staged.flush()
+
+        try FileManager.default.removeItem(at: dir.appendingPathComponent("seeded.parola"))
+        try seedBundle(in: dir, named: "seeded", text: "qqxwmarker in the minutes")
+        let relaunched = LibraryStore(libraryURL: dir, extraIndexer: nil)
+
+        #expect(await relaunched.search("zzyzxmarker").isEmpty)
+        #expect(await relaunched.search("qqxwmarker").count == 1)
+    }
+
+    @Test("a library nothing touched is not reindexed on the next launch")
+    func leavesAFreshIndexAlone() async throws {
+        let (store, dir) = try makeTempLibrary()
+        _ = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        await store.flush()
+        let snapshot = dir.appendingPathComponent(".search-index.json")
+        let before = try #require(
+            try snapshot.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        )
+
+        let relaunched = LibraryStore(libraryURL: dir, extraIndexer: nil)
+        #expect(await relaunched.search("hi").count == 1)
+        await relaunched.flush()
+
+        let after = try snapshot.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        #expect(after == before, "a rebuild would rewrite the snapshot")
+    }
+
     @Test("a failed manifest write leaves no pre-edit document in the cache")
     func updateTranscriptFailureDropsStaleCache() async throws {
         let (store, _) = try makeTempLibrary()

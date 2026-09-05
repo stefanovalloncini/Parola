@@ -248,7 +248,7 @@ struct LibrarySearchIndexTests {
         """
         try Data(v2.utf8).write(to: url)
         let index = LibrarySearchIndex(indexURL: url)
-        #expect(await index.needsRebuild())
+        #expect(await index.needsRebuild(matching: [:]))
         #expect(await index.search("sprint").isEmpty)
     }
 
@@ -261,7 +261,7 @@ struct LibrarySearchIndexTests {
         """
         try Data(v3.utf8).write(to: url)
         let index = LibrarySearchIndex(indexURL: url)
-        #expect(await index.needsRebuild())
+        #expect(await index.needsRebuild(matching: [:]))
         #expect(await index.search("sprint").isEmpty)
     }
 
@@ -437,7 +437,7 @@ struct LibrarySearchIndexTests {
     @Test("a missing snapshot asks for a rebuild")
     func missingSnapshotNeedsRebuild() async throws {
         let (index, _) = makeTempIndex()
-        #expect(await index.needsRebuild())
+        #expect(await index.needsRebuild(matching: [:]))
     }
 
     @Test("indexing on a cold instance does not clobber the loaded snapshot")
