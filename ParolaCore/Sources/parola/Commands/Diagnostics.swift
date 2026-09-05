@@ -25,8 +25,7 @@ struct Diagnostics: AsyncParsableCommand {
             throw ValidationError("--stdout and --output can't be combined.")
         }
         let directory = DiagnosticsBootstrap.defaultDirectory
-        // Listed before the render so --clear deletes what the report covers, never a file another
-        // process wrote while it ran.
+        // Listed before the render so the report and --clear see the same files.
         let files = Self.sinkFiles(in: directory)
         if files.isEmpty {
             stderr("No diagnostics recorded.")
@@ -97,7 +96,13 @@ struct Diagnostics: AsyncParsableCommand {
         guard !files.isEmpty else { return }
         var removed = 0
         var bytes = 0
+        var live = 0
         for file in files {
+            // Unlinking a running app's file would leave it writing into an inode nobody can read.
+            guard !FileDiagnosticsSink.isOwnedByLiveProcess(file.lastPathComponent) else {
+                live += 1
+                continue
+            }
             let size = (try? file.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
             do {
                 try FileManager.default.removeItem(at: file)
@@ -107,6 +112,8 @@ struct Diagnostics: AsyncParsableCommand {
                 stderr("Could not delete \(file.lastPathComponent): \(error.localizedDescription)")
             }
         }
-        stderr("Deleted \(removed) \(removed == 1 ? "file" : "files") (\(humanBytes(bytes))).")
+        let count = "Deleted \(removed) \(removed == 1 ? "file" : "files")"
+        let deleted = removed > 0 ? "\(count) (\(humanBytes(bytes)))" : count
+        stderr(live > 0 ? "\(deleted); \(live) still in use." : "\(deleted).")
     }
 }

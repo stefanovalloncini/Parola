@@ -350,10 +350,10 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         return outcome
     }
 
-    /// A sibling process still holding its log open would keep writing into an unlinked inode, so
-    /// the budget trim skips it. A recycled pid can spare a dead process's file until the age
-    /// cutoff — which runs no liveness check — catches it.
-    private static func isOwnedByLiveProcess(_ fileName: String) -> Bool {
+    /// A process still holding its log open would keep writing into an unlinked inode, so the
+    /// budget trim and the CLI's `--clear` both skip it. A recycled pid can spare a dead process's
+    /// file until the age cutoff — which runs no liveness check — catches it.
+    public static func isOwnedByLiveProcess(_ fileName: String) -> Bool {
         guard fileName.hasPrefix(filePrefix) else { return false }
         let rest = fileName.dropFirst(filePrefix.count)
         guard let separator = rest.firstIndex(of: "-"),
