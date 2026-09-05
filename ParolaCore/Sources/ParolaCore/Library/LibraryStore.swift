@@ -11,6 +11,43 @@ public actor LibraryStore {
         }
     }
 
+    /// A few slots, most recently used last: back-and-forth navigation stays free without pinning several multi-megabyte transcripts in memory.
+    private struct LoadedEntryCache {
+        private var slots: [(id: LibraryEntry.ID, value: LoadedEntry)] = []
+        private let capacity: Int
+
+        init(capacity: Int) {
+            self.capacity = capacity
+        }
+
+        mutating func value(for id: LibraryEntry.ID) -> LoadedEntry? {
+            guard let index = slots.firstIndex(where: { $0.id == id }) else { return nil }
+            let slot = slots.remove(at: index)
+            slots.append(slot)
+            return slot.value
+        }
+
+        mutating func insert(_ value: LoadedEntry, for id: LibraryEntry.ID) {
+            slots.removeAll { $0.id == id }
+            slots.append((id, value))
+            if slots.count > capacity { slots.removeFirst(slots.count - capacity) }
+        }
+
+        /// A manifest edit refreshes the entry in place; it is not a use, so it leaves recency alone.
+        mutating func patch(_ entry: LibraryEntry) {
+            guard let index = slots.firstIndex(where: { $0.id == entry.id }) else { return }
+            slots[index].value = LoadedEntry(entry: entry, document: slots[index].value.document)
+        }
+
+        mutating func remove(_ id: LibraryEntry.ID) {
+            slots.removeAll { $0.id == id }
+        }
+
+        mutating func removeAll() {
+            slots.removeAll()
+        }
+    }
+
     public static let shared = LibraryStore()
     public static var defaultLibraryURL: URL {
         URL.applicationSupportDirectory.appending(path: "Parola/Library", directoryHint: .isDirectory)
@@ -21,7 +58,7 @@ public actor LibraryStore {
     private let extraIndexer: LibraryIndexer?
     private var cachedActive: [LibraryEntry]?
     private var cachedDeleted: [LibraryEntry]?
-    private var cachedLoaded: (id: LibraryEntry.ID, value: LoadedEntry)?
+    private var cachedLoaded = LoadedEntryCache(capacity: 3)
     private var listCacheEpoch = 0
     private var indexReadyTask: Task<Void, Never>?
     private nonisolated let extraIndexerJobs: AsyncStream<@Sendable () async -> Void>.Continuation?
@@ -201,23 +238,21 @@ public actor LibraryStore {
         guard let contents = try? fm.contentsOfDirectory(at: libraryURL, includingPropertiesForKeys: nil) else {
             return fm.fileExists(atPath: libraryURL.path) ? nil : []
         }
+        let decoder = Self.manifestDecoder()
         return contents
             .filter { $0.pathExtension == "parola" }
-            .compactMap { try? makeEntry(bundleURL: $0) }
+            .compactMap { try? makeEntry(bundleURL: $0, decoder: decoder) }
     }
 
-    public func load(_ id: LibraryEntry.ID) throws -> LoadedEntry {
-        if let cached = cachedLoaded, cached.id == id {
-            return cached.value
+    public func load(_ id: LibraryEntry.ID) async throws -> LoadedEntry {
+        if let cached = cachedLoaded.value(for: id) {
+            return cached
         }
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
-        var doc = try ParolaDocument.read(at: bundleURL)
-        // Entries written before the blank-drop moved to assembly time still carry silent VAD
-        // chunks as empty rows. The surviving ids stay as they are: `segmentNotes` is keyed by them.
-        doc.transcript.segments = doc.transcript.segments.droppingBlankText()
+        let doc = try await decodedDocument(at: bundleURL)
         // Bundles written before the manifest carried a duration learn it the first time
         // they're opened, so the library list fills in instead of staying blank forever.
         if doc.manifest.durationSeconds == nil, let duration = doc.transcript.durationSeconds, duration > 0 {
@@ -225,8 +260,26 @@ public actor LibraryStore {
         }
         let entry = try makeEntry(bundleURL: bundleURL)
         let loaded = LoadedEntry(entry: entry, document: doc)
-        cachedLoaded = (id, loaded)
+        cachedLoaded.insert(loaded, for: id)
         return loaded
+    }
+
+    /// Off the actor because a long transcript is megabytes of JSON; a mutation landing mid-decode would hand back pre-mutation content, so retry under the new epoch as `primeCaches` does, with the same on-actor last resort to terminate.
+    private func decodedDocument(at bundleURL: URL) async throws -> ParolaDocument {
+        for _ in 0..<8 {
+            let epoch = listCacheEpoch
+            let doc = try await offActorThrowingIO { try Self.readCleanedDocument(at: bundleURL) }
+            if epoch == listCacheEpoch { return doc }
+        }
+        return try Self.readCleanedDocument(at: bundleURL)
+    }
+
+    private nonisolated static func readCleanedDocument(at bundleURL: URL) throws -> ParolaDocument {
+        var doc = try ParolaDocument.read(at: bundleURL)
+        // Entries written before the blank-drop moved to assembly time still carry silent VAD
+        // chunks as empty rows. The surviving ids stay as they are: `segmentNotes` is keyed by them.
+        doc.transcript.segments = doc.transcript.segments.droppingBlankText()
+        return doc
     }
 
     public func add(
@@ -343,7 +396,7 @@ public actor LibraryStore {
             throw LibraryError.notFound(id)
         }
         let transcriptURL = bundleURL.appendingPathComponent("transcript.json")
-        if cachedLoaded?.id == id { cachedLoaded = nil }
+        cachedLoaded.remove(id)
         do {
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .iso8601
@@ -439,7 +492,7 @@ public actor LibraryStore {
     /// A manifest edit leaves transcript.json alone, so an open document is still current; fall back
     /// to disk — off the actor, word timings and all — only when it isn't cached.
     private func transcriptForReindex(_ id: LibraryEntry.ID, at bundleURL: URL) async -> Transcript? {
-        if let cached = cachedLoaded, cached.id == id { return cached.value.document.transcript }
+        if let cached = cachedLoaded.value(for: id) { return cached.document.transcript }
         return await offActorIO { try? ParolaDocument.read(at: bundleURL).transcript }
     }
 
@@ -482,7 +535,7 @@ public actor LibraryStore {
             return entry
         } catch {
             invalidateListCaches()
-            cachedLoaded = nil
+            cachedLoaded.removeAll()
             throw error
         }
     }
@@ -494,9 +547,7 @@ public actor LibraryStore {
         cachedDeleted = patched(cachedDeleted, with: entry, belongs: entry.deletedAt != nil) {
             ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast)
         }
-        if let cached = cachedLoaded, cached.id == entry.id {
-            cachedLoaded = (entry.id, LoadedEntry(entry: entry, document: cached.value.document))
-        }
+        cachedLoaded.patch(entry)
         // A patch is a write like any other: an in-flight primeCaches must re-scan rather than cache
         // the snapshot it took before this manifest landed.
         listCacheEpoch &+= 1
@@ -519,7 +570,7 @@ public actor LibraryStore {
     private func removeFromCaches(id: LibraryEntry.ID) {
         cachedActive?.removeAll { $0.id == id }
         cachedDeleted?.removeAll { $0.id == id }
-        if cachedLoaded?.id == id { cachedLoaded = nil }
+        cachedLoaded.remove(id)
         listCacheEpoch &+= 1
     }
 
@@ -642,7 +693,7 @@ public actor LibraryStore {
         for entry in toPurge {
             do {
                 try FileManager.default.removeItem(at: entry.bundleURL)
-                if cachedLoaded?.id == entry.id { cachedLoaded = nil }
+                cachedLoaded.remove(entry.id)
                 await deindexEntry(id: entry.id)
             } catch {
                 continue
@@ -663,21 +714,30 @@ public actor LibraryStore {
     public func dropCaches() {
         cachedActive = nil
         cachedDeleted = nil
-        cachedLoaded = nil
+        cachedLoaded.removeAll()
         listCacheEpoch &+= 1
     }
 
     private nonisolated func makeEntry(bundleURL: URL) throws -> LibraryEntry {
+        try makeEntry(bundleURL: bundleURL, decoder: Self.manifestDecoder())
+    }
+
+    private nonisolated func makeEntry(bundleURL: URL, decoder: JSONDecoder) throws -> LibraryEntry {
         let manifestURL = bundleURL.appendingPathComponent("manifest.json")
         let data = try Data(contentsOf: manifestURL)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
         let manifest = try decoder.decode(ParolaDocument.Manifest.self, from: data)
         guard manifest.version <= ParolaDocument.Manifest.currentVersion else {
             throw ParolaError.ioError("Parola document version \(manifest.version) is newer than this app understands.")
         }
         let id = (bundleURL.lastPathComponent as NSString).deletingPathExtension
         return LibraryEntry(id: id, bundleURL: bundleURL, manifest: manifest)
+    }
+
+    /// One per scan, never a shared static: `makeEntry` is nonisolated and runs both on the actor and on the off-actor scan.
+    private nonisolated static func manifestDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }
 
     private func uniqueEntryName(at date: Date) -> String {
