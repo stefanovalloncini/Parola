@@ -48,7 +48,7 @@ struct LibraryFilterBar: View {
                         Text(labelFilter ?? "All labels")
                     }
                     .font(DS.Font.subheadlineMedium)
-                    .foregroundStyle(labelFilter == nil ? .secondary : DS.Color.accent)
+                    .foregroundStyle(labelFilter == nil ? .secondary : DS.Color.accentText)
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
@@ -70,7 +70,7 @@ struct LibraryFilterBar: View {
                         Text(languageFilter.map { languageName($0) } ?? String(localized: "All languages"))
                     }
                     .font(DS.Font.subheadlineMedium)
-                    .foregroundStyle(languageFilter == nil ? .secondary : DS.Color.accent)
+                    .foregroundStyle(languageFilter == nil ? .secondary : DS.Color.accentText)
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
@@ -88,7 +88,7 @@ struct LibraryFilterBar: View {
                     Text(dateRangeFilter.label)
                 }
                 .font(DS.Font.subheadlineMedium)
-                .foregroundStyle(dateRangeFilter == .all ? .secondary : DS.Color.accent)
+                .foregroundStyle(dateRangeFilter == .all ? .secondary : DS.Color.accentText)
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)

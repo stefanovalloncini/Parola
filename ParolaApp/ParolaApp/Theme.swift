@@ -71,6 +71,31 @@ struct RGBA: Sendable, Codable, Equatable {
         return (high + 0.05) / (low + 0.05)
     }
 
+    /// WCAG AA for small text.
+    static let textContrastMinimum = 4.5
+
+    func blended(toward target: RGBA, amount: Double) -> RGBA {
+        RGBA(r + (target.r - r) * amount, g + (target.g - g) * amount, b + (target.b - b) * amount, a)
+    }
+
+    /// This color moved toward whichever of black or white the backdrop is not, by the smallest
+    /// amount that reaches `textContrastMinimum`. Unchanged when it already clears.
+    func legible(on backdrop: RGBA) -> RGBA {
+        guard contrast(against: backdrop) < Self.textContrastMinimum else { return self }
+        let target = backdrop.relativeLuminance > relativeLuminance ? RGBA(0, 0, 0) : RGBA(1, 1, 1)
+        var low = 0.0
+        var high = 1.0
+        for _ in 0..<24 {
+            let mid = (low + high) / 2
+            if blended(toward: target, amount: mid).contrast(against: backdrop) >= Self.textContrastMinimum {
+                high = mid
+            } else {
+                low = mid
+            }
+        }
+        return blended(toward: target, amount: high)
+    }
+
     /// Parses `#RRGGBB` / `#RRGGBBAA` (with or without the leading `#`). Returns nil on malformed input.
     init?(hex: String) {
         var s = hex.trimmingCharacters(in: .whitespaces)
@@ -127,18 +152,21 @@ struct ThemePalette: Sendable, Codable, Equatable {
 }
 
 extension ThemePalette {
-    /// Neutrals shared by every built-in preset, matching the values the asset catalog shipped.
+    /// Neutrals shared by every built-in preset. The dark surfaces sit above the main window's
+    /// `NSColor.windowBackgroundColor` (#1E1E1E) so a raised card reads as raised, and
+    /// `textSecondary` is a fixed pair because `.secondary` composites to #808080 on white — 3.95.
     static let sharedNeutrals = (
-        canvas: ThemeColor.dynamic(light: RGBA(0.972, 0.972, 0.970), dark: RGBA(0.039, 0.039, 0.039)),
-        surface: ThemeColor.dynamic(light: RGBA(1, 1, 1), dark: RGBA(0.086, 0.086, 0.086)),
-        surfaceElevated: ThemeColor.dynamic(light: RGBA(0.945, 0.945, 0.945), dark: RGBA(0.118, 0.118, 0.118)),
+        canvas: ThemeColor.dynamic(light: RGBA(0.972, 0.972, 0.970), dark: RGBA(0.098, 0.098, 0.098)),
+        surface: ThemeColor.dynamic(light: RGBA(1, 1, 1), dark: RGBA(0.157, 0.157, 0.157)),
+        surfaceElevated: ThemeColor.dynamic(light: RGBA(0.945, 0.945, 0.945), dark: RGBA(0.196, 0.196, 0.196)),
         divider: ThemeColor.dynamic(light: RGBA(0, 0, 0, 0.08), dark: RGBA(1, 1, 1, 0.08)),
+        textSecondary: ThemeColor.dynamic(light: RGBA(0.412, 0.412, 0.412), dark: RGBA(0.63, 0.63, 0.63)),
         success: ThemeColor.uniform(RGBA(0.32, 0.74, 0.42)),
         warning: ThemeColor.uniform(RGBA(0.95, 0.66, 0.20))
     )
 
-    /// A preset that recolors only the accent, keeping the system text colors and shared neutrals
-    /// — preserving today's behavior where switching accent doesn't touch backgrounds or contrast.
+    /// A preset that recolors only the accent and keeps the shared neutrals, so switching accent
+    /// never moves a background or a text contrast ratio.
     static func accented(_ accent: ThemeColor) -> ThemePalette {
         ThemePalette(
             accent: accent,
@@ -147,10 +175,21 @@ extension ThemePalette {
             surfaceElevated: sharedNeutrals.surfaceElevated,
             divider: sharedNeutrals.divider,
             textPrimary: .system(.primary),
-            textSecondary: .system(.secondary),
+            textSecondary: sharedNeutrals.textSecondary,
             success: sharedNeutrals.success,
             warning: sharedNeutrals.warning,
             danger: .system(.red)
+        )
+    }
+
+    /// The accent pulled toward black or white until small text on `surfaceElevated` — the least
+    /// contrasty surface the app sets text on — clears AA. Amber as label text reads 1.9 untouched.
+    var accentText: ThemeColor {
+        let tint = accent.appearanceVariants
+        let backdrop = surfaceElevated.appearanceVariants
+        return .dynamic(
+            light: tint.light.legible(on: backdrop.light),
+            dark: tint.dark.legible(on: backdrop.dark)
         )
     }
 
@@ -159,6 +198,17 @@ extension ThemePalette {
 }
 
 extension ThemeColor {
+    /// The light and dark values behind this color; a system color answers with one value for both.
+    var appearanceVariants: (light: RGBA, dark: RGBA) {
+        switch self {
+        case .dynamic(let light, let dark):
+            return (light, dark)
+        case .system(let semantic):
+            let resolved = RGBA(semantic.color)
+            return (resolved, resolved)
+        }
+    }
+
     /// Accents below this RGB chroma read as grey and fail as a highlight; substitute azure instead.
     private static let highlightChromaFloor = 0.15
     private static let highlightFallback = RGBA(0.30, 0.56, 0.98)

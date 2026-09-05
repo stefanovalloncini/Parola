@@ -109,11 +109,11 @@ struct ThemePaletteTests {
         #expect(ThemePreset.graphite.label == "Mono")
     }
 
-    @Test("a preset palette uses system text colors and the shared neutrals")
+    @Test("a preset palette uses the system primary color and the shared neutrals")
     func presetPaletteShape() {
         let palette = ThemePreset.blue.palette
         #expect(palette.textPrimary == .system(.primary))
-        #expect(palette.textSecondary == .system(.secondary))
+        #expect(palette.textSecondary == ThemePalette.sharedNeutrals.textSecondary)
         #expect(palette.danger == .system(.red))
         #expect(palette.canvas == ThemePalette.sharedNeutrals.canvas)
         #expect(palette.surface == ThemePalette.sharedNeutrals.surface)

@@ -112,6 +112,7 @@ enum DS {
     /// One instance per palette, so repeated reads compare equal and SwiftUI can skip redraws; a dynamic NSColor re-runs its provider per draw, so the cached instance still follows the appearance.
     private struct Resolved {
         let accent: SwiftUI.Color
+        let accentText: SwiftUI.Color
         let highlight: SwiftUI.Color
         let primaryText: SwiftUI.Color
         let secondaryText: SwiftUI.Color
@@ -126,6 +127,7 @@ enum DS {
 
         init(_ palette: ThemePalette) {
             accent = palette.accent.color
+            accentText = palette.accentText.color
             highlight = palette.highlight.color
             primaryText = palette.textPrimary.color
             secondaryText = palette.textSecondary.color
@@ -153,6 +155,9 @@ enum DS {
         /// A legible foreground for text/glyphs drawn on top of `accent`: near-black on light
         /// accents (Amber, Mint, custom), white on dark ones. Resolves per appearance.
         static var onAccent: SwiftUI.Color { DS.resolved.onAccent }
+
+        /// The accent as small text on a surface, darkened or lightened until it clears AA.
+        static var accentText: SwiftUI.Color { DS.resolved.accentText }
     }
 
     enum Palette {
