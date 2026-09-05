@@ -209,6 +209,10 @@ extension ThemePalette {
     var dangerText: ThemeColor { danger.legibleText(on: surfaceElevated) }
     var successText: ThemeColor { success.legibleText(on: surfaceElevated) }
 
+    /// `dangerText` pinned to its dark value for chrome that paints its own dark scrim and writes on
+    /// it in white, so the app's surfaces — and the light variant derived from them — don't apply.
+    var dangerOnDark: ThemeColor { .uniform(dangerText.appearanceVariants.dark) }
+
     /// Active-segment highlight tint: the accent, unless it's too grey to stand out (Mono) — then azure.
     var highlight: ThemeColor { accent.asHighlight }
 }

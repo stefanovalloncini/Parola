@@ -38,7 +38,7 @@ struct BatchJobDetail: View {
         case .done:
             ProgressView(value: 1)
                 .progressViewStyle(.linear)
-                .tint(statusColor)
+                .tint(statusFill)
                 .frame(height: 3)
         case .failed:
             ProgressView(value: 1)
@@ -67,6 +67,7 @@ struct BatchJobDetail: View {
         }
     }
 
+    /// For the label. A fill answers a different question — see `statusFill`.
     private var statusColor: Color {
         switch job.status {
         case .pending: return DS.Color.secondaryText
@@ -74,6 +75,16 @@ struct BatchJobDetail: View {
         case .done: return DS.Color.successText
         case .failed: return DS.Color.dangerText
         case .cancelled: return DS.Color.secondaryText
+        }
+    }
+
+    /// For the bar: a fill carries no text, so it keeps the saturated token.
+    private var statusFill: Color {
+        switch job.status {
+        case .pending, .cancelled: return DS.Color.secondaryText
+        case .transcribing: return DS.Color.accent
+        case .done: return DS.Palette.success
+        case .failed: return DS.Color.danger
         }
     }
 }

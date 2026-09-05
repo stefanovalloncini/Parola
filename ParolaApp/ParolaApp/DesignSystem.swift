@@ -118,6 +118,7 @@ enum DS {
         let accentText: SwiftUI.Color
         let accentWash: SwiftUI.Color
         let dangerText: SwiftUI.Color
+        let dangerOnDark: SwiftUI.Color
         let successText: SwiftUI.Color
         let highlight: SwiftUI.Color
         let primaryText: SwiftUI.Color
@@ -136,6 +137,7 @@ enum DS {
             accentText = palette.accentText.color
             accentWash = palette.accentWash.color
             dangerText = palette.dangerText.color
+            dangerOnDark = palette.dangerOnDark.color
             successText = palette.successText.color
             highlight = palette.highlight.color
             primaryText = palette.textPrimary.color
@@ -174,6 +176,9 @@ enum DS {
         /// `danger` / `success` as small text, adjusted until they clear AA on the card fill.
         static var dangerText: SwiftUI.Color { DS.resolved.dangerText }
         static var successText: SwiftUI.Color { DS.resolved.successText }
+
+        /// `dangerText` for chrome drawn on its own dark scrim rather than on an app surface.
+        static var dangerOnDark: SwiftUI.Color { DS.resolved.dangerOnDark }
     }
 
     enum Palette {

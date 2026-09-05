@@ -27,7 +27,9 @@ struct LiveCaptionsView: View {
         if let error = controller.state.error {
             Text(error)
                 .font(.callout)
-                .foregroundStyle(DS.Color.dangerText.opacity(0.9))
+                // This overlay paints its own dark scrim and writes on it in white, so the palette's
+                // surface-derived text colours read as too dark here whatever the app theme is.
+                .foregroundStyle(DS.Color.dangerOnDark.opacity(0.9))
                 .multilineTextAlignment(.center)
         } else if caption.isEmpty {
             HStack(spacing: 8) {

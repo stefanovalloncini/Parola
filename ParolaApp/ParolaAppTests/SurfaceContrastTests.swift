@@ -50,6 +50,19 @@ struct SurfaceContrastTests {
         #expect(text.dark.contrast(against: Self.darkWindowBackdrop) >= Self.minimum)
     }
 
+    @Test("the caption overlay's red stays bright whatever the app theme is",
+          arguments: ThemePreset.allCases)
+    func dangerOnDarkContrast(preset: ThemePreset) throws {
+        let palette = preset.palette
+        let overlay = try #require(Self.pair(palette.dangerOnDark))
+        // The overlay's own scrim is a 60% black wash under a material; the dark canvas is the
+        // lightest it can plausibly composite to.
+        let scrim = try #require(Self.pair(palette.canvas)).dark
+        #expect(overlay.light == overlay.dark, "the overlay ignores the scheme")
+        #expect(overlay.light.contrast(against: RGBA(0, 0, 0)) >= Self.minimum)
+        #expect(overlay.light.contrast(against: scrim) >= Self.minimum)
+    }
+
     @Test("accent text clears AA on the card fill for every preset", arguments: ThemePreset.allCases)
     func accentTextContrast(preset: ThemePreset) throws {
         let palette = preset.palette
