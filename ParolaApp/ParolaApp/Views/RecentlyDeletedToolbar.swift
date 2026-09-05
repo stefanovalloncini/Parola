@@ -102,7 +102,7 @@ struct RecentlyDeletedToolbar: View {
             line.append(AttributedString(" · "))
             var clause = AttributedString(RecentlyDeletedCopy.subtitleExpiring(expiringSoon))
             clause.font = DS.Font.captionEmphasized
-            clause.foregroundColor = DS.Color.danger
+            clause.foregroundColor = DS.Color.dangerText
             line.append(clause)
         }
         return Text(line)

@@ -114,7 +114,7 @@ struct ThemePaletteTests {
         let palette = ThemePreset.blue.palette
         #expect(palette.textPrimary == .system(.primary))
         #expect(palette.textSecondary == ThemePalette.sharedNeutrals.textSecondary)
-        #expect(palette.danger == .system(.red))
+        #expect(palette.danger == ThemePalette.sharedNeutrals.danger)
         #expect(palette.canvas == ThemePalette.sharedNeutrals.canvas)
         #expect(palette.surface == ThemePalette.sharedNeutrals.surface)
         #expect(palette.accent == ThemePreset.blue.accent)
@@ -137,7 +137,7 @@ struct ThemePaletteTests {
         #expect(palette.textPrimary.isUniform)
         #expect(palette.success == ThemePalette.sharedNeutrals.success)
         #expect(palette.warning == ThemePalette.sharedNeutrals.warning)
-        #expect(palette.danger == .system(.red))
+        #expect(palette.danger == ThemePalette.sharedNeutrals.danger)
     }
 
     @Test("selection resolves a preset case to that preset's palette")

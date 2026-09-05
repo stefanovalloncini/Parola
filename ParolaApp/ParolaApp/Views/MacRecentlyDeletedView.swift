@@ -107,7 +107,7 @@ struct MacRecentlyDeletedView: View {
             Button("Delete Permanently") { confirmingPurgeBulk = selection }
                 .buttonStyle(.plain)
                 .font(DS.Font.subheadlineMedium)
-                .foregroundStyle(DS.Color.danger)
+                .foregroundStyle(DS.Color.dangerText)
                 .axLeaf("Selection.Button.DeletePermanently")
             Button("Clear Selection") { selection = [] }
                 .buttonStyle(.plain)

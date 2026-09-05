@@ -47,7 +47,7 @@ struct LabelsSection: View {
             .accessibilityLabel("Remove label \(label)")
             .axLeaf("Labels.Button.RemoveChip")
         }
-        .foregroundStyle(DS.Color.accent)
+        .foregroundStyle(DS.Color.accentText)
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
         .background(

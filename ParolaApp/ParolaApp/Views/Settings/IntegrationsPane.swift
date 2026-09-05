@@ -67,7 +67,7 @@ private struct ToolStatusRow: View {
                 if let error {
                     Text(error)
                         .font(.caption)
-                        .foregroundStyle(DS.Color.danger)
+                        .foregroundStyle(DS.Color.dangerText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

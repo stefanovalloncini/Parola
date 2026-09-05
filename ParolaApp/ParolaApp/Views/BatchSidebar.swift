@@ -70,7 +70,7 @@ private struct BatchRow: View {
                 .foregroundStyle(DS.Color.accent)
         case .failed:
             Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(DS.Color.danger)
+                .foregroundStyle(DS.Color.dangerText)
         case .cancelled:
             Image(systemName: "xmark.circle")
                 .foregroundStyle(DS.Color.secondaryText)

@@ -1,9 +1,12 @@
+import AppKit
 import SwiftUI
 import ParolaCore
 
 enum DS {
     enum Spacing {
+        static let hair: CGFloat = 2
         static let tight: CGFloat = 4
+        static let snug: CGFloat = 6
         static let small: CGFloat = 8
         static let regular: CGFloat = 12
         static let medium: CGFloat = 16
@@ -113,6 +116,9 @@ enum DS {
     private struct Resolved {
         let accent: SwiftUI.Color
         let accentText: SwiftUI.Color
+        let accentWash: SwiftUI.Color
+        let dangerText: SwiftUI.Color
+        let successText: SwiftUI.Color
         let highlight: SwiftUI.Color
         let primaryText: SwiftUI.Color
         let secondaryText: SwiftUI.Color
@@ -128,6 +134,9 @@ enum DS {
         init(_ palette: ThemePalette) {
             accent = palette.accent.color
             accentText = palette.accentText.color
+            accentWash = palette.accentWash.color
+            dangerText = palette.dangerText.color
+            successText = palette.successText.color
             highlight = palette.highlight.color
             primaryText = palette.textPrimary.color
             secondaryText = palette.textSecondary.color
@@ -158,6 +167,13 @@ enum DS {
 
         /// The accent as small text on a surface, darkened or lightened until it clears AA.
         static var accentText: SwiftUI.Color { DS.resolved.accentText }
+
+        /// The soft accent fill a live readout sits on; `accentText` is legible on it.
+        static var accentWash: SwiftUI.Color { DS.resolved.accentWash }
+
+        /// `danger` / `success` as small text, adjusted until they clear AA on the card fill.
+        static var dangerText: SwiftUI.Color { DS.resolved.dangerText }
+        static var successText: SwiftUI.Color { DS.resolved.successText }
     }
 
     enum Palette {
@@ -168,6 +184,8 @@ enum DS {
         static let subtleFill = SwiftUI.Color.primary.opacity(0.06)
         static var divider: SwiftUI.Color { DS.resolved.divider }
         static let pillFill = SwiftUI.Color.primary.opacity(0.08)
+        /// What AppKit paints behind a text field, so ours sit at the same depth as the system ones.
+        static let fieldFill = SwiftUI.Color(nsColor: .textBackgroundColor)
         static let pillFillHover = SwiftUI.Color.primary.opacity(0.14)
         static var success: SwiftUI.Color { DS.resolved.success }
         static var warning: SwiftUI.Color { DS.resolved.warning }
@@ -237,23 +255,24 @@ extension View {
         )
     }
 
-    /// A live readout that has to hold the accent on video: accent fill, `onAccent` text.
+    /// A live readout that has to hold the accent on video. A solid accent fill would need
+    /// `onAccent`, which picks its side by luminance and lands under AA on five of the seven presets.
     func accentPill() -> some View {
         font(DS.Font.captionMono)
-            .foregroundStyle(DS.Color.onAccent)
+            .foregroundStyle(DS.Color.accentText)
             .padding(.horizontal, DS.Spacing.small)
-            .padding(.vertical, 2)
-            .background(Capsule(style: .continuous).fill(DS.Color.accent))
+            .padding(.vertical, DS.Spacing.hair)
+            .background(Capsule(style: .continuous).fill(DS.Color.accentWash))
     }
 
     /// A text field's border and focus ring, drawn by us. AppKit draws `.roundedBorder`'s ring with
     /// `NSColor.controlAccentColor`, which comes from the AccentColor asset and ignores the palette.
     func fieldChrome(focused: Bool) -> some View {
-        padding(.horizontal, DS.Spacing.small)
-            .padding(.vertical, 6)
+        padding(.horizontal, DS.Spacing.snug)
+            .padding(.vertical, DS.Spacing.snug)
             .background(
                 RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                    .fill(DS.Palette.subtleFill)
+                    .fill(DS.Palette.fieldFill)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)

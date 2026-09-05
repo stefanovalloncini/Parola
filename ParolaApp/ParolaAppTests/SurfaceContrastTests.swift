@@ -59,6 +59,40 @@ struct SurfaceContrastTests {
         #expect(text.dark.contrast(against: fill.dark) >= Self.minimum, "\(preset.rawValue) dark")
     }
 
+    @Test("the run readout clears AA on its own fill for every preset", arguments: ThemePreset.allCases)
+    func accentPillContrast(preset: ThemePreset) throws {
+        let palette = preset.palette
+        let text = try #require(Self.pair(palette.accentText))
+        let wash = try #require(Self.pair(palette.accentWash))
+        #expect(text.light.contrast(against: wash.light) >= Self.minimum, "\(preset.rawValue) light")
+        #expect(text.dark.contrast(against: wash.dark) >= Self.minimum, "\(preset.rawValue) dark")
+    }
+
+    @Test("the readout fill still carries accent rather than collapsing into the surface",
+          arguments: ThemePreset.allCases)
+    func accentWashStaysTinted(preset: ThemePreset) throws {
+        let palette = preset.palette
+        let wash = try #require(Self.pair(palette.accentWash))
+        let surface = try #require(Self.pair(palette.surface))
+        #expect(wash.light != surface.light)
+        #expect(wash.dark != surface.dark)
+    }
+
+    @Test("red and green as text clear AA on both surfaces, both schemes",
+          arguments: ThemePreset.allCases)
+    func statusTextContrast(preset: ThemePreset) throws {
+        let palette = preset.palette
+        let surface = try #require(Self.pair(palette.surface))
+        let card = try #require(Self.pair(palette.surfaceElevated))
+        for (name, token) in [("danger", palette.dangerText), ("success", palette.successText)] {
+            let text = try #require(Self.pair(token))
+            #expect(text.light.contrast(against: surface.light) >= Self.minimum, "\(name) light on surface")
+            #expect(text.light.contrast(against: card.light) >= Self.minimum, "\(name) light on card")
+            #expect(text.dark.contrast(against: surface.dark) >= Self.minimum, "\(name) dark on surface")
+            #expect(text.dark.contrast(against: card.dark) >= Self.minimum, "\(name) dark on card")
+        }
+    }
+
     @Test("accent text leaves an accent that already clears AA alone")
     func accentTextKeepsLegibleAccents() {
         let dark = RGBA(0.1, 0.1, 0.1)

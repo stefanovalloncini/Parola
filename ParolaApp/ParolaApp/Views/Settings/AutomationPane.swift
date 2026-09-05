@@ -144,7 +144,7 @@ struct AutomationPane: View {
                 if let confirmation = copyConfirmation {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(DS.Palette.success)
+                            .foregroundStyle(DS.Color.successText)
                         Text(confirmation)
                             .font(DS.Font.caption)
                             .foregroundStyle(.secondary)

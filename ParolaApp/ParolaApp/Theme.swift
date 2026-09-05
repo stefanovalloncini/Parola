@@ -121,7 +121,7 @@ struct RGBA: Sendable, Codable, Equatable {
 }
 
 /// System semantic colors that adapt to appearance and accessibility settings on their own.
-/// Used for text so presets keep the OS's contrast/Increase-Contrast behavior.
+/// Only `textPrimary` still uses one: every other token needs a value the app can measure.
 enum SystemColor: String, Sendable, Codable {
     case primary
     case secondary
@@ -162,7 +162,10 @@ extension ThemePalette {
         divider: ThemeColor.dynamic(light: RGBA(0, 0, 0, 0.08), dark: RGBA(1, 1, 1, 0.08)),
         textSecondary: ThemeColor.dynamic(light: RGBA(0.412, 0.412, 0.412), dark: RGBA(0.63, 0.63, 0.63)),
         success: ThemeColor.uniform(RGBA(0.32, 0.74, 0.42)),
-        warning: ThemeColor.uniform(RGBA(0.95, 0.66, 0.20))
+        warning: ThemeColor.uniform(RGBA(0.95, 0.66, 0.20)),
+        // The two values `Color.red` already resolved to; spelled out so text derived from them can
+        // be computed instead of waiting for a drawing appearance.
+        danger: ThemeColor.dynamic(light: RGBA(1.0, 0.220, 0.235), dark: RGBA(1.0, 0.259, 0.271))
     )
 
     /// A preset that recolors only the accent and keeps the shared neutrals, so switching accent
@@ -178,26 +181,50 @@ extension ThemePalette {
             textSecondary: sharedNeutrals.textSecondary,
             success: sharedNeutrals.success,
             warning: sharedNeutrals.warning,
-            danger: .system(.red)
+            danger: sharedNeutrals.danger
         )
     }
 
-    /// The accent pulled toward black or white until small text on `surfaceElevated` — the least
-    /// contrasty surface the app sets text on — clears AA. Amber as label text reads 1.9 untouched.
-    var accentText: ThemeColor {
+    /// How much accent a live readout's fill carries. Opaque, so the text on it clears AA wherever
+    /// the readout lands rather than only over the surface it was measured against.
+    static let accentWashOpacity = 0.15
+
+    var accentWash: ThemeColor {
         let tint = accent.appearanceVariants
-        let backdrop = surfaceElevated.appearanceVariants
+        let behind = surface.appearanceVariants
         return .dynamic(
-            light: tint.light.legible(on: backdrop.light),
-            dark: tint.dark.legible(on: backdrop.dark)
+            light: tint.light.blended(toward: behind.light, amount: 1 - Self.accentWashOpacity),
+            dark: tint.dark.blended(toward: behind.dark, amount: 1 - Self.accentWashOpacity)
         )
     }
+
+    /// The accent as small text, legible on both surfaces the app sets accent text on: the card fill
+    /// and `accentWash`. Amber on the card reads 1.4 untouched.
+    var accentText: ThemeColor {
+        accent.legibleText(on: surfaceElevated).legibleText(on: accentWash)
+    }
+
+    /// Red and green as small text. The raised dark surfaces put the raw system red at 3.7 on a card,
+    /// and green has been under AA in light mode all along.
+    var dangerText: ThemeColor { danger.legibleText(on: surfaceElevated) }
+    var successText: ThemeColor { success.legibleText(on: surfaceElevated) }
 
     /// Active-segment highlight tint: the accent, unless it's too grey to stand out (Mono) — then azure.
     var highlight: ThemeColor { accent.asHighlight }
 }
 
 extension ThemeColor {
+    /// This color darkened (light appearance) or lightened (dark) until small text on `backdrop`
+    /// clears AA in that appearance. Unchanged where it already clears.
+    func legibleText(on backdrop: ThemeColor) -> ThemeColor {
+        let tint = appearanceVariants
+        let behind = backdrop.appearanceVariants
+        return .dynamic(
+            light: tint.light.legible(on: behind.light),
+            dark: tint.dark.legible(on: behind.dark)
+        )
+    }
+
     /// The light and dark values behind this color; a system color answers with one value for both.
     var appearanceVariants: (light: RGBA, dark: RGBA) {
         switch self {
@@ -324,7 +351,7 @@ extension ThemePalette {
             textSecondary: .uniform(RGBA(textSecondary)),
             success: sharedNeutrals.success,
             warning: sharedNeutrals.warning,
-            danger: .system(.red)
+            danger: sharedNeutrals.danger
         )
     }
 }

@@ -48,7 +48,7 @@ struct YouTubeURLSheet: View {
                 if let error = model.youtubeURLError {
                     Text(error)
                         .font(DS.Font.caption)
-                        .foregroundStyle(DS.Color.danger)
+                        .foregroundStyle(DS.Color.dangerText)
                         .fixedSize(horizontal: false, vertical: true)
                         .axLeaf("YouTube.Text.URLError")
                 }
@@ -121,7 +121,7 @@ private struct YtDlpBanner: View {
             if let error = model.ytDlpInstallError {
                 Text(error)
                     .font(DS.Font.caption)
-                    .foregroundStyle(DS.Color.danger)
+                    .foregroundStyle(DS.Color.dangerText)
                     .fixedSize(horizontal: false, vertical: true)
             }
 

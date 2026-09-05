@@ -223,9 +223,9 @@ private struct FindReplaceRuleRow: View {
                 if let regexError {
                     HStack(spacing: 4) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(DS.Color.danger)
+                            .foregroundStyle(DS.Color.dangerText)
                         Text(regexError)
-                            .foregroundStyle(DS.Color.danger)
+                            .foregroundStyle(DS.Color.dangerText)
                     }
                     .font(DS.Font.caption)
                 }
