@@ -50,7 +50,7 @@ enum ProbeAudioExtractor {
 
     /// Loudest slice, not the window's mean: a memo of a quiet room with one sentence in it should
     /// outrank a window of steady fan noise, and averaging buries the sentence.
-    private static func energy(of window: AudioProbeWindow, in file: AVAudioFile) throws -> Double {
+    static func energy(of window: AudioProbeWindow, in file: AVAudioFile) throws -> Double {
         let sampleRate = file.processingFormat.sampleRate
         let sliceFrames = AVAudioFrameCount(max(1, measureSliceSeconds * sampleRate))
         let sliceCount = max(1, min(measureSlices, Int(window.duration / measureSliceSeconds)))

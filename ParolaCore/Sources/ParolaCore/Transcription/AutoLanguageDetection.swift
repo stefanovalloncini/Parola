@@ -54,7 +54,7 @@ enum ProbeWindowPlanner {
     static let windowSeconds: Double = 20
     static let windowLimit = 6
     static let candidateLimit = 24
-    private static let silenceFloor = 0.1
+    static let silenceFloor = 0.1
 
     static func candidates(
         duration: Double,

@@ -20,8 +20,22 @@ public enum TranscriptCleanup {
         to transcript: Transcript,
         options: TranscriptCleanupOptions = TranscriptCleanupOptions()
     ) -> Transcript {
+        apply(to: transcript, options: options, energy: nil)
+    }
+
+    /// The energy probe is what lets the pass drop a line repeated over silence; a run with no file
+    /// behind it — a live stream, or a document read back from the library — passes nil and keeps
+    /// every repetition.
+    static func apply(
+        to transcript: Transcript,
+        options: TranscriptCleanupOptions,
+        energy: SegmentEnergyProbe?
+    ) -> Transcript {
         var segments = transcript.segments.droppingBlankText()
         if options.filtersHallucinations {
+            if let energy {
+                segments = SilentRepetitions.dropped(from: segments, probe: energy)
+            }
             segments = IgnoredSegments.applyBuiltInDefaults(to: segments)
         }
         if options.mergesSentences {

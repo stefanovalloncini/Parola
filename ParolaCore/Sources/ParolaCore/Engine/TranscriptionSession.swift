@@ -110,7 +110,8 @@ public actor TranscriptionSession {
             options: TranscriptCleanupOptions(
                 filtersHallucinations: options.filtersHallucinations,
                 mergesSentences: false
-            )
+            ),
+            energy: AudioFileEnergyProbe(url: audioURL)
         )
         if options.diarize {
             try Task.checkCancellation()
