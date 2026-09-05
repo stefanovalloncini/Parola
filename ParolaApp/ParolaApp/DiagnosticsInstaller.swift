@@ -28,11 +28,11 @@ final class DiagnosticsInstaller {
             minimumLevel: Self.minimumLevel(environment: environment)
         )
         self.sink = sink
-        // Best effort: the sink's retention sweep can log and it starts inside that initializer,
-        // so installing right after it only usually catches the sweep's own notice.
+        // Best effort: the sink sweeps its own retention inside that initializer, so anything the
+        // sweep logs is emitted before this install can catch it.
         ParolaLog.install(sink)
         ParolaLog.info(.appLifecycle, "diagnostics sink installed")
-        flushTask = Task { [sink] in
+        flushTask = Task.detached { [sink] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: flushInterval)
                 guard !Task.isCancelled else { return }
