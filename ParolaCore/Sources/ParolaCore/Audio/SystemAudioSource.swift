@@ -39,9 +39,11 @@ public actor SystemAudioSource: LiveAudioSource {
                 onScreenWindowsOnly: false
             )
         } catch {
+            ParolaLog.error(.audioCapture, "screencapturekit unavailable", [.error: .error(error)])
             throw ParolaError.captureUnavailable("ScreenCaptureKit unavailable: \(error.localizedDescription)")
         }
         guard let display = content.displays.first else {
+            ParolaLog.error(.audioCapture, "no display available for system audio")
             throw ParolaError.captureUnavailable("no display available for system audio capture")
         }
 
@@ -87,6 +89,11 @@ public actor SystemAudioSource: LiveAudioSource {
             try stream.addStreamOutput(handler, type: .audio, sampleHandlerQueue: callbackQueue)
             try await stream.startCapture()
         } catch {
+            ParolaLog.error(
+                .audioCapture,
+                "system audio capture failed to start",
+                [.error: .error(error)]
+            )
             try? await stream.stopCapture()
             try? FileManager.default.removeItem(at: outputURL)
             throw error
@@ -98,6 +105,7 @@ public actor SystemAudioSource: LiveAudioSource {
     public func prepare() async throws -> URL {
         try await stop()
         if let captureFailure {
+            ParolaLog.error(.audioRecording, "system audio take discarded after a write failure")
             try? FileManager.default.removeItem(at: outputURL)
             throw ParolaError.captureUnavailable(captureFailure)
         }

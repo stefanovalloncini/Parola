@@ -35,6 +35,11 @@ final class CaptureFileWriter: @unchecked Sendable {
         do {
             try writeChunk(buffer)
         } catch {
+            ParolaLog.error(
+                .audioRecording,
+                "capture write failed, take latched",
+                [.error: .error(error), .count: .int(droppedChunks)]
+            )
             fail("could not write the recording to disk (\(error.localizedDescription))")
         }
     }

@@ -64,6 +64,7 @@ public actor MicAudioSource: LiveAudioSource {
         }
         let tapFormat = inputNode.outputFormat(forBus: 0)
         guard tapFormat.sampleRate > 0 else {
+            ParolaLog.error(.audioCapture, "microphone input format is invalid")
             throw ParolaError.captureUnavailable("microphone not available — input format invalid (mic permission?)")
         }
 
@@ -73,9 +74,11 @@ public actor MicAudioSource: LiveAudioSource {
             channels: 1,
             interleaved: false
         ) else {
+            ParolaLog.fault(.audioCapture, "could not build the capture format")
             throw ParolaError.captureUnavailable("could not create 16 kHz mono Float32 format")
         }
         guard let conv = AVAudioConverter(from: tapFormat, to: outFormat) else {
+            ParolaLog.fault(.audioCapture, "could not create the audio converter")
             throw ParolaError.captureUnavailable("could not create audio converter \(tapFormat) → \(outFormat)")
         }
 
@@ -116,6 +119,7 @@ public actor MicAudioSource: LiveAudioSource {
         do {
             try engine.start()
         } catch {
+            ParolaLog.error(.audioCapture, "audio engine failed to start", [.error: .error(error)])
             inputNode.removeTap(onBus: 0)
             cont.finish()
             consumer.cancel()
@@ -158,6 +162,11 @@ public actor MicAudioSource: LiveAudioSource {
         let writer = current.writer
         await stop()
         if let failure = writer.failure {
+            ParolaLog.error(
+                .audioRecording,
+                "take discarded after a write failure",
+                [.count: .int(writer.droppedChunks)]
+            )
             try? FileManager.default.removeItem(at: url)
             throw ParolaError.captureUnavailable(failure)
         }

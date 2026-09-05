@@ -87,6 +87,11 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         description.isPrivate = true
         var tap = AudioObjectID(kAudioObjectUnknown)
         guard AudioHardwareCreateProcessTap(description, &tap) == noErr else {
+            ParolaLog.error(
+                .audioCapture,
+                "could not create the audio process tap",
+                [.count: .int(processObjects.count)]
+            )
             throw ParolaError.captureUnavailable("could not create the audio process tap")
         }
         tapID = tap
@@ -153,6 +158,7 @@ public actor ProcessTapAudioSource: LiveAudioSource {
         }
         ioProcID = procID
         guard AudioDeviceStart(aggregateID, procID) == noErr else {
+            ParolaLog.error(.audioCapture, "tap aggregate device failed to start")
             teardownAll()
             throw ParolaError.captureUnavailable("could not start the tap aggregate device")
         }

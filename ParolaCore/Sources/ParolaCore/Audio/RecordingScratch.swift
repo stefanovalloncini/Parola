@@ -18,7 +18,15 @@ public enum RecordingScratch {
     /// A unique URL for a new take, creating the directory if needed.
     public static func fileURL(prefix: String) -> URL {
         let dir = directory
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        } catch {
+            ParolaLog.error(
+                .audioRecording,
+                "could not create the recording scratch directory",
+                [.error: .error(error)]
+            )
+        }
         return dir.appendingPathComponent("\(prefix)-\(UUID().uuidString).wav")
     }
 }

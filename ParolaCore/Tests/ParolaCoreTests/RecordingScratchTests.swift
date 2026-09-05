@@ -2,7 +2,9 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-@Suite("RecordingScratch", .serialized)
+// .logFacade is the gate CaptureLoggingTests holds while it points the same process-wide
+// scratch override at a directory it cannot create.
+@Suite("RecordingScratch", .serialized, .logFacade)
 struct RecordingScratchTests {
 
     @Test("defaults to the temp directory")
