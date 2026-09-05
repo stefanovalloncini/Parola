@@ -90,14 +90,18 @@ public actor LibraryStore {
 
     private func rebuildSearchIndexIfStale() async {
         let url = libraryURL
+        let epoch = listCacheEpoch
         let scan = await offActorIO(qos: .utility) { [self] in indexScan(at: url) }
         guard let scan else {
             indexReadyTask = nil
             return
         }
+        // The list caches want the same scan; skip it if a mutation landed while it ran.
+        if cachedActive == nil, epoch == listCacheEpoch { applyScan(scan.entries) }
         guard await searchIndex.needsRebuild(matching: scan.fingerprints) else { return }
+        let indexable = scan.entries.filter { $0.deletedAt == nil }
         let rebuilt = await offActorIO(qos: .utility) {
-            scan.entries.compactMap { entry -> LibrarySearchIndex.RebuildEntry? in
+            indexable.compactMap { entry -> LibrarySearchIndex.RebuildEntry? in
                 guard let doc = try? ParolaDocument.read(at: entry.bundleURL) else { return nil }
                 return .init(
                     id: entry.id,
@@ -116,15 +120,16 @@ public actor LibraryStore {
         let fingerprints: [String: String]
     }
 
-    /// Soft-deleted bundles stay on disk but leave the index, so the scan the snapshot is measured
-    /// against leaves them out too.
+    /// Soft-deleted bundles stay on disk but leave the index, so the fingerprints the snapshot is
+    /// measured against leave them out. `entries` holds the whole scan, for the list caches.
     private nonisolated func indexScan(at libraryURL: URL) -> IndexScan? {
         guard let scanned = scanEntries(at: libraryURL) else { return nil }
-        let active = scanned.filter { $0.deletedAt == nil }
         return IndexScan(
-            entries: active,
+            entries: scanned,
             fingerprints: Dictionary(
-                active.map { ($0.id, Self.bundleFingerprint($0.bundleURL)) },
+                scanned.lazy
+                    .filter { $0.deletedAt == nil }
+                    .map { ($0.id, Self.bundleFingerprint($0.bundleURL)) },
                 uniquingKeysWith: { first, _ in first }
             )
         )
