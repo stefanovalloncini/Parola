@@ -217,6 +217,53 @@ struct TranscriptionSessionMergeTests {
         #expect(transcript.segments.map(\.text) == ["Allora vediamo come va."])
     }
 
+    private let turnSeeds = [
+        TranscriptSegmentSeed(start: 0.0, end: 1.0, text: "e questo"),
+        TranscriptSegmentSeed(start: 1.3, end: 2.0, text: "è quanto"),
+        TranscriptSegmentSeed(start: 2.3, end: 3.0, text: "sì certo"),
+        TranscriptSegmentSeed(start: 3.3, end: 4.0, text: "come dicevi")
+    ]
+
+    @Test("the diarizer's labels reach the merge, so no segment spans a speaker change")
+    func mergesAfterDiarization() async throws {
+        let (session, audioURL) = try await makeSession(
+            engineID: .whisperKit, model: "openai_whisper-tiny", segments: turnSeeds
+        )
+        await session.useDiarization { transcript, _, _ in
+            var labelled = transcript
+            labelled.segments = transcript.segments.enumerated().map { index, segment in
+                var copy = segment
+                copy.speaker = index.isMultiple(of: 2) ? "Speaker 1" : "Speaker 2"
+                return copy
+            }
+            return labelled
+        }
+
+        let transcript = try await session.transcribe(
+            source: FileAudioSource(url: audioURL),
+            options: TranscriptionOptions(model: "openai_whisper-tiny", diarize: true)
+        )
+        await session.unloadModel()
+
+        #expect(transcript.segments.map(\.text) == turnSeeds.map(\.text))
+        #expect(transcript.segments.map(\.speaker) == ["Speaker 1", "Speaker 2", "Speaker 1", "Speaker 2"])
+    }
+
+    @Test("the same fragments come back as one turn when nothing labels them")
+    func mergesTurnsWithoutDiarization() async throws {
+        let (session, audioURL) = try await makeSession(
+            engineID: .whisperKit, model: "openai_whisper-tiny", segments: turnSeeds
+        )
+
+        let transcript = try await session.transcribe(
+            source: FileAudioSource(url: audioURL),
+            options: TranscriptionOptions(model: "openai_whisper-tiny")
+        )
+        await session.unloadModel()
+
+        #expect(transcript.segments.count == 1)
+    }
+
     @Test("another engine's segmentation is left as the engine made it")
     func leavesOtherEnginesAlone() async throws {
         let (session, audioURL) = try await makeSession(

@@ -23,6 +23,9 @@ public actor TranscriptionSession {
     private var pressureSource: (any DispatchSourceMemoryPressure)?
     private var transcribeRunning = false
     private var transcribeWaiters: [CheckedContinuation<Void, Never>] = []
+    private var diarizeStep: DiarizeStep?
+
+    typealias DiarizeStep = @Sendable (Transcript, URL, Int?) async throws -> Transcript
 
     public init(
         modelStore: ModelStore = .shared,
@@ -111,7 +114,7 @@ public actor TranscriptionSession {
         )
         if options.diarize {
             try Task.checkCancellation()
-            transcript = try await diarizer.diarize(
+            transcript = try await diarize(
                 transcript: transcript,
                 audioURL: audioURL,
                 numberOfSpeakers: options.expectedSpeakers
@@ -136,6 +139,27 @@ public actor TranscriptionSession {
             ]
         )
         return transcript
+    }
+
+    /// Stages speaker labels in place of SpeakerKit. Internal, so the CLI and both apps always
+    /// run the real diarizer.
+    func useDiarization(_ step: @escaping DiarizeStep) {
+        diarizeStep = step
+    }
+
+    private func diarize(
+        transcript: Transcript,
+        audioURL: URL,
+        numberOfSpeakers: Int?
+    ) async throws -> Transcript {
+        if let diarizeStep {
+            return try await diarizeStep(transcript, audioURL, numberOfSpeakers)
+        }
+        return try await diarizer.diarize(
+            transcript: transcript,
+            audioURL: audioURL,
+            numberOfSpeakers: numberOfSpeakers
+        )
     }
 
     private func acquireTranscribeSlot() async throws {
