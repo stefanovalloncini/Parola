@@ -919,7 +919,7 @@ final class AppModel {
     var librarySortOrder: LibrarySortOrder = .newest {
         didSet {
             reapplyLibrarySort()
-            // Opening an entry no longer reassigns the list, so this order needs the manifests re-read before it sorts by them.
+            // This is the one order that reads a field `sameEntries` masks, so it sorts on manifests it must re-read first.
             if librarySortOrder == .lastOpened { refreshLibrary() }
         }
     }

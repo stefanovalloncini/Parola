@@ -148,14 +148,28 @@ struct LibraryRefreshSkipTests {
         let version = model.libraryVersion
 
         model.loadEntry(seeded.id)
-        for _ in 0..<200 where model.selectedEntryID != seeded.id {
+        // Wait for the write the skipping is about: markOpened has stamped the manifest on disk, and the
+        // refresh it triggers has landed. A fixed sleep would pass whether or not the refresh ever ran.
+        var stamped = false
+        for _ in 0..<400 {
+            await model.libraryRefreshTask?.value
+            if try manifest(at: seeded.bundleURL).lastOpenedAt != nil { stamped = true; break }
             try await Task.sleep(for: .milliseconds(10))
         }
         await model.libraryRefreshTask?.value
-        try await Task.sleep(for: .milliseconds(100))
 
+        #expect(stamped)
         #expect(model.selectedEntryID == seeded.id)
         #expect(model.libraryVersion == version)
+    }
+
+    private func manifest(at bundleURL: URL) throws -> ParolaDocument.Manifest {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(
+            ParolaDocument.Manifest.self,
+            from: Data(contentsOf: bundleURL.appendingPathComponent("manifest.json"))
+        )
     }
 
     @Test("a refresh that finds nothing new leaves the version alone")

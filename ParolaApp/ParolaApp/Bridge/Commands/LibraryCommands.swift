@@ -86,7 +86,7 @@ extension ParolaAutomationServer {
                 ],
                 handler: { args, ctx in
                     let query = try args.string("query")
-                    // Clearing the results first would cost the UI a rebuild back to the unfiltered list that a real search never pays.
+                    // This command measures what the sidebar does, which never clears the results first; the version tells it when the query landed.
                     let baseline = ctx.model.searchResultsVersion
                     ctx.model.search(query)
                     let clock = ctx.model.clock

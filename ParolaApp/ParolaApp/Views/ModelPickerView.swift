@@ -7,6 +7,7 @@ struct ModelPickerView: View {
     @State private var searchText = ""
     @State private var installedOnly = false
 
+    /// Frozen at first use: ModelStore re-applies the managed allowlist on every scan, so a stale row here cannot reach a blocked model.
     private static let groups: [(ModelCategory, [ModelVariant])] = ModelCatalog.groupedForPicker()
 
     var body: some View {

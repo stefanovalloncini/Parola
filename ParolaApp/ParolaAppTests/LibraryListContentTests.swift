@@ -173,13 +173,18 @@ struct LibraryListContentTests {
         return host.fittingSize.height
     }
 
-    /// The home style carries the same content without the declared height, so it measures what the library row is pinned to.
+    /// The home style carries the same content without the declared height, so it measures what the library row
+    /// is pinned to. Comparing the two is what can fail: asserting the library row's own constant cannot.
     @Test("the declared library row height is the height the row would have measured")
     func rowHeightMatchesMeasuredContent() async {
-        #expect(await rowHeight(density: "comfortable", style: .library) == 39)
-        #expect(await rowHeight(density: "comfortable", style: .home) == 39)
-        #expect(await rowHeight(density: "compact", style: .library) == 35)
-        #expect(await rowHeight(density: "compact", style: .home) == 35)
+        let comfortable = await rowHeight(density: "comfortable", style: .home)
+        let compact = await rowHeight(density: "compact", style: .home)
+
+        #expect(comfortable == 39)
+        #expect(compact == 35)
+        #expect(await rowHeight(density: "comfortable", style: .library) == comfortable)
+        #expect(await rowHeight(density: "compact", style: .library) == compact)
+        #expect(comfortable - compact == DS.Spacing.tight)
     }
 
     private func mixedLibrary() -> [LibraryEntry] {
