@@ -2344,6 +2344,16 @@
         }
       }
     },
+    "Couldn't transcribe %@": {
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione di %@ non riuscita"
+          }
+        }
+      }
+    },
     "Count-in": {
       "extractionState": "manual",
       "localizations": {

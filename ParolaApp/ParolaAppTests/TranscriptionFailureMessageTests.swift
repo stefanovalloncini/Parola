@@ -24,4 +24,22 @@ struct TranscriptionFailureMessageTests {
         let error = ParolaError.invalidLanguage("zz")
         #expect(AppModel.transcriptionFailureMessage(for: error) == error.localizedDescription)
     }
+
+    @Test("the error card drops the message's own prefix")
+    func errorDetailDropsPrefix() {
+        let message = AppModel.transcriptionFailureMessage(for: ParolaError.transcriptionFailed("the model could not read the audio"))
+        #expect(AppModel.errorDetail(from: message) == "the model could not read the audio")
+    }
+
+    @Test("the Italian prefix is dropped from the Italian message")
+    func errorDetailDropsItalianPrefix() throws {
+        let bundle = try italianBundle()
+        let message = AppModel.transcriptionFailureMessage(for: ParolaError.transcriptionFailed("formato non valido"), bundle: bundle)
+        #expect(AppModel.errorDetail(from: message, bundle: bundle) == "formato non valido")
+    }
+
+    @Test("a message without the prefix is left alone")
+    func errorDetailKeepsOtherMessages() {
+        #expect(AppModel.errorDetail(from: "The disk is full.") == "The disk is full.")
+    }
 }

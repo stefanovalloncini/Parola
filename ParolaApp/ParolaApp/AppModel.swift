@@ -225,6 +225,8 @@ final class AppModel {
     @ObservationIgnored var pendingRecoveryWrite: Task<Void, Never>?
     /// A recorded take whose transcription failed; the file backs the error pane's Retry.
     var failedTakeAudioURL: URL?
+    /// The file a failed file transcription was reading; backs the error banner's Retry and Show in Finder.
+    var failedFileURL: URL?
     @ObservationIgnored var failedTakeTitle: String?
     @ObservationIgnored var failedTakeCategory: EntryCategory?
     @ObservationIgnored var pendingDictationRestart: Task<Void, Never>?
@@ -1657,6 +1659,7 @@ final class AppModel {
                 fileTranscribeFraction = nil
                 fileTranscribeStage = nil
                 endRecovery(recoveryToken)
+                failedFileURL = nil
                 phase = .ready
                 persistToLibrary(processed, audioSource: fileURL)
             } catch {
@@ -1664,7 +1667,7 @@ final class AppModel {
                 filePartialText = ""
                 fileTranscribeFraction = nil
                 fileTranscribeStage = nil
-                if !Task.isCancelled { applyTranscriptionError(error) }
+                if !Task.isCancelled { applyTranscriptionError(error, source: fileURL) }
             }
             if !Task.isCancelled {
                 self.fileTranscribeTask = nil
@@ -1925,12 +1928,24 @@ final class AppModel {
         return url
     }
 
-    private func applyTranscriptionError(_ error: Error) {
+    private func applyTranscriptionError(_ error: Error, source: URL? = nil) {
         if error is CancellationError || Task.isCancelled {
             phase = .idle
         } else {
+            // Only one file sits behind the error card, so a fresh failure replaces the last.
+            failedTakeAudioURL = nil
+            failedTakeTitle = nil
+            failedTakeCategory = nil
+            failedFileURL = source
             phase = .failed(message: Self.transcriptionFailureMessage(for: error))
         }
+    }
+
+    /// The error card names the failure in its title, so the message drops its own lead-in.
+    nonisolated static func errorDetail(from message: String, bundle: Bundle = .main) -> String {
+        let prefix = String(localized: "Transcription failed: \("")", bundle: bundle)
+        guard message.hasPrefix(prefix) else { return message }
+        return String(message.dropFirst(prefix.count))
     }
 
     nonisolated static func transcriptionFailureMessage(for error: Error, bundle: Bundle = .main) -> String {
@@ -2014,6 +2029,7 @@ final class AppModel {
     func dismissError() {
         // Back to the transcript when one is loaded: a failed export or prompt shouldn't cost the user their place.
         phase = transcript == nil ? .idle : .ready
+        failedFileURL = nil
         failedTakeAudioURL = nil
         failedTakeTitle = nil
         failedTakeCategory = nil
@@ -2366,6 +2382,7 @@ final class AppModel {
                     activate: false
                 )
                 if let audioURL {
+                    failedFileURL = nil
                     failedTakeAudioURL = audioURL
                     failedTakeTitle = takeTitle
                     failedTakeCategory = takeCategory
@@ -2476,6 +2493,7 @@ final class AppModel {
             transcript = processed
             adoptLoadedMediaDuration()
             endRecovery(recoveryToken)
+            failedFileURL = nil
             failedTakeAudioURL = nil
             failedTakeTitle = nil
             failedTakeCategory = nil
@@ -2486,6 +2504,7 @@ final class AppModel {
             endRecovery(recoveryToken)
             var message = Self.transcriptionFailureMessage(for: error)
             if !(error is CancellationError), !Task.isCancelled {
+                failedFileURL = nil
                 failedTakeCategory = pendingRecordingCategory
                 failedTakeAudioURL = url
                 failedTakeTitle = title
@@ -2505,6 +2524,31 @@ final class AppModel {
             phase = .failed(message: message)
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
         }
+    }
+
+    var canRetryFailedTranscription: Bool {
+        failedTakeAudioURL != nil || failedFileURL != nil
+    }
+
+    /// What the error card names: a recorded take by its title, an opened file by its file name.
+    var failedSourceName: String? {
+        if failedTakeAudioURL != nil { return failedTakeTitle }
+        return failedFileURL?.lastPathComponent
+    }
+
+    func retryFailedTranscription() {
+        if failedTakeAudioURL != nil {
+            retryFailedTake()
+            return
+        }
+        guard let url = failedFileURL else { return }
+        failedFileURL = nil
+        transcribe(fileURL: url)
+    }
+
+    func revealFailedFile() {
+        guard let url = failedFileURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
     /// Re-runs transcription of the take a failure left behind.

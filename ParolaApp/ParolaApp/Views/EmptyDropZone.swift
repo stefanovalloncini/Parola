@@ -2,12 +2,19 @@ import SwiftUI
 import ParolaCore
 
 struct EmptyDropZone: View {
+    /// A failure shows as a card above the intake surface, which stays usable.
+    var errorMessage: String?
+
     @Environment(AppModel.self) private var model
     @State private var recentRowSpace: CGFloat = 0
     @ScaledMetric(relativeTo: .body) private var recentRowHeight: CGFloat = 49
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.large) {
+            if let errorMessage {
+                ErrorBanner(message: errorMessage)
+            }
+
             IntakeDropWell()
                 .axLeaf("Empty.Button.OpenFile")
 

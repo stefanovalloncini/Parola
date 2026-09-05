@@ -112,7 +112,7 @@ struct ContentRoutes: View {
                 EmptyDropZone()
             }
         case .failed(let message):
-            ErrorPane(message: message)
+            EmptyDropZone(errorMessage: message)
         }
     }
 
