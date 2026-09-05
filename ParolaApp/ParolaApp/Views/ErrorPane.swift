@@ -48,7 +48,7 @@ struct ErrorBanner: View {
             Spacer(minLength: 0)
         }
         .padding(DS.Spacing.regular)
-        // A width floor: proposed no width the message wraps per character and the route's height explodes.
+        // Without a width floor the message wraps per character when asked for its ideal size, and the route's height explodes.
         .frame(minWidth: MainWindowLayout.narrowestPaneWidth, maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)

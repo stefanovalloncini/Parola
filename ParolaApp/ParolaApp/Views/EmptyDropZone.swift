@@ -248,10 +248,7 @@ private struct IntakeDropWell: View {
                 Label("Choose Files…", systemImage: "folder")
                     .font(DS.Font.subheadlineMedium)
                     .foregroundStyle(DS.Color.primaryText)
-                    .padding(.horizontal, 14)
-                    .frame(height: 28)
-                    .background(Capsule(style: .continuous).fill(DS.Palette.pillFill))
-                    .overlay(Capsule(style: .continuous).strokeBorder(DS.Color.separator, lineWidth: 0.5))
+                    .chipChrome(isSelected: false, size: .prominent, style: .subtle)
             }
             .padding(.horizontal, DS.Spacing.large)
             .padding(.vertical, DS.Spacing.regular)
