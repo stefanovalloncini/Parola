@@ -11,8 +11,9 @@ protocol SegmentEnergyProbe {
 
 /// Whisper fills silence with a plausible line repeated at VAD-chunk intervals — "Grazie a tutti."
 /// four times over a two-minute lead-in. A phrase list cannot tell those from the same words
-/// actually spoken, so this asks the audio instead: a line repeated three or more times across the
-/// transcript is a candidate, and only the copies whose own span is quiet are dropped.
+/// actually spoken, so this asks the audio and the layout instead: a line repeated three or more
+/// times is a candidate, and a copy goes only when its span is quiet AND another copy sits right
+/// beside it. Filler arrives back to back; a line the other speaker talks around does not.
 enum SilentRepetitions {
     static let minimumRepeats = 3
 
@@ -25,6 +26,8 @@ enum SilentRepetitions {
     /// the 159 memo gives 0.0157 — over its loudest hallucination (0.0124), 4.2× under its speech;
     /// uniform speech at 0.02 with one 0.15 thump gives 0.008, so speech-level repeats stay;
     /// 16 windows of room tone against 8 at 0.08 give 0.032, so a 0.005 repeat over silence goes.
+    /// The memo's loudest filler and a speaker 10 dB down measure the same, so what separates them
+    /// is the neighbour test, not this.
     static let quietShareOfSpeech = 0.4
 
     /// Below three loud windows there is no middle to take. The fallback is the whole-file median,
@@ -40,17 +43,19 @@ enum SilentRepetitions {
             guard !key.isEmpty else { continue }
             groups[key, default: []].append(index)
         }
-        let candidates = groups.values
-            .filter { $0.count >= minimumRepeats }
-            .flatMap { $0 }
-            // In playback order, so the energy reads walk the file forward instead of seeking back.
-            .sorted { segments[$0].start < segments[$1].start }
-        guard !candidates.isEmpty, let floor = floor(forWindows: probe.windowEnergies()) else {
+        let repeated = Set(groups.values.filter { $0.count >= minimumRepeats }.flatMap { $0 })
+        guard !repeated.isEmpty, let floor = floor(forWindows: probe.windowEnergies()) else {
             return segments
         }
 
+        // Walked in playback order: the energy reads go forward through the file, and a copy's
+        // neighbours are the segments either side of it in time.
+        let order = segments.indices.sorted { segments[$0].start < segments[$1].start }
         var quiet: Set<Int> = []
-        for index in candidates {
+        for (position, index) in order.enumerated() where repeated.contains(index) {
+            let before = position > 0 && repeated.contains(order[position - 1])
+            let after = position + 1 < order.count && repeated.contains(order[position + 1])
+            guard before || after else { continue }
             let segment = segments[index]
             guard let energy = probe.energy(from: segment.start, to: segment.end), energy < floor else {
                 continue

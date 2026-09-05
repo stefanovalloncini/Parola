@@ -157,6 +157,51 @@ struct SilentRepetitionsTests {
         #expect(floor * 3 < 0.066)
     }
 
+    @Test("a copy the other speaker talks around is kept, the ones in a run go")
+    func keepsACopyWithRealSpeechOnBothSides() {
+        let segments = [
+            TranscriptSegment(id: 0, start: 0, end: 9, text: "Grazie."),
+            TranscriptSegment(id: 1, start: 10, end: 19, text: "Grazie."),
+            TranscriptSegment(id: 2, start: 20, end: 29, text: "e allora vediamo"),
+            TranscriptSegment(id: 3, start: 30, end: 39, text: "Grazie."),
+        ]
+        let out = SilentRepetitions.dropped(from: segments, probe: StubEnergyProbe(quietBefore: .infinity))
+        #expect(out.map(\.text) == ["e allora vediamo", "Grazie."])
+    }
+
+    @Test("the 159 memo's layout loses exactly the four copies that sit in a run")
+    func memoLayoutDropsTheRunOnly() {
+        let out = SilentRepetitions.dropped(from: Self.memoLayout, probe: Self.memoProbe)
+        #expect(out.map { round($0.start * 10) / 10 } == [0, 41.8, 57.8, 152.4, 539.2, 545.9, 564.1, 638.6])
+    }
+
+    @Test("an interleaved backchannel ten decibels down survives its own level")
+    func keepsAnInterleavedBackchannel() throws {
+        let windows = Array(repeating: 0.08, count: 14)
+            + Array(repeating: 0.008, count: 4)
+            + Array(repeating: 0.002, count: 6)
+        // The level test alone would take these: 0.008 is a quarter of the 0.032 floor.
+        #expect(try #require(SilentRepetitions.floor(forWindows: windows)) > 0.008)
+
+        let segments = Self.interleaved(quiet: "Sì.")
+        let probe = Self.probe(windows, quiet: 0.008, loud: 0.08)
+        #expect(SilentRepetitions.dropped(from: segments, probe: probe) == segments)
+    }
+
+    @Test("a thump that lifts the floor over the speech does not take interleaved speech")
+    func keepsInterleavedSpeechUnderALoudThump() throws {
+        let tables = [
+            [0.8] + Self.memoWindows.dropFirst(),
+            [0.8, 0.8, 0.8] + Self.memoWindows.dropFirst(3),
+        ]
+        for windows in tables.map(Array.init) {
+            #expect(try #require(SilentRepetitions.floor(forWindows: windows)) > 0.066)
+            let segments = Self.interleaved(quiet: "Sì.")
+            let probe = Self.probe(windows, quiet: 0.066, loud: 0.08)
+            #expect(SilentRepetitions.dropped(from: segments, probe: probe) == segments)
+        }
+    }
+
     @Test("cleanup with no energy probe keeps every repetition")
     func cleanupWithoutAProbeIsUnchanged() {
         let segments = (0..<8).map {
@@ -186,6 +231,57 @@ struct SilentRepetitionsTests {
         #expect(out.segments.map(\.text) == [
             "Grazie.", "Grazie.", "Grazie.", "Sottotitoli a cura di QTSS", "Buongiorno a tutti",
         ])
+    }
+
+    /// The 159 memo's lead-in as the turbo model transcribes it, paired with the level each span
+    /// measures. Two copies have real speech on both sides and one sits alone at 545.9.
+    private static let memoSpans: [(start: Double, end: Double, text: String, level: Double)] = [
+        (0.0, 21.0, "Grazie a tutti.", 0.07729),
+        (21.0, 41.8, "Grazie a tutti.", 0.01236),
+        (41.8, 57.8, "se lo faccio funzionare adesso non ho niente", 0.07134),
+        (57.8, 80.3, "Grazie a tutti.", 0.06897),
+        (80.3, 81.3, "Grazie.", 0.00244),
+        (98.4, 120.9, "Grazie a tutti.", 0.00650),
+        (120.9, 121.9, "Grazie.", 0.00789),
+        (152.4, 157.4, "La principale è questa", 0.06586),
+        (539.2, 545.9, "questi qua ad esempio sono messo in fissa", 0.05000),
+        (545.9, 547.9, "Grazie.", 0.00458),
+        (564.1, 570.0, "ok qui questo è il secondo colore", 0.05000),
+        (638.6, 650.0, "Grazie.", 0.17715),
+    ]
+
+    private static let memoLayout = memoSpans.enumerated().map { index, span in
+        TranscriptSegment(id: index, start: span.start, end: span.end, text: span.text)
+    }
+
+    static let memoWindows = [
+        0.19934, 0.00676, 0.10335, 0.00431, 0.00515, 0.03427, 0.05538, 0.03065,
+        0.01200, 0.01776, 0.02233, 0.01234, 0.01482, 0.02257, 0.04441, 0.03148,
+        0.01264, 0.01576, 0.02202, 0.01018, 0.00615, 0.01831, 0.07960, 0.18455,
+    ]
+
+    private static let memoProbe = TableEnergyProbe(
+        windows: memoWindows,
+        levels: Dictionary(uniqueKeysWithValues: memoSpans.map { ($0.start, $0.level) })
+    )
+
+    /// Four turns of a loud speaker with a quiet backchannel between each.
+    private static func interleaved(quiet: String) -> [TranscriptSegment] {
+        (0..<7).map {
+            TranscriptSegment(
+                id: $0, start: Double($0) * 10, end: Double($0) * 10 + 9,
+                text: $0.isMultiple(of: 2) ? "riga numero \($0)" : quiet
+            )
+        }
+    }
+
+    private static func probe(_ windows: [Double], quiet: Double, loud: Double) -> TableEnergyProbe {
+        TableEnergyProbe(
+            windows: windows,
+            levels: Dictionary(uniqueKeysWithValues: (0..<7).map {
+                (Double($0) * 10, $0.isMultiple(of: 2) ? loud : quiet)
+            })
+        )
     }
 
     private static let trio = (0..<3).map {
@@ -251,6 +347,15 @@ enum LeadInSilenceFixture {
         try file.write(from: buffer)
         return url
     }
+}
+
+private struct TableEnergyProbe: SegmentEnergyProbe {
+    let windows: [Double]
+    let levels: [Double: Double]
+
+    func windowEnergies() -> [Double] { windows }
+
+    func energy(from start: Double, to end: Double) -> Double? { levels[start] }
 }
 
 private struct StubEnergyProbe: SegmentEnergyProbe {
