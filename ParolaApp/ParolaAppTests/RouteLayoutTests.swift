@@ -36,14 +36,16 @@ struct RouteLayoutTests {
         return host
     }
 
-    private func viewsPastSideEdges(of host: NSView) -> [String] {
+    private func viewsPastEdges(of host: NSView, axis: Axis.Set) -> [String] {
         var names: [String] = []
         func walk(_ view: NSView) {
             for sub in view.subviews {
                 // AppKit parks its key-view proxy off to the left of the window; it never draws.
                 if String(describing: type(of: sub)) == "KeyViewProxy" { continue }
                 let frame = sub.convert(sub.bounds, to: host)
-                if frame.minX < -0.5 || frame.maxX > host.bounds.width + 0.5 {
+                let pastSides = frame.minX < -0.5 || frame.maxX > host.bounds.width + 0.5
+                let pastEnds = frame.minY < -0.5 || frame.maxY > host.bounds.height + 0.5
+                if (axis.contains(.horizontal) && pastSides) || (axis.contains(.vertical) && pastEnds) {
                     names.append("\(type(of: sub)) \(frame)")
                 }
                 walk(sub)
@@ -67,8 +69,35 @@ struct RouteLayoutTests {
             let model = makeModel(defaults, jobs: jobs)
             model.route = .batch
             let host = hostedWindow(model, width: width, height: MainWindowLayout.minimumHeight)
-            let overflowing = viewsPastSideEdges(of: host)
+            let overflowing = viewsPastEdges(of: host, axis: .horizontal)
             #expect(overflowing.isEmpty, "laid out past \(width)pt with \(jobs) jobs: \(overflowing.joined(separator: ", "))")
+        }
+    }
+
+    @Test(
+        "the queue route fits the window it is given",
+        arguments: [CGSize(width: 1180, height: 760), CGSize(width: 920, height: 700)], [0, 3]
+    )
+    func queueRouteFitsTheWindow(size: CGSize, jobs: Int) {
+        withIsolatedDefaults { defaults in
+            let model = makeModel(defaults, jobs: jobs)
+            model.route = .queue
+            let host = hostedWindow(model, width: size.width, height: size.height)
+            let overflowing = viewsPastEdges(of: host, axis: [.horizontal, .vertical])
+            #expect(overflowing.isEmpty, "laid out past \(size) with \(jobs) jobs: \(overflowing.joined(separator: ", "))")
+        }
+    }
+
+    @Test(
+        "an empty route asks for no more height than the smallest window has",
+        arguments: [AppModel.Route.queue, .batch, .transcript]
+    )
+    func emptyRoutesFitTheSmallestWindow(route: AppModel.Route) {
+        withIsolatedDefaults { defaults in
+            let model = makeModel(defaults, jobs: 0)
+            model.route = route
+            let host = NSHostingView(rootView: ContentView().environment(model))
+            #expect(host.fittingSize.height <= MainWindowLayout.minimumHeight, "\(route) wants \(host.fittingSize.height)pt")
         }
     }
 }
