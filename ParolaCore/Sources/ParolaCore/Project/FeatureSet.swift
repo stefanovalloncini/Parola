@@ -83,7 +83,7 @@ public enum CLISubcommandPolicy {
         if features.isEnabled(.micRecording) || features.isEnabled(.meetings) {
             names.append("record")
         }
-        names += ["models", "engines", "open", "burn", "bench", "library"]
+        names += ["models", "engines", "open", "burn", "bench", "library", "diagnostics"]
         if features.isEnabled(.automation) {
             names.append("mcp")
         }

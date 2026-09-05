@@ -1,0 +1,112 @@
+import ArgumentParser
+import Foundation
+import ParolaCore
+
+struct Diagnostics: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "diagnostics",
+        abstract: "Write a report about this Mac and Parola's recent errors, for a bug report."
+    )
+
+    @Option(
+        name: .shortAndLong,
+        help: "Write the report here. Defaults to Parola-Diagnostics-<date>.txt in the current directory."
+    )
+    var output: String?
+
+    @Flag(name: .long, help: "Print the report instead of writing a file.")
+    var stdout: Bool = false
+
+    @Flag(name: .long, help: "Delete the recorded diagnostics once the report is written.")
+    var clear: Bool = false
+
+    func run() async throws {
+        if stdout, output != nil {
+            throw ValidationError("--stdout and --output can't be combined.")
+        }
+        let directory = FileDiagnosticsSink.defaultDirectory
+        // Listed before the render so --clear deletes what the report covers, never a file another
+        // process wrote while it ran.
+        let files = Self.sinkFiles(in: directory)
+        if files.isEmpty {
+            stderr("No diagnostics recorded.")
+        }
+
+        let report = DiagnosticsExport.render(directory: directory, environment: await environment())
+        if stdout {
+            print(report, terminator: "")
+        } else {
+            let url = Self.reportURL(output)
+            try report.write(to: url, atomically: true, encoding: .utf8)
+            print(url.path)
+        }
+
+        if clear {
+            Self.delete(files)
+        }
+    }
+
+    private static let knownEngines: [EngineID] = [.whisperKit, .parakeet, .appleSpeech]
+
+    private func environment() async -> DiagnosticsEnvironment {
+        let registry = EngineRegistry.shared
+        await ParolaCoreBootstrap.registerBuiltInEngines(registry: registry)
+        var engines: [EngineID: Bool] = [:]
+        for id in Self.knownEngines {
+            engines[id] = await registry.isRegistered(id)
+        }
+
+        let store = ModelStore.shared
+        let models = store.scan().installed.map { model in
+            DiagnosticsEnvironment.InstalledModel(
+                token: ModelToken(model.name),
+                bytes: model.installedURL.flatMap { store.sizeOnDisk(at: $0) }.map { UInt64($0) }
+            )
+        }
+
+        let library = LibraryStore.shared
+        return DiagnosticsEnvironment(
+            appVersion: Parola.version,
+            engines: engines,
+            models: models,
+            libraryEntryCount: await library.list().count,
+            libraryBytes: await library.sizeOnDisk(),
+            features: ParolaCLI.features
+        )
+    }
+
+    private static func reportURL(_ output: String?) -> URL {
+        if let output { return URL(fileURLWithPath: output) }
+        let day = Date().formatted(.iso8601.year().month().day().dateSeparator(.dash))
+        return URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("Parola-Diagnostics-\(day).txt")
+    }
+
+    private static func sinkFiles(in directory: URL) -> [URL] {
+        let entries = (try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.fileSizeKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        return entries.filter {
+            $0.lastPathComponent.hasPrefix(FileDiagnosticsSink.filePrefix) && $0.pathExtension == "jsonl"
+        }
+    }
+
+    private static func delete(_ files: [URL]) {
+        guard !files.isEmpty else { return }
+        var removed = 0
+        var bytes = 0
+        for file in files {
+            let size = (try? file.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+            do {
+                try FileManager.default.removeItem(at: file)
+                removed += 1
+                bytes += size
+            } catch {
+                stderr("Could not delete \(file.lastPathComponent): \(error.localizedDescription)")
+            }
+        }
+        stderr("Deleted \(removed) \(removed == 1 ? "file" : "files") (\(humanBytes(bytes))).")
+    }
+}

@@ -17,6 +17,7 @@ struct ParolaCLI: AsyncParsableCommand {
         "burn": Burn.self,
         "bench": Bench.self,
         "library": Library.self,
+        "diagnostics": Diagnostics.self,
         "mcp": MCP.self,
     ]
 

@@ -223,3 +223,8 @@ still fails, the app is running with the automation bridge switched off —
 **The client shows no tools at all.** Run the server by hand and look at
 stderr; it logs `parola-mcp listening on stdio` on startup. A crash on launch
 usually means the binary path in the client config is stale.
+
+**A call failed and stderr didn't say why.** The server records diagnostics
+while it runs. `parola diagnostics` writes them out as a plain-text report —
+structural facts only, no transcript text or paths — and prints its path;
+`parola diagnostics --clear` deletes what was recorded.

@@ -16,6 +16,11 @@ struct CLIFeatureGateTests {
         #expect(CLISubcommandPolicy.visible(features: FeatureSet(enabled: [.meetings])).contains("record"))
     }
 
+    @Test func diagnosticsIsNeverGated() {
+        #expect(CLISubcommandPolicy.visible(features: FeatureSet(enabled: [])).contains("diagnostics"))
+        #expect(CLISubcommandPolicy.visible(features: .all).contains("diagnostics"))
+    }
+
     @Test func fullSetKeepsEverything() {
         let names = CLISubcommandPolicy.visible(features: .all)
         #expect(names.contains("record"))
