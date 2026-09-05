@@ -191,7 +191,13 @@ actor WhisperKitTranscriber: Transcriber {
             language: detectedLanguage,
             modelName: modelName,
             sourceURL: url,
-            durationSeconds: maxEnd > 0 ? maxEnd : nil
+            durationSeconds: maxEnd > 0 ? maxEnd : nil,
+            languageDetection: WhisperLanguagePin.detection(
+                requested: options.language,
+                probed: probed,
+                ranAs: detectedLanguage,
+                canDetect: kit.textDecoder.isModelMultilingual
+            )
         )
     }
 
@@ -206,7 +212,7 @@ actor WhisperKitTranscriber: Transcriber {
 
     private static let languageProbeWindows = 5
 
-    private func probeLanguage(kit: WhisperKit, url: URL) async -> String? {
+    private func probeLanguage(kit: WhisperKit, url: URL) async -> LanguageDetection? {
         guard kit.textDecoder.isModelMultilingual else { return nil }
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-whisper-language-probe-\(UUID().uuidString).caf")
@@ -254,23 +260,29 @@ struct WhisperLanguageReading: Hashable, Sendable {
 
 /// Weighs one language reading per probe window. A window of room tone reads as a confident
 /// language all the same — Czech, Russian, whatever the noise resembles — so no single window is
-/// trusted: the winner has to carry a clear majority of the confidence, otherwise the run is left
-/// to detect per chunk as it did before.
+/// trusted: a winner is detected only once a second window corroborates it and it carries a clear
+/// majority of the confidence. A lone surviving reading still pins the run, but as an assumption;
+/// a close call pins nothing and the run detects per chunk as it did before.
 enum WhisperLanguageVote {
     static let minimumConfidence = 0.1
     static let lead = 1.25
 
-    static func decide(_ readings: [WhisperLanguageReading]) -> String? {
+    static func decide(_ readings: [WhisperLanguageReading]) -> LanguageDetection? {
         var mass: [String: Double] = [:]
+        var counted = 0
         for reading in readings where reading.confidence >= minimumConfidence {
             let code = reading.language.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !code.isEmpty else { continue }
             mass[code, default: 0] += reading.confidence
+            counted += 1
         }
         let ranked = mass.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
         guard let best = ranked.first else { return nil }
-        guard ranked.count == 1 || best.value >= ranked[1].value * lead else { return nil }
-        return best.key
+        guard let runnerUp = ranked.dropFirst().first else {
+            return counted > 1 ? .detected(best.key) : .assumed(best.key)
+        }
+        guard best.value >= runnerUp.value * lead else { return nil }
+        return .detected(best.key)
     }
 }
 
@@ -279,13 +291,25 @@ enum WhisperLanguageVote {
 enum WhisperLanguagePin {
     static func resolve(
         requested: String?,
-        probed: String?
+        probed: LanguageDetection?
     ) -> (language: String?, detectLanguage: Bool) {
         if let requested { return (requested, false) }
-        if let probed, !probed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return (probed, false)
+        if let code = probed?.code, !code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return (code, false)
         }
         return (nil, true)
+    }
+
+    /// What the run can tell the user about its language. Nothing when they named it, and nothing
+    /// from an English-only model, which was never choosing.
+    static func detection(
+        requested: String?,
+        probed: LanguageDetection?,
+        ranAs language: String,
+        canDetect: Bool
+    ) -> LanguageDetection? {
+        guard requested == nil, canDetect else { return nil }
+        return probed ?? .assumed(language)
     }
 }
 

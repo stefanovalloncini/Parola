@@ -118,7 +118,7 @@ struct WhisperLanguageVoteTests {
     func agreementPins() {
         let vote = WhisperLanguageVote.decide([reading("it", 0.9), reading("it", 0.8)])
 
-        #expect(vote == "it")
+        #expect(vote == .detected("it"))
     }
 
     @Test("two noise windows disagreeing lose to the pair that agrees")
@@ -127,7 +127,7 @@ struct WhisperLanguageVoteTests {
             reading("cs", 0.7), reading("en", 0.6), reading("it", 0.9), reading("it", 0.85),
         ])
 
-        #expect(vote == "it")
+        #expect(vote == .detected("it"))
     }
 
     @Test("an even split leaves the language unpinned")
@@ -139,7 +139,14 @@ struct WhisperLanguageVoteTests {
     func lowConfidenceIgnored() {
         let vote = WhisperLanguageVote.decide([reading("cs", 0.05), reading("it", 0.9)])
 
-        #expect(vote == "it")
+        #expect(vote == .assumed("it"))
+    }
+
+    @Test("a weak runner-up still counts as corroboration for the winner")
+    func weakRunnerUpCorroborates() {
+        let vote = WhisperLanguageVote.decide([reading("cs", 0.11), reading("it", 0.9)])
+
+        #expect(vote == .detected("it"))
     }
 
     @Test("nothing but low-confidence readings leaves the language unpinned")
@@ -152,9 +159,9 @@ struct WhisperLanguageVoteTests {
         #expect(WhisperLanguageVote.decide([]) == nil)
     }
 
-    @Test("one confident reading is enough when there is nothing else to read")
+    @Test("one confident reading pins the language but only as an assumption")
     func singleReading() {
-        #expect(WhisperLanguageVote.decide([reading("it", 0.9)]) == "it")
+        #expect(WhisperLanguageVote.decide([reading("it", 0.9)]) == .assumed("it"))
     }
 
     @Test("a blank language code is not a vote")
@@ -167,7 +174,7 @@ struct WhisperLanguageVoteTests {
 struct WhisperLanguagePinTests {
     @Test("an explicit language wins and disables detection")
     func explicitLanguage() {
-        let pin = WhisperLanguagePin.resolve(requested: "it", probed: "el")
+        let pin = WhisperLanguagePin.resolve(requested: "it", probed: .detected("el"))
 
         #expect(pin.language == "it")
         #expect(pin.detectLanguage == false)
@@ -175,7 +182,7 @@ struct WhisperLanguagePinTests {
 
     @Test("a probed language pins the rest of the file")
     func probedLanguage() {
-        let pin = WhisperLanguagePin.resolve(requested: nil, probed: "it")
+        let pin = WhisperLanguagePin.resolve(requested: nil, probed: .detected("it"))
 
         #expect(pin.language == "it")
         #expect(pin.detectLanguage == false)
@@ -191,9 +198,54 @@ struct WhisperLanguagePinTests {
 
     @Test("an empty probe result is not treated as a language")
     func emptyProbe() {
-        let pin = WhisperLanguagePin.resolve(requested: nil, probed: "  ")
+        let pin = WhisperLanguagePin.resolve(requested: nil, probed: .assumed("  "))
 
         #expect(pin.language == nil)
         #expect(pin.detectLanguage)
+    }
+
+    @Test("a corroborated probe is reported as detected")
+    func detectedProbeIsReported() {
+        let detection = WhisperLanguagePin.detection(
+            requested: nil, probed: .detected("it"), ranAs: "it", canDetect: true
+        )
+
+        #expect(detection == .detected("it"))
+    }
+
+    @Test("a probe that won by default is reported as assumed")
+    func assumedProbeIsReported() {
+        let detection = WhisperLanguagePin.detection(
+            requested: nil, probed: .assumed("cs"), ranAs: "cs", canDetect: true
+        )
+
+        #expect(detection == .assumed("cs"))
+    }
+
+    @Test("a failed probe leaves the run's own language reported as assumed")
+    func failedProbeIsAssumed() {
+        let detection = WhisperLanguagePin.detection(
+            requested: nil, probed: nil, ranAs: "el", canDetect: true
+        )
+
+        #expect(detection == .assumed("el"))
+    }
+
+    @Test("a language the caller named is reported as neither")
+    func explicitLanguageReportsNothing() {
+        let detection = WhisperLanguagePin.detection(
+            requested: "it", probed: nil, ranAs: "it", canDetect: true
+        )
+
+        #expect(detection == nil)
+    }
+
+    @Test("an English-only model reports nothing about the language")
+    func monolingualModelReportsNothing() {
+        let detection = WhisperLanguagePin.detection(
+            requested: nil, probed: nil, ranAs: "en", canDetect: false
+        )
+
+        #expect(detection == nil)
     }
 }
