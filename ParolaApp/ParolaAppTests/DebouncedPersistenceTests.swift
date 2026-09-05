@@ -3,6 +3,33 @@ import Testing
 @testable import Parola
 import ParolaCore
 
+private actor Gate {
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func open() {
+        isOpen = true
+        for waiter in waiters { waiter.resume() }
+        waiters = []
+    }
+
+    func wait() async {
+        if isOpen { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+}
+
+private struct GatedClock: Clock {
+    typealias Instant = ContinuousClock.Instant
+    let gate: Gate
+    var now: Instant { ContinuousClock().now }
+    var minimumResolution: Duration { .zero }
+    func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+        await gate.wait()
+        try Task.checkCancellation()
+    }
+}
+
 private struct ImmediateClock: Clock {
     typealias Instant = ContinuousClock.Instant
     var now: Instant { ContinuousClock().now }
@@ -174,5 +201,62 @@ struct DebouncedPersistenceTests {
 
         let results = await model.library.search("kryptonite")
         #expect(results.count == 1, "search index must reflect the text edit even when the final coalesced call was a timing nudge")
+    }
+
+    private func manifestDuration(of entry: LibraryEntry) -> Double? {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let data = try? Data(contentsOf: entry.bundleURL.appendingPathComponent("manifest.json")),
+              let manifest = try? decoder.decode(ParolaDocument.Manifest.self, from: data)
+        else { return nil }
+        return manifest.durationSeconds
+    }
+
+    @Test("a duration correction is not undone by an edit save already waiting")
+    func correctedDurationOutlivesPendingEdit() async throws {
+        let gate = Gate()
+        let model = AppModel(bootstrap: AppBootstrap(
+            mode: .test,
+            library: makeTempLibraryURL("debounce-gated"),
+            defaultsOverride: makeIsolatedDefaults(),
+            sideEffects: [],
+            filePicker: TestFilePicker(),
+            clock: GatedClock(gate: gate)
+        ))
+        let stale = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "original")],
+            language: "en",
+            modelName: "stub",
+            durationSeconds: 2134.272
+        )
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let entry = try await seedStore.add(transcript: stale, audioSource: nil, category: .transcription)
+        model.selectedEntryID = entry.id
+        model.transcript = stale
+
+        model.editSegment(id: 0, newText: "edited")
+        model.mediaDurationSeconds = 12
+        model.adoptLoadedMediaDuration()
+
+        var corrected = false
+        for _ in 0..<200 {
+            if abs((manifestDuration(of: entry) ?? 0) - 12) < 0.05 { corrected = true; break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(corrected, "manifest says \(String(describing: manifestDuration(of: entry)))")
+
+        await gate.open()
+        for _ in 0..<200 {
+            if model.pendingTranscriptSaveTask == nil { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.pendingTranscriptSaveTask == nil, "debounce task should have fired")
+
+        let loaded = try await model.library.load(entry.id)
+        #expect(loaded.document.transcript.segments[0].text == "edited")
+        #expect(
+            abs((manifestDuration(of: entry) ?? 0) - 12) < 0.05,
+            "manifest says \(String(describing: manifestDuration(of: entry)))"
+        )
     }
 }

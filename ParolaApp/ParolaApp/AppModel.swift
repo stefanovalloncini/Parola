@@ -2570,12 +2570,14 @@ final class AppModel {
             try? await Task.sleep(for: .seconds(1), clock: clock)
             guard !Task.isCancelled else { return }
             guard await self?.pendingTranscriptSaveGeneration == generation else { return }
-            let reindex: Bool = await MainActor.run { [weak self] in
+            // Read at fire time: a duration correction may have patched the transcript since the edit was scheduled.
+            let pending: (transcript: Transcript, reindex: Bool) = await MainActor.run { [weak self] in
                 let flag = self?.pendingSaveTextChanged ?? false
                 self?.pendingSaveTextChanged = false
-                return flag
+                let latest = self?.selectedEntryID == id ? self?.transcript : nil
+                return (latest ?? transcript, flag)
             }
-            try? await library.updateTranscript(transcript, for: id, reindex: reindex)
+            try? await library.updateTranscript(pending.transcript, for: id, reindex: pending.reindex)
             await MainActor.run { [weak self] in
                 if self?.pendingTranscriptSaveGeneration == generation {
                     self?.pendingTranscriptSaveTask = nil
