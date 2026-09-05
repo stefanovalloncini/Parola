@@ -21,7 +21,9 @@ enum StreamChunkConverter {
         guard let outBuffer = scratch else { return nil }
         outBuffer.frameLength = 0
 
-        var consumed = false
+        // The input block is `@Sendable`, but `convert` runs it on this thread before returning.
+        nonisolated(unsafe) let input = chunk
+        nonisolated(unsafe) var consumed = false
         var error: NSError?
         let status = converter.convert(to: outBuffer, error: &error) { _, outStatus in
             if consumed {
@@ -30,7 +32,7 @@ enum StreamChunkConverter {
             }
             consumed = true
             outStatus.pointee = .haveData
-            return chunk
+            return input
         }
         guard status != .error, outBuffer.frameLength > 0 else { return nil }
         return outBuffer

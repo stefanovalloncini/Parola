@@ -2590,7 +2590,7 @@ final class AppModel {
         pendingTranscriptSaveTask = Task { [weak self, library] in
             try? await Task.sleep(for: .seconds(1), clock: clock)
             guard !Task.isCancelled else { return }
-            guard await self?.pendingTranscriptSaveGeneration == generation else { return }
+            guard self?.pendingTranscriptSaveGeneration == generation else { return }
             // Read at fire time: a duration correction may have patched the transcript since the edit was scheduled.
             let pending: (transcript: Transcript, reindex: Bool) = await MainActor.run { [weak self] in
                 let flag = self?.pendingSaveTextChanged ?? false

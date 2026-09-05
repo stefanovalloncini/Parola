@@ -185,7 +185,7 @@ struct TranscribingPane: View {
                     if hasText {
                         TimelineView(.periodic(from: startDate, by: Self.caretBlinkPeriod)) { context in
                             let ticks = Int(context.date.timeIntervalSince(startDate) / Self.caretBlinkPeriod)
-                            (Text(bodyText) + caret(visible: reduceMotion || ticks % 2 == 0))
+                            Text("\(Text(bodyText))\(caret(visible: reduceMotion || ticks % 2 == 0))")
                                 .font(DS.Font.transcript)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .textSelection(.enabled)
