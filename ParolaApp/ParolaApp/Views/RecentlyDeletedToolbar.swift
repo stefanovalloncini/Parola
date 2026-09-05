@@ -189,37 +189,52 @@ struct RecentlyDeletedFilterBar: View {
     @Binding var categoryFilter: RecentlyDeletedCategoryFilter
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        // Both groups on one line at the ideal sheet width; stacked at the minimum, where the
+        // last kind pill would otherwise sit outside the sheet.
+        ViewThatFits(in: .horizontal) {
             HStack(spacing: 6) {
-                caption("When")
-                ForEach(RecentlyDeletedDateFilter.allCases) { option in
-                    Chip(
-                        title: LocalizedStringKey(option.title),
-                        isSelected: dateFilter == option,
-                        size: .compact,
-                        weight: .semibold
-                    ) {
-                        dateFilter = option
-                    }
-                }
-
-                caption("Kind")
+                whenGroup
+                kindGroup
                     .padding(.leading, DS.Spacing.tight)
-
-                ForEach(RecentlyDeletedCategoryFilter.allCases) { option in
-                    Chip(
-                        title: LocalizedStringKey(option.title),
-                        tint: dot(for: option),
-                        isSelected: categoryFilter == option,
-                        size: .compact,
-                        weight: .semibold
-                    ) {
-                        categoryFilter = option
-                    }
-                }
             }
-            .padding(.horizontal, DS.Spacing.regular)
-            .padding(.vertical, DS.Spacing.small)
+            VStack(alignment: .leading, spacing: DS.Spacing.small) {
+                HStack(spacing: 6) { whenGroup }
+                HStack(spacing: 6) { kindGroup }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.small)
+    }
+
+    @ViewBuilder
+    private var whenGroup: some View {
+        caption("When")
+        ForEach(RecentlyDeletedDateFilter.allCases) { option in
+            Chip(
+                title: LocalizedStringKey(option.title),
+                isSelected: dateFilter == option,
+                size: .compact,
+                weight: .semibold
+            ) {
+                dateFilter = option
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var kindGroup: some View {
+        caption("Kind")
+        ForEach(RecentlyDeletedCategoryFilter.allCases) { option in
+            Chip(
+                title: LocalizedStringKey(option.title),
+                tint: dot(for: option),
+                isSelected: categoryFilter == option,
+                size: .compact,
+                weight: .semibold
+            ) {
+                categoryFilter = option
+            }
         }
     }
 
