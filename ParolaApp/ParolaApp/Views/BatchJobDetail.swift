@@ -70,9 +70,9 @@ struct BatchJobDetail: View {
     private var statusColor: Color {
         switch job.status {
         case .pending: return DS.Color.secondaryText
-        case .transcribing: return DS.Color.accent
-        case .done: return DS.Palette.success
-        case .failed: return DS.Color.danger
+        case .transcribing: return DS.Color.accentText
+        case .done: return DS.Color.successText
+        case .failed: return DS.Color.dangerText
         case .cancelled: return DS.Color.secondaryText
         }
     }

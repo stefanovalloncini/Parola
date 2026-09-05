@@ -51,7 +51,7 @@ struct LibraryFilterBar: View {
                 }
                 // A borderless menu paints its label with the tint and ignores foregroundStyle, so
                 // the tint is the only way to say what colour this control is.
-                .tint(labelFilter == nil ? Color.secondary : DS.Color.accentText)
+                .tint(labelFilter == nil ? DS.Color.secondaryText : DS.Color.accentText)
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
@@ -73,7 +73,7 @@ struct LibraryFilterBar: View {
                     }
                     .font(DS.Font.subheadlineMedium)
                 }
-                .tint(languageFilter == nil ? Color.secondary : DS.Color.accentText)
+                .tint(languageFilter == nil ? DS.Color.secondaryText : DS.Color.accentText)
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
@@ -91,7 +91,7 @@ struct LibraryFilterBar: View {
                 }
                 .font(DS.Font.subheadlineMedium)
             }
-            .tint(dateRangeFilter == .all ? Color.secondary : DS.Color.accentText)
+            .tint(dateRangeFilter == .all ? DS.Color.secondaryText : DS.Color.accentText)
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()

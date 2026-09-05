@@ -228,7 +228,7 @@ struct LibraryListView: View {
                 }
                 .listStyle(.inset)
                 .tint(DS.Color.accent)
-                .animation(animatesRows ? DS.Motion.listRows : nil, value: entries.map(\.id))
+                .animation(animatesRows && !reduceMotion ? DS.Motion.listRows : nil, value: entries.map(\.id))
                 .onKeyPress(.return) {
                     guard selection.count == 1, let id = selection.first else { return .ignored }
                     model.loadEntry(id)
@@ -240,7 +240,7 @@ struct LibraryListView: View {
         .onAppear { recomputeEntries() }
         // A later transaction than onAppear's first fill, so the rows the route opens with don't
         // animate in; everything after that does.
-        .task { animatesRows = !reduceMotion }
+        .task { animatesRows = true }
         .onChange(of: model.libraryVersion) { _, _ in
             let newEntries = recomputeEntries()
             selection = selection.intersection(Set(newEntries.map(\.id)))

@@ -27,7 +27,7 @@ struct LiveCaptionsView: View {
         if let error = controller.state.error {
             Text(error)
                 .font(.callout)
-                .foregroundStyle(DS.Color.danger.opacity(0.9))
+                .foregroundStyle(DS.Color.dangerText.opacity(0.9))
                 .multilineTextAlignment(.center)
         } else if caption.isEmpty {
             HStack(spacing: 8) {
