@@ -159,12 +159,7 @@ struct ContentRoutes: View {
     }
 
     private var showsLibraryBrowse: Bool {
-        switch model.phase {
-        case .idle, .ready:
-            return model.searchResults != nil || model.libraryFilter != nil || model.libraryBrowsingAll
-        default:
-            return false
-        }
+        model.isBrowsingLibrary
     }
 
     /// One call site on purpose: an `if` per case would give each branch its own identity and tear the List down on every sidebar move.

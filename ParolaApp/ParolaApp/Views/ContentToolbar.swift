@@ -6,20 +6,23 @@ struct ContentToolbar: ToolbarContent {
     @State private var optionsOpen = false
 
     var body: some ToolbarContent {
-        ToolbarItem(placement: .navigation) {
-            HStack(spacing: DS.Spacing.small) {
-                ModelPickerView()
-                LanguagePickerView()
-                    .disabled(selectedModelIsEnglishOnly)
-                    .modifier(EnglishOnlyHelpModifier(isEnglishOnly: selectedModelIsEnglishOnly))
+        if showsIntakeSettings {
+            ToolbarItem(placement: .navigation) {
+                HStack(spacing: DS.Spacing.small) {
+                    ModelPickerView()
+                    LanguagePickerView()
+                        .disabled(selectedModelIsEnglishOnly)
+                        .modifier(EnglishOnlyHelpModifier(isEnglishOnly: selectedModelIsEnglishOnly))
+                }
+                // The toolbar's glass capsule hugs the item, so without this the pills' own
+                // capsules run flush into its rounded ends and read as spilling out of it.
+                .padding(.horizontal, 5)
             }
-            // The toolbar's glass capsule hugs the item, so without this the pills' own
-            // capsules run flush into its rounded ends and read as spilling out of it.
-            .padding(.horizontal, 5)
+            ToolbarItem(placement: .navigation) {
+                optionsButton
+            }
         }
-        ToolbarItem(placement: .navigation) {
-            optionsButton
-        }
+        ToolbarSpacer(.flexible, placement: .navigation)
         ToolbarItemGroup(placement: .primaryAction) {
             if isRecording {
                 Button {
@@ -129,6 +132,11 @@ struct ContentToolbar: ToolbarContent {
         .help("Start a new transcription.")
         .accessibilityIdentifier("toolbar.new")
         .axLeaf("Toolbar.Menu.New")
+    }
+
+    /// The model, language and options apply to the next run, so the library's own lists hide them.
+    private var showsIntakeSettings: Bool {
+        !model.isBrowsingLibrary
     }
 
     private var selectedModelIsEnglishOnly: Bool {

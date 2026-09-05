@@ -863,6 +863,14 @@ final class AppModel {
     /// Lets a waiter tell "the query finished" from "the query returned what the last one did".
     @ObservationIgnored private(set) var searchResultsVersion: Int = 0
     var searchQuery: String = ""
+    /// True while the content area shows a library list instead of the phase machine's panes.
+    var isBrowsingLibrary: Bool {
+        guard route == .transcript, batchJobs.isEmpty else { return false }
+        switch phase {
+        case .idle, .ready: return searchResults != nil || libraryFilter != nil || libraryBrowsingAll
+        default: return false
+        }
+    }
     /// Why each result matched, keyed by entry: the snippet the results list shows under the row.
     var searchMatches: [String: LibrarySearchIndex.Match] = [:]
     var selectedEntryID: LibraryEntry.ID?
