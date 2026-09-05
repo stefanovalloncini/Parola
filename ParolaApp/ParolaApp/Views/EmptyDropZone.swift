@@ -184,8 +184,7 @@ struct EmptyDropZone: View {
     }
 }
 
-/// The resting half of the split drop zone: the window says a drop is welcome before a drag
-/// ever starts, and shows the model and language it would commit to.
+/// The resting half of the split drop zone: the window says a drop is welcome before a drag ever starts.
 private struct IntakeDropWell: View {
     @Environment(AppModel.self) private var model
     @State private var isHovering = false
@@ -208,7 +207,6 @@ private struct IntakeDropWell: View {
                         .foregroundStyle(DS.Color.secondaryText)
                 }
                 Spacer(minLength: DS.Spacing.regular)
-                IntakeStateChips()
             }
             .padding(.horizontal, DS.Spacing.large)
             .padding(.vertical, DS.Spacing.regular)

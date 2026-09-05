@@ -115,18 +115,14 @@ private struct SplitDropOverlay: View {
         .axBranch("SplitDrop")
     }
 
+    @ViewBuilder
     private var header: some View {
-        HStack(spacing: DS.Spacing.regular) {
-            if let countLabel {
-                Text(countLabel)
-                    .font(DS.Font.subheadlineMedium)
-                    .foregroundStyle(DS.Color.secondaryText)
-            }
-            if showsIntakeState {
-                IntakeStateChips()
-            }
+        if let countLabel {
+            Text(countLabel)
+                .font(DS.Font.subheadlineMedium)
+                .foregroundStyle(DS.Color.secondaryText)
+                .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder
@@ -207,13 +203,6 @@ private struct SplitDropOverlay: View {
     private var isSingleZone: Bool {
         if case .split = plan { return false }
         return true
-    }
-
-    private var showsIntakeState: Bool {
-        switch plan {
-        case .split, .transcribeOnly, .queueOnly, .transcribeLink: return true
-        case .importSubtitles, .openProjects, .none: return false
-        }
     }
 
     private var count: Int? {
