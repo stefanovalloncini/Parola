@@ -108,6 +108,71 @@ struct DiagnosticsRetentionTests {
         #expect(outcome.bytesRemaining == 600)
     }
 
+    @Test("the budget trim reclaims this sink's own closed rotations")
+    func trimsOwnClosedRotations() async throws {
+        let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7, totalBudgetBytes: 1_000)
+        try await sink.waitForInstallSweep()
+        let open = sink.currentFileURL
+        try Data(repeating: 0x61, count: 100).write(to: open)
+        let base = open.deletingPathExtension().lastPathComponent
+        var rotations: [URL] = []
+        for index in 1...5 {
+            rotations.append(try makeFile(dir, "\(base)-\(index).jsonl", bytes: 600, ageDays: 6 - index))
+        }
+
+        let outcome = sink.sweep(now: Date())
+
+        #expect(outcome.deleted == 4)
+        #expect(outcome.ownRotations == 4)
+        #expect(outcome.skippedLive == 0)
+        #expect(outcome.overBudget == false)
+        #expect(FileManager.default.fileExists(atPath: open.path))
+        for url in rotations.dropLast() {
+            #expect(FileManager.default.fileExists(atPath: url.path) == false)
+        }
+        #expect(FileManager.default.fileExists(atPath: rotations[4].path))
+    }
+
+    @Test("the over-budget notice reports the sink's own rotations next to the live skips")
+    func overBudgetNoticeCountsOwnRotations() async throws {
+        let dir = tempDirectory()
+        let capture = CapturingDiagnosticsSink()
+        ParolaLog.install(capture)
+        defer { ParolaLog.uninstall() }
+        let sink = FileDiagnosticsSink(
+            directory: dir, maxFileBytes: 100, retentionDays: 7, totalBudgetBytes: 100
+        )
+        try await sink.waitForInstallSweep()
+        let livePID = ProcessInfo.processInfo.processIdentifier
+        _ = try makeFile(dir, "parola-\(livePID)-100.jsonl", bytes: 600, ageDays: 3)
+
+        sink.enqueue(LogRecord(
+            timestamp: Date(), level: .notice, subsystem: .core, category: .diagnostics,
+            message: "rotate me", fields: [:], file: "T.swift", line: 1
+        ))
+        await sink.flush()
+
+        let notice = try #require(await overBudgetNotice(in: capture))
+        #expect(notice.fields[.count]?.text == "1")
+        #expect(notice.fields[.rotations]?.text == "1")
+    }
+
+    private func overBudgetNotice(
+        in capture: CapturingDiagnosticsSink,
+        timeout: Duration = .seconds(2)
+    ) async -> LogRecord? {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
+            let found = capture.records.first {
+                $0.message.rendered == "diagnostics sweep finished over budget"
+            }
+            if let found { return found }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return nil
+    }
+
     @Test("the active file survives both the age cutoff and the budget trim")
     func activeFileSurvives() throws {
         let dir = tempDirectory()

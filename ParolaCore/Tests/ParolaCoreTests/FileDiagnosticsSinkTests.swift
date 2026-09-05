@@ -159,7 +159,7 @@ struct FileDiagnosticsSinkTests {
         let keys = try #require(object["fields"] as? [String: String]).keys
         #expect(keys.sorted() == [
             "attempt", "audioSeconds", "bytes", "count", "elapsed", "engine", "entry", "error",
-            "feature", "format", "job", "language", "mode", "model", "stage",
+            "feature", "format", "job", "language", "mode", "model", "rotations", "stage",
         ])
     }
 

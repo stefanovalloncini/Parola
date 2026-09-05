@@ -92,7 +92,11 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             ParolaLog.notice(
                 .diagnostics,
                 "diagnostics sweep finished over budget",
-                [.bytes: .bytes(Int64(outcome.bytesRemaining)), .count: .int(outcome.skippedLive)]
+                [
+                    .bytes: .bytes(Int64(outcome.bytesRemaining)),
+                    .count: .int(outcome.skippedLive),
+                    .rotations: .int(outcome.ownRotations),
+                ]
             )
         }
     }
@@ -240,10 +244,12 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     }
 
     /// What one sweep did. `overBudget` means the trim ran out of files it was allowed to delete
-    /// — every survivor is either this instance's or a live sibling's — so the folder stays large.
+    /// — every survivor is either the file still open here or a live sibling's — so the folder
+    /// stays large. `ownRotations` is how many of the deletions were this sink's own rotations.
     struct SweepOutcome: Sendable, Equatable {
         var deleted = 0
         var skippedLive = 0
+        var ownRotations = 0
         var bytesRemaining = 0
         var overBudget = false
     }
@@ -265,16 +271,20 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
 
         var surviving: [(url: URL, date: Date, size: Int)] = []
         let cutoff = now.addingTimeInterval(-Double(retentionDays) * 86_400)
+        // Only the file still open is exempt: this sink's earlier rotations are closed, complete
+        // and ours to trim.
+        let openFile = currentFileName
         for url in mine {
             let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
             let date = values?.contentModificationDate ?? now
             let size = values?.fileSize ?? 0
-            if date < cutoff && !url.lastPathComponent.hasPrefix(baseName) {
+            if date < cutoff && url.lastPathComponent != openFile {
                 try? manager.removeItem(at: url)
                 if manager.fileExists(atPath: url.path) {
                     surviving.append((url, date, size))
                 } else {
                     outcome.deleted += 1
+                    if url.lastPathComponent.hasPrefix(baseName) { outcome.ownRotations += 1 }
                 }
             } else {
                 surviving.append((url, date, size))
@@ -287,11 +297,12 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         while total > totalBudgetBytes, index < surviving.count {
             let candidate = surviving[index]
             let name = candidate.url.lastPathComponent
-            if name.hasPrefix(baseName) {
+            if name == openFile {
                 index += 1
                 continue
             }
-            if Self.isOwnedByLiveProcess(name) {
+            // Our own pid is live, so the liveness skip has to let our closed rotations through.
+            if !name.hasPrefix(baseName), Self.isOwnedByLiveProcess(name) {
                 outcome.skippedLive += 1
                 index += 1
                 continue
@@ -300,6 +311,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
                 try manager.removeItem(at: candidate.url)
                 total -= candidate.size
                 outcome.deleted += 1
+                if name.hasPrefix(baseName) { outcome.ownRotations += 1 }
             } catch {
             }
             index += 1

@@ -79,6 +79,7 @@ public enum LogField: String, Sendable, CaseIterable, Comparable {
     case language
     case mode
     case model
+    case rotations
     case stage
 
     public static func < (lhs: LogField, rhs: LogField) -> Bool {
