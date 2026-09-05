@@ -32,6 +32,11 @@ enum LibraryListContent {
         }
     }
 
+    /// Search results replace the category rows, so the list runs without a category while they are showing.
+    static func browseCategory(filter: EntryCategory?, searching: Bool) -> EntryCategory? {
+        searching ? nil : filter
+    }
+
     static func rows(
         from entries: [LibraryEntry],
         category: EntryCategory?,

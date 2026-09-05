@@ -135,15 +135,15 @@ struct ContentRoutes: View {
         }
     }
 
-    @ViewBuilder
+    /// One call site on purpose: an `if` per case would give each branch its own identity and tear the List down on every sidebar move.
     private var libraryBrowseList: some View {
-        if let results = model.searchResults {
-            LibraryListView(category: nil, searchResults: results)
-        } else if let filter = model.libraryFilter {
-            LibraryListView(category: filter)
-        } else {
-            LibraryListView(category: nil)
-        }
+        LibraryListView(
+            category: LibraryListContent.browseCategory(
+                filter: model.libraryFilter,
+                searching: model.searchResults != nil
+            ),
+            searchResults: model.searchResults
+        )
     }
 
 }

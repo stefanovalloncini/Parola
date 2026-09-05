@@ -127,6 +127,40 @@ struct LibraryListContentTests {
         #expect(byDate.isEmpty)
     }
 
+    @Test("search results take the list over from whatever category was showing")
+    func searchResultsWinOverTheFilter() {
+        #expect(LibraryListContent.browseCategory(filter: .meeting, searching: false) == .meeting)
+        #expect(LibraryListContent.browseCategory(filter: .meeting, searching: true) == nil)
+        #expect(LibraryListContent.browseCategory(filter: nil, searching: true) == nil)
+        #expect(LibraryListContent.browseCategory(filter: nil, searching: false) == nil)
+    }
+
+    /// The list now survives sidebar moves, so what a category switch leaves behind is what the user keeps.
+    @Test("a category switch narrows the rows and drops the selection that left with them")
+    func categorySwitchKeepsOnlyTheSurvivingSelection() {
+        let entries = [
+            entry(id: "a", title: "Alpha", offset: 100),
+            entry(id: "b", title: "Beta", offset: 200, category: .meeting),
+            entry(id: "c", title: "Gamma", offset: 300, category: .meeting),
+        ]
+        func ids(_ category: EntryCategory?) -> Set<LibraryEntry.ID> {
+            Set(LibraryListContent.rows(
+                from: entries, category: category, labelFilter: nil, languageFilter: nil, dateRange: .all
+            ).map(\.id))
+        }
+
+        var selection: Set<LibraryEntry.ID> = ["a", "b"]
+        selection.formIntersection(ids(.meeting))
+        #expect(selection == ["b"])
+
+        selection.formIntersection(ids(.transcription))
+        #expect(selection.isEmpty)
+
+        selection = ["a", "b", "c"]
+        selection.formIntersection(ids(nil))
+        #expect(selection == ["a", "b", "c"])
+    }
+
     @Test("each filter's empty state leads with an action that produces that kind of entry")
     func emptyActionsMatchTheFilter() {
         #expect(LibraryListContent.emptyActions(for: .dictation, features: .all).first == .startDictation)
