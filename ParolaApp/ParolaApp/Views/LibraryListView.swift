@@ -155,6 +155,13 @@ struct LibraryListView: View {
                             .accessibilityIdentifier("library.row.\(entry.id).delete")
                         }
                         .accessibilityIdentifier("library.row.\(entry.id)")
+                        // List(.inset) indents its rows by 16pt of its own; this lands them on the 24pt gutter.
+                        .listRowInsets(EdgeInsets(
+                            top: DS.Spacing.tight,
+                            leading: DS.Spacing.small,
+                            bottom: DS.Spacing.tight,
+                            trailing: DS.Spacing.small
+                        ))
                 }
                 .listStyle(.inset)
                 .tint(DS.Color.accent)
@@ -256,12 +263,9 @@ struct LibraryListView: View {
                 .font(DS.Font.captionMono)
                 .foregroundStyle(DS.Color.secondaryText)
         }
-        .padding(.horizontal, Self.listRowInset)
+        .padding(.horizontal, DS.Spacing.large)
         .padding(.vertical, DS.Spacing.regular)
     }
-
-    /// What `List(.inset)` insets its rows by — the header matches it so both share a left edge.
-    private static let listRowInset: CGFloat = 15
 
     private func performBulkDelete() {
         let targets = selection
