@@ -230,8 +230,7 @@ final class AppModel {
         case other
     }
 
-    /// What the current `.failed` phase was doing. Every phase change resets it, so only the
-    /// transcription paths that opt back in get the file-naming, Retry and Reveal card.
+    /// Every phase change resets this, so only the transcription paths that opt back in get a named card.
     private(set) var failureKind: FailureKind = .other
     /// A recorded take whose transcription failed; the file backs the error pane's Retry.
     var failedTakeAudioURL: URL?
@@ -1631,8 +1630,7 @@ final class AppModel {
         startFileTranscription(fileURL: fileURL, translateOverride: translateOverride)
     }
 
-    /// The run itself, past the routing an arriving file goes through: Retry asks for this file now,
-    /// not for a place in the batch a drop would have joined.
+    /// The run itself, past the routing an arriving file goes through: Retry means this file, now.
     private func startFileTranscription(fileURL: URL, translateOverride: Bool?) {
         noteRecentFile(fileURL)
         sourceFileURL = fileURL
@@ -2585,9 +2583,6 @@ final class AppModel {
         guard let url = failedTakeAudioURL else { return }
         let title = failedTakeTitle ?? Self.liveRecordingTitle(category: .transcription, endedAt: Date())
         pendingRecordingCategory = failedTakeCategory ?? .transcription
-        failedTakeAudioURL = nil
-        failedTakeTitle = nil
-        failedTakeCategory = nil
         fileTranscribeTask?.cancel()
         fileTranscribeTask = Task {
             await transcribeRecordedTake(url: url, title: title)

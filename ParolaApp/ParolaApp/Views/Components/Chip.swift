@@ -82,7 +82,9 @@ extension View {
         style: Chip.Style = .elevated,
         hovering: Bool = false,
         selectedFill: Color = DS.Color.accent,
-        bordered: Bool = true
+        bordered: Bool = true,
+        border overrideBorder: Color? = nil,
+        horizontalPadding: CGFloat? = nil
     ) -> some View {
         let fill: Color
         if isSelected {
@@ -94,9 +96,9 @@ extension View {
             }
         }
         let border: Color = bordered
-            ? (isSelected ? selectedFill.opacity(0.45) : DS.Color.separator.opacity(0.4))
+            ? (overrideBorder ?? (isSelected ? selectedFill.opacity(0.45) : DS.Color.separator.opacity(0.4)))
             : .clear
-        return padding(.horizontal, size.horizontalPadding)
+        return padding(.horizontal, horizontalPadding ?? size.horizontalPadding)
             .frame(height: size.height)
             .background(Capsule(style: .continuous).fill(fill))
             .overlay(Capsule(style: .continuous).strokeBorder(border, lineWidth: 0.5))

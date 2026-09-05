@@ -168,9 +168,10 @@ struct EmptyDropZone: View {
                     model.route = .transcript
                 }
             }
-            // Color.clear takes the leftover height, so the row count follows the space the
-            // window has rather than feeding back into it.
+            // Color.clear takes the leftover height, so the row count follows the space, not the reverse.
             Color.clear
+                // A floor of one row: a short window would otherwise measure zero and clip the list away.
+                .frame(minHeight: recentRowHeight)
                 .overlay(alignment: .top) {
                     VStack(spacing: 0) {
                         ForEach(Array(recents.enumerated()), id: \.element.id) { index, display in
@@ -248,7 +249,13 @@ private struct IntakeDropWell: View {
                 Label("Choose Files…", systemImage: "folder")
                     .font(DS.Font.subheadlineMedium)
                     .foregroundStyle(DS.Color.primaryText)
-                    .chipChrome(isSelected: false, size: .prominent, style: .subtle)
+                    .chipChrome(
+                        isSelected: false,
+                        size: .prominent,
+                        style: .subtle,
+                        border: DS.Color.separator,
+                        horizontalPadding: 14
+                    )
             }
             .padding(.horizontal, DS.Spacing.large)
             .padding(.vertical, DS.Spacing.regular)
