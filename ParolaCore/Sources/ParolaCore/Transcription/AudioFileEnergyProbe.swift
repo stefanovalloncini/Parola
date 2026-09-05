@@ -6,7 +6,7 @@ import Foundation
 final class AudioFileEnergyProbe: SegmentEnergyProbe {
     private let file: AVAudioFile
     private let duration: Double
-    private var loudest: Double?
+    private var windows: [Double]?
 
     init?(url: URL) {
         guard let file = try? AVAudioFile(forReading: url) else { return nil }
@@ -19,12 +19,11 @@ final class AudioFileEnergyProbe: SegmentEnergyProbe {
     /// Measured over windows spread across the whole recording rather than over the segments in
     /// hand: a file whose only sound is the hallucination would otherwise take that as its
     /// reference and rule it loud.
-    func loudestEnergy() -> Double {
-        if let loudest { return loudest }
+    func windowEnergies() -> [Double] {
+        if let windows { return windows }
         let measured = ProbeWindowPlanner.candidates(duration: duration)
             .compactMap { try? ProbeAudioExtractor.energy(of: $0, in: file) }
-            .max() ?? 0
-        loudest = measured
+        windows = measured
         return measured
     }
 
