@@ -6,10 +6,23 @@ struct EmptyDropZone: View {
     var errorMessage: String?
 
     @Environment(AppModel.self) private var model
+    @State private var paneHeight: CGFloat = 0
     @State private var recentRowSpace: CGFloat = 0
     @ScaledMetric(relativeTo: .body) private var recentRowHeight: CGFloat = 49
 
     var body: some View {
+        ScrollView {
+            page
+                .padding(.horizontal, DS.Spacing.large)
+                .padding(.vertical, DS.Spacing.large)
+                // Fills the window when the page fits, scrolls when it doesn't.
+                .frame(maxWidth: .infinity, minHeight: paneHeight, alignment: .top)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { paneHeight = $0 }
+    }
+
+    private var page: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.large) {
             if let errorMessage {
                 ErrorBanner(message: errorMessage)
@@ -62,9 +75,6 @@ struct EmptyDropZone: View {
                 recentSection
             }
         }
-        .padding(.horizontal, DS.Spacing.large)
-        .padding(.vertical, DS.Spacing.large)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private struct StartAction: Identifiable {
