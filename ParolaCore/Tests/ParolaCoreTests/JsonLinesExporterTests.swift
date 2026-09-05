@@ -39,6 +39,25 @@ struct JsonLinesExporterTests {
         #expect(data.isEmpty)
     }
 
+    @Test("blank segments from an older entry are not emitted")
+    func dropsBlankSegments() throws {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "hello"),
+                TranscriptSegment(id: 1, start: 1, end: 2, text: "   "),
+                TranscriptSegment(id: 2, start: 2, end: 3, text: "world"),
+            ],
+            language: "en",
+            modelName: "tiny"
+        )
+
+        let data = try JsonLinesExporter().render(transcript)
+
+        let lines = String(decoding: data, as: UTF8.self)
+            .split(separator: "\n", omittingEmptySubsequences: true)
+        #expect(lines.count == 2)
+    }
+
     @Test("registered in Exporters")
     func registered() {
         let exporter = Exporters.exporter(for: .jsonl)

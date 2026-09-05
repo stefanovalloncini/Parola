@@ -132,6 +132,17 @@ struct ExporterTests {
         #expect(decoded == original)
     }
 
+    @Test("json leaves a blank segment out")
+    func jsonDropsBlankSegments() throws {
+        var original = sample()
+        original.segments.insert(TranscriptSegment(id: 3, start: 1.5, end: 1.6, text: ""), at: 1)
+
+        let rendered = try JsonExporter().renderText(original)
+
+        let decoded = try JSONDecoder().decode(Transcript.self, from: Data(rendered.utf8))
+        #expect(decoded.segments == sample().segments)
+    }
+
     @Test("srt timestamp formatting")
     func srtTimestamp() {
         #expect(SrtExporter.srtTimestamp(0) == "00:00:00,000")

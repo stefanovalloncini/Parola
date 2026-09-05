@@ -123,7 +123,11 @@ struct CapabilityGuardTests {
         }
         let suggested = try #require(ModelCatalog.variantSupporting(language: "it", preferring: .parakeet))
         #expect(message.contains("Parakeet TDT 0.6B v2"))
-        #expect(message.contains(suggested.id))
+        #expect(message.contains(suggested.displayName))
+        #expect(
+            message.contains(suggested.id) == false,
+            "a display name with its own parenthetical stands in for the raw id"
+        )
         #expect(ModelCatalog.staticCapabilities(for: suggested)?.supportedLanguages.allows("it") == true)
     }
 

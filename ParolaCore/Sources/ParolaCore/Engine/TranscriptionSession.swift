@@ -277,7 +277,7 @@ public actor TranscriptionSession {
 
     /// A display name that already carries a parenthetical would read as a double bracket.
     private static func named(_ variant: ModelVariant) -> String {
-        variant.displayName.contains("(") ? variant.id : "\(variant.displayName) (\(variant.id))"
+        variant.displayName.contains("(") ? variant.displayName : "\(variant.displayName) (\(variant.id))"
     }
 
     private func ensureBootstrap() async {

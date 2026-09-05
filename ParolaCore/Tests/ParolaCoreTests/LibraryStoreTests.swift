@@ -482,6 +482,26 @@ struct LibraryStoreTests {
         #expect(refreshed.updatedAt == when)
     }
 
+    @Test("blank rows in an entry written before the assembly-time drop disappear on load")
+    func loadDropsBlankSegments() async throws {
+        let (store, _) = try makeTempLibrary()
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "hi"),
+                TranscriptSegment(id: 1, start: 6.18, end: 7.58, text: ""),
+                TranscriptSegment(id: 2, start: 12, end: 13, text: "there"),
+            ],
+            language: "en",
+            modelName: "tiny"
+        )
+        let entry = try await store.add(transcript: transcript, audioSource: nil)
+
+        let loaded = try await store.load(entry.id)
+
+        #expect(loaded.document.transcript.segments.map(\.text) == ["hi", "there"])
+        #expect(loaded.document.transcript.segments.map(\.id) == [0, 1])
+    }
+
     @Test("a failed manifest write leaves no pre-edit document in the cache")
     func updateTranscriptFailureDropsStaleCache() async throws {
         let (store, _) = try makeTempLibrary()

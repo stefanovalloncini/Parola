@@ -152,7 +152,13 @@ public actor LibraryStore {
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
-        let doc = try ParolaDocument.read(at: bundleURL)
+        var doc = try ParolaDocument.read(at: bundleURL)
+        // Entries written before the blank-drop moved to assembly time still carry silent VAD
+        // chunks as empty rows.
+        doc.transcript = TranscriptCleanup.apply(
+            to: doc.transcript,
+            options: TranscriptCleanupOptions(filtersHallucinations: false, mergesSentences: false)
+        )
         // Bundles written before the manifest carried a duration learn it the first time
         // they're opened, so the library list fills in instead of staying blank forever.
         if doc.manifest.durationSeconds == nil, let duration = doc.transcript.durationSeconds, duration > 0 {

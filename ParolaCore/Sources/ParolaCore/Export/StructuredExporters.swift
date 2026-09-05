@@ -6,7 +6,9 @@ public struct JsonExporter: TranscriptExporter {
     public func render(_ transcript: Transcript) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        return try encoder.encode(transcript)
+        var clean = transcript
+        clean.segments = transcript.segments.droppingBlankText()
+        return try encoder.encode(clean)
     }
 }
 
@@ -17,7 +19,7 @@ struct JsonLinesExporter: TranscriptExporter {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         var data = Data()
-        for segment in transcript.segments {
+        for segment in transcript.segments.droppingBlankText() {
             data.append(try encoder.encode(segment))
             data.append(0x0A)
         }
