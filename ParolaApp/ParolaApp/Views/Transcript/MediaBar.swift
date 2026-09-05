@@ -143,8 +143,7 @@ struct MediaBar: View {
     }
 }
 
-/// `.borderlessButton` hands the label to AppKit, which drops the capsule and leaves the rate
-/// looking like plain text; `.menuStyle(.button)` keeps the drawn label.
+/// The rate's capsule: `.borderlessButton` would drop it and leave the rate looking like plain text.
 private struct SpeedPillStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label

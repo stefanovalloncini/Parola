@@ -22,8 +22,7 @@ struct SheetFrame<Content: View, Footer: View>: View {
         return copy
     }
 
-    /// For sheets whose footer already ends in Cancel: two dismiss controls, and two
-    /// `.cancelAction` shortcuts, is one too many.
+    /// For sheets whose footer already ends in Cancel: two dismiss controls and two `.cancelAction`s.
     func hidesCloseButton() -> SheetFrame {
         var copy = self
         copy.showsClose = false

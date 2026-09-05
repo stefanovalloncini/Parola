@@ -219,8 +219,7 @@ enum DS {
 
     static let speakerPalette: [SwiftUI.Color] = speakerTints.map(\.color)
 
-    /// The one symbol table for entry categories: the sidebar, the library empty states and
-    /// Recently Deleted all read from here so a dictation looks the same wherever it appears.
+    /// The one symbol table for entry categories: sidebar, library empty states and Recently Deleted.
     static func categorySymbol(for category: EntryCategory) -> String {
         switch category {
         case .transcription: return "text.alignleft"

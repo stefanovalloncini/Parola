@@ -146,8 +146,7 @@ struct QueueView: View {
         }
     }
 
-    /// `statuses` is an order, not a set: In Progress lists the running job above the queued ones
-    /// whatever the sort picked.
+    /// `statuses` is an order, not a set: In Progress lists the running job first whatever the sort picked.
     @ViewBuilder
     private func section(title: String, jobs: [BatchJob], statuses: [BatchJob.Status]) -> some View {
         let matching = statuses.flatMap { status in jobs.filter { $0.status == status } }

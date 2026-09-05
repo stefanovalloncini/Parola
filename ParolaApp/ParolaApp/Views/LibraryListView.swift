@@ -164,8 +164,7 @@ struct LibraryListView: View {
         }
         displayCache = cache
         entries = displays
-        // One shape everywhere: the count alone. Bundle sizes arrive later and only for entries
-        // that carry audio, so folding them in here made the header change shape as a pane settled.
+        // The count alone: bundle sizes land later and only for audio, so the label used to change shape.
         totalsLabel = displays.isEmpty ? "" : "\(displays.count)"
         totalsHelp = totalBytes > 0 ? String(localized: "Total size: \(AppFormat.byteSize(totalBytes))") : nil
         return displays

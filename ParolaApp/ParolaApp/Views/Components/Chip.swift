@@ -104,8 +104,7 @@ extension View {
     }
 }
 
-/// A pull-down menu that has to read as a filter chip: `.menuStyle(.button)` keeps the label
-/// view, which `.borderlessButton` replaces with an AppKit-drawn title.
+/// A filter chip that opens a menu: `.borderlessButton` would replace the label with an AppKit title.
 struct ChipButtonStyle: ButtonStyle {
     var isSelected: Bool
     var size: Chip.Size = .compact
