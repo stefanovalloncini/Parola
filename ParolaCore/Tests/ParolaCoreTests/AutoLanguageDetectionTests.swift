@@ -353,6 +353,40 @@ struct AutoLanguageDetectionTests {
         #expect(abs(duration - 10) < 0.2)
     }
 
+    @Test("probe windows reach speech that starts long after the opening minutes")
+    func extractionReachesLateSpeech() throws {
+        let url = try Self.writeTone(sampleRate: 8000, seconds: 500, loudRange: 400..<500)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let probeURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-probe-\(UUID().uuidString).caf")
+        defer { try? FileManager.default.removeItem(at: probeURL) }
+
+        let windows = try ProbeAudioExtractor.extract(from: url, to: probeURL)
+
+        #expect(!windows.isEmpty)
+        #expect(windows.allSatisfy { $0.start > 300 && $0.end > 400 })
+        let written = try AVAudioFile(forReading: probeURL)
+        let duration = Double(written.length) / written.processingFormat.sampleRate
+        #expect(duration <= 120)
+    }
+
+    @Test("the Whisper probe reads samples from past the first five minutes")
+    func whisperProbeSamplesReachLateSpeech() throws {
+        let url = try Self.writeTone(sampleRate: 8000, seconds: 500, loudRange: 400..<500)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let probeURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-probe-\(UUID().uuidString).caf")
+        defer { try? FileManager.default.removeItem(at: probeURL) }
+
+        let samples = try #require(WhisperKitTranscriber.probeSamples(url: url, scratch: probeURL))
+
+        #expect((samples.map(abs).max() ?? 0) > 0.2)
+        let offsets = SpeechWindowFinder.loudestWindowOffsets(
+            in: samples, windowLength: 30 * 16_000, limit: 5
+        )
+        #expect(!offsets.isEmpty)
+    }
+
     @Test("a stereo source with sound on one side only is extracted as audible mono")
     func extractionDownmixesStereo() throws {
         let url = try Self.writeTone(sampleRate: 8000, seconds: 6, loudRange: 0..<6, channels: 2, loudChannel: 1)

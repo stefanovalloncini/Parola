@@ -84,6 +84,24 @@ struct SpeechWindowFinderTests {
         #expect(!offsets.isEmpty)
     }
 
+    @Test("a file ending mid-window still offers its tail")
+    func trailingPartialWindow() {
+        let offsets = SpeechWindowFinder.loudestWindowOffsets(
+            in: tone(seconds: 59.9), windowLength: windowLength, limit: 3, hopLength: windowLength
+        )
+
+        #expect(offsets.count == 2)
+    }
+
+    @Test("a sliver at the end is not a window")
+    func shortTailIsNotAWindow() {
+        let offsets = SpeechWindowFinder.loudestWindowOffsets(
+            in: tone(seconds: 35), windowLength: windowLength, limit: 3, hopLength: windowLength
+        )
+
+        #expect(offsets == [0])
+    }
+
     @Test("an empty waveform has no windows")
     func emptyWaveform() {
         #expect(SpeechWindowFinder.loudestWindowOffsets(in: [], windowLength: windowLength, limit: 3).isEmpty)

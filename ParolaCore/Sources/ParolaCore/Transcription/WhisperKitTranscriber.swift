@@ -204,15 +204,19 @@ actor WhisperKitTranscriber: Transcriber {
         return fields
     }
 
-    private static let languageProbePrefixSeconds: Double = 300
     private static let languageProbeWindows = 5
 
     private func probeLanguage(kit: WhisperKit, url: URL) async -> String? {
         guard kit.textDecoder.isModelMultilingual else { return nil }
-        guard let samples = probeSamples(url: url), !samples.isEmpty else { return nil }
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-whisper-language-probe-\(UUID().uuidString).caf")
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        guard let samples = Self.probeSamples(url: url, scratch: scratch), !samples.isEmpty else { return nil }
         let windowSamples = kit.featureExtractor.windowSamples ?? Constants.defaultWindowSamples
+        // The windows tile the scratch file: overlapping candidates crowd each other out, and a minute of speech would be read as one.
         let offsets = SpeechWindowFinder.loudestWindowOffsets(
-            in: samples, windowLength: windowSamples, limit: Self.languageProbeWindows
+            in: samples, windowLength: windowSamples, limit: Self.languageProbeWindows,
+            hopLength: windowSamples
         )
         var readings: [WhisperLanguageReading] = []
         for offset in offsets {
@@ -233,12 +237,12 @@ actor WhisperKitTranscriber: Transcriber {
         return decided
     }
 
-    private func probeSamples(url: URL) -> [Float]? {
-        guard let buffer = try? AudioProcessor.loadAudio(
-            fromPath: url.path,
-            startTime: 0,
-            endTime: Self.languageProbePrefixSeconds
-        ) else { return nil }
+    /// The loudest stretches of the whole recording, copied into one short scratch file: a lecture
+    /// whose speaker starts at minute nine used to be probed on nothing but its opening room tone.
+    static func probeSamples(url: URL, scratch: URL) -> [Float]? {
+        guard let windows = try? ProbeAudioExtractor.extract(from: url, to: scratch),
+              !windows.isEmpty else { return nil }
+        guard let buffer = try? AudioProcessor.loadAudio(fromPath: scratch.path) else { return nil }
         return AudioProcessor.convertBufferToArray(buffer: buffer)
     }
 }

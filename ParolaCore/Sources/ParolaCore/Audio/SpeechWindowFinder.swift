@@ -1,7 +1,8 @@
 import Foundation
 
 /// Offers the loudest stretches of a mono waveform, loudest first, for callers that can only afford
-/// to look at a few seconds of a long file.
+/// to look at a few seconds of a long file. A tail worth half a window is offered too, so a file
+/// that ends a few samples into its last window does not lose it.
 enum SpeechWindowFinder {
     static func loudestWindowOffsets(
         in samples: [Float],
@@ -18,6 +19,9 @@ enum SpeechWindowFinder {
         while offset + windowLength <= samples.count {
             measured.append((offset, rootMeanSquare(samples[offset..<(offset + windowLength)])))
             offset += hop
+        }
+        if offset < samples.count, samples.count - offset >= windowLength / 2 {
+            measured.append((offset, rootMeanSquare(samples[offset...])))
         }
         measured.sort { $0.energy == $1.energy ? $0.offset < $1.offset : $0.energy > $1.energy }
 
