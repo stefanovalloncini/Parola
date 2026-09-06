@@ -2157,6 +2157,17 @@
         }
       }
     },
+    "Completed": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completato"
+          }
+        }
+      }
+    },
     "Confidence": {
       "extractionState": "manual",
       "localizations": {
@@ -4196,6 +4207,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Importa…"
+          }
+        }
+      }
+    },
+    "In Progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In corso"
+          }
+        }
+      }
+    },
+    "In progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In corso"
           }
         }
       }
@@ -6719,6 +6752,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Solo release di produzione. Consigliato."
+          }
+        }
+      }
+    },
+    "Progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avanzamento"
           }
         }
       }

@@ -236,6 +236,8 @@ final class AppModel {
     var failedTakeAudioURL: URL?
     /// The file a failed file transcription was reading; the error card retries and reveals it.
     var failedFileURL: URL?
+    /// The translate setting the failed run used, so Retry repeats it rather than the current toggle.
+    var failedTranslateOverride: Bool?
     @ObservationIgnored var failedTakeTitle: String?
     @ObservationIgnored var failedTakeCategory: EntryCategory?
     @ObservationIgnored var pendingDictationRestart: Task<Void, Never>?
@@ -1688,7 +1690,9 @@ final class AppModel {
                 filePartialText = ""
                 fileTranscribeFraction = nil
                 fileTranscribeStage = nil
-                if !Task.isCancelled { applyTranscriptionError(error, source: fileURL) }
+                if !Task.isCancelled {
+                    applyTranscriptionError(error, source: fileURL, translateOverride: translateOverride)
+                }
             }
             if !Task.isCancelled {
                 self.fileTranscribeTask = nil
@@ -1953,7 +1957,7 @@ final class AppModel {
         return url
     }
 
-    private func applyTranscriptionError(_ error: Error, source: URL? = nil) {
+    private func applyTranscriptionError(_ error: Error, source: URL? = nil, translateOverride: Bool? = nil) {
         if error is CancellationError || Task.isCancelled {
             phase = .idle
         } else {
@@ -1961,6 +1965,7 @@ final class AppModel {
             // After the phase: its didSet forgets whatever the last failure left behind.
             failureKind = .transcription
             failedFileURL = source
+            failedTranslateOverride = translateOverride
         }
     }
 
@@ -2550,8 +2555,9 @@ final class AppModel {
 
     /// A phase change means the last failure's file is no longer what the error card is about.
     private func forgetFailedSource() {
-        failureKind = .other
+        if failureKind != .other { failureKind = .other }
         if failedFileURL != nil { failedFileURL = nil }
+        if failedTranslateOverride != nil { failedTranslateOverride = nil }
         if failedTakeAudioURL != nil { failedTakeAudioURL = nil }
         failedTakeTitle = nil
         failedTakeCategory = nil
@@ -2574,7 +2580,7 @@ final class AppModel {
             return
         }
         guard let url = failedFileURL else { return }
-        startFileTranscription(fileURL: url, translateOverride: nil)
+        startFileTranscription(fileURL: url, translateOverride: failedTranslateOverride)
     }
 
     func revealFailedFile() {

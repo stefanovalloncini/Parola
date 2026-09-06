@@ -94,6 +94,41 @@ extension TranscriberMockSuites {
             #expect(!model.canRetryFailedTranscription)
         }
 
+        @Test("a translate-on retry keeps translate on, even if the toggle is off")
+        func retryKeepsTheTranslateOverride() async throws {
+            await MockTranscriberRegistry.shared.clear()
+            let wav = try makeWAV()
+            defer {
+                try? FileManager.default.removeItem(at: wav)
+                Task { await MockTranscriberRegistry.shared.clear() }
+            }
+
+            await MockTranscriberRegistry.shared.install(
+                engineID: nil,
+                response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
+                )
+            )
+
+            let model = makeModel()
+            model.translate = false
+            model.transcribe(fileURL: wav, translateOverride: true)
+            let failed = await waitUntil {
+                if case .failed = model.phase { return true }
+                return false
+            }
+            #expect(failed)
+            #expect(model.failedTranslateOverride == true)
+
+            model.retryFailedTranscription()
+            let failedAgain = await waitUntil {
+                if case .failed = model.phase { return true }
+                return false
+            }
+            #expect(failedAgain)
+            #expect(model.failedTranslateOverride == true, "Retry must not fall back to the current translate toggle")
+        }
+
         @Test("opening an entry forgets the file the last failure named")
         func openingAnEntryForgetsTheFailedFile() async throws {
             await MockTranscriberRegistry.shared.clear()

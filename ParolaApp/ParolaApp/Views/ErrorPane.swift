@@ -32,7 +32,7 @@ struct ErrorBanner: View {
                     if model.canRetryFailedTranscription {
                         Button("Retry") { model.retryFailedTranscription() }
                             .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
-                            .axLeaf("Error.Button.RetryTake")
+                            .axLeaf("Error.Button.Retry")
                     }
                     if model.failedFileURL != nil {
                         Button("Reveal in Finder") { model.revealFailedFile() }

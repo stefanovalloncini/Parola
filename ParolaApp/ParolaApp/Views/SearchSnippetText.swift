@@ -34,6 +34,6 @@ enum SearchSnippetText {
         return match.highlights.compactMap { highlight in
             guard highlight.length > 0, highlight.start >= 0, highlight.start < count else { return nil }
             return highlight.start..<min(highlight.start + highlight.length, count)
-        }
+        }.sorted { $0.lowerBound < $1.lowerBound }
     }
 }

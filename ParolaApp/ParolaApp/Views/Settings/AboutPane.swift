@@ -77,11 +77,8 @@ struct AboutPane: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
             }
-            .task {
-                while !Task.isCancelled {
-                    hasDiagnostics = await model.diagnosticsRecordsExist()
-                    try? await Task.sleep(for: .seconds(2))
-                }
+            .onAppear {
+                Task { hasDiagnostics = await model.diagnosticsRecordsExist() }
             }
 
             Spacer()

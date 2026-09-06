@@ -139,11 +139,12 @@ struct QueueView: View {
 
     /// `statuses` is an order, not a set: In Progress lists the running job first whatever the sort picked.
     @ViewBuilder
-    private func section(title: String, jobs: [BatchJob], statuses: [BatchJob.Status]) -> some View {
+    private func section(title: LocalizedStringKey, jobs: [BatchJob], statuses: [BatchJob.Status]) -> some View {
         let matching = statuses.flatMap { status in jobs.filter { $0.status == status } }
         if !matching.isEmpty {
             VStack(alignment: .leading, spacing: DS.Spacing.small) {
-                Text(title.uppercased())
+                Text(title)
+                    .textCase(.uppercase)
                     .font(DS.Font.captionMedium)
                     .tracking(0.6)
                     .foregroundStyle(DS.Color.secondaryText)

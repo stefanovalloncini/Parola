@@ -235,4 +235,13 @@ struct FindAndReplaceTests {
         model.revealInTranscript("world")
         #expect(!model.findIsOpen)
     }
+
+    /// `transcript.text` joins segments with a space, so this phrase exists in the joined text
+    /// but not inside either segment on its own — a hit `findMatches` correctly refuses.
+    @Test("a query straddling a segment boundary leaves Find closed")
+    func revealSkipsAQueryStraddlingASegmentBoundary() {
+        model.revealInTranscript("world. Hello")
+        #expect(!model.findIsOpen)
+        #expect(model.findQuery.isEmpty)
+    }
 }

@@ -43,6 +43,12 @@ struct SearchSnippetTextTests {
         #expect(String(chars[8..<14]) == "lancio")
     }
 
+    @Test("out-of-order highlights come back sorted, so none are dropped as before the cursor")
+    func sortsOutOfOrderHighlights() {
+        let ranges = SearchSnippetText.markedRanges(match("il lancio e il lancio", [(15, 6), (3, 6)]))
+        #expect(ranges == [3..<9, 15..<21])
+    }
+
     @Test("every marked range survives the round trip into an attributed string")
     func attributedKeepsEveryRun() {
         let text = SearchSnippetText.attributed(match("il lancio e il lancio", [(3, 6), (15, 6)]))
