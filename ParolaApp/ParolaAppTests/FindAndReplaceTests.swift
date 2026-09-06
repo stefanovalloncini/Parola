@@ -245,13 +245,23 @@ struct FindAndReplaceTests {
         #expect(model.findQuery == "world")
     }
 
-    /// The index matches without regard to case, so its position stands even when Find will show nothing.
-    @Test("a case-sensitive Find still opens on the hit's segment")
+    /// The index matches without regard to case, so its position stands where Find would show nothing.
+    @Test("a case-sensitive Find selects the segment and stays closed")
     func revealSelectsTheSegmentUnderCaseSensitiveFind() {
         model.findCaseSensitive = true
         model.revealInTranscript("hello", at: .init(seconds: 1, segmentIndex: 1, textOffset: 12))
         #expect(model.currentSegmentID == 1)
-        #expect(model.findIsOpen)
+        #expect(!model.findIsOpen)
+        #expect(model.findQuery.isEmpty)
+    }
+
+    /// The index matches a query's tokens one by one, so "Hello world" is a hit no segment contains verbatim.
+    @Test("a query no segment holds verbatim still jumps, without opening Find")
+    func revealJumpsOnAMultiWordQueryWithoutOpeningFind() {
+        model.revealInTranscript("Goodbye Hello", at: .init(seconds: 1, segmentIndex: 1, textOffset: 12))
+        #expect(model.currentSegmentID == 1)
+        #expect(!model.findIsOpen)
+        #expect(model.findQuery.isEmpty)
     }
 
     @Test("a case-sensitive Find is not opened on a hit it would not find")

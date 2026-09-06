@@ -39,17 +39,15 @@ extension AppModel {
         snapToCurrentMatch()
     }
 
-    /// Opens a search result on its hit: the index's position selects the segment outright, and Find
-    /// opens on the query so the next and previous hits are a keystroke away. Without a position —
-    /// a title, summary or speaker match — there is nothing to open unless the body holds the query.
+    /// The index matches tokens, not substrings, so the jump stands alone and Find opens only on a query a segment holds.
     func revealInTranscript(_ query: String, at firstHit: LibrarySearchIndex.Match.FirstHit? = nil) {
         guard let transcript else { return }
         if let firstHit, transcript.segments.indices.contains(firstHit.segmentIndex) {
             currentSegmentID = transcript.segments[firstHit.segmentIndex].id
-        } else if transcript.findMatches(query, caseSensitive: findCaseSensitive).isEmpty {
-            return
         }
+        guard !transcript.findMatches(query, caseSensitive: findCaseSensitive).isEmpty else { return }
         findIsOpen = true
+        // The 150 ms recompute this starts re-snaps the selection to the first Find match.
         if findQuery == query { scheduleRecomputeMatches() } else { findQuery = query }
     }
 

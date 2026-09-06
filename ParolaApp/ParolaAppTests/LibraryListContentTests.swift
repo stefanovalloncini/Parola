@@ -353,9 +353,21 @@ struct LibraryListContentTests {
         #expect(SearchResultRow.timestamp(for: nil) == nil)
     }
 
+    /// The slot is reserved on every row so the snippets line up; too narrow a one would truncate the longest clock.
+    @Test("the reserved timestamp slot fits the longest time a row can show")
+    func timestampSlotFitsTheLongestClock() {
+        let caption = NSFont.preferredFont(forTextStyle: .caption1)
+        let mono = NSFont.monospacedSystemFont(ofSize: caption.pointSize, weight: .regular)
+        for font in [caption, mono] {
+            let width = ("1:02:34" as NSString).size(withAttributes: [.font: font]).width
+            #expect(width <= SearchResultRow.timestampWidth)
+        }
+    }
+
     /// However long the snippet runs, the row stops at two lines — that is what keeps the list from being a text dump.
     @Test("a search result row clamps its snippet to two lines, timestamp or not")
-    func searchRowClampsSnippetToTwoLines() {
+    func searchRowClampsSnippetToTwoLines() async {
+        let model = await makeModel()
         let display = LibraryRowDisplay(entry: entry(id: "a", title: "Alpha", offset: 0), sizeBytes: 1_000_000)
         func height(_ snippet: String, at seconds: Double? = nil) -> CGFloat {
             let match = LibrarySearchIndex.Match(
@@ -368,6 +380,7 @@ struct LibraryListContentTests {
             // The width has to be on the view: `fittingSize` proposes its own, and the snippet never wraps.
             let host = NSHostingView(
                 rootView: SearchResultRow(display: display, match: match)
+                    .environment(model)
                     .frame(width: MainWindowLayout.transcriptReadableWidth)
             )
             host.layoutSubtreeIfNeeded()

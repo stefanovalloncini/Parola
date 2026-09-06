@@ -7,10 +7,14 @@ struct SearchResultRow: View {
     /// Where the row's separator starts, so it runs under the text instead of under the glyph column.
     nonisolated static let separatorInset: CGFloat = DS.Spacing.small + glyphWidth + DS.Spacing.regular
 
+    /// Wide enough for h:mm:ss, so the snippets of a mixed list start on the same column.
+    nonisolated static let timestampWidth: CGFloat = 52
+
     let display: LibraryRowDisplay
     let match: LibrarySearchIndex.Match?
     var isSelected: Bool = false
 
+    @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovering = false
 
@@ -55,12 +59,16 @@ struct SearchResultRow: View {
     }
 
     private var snippet: some View {
-        HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
-            if let timestamp = Self.timestamp(for: match) {
-                Text(timestamp)
-                    .font(DS.Font.captionMono)
-                    .foregroundStyle(secondaryStyle)
-            }
+        let timestamp = Self.timestamp(for: match)
+        // A title-only row keeps the slot, hidden: an empty Text sits on a different baseline and shifts the row.
+        return HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
+            Text(timestamp ?? "00:00")
+                .font(model.monospacedTimestamps ? DS.Font.captionMono : DS.Font.caption)
+                .foregroundStyle(secondaryStyle)
+                .lineLimit(1)
+                .opacity(timestamp == nil ? 0 : 1)
+                .accessibilityHidden(timestamp == nil)
+                .frame(width: Self.timestampWidth, alignment: .leading)
             Text(snippetText)
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.primaryText)
