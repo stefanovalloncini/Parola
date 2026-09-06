@@ -46,9 +46,11 @@ extension AppModel {
         guard let id = selectedEntryID else { return }
         let bundleURL = library.libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         Task {
-            try? await Self.offMainIO {
+            let written: Void? = try? await Self.offMainIO {
                 try ParolaDocument.updateManifest(at: bundleURL) { $0.durationSeconds = seconds }
             }
+            guard written != nil else { return }
+            patchLibraryEntry(id: id) { $0.durationSeconds = seconds }
         }
     }
 

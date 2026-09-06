@@ -48,6 +48,19 @@ extension AppModel {
         libraryEntries = entries
     }
 
+    /// A refresh whose only difference is `lastOpenedAt` is masked out, so the writers that change
+    /// one manifest patch their own row here rather than wait for an unrelated library change.
+    func patchLibraryEntry(id: LibraryEntry.ID, _ edit: (inout ParolaDocument.Manifest) -> Void) {
+        guard let index = libraryEntries.firstIndex(where: { $0.id == id }) else { return }
+        let current = libraryEntries[index]
+        var manifest = current.manifest
+        edit(&manifest)
+        guard manifest != current.manifest else { return }
+        libraryEntries[index] = LibraryEntry(
+            id: current.id, bundleURL: current.bundleURL, manifest: manifest
+        )
+    }
+
     func setDeletedEntries(_ entries: [LibraryEntry]) {
         guard !Self.sameEntries(entries, deletedEntries, comparingLastOpened: false) else { return }
         deletedEntries = entries
@@ -328,7 +341,10 @@ extension AppModel {
                 searchResults = nil
                 searchMatches = [:]
                 if let hit, !hit.isEmpty { revealInTranscript(hit) }
-                try? await library.markOpened(id: id)
+                let openedAt = Date()
+                if (try? await library.markOpened(id: id, at: openedAt)) != nil {
+                    patchLibraryEntry(id: id) { $0.lastOpenedAt = openedAt }
+                }
                 refreshLibrary()
             } catch {
                 guard generation == loadEntryGeneration else { return }

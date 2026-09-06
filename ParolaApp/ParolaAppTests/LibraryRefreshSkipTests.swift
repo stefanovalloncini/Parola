@@ -123,8 +123,8 @@ struct LibraryRefreshSkipTests {
         #expect(model.libraryVersion > sorting)
     }
 
-    @Test("opening an entry does not rebuild the list")
-    func openingAnEntryLeavesTheVersionAlone() async throws {
+    @Test("opening an entry repaints the row it just stamped")
+    func openingAnEntryRefreshesItsRow() async throws {
         let libraryURL = makeTempLibraryURL("refreshskip-open")
         let seedStore = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
         let seeded = try await seedStore.add(
@@ -138,7 +138,7 @@ struct LibraryRefreshSkipTests {
         )
         let model = AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-\(UUID())")!,
+            defaults: temporaryDefaults(),
             libraryURL: libraryURL
         )
         model.refreshLibrary()
@@ -160,7 +160,8 @@ struct LibraryRefreshSkipTests {
 
         #expect(stamped)
         #expect(model.selectedEntryID == seeded.id)
-        #expect(model.libraryVersion == version)
+        #expect(model.libraryVersion > version, "the row shows Last opened, so it has to rebuild")
+        #expect(model.libraryEntry(id: seeded.id)?.lastOpenedAt != nil)
     }
 
     private func manifest(at bundleURL: URL) throws -> ParolaDocument.Manifest {

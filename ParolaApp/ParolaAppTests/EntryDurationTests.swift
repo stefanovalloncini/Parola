@@ -163,4 +163,20 @@ struct EntryDurationTests {
         #expect(transcriptAfter == transcriptBefore, "transcript.json was rewritten")
         #expect(stored.updatedAt == updatedAtBefore)
     }
+
+    @Test("the corrected duration reaches the row the list is drawing")
+    func correctedDurationReachesTheLibraryRow() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, mediaSeconds: 1, transcriptDuration: 2134.272, text: "corrupted take")
+
+        #expect(await openEntry(entry.id, in: model))
+        let patched = await waitUntil {
+            abs((model.libraryEntry(id: entry.id)?.durationSeconds ?? 0) - 1) < 0.05
+        }
+
+        #expect(
+            patched,
+            "row says \(String(describing: model.libraryEntry(id: entry.id)?.durationSeconds))"
+        )
+    }
 }
