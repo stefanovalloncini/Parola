@@ -71,12 +71,13 @@ struct DiagnosticsRetentionTests {
     }
 
     @Test("the age cutoff spares an expired file a live process still holds open")
-    func ageCutoffSparesLiveSibling() throws {
+    func ageCutoffSparesLiveSibling() async throws {
         let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7)
+        try await sink.waitForInstallSweep()
         let livePID = ProcessInfo.processInfo.processIdentifier
         let idle = try makeFile(dir, "parola-\(livePID)-100.jsonl", bytes: 10, ageDays: 9)
         let orphan = try makeFile(dir, "parola-\(Self.deadPID)-200.jsonl", bytes: 10, ageDays: 9)
-        let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7)
 
         let outcome = sink.sweep(now: Date())
 

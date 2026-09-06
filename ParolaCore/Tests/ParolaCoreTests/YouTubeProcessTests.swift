@@ -3,7 +3,8 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-@Suite("YouTubeProcess waiter")
+// The waiter runs on a clock nothing advances, so a regression stops returning rather than failing.
+@Suite("YouTubeProcess waiter", .timeLimit(.minutes(1)))
 struct YouTubeProcessTests {
     @Test("waitWithTimeout returns when the process exits naturally")
     func waitsForNaturalExit() async throws {
