@@ -25,8 +25,8 @@ struct DiagnosticsRetentionTests {
     @Test("files past the retention window are deleted")
     func deletesExpired() throws {
         let dir = tempDirectory()
-        let old = try makeFile(dir, "parola-1-100.jsonl", bytes: 10, ageDays: 9)
-        let fresh = try makeFile(dir, "parola-2-200.jsonl", bytes: 10, ageDays: 1)
+        let old = try makeFile(dir, "parola-\(Self.deadPID)-100.jsonl", bytes: 10, ageDays: 9)
+        let fresh = try makeFile(dir, "parola-\(Self.deadPID)-200.jsonl", bytes: 10, ageDays: 1)
         let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7)
         sink.sweep(now: Date())
         #expect(FileManager.default.fileExists(atPath: old.path) == false)
@@ -70,14 +70,36 @@ struct DiagnosticsRetentionTests {
         #expect(FileManager.default.fileExists(atPath: orphan.path) == false)
     }
 
-    @Test("the age cutoff deletes an expired file even when its pid is live again")
-    func expiredFileIsDeletedRegardlessOfLiveness() throws {
+    @Test("the age cutoff spares an expired file a live process still holds open")
+    func ageCutoffSparesLiveSibling() throws {
         let dir = tempDirectory()
         let livePID = ProcessInfo.processInfo.processIdentifier
-        let expired = try makeFile(dir, "parola-\(livePID)-100.jsonl", bytes: 10, ageDays: 9)
+        let idle = try makeFile(dir, "parola-\(livePID)-100.jsonl", bytes: 10, ageDays: 9)
+        let orphan = try makeFile(dir, "parola-\(Self.deadPID)-200.jsonl", bytes: 10, ageDays: 9)
         let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7)
-        sink.sweep(now: Date())
-        #expect(FileManager.default.fileExists(atPath: expired.path) == false)
+
+        let outcome = sink.sweep(now: Date())
+
+        #expect(
+            FileManager.default.fileExists(atPath: idle.path),
+            "an idle process's mtime never advances, so ageing its open file out unlinks the inode"
+        )
+        #expect(FileManager.default.fileExists(atPath: orphan.path) == false)
+        #expect(outcome.deleted == 1)
+        #expect(outcome.skippedLive == 1)
+    }
+
+    @Test("a live sibling spared by both the cutoff and the trim is counted once")
+    func liveSiblingCountedOnce() throws {
+        let dir = tempDirectory()
+        let livePID = ProcessInfo.processInfo.processIdentifier
+        _ = try makeFile(dir, "parola-\(livePID)-100.jsonl", bytes: 600, ageDays: 9)
+        let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7, totalBudgetBytes: 100)
+
+        let outcome = sink.sweep(now: Date())
+
+        #expect(outcome.skippedLive == 1)
+        #expect(outcome.overBudget)
     }
 
     @Test("a sweep that cannot get under budget says so")

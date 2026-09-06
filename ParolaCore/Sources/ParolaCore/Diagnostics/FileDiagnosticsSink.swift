@@ -297,6 +297,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         }
 
         var surviving: [(url: URL, date: Date, size: Int)] = []
+        var liveSkips: Set<String> = []
         let cutoff = now.addingTimeInterval(-Double(retentionDays) * 86_400)
         // Only the file still open is exempt: this sink's earlier rotations are closed, complete
         // and ours to trim.
@@ -305,15 +306,20 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
             let date = values?.contentModificationDate ?? now
             let size = values?.fileSize ?? 0
-            if date < cutoff && url.lastPathComponent != openFile {
+            let name = url.lastPathComponent
+            // An idle process writes nothing, so its mtime never advances and the cutoff catches a
+            // file it is still holding open; unlinking that leaves it writing to a lost inode.
+            let heldLive = !name.hasPrefix(baseName) && Self.isOwnedByLiveProcess(name)
+            if date < cutoff && name != openFile && !heldLive {
                 try? manager.removeItem(at: url)
                 if manager.fileExists(atPath: url.path) {
                     surviving.append((url, date, size))
                 } else {
                     outcome.deleted += 1
-                    if url.lastPathComponent.hasPrefix(baseName) { outcome.ownRotations += 1 }
+                    if name.hasPrefix(baseName) { outcome.ownRotations += 1 }
                 }
             } else {
+                if date < cutoff && heldLive { liveSkips.insert(name) }
                 surviving.append((url, date, size))
             }
         }
@@ -330,7 +336,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             }
             // Our own pid is live, so the liveness skip has to let our closed rotations through.
             if !name.hasPrefix(baseName), Self.isOwnedByLiveProcess(name) {
-                outcome.skippedLive += 1
+                liveSkips.insert(name)
                 index += 1
                 continue
             }
@@ -344,15 +350,16 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             index += 1
         }
 
+        outcome.skippedLive = liveSkips.count
         outcome.bytesRemaining = total
         outcome.overBudget = total > totalBudgetBytes
         sweepState.withLock { $0 += 1 }
         return outcome
     }
 
-    /// A process still holding its log open would keep writing into an unlinked inode, so the
-    /// budget trim and the CLI's `--clear` both skip it. A recycled pid can spare a dead process's
-    /// file until the age cutoff — which runs no liveness check — catches it.
+    /// A process still holding its log open would keep writing into an unlinked inode, so the age
+    /// cutoff, the budget trim and the CLI's `--clear` all skip it. A recycled pid can therefore
+    /// spare a dead process's file until the pid is free again.
     public static func isOwnedByLiveProcess(_ fileName: String) -> Bool {
         guard fileName.hasPrefix(filePrefix) else { return false }
         let rest = fileName.dropFirst(filePrefix.count)
