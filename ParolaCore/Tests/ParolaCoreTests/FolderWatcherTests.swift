@@ -300,7 +300,7 @@ actor ManualScheduler: FolderWatcherScheduler {
     func runTick(after interval: Duration, _ body: @Sendable @escaping () async -> Void) async throws {
         await park()
         await body()
-        await signalDone()
+        signalDone()
     }
 
     func advanceAndWait() async throws {

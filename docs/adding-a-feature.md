@@ -34,6 +34,7 @@ If the feature plugs into `Transcriber`, `LanguageModel`, or `AudioSource`, the 
 
 - AppModel method — unit test in `AppModel<Area>Tests.swift`.
 - Automation command — integration test in `AutomationCommand<Area>Tests.swift` that dispatches the command through a test-mode bridge and verifies the resulting state slice.
+- Logging — capture with a `CapturingDiagnosticsSink` inside `ParolaLog.withSink(sink) { }`, not `ParolaLog.install`. The scope follows the task tree, so a record emitted from a `Task.detached` or a GCD hop goes to the installed sink instead: a test that asserts on one of those installs the sink itself and takes `.logFacade`.
 
 ## Coverage check
 
