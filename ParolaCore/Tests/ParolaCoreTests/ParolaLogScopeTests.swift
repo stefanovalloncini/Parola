@@ -31,6 +31,20 @@ struct ParolaLogScopeTests {
         #expect(sink.records.isEmpty)
     }
 
+    @Test("a Dispatch hop logs outside the scope that started it")
+    func dispatchHopsLeaveTheScope() async {
+        let sink = CapturingDiagnosticsSink()
+        await ParolaLog.withSink(sink) {
+            await withCheckedContinuation { continuation in
+                DispatchQueue.global().async {
+                    ParolaLog.info(.cli, "scope probe: dispatch hop")
+                    continuation.resume()
+                }
+            }
+        }
+        #expect(sink.records.isEmpty)
+    }
+
     @Test("a detached task that re-enters the scope is captured again")
     func detachedTasksCanReenterTheScope() async {
         let sink = CapturingDiagnosticsSink()
@@ -146,6 +160,26 @@ struct ParolaLogScopeAndInstallTests {
 
         #expect(probes(scoped).isEmpty)
         #expect(probes(installed) == ["install probe: detached"])
+    }
+
+    @Test("a record from a Dispatch hop lands on the installed sink, not the scope")
+    func dispatchRecordsFollowTheInstalledSink() async {
+        let installed = CapturingDiagnosticsSink()
+        let scoped = CapturingDiagnosticsSink()
+        ParolaLog.install(installed)
+        defer { ParolaLog.uninstall() }
+
+        await ParolaLog.withSink(scoped) {
+            await withCheckedContinuation { continuation in
+                DispatchQueue.global().async {
+                    ParolaLog.info(.cli, "install probe: dispatch hop")
+                    continuation.resume()
+                }
+            }
+        }
+
+        #expect(probes(scoped).isEmpty)
+        #expect(probes(installed) == ["install probe: dispatch hop"])
     }
 
     @Test("a flush inside a scope drains the scope's sink")

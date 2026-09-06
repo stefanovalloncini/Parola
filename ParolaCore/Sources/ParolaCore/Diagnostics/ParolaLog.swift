@@ -14,7 +14,8 @@ public enum ParolaLog {
     /// Sends the records this task tree emits to `sink` instead of the installed one, for as long as
     /// `operation` runs. Structured children and `Task { }` inherit the routing; a `Task.detached`,
     /// a Dispatch hop or a C callback does not, and keeps logging to the installed sink, so a caller
-    /// must not expect its capture to hold those records.
+    /// must not expect its capture to hold those records. A `Task { }` started inside the scope keeps
+    /// `sink` for its whole life, including whatever it logs after `withSink` has returned.
     public static func withSink<T>(
         _ sink: any DiagnosticsSink,
         isolation: isolated (any Actor)? = #isolation,

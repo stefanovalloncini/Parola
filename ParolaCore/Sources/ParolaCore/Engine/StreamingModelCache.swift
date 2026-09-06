@@ -45,6 +45,7 @@ actor StreamingModelCache {
         let myEpoch = evictionEpoch
         // Bookkeeping is detached from the borrower: a cancelled borrow returns early while
         // the load runs on, and this is what lands the finished kit in the cache.
+        // Task {}, not detached: the log scope has to follow this bookkeeping.
         Task { [weak self] in
             let kit: SharedWhisperKit?
             do {

@@ -133,6 +133,13 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         fileQueue.async { self.drainOnQueue() }
     }
 
+    /// Test seam: resolves once the file queue has run everything enqueued before the call.
+    func waitForFileQueue() async {
+        await withCheckedContinuation { continuation in
+            fileQueue.async { continuation.resume() }
+        }
+    }
+
     public func flush() async {
         await withCheckedContinuation { continuation in
             fileQueue.async {

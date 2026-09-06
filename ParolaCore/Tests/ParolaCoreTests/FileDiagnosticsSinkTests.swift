@@ -20,19 +20,6 @@ struct FileDiagnosticsSinkTests {
         )
     }
 
-    private func waitForContent(
-        _ substring: String, in url: URL, timeout: Duration = .seconds(10)
-    ) async throws {
-        let deadline = ContinuousClock.now + timeout
-        while ContinuousClock.now < deadline {
-            if let text = try? String(contentsOf: url, encoding: .utf8), text.contains(substring) {
-                return
-            }
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        Issue.record("expected \"\(substring)\" in \(url.path) within \(timeout)")
-    }
-
     private func waitUntilDeleted(_ url: URL, timeout: Duration = .seconds(10)) async throws {
         let deadline = ContinuousClock.now + timeout
         while ContinuousClock.now < deadline {
@@ -47,7 +34,8 @@ struct FileDiagnosticsSinkTests {
         let dir = tempDirectory()
         let sink = FileDiagnosticsSink(directory: dir)
         sink.enqueue(record(.error, "boom"))
-        try await waitForContent("boom", in: sink.currentFileURL)
+        await sink.waitForFileQueue()
+        #expect(try String(contentsOf: sink.currentFileURL, encoding: .utf8).contains("boom"))
     }
 
     @Test("info records buffer until flushed")
@@ -67,7 +55,8 @@ struct FileDiagnosticsSinkTests {
         let dir = tempDirectory()
         let sink = FileDiagnosticsSink(directory: dir)
         sink.enqueue(record(.error, "before"))
-        try await waitForContent("before", in: sink.currentFileURL)
+        await sink.waitForFileQueue()
+        #expect(try String(contentsOf: sink.currentFileURL, encoding: .utf8).contains("before"))
 
         await sink.startNewFile()
         for url in try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
@@ -75,7 +64,8 @@ struct FileDiagnosticsSinkTests {
         }
 
         sink.enqueue(record(.error, "after"))
-        try await waitForContent("after", in: sink.currentFileURL)
+        await sink.waitForFileQueue()
+        #expect(try String(contentsOf: sink.currentFileURL, encoding: .utf8).contains("after"))
         let names = try FileManager.default.contentsOfDirectory(atPath: dir.path)
         #expect(names.count == 1)
     }
