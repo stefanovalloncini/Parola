@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import os
 @testable import ParolaDictation
 
 @Suite("Async timeout race")
@@ -12,19 +13,26 @@ struct AsyncTimeoutTests {
 
     @Test("abandons work that ignores cancellation at the deadline")
     func timeoutWinsOverUncancellableWork() async {
-        let clock = ContinuousClock()
-        let start = clock.now
-        let value = await AsyncTimeout.run(.milliseconds(50)) { () -> String in
+        let clock = TestClock()
+        let workFinished = OSAllocatedUnfairLock(initialState: false)
+        async let raced = AsyncTimeout.run(.milliseconds(50), clock: clock) { () -> String in
             await withCheckedContinuation { continuation in
                 DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
                     continuation.resume(returning: ())
                 }
             }
+            workFinished.withLock { $0 = true }
             return "late"
         }
-        let elapsed = clock.now - start
-        #expect(value == nil)
-        #expect(elapsed < .seconds(2), "the caller must get control back at the deadline, not when the work returns")
+
+        await waitForDeadlineSleeper(on: clock)
+        clock.advance(by: .milliseconds(50))
+
+        #expect(await raced == nil)
+        #expect(
+            workFinished.withLock { $0 } == false,
+            "the caller must get control back at the deadline, not when the work returns"
+        )
     }
 
     @Test("cancellable work is cancelled at the deadline")
@@ -34,5 +42,14 @@ struct AsyncTimeoutTests {
             return Task.isCancelled ? "cancelled" : "slept"
         }
         #expect(value == nil)
+    }
+
+    private func waitForDeadlineSleeper(on clock: TestClock, timeout: Duration = .seconds(5)) async {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
+            if clock.sleeperCount > 0 { return }
+            try? await Task.sleep(for: .milliseconds(1))
+        }
+        Issue.record("the deadline sleeper never registered on the test clock")
     }
 }
