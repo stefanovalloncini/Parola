@@ -1,14 +1,20 @@
 import Testing
 import Foundation
+import os
 @testable import ParolaCore
 
 @Suite("LibraryStore load cache", .tags(.fileSystem))
 struct LibraryLoadCacheTests {
-    private func makeStore() throws -> (LibraryStore, URL) {
+    private func makeStore(
+        didDecodeDocument: (@Sendable () -> Void)? = nil
+    ) throws -> (LibraryStore, URL) {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-load-cache-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        return (LibraryStore(libraryURL: tmp, extraIndexer: nil), tmp)
+        let store = LibraryStore(
+            libraryURL: tmp, extraIndexer: nil, didDecodeDocument: didDecodeDocument
+        )
+        return (store, tmp)
     }
 
     private func makeTranscript(_ text: String, segments count: Int = 1) -> Transcript {
@@ -113,36 +119,65 @@ struct LibraryLoadCacheTests {
         #expect(firstText(loaded) == "original")
     }
 
-    /// Resumes once the racing task is running, so the sleep that follows measures the off-actor
-    /// decode and not task start-up.
-    private func waitingForStart(_ count: Int, _ stream: AsyncStream<Void>) async {
-        var seen = 0
-        for await _ in stream {
-            seen += 1
-            if seen == count { return }
+    /// Parks decodes that have read the bundle but not yet answered, so a mutation can be made to
+    /// land inside one instead of raced against it.
+    private final class DecodeGate: Sendable {
+        private struct Arming: Sendable {
+            let release: DispatchSemaphore
+            var remaining: Int
+            var parked: Int
+        }
+
+        private let state = OSAllocatedUnfairLock<Arming?>(initialState: nil)
+
+        var hook: @Sendable () -> Void {
+            { [state] in
+                let release: DispatchSemaphore? = state.withLock { current in
+                    guard var arming = current, arming.remaining > 0 else { return nil }
+                    arming.remaining -= 1
+                    arming.parked += 1
+                    current = arming
+                    return arming.release
+                }
+                release?.wait()
+            }
+        }
+
+        /// Runs `body` once `count` decodes are parked, then lets them all answer.
+        func holding(_ count: Int, _ body: () async throws -> Void) async rethrows {
+            let release = DispatchSemaphore(value: 0)
+            state.withLock { $0 = Arming(release: release, remaining: count, parked: 0) }
+            defer {
+                state.withLock { $0 = nil }
+                for _ in 0..<count { release.signal() }
+            }
+            let deadline = ContinuousClock.now + .seconds(10)
+            while state.withLock({ $0?.parked ?? count }) < count {
+                if ContinuousClock.now > deadline {
+                    Issue.record("the decodes never reached the gate")
+                    break
+                }
+                try? await Task.sleep(for: .milliseconds(1))
+            }
+            try await body()
         }
     }
 
     @Test("a load in flight when updateTranscript lands never answers with the pre-update transcript")
     func loadRacingUpdateSeesTheUpdate() async throws {
-        let (store, tmp) = try makeStore()
+        let gate = DecodeGate()
+        let (store, tmp) = try makeStore(didDecodeDocument: gate.hook)
         defer { try? FileManager.default.removeItem(at: tmp) }
-        // Big enough that the off-actor decode cannot finish inside the head start the update gets.
-        let entry = try await store.add(transcript: makeTranscript("original 0", segments: 5_000), audioSource: nil)
+        let entry = try await store.add(transcript: makeTranscript("original 0"), audioSource: nil)
 
         for i in 0..<8 {
             if i > 0 {
-                try await store.updateTranscript(makeTranscript("original \(i)", segments: 5_000), for: entry.id)
+                try await store.updateTranscript(makeTranscript("original \(i)"), for: entry.id)
             }
-            let started = AsyncStream<Void>.makeStream()
-            let signal = started.continuation
-            let loading = Task { () -> LoadedEntry in
-                signal.yield()
-                return try await store.load(entry.id)
+            let loading = Task { try await store.load(entry.id) }
+            try await gate.holding(1) {
+                try await store.updateTranscript(makeTranscript("edited \(i)"), for: entry.id)
             }
-            await waitingForStart(1, started.stream)
-            try await Task.sleep(for: .milliseconds(1))
-            try await store.updateTranscript(makeTranscript("edited \(i)"), for: entry.id)
 
             #expect(firstText(try await loading.value) == "edited \(i)")
             #expect(firstText(try await store.load(entry.id)) == "edited \(i)")
@@ -151,27 +186,20 @@ struct LibraryLoadCacheTests {
 
     @Test("two concurrent loads of the same entry agree on one whole version")
     func concurrentLoadsAgree() async throws {
-        let (store, tmp) = try makeStore()
+        let gate = DecodeGate()
+        let (store, tmp) = try makeStore(didDecodeDocument: gate.hook)
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let entry = try await store.add(transcript: makeTranscript("original 0", segments: 5_000), audioSource: nil)
+        let entry = try await store.add(transcript: makeTranscript("original 0", segments: 8), audioSource: nil)
 
         for i in 0..<8 {
             if i > 0 {
-                try await store.updateTranscript(makeTranscript("original \(i)", segments: 5_000), for: entry.id)
+                try await store.updateTranscript(makeTranscript("original \(i)", segments: 8), for: entry.id)
             }
-            let started = AsyncStream<Void>.makeStream()
-            let signal = started.continuation
-            let first = Task { () -> LoadedEntry in
-                signal.yield()
-                return try await store.load(entry.id)
+            let first = Task { try await store.load(entry.id) }
+            let second = Task { try await store.load(entry.id) }
+            try await gate.holding(2) {
+                try await store.updateTranscript(makeTranscript("edited \(i)", segments: 8), for: entry.id)
             }
-            let second = Task { () -> LoadedEntry in
-                signal.yield()
-                return try await store.load(entry.id)
-            }
-            await waitingForStart(2, started.stream)
-            try await Task.sleep(for: .milliseconds(1))
-            try await store.updateTranscript(makeTranscript("edited \(i)"), for: entry.id)
 
             let firstTexts = Set(try await first.value.document.transcript.segments.map(\.text))
             let secondTexts = Set(try await second.value.document.transcript.segments.map(\.text))

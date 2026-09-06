@@ -62,14 +62,26 @@ public actor LibraryStore {
     private var listCacheEpoch = 0
     private var indexReadyTask: Task<Void, Never>?
     private nonisolated let extraIndexerJobs: AsyncStream<@Sendable () async -> Void>.Continuation?
+    private nonisolated let didDecodeDocument: (@Sendable () -> Void)?
 
     public init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
         self.init(libraryURL: libraryURL, extraIndexer: SpotlightIndexer())
     }
 
     public init(libraryURL: URL, extraIndexer: LibraryIndexer?) {
+        self.init(libraryURL: libraryURL, extraIndexer: extraIndexer, didDecodeDocument: nil)
+    }
+
+    /// `didDecodeDocument` runs on the off-actor queue once a decode has read the bundle, so a test
+    /// can force a mutation to land before that decode is handed back instead of timing it.
+    init(
+        libraryURL: URL,
+        extraIndexer: LibraryIndexer?,
+        didDecodeDocument: (@Sendable () -> Void)?
+    ) {
         self.libraryURL = libraryURL
         self.extraIndexer = extraIndexer
+        self.didDecodeDocument = didDecodeDocument
         // Extra-indexer calls drain FIFO on one background worker: CoreSpotlight's XPC can
         // stall indefinitely (observed on ad-hoc dev builds), and a best-effort mirror index
         // must never block the library write path.
@@ -290,7 +302,11 @@ public actor LibraryStore {
     private func decodedDocument(at bundleURL: URL) async throws -> ParolaDocument {
         for _ in 0..<8 {
             let epoch = listCacheEpoch
-            let doc = try await offActorThrowingIO { try Self.readCleanedDocument(at: bundleURL) }
+            let doc = try await offActorThrowingIO { [didDecodeDocument] in
+                let decoded = try Self.readCleanedDocument(at: bundleURL)
+                didDecodeDocument?()
+                return decoded
+            }
             if epoch == listCacheEpoch { return doc }
         }
         return try Self.readCleanedDocument(at: bundleURL)
