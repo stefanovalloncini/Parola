@@ -259,7 +259,11 @@ public actor LibrarySearchIndex {
             .sorted { $0.value > $1.value }
             .compactMap { (id, score) -> Match? in
                 guard let entry = entries[id] else { return nil }
-                let snippet = Self.makeSnippet(text: entry.excerpt, tokens: queryTokens)
+                let snippet = Self.makeSnippet(
+                    text: entry.excerpt,
+                    truncated: entry.excerptTruncated,
+                    tokens: queryTokens
+                )
                 return Match(
                     entryID: id,
                     score: score,
@@ -538,7 +542,11 @@ public actor LibrarySearchIndex {
         return Int(exactly: (seconds * 100).rounded()) ?? 0
     }
 
-    private static func makeSnippet(text: String, tokens: [String]) -> (text: String, highlights: [Highlight]) {
+    private static func makeSnippet(
+        text: String,
+        truncated: Bool,
+        tokens: [String]
+    ) -> (text: String, highlights: [Highlight]) {
         guard !text.isEmpty else { return ("", []) }
         var firstHit: Range<String.Index>?
         for token in tokens {
@@ -570,9 +578,9 @@ public actor LibrarySearchIndex {
         highlights.sort { $0.start < $1.start }
         // An ellipsis says the line was cut out of a longer one; the leading one shifts every offset.
         let leading = snippetRange.lowerBound == text.startIndex ? "" : "…"
-        // `text` is the excerpt, not the full line: at the excerpt's cap, the line may continue past it.
-        let atExcerptEnd = snippetRange.upperBound == text.endIndex && text.count < Self.excerptLength
-        let trailing = atExcerptEnd ? "" : "…"
+        // `text` is the excerpt, not the full line, so a snippet running to its end still ends mid-line
+        // whenever the entry's text was longer than the excerpt.
+        let trailing = snippetRange.upperBound < text.endIndex || truncated ? "…" : ""
         let shift = leading.count
         let shifted = shift == 0 ? highlights : highlights.map { Highlight(start: $0.start + shift, length: $0.length) }
         return (leading + body + trailing, mergeOverlapping(shifted))

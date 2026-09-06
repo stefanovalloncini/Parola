@@ -366,6 +366,27 @@ struct LibrarySearchIndexTests {
         #expect(match.snippet.hasSuffix("…"))
     }
 
+    @Test("a text exactly as long as the excerpt is not marked as cut")
+    func snippetAtExcerptLengthIsNotMarked() async throws {
+        let (index, _) = makeTempIndex()
+        let body = String(repeating: "ab ", count: 64) + "z " + "sprint"
+        #expect(body.count == 200)
+        await index.index(id: "e1", title: "Notes", text: body, createdAt: Date())
+        let match = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
+        #expect(match.snippet.hasPrefix("…"))
+        #expect(match.snippet.hasSuffix("sprint"))
+    }
+
+    @Test("one character past the excerpt puts the trailing mark back")
+    func snippetPastExcerptLengthIsMarked() async throws {
+        let (index, _) = makeTempIndex()
+        let body = String(repeating: "ab ", count: 64) + "z " + "sprint!"
+        #expect(body.count == 201)
+        await index.index(id: "e1", title: "Notes", text: body, createdAt: Date())
+        let match = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
+        #expect(match.snippet.hasSuffix("…"))
+    }
+
     @Test("a snippet that is the whole line carries no ellipsis")
     func wholeLineSnippetIsNotMarked() async throws {
         let (index, _) = makeTempIndex()
