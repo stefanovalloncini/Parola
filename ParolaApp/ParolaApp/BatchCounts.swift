@@ -8,16 +8,23 @@ enum BatchProgress {
         return (jobs.count { $0.status == .done }, jobs.count)
     }
 
-    static func filesLabel(for jobs: [BatchJob], locale: Locale = AppFormat.locale) -> String? {
+    /// The header's caption, and whether it is a live progress count: one pass over the queue, so
+    /// the header does not scan it again to decide the accessibility id.
+    static func headerLabel(
+        for jobs: [BatchJob], locale: Locale = AppFormat.locale
+    ) -> (text: String, isProgress: Bool)? {
         guard !jobs.isEmpty else { return nil }
         if let counts = counts(for: jobs) {
             if counts.total == 1 {
-                return String(localized: "\(counts.finished) of 1 file", locale: locale)
+                return (String(localized: "\(counts.finished) of 1 file", locale: locale), true)
             }
-            return String(localized: "\(counts.finished) of \(counts.total) files", locale: locale)
+            return (
+                String(localized: "\(counts.finished) of \(counts.total) files", locale: locale),
+                true
+            )
         }
-        if jobs.count == 1 { return String(localized: "1 file", locale: locale) }
-        return String(localized: "\(jobs.count) files", locale: locale)
+        if jobs.count == 1 { return (String(localized: "1 file", locale: locale), false) }
+        return (String(localized: "\(jobs.count) files", locale: locale), false)
     }
 }
 
