@@ -170,6 +170,49 @@ struct LibrarySearchIndexTests {
         #expect(match.matchCount == 2)
     }
 
+    @Test("a snapshot written before the hit positions existed is discarded and rebuilt")
+    func snapshotBeforePositionsIsDiscarded() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-search-v6-\(UUID().uuidString).json")
+        let v6 = #"{"version":6,"entries":[{"id":"e1","title":"Notes","excerpt":"Sprint planning",""#
+            + #"tokens":["notes","planning","sprint"],"counts":[1,1,1],"fingerprint":"f1"}]}"#
+        try Data(v6.utf8).write(to: url)
+        let index = LibrarySearchIndex(indexURL: url)
+        #expect(await index.search("sprint").isEmpty)
+        #expect(await index.needsRebuild(matching: ["e1": "f1"]))
+        await index.rebuild(entries: [
+            .init(
+                id: "e1",
+                title: "Notes",
+                text: "Sprint planning and sprint retro",
+                boundaries: [.init(textOffset: 0, seconds: 0)],
+                fingerprint: "f1"
+            )
+        ])
+        let match = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
+        #expect(match.matchCount == 2)
+    }
+
+    @Test("the snapshot carries each entry's segment boundaries")
+    func snapshotStoresSegmentBoundaries() async throws {
+        let (index, url) = makeTempIndex()
+        await index.index(
+            id: "e1",
+            title: "Notes",
+            text: "Sprint planning today. Retro tomorrow.",
+            boundaries: [
+                .init(textOffset: 0, seconds: 0),
+                .init(textOffset: 23, seconds: 12.399999618530273)
+            ],
+            createdAt: Date()
+        )
+        await index.flush()
+        let raw = try #require(String(data: Data(contentsOf: url), encoding: .utf8))
+        #expect(raw.contains(#""version":7"#))
+        #expect(raw.contains(#""boundaryOffsets":[0,23]"#))
+        #expect(raw.contains(#""boundaryCentiseconds":[0,1240]"#))
+    }
+
     @Test("an entry whose counts went missing still counts its hit once")
     func missingCountsFallBackToOne() async throws {
         let (index1, url) = makeTempIndex()

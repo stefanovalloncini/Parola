@@ -13,6 +13,17 @@ public actor LibrarySearchIndex {
         }
     }
 
+    /// Where a segment's text starts inside the joined transcript, and when it is spoken.
+    public struct SegmentBoundary: Sendable, Equatable {
+        public let textOffset: Int
+        public let seconds: Double
+
+        public init(textOffset: Int, seconds: Double) {
+            self.textOffset = textOffset
+            self.seconds = seconds
+        }
+    }
+
     public struct Match: Sendable, Equatable {
         public let entryID: String
         public let score: Int
@@ -41,6 +52,7 @@ public actor LibrarySearchIndex {
         let title: String
         let text: String
         let auxiliaryText: String
+        let boundaries: [SegmentBoundary]
         let fingerprint: String
 
         init(
@@ -48,12 +60,14 @@ public actor LibrarySearchIndex {
             title: String,
             text: String,
             auxiliaryText: String = "",
+            boundaries: [SegmentBoundary] = [],
             fingerprint: String = ""
         ) {
             self.id = id
             self.title = title
             self.text = text
             self.auxiliaryText = auxiliaryText
+            self.boundaries = boundaries
             self.fingerprint = fingerprint
         }
     }
@@ -61,8 +75,13 @@ public actor LibrarySearchIndex {
     private struct IndexedEntry: Sendable {
         let title: String
         let excerpt: String
+        let excerptTruncated: Bool
         let tokens: [String]
         let counts: [Int]
+        /// Parallel to `tokens`: where the token first occurs in the body, `noOffset` for title-only tokens.
+        let offsets: [Int]
+        let boundaryOffsets: [Int]
+        let boundaryCentiseconds: [Int]
         let fingerprint: String
     }
 
@@ -70,8 +89,12 @@ public actor LibrarySearchIndex {
         let id: String
         let title: String
         let excerpt: String
+        let excerptTruncated: Bool
         let tokens: [String]
         let counts: [Int]
+        let offsets: [Int]
+        let boundaryOffsets: [Int]
+        let boundaryCentiseconds: [Int]
         let fingerprint: String
     }
 
@@ -108,8 +131,9 @@ public actor LibrarySearchIndex {
         case failed(any Error)
     }
 
-    private static let snapshotVersion = 6
+    private static let snapshotVersion = 7
     private static let excerptLength = 200
+    private static let noOffset = -1
     private static let snapshotPrefix = Data(#"{"version":\#(snapshotVersion),"entries":["#.utf8)
     private static let snapshotSeparator = Data(",".utf8)
     private static let snapshotSuffix = Data("]}".utf8)
@@ -160,6 +184,7 @@ public actor LibrarySearchIndex {
     }
 
     /// Indexes an entry. `auxiliaryText` (summary, notes, speaker names) is tokenized for search but never shown in snippets.
+    /// `boundaries` places each segment inside `text`, so a match can report the time of its first hit.
     /// `fingerprint` records the state of the bundle this text came from, so a later launch can tell
     /// whether the library still holds what was indexed.
     public func index(
@@ -167,12 +192,16 @@ public actor LibrarySearchIndex {
         title: String,
         text: String,
         auxiliaryText: String = "",
+        boundaries: [SegmentBoundary] = [],
         fingerprint: String = "",
         createdAt: Date
     ) async {
         await ensureLoaded()
         removeFromIndex(id)
-        addToIndex(id: id, title: title, text: text, auxiliaryText: auxiliaryText, fingerprint: fingerprint)
+        addToIndex(
+            id: id, title: title, text: text, auxiliaryText: auxiliaryText,
+            boundaries: boundaries, fingerprint: fingerprint
+        )
         scheduleSave()
     }
 
@@ -199,7 +228,7 @@ public actor LibrarySearchIndex {
                 for id in inverted[indexToken] ?? [] {
                     scores[id, default: 0] += 1
                     guard let entry = entries[id] else { continue }
-                    hits[id, default: 0] += Self.occurrences(of: indexToken, in: entry)
+                    hits[id, default: 0] += Self.occurrences(at: Self.position(of: indexToken, in: entry), in: entry)
                 }
             }
         }
@@ -246,8 +275,12 @@ public actor LibrarySearchIndex {
         let updated = IndexedEntry(
             title: existing.title,
             excerpt: existing.excerpt,
+            excerptTruncated: existing.excerptTruncated,
             tokens: existing.tokens,
             counts: existing.counts,
+            offsets: existing.offsets,
+            boundaryOffsets: existing.boundaryOffsets,
+            boundaryCentiseconds: existing.boundaryCentiseconds,
             fingerprint: fingerprint
         )
         entries[id] = updated
@@ -268,6 +301,7 @@ public actor LibrarySearchIndex {
                 title: entry.title,
                 text: entry.text,
                 auxiliaryText: entry.auxiliaryText,
+                boundaries: entry.boundaries,
                 fingerprint: entry.fingerprint
             )
         }
@@ -310,8 +344,12 @@ public actor LibrarySearchIndex {
             entries[entry.id] = IndexedEntry(
                 title: entry.title,
                 excerpt: entry.excerpt,
+                excerptTruncated: entry.excerptTruncated,
                 tokens: entry.tokens,
                 counts: entry.counts,
+                offsets: entry.offsets,
+                boundaryOffsets: entry.boundaryOffsets,
+                boundaryCentiseconds: entry.boundaryCentiseconds,
                 fingerprint: entry.fingerprint
             )
             for token in entry.tokens {
@@ -326,18 +364,28 @@ public actor LibrarySearchIndex {
         title: String,
         text: String,
         auxiliaryText: String,
+        boundaries: [SegmentBoundary],
         fingerprint: String
     ) {
         var occurrences: [String: Int] = [:]
-        for token in Self.tokenize(title) + Self.tokenize(text) + Self.tokenize(auxiliaryText) {
+        var bodyOffsets: [String: Int] = [:]
+        Self.enumerateTokens(in: title) { token, _ in occurrences[token, default: 0] += 1 }
+        Self.enumerateTokens(in: text) { token, offset in
             occurrences[token, default: 0] += 1
+            if bodyOffsets[token] == nil { bodyOffsets[token] = offset }
         }
+        Self.enumerateTokens(in: auxiliaryText) { token, _ in occurrences[token, default: 0] += 1 }
         let tokens = occurrences.keys.sorted()
+        let excerpt = Self.excerpt(of: text)
         let entry = IndexedEntry(
             title: title,
-            excerpt: String(text.prefix(Self.excerptLength)),
+            excerpt: excerpt.text,
+            excerptTruncated: excerpt.truncated,
             tokens: tokens,
             counts: tokens.map { occurrences[$0] ?? 0 },
+            offsets: tokens.map { bodyOffsets[$0] ?? Self.noOffset },
+            boundaryOffsets: boundaries.map(\.textOffset),
+            boundaryCentiseconds: boundaries.map { Self.centiseconds($0.seconds) },
             fingerprint: fingerprint
         )
         entries[id] = entry
@@ -371,8 +419,12 @@ public actor LibrarySearchIndex {
             id: id,
             title: entry.title,
             excerpt: entry.excerpt,
+            excerptTruncated: entry.excerptTruncated,
             tokens: entry.tokens,
             counts: entry.counts,
+            offsets: entry.offsets,
+            boundaryOffsets: entry.boundaryOffsets,
+            boundaryCentiseconds: entry.boundaryCentiseconds,
             fingerprint: entry.fingerprint
         )
     }
@@ -387,25 +439,54 @@ public actor LibrarySearchIndex {
         return low
     }
 
-    /// A snapshot written before the counts existed still proves the token is in the entry, so the floor is 1.
-    private static func occurrences(of token: String, in entry: IndexedEntry) -> Int {
+    private static func position(of token: String, in entry: IndexedEntry) -> Int? {
         let position = firstIndex(in: entry.tokens, atLeast: token)
-        guard position < entry.tokens.count, entry.tokens[position] == token,
-              position < entry.counts.count else { return 1 }
+        guard position < entry.tokens.count, entry.tokens[position] == token else { return nil }
+        return position
+    }
+
+    /// An entry whose counts went missing still proves the token is in it, so the floor is 1.
+    private static func occurrences(at position: Int?, in entry: IndexedEntry) -> Int {
+        guard let position, position < entry.counts.count else { return 1 }
         return max(1, entry.counts[position])
     }
 
     private static func tokenize(_ text: String) -> [String] {
-        guard !text.isEmpty else { return [] }
+        var tokens: [String] = []
+        enumerateTokens(in: text) { token, _ in tokens.append(token) }
+        return tokens
+    }
+
+    /// Visits each token with the character offset it starts at. The offsets walk forward with the
+    /// tokenizer, so the whole pass stays linear in the text's length.
+    private static func enumerateTokens(in text: String, _ visit: (String, Int) -> Void) {
+        guard !text.isEmpty else { return }
         let tokenizer = NLTokenizer(unit: .word)
         tokenizer.string = text
-        var tokens: [String] = []
+        var cursor = text.startIndex
+        var offset = 0
         tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
             let token = text[range].lowercased()
-            if token.count > 1 { tokens.append(token) }
+            guard token.count > 1 else { return true }
+            offset += text.distance(from: cursor, to: range.lowerBound)
+            cursor = range.lowerBound
+            visit(token, offset)
             return true
         }
-        return tokens
+    }
+
+    private static func excerpt(of text: String) -> (text: String, truncated: Bool) {
+        guard let cut = text.index(text.startIndex, offsetBy: excerptLength, limitedBy: text.endIndex) else {
+            return (text, false)
+        }
+        return (String(text[..<cut]), cut < text.endIndex)
+    }
+
+    /// Engine timings are Float32 widened to Double, which JSON writes as `12.399999618530273`;
+    /// hundredths keep the snapshot small and still land on the right second.
+    private static func centiseconds(_ seconds: Double) -> Int {
+        guard seconds.isFinite, seconds > 0 else { return 0 }
+        return Int(exactly: (seconds * 100).rounded()) ?? 0
     }
 
     private static func makeSnippet(text: String, tokens: [String]) -> (text: String, highlights: [Highlight]) {

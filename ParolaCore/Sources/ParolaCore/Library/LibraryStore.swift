@@ -181,6 +181,7 @@ public actor LibraryStore {
                     title: entry.title,
                     text: doc.transcript.text,
                     auxiliaryText: Self.searchAuxiliaryText(notes: entry.segmentNotes, transcript: doc.transcript),
+                    boundaries: Self.segmentBoundaries(for: doc.transcript),
                     fingerprint: fingerprint
                 )
             }
@@ -363,6 +364,7 @@ public actor LibraryStore {
             title: entry.title,
             text: text,
             auxiliaryText: Self.searchAuxiliaryText(notes: entry.segmentNotes, transcript: transcript),
+            boundaries: Self.segmentBoundaries(for: transcript),
             fingerprint: Self.bundleFingerprint(entry.bundleURL),
             createdAt: entry.createdAt
         )
@@ -385,6 +387,28 @@ public actor LibraryStore {
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             extraIndexerJobs.yield { cont.resume() }
         }
+    }
+
+    /// Where each segment lands inside `Transcript.text`, so a search hit can name the time it is spoken.
+    /// Mirrors that property's joining: segments that trim to nothing contribute no text and take the
+    /// offset of the segment after them, which keeps this array indexed by segment.
+    static func segmentBoundaries(for transcript: Transcript) -> [LibrarySearchIndex.SegmentBoundary] {
+        var boundaries: [LibrarySearchIndex.SegmentBoundary] = []
+        boundaries.reserveCapacity(transcript.segments.count)
+        var offset = 0
+        var joinedAny = false
+        for segment in transcript.segments {
+            let trimmed = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
+                boundaries.append(.init(textOffset: offset + (joinedAny ? 1 : 0), seconds: segment.start))
+                continue
+            }
+            if joinedAny { offset += 1 }
+            boundaries.append(.init(textOffset: offset, seconds: segment.start))
+            offset += trimmed.count
+            joinedAny = true
+        }
+        return boundaries
     }
 
     static func searchAuxiliaryText(notes: [String: String], transcript: Transcript) -> String {

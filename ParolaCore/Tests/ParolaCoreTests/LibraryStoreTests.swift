@@ -713,6 +713,30 @@ struct LibraryStoreTests {
         #expect(await store.search("quarterly").contains(where: { $0.entryID == entry.id }) == false)
     }
 
+    @Test("segment boundaries land where the joined transcript puts each segment")
+    func segmentBoundariesMatchJoinedText() {
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 3, text: " Buongiorno a tutti "),
+                TranscriptSegment(id: 1, start: 4.5, end: 5, text: "   "),
+                TranscriptSegment(id: 2, start: 9, end: 12, text: "il lancio è vicino")
+            ],
+            language: "it",
+            modelName: "tiny"
+        )
+        let boundaries = LibraryStore.segmentBoundaries(for: transcript)
+        let text = transcript.text
+        #expect(boundaries.count == transcript.segments.count)
+        #expect(boundaries.map(\.seconds) == [0, 4.5, 9])
+        for (segment, boundary) in zip(transcript.segments, boundaries) {
+            let trimmed = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            let start = text.index(text.startIndex, offsetBy: boundary.textOffset)
+            #expect(text[start...].hasPrefix(trimmed))
+        }
+        #expect(boundaries[1].textOffset == boundaries[2].textOffset)
+    }
+
     @Test("search returns active entries and filters soft-deleted")
     func searchFiltersSoftDeleted() async throws {
         let (store, _) = try makeTempLibrary()
