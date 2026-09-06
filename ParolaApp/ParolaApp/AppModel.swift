@@ -1903,6 +1903,10 @@ final class AppModel {
 
     @discardableResult
     func fetchYouTubeSubs(urlString: String) -> LinkHandoff {
+        guard features.isEnabled(.youtube) else {
+            phase = .failed(message: ParolaError.featureDisabled(.youtube).description)
+            return .rejected
+        }
         guard let url = makeYouTubeURL(urlString) else { return .rejected }
         if phaseDefersArrivals || transcribeTaskRunning {
             deferredLinks.append(.subtitles(url.absoluteString))

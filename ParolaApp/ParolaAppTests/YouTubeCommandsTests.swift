@@ -7,14 +7,16 @@ import ParolaCore
 @Suite("Bridge YouTube commands")
 struct YouTubeCommandsTests {
 
-    private func makeRig() throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
+    private func makeRig(
+        features: Set<ParolaFeature> = Set(ParolaFeature.allCases)
+    ) throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
         let bootstrap = AppBootstrap(
             mode: .test,
             library: makeTempLibraryURL("youtubecommands"),
             defaultsOverride: temporaryDefaults(),
             sideEffects: [],
             filePicker: SystemFilePicker(),
-            enabledFeaturesOverride: Set(ParolaFeature.allCases)
+            enabledFeaturesOverride: features
         )
         let model = AppModel(bootstrap: bootstrap)
         let server = try ParolaAutomationServer(model: model)
@@ -69,6 +71,37 @@ struct YouTubeCommandsTests {
         #expect(result == .object(["started": .bool(false), "parked": .bool(true)]))
         #expect(model.deferredLinks == [.subtitles(Self.link)])
         #expect(model.phase == .recording(source: .microphone))
+    }
+
+    @Test("the bridge refuses both subtitle doors with YouTube off", arguments: [
+        "fetchYouTubeSubs", "openYouTubeSheet",
+    ])
+    func bridgeRefusesYouTubeWhenDisabled(name: String) async throws {
+        let allowed = Set(ParolaFeature.allCases).subtracting([.youtube])
+        let (model, server, context, commands) = try makeRig(features: allowed)
+        let command = try #require(commands[name])
+        let args = try command.validate(AutomationArgs(["url": .string(Self.link)]))
+
+        await #expect(throws: AutomationError.self) {
+            _ = try await command.handler(args, context)
+        }
+        withExtendedLifetime(server) {}
+
+        #expect(model.youtubeSheetOpen == false)
+        #expect(model.deferredLinks.isEmpty)
+    }
+
+    @Test("fetchYouTubeSubs refuses without spawning anything when YouTube is off")
+    func fetchYouTubeSubsRefusesWhenDisabled() throws {
+        let allowed = Set(ParolaFeature.allCases).subtracting([.youtube])
+        let (model, server, _, _) = try makeRig(features: allowed)
+
+        let handoff = model.fetchYouTubeSubs(urlString: Self.link)
+        withExtendedLifetime(server) {}
+
+        #expect(handoff == .rejected)
+        #expect(model.deferredLinks.isEmpty)
+        #expect(model.phase == .failed(message: ParolaError.featureDisabled(.youtube).description))
     }
 
     @Test("a URL yt-dlp cannot take is neither started nor parked")

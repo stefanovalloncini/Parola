@@ -84,6 +84,7 @@ extension ParolaAutomationServer {
                 summary: "Opens the YouTube URL sheet.",
                 kind: .mutating,
                 handler: { _, ctx in
+                    try ctx.require(.youtube)
                     ctx.model.youtubeSheetOpen = true
                     return .object(["open": .bool(true)])
                 }
@@ -109,6 +110,7 @@ extension ParolaAutomationServer {
                     .init(name: "url", kind: .string(), required: true, summary: "YouTube URL"),
                 ],
                 handler: { args, ctx in
+                    try ctx.require(.youtube)
                     let url = try args.string("url")
                     let handoff = ctx.model.fetchYouTubeSubs(urlString: url)
                     return .object([
