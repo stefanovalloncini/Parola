@@ -297,6 +297,24 @@ struct LibraryStoreTests {
         #expect(FileManager.default.fileExists(atPath: old.bundleURL.path) == false)
     }
 
+    @Test("a load cancelled before it starts throws instead of decoding")
+    func cancelledLoadDoesNotDeliver() async throws {
+        let (store, tmp) = try makeTempLibrary()
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+
+        let loading = Task { () -> LoadedEntry in
+            for _ in 0..<1_000 where !Task.isCancelled {
+                await Task.yield()
+            }
+            return try await store.load(entry.id)
+        }
+        loading.cancel()
+
+        await #expect(throws: CancellationError.self) { try await loading.value }
+        #expect(try await store.load(entry.id).entry.id == entry.id)
+    }
+
     @Test("delete invalidates the list cache so the entry no longer appears")
     func deleteInvalidatesCache() async throws {
         let (store, _) = try makeTempLibrary()

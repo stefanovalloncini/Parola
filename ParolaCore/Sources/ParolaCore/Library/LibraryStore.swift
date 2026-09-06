@@ -835,11 +835,16 @@ private func offActorIO<T: Sendable>(
     }
 }
 
+/// The hop cannot be cancelled once it is running, so the checks bracket it: a cancelled caller
+/// pays at most one pass of `work` instead of `decodedDocument`'s eight.
 private func offActorThrowingIO<T: Sendable>(
     qos: DispatchQoS.QoSClass = .userInitiated,
     _ work: @escaping @Sendable () throws -> T
 ) async throws -> T {
-    try await withCheckedThrowingContinuation { continuation in
+    try Task.checkCancellation()
+    let value: T = try await withCheckedThrowingContinuation { continuation in
         DispatchQueue.global(qos: qos).async { continuation.resume(with: Result { try work() }) }
     }
+    try Task.checkCancellation()
+    return value
 }
