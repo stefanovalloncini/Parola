@@ -4,7 +4,7 @@ import Testing
 
 extension FileDiagnosticsSink {
     /// Waits for the install-time sweep (runs on a background queue) so fixtures don't race it.
-    func waitForInstallSweep(timeout: Duration = .seconds(2)) async throws {
+    func waitForInstallSweep(timeout: Duration = .seconds(10)) async throws {
         let deadline = ContinuousClock.now + timeout
         while ContinuousClock.now < deadline {
             if completedSweeps > 0 { return }

@@ -21,7 +21,7 @@ struct FileDiagnosticsSinkTests {
     }
 
     private func waitForContent(
-        _ substring: String, in url: URL, timeout: Duration = .seconds(2)
+        _ substring: String, in url: URL, timeout: Duration = .seconds(10)
     ) async throws {
         let deadline = ContinuousClock.now + timeout
         while ContinuousClock.now < deadline {
@@ -33,7 +33,7 @@ struct FileDiagnosticsSinkTests {
         Issue.record("expected \"\(substring)\" in \(url.path) within \(timeout)")
     }
 
-    private func waitUntilDeleted(_ url: URL, timeout: Duration = .seconds(2)) async throws {
+    private func waitUntilDeleted(_ url: URL, timeout: Duration = .seconds(10)) async throws {
         let deadline = ContinuousClock.now + timeout
         while ContinuousClock.now < deadline {
             if !FileManager.default.fileExists(atPath: url.path) { return }

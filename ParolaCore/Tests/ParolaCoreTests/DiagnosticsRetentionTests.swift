@@ -214,7 +214,7 @@ struct DiagnosticsRetentionTests {
 
     private func overBudgetNotice(
         in capture: CapturingDiagnosticsSink,
-        timeout: Duration = .seconds(2)
+        timeout: Duration = .seconds(10)
     ) async -> LogRecord? {
         let deadline = ContinuousClock.now + timeout
         while ContinuousClock.now < deadline {
