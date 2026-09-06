@@ -353,6 +353,25 @@ struct LibraryListContentTests {
         #expect(SearchResultRow.timestamp(for: nil) == nil)
     }
 
+    @Test("the timestamp column is kept for a list where something was spoken, and dropped where nothing was")
+    func timestampSlotFollowsTheList() {
+        let ids = ["a", "b"]
+        func matches(_ seconds: [Double?]) -> [String: LibrarySearchIndex.Match] {
+            Dictionary(uniqueKeysWithValues: zip(ids, seconds).map { id, at in
+                (id, LibrarySearchIndex.Match(
+                    entryID: id,
+                    score: 1,
+                    snippet: "s",
+                    firstHit: at.map { .init(seconds: $0, segmentIndex: 1, textOffset: 8) }
+                ))
+            })
+        }
+        #expect(LibraryListContent.showsTimestampSlot(for: ids, matches: matches([12, 30])))
+        #expect(LibraryListContent.showsTimestampSlot(for: ids, matches: matches([nil, 30])))
+        #expect(!LibraryListContent.showsTimestampSlot(for: ids, matches: matches([nil, nil])))
+        #expect(!LibraryListContent.showsTimestampSlot(for: [], matches: matches([12, 30])))
+    }
+
     /// The slot is reserved on every row so the snippets line up; too narrow a one would truncate the longest clock.
     @Test("the reserved timestamp slot fits the longest time a row can show")
     func timestampSlotFitsTheLongestClock() {

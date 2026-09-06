@@ -101,6 +101,14 @@ enum LibraryListContent {
         return "\(transcripts) · \(matchesLabel(matches, locale: locale))"
     }
 
+    /// The rows keep a column for the time so their snippets line up; a list where nothing was spoken keeps its width.
+    static func showsTimestampSlot(
+        for ids: [LibraryEntry.ID],
+        matches: [String: LibrarySearchIndex.Match]
+    ) -> Bool {
+        ids.contains { matches[$0]?.firstHit != nil }
+    }
+
     /// Reads the counts live: a query edit can leave the same entries matching a different number of times.
     static func searchTotalsLabel(
         for ids: [LibraryEntry.ID],
@@ -228,9 +236,14 @@ struct LibraryListView: View {
             if entries.isEmpty {
                 emptyState
             } else {
+                // Read once for the whole list, not per row: every row has to reserve the same column or none does.
+                let showsTimestamp = LibraryListContent.showsTimestampSlot(
+                    for: entries.map(\.id),
+                    matches: model.searchMatches
+                )
                 List(entries, id: \.id, selection: $selection) { row in
                     let entry = row.entry
-                    rowContent(for: row)
+                    rowContent(for: row, showsTimestamp: showsTimestamp)
                         .contentShape(Rectangle())
                         .draggable(entry.bundleURL)
                         .onTapGesture(count: 2) {
@@ -340,14 +353,15 @@ struct LibraryListView: View {
     }
 
     @ViewBuilder
-    private func rowContent(for row: LibraryRowDisplay) -> some View {
+    private func rowContent(for row: LibraryRowDisplay, showsTimestamp: Bool) -> some View {
         if searchResults == nil {
             LibraryRow(display: row, isSelected: selection.contains(row.id))
         } else {
             SearchResultRow(
                 display: row,
                 match: model.searchMatches[row.id],
-                isSelected: selection.contains(row.id)
+                isSelected: selection.contains(row.id),
+                showsTimestamp: showsTimestamp
             )
             .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] + SearchResultRow.separatorInset }
         }
