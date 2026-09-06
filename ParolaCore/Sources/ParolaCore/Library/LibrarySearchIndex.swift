@@ -89,6 +89,17 @@ public actor LibrarySearchIndex {
         }
     }
 
+    /// One pass over the text answers both "how many" and "where first", so the tokens are hashed once.
+    private struct Tally {
+        var count = 0
+        var offset = LibrarySearchIndex.noOffset
+
+        mutating func add(at bodyOffset: Int) {
+            count += 1
+            if offset == LibrarySearchIndex.noOffset { offset = bodyOffset }
+        }
+    }
+
     private struct IndexedEntry: Sendable {
         let title: String
         let excerpt: String
@@ -394,23 +405,19 @@ public actor LibrarySearchIndex {
         boundaries: [SegmentBoundary],
         fingerprint: String
     ) {
-        var occurrences: [String: Int] = [:]
-        var bodyOffsets: [String: Int] = [:]
-        Self.enumerateTokens(in: title) { token, _ in occurrences[token, default: 0] += 1 }
-        Self.enumerateTokens(in: text) { token, offset in
-            occurrences[token, default: 0] += 1
-            if bodyOffsets[token] == nil { bodyOffsets[token] = offset }
-        }
-        Self.enumerateTokens(in: auxiliaryText) { token, _ in occurrences[token, default: 0] += 1 }
-        let tokens = occurrences.keys.sorted()
+        var tallies: [String: Tally] = [:]
+        Self.enumerateTokens(in: title) { token, _ in tallies[token, default: Tally()].count += 1 }
+        Self.enumerateTokens(in: text) { token, offset in tallies[token, default: Tally()].add(at: offset) }
+        Self.enumerateTokens(in: auxiliaryText) { token, _ in tallies[token, default: Tally()].count += 1 }
+        let tokens = tallies.keys.sorted()
         let excerpt = Self.excerpt(of: text)
         let entry = IndexedEntry(
             title: title,
             excerpt: excerpt.text,
             excerptTruncated: excerpt.truncated,
             tokens: tokens,
-            counts: tokens.map { occurrences[$0] ?? 0 },
-            offsets: tokens.map { bodyOffsets[$0] ?? Self.noOffset },
+            counts: tokens.map { tallies[$0]?.count ?? 0 },
+            offsets: tokens.map { tallies[$0]?.offset ?? Self.noOffset },
             boundaryOffsets: boundaries.map(\.textOffset),
             boundaryCentiseconds: boundaries.map { Self.centiseconds($0.seconds) },
             fingerprint: fingerprint
