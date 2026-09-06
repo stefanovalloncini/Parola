@@ -35,8 +35,7 @@ public final class DiagnosticsBootstrap: Sendable {
             minimumLevel: Self.minimumLevel(environment: environment)
         )
         self.sink = sink
-        // Best effort: the sink's retention sweep can log and it starts inside that initializer,
-        // so installing right after it only usually catches the sweep's own notice.
+        // Best effort: the sweep starts inside init, so this only usually catches its own notice.
         ParolaLog.install(sink)
         ParolaLog.info(.diagnostics, "diagnostics sink installed")
         flushTask = periodicFlush

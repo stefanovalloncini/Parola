@@ -13,20 +13,45 @@ struct CLIEntryLoggingTests {
         return text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
-    /// The CLI commands own the process's argument parsing and its sink, so they are pinned in
-    /// source rather than run: `Record.run()` opens a microphone.
-    @Test("record and transcribe log their entry after the sink is installed")
+    /// Pinned in source rather than run: `Record.run()` opens a microphone.
+    @Test("record and transcribe gate before they log their entry")
     func entrySites() throws {
         let record = try source("parola/Commands/Record")
         #expect(record.contains(
-            #"CLIDiagnostics.installIfWanted(alwaysOn: true) ParolaLog.info( .cli, "record started from \(source)","#
+            #"CLIDiagnostics.installIfWanted(alwaysOn: true) switch source {"#
+        ))
+        #expect(record.contains(
+            #"} ParolaLog.info( .cli, "record started from \(source)","#
         ))
         #expect(record.contains(#"model.map { [LogField.model: LogValue.safe(ModelToken($0))] } ?? [:]"#))
 
         let transcribe = try source("parola/Commands/Transcribe")
         #expect(transcribe.contains(
-            #"CLIDiagnostics.installIfWanted(alwaysOn: false) ParolaLog.info(.cli, "transcribe started", [.count: .int(inputs.count)])"#
+            #"guard !inputs.isEmpty else { throw ValidationError("At least one input file is required.") }"#
+                + #" ParolaLog.info(.cli, "transcribe started", [.count: .int(inputs.count)])"#
         ))
+    }
+
+    /// Record stays visible with `meetings` enabled; only the mic-source gate refuses.
+    @Test(
+        "the mic-source gate refuses record before it logs its entry",
+        .enabled(if: parolaBinaryURL != nil)
+    )
+    func recordGateRefusesBeforeLogging() throws {
+        try withTemporaryHome { home, environment in
+            let plist = home.appendingPathComponent("gate.plist")
+            try (["enabledFeatures": ["meetings", "batch"]] as NSDictionary).write(to: plist)
+            var overrides = environment
+            overrides["PAROLA_MANAGED_PLIST"] = plist.path
+            let run = try runParola(["record"], environment: overrides, currentDirectory: home)
+
+            #expect(run.status != 0)
+            #expect(run.output.contains("disabled in this deployment"))
+            let sinkText = diagnosticsFiles(in: home)
+                .compactMap { try? String(contentsOf: $0, encoding: .utf8) }
+                .joined()
+            #expect(!sinkText.contains("record started from"))
+        }
     }
 
     @Test("the stdio runner logs the EOF that shuts it down")

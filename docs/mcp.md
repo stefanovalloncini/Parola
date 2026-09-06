@@ -227,4 +227,4 @@ usually means the binary path in the client config is stale.
 **A call failed and stderr didn't say why.** The server records diagnostics
 while it runs. `parola diagnostics` writes them out as a plain-text report —
 structural facts only, no transcript text or paths — and prints its path;
-`parola diagnostics --clear` deletes what was recorded.
+`parola diagnostics --clear` deletes what was recorded, sparing a file a live process is still writing.

@@ -46,6 +46,7 @@ struct ModelDownloadLoggingTests {
     func modelsDirectoryFailure() async throws {
         try await withSink { sink in
             let parent = try temporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: parent) }
             try withReadOnly(parent) {
                 _ = ModelStore(modelsDirectory: parent.appendingPathComponent("store", isDirectory: true))
             }
@@ -242,11 +243,13 @@ struct ModelDownloadLoggingTests {
             let session = MockTransport.makeSession(
                 handler: MockTransport.Handler { _ in .ok(body: "[]") }
             )
+            let destination = try temporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: destination) }
             await #expect(throws: ParolaError.self) {
                 try await HuggingFaceDownloader.snapshot(
                     repo: "argmaxinc/whisperkit-coreml",
                     subpath: Self.tiny,
-                    destination: try temporaryDirectory(),
+                    destination: destination,
                     urlSession: session,
                     progress: nil
                 )
@@ -260,11 +263,13 @@ struct ModelDownloadLoggingTests {
     func fileDownloadHTTPFailure() async throws {
         try await withSink { sink in
             let session = Self.session(tree: Self.tree(size: 7), fileStatus: 503)
+            let destination = try temporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: destination) }
             await #expect(throws: ParolaError.self) {
                 try await HuggingFaceDownloader.snapshot(
                     repo: "argmaxinc/whisperkit-coreml",
                     subpath: Self.tiny,
-                    destination: try temporaryDirectory(),
+                    destination: destination,
                     urlSession: session,
                     progress: nil
                 )
@@ -281,11 +286,13 @@ struct ModelDownloadLoggingTests {
     func checksumMismatch() async throws {
         try await withSink { sink in
             let session = Self.session(tree: Self.tree(size: 7, sha256: String(repeating: "0", count: 64)))
+            let destination = try temporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: destination) }
             await #expect(throws: ParolaError.self) {
                 try await HuggingFaceDownloader.snapshot(
                     repo: "argmaxinc/whisperkit-coreml",
                     subpath: Self.tiny,
-                    destination: try temporaryDirectory(),
+                    destination: destination,
                     urlSession: session,
                     progress: nil
                 )
@@ -302,11 +309,13 @@ struct ModelDownloadLoggingTests {
     func shortFileRejected() async throws {
         try await withSink { sink in
             let session = Self.session(tree: Self.tree(size: 999))
+            let destination = try temporaryDirectory()
+            defer { try? FileManager.default.removeItem(at: destination) }
             await #expect(throws: ParolaError.self) {
                 try await HuggingFaceDownloader.snapshot(
                     repo: "argmaxinc/whisperkit-coreml",
                     subpath: Self.tiny,
-                    destination: try temporaryDirectory(),
+                    destination: destination,
                     urlSession: session,
                     progress: nil
                 )

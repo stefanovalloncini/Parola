@@ -2,8 +2,7 @@ import Foundation
 import os
 import ParolaCore
 
-/// Which commands get a diagnostics sink. Long-running ones always do; a one-shot only under
-/// `PAROLA_DIAGNOSTICS=1`, so scripted runs do not accrete files.
+/// Long-running commands always get a diagnostics sink; a one-shot only under `PAROLA_DIAGNOSTICS=1`.
 enum CLIDiagnostics {
     private static let installed = OSAllocatedUnfairLock<DiagnosticsBootstrap?>(initialState: nil)
 
@@ -22,10 +21,19 @@ enum CLIDiagnostics {
             environment: environment,
             periodicFlush: alwaysOn
         )
-        installed.withLock { $0 = bootstrap }
+        let previous = installed.withLock {
+            let old = $0
+            $0 = bootstrap
+            return old
+        }
+        previous?.stopPeriodicFlush()
     }
 
     static func flush() async {
-        await ParolaLog.flush()
+        if let bootstrap = installed.withLock({ $0 }) {
+            await bootstrap.flush()
+        } else {
+            await ParolaLog.flush()
+        }
     }
 }

@@ -58,10 +58,10 @@ struct Transcribe: AsyncParsableCommand {
 
     func run() async throws {
         CLIDiagnostics.installIfWanted(alwaysOn: false)
-        ParolaLog.info(.cli, "transcribe started", [.count: .int(inputs.count)])
         guard !inputs.isEmpty else {
             throw ValidationError("At least one input file is required.")
         }
+        ParolaLog.info(.cli, "transcribe started", [.count: .int(inputs.count)])
 
         let resolved = try inputs.map(Self.resolveInput)
         if resolved.count > 1, resolved.contains(where: { $0.isURL }) {

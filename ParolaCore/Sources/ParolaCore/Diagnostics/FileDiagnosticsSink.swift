@@ -77,8 +77,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         self.maxBufferedRecords = maxBufferedRecords
         let pid = ProcessInfo.processInfo.processIdentifier
         let epoch = Int(Date().timeIntervalSince1970)
-        // The token keeps two sinks built in the same second apart: they would otherwise share a
-        // base name, and the trim's identity exemption would let one delete the other's open file.
+        // Keeps two sinks built in the same second from sharing a base name and trimming each other's file.
         let token = String(UInt32.random(in: 0..<0x1_0000), radix: 16)
         self.baseName = "\(Self.filePrefix)\(pid)-\(epoch)-\(token)"
         scheduleSweep()
@@ -273,6 +272,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     /// What one sweep did. `overBudget` means the trim ran out of files it was allowed to delete
     /// — every survivor is either the file still open here or a live sibling's — so the folder
     /// stays large. `ownRotations` is how many of the deletions were this sink's own rotations.
+    /// `skippedLive` counts both the age-branch and budget-branch skips, deduplicated by path.
     struct SweepOutcome: Sendable, Equatable {
         var deleted = 0
         var skippedLive = 0
@@ -299,8 +299,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         var surviving: [(url: URL, date: Date, size: Int)] = []
         var liveSkips: Set<String> = []
         let cutoff = now.addingTimeInterval(-Double(retentionDays) * 86_400)
-        // Only the file still open is exempt: this sink's earlier rotations are closed, complete
-        // and ours to trim.
+        // Only the file still open is exempt; this sink's earlier rotations are closed and ours to trim.
         let openFile = currentFileName
         for url in mine {
             let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])

@@ -25,7 +25,6 @@ struct DiagnosticsBootstrapTests {
             if !text.isEmpty { return text }
             try await Task.sleep(for: .milliseconds(20))
         }
-        Issue.record("no diagnostics file was written")
         return ""
     }
 
@@ -41,6 +40,7 @@ struct DiagnosticsBootstrapTests {
     @Test("the installed sink takes records emitted through the facade")
     func installsTheSink() throws {
         let directory = scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
         let bootstrap = DiagnosticsBootstrap(directory: directory, environment: [:], periodicFlush: false)
         defer { ParolaLog.uninstall() }
 
@@ -52,6 +52,7 @@ struct DiagnosticsBootstrapTests {
     @Test("the periodic flush writes breadcrumbs nothing else would drain")
     func periodicFlushDrainsOnItsOwn() async throws {
         let directory = scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
         let bootstrap = DiagnosticsBootstrap(
             directory: directory,
             environment: [:],
@@ -70,6 +71,7 @@ struct DiagnosticsBootstrapTests {
     @Test("without the periodic flush an info record waits for a drain")
     func noPeriodicFlushLeavesTheBufferAlone() async throws {
         let directory = scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
         let bootstrap = DiagnosticsBootstrap(directory: directory, environment: [:], periodicFlush: false)
         // The notice is buffered and flush() drains the sink directly; this keeps foreign records out.
         ParolaLog.uninstall()

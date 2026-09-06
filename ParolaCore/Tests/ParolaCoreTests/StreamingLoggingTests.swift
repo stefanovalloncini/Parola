@@ -50,9 +50,10 @@ struct StreamingLoggingTests {
         return nil
     }
 
-    private func temporaryStore() -> ModelStore {
-        ModelStore(modelsDirectory: FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-streaming-logging-\(UUID().uuidString)", isDirectory: true))
+    private func temporaryStore() -> (store: ModelStore, directory: URL) {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-streaming-logging-\(UUID().uuidString)", isDirectory: true)
+        return (ModelStore(modelsDirectory: directory), directory)
     }
 
     // MARK: - Session
@@ -60,7 +61,9 @@ struct StreamingLoggingTests {
     @Test("a model whose engine can't stream is refused with a notice")
     func nonStreamingEngineRefused() async throws {
         try await withSink { sink in
-            let session = StreamingTranscriptionSession(modelStore: temporaryStore())
+            let (store, directory) = temporaryStore()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let session = StreamingTranscriptionSession(modelStore: store)
             await #expect(throws: ParolaError.self) {
                 _ = try await session.start(
                     options: TranscriptionOptions(model: "nvidia_parakeet-tdt-0.6b-v2")
@@ -76,7 +79,8 @@ struct StreamingLoggingTests {
     @Test("an accepted start reports the session and its model")
     func acceptedStartReported() async throws {
         try await withSink { sink in
-            let store = temporaryStore()
+            let (store, directory) = temporaryStore()
+            defer { try? FileManager.default.removeItem(at: directory) }
             try store.seedInstalledModel("openai_whisper-tiny")
             let session = StreamingTranscriptionSession(modelStore: store)
             // The seeded directory holds no weights, so the model load fails offline right after.
@@ -160,6 +164,10 @@ struct StreamingLoggingTests {
             for _ in 0..<500 where !capture.installed {
                 try await Task.sleep(for: .milliseconds(2))
             }
+            guard capture.installed else {
+                Issue.record("capture never installed")
+                return
+            }
             capture.push(seconds: 2, value: 0.5)
             _ = await runTask.value
             let records = streamingRecords(sink, message: "streaming iteration failed")
@@ -177,8 +185,10 @@ struct StreamingLoggingTests {
     func cachedLoadFailureReported() async throws {
         try await withSink { sink in
             let cache = StreamingModelCache { _, _ in throw StreamingLogFailure() }
+            let (store, directory) = temporaryStore()
+            defer { try? FileManager.default.removeItem(at: directory) }
             await #expect(throws: StreamingLogFailure.self) {
-                _ = try await cache.borrow("openai_whisper-tiny", store: temporaryStore())
+                _ = try await cache.borrow("openai_whisper-tiny", store: store)
             }
             let record = try #require(await awaitRecord(sink, message: "model load failed"))
             #expect(record.level == .error)
@@ -191,8 +201,10 @@ struct StreamingLoggingTests {
     func cancelledLoadNotReported() async throws {
         try await withSink { sink in
             let cache = StreamingModelCache { _, _ in throw CancellationError() }
+            let (store, directory) = temporaryStore()
+            defer { try? FileManager.default.removeItem(at: directory) }
             await #expect(throws: CancellationError.self) {
-                _ = try await cache.borrow("openai_whisper-tiny", store: temporaryStore())
+                _ = try await cache.borrow("openai_whisper-tiny", store: store)
             }
             try await Task.sleep(for: .milliseconds(50))
             #expect(streamingRecords(sink, message: "model load failed").isEmpty)

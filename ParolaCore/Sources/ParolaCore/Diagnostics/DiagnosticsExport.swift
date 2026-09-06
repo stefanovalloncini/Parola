@@ -104,8 +104,7 @@ public struct DiagnosticsEnvironment: Sendable {
     }
 }
 
-/// One line read back from a sink file. Deliberately not a `LogRecord`: rebuilding one would need
-/// a public `LogRecord.init` or a runtime-`String` `LogMessage`, and both are closed on purpose.
+/// One line read back from a sink file — not a `LogRecord`, whose `init` and runtime message stay closed.
 struct ExportedRecord: Sendable {
     let timestamp: Date?
     let timestampText: String
@@ -153,8 +152,7 @@ public enum DiagnosticsExport {
                 reading.skippedFiles += 1
                 continue
             }
-            // A crashing session's own file is the one most likely to end mid-character, so decode
-            // it leniently and let the single broken line fail JSON decode and be counted.
+            // A crashing session's file may end mid-character; decode leniently and count the broken line.
             let text = String(decoding: data, as: UTF8.self)
             for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
                 if let record = decode(line: line) {
@@ -188,8 +186,7 @@ public enum DiagnosticsExport {
         )
     }
 
-    /// Ties every record to its read order so equal timestamps and unparsable ones — which sort
-    /// last — keep a stable position across runs.
+    /// Ties every record to its read order, so equal/unparsable timestamps keep a stable position.
     private static func sortedByTimestamp(_ records: [ExportedRecord]) -> [ExportedRecord] {
         records.enumerated().sorted { lhs, rhs in
             switch (lhs.element.timestamp, rhs.element.timestamp) {

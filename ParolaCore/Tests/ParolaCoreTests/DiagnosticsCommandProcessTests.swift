@@ -25,6 +25,16 @@ struct DiagnosticsCommandProcessTests {
         }
     }
 
+    @Test func doesNotInstallItsOwnSink() throws {
+        try withTemporaryHome { home, environment in
+            var overrides = environment
+            overrides["PAROLA_DIAGNOSTICS"] = "1"
+            let run = try runParola(["diagnostics"], environment: overrides, currentDirectory: home)
+            #expect(run.status == 0)
+            #expect(diagnosticsFiles(in: home).isEmpty)
+        }
+    }
+
     @Test func stdoutPrintsTheReportAndWritesNoFile() throws {
         try withTemporaryHome { home, environment in
             let run = try runParola(["diagnostics", "--stdout"], environment: environment, currentDirectory: home)
@@ -78,8 +88,7 @@ struct DiagnosticsCommandProcessTests {
         }
     }
 
-    /// A pid near the top of the range macOS hands out, checked to be nobody's, so the file it
-    /// names is safe to treat as abandoned.
+    /// A pid near the top of macOS's range, checked to be nobody's, so its file is safe to treat as abandoned.
     private static func deadProcessID() -> pid_t {
         for candidate in stride(from: pid_t(99_990), through: pid_t(90_000), by: -1)
         where kill(candidate, 0) != 0 && errno == ESRCH {

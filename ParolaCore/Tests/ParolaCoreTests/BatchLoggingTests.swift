@@ -47,6 +47,7 @@ struct BatchLoggingTests {
     func refusedQueue() async throws {
         try await withSink { sink in
             let (queue, audioURL) = try await makeQueue(features: FeatureSet(enabled: []))
+            defer { try? FileManager.default.removeItem(at: audioURL.deletingLastPathComponent()) }
             let jobs = [BatchJob(url: audioURL), BatchJob(url: audioURL)]
             await drain(queue.process(jobs: jobs, options: TranscriptionOptions(model: "openai_whisper-tiny")))
 
@@ -63,6 +64,7 @@ struct BatchLoggingTests {
     func failedJob() async throws {
         try await withSink { sink in
             let (queue, audioURL) = try await makeQueue()
+            defer { try? FileManager.default.removeItem(at: audioURL.deletingLastPathComponent()) }
             let missing = audioURL.deletingLastPathComponent().appendingPathComponent("gone.wav")
             let job = BatchJob(url: missing)
             await drain(queue.process(jobs: [job], options: TranscriptionOptions(model: "openai_whisper-tiny")))
@@ -80,6 +82,7 @@ struct BatchLoggingTests {
     func cancelledJob() async throws {
         try await withSink { sink in
             let (queue, audioURL) = try await makeQueue(behavior: .cancel)
+            defer { try? FileManager.default.removeItem(at: audioURL.deletingLastPathComponent()) }
             let job = BatchJob(url: audioURL)
             await drain(queue.process(jobs: [job], options: TranscriptionOptions(model: "openai_whisper-tiny")))
 
@@ -94,6 +97,7 @@ struct BatchLoggingTests {
     func finishedQueue() async throws {
         try await withSink { sink in
             let (queue, audioURL) = try await makeQueue()
+            defer { try? FileManager.default.removeItem(at: audioURL.deletingLastPathComponent()) }
             let jobs = [BatchJob(url: audioURL), BatchJob(url: audioURL)]
             await drain(queue.process(jobs: jobs, options: TranscriptionOptions(model: "openai_whisper-tiny")))
 

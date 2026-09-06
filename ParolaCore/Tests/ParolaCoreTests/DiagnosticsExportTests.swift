@@ -72,6 +72,7 @@ struct DiagnosticsExportTests {
     @Test("records from every file merge into one timeline")
     func mergesFilesInTimestampOrder() throws {
         let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
         try write([
             try line(ts: "2026-08-22T13:58:02.114Z", message: "first"),
             try line(ts: "2026-08-22T13:58:06.000Z", message: "fourth"),
@@ -89,6 +90,7 @@ struct DiagnosticsExportTests {
     @Test("a line that is not JSON is skipped and counted")
     func skipsMalformedLines() throws {
         let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
         try write([
             try line(ts: "2026-08-22T13:58:02.114Z", message: "kept"),
             "{ this is not json",
@@ -106,6 +108,7 @@ struct DiagnosticsExportTests {
     @Test("a file that ends mid-character keeps the lines before the break")
     func keepsLinesBeforeATruncatedTail() throws {
         let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
         var data = Data((try line(ts: "2026-08-22T13:58:02.114Z", message: "kept") + "\n").utf8)
         data.append(contentsOf: [0x7B, 0x22, 0x74, 0xC3])
         try data.write(to: directory.appendingPathComponent("parola-100-1755871000.jsonl"))
@@ -119,6 +122,7 @@ struct DiagnosticsExportTests {
     @Test("a file that cannot be read is counted, not dropped in silence")
     func countsUnreadableFiles() throws {
         let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
         try write([try line(ts: "2026-08-22T13:58:02.114Z", message: "kept")],
                   to: directory, named: "parola-100-1755871000.jsonl")
         try write([try line(ts: "2026-08-22T13:58:03.000Z", message: "lost")],
@@ -140,6 +144,7 @@ struct DiagnosticsExportTests {
     @Test("a line from a newer schema is skipped and counted")
     func skipsNewerSchema() throws {
         let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
         try write([
             try line(ts: "2026-08-22T13:58:02.114Z", message: "kept"),
             try line(
@@ -157,6 +162,7 @@ struct DiagnosticsExportTests {
     @Test("a record whose timestamp will not parse sorts last")
     func unparsableTimestampSortsLast() throws {
         let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
         try write([
             try line(ts: "not a date", message: "undated"),
             try line(ts: "2026-08-22T13:58:02.114Z", message: "dated"),
@@ -170,6 +176,7 @@ struct DiagnosticsExportTests {
     @Test("the header reports every environment field")
     func headerReportsEveryField() throws {
         let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
         let text = DiagnosticsExport.render(
             directory: directory,
             environment: fullEnvironment,
@@ -193,12 +200,13 @@ struct DiagnosticsExportTests {
     @Test("the header degrades where the frontend has no answer")
     func headerDegradesForMissingValues() throws {
         let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
         var environment = emptyEnvironment
         environment.features = FeatureSet(enabled: [.batch, .ai])
         let text = DiagnosticsExport.render(directory: directory, environment: environment)
 
         #expect(text.contains("App unknown  macOS 26.1  arm64  16 GB  it_IT"))
-        #expect(text.contains("Permissions  not applicable"))
+        #expect(text.contains("Permissions  unknown"))
         #expect(text.contains("Engines      unknown"))
         #expect(text.contains("Models       none installed"))
         #expect(text.contains("Library      unknown entries, not measured"))
@@ -208,6 +216,7 @@ struct DiagnosticsExportTests {
     @Test("an unrecognized model id never reaches the header")
     func unknownModelIsNotEchoed() throws {
         let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
         var environment = emptyEnvironment
         environment.models = [.init(token: ModelToken("/Users/someone/Models/secret"), bytes: nil)]
         let text = DiagnosticsExport.render(directory: directory, environment: environment)
@@ -219,6 +228,7 @@ struct DiagnosticsExportTests {
     @Test("an audio-load failure exports its kind, never the path it was given")
     func errorFieldCarriesNoPath() async throws {
         let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
         let failure = ParolaError.audioLoadFailed(
             URL(fileURLWithPath: "/Users/someone/Recordings/Board meeting.m4a"),
             underlying: "/Users/someone/Recordings/Board meeting.m4a could not be opened"
@@ -247,6 +257,7 @@ struct DiagnosticsExportTests {
     @Test("the exported record line keeps the shape of LogRecord.formattedLine")
     func recordLineMatchesFormattedLine() async throws {
         let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
         let record = LogRecord(
             timestamp: Date(timeIntervalSince1970: 1_755_871_082.114),
             level: .error,

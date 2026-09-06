@@ -65,7 +65,7 @@ extension DiagnosticsExport {
             ("accessibility", environment.accessibility),
         ]
         let rendered = items.compactMap { name, state in state.map { "\(name)=\($0.rawValue)" } }
-        return rendered.isEmpty ? "not applicable" : rendered.joined(separator: " ")
+        return rendered.isEmpty ? "unknown" : rendered.joined(separator: " ")
     }
 
     private static func enginesText(_ engines: [EngineID: Bool]) -> String {

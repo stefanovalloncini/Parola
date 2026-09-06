@@ -43,7 +43,8 @@ what Parola logged when it failed. It writes `Parola-Diagnostics-<date>.txt` in
 the current directory and prints the path. The report holds no transcript text,
 file names, or paths, so you can read it before you attach it to a bug report.
 Pass `--stdout` to print it instead of writing a file, and `--clear` to delete
-the recorded diagnostics once the report is out.
+the recorded diagnostics once the report is out (a file a live process is still
+writing is spared).
 
 ## Build the app
 

@@ -145,8 +145,7 @@ struct YouTubeAndAILoggingTests {
         }
     }
 
-    /// The remaining sites need `yt-dlp` on the machine, an Apple Intelligence state this host
-    /// cannot be put into, or a keychain that refuses — so their calls are pinned in source.
+    /// The remaining sites need `yt-dlp`, an unreachable Apple Intelligence state, or a refusing keychain — pinned in source.
     @Test("the sites that cannot be driven here are still present and still safe")
     func pinnedSites() throws {
         let youtube = try coreSource("Audio/YouTubeAudioSource")

@@ -51,8 +51,7 @@ struct LogMessageTests {
         #expect((URL(fileURLWithPath: "/x") as Any) as? any LogSafe == nil)
     }
 
-    /// A public memberwise init is the other door back in: it would let a caller rebuild a record
-    /// from arbitrary strings, which is what `LogMessage`'s StaticString pin exists to prevent.
+    /// A public memberwise init would let a caller rebuild a record from strings — what the StaticString pin prevents.
     @Test("LogRecord's memberwise init stays internal")
     func recordInitIsNotPublic() throws {
         let source = URL(filePath: #filePath)

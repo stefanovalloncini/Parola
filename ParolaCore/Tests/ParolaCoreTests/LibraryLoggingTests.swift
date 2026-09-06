@@ -59,6 +59,7 @@ struct LibraryLoggingTests {
     func unreadableLibraryFolder() async throws {
         try await withSink { sink in
             let libraryURL = try makeLibraryURL()
+            defer { try? FileManager.default.removeItem(at: libraryURL) }
             try setPermissions(0o000, on: libraryURL)
             defer { try? setPermissions(0o700, on: libraryURL) }
 
@@ -80,7 +81,9 @@ struct LibraryLoggingTests {
         defer { ParolaLog.uninstall() }
 
         let libraryURL = try makeLibraryURL()
+        defer { try? FileManager.default.removeItem(at: libraryURL) }
         let audio = try makeAudio()
+        defer { try? FileManager.default.removeItem(at: audio) }
         let seed = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
         let broken = try await seed.add(transcript: makeTranscript("first"), audioSource: audio)
         _ = try await seed.add(transcript: makeTranscript("second"), audioSource: audio)
@@ -107,8 +110,11 @@ struct LibraryLoggingTests {
     func transcriptWriteFailure() async throws {
         try await withSink { sink in
             let libraryURL = try makeLibraryURL()
+            defer { try? FileManager.default.removeItem(at: libraryURL) }
             let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
-            let entry = try await store.add(transcript: makeTranscript(), audioSource: try makeAudio())
+            let audio = try makeAudio()
+            defer { try? FileManager.default.removeItem(at: audio) }
+            let entry = try await store.add(transcript: makeTranscript(), audioSource: audio)
             try setPermissions(0o500, on: entry.bundleURL)
             defer { try? setPermissions(0o700, on: entry.bundleURL) }
 
@@ -129,8 +135,11 @@ struct LibraryLoggingTests {
     func recacheFailure() async throws {
         try await withSink { sink in
             let libraryURL = try makeLibraryURL()
+            defer { try? FileManager.default.removeItem(at: libraryURL) }
             let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
-            let entry = try await store.add(transcript: makeTranscript(), audioSource: try makeAudio())
+            let audio = try makeAudio()
+            defer { try? FileManager.default.removeItem(at: audio) }
+            let entry = try await store.add(transcript: makeTranscript(), audioSource: audio)
             let manifestURL = entry.bundleURL.appendingPathComponent("manifest.json")
             var manifest = try #require(
                 JSONSerialization.jsonObject(with: try Data(contentsOf: manifestURL)) as? [String: Any]
@@ -154,10 +163,14 @@ struct LibraryLoggingTests {
     func adoptRollback() async throws {
         try await withSink { sink in
             let sourceURL = try makeLibraryURL()
+            defer { try? FileManager.default.removeItem(at: sourceURL) }
             let source = LibraryStore(libraryURL: sourceURL, extraIndexer: nil)
-            let entry = try await source.add(transcript: makeTranscript(), audioSource: try makeAudio())
+            let audio = try makeAudio()
+            defer { try? FileManager.default.removeItem(at: audio) }
+            let entry = try await source.add(transcript: makeTranscript(), audioSource: audio)
 
             let libraryURL = try makeLibraryURL()
+            defer { try? FileManager.default.removeItem(at: libraryURL) }
             let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
             try setPermissions(0o500, on: libraryURL)
             defer { try? setPermissions(0o700, on: libraryURL) }
@@ -179,7 +192,9 @@ struct LibraryLoggingTests {
     func purgeFailures() async throws {
         try await withSink { sink in
             let libraryURL = try makeLibraryURL()
+            defer { try? FileManager.default.removeItem(at: libraryURL) }
             let audio = try makeAudio()
+            defer { try? FileManager.default.removeItem(at: audio) }
             let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
             let first = try await store.add(transcript: makeTranscript("one"), audioSource: audio)
             let second = try await store.add(transcript: makeTranscript("two"), audioSource: audio)
@@ -202,7 +217,9 @@ struct LibraryLoggingTests {
     @Test("a snapshot write failure is logged once per run of failures")
     func snapshotWriteFailure() async throws {
         try await withSink { sink in
-            let indexURL = try makeLibraryURL().appendingPathComponent("index.json")
+            let libraryURL = try makeLibraryURL()
+            defer { try? FileManager.default.removeItem(at: libraryURL) }
+            let indexURL = libraryURL.appendingPathComponent("index.json")
             let attempts = OSAllocatedUnfairLock(initialState: 0)
             let index = LibrarySearchIndex(
                 indexURL: indexURL, saveDebounce: .seconds(60), clock: ContinuousClock()
@@ -238,7 +255,9 @@ struct LibraryLoggingTests {
     @Test("a snapshot from an older version says it was discarded")
     func staleSnapshotDiscarded() async throws {
         try await withSink { sink in
-            let indexURL = try makeLibraryURL().appendingPathComponent("index.json")
+            let libraryURL = try makeLibraryURL()
+            defer { try? FileManager.default.removeItem(at: libraryURL) }
+            let indexURL = libraryURL.appendingPathComponent("index.json")
             try Data(#"{"version":1,"entries":[]}"#.utf8).write(to: indexURL)
             let index = LibrarySearchIndex(indexURL: indexURL)
 

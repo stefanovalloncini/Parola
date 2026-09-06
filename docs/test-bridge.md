@@ -78,6 +78,8 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `toggleInspector` | — | Toggle the transcript inspector, the same way ⌘⇧I does. Below ~1050 pt of window the pane folds the inspector away, and this is the only way to bring it back. |
 | `setWindowFrame` | x, y, w, h | Move and resize the main window; the reply carries the frame that landed after the window's minimum size clamped it. AX resize is refused on ad-hoc-signed builds, so layout checks go through here. |
 
+Rows named without the `parola_app_` prefix are raw bridge commands, called through `parola_app_dispatch`.
+
 ### Settings + library
 
 | Tool | Args | What it does |

@@ -4,8 +4,7 @@ import Testing
 @testable import ParolaCore
 
 extension FileDiagnosticsSink {
-    /// The install-time sweep runs on a background queue, so a test that seeds fixtures after
-    /// construction has to wait for it or the two sweeps race over the same files.
+    /// Waits for the install-time sweep (runs on a background queue) so fixtures don't race it.
     func waitForInstallSweep(timeout: Duration = .seconds(2)) async throws {
         let deadline = ContinuousClock.now + timeout
         while ContinuousClock.now < deadline {
@@ -32,8 +31,7 @@ final class ScopedCapturingSink: DiagnosticsSink {
 
     var records: [LogRecord] { storage.withLock { $0.records } }
 
-    /// Records that arrived from outside `scope`, so a test can tell "nobody logged this" apart from
-    /// "the filter ate it".
+    /// Records that arrived from outside `scope`, so "nobody logged this" reads apart from "the filter ate it".
     var droppedCount: Int { storage.withLock { $0.dropped } }
 
     func enqueue(_ record: LogRecord) {
