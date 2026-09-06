@@ -303,6 +303,8 @@ extension AppModel {
     func loadEntry(_ id: LibraryEntry.ID) {
         loadEntryGeneration &+= 1
         let generation = loadEntryGeneration
+        // Read before the load clears the search: a result opened from the list lands on its first hit.
+        let hit = searchResults == nil ? nil : searchQuery.trimmingCharacters(in: .whitespaces)
         Task { [weak self] in
             guard let self else { return }
             await flushPendingTranscriptSave()
@@ -325,6 +327,7 @@ extension AppModel {
                 libraryBrowsingAll = false
                 searchResults = nil
                 searchMatches = [:]
+                if let hit, !hit.isEmpty { revealInTranscript(hit) }
                 try? await library.markOpened(id: id)
                 refreshLibrary()
             } catch {

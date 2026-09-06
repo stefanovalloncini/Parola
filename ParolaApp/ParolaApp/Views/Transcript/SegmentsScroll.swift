@@ -78,7 +78,7 @@ struct SegmentsScroll: View {
                 .padding(.vertical, DS.Spacing.regular)
             }
             .onChange(of: model.currentSegmentID) { _, id in
-                guard let id, model.player?.timeControlStatus == .playing else { return }
+                guard let id, model.player?.timeControlStatus == .playing || model.findIsOpen else { return }
                 withAnimation(.easeInOut(duration: 0.2)) {
                     proxy.scrollTo(id, anchor: .center)
                 }

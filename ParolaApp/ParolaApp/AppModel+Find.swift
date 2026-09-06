@@ -39,6 +39,12 @@ extension AppModel {
         snapToCurrentMatch()
     }
 
+    /// Find already knows how to walk a query's hits, so opening it is how a search result lands on its first one.
+    func revealInTranscript(_ query: String) {
+        findIsOpen = true
+        if findQuery == query { scheduleRecomputeMatches() } else { findQuery = query }
+    }
+
     func goToNextMatch() {
         guard !matches.isEmpty else { return }
         currentMatchIndex = (currentMatchIndex + 1) % matches.count

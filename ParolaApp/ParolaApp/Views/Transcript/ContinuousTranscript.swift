@@ -84,7 +84,7 @@ struct ContinuousChunks: View {
         .onChange(of: model.transcriptVersion) { _, _ in rebuildChunks() }
         .onChange(of: model.currentSegmentID) { _, _ in
             applyHighlight()
-            followPlayback()
+            followCurrentSegment()
         }
     }
 
@@ -176,9 +176,9 @@ struct ContinuousChunks: View {
         highlightedSegmentID = nextID
     }
 
-    private func followPlayback() {
+    private func followCurrentSegment() {
         guard let id = model.currentSegmentID,
-              model.player?.timeControlStatus == .playing,
+              model.player?.timeControlStatus == .playing || model.findIsOpen,
               let chunkID = chunkIndexBySegment[id] else { return }
         withAnimation(.easeInOut(duration: 0.2)) {
             scrollProxy.scrollTo(chunkID, anchor: .center)
