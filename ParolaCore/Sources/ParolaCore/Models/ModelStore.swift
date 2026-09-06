@@ -447,6 +447,7 @@ public final class ModelStore: Sendable {
     /// Downloads a model variant into our cache directory. If already present, returns immediately.
     /// Concurrent calls for the same variant are serialized; the loser returns the winner's result.
     /// - Parameter progress: 0.0–1.0 progress callback (best-effort).
+    /// - Parameter urlSession: Only reaches the HuggingFace path; a registry engine's own downloader ignores it.
     public func download(
         variant: String,
         progress: (@Sendable (Double) -> Void)? = nil,
@@ -586,7 +587,7 @@ public final class ModelStore: Sendable {
         progress?(1.0)
         ParolaLog.info(
             .models,
-            "download finished for \(ModelToken(name))",
+            "download finished for \(ModelToken(variant))",
             self.installedSizeFields(at: result, startedAt: startedAt)
         )
         return result

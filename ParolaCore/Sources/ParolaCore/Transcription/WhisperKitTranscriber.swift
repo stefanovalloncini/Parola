@@ -274,8 +274,7 @@ struct WhisperLanguageReading: Hashable, Sendable {
 enum WhisperLanguageVote {
     static let minimumConfidence = 0.1
     static let lead = 1.25
-    /// Measured on the turbo model: clean speech reads 0.98-0.9999, a window of white noise 0.45, the
-    /// half-English stretch of an Italian memo 0.56, and the noise window that pinned Czech in T23 0.12.
+    /// 0.85; measured on the turbo model between 0.45 (white noise) and 0.98+ (clean speech).
     static let certainty = 0.85
 
     static func decide(_ readings: [WhisperLanguageReading]) -> LanguageDetection? {
@@ -321,6 +320,9 @@ enum WhisperLanguagePin {
         canDetect: Bool
     ) -> LanguageDetection? {
         guard requested == nil, canDetect else { return nil }
+        if let probed, probed.code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .assumed(language)
+        }
         return probed ?? .assumed(language)
     }
 }

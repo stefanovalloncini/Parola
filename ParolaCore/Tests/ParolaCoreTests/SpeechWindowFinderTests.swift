@@ -207,6 +207,11 @@ struct WhisperLanguagePinTests {
 
         #expect(pin.language == nil)
         #expect(pin.detectLanguage)
+
+        let detection = WhisperLanguagePin.detection(
+            requested: nil, probed: .assumed("  "), ranAs: "el", canDetect: true
+        )
+        #expect(detection == .assumed("el"))
     }
 
     @Test("a corroborated probe is reported as detected")

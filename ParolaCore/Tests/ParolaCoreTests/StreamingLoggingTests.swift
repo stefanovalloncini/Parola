@@ -235,7 +235,7 @@ struct StreamingLoggingTests {
         expectCalls([
             #"ParolaLog.fault(.streaming, "start called while a session was already running")"#,
             #"ParolaLog.notice(.streaming, "engine \(variant.engineID) cannot stream")"#,
-            #"ParolaLog.info( .streaming, "streaming session starting on \(EngineID.whisperKit)", [.model: .safe(ModelToken(modelName))]"#,
+            #"ParolaLog.info( .streaming, "streaming session starting on whisperkit", [.model: .safe(ModelToken(modelName))]"#,
             #"ParolaLog.error( .streaming, "tokenizer was nil after model load", [.model: .safe(ModelToken(modelName))]"#,
             #"ParolaLog.error(.streaming, "streaming failed", failureFields(error))"#,
             #"if loop != nil { ParolaLog.error(.streaming, "streaming loop ended without a stop request") }"#,

@@ -90,10 +90,15 @@ struct BatchLoggingTests {
             #expect(record.level == .info)
             #expect(record.fields[.job]?.text == shortID(job.id))
             #expect(batchRecords(sink, message: "job failed").isEmpty)
+
+            let finished = try #require(batchRecords(sink, message: "batch finished").first)
+            #expect(finished.fields[.completed]?.text == "0")
+            #expect(finished.fields[.failed]?.text == "0")
+            #expect(finished.fields[.cancelled]?.text == "1")
         }
     }
 
-    @Test("a finished queue reports how many jobs it ran")
+    @Test("a finished queue reports how many jobs it ran, and reports starting")
     func finishedQueue() async throws {
         try await withSink { sink in
             let (queue, audioURL) = try await makeQueue()
@@ -101,11 +106,33 @@ struct BatchLoggingTests {
             let jobs = [BatchJob(url: audioURL), BatchJob(url: audioURL)]
             await drain(queue.process(jobs: jobs, options: TranscriptionOptions(model: "openai_whisper-tiny")))
 
+            let starting = try #require(batchRecords(sink, message: "batch starting").first)
+            #expect(starting.level == .info)
+            #expect(starting.fields[.count]?.text == "2")
+
             let records = batchRecords(sink, message: "batch finished")
             #expect(records.count == 1)
             let record = try #require(records.first)
             #expect(record.level == .info)
-            #expect(record.fields[.count]?.text == "2")
+            #expect(record.fields[.completed]?.text == "2")
+            #expect(record.fields[.failed]?.text == "0")
+            #expect(record.fields[.cancelled]?.text == "0")
+        }
+    }
+
+    @Test("a batch mixing a success and a failure reports both counts")
+    func mixedOutcomeQueue() async throws {
+        try await withSink { sink in
+            let (queue, audioURL) = try await makeQueue()
+            defer { try? FileManager.default.removeItem(at: audioURL.deletingLastPathComponent()) }
+            let missing = audioURL.deletingLastPathComponent().appendingPathComponent("gone.wav")
+            let jobs = [BatchJob(url: audioURL), BatchJob(url: missing)]
+            await drain(queue.process(jobs: jobs, options: TranscriptionOptions(model: "openai_whisper-tiny")))
+
+            let record = try #require(batchRecords(sink, message: "batch finished").first)
+            #expect(record.fields[.completed]?.text == "1")
+            #expect(record.fields[.failed]?.text == "1")
+            #expect(record.fields[.cancelled]?.text == "0")
         }
     }
 }

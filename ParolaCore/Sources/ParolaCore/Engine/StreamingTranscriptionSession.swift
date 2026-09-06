@@ -86,7 +86,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             )
         }
         ParolaLog.info(
-            .streaming, "streaming session starting on \(EngineID.whisperKit)",
+            .streaming, "streaming session starting on whisperkit",
             [.model: .safe(ModelToken(modelName))]
         )
         if !modelStore.isInstalled(modelName) {

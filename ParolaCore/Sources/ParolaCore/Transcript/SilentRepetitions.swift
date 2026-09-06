@@ -1,7 +1,6 @@
 import Foundation
 
-/// How loud the source audio is. The cleanup takes one of these rather than a URL so it stays
-/// pure: production hands it a reader over the recording, a test hands it canned levels.
+/// How loud the source audio is, kept abstract so production and tests can both supply it.
 protocol SegmentEnergyProbe {
     /// Loudest half-second of each of the windows the planner spreads over the whole recording.
     func windowEnergies() -> [Double]
@@ -9,30 +8,19 @@ protocol SegmentEnergyProbe {
     func energy(from start: Double, to end: Double) -> Double?
 }
 
-/// Whisper fills silence with a plausible line repeated at VAD-chunk intervals — "Grazie a tutti."
-/// four times over a two-minute lead-in. A phrase list cannot tell those from the same words
-/// actually spoken, so this asks the audio and the layout instead: a line repeated three or more
-/// times is a candidate, and a copy goes only when its span is quiet AND another copy sits right
-/// beside it. Filler arrives back to back; a line the other speaker talks around does not.
+/// Drops a repeated line only when its span is quiet and another copy sits right beside it — filler
+/// arrives back to back, a line the other speaker talks around does not.
 enum SilentRepetitions {
     static let minimumRepeats = 3
 
-    /// A window holding at least a tenth of the peak is one the planner would call speech
-    /// (`ProbeWindowPlanner.pick`); the middle of that set is what a spoken line measures there.
+    /// A window at or above this share of the peak reads as speech (`ProbeWindowPlanner.pick`).
     static let loudWindowShare = ProbeWindowPlanner.silenceFloor
     static let minimumLoudWindows = 3
 
-    /// Silence is four tenths of that. Three measured tables pin the share:
-    /// the 159 memo gives 0.0157 — over its loudest hallucination (0.0124), 4.2× under its speech;
-    /// uniform speech at 0.02 with one 0.15 thump gives 0.008, so speech-level repeats stay;
-    /// 16 windows of room tone against 8 at 0.08 give 0.032, so a 0.005 repeat over silence goes.
-    /// The memo's loudest filler and a speaker 10 dB down measure the same, so what separates them
-    /// is the neighbour test, not this.
+    /// 0.4× the loud-window level; measured admissible band across three fixtures is 0.008–0.032.
     static let quietShareOfSpeech = 0.4
 
-    /// Below three loud windows there is no middle to take. The fallback is the whole-file median,
-    /// capped so one transient cannot set the level alone and floored so a recording that is
-    /// almost all digital silence still has a reference to scale from.
+    /// Median-fallback bounds when fewer than three loud windows exist: capped 8×, floored at 10%.
     static let medianReferenceFactor = 8.0
     static let minimumReferenceShare = 0.1
 

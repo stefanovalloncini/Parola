@@ -74,12 +74,15 @@ public enum LogField: String, Sendable, CaseIterable, Comparable {
     case attempt
     case audioSeconds
     case bytes
+    case cancelled
+    case completed
     case count
     case elapsed
     case energy
     case engine
     case entry
     case error
+    case failed
     case feature
     case floor
     case format

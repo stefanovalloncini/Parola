@@ -65,7 +65,7 @@ public actor BatchQueue {
     ) -> AsyncStream<BatchEvent> {
         guard features.isEnabled(.batch) else {
             ParolaLog.notice(
-                .batch, "batch refused: \(ParolaFeature.batch) disabled",
+                .batch, "batch refused: batch disabled",
                 [.count: .int(jobs.count)]
             )
             return AsyncStream { continuation in
@@ -91,8 +91,13 @@ public actor BatchQueue {
         options: TranscriptionOptions,
         continuation: AsyncStream<BatchEvent>.Continuation
     ) async {
+        ParolaLog.info(.batch, "batch starting", [.count: .int(jobs.count)])
+        var completed = 0
+        var failed = 0
+        var cancelled = 0
         for job in jobs {
             if Task.isCancelled {
+                cancelled += 1
                 continuation.yield(.cancelled(jobID: job.id))
                 continue
             }
@@ -115,11 +120,14 @@ public actor BatchQueue {
                     options: options,
                     progressHandler: forwarder
                 )
+                completed += 1
                 continuation.yield(.completed(jobID: job.id, transcript: transcript))
             } catch is CancellationError {
+                cancelled += 1
                 ParolaLog.info(.batch, "job cancelled", [.job: .id(job.id)])
                 continuation.yield(.cancelled(jobID: job.id))
             } catch {
+                failed += 1
                 ParolaLog.error(
                     .batch, "job failed",
                     [
@@ -131,7 +139,10 @@ public actor BatchQueue {
                 continuation.yield(.failed(jobID: job.id, reason: String(describing: error)))
             }
         }
-        ParolaLog.info(.batch, "batch finished", [.count: .int(jobs.count)])
+        ParolaLog.info(
+            .batch, "batch finished",
+            [.completed: .int(completed), .failed: .int(failed), .cancelled: .int(cancelled)]
+        )
         continuation.yield(.finished)
         continuation.finish()
     }

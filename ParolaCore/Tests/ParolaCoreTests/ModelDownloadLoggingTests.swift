@@ -132,6 +132,30 @@ struct ModelDownloadLoggingTests {
         }
     }
 
+    @Test("a registry download's start and finish tokens match, even when the download name differs")
+    func downloadTokensMatchWhenDownloadNameDiffers() async throws {
+        let turbo = "openai_whisper-large-v3_turbo"
+        try await withSink { sink in
+            let store = try makeStore()
+            let registry = EngineRegistry()
+            await registry.register(
+                engineID: .whisperKit,
+                capabilities: .whisperKitDefaults,
+                factory: { _ in StubTranscriber() },
+                downloader: { name, store, _ in
+                    let url = store.installedURL(for: name)
+                    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+                    try Data("weights".utf8).write(to: url.appendingPathComponent("model.bin"))
+                    return url
+                }
+            )
+            _ = try await store.download(variant: turbo, registry: registry)
+
+            #expect(modelRecords(sink, message: "download starting for \(turbo)").count == 1)
+            #expect(modelRecords(sink, message: "download finished for \(turbo)").count == 1)
+        }
+    }
+
     @Test("a registry downloader that throws is reported with its engine and model")
     func registryDownloadFailure() async throws {
         try await withSink { sink in

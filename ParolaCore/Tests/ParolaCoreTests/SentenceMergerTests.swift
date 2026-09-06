@@ -1,7 +1,7 @@
 import Clocks
 import Foundation
 import Testing
-@preconcurrency import SpeakerKit
+import SpeakerKit
 @testable import ParolaCore
 
 @Suite("Sentence-aware segment merging")

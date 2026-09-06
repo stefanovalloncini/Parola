@@ -568,6 +568,7 @@ struct LibraryStoreTests {
     @Test("a bundle removed behind the app stops matching")
     func dropsBundlesRemovedBehindTheApp() async throws {
         let dir = try makeTempLibraryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
         try seedBundle(in: dir, named: "seeded", text: "zzyzxmarker in the minutes")
         let staged = LibraryStore(libraryURL: dir, extraIndexer: nil)
         #expect(await staged.search("zzyzxmarker").count == 1)
@@ -582,6 +583,7 @@ struct LibraryStoreTests {
     @Test("a bundle rewritten behind the app is reindexed from its new transcript")
     func reindexesBundlesRewrittenBehindTheApp() async throws {
         let dir = try makeTempLibraryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
         try seedBundle(in: dir, named: "seeded", text: "zzyzxmarker in the minutes")
         let staged = LibraryStore(libraryURL: dir, extraIndexer: nil)
         #expect(await staged.search("zzyzxmarker").count == 1)

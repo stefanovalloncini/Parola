@@ -146,12 +146,7 @@ struct SilentRepetitionsTests {
     /// with room to spare on the speech side.
     @Test("the floor clears the 159 memo's measurements at both ends")
     func floorMatchesTheMemoMeasurements() throws {
-        let windows = [
-            0.19934, 0.00676, 0.10335, 0.00431, 0.00515, 0.03427, 0.05538, 0.03065,
-            0.01200, 0.01776, 0.02233, 0.01234, 0.01482, 0.02257, 0.04441, 0.03148,
-            0.01264, 0.01576, 0.02202, 0.01018, 0.00615, 0.01831, 0.07960, 0.18455,
-        ]
-        let floor = try #require(SilentRepetitions.floor(forWindows: windows))
+        let floor = try #require(SilentRepetitions.floor(forWindows: Self.memoWindows))
         #expect(abs(floor - 0.01574) < 0.0001)
         #expect(floor > 0.0124)
         #expect(floor * 3 < 0.066)
@@ -385,8 +380,11 @@ struct SessionSilentRepetitionsTests {
 
     @Test("a Whisper run drops the copies over the lead-in")
     func whisperRunDropsTheCopies() async throws {
-        let (session, audioURL) = try await makeSession(engineID: .whisperKit, model: "openai_whisper-tiny")
+        let (session, audioURL, modelsDirectory) = try await makeSession(
+            engineID: .whisperKit, model: "openai_whisper-tiny"
+        )
         defer { try? FileManager.default.removeItem(at: audioURL) }
+        defer { try? FileManager.default.removeItem(at: modelsDirectory) }
 
         let transcript = try await session.transcribe(
             source: FileAudioSource(url: audioURL),
@@ -399,10 +397,11 @@ struct SessionSilentRepetitionsTests {
 
     @Test("another engine's repetitions are left as the engine made them")
     func otherEnginesKeepTheirRepetitions() async throws {
-        let (session, audioURL) = try await makeSession(
+        let (session, audioURL, modelsDirectory) = try await makeSession(
             engineID: .parakeet, model: "nvidia_parakeet-tdt-0.6b-v2"
         )
         defer { try? FileManager.default.removeItem(at: audioURL) }
+        defer { try? FileManager.default.removeItem(at: modelsDirectory) }
 
         let transcript = try await session.transcribe(
             source: FileAudioSource(url: audioURL),
@@ -416,7 +415,7 @@ struct SessionSilentRepetitionsTests {
     private func makeSession(
         engineID: EngineID,
         model: String
-    ) async throws -> (session: TranscriptionSession, audioURL: URL) {
+    ) async throws -> (session: TranscriptionSession, audioURL: URL, modelsDirectory: URL) {
         let registry = EngineRegistry()
         let response = MockTranscriberResponse(segments: seeds, language: "it", modelName: "mock")
         await registry.register(
@@ -432,7 +431,8 @@ struct SessionSilentRepetitionsTests {
         try store.seedInstalledModel(model)
         return (
             TranscriptionSession(modelStore: store, registry: registry),
-            try LeadInSilenceFixture.write()
+            try LeadInSilenceFixture.write(),
+            dir
         )
     }
 }

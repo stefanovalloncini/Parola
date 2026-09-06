@@ -440,7 +440,9 @@ public actor LibrarySearchIndex {
         highlights.sort { $0.start < $1.start }
         // An ellipsis says the line was cut out of a longer one; the leading one shifts every offset.
         let leading = snippetRange.lowerBound == text.startIndex ? "" : "…"
-        let trailing = snippetRange.upperBound == text.endIndex ? "" : "…"
+        // `text` is the excerpt, not the full line: at the excerpt's cap, the line may continue past it.
+        let atExcerptEnd = snippetRange.upperBound == text.endIndex && text.count < Self.excerptLength
+        let trailing = atExcerptEnd ? "" : "…"
         let shift = leading.count
         let shifted = shift == 0 ? highlights : highlights.map { Highlight(start: $0.start + shift, length: $0.length) }
         return (leading + body + trailing, mergeOverlapping(shifted))

@@ -223,6 +223,16 @@ struct LibrarySearchIndexTests {
         }
     }
 
+    @Test("a hit near the excerpt's cap is still marked as cut, since the line may continue past it")
+    func snippetNearExcerptCapKeepsTrailingEllipsis() async throws {
+        let (index, _) = makeTempIndex()
+        let body = String(repeating: "ab ", count: 60) + "sprint" + String(repeating: " cd", count: 30)
+        #expect(body.count > 200)
+        await index.index(id: "e1", title: "Notes", text: body, createdAt: Date())
+        let match = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
+        #expect(match.snippet.hasSuffix("…"))
+    }
+
     @Test("a snippet that is the whole line carries no ellipsis")
     func wholeLineSnippetIsNotMarked() async throws {
         let (index, _) = makeTempIndex()

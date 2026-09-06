@@ -37,7 +37,8 @@ struct LibraryLoadCacheTests {
 
     @Test("a repeat load of the same entry answers from the cache")
     func repeatLoadSkipsDisk() async throws {
-        let (store, _) = try makeStore()
+        let (store, tmp) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: tmp) }
         let entry = try await store.add(transcript: makeTranscript("original"), audioSource: nil)
         #expect(firstText(try await store.load(entry.id)) == "original")
 
@@ -48,7 +49,8 @@ struct LibraryLoadCacheTests {
 
     @Test("alternating between two entries re-reads neither")
     func alternatingLoadsStayCached() async throws {
-        let (store, _) = try makeStore()
+        let (store, tmp) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: tmp) }
         let a = try await store.add(transcript: makeTranscript("a"), audioSource: nil)
         let b = try await store.add(transcript: makeTranscript("b"), audioSource: nil)
         _ = try await store.load(a.id)
@@ -63,7 +65,8 @@ struct LibraryLoadCacheTests {
 
     @Test("a fourth entry evicts the least recently loaded one")
     func fourthLoadEvictsTheOldest() async throws {
-        let (store, _) = try makeStore()
+        let (store, tmp) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: tmp) }
         var entries: [LibraryEntry] = []
         for i in 0..<4 {
             entries.append(try await store.add(transcript: makeTranscript("entry \(i)"), audioSource: nil))
@@ -81,7 +84,8 @@ struct LibraryLoadCacheTests {
 
     @Test("updateTranscript drops the cached copy of that entry and no other")
     func updateTranscriptInvalidatesOneSlot() async throws {
-        let (store, _) = try makeStore()
+        let (store, tmp) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: tmp) }
         let a = try await store.add(transcript: makeTranscript("a"), audioSource: nil)
         let b = try await store.add(transcript: makeTranscript("b"), audioSource: nil)
         _ = try await store.load(a.id)
@@ -96,7 +100,8 @@ struct LibraryLoadCacheTests {
 
     @Test("a manifest edit refreshes the cached entry without re-reading the transcript")
     func manifestEditPatchesTheCachedEntry() async throws {
-        let (store, _) = try makeStore()
+        let (store, tmp) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: tmp) }
         let entry = try await store.add(transcript: makeTranscript("original"), audioSource: nil)
         _ = try await store.load(entry.id)
         try rewriteOnDisk(entry, text: "on disk")
@@ -120,7 +125,8 @@ struct LibraryLoadCacheTests {
 
     @Test("a load in flight when updateTranscript lands never answers with the pre-update transcript")
     func loadRacingUpdateSeesTheUpdate() async throws {
-        let (store, _) = try makeStore()
+        let (store, tmp) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: tmp) }
         // Big enough that the off-actor decode cannot finish inside the head start the update gets.
         let entry = try await store.add(transcript: makeTranscript("original 0", segments: 5_000), audioSource: nil)
 
@@ -145,7 +151,8 @@ struct LibraryLoadCacheTests {
 
     @Test("two concurrent loads of the same entry agree on one whole version")
     func concurrentLoadsAgree() async throws {
-        let (store, _) = try makeStore()
+        let (store, tmp) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: tmp) }
         let entry = try await store.add(transcript: makeTranscript("original 0", segments: 5_000), audioSource: nil)
 
         for i in 0..<8 {
