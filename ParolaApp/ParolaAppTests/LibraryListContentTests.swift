@@ -276,4 +276,27 @@ struct LibraryListContentTests {
         #expect(LibraryListContent.totalsLabel(for: 1, locale: english) == "1 transcript")
         #expect(LibraryListContent.totalsLabel(for: 3, locale: english) == "3 transcripts")
     }
+
+    @Test("the search caption counts the entries and the hits inside them")
+    func searchTotalsLabelCountsBoth() {
+        let english = Locale(identifier: "en_US")
+        #expect(LibraryListContent.searchTotalsLabel(entries: 0, matches: 0, locale: english) == nil)
+        #expect(LibraryListContent.searchTotalsLabel(entries: 0, matches: 4, locale: english) == nil)
+        #expect(
+            LibraryListContent.searchTotalsLabel(entries: 10, matches: 14, locale: english)
+                == "10 transcripts · 14 matches"
+        )
+        #expect(
+            LibraryListContent.searchTotalsLabel(entries: 1, matches: 1, locale: english)
+                == "1 transcript · 1 match"
+        )
+    }
+
+    /// An index written before the counts existed answers 0, and a caption reading "· 0 matches" would be a lie.
+    @Test("the search caption drops the hit count when the index has none")
+    func searchTotalsLabelWithoutCounts() {
+        let english = Locale(identifier: "en_US")
+        #expect(LibraryListContent.searchTotalsLabel(entries: 2, matches: 0, locale: english) == "2 transcripts")
+    }
+
 }

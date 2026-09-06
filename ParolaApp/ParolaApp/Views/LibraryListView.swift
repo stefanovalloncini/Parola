@@ -22,8 +22,7 @@ enum LibraryListContent {
     }
 
     /// The source keys, not `LocalizedStringKey`, so the casing rule can be asserted over them.
-    static func emptyTitle(for category: EntryCategory?, isSearch: Bool) -> String {
-        if isSearch { return "No Matches" }
+    static func emptyTitle(for category: EntryCategory?) -> String {
         switch category {
         case .transcription: return "No Transcriptions Yet"
         case .meeting: return "No Meetings Yet"
@@ -90,6 +89,22 @@ enum LibraryListContent {
         guard count > 0 else { return nil }
         if count == 1 { return String(localized: "1 transcript", locale: locale) }
         return String(localized: "\(count) transcripts", locale: locale)
+    }
+
+    /// The search page counts two things: the entries that matched, and the hits they hold between them.
+    static func searchTotalsLabel(
+        entries: Int,
+        matches: Int,
+        locale: Locale = AppFormat.locale
+    ) -> String? {
+        guard let transcripts = totalsLabel(for: entries, locale: locale) else { return nil }
+        guard matches > 0 else { return transcripts }
+        return "\(transcripts) · \(matchesLabel(matches, locale: locale))"
+    }
+
+    static func matchesLabel(_ count: Int, locale: Locale = AppFormat.locale) -> String {
+        if count == 1 { return String(localized: "1 match", locale: locale) }
+        return String(localized: "\(count) matches", locale: locale)
     }
 
     static func rows(
@@ -171,7 +186,12 @@ struct LibraryListView: View {
         displayCache = cache
         entries = displays
         // The count alone: bundle sizes land later and only for audio, so the label used to change shape.
-        totalsLabel = LibraryListContent.totalsLabel(for: displays.count) ?? ""
+        if searchResults == nil {
+            totalsLabel = LibraryListContent.totalsLabel(for: displays.count) ?? ""
+        } else {
+            let matches = displays.reduce(0) { $0 + (model.searchMatches[$1.id]?.matchCount ?? 0) }
+            totalsLabel = LibraryListContent.searchTotalsLabel(entries: displays.count, matches: matches) ?? ""
+        }
         totalsHelp = totalBytes > 0 ? String(localized: "Total size: \(AppFormat.byteSize(totalBytes))") : nil
         return displays
     }
@@ -299,7 +319,7 @@ struct LibraryListView: View {
         PageHeader(
             title: headerTitle,
             count: totalsLabel.isEmpty ? nil : totalsLabel,
-            countHelp: totalsHelp,
+            countHelp: searchResults == nil ? totalsHelp : nil,
             leading: {
                 if searchResults == nil {
                     LibraryFilterBar(
@@ -309,10 +329,6 @@ struct LibraryListView: View {
                         labelOptions: model.knownLabels(in: category),
                         languageOptions: model.knownLanguages(in: category)
                     )
-                } else {
-                    Button("Clear") { model.clearSearch() }
-                        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                        .axLeaf("Search.Button.Clear")
                 }
             },
             trailing: {
@@ -360,7 +376,9 @@ struct LibraryListView: View {
 
     @ViewBuilder
     private var emptyState: some View {
-        if filterHidesEverything {
+        if searchResults != nil {
+            searchEmptyState
+        } else if filterHidesEverything {
             filteredEmptyState
         } else {
             EmptyStateView(systemImage: emptyIcon, title: emptyTitle) {
@@ -383,6 +401,15 @@ struct LibraryListView: View {
     private var filterHidesEverything: Bool {
         searchResults == nil
             && LibraryListContent.filtersHideEverything(activeFilters, category: category, entries: model.libraryEntries)
+    }
+
+    private var searchEmptyState: some View {
+        EmptyStateView(
+            systemImage: "magnifyingglass",
+            title: "No results for “\(searchQueryText)”",
+            message: "Search looks in titles and transcript text"
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var filteredEmptyState: some View {
@@ -412,10 +439,13 @@ struct LibraryListView: View {
         }
     }
 
+    private var searchQueryText: String {
+        model.searchQuery.trimmingCharacters(in: .whitespaces)
+    }
+
     private var headerTitle: LocalizedStringKey {
         if searchResults != nil {
-            let query = model.searchQuery.trimmingCharacters(in: .whitespaces)
-            return query.isEmpty ? "Search results" : "Results for “\(query)”"
+            return searchQueryText.isEmpty ? "Search results" : "Results for “\(searchQueryText)”"
         }
         switch category {
         case .transcription: return "Transcriptions"
@@ -426,7 +456,7 @@ struct LibraryListView: View {
     }
 
     private var emptyTitle: LocalizedStringKey {
-        LocalizedStringKey(LibraryListContent.emptyTitle(for: category, isSearch: searchResults != nil))
+        LocalizedStringKey(LibraryListContent.emptyTitle(for: category))
     }
 
     private var emptyIcon: String {
