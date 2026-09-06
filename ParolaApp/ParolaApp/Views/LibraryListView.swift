@@ -107,6 +107,25 @@ enum LibraryListContent {
         return String(localized: "\(count) matches", locale: locale)
     }
 
+    static func categoryName(_ category: EntryCategory, locale: Locale = AppFormat.locale) -> String {
+        switch category {
+        case .transcription: return String(localized: "Transcription", locale: locale)
+        case .meeting: return String(localized: "Meeting", locale: locale)
+        case .dictation: return String(localized: "Dictation", locale: locale)
+        }
+    }
+
+    static func resultMeta(
+        category: EntryCategory,
+        date: String,
+        matches: Int,
+        locale: Locale = AppFormat.locale
+    ) -> String {
+        var parts = [categoryName(category, locale: locale), date]
+        if matches > 0 { parts.append(matchesLabel(matches, locale: locale)) }
+        return parts.joined(separator: " · ")
+    }
+
     static func rows(
         from entries: [LibraryEntry],
         category: EntryCategory?,
@@ -205,7 +224,7 @@ struct LibraryListView: View {
             } else {
                 List(entries, id: \.id, selection: $selection) { row in
                     let entry = row.entry
-                    LibraryRow(display: row, match: model.searchMatches[row.id])
+                    rowContent(for: row)
                         .contentShape(Rectangle())
                         .draggable(entry.bundleURL)
                         .onTapGesture(count: 2) {
@@ -313,6 +332,20 @@ struct LibraryListView: View {
             .accessibilityIdentifier("alert.rename.confirm")
         }
         .axBranch("Library")
+    }
+
+    @ViewBuilder
+    private func rowContent(for row: LibraryRowDisplay) -> some View {
+        if searchResults == nil {
+            LibraryRow(display: row)
+        } else {
+            SearchResultRow(
+                display: row,
+                match: model.searchMatches[row.id],
+                isSelected: selection.contains(row.id)
+            )
+            .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] + SearchResultRow.separatorInset }
+        }
     }
 
     private var header: some View {
@@ -510,7 +543,6 @@ struct LibraryRow: View {
 
     let display: LibraryRowDisplay
     var style: Style = .library
-    var match: LibrarySearchIndex.Match?
 
     @Environment(AppModel.self) private var model
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -579,13 +611,6 @@ struct LibraryRow: View {
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.secondaryText)
                 .lineLimit(1)
-                if let match, !match.snippet.isEmpty {
-                    Text(SearchSnippetText.attributed(match))
-                        .font(DS.Font.caption)
-                        .foregroundStyle(DS.Color.secondaryText)
-                        .lineLimit(2)
-                        .padding(.top, 1)
-                }
             }
             Spacer(minLength: DS.Spacing.regular)
             labelChips

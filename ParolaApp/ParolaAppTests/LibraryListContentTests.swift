@@ -299,4 +299,37 @@ struct LibraryListContentTests {
         #expect(LibraryListContent.searchTotalsLabel(entries: 2, matches: 0, locale: english) == "2 transcripts")
     }
 
+    @Test("a result's meta line names the kind, the day and the hits")
+    func resultMetaReadsInOrder() {
+        let english = Locale(identifier: "en_US")
+        #expect(
+            LibraryListContent.resultMeta(category: .meeting, date: "5 Sep", matches: 3, locale: english)
+                == "Meeting · 5 Sep · 3 matches"
+        )
+        #expect(
+            LibraryListContent.resultMeta(category: .dictation, date: "5 Sep", matches: 1, locale: english)
+                == "Dictation · 5 Sep · 1 match"
+        )
+        #expect(
+            LibraryListContent.resultMeta(category: .transcription, date: "5 Sep", matches: 0, locale: english)
+                == "Transcription · 5 Sep"
+        )
+    }
+
+    /// However long the snippet runs, the row stops at two lines — that is what keeps the list from being a text dump.
+    @Test("a search result row clamps its snippet to two lines")
+    func searchRowClampsSnippetToTwoLines() {
+        let display = LibraryRowDisplay(entry: entry(id: "a", title: "Alpha", offset: 0), sizeBytes: 1_000_000)
+        func height(_ snippet: String) -> CGFloat {
+            let match = LibrarySearchIndex.Match(entryID: "a", score: 1, matchCount: 2, snippet: snippet)
+            // The width has to be on the view: `fittingSize` proposes its own, and the snippet never wraps.
+            let host = NSHostingView(rootView: SearchResultRow(display: display, match: match).frame(width: 480))
+            host.layoutSubtreeIfNeeded()
+            return host.fittingSize.height
+        }
+        let twoLines = height(String(repeating: "parola ", count: 40))
+        #expect(twoLines == height(String(repeating: "parola ", count: 400)))
+        #expect(height("breve") < twoLines)
+        #expect(height("") == height("breve"))
+    }
 }

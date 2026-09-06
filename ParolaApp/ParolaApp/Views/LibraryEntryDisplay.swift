@@ -33,6 +33,7 @@ struct LibraryRowDisplay: Identifiable {
     let entry: LibraryEntry
     let title: String
     let timestamp: String
+    let shortDate: String
     let sizeLabel: String?
     let durationLabel: String?
     let languageLabel: String?
@@ -49,6 +50,7 @@ struct LibraryRowDisplay: Identifiable {
         self.entry = entry
         self.title = title
         timestamp = AppFormat.dateAndTime(entry.createdAt)
+        shortDate = AppFormat.dayAndMonth(entry.createdAt)
         if let sizeBytes, sizeBytes > 0 {
             sizeLabel = AppFormat.byteSize(sizeBytes)
         } else {
