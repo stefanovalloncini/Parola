@@ -21,6 +21,17 @@ struct SearchPill: View {
         self.identifier = identifier
     }
 
+    /// Esc clears only where a screen asked for it, and only with something to clear: everywhere
+    /// else it has to keep reaching the sheet or window the field sits in.
+    enum EscapeOutcome: Equatable {
+        case clear
+        case ignore
+    }
+
+    static func escapeOutcome(clearsOnEscape: Bool, isEmpty: Bool) -> EscapeOutcome {
+        clearsOnEscape && !isEmpty ? .clear : .ignore
+    }
+
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
@@ -30,9 +41,9 @@ struct SearchPill: View {
                 .textFieldStyle(.plain)
                 .font(DS.Font.subheadline)
                 .accessibilityIdentifier(identifier)
-                // Opt-in, and ignored when there is nothing to clear, so Esc still reaches the sheet the field sits in.
                 .onKeyPress(.escape) {
-                    guard clearsOnEscape, !text.isEmpty else { return .ignored }
+                    guard Self.escapeOutcome(clearsOnEscape: clearsOnEscape, isEmpty: text.isEmpty) == .clear
+                    else { return .ignored }
                     text = ""
                     return .handled
                 }
