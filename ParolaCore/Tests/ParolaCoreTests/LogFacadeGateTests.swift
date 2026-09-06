@@ -1,52 +1,5 @@
 import Testing
-
-/// Serializes the suites that still share a process-wide override: an installed `ParolaLog` sink, a
-/// `FileDiagnosticsSink` whose init-time sweep logs, or `RecordingScratch`'s directory. Suites that
-/// only capture their own records scope them with `ParolaLog.withSink` and need no gate.
-struct LogFacadeTrait: SuiteTrait, TestTrait, TestScoping {
-    var isRecursive: Bool { true }
-
-    func provideScope(
-        for test: Test,
-        testCase: Test.Case?,
-        performing function: @Sendable () async throws -> Void
-    ) async throws {
-        await LogFacadeGate.shared.acquire()
-        do {
-            try await function()
-        } catch {
-            await LogFacadeGate.shared.release()
-            throw error
-        }
-        await LogFacadeGate.shared.release()
-    }
-}
-
-extension Trait where Self == LogFacadeTrait {
-    static var logFacade: Self { Self() }
-}
-
-/// Not reentrant: a suite tagged `.logFacade` must never call `acquire` again inside a test.
-actor LogFacadeGate {
-    static let shared = LogFacadeGate()
-
-    private var busy = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-
-    func acquire() async {
-        while busy {
-            await withCheckedContinuation { waiters.append($0) }
-        }
-        busy = true
-    }
-
-    func release() {
-        busy = false
-        let queued = waiters
-        waiters = []
-        for waiter in queued { waiter.resume() }
-    }
-}
+import ParolaTestSupport
 
 /// Deliberately untagged — the gate is not reentrant, so tagging this suite would deadlock it.
 @Suite("Log facade gate")

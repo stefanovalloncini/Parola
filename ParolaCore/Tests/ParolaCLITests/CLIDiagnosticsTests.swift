@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import ParolaCore
+import ParolaTestSupport
 @testable import parola
 
 @Suite("CLI diagnostics policy", .serialized, .logFacade)

@@ -46,6 +46,10 @@ let package = Package(
             name: "ScenarioKit",
             path: "Sources/ScenarioKit"
         ),
+        .target(
+            name: "ParolaTestSupport",
+            path: "Tests/Support/ParolaTestSupport"
+        ),
         .executableTarget(
             name: "parola",
             dependencies: [
@@ -63,7 +67,7 @@ let package = Package(
             dependencies: [
                 "ParolaCore",
                 "ParolaDictation",
-                "parola",
+                "ParolaTestSupport",
                 .product(name: "Clocks", package: "swift-clocks"),
             ],
             resources: [
@@ -75,6 +79,10 @@ let package = Package(
                 .copy("Resources/tiny.parola"),
                 .copy("Resources/expected"),
             ]
+        ),
+        .testTarget(
+            name: "ParolaCLITests",
+            dependencies: ["ParolaCore", "ParolaTestSupport", "parola"]
         ),
         .testTarget(
             name: "ParolaMCPTests",
