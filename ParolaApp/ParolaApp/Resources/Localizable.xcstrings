@@ -263,6 +263,28 @@
         }
       }
     },
+    "%lld of %lld files": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld di %lld file"
+          }
+        }
+      }
+    },
+    "%lld of 1 file": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld di 1 file"
+          }
+        }
+      }
+    },
     "%lld segments": {
       "extractionState": "manual",
       "localizations": {
@@ -281,6 +303,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld selezionati"
+          }
+        }
+      }
+    },
+    "%lld transcripts": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld trascrizioni"
           }
         }
       }
@@ -439,6 +472,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 selezionato"
+          }
+        }
+      }
+    },
+    "1 transcript": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 trascrizione"
           }
         }
       }

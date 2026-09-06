@@ -268,4 +268,12 @@ struct LibraryListContentTests {
         #expect(LibraryListContent.emptyActions(for: .meeting, features: noCapture) == [.openFile])
         #expect(LibraryListContent.emptyActions(for: .dictation, features: noCapture) == [.openFile])
     }
+
+    @Test("the totals caption hides for an empty library and pluralizes otherwise")
+    func totalsLabelPluralizes() {
+        let english = Locale(identifier: "en_US")
+        #expect(LibraryListContent.totalsLabel(for: 0, locale: english) == nil)
+        #expect(LibraryListContent.totalsLabel(for: 1, locale: english) == "1 transcript")
+        #expect(LibraryListContent.totalsLabel(for: 3, locale: english) == "3 transcripts")
+    }
 }

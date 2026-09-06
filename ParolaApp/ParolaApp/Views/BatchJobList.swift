@@ -10,8 +10,9 @@ struct BatchJobList: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Spacer()
+            HStack(spacing: DS.Spacing.small) {
+                SearchPill(text: $searchText, placeholder: "Search files…")
+                sortMenu
                 Button("Clear") { model.clearBatch() }
                     .buttonStyle(.borderless)
                     .controlSize(.small)
@@ -20,13 +21,6 @@ struct BatchJobList: View {
             }
             .padding(.horizontal, DS.Spacing.large)
             .padding(.top, DS.Spacing.regular)
-            .padding(.bottom, DS.Spacing.small)
-
-            HStack(spacing: DS.Spacing.small) {
-                SearchPill(text: $searchText, placeholder: "Search files…")
-                sortMenu
-            }
-            .padding(.horizontal, DS.Spacing.large)
             .padding(.bottom, DS.Spacing.small)
 
             jobsScroll

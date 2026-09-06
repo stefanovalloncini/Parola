@@ -86,6 +86,12 @@ enum LibraryListContent {
         return !rows(from: entries, category: category, labelFilter: nil, languageFilter: nil, dateRange: .all).isEmpty
     }
 
+    static func totalsLabel(for count: Int, locale: Locale = AppFormat.locale) -> String? {
+        guard count > 0 else { return nil }
+        if count == 1 { return String(localized: "1 transcript", locale: locale) }
+        return String(localized: "\(count) transcripts", locale: locale)
+    }
+
     static func rows(
         from entries: [LibraryEntry],
         category: EntryCategory?,
@@ -165,7 +171,7 @@ struct LibraryListView: View {
         displayCache = cache
         entries = displays
         // The count alone: bundle sizes land later and only for audio, so the label used to change shape.
-        totalsLabel = displays.isEmpty ? "" : "\(displays.count)"
+        totalsLabel = LibraryListContent.totalsLabel(for: displays.count) ?? ""
         totalsHelp = totalBytes > 0 ? String(localized: "Total size: \(AppFormat.byteSize(totalBytes))") : nil
         return displays
     }

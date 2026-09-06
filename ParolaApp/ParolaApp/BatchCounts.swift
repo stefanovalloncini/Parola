@@ -8,13 +8,14 @@ enum BatchProgress {
         return (jobs.count { $0.status == .done }, jobs.count)
     }
 
-    static func label(for jobs: [BatchJob]) -> String? {
-        guard let counts = counts(for: jobs) else { return nil }
-        return String(localized: "\(counts.finished) of \(counts.total)")
-    }
-
     static func filesLabel(for jobs: [BatchJob], locale: Locale = AppFormat.locale) -> String? {
         guard !jobs.isEmpty else { return nil }
+        if let counts = counts(for: jobs) {
+            if counts.total == 1 {
+                return String(localized: "\(counts.finished) of 1 file", locale: locale)
+            }
+            return String(localized: "\(counts.finished) of \(counts.total) files", locale: locale)
+        }
         if jobs.count == 1 { return String(localized: "1 file", locale: locale) }
         return String(localized: "\(jobs.count) files", locale: locale)
     }

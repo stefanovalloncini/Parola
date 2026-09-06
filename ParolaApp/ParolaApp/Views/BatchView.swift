@@ -27,15 +27,7 @@ struct BatchView: View {
         PageHeader(
             title: "Batch",
             count: BatchProgress.filesLabel(for: model.batchJobs),
-            leading: {
-                if let progress = BatchProgress.label(for: model.batchJobs) {
-                    Text(progress)
-                        .font(DS.Font.calloutMono)
-                        .monospacedDigit()
-                        .foregroundStyle(DS.Color.secondaryText)
-                        .axLeaf("Header.Text.Progress")
-                }
-            },
+            countAxID: BatchProgress.counts(for: model.batchJobs) != nil ? "Header.Text.Progress" : nil,
             trailing: {
                 Menu {
                     ForEach(ExportFormat.allCases, id: \.self) { format in
