@@ -4,13 +4,11 @@ import Testing
 @testable import Parola
 import ParolaCore
 
-@Suite("Dictation insertion logging", .serialized, .logFacade)
+@Suite("Dictation insertion logging", .serialized)
 struct DictationInsertionLoggingTests {
     private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
         let sink = CapturingDiagnosticsSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-        try await body(sink)
+        try await ParolaLog.withSink(sink) { try await body(sink) }
     }
 
     // Both inserters leave the dictated text on the clipboard when they give up, so the tests hand it back.

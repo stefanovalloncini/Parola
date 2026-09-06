@@ -4,13 +4,11 @@ import Testing
 import ParolaCore
 
 @MainActor
-@Suite("Recovery and library-save logging", .serialized, .logFacade)
+@Suite("Recovery and library-save logging", .serialized)
 struct RecoveryLoggingTests {
     private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
         let sink = CapturingDiagnosticsSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-        try await body(sink)
+        try await ParolaLog.withSink(sink) { try await body(sink) }
     }
 
     private func records(
@@ -123,28 +121,31 @@ struct RecoveryLoggingTests {
         }
     }
 
-    @Test("stale in-flight takes are reported as one count, never as file names")
+    // .logFacade: the sweep logs from a GCD hop, which no scope reaches, so it needs the installed sink.
+    @Test("stale in-flight takes are reported as one count, never as file names", .logFacade)
     func staleTakesSwept() async throws {
-        try await withSink { sink in
-            let libraryURL = makeTempLibraryURL("recovery-logging-sweep")
-            let model = makeModel(libraryURL: libraryURL)
-            let inflight = model.inflightRecordingsURL
-            try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
-            let old = Date().addingTimeInterval(-72 * 3600)
-            for name in ["take-one.wav", "take-two.wav"] {
-                let url = inflight.appendingPathComponent(name)
-                try Data("RIFFfake".utf8).write(to: url)
-                try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: url.path)
-            }
+        let sink = CapturingDiagnosticsSink()
+        ParolaLog.install(sink)
+        defer { ParolaLog.uninstall() }
 
-            model.sweepInflightRecordings()
-
-            let record = try #require(
-                await waitForRecord(sink, .appRecovery, message: "stale in-flight takes deleted")
-            )
-            #expect(record.level == .notice)
-            #expect(record.fields[.count]?.text == "2")
-            #expect(record.formattedLine.contains("take-one") == false)
+        let libraryURL = makeTempLibraryURL("recovery-logging-sweep")
+        let model = makeModel(libraryURL: libraryURL)
+        let inflight = model.inflightRecordingsURL
+        try FileManager.default.createDirectory(at: inflight, withIntermediateDirectories: true)
+        let old = Date().addingTimeInterval(-72 * 3600)
+        for name in ["take-one.wav", "take-two.wav"] {
+            let url = inflight.appendingPathComponent(name)
+            try Data("RIFFfake".utf8).write(to: url)
+            try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: url.path)
         }
+
+        model.sweepInflightRecordings()
+
+        let record = try #require(
+            await waitForRecord(sink, .appRecovery, message: "stale in-flight takes deleted")
+        )
+        #expect(record.level == .notice)
+        #expect(record.fields[.count]?.text == "2")
+        #expect(record.formattedLine.contains("take-one") == false)
     }
 }

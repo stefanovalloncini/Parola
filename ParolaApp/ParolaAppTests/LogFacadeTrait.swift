@@ -1,8 +1,8 @@
 import Testing
 
-/// Serializes suites that install a `ParolaLog` sink. `ParolaLog`'s sink is process-global and
-/// `.serialized` only orders tests within one suite, so without this two such suites overlap and
-/// one captures the other's records. Mirrors ParolaCoreTests' trait of the same name.
+/// Serializes the suites that still install a `ParolaLog` sink process-wide. Suites that only
+/// capture their own records scope them with `ParolaLog.withSink` and need no gate. Mirrors
+/// ParolaCoreTests' trait of the same name.
 struct LogFacadeTrait: SuiteTrait, TestTrait, TestScoping {
     var isRecursive: Bool { true }
 

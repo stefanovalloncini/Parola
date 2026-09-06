@@ -5,13 +5,11 @@ import Testing
 import ParolaCore
 
 @MainActor
-@Suite("Permission and bridge logging", .serialized, .logFacade)
+@Suite("Permission and bridge logging", .serialized)
 struct PermissionLoggingTests {
     private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
         let sink = CapturingDiagnosticsSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-        try await body(sink)
+        try await ParolaLog.withSink(sink) { try await body(sink) }
     }
 
     private func records(
@@ -30,8 +28,8 @@ struct PermissionLoggingTests {
     }
 
     @Test("screen recording and system audio are logged when they change, once per change")
-    func captureStateChanges() async throws {
-        try await withSink { sink in
+    func captureStateChanges() async {
+        await withSink { sink in
             let screen = Box(false)
             let audio = Box(SystemAudioRecordingPermission.denied)
             let permissions = SystemCapturePermissions(
@@ -58,8 +56,8 @@ struct PermissionLoggingTests {
     }
 
     @Test("accessibility and microphone are logged when they change, once per change")
-    func dictationStateChanges() async throws {
-        try await withSink { sink in
+    func dictationStateChanges() async {
+        await withSink { sink in
             let trusted = Box(false)
             let microphone = Box(AVAuthorizationStatus.notDetermined)
             let permissions = DictationPermissions(

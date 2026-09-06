@@ -6,13 +6,11 @@ import ParolaCore
 private let exportFailureDomain = "parola-export-logging"
 
 @MainActor
-@Suite("Export logging", .serialized, .logFacade)
+@Suite("Export logging", .serialized)
 struct ExportLoggingTests {
     private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
         let sink = CapturingDiagnosticsSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-        try await body(sink)
+        try await ParolaLog.withSink(sink) { try await body(sink) }
     }
 
     private func exportRecords(
@@ -116,24 +114,27 @@ struct ExportLoggingTests {
         }
     }
 
-    @Test("an auto-export failure is no longer silent")
+    // .logFacade: auto-export runs detached, and a detached task logs to the installed sink, not a scope.
+    @Test("an auto-export failure is no longer silent", .logFacade)
     func autoExportFailure() async throws {
-        try await withSink { sink in
-            let model = makeModel()
-            model.autoExportRules = [
-                AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.txt])
-            ]
+        let sink = CapturingDiagnosticsSink()
+        ParolaLog.install(sink)
+        defer { ParolaLog.uninstall() }
 
-            model.runAutoExports(
-                transcript: makeTranscript(),
-                sourceURL: unwritableDestination("secret-notes.wav")
-            )
+        let model = makeModel()
+        model.autoExportRules = [
+            AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.txt])
+        ]
 
-            let record = try #require(await waitForRecord(sink, message: "auto-export failed as txt"))
-            #expect(record.level == .error)
-            #expect(record.fields[.error] != nil)
-            #expect(record.formattedLine.contains("secret-notes") == false)
-        }
+        model.runAutoExports(
+            transcript: makeTranscript(),
+            sourceURL: unwritableDestination("secret-notes.wav")
+        )
+
+        let record = try #require(await waitForRecord(sink, message: "auto-export failed as txt"))
+        #expect(record.level == .error)
+        #expect(record.fields[.error] != nil)
+        #expect(record.formattedLine.contains("secret-notes") == false)
     }
 
     // The bulk library export runs an NSOpenPanel modally, so its catch is pinned in source.
