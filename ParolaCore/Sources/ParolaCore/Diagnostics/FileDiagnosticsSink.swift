@@ -155,23 +155,14 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     public func startNewFile() async {
         await withCheckedContinuation { continuation in
             fileQueue.async {
-                self.rotateOnQueue()
+                self.drainOnQueue()
+                try? self.fileState.handle?.close()
+                self.fileState.handle = nil
+                self.fileState.bytesWritten = 0
+                self.rotationState.withLock { $0 += 1 }
                 continuation.resume()
             }
         }
-    }
-
-    /// Test seam: rotates without an await, so a `sweep` hook can force one mid-sweep.
-    func rotateSynchronously() {
-        fileQueue.sync { rotateOnQueue() }
-    }
-
-    private func rotateOnQueue() {
-        drainOnQueue()
-        try? fileState.handle?.close()
-        fileState.handle = nil
-        fileState.bytesWritten = 0
-        rotationState.withLock { $0 += 1 }
     }
 
     /// Blocks the caller until the buffer is on disk. Never call it from `fileQueue` itself:

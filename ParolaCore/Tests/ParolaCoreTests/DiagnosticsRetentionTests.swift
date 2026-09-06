@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import os
 @testable import ParolaCore
 
 @Suite("Diagnostics retention", .serialized, .logFacade)
@@ -182,14 +183,28 @@ struct DiagnosticsRetentionTests {
         try Data(repeating: 0x61, count: 600).write(to: sink.currentFileURL)
         let next = try makeFile(dir, "\(base)-1.jsonl", bytes: 600, ageDays: 9)
 
-        var rotations = 0
-        let outcome = sink.sweep(now: Date()) {
-            guard rotations == 0 else { return }
-            rotations += 1
-            sink.rotateSynchronously()
+        // The sweep runs off the cooperative pool, so its hook can wait for the rotation task.
+        let rotations = OSAllocatedUnfairLock(initialState: 0)
+        let outcome = await withCheckedContinuation { continuation in
+            DispatchQueue.global().async {
+                let outcome = sink.sweep(now: Date()) {
+                    let first = rotations.withLock { count -> Bool in
+                        count += 1
+                        return count == 1
+                    }
+                    guard first else { return }
+                    let rotated = DispatchSemaphore(value: 0)
+                    Task {
+                        await sink.startNewFile()
+                        rotated.signal()
+                    }
+                    rotated.wait()
+                }
+                continuation.resume(returning: outcome)
+            }
         }
 
-        #expect(rotations == 1)
+        #expect(rotations.withLock { $0 } >= 1)
         #expect(
             FileManager.default.fileExists(atPath: next.path),
             "the sweep unlinked the file the rotation had just made the open one"
