@@ -119,6 +119,7 @@ struct DiagnosticsReading: Sendable {
     var records: [ExportedRecord] = []
     var skippedLines: Int = 0
     var skippedFiles: Int = 0
+    var truncated: Bool = false
 }
 
 public enum DiagnosticsExport {
@@ -132,11 +133,16 @@ public enum DiagnosticsExport {
         render(reading: read(directory: directory), environment: environment, generatedAt: generatedAt)
     }
 
-    static func read(directory: URL) -> DiagnosticsReading {
+    /// The most one report reads back. The sink enforces the same budget over its directory, but
+    /// only when a sweep runs, so a store that went over it would otherwise render as a
+    /// multi-megabyte plain-text report.
+    static let maxReadBytes = 10_000_000
+
+    static func read(directory: URL, maxBytes: Int = maxReadBytes) -> DiagnosticsReading {
         let manager = FileManager.default
         guard let entries = try? manager.contentsOfDirectory(
             at: directory,
-            includingPropertiesForKeys: nil,
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
             options: [.skipsHiddenFiles]
         ) else { return DiagnosticsReading() }
 
@@ -147,13 +153,20 @@ public enum DiagnosticsExport {
                     && $0.pathExtension == "jsonl"
             }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        let budget = readBudget(for: files, maxBytes: maxBytes)
+        reading.truncated = budget.truncated
         for file in files {
-            guard let data = try? Data(contentsOf: file) else {
+            guard let limit = budget.limits[file] else { continue }
+            guard let tail = readTail(of: file, limit: limit) else {
                 reading.skippedFiles += 1
                 continue
             }
             // A crashing session's file may end mid-character; decode leniently and count the broken line.
-            let text = String(decoding: data, as: UTF8.self)
+            var text = String(decoding: tail.data, as: UTF8.self)
+            // The budget cut into this file, so its first line is a fragment rather than a bad record.
+            if tail.cutHead, let newline = text.firstIndex(of: "\n") {
+                text = String(text[text.index(after: newline)...])
+            }
             for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
                 if let record = decode(line: line) {
                     reading.records.append(record)
@@ -164,6 +177,46 @@ public enum DiagnosticsExport {
         }
         reading.records = sortedByTimestamp(reading.records)
         return reading
+    }
+
+    /// Spends the byte budget newest file first, so an over-budget store keeps the records closest
+    /// to the bug. A file that gets no budget at all is left out of the returned limits.
+    private static func readBudget(
+        for files: [URL], maxBytes: Int
+    ) -> (limits: [URL: Int], truncated: Bool) {
+        let described = files.map { url -> (url: URL, date: Date, size: Int) in
+            let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+            return (url, values?.contentModificationDate ?? .distantPast, values?.fileSize ?? 0)
+        }
+        guard described.reduce(0, { $0 + $1.size }) > maxBytes else {
+            return (Dictionary(uniqueKeysWithValues: files.map { ($0, Int.max) }), false)
+        }
+        let newestFirst = described.sorted {
+            $0.date == $1.date
+                ? $0.url.lastPathComponent > $1.url.lastPathComponent
+                : $0.date > $1.date
+        }
+        var limits: [URL: Int] = [:]
+        var remaining = maxBytes
+        for file in newestFirst where remaining > 0 {
+            limits[file.url] = remaining
+            remaining -= min(file.size, remaining)
+        }
+        return (limits, true)
+    }
+
+    /// Reads at most `limit` bytes from the end of the file; `cutHead` says the first line is a fragment.
+    private static func readTail(of url: URL, limit: Int) -> (data: Data, cutHead: Bool)? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        do {
+            let size = try handle.seekToEnd()
+            let cutHead = size > UInt64(limit)
+            try handle.seek(toOffset: cutHead ? size - UInt64(limit) : 0)
+            return (try handle.readToEnd() ?? Data(), cutHead)
+        } catch {
+            return nil
+        }
     }
 
     private static func decode(line: Substring) -> ExportedRecord? {

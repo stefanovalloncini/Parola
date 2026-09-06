@@ -126,6 +126,11 @@ extension DiagnosticsExport {
             let noun = reading.skippedFiles == 1 ? "file" : "files"
             footer.append("\(reading.skippedFiles) \(noun) skipped: could not be read.")
         }
+        if reading.truncated {
+            footer.append(
+                "Oldest records dropped: the store is over the export's \(maxReadBytes / 1_000_000) MB cap."
+            )
+        }
         return footer
     }
 

@@ -283,6 +283,65 @@ struct DiagnosticsExportTests {
         ))
     }
 
+    @Test("an over-budget store keeps its newest records and says so")
+    func capsAnOversizedDirectory() throws {
+        let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let oldest = try line(ts: "2026-08-22T13:58:01.000Z", message: "oldest")
+        let middle = try line(ts: "2026-08-22T13:58:02.000Z", message: "middle")
+        let newest = try line(ts: "2026-08-22T13:58:03.000Z", message: "newest")
+        let names = [
+            "parola-100-1755871000.jsonl",
+            "parola-200-1755871001.jsonl",
+            "parola-300-1755871002.jsonl",
+        ]
+        let now = Date()
+        for (index, content) in [oldest, middle, newest].enumerated() {
+            try write([content], to: directory, named: names[index])
+            try FileManager.default.setAttributes(
+                [.modificationDate: now.addingTimeInterval(Double(index))],
+                ofItemAtPath: directory.appendingPathComponent(names[index]).path
+            )
+        }
+
+        let capped = DiagnosticsExport.read(directory: directory, maxBytes: newest.utf8.count + 1)
+        #expect(capped.records.map(\.message) == ["newest"])
+        #expect(capped.truncated)
+        #expect(capped.skippedLines == 0)
+
+        let whole = DiagnosticsExport.read(directory: directory)
+        #expect(whole.records.map(\.message) == ["oldest", "middle", "newest"])
+        #expect(!whole.truncated)
+    }
+
+    @Test("a file the budget cuts into contributes its last whole lines")
+    func keepsWholeLinesFromACutFile() throws {
+        let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let first = try line(ts: "2026-08-22T13:58:01.000Z", message: "first")
+        let second = try line(ts: "2026-08-22T13:58:02.000Z", message: "second")
+        try write([first, second], to: directory, named: "parola-100-1755871000.jsonl")
+
+        let reading = DiagnosticsExport.read(directory: directory, maxBytes: second.utf8.count + 5)
+        #expect(reading.records.map(\.message) == ["second"])
+        #expect(reading.skippedLines == 0)
+        #expect(reading.truncated)
+    }
+
+    @Test("the report says when the cap dropped the oldest records")
+    func rendersTheTruncationNotice() throws {
+        let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let record = try line(ts: "2026-08-22T13:58:01.000Z", message: "kept")
+        try write([record, record], to: directory, named: "parola-100-1755871000.jsonl")
+
+        let reading = DiagnosticsExport.read(directory: directory, maxBytes: record.utf8.count + 1)
+        let text = DiagnosticsExport.render(
+            reading: reading, environment: emptyEnvironment, generatedAt: Date()
+        )
+        #expect(text.contains("Oldest records dropped: the store is over the export's 10 MB cap."))
+    }
+
     @Test("an absent directory renders a report with no records")
     func absentDirectoryRendersEmptyReport() {
         let missing = FileManager.default.temporaryDirectory
