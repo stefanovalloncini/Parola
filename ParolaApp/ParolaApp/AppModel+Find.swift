@@ -39,9 +39,16 @@ extension AppModel {
         snapToCurrentMatch()
     }
 
-    /// Opens Find on a search result's hit; a title/summary/speaker-only match has none, so this no-ops.
-    func revealInTranscript(_ query: String) {
-        guard let transcript, !transcript.findMatches(query, caseSensitive: false).isEmpty else { return }
+    /// Opens a search result on its hit: the index's position selects the segment outright, and Find
+    /// opens on the query so the next and previous hits are a keystroke away. Without a position —
+    /// a title, summary or speaker match — there is nothing to open unless the body holds the query.
+    func revealInTranscript(_ query: String, at firstHit: LibrarySearchIndex.Match.FirstHit? = nil) {
+        guard let transcript else { return }
+        if let firstHit, transcript.segments.indices.contains(firstHit.segmentIndex) {
+            currentSegmentID = transcript.segments[firstHit.segmentIndex].id
+        } else if transcript.findMatches(query, caseSensitive: findCaseSensitive).isEmpty {
+            return
+        }
         findIsOpen = true
         if findQuery == query { scheduleRecomputeMatches() } else { findQuery = query }
     }

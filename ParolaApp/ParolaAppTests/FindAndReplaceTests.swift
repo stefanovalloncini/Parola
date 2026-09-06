@@ -232,8 +232,44 @@ struct FindAndReplaceTests {
     @Test("opening a result with no transcript loaded leaves Find closed")
     func revealSkipsWithoutATranscript() {
         model.transcript = nil
-        model.revealInTranscript("world")
+        model.revealInTranscript("world", at: .init(seconds: 2, segmentIndex: 2, textOffset: 30))
         #expect(!model.findIsOpen)
+        #expect(model.currentSegmentID == nil)
+    }
+
+    @Test("a result with a known position selects that segment")
+    func revealSelectsTheHitsSegment() {
+        model.revealInTranscript("world", at: .init(seconds: 2, segmentIndex: 2, textOffset: 30))
+        #expect(model.currentSegmentID == 2)
+        #expect(model.findIsOpen)
+        #expect(model.findQuery == "world")
+    }
+
+    /// The index matches without regard to case, so its position stands even when Find will show nothing.
+    @Test("a case-sensitive Find still opens on the hit's segment")
+    func revealSelectsTheSegmentUnderCaseSensitiveFind() {
+        model.findCaseSensitive = true
+        model.revealInTranscript("hello", at: .init(seconds: 1, segmentIndex: 1, textOffset: 12))
+        #expect(model.currentSegmentID == 1)
+        #expect(model.findIsOpen)
+    }
+
+    @Test("a case-sensitive Find is not opened on a hit it would not find")
+    func revealHonoursCaseSensitivity() {
+        model.findCaseSensitive = true
+        model.revealInTranscript("hello")
+        #expect(!model.findIsOpen)
+        #expect(model.currentSegmentID == nil)
+    }
+
+    /// A position from an index that no longer matches the transcript must not select a segment at random.
+    @Test("a position past the end of the transcript falls back to the body")
+    func revealIgnoresAStalePosition() {
+        model.revealInTranscript("ornitorinco", at: .init(seconds: 9, segmentIndex: 99, textOffset: 900))
+        #expect(!model.findIsOpen)
+        #expect(model.currentSegmentID == nil)
+        model.revealInTranscript("world", at: .init(seconds: 9, segmentIndex: 99, textOffset: 900))
+        #expect(model.findIsOpen)
     }
 
     /// This phrase exists in `transcript.text`'s joined form but not inside either segment alone.
