@@ -236,6 +236,17 @@
         }
       }
     },
+    "%lld matches": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld corrispondenze"
+          }
+        }
+      }
+    },
     "%lld ms": {
       "extractionState": "manual",
       "localizations": {
@@ -461,6 +472,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 segmento a bassa confidenza"
+          }
+        }
+      }
+    },
+    "1 match": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 corrispondenza"
           }
         }
       }
@@ -5583,6 +5605,17 @@
         }
       }
     },
+    "No results for “%@”": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun risultato per “%@”"
+          }
+        }
+      }
+    },
     "No rules match.": {
       "extractionState": "manual",
       "localizations": {
@@ -7683,6 +7716,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cerca nella cronologia…"
+          }
+        }
+      }
+    },
+    "Search looks in titles and transcript text": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La ricerca guarda nei titoli e nel testo delle trascrizioni"
           }
         }
       }
