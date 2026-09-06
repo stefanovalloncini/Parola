@@ -355,7 +355,13 @@ private struct TableEnergyProbe: SegmentEnergyProbe {
 
     func windowEnergies() -> [Double] { windows }
 
-    func energy(from start: Double, to end: Double) -> Double? { levels[start] }
+    func energy(from start: Double, to end: Double) -> Double? {
+        guard let level = levels[start] else {
+            Issue.record("no tabled level for the window starting at \(start)")
+            return nil
+        }
+        return level
+    }
 }
 
 private struct StubEnergyProbe: SegmentEnergyProbe {
