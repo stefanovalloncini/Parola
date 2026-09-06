@@ -46,7 +46,7 @@ public enum EngineTool: String, CaseIterable, Sendable {
         case .searchLibrary:
             return MCPTool(
                 name: rawValue,
-                description: "Full-text search over Parola's transcript library. Matches titles, transcript text, summaries, notes and speaker names, and returns entry ids with a score and a snippet.",
+                description: "Full-text search over Parola's transcript library. Matches titles, transcript text, summaries, notes and speaker names, and returns entry ids with a score, the time of the first hit in the recording (absent for a title-only match) and a snippet.",
                 inputSchema: AnyEncodable([
                     "type": "object",
                     "properties": [

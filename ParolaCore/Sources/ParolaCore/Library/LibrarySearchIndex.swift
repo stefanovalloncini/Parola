@@ -495,8 +495,7 @@ public actor LibrarySearchIndex {
     private static func firstHit(atOffset offset: Int, in entry: IndexedEntry) -> Match.FirstHit? {
         guard !entry.boundaryOffsets.isEmpty,
               entry.boundaryCentiseconds.count == entry.boundaryOffsets.count else { return nil }
-        // Segments that join no text share the offset of the one after them, so the last boundary at
-        // or before the hit is always the segment that holds it.
+        // Segments that join no text share the next one's offset, so the *last* boundary at or before the hit holds it.
         var low = 0
         var high = entry.boundaryOffsets.count
         while low < high {
@@ -585,8 +584,7 @@ public actor LibrarySearchIndex {
         highlights.sort { $0.start < $1.start }
         // An ellipsis says the line was cut out of a longer one; the leading one shifts every offset.
         let leading = snippetRange.lowerBound == text.startIndex ? "" : "…"
-        // `text` is the excerpt, not the full line, so a snippet running to its end still ends mid-line
-        // whenever the entry's text was longer than the excerpt.
+        // `text` is the excerpt: reaching its end is still mid-line when the entry's text ran past it.
         let trailing = snippetRange.upperBound < text.endIndex || truncated ? "…" : ""
         let shift = leading.count
         let shifted = shift == 0 ? highlights : highlights.map { Highlight(start: $0.start + shift, length: $0.length) }

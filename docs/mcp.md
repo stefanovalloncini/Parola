@@ -74,7 +74,7 @@ installed. App tools talk to a running Parola.app over a local bridge.
 | `parola_transcribe` | Transcribe an audio or video file on device. See the reference below. |
 | `parola_list_models` | The model catalog by category, with `[x]` on the installed ones. |
 | `parola_list_engines` | Registered engines and whether each supports `translate` and `prompt`. |
-| `parola_search_library` | Full-text search over stored transcripts. Returns entry ids with a score and a snippet. Args: `query`, `limit`. |
+| `parola_search_library` | Full-text search over stored transcripts. Returns entry ids with a score, the time of the first hit in the recording (absent for a title-only match) and a snippet. Args: `query`, `limit`. |
 | `parola_list_recent` | Titles of the most recent stored transcripts. Arg: `limit`. |
 | `parola_summarize` | Transcribe a file, then summarise it with the on-device LLM. Arg: `path`. |
 | `parola_open_app` | Launch Parola.app and wait for its bridge. Args: `timeoutMs`, `bundleID`. |

@@ -737,6 +737,33 @@ struct LibraryStoreTests {
         #expect(boundaries[1].textOffset == boundaries[2].textOffset)
     }
 
+    /// The silent segment shares its offset with the one that follows; a hit there belongs to the later one.
+    @Test("a hit on a shared boundary offset resolves to the segment that holds the text")
+    func sharedBoundaryOffsetResolvesToTheLaterSegment() async throws {
+        let indexURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-boundary-\(UUID().uuidString).json")
+        let index = LibrarySearchIndex(indexURL: indexURL)
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 3, text: "Buongiorno a tutti"),
+                TranscriptSegment(id: 1, start: 4.5, end: 5, text: "   "),
+                TranscriptSegment(id: 2, start: 9, end: 12, text: "lancio di primavera")
+            ],
+            language: "it",
+            modelName: "tiny"
+        )
+        await index.index(
+            id: "e1",
+            title: "Note",
+            text: transcript.text,
+            boundaries: LibraryStore.segmentBoundaries(for: transcript),
+            createdAt: Date()
+        )
+        let hit = try #require(await index.search("lancio").first?.firstHit)
+        #expect(hit.segmentIndex == 2)
+        #expect(hit.seconds == 9)
+    }
+
     @Test("a search result carries the time of its first transcript hit, rebuild included")
     func searchReportsFirstHitTime() async throws {
         let (store1, libraryURL) = try makeTempLibrary()

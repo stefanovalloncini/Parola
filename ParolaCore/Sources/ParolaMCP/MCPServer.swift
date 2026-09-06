@@ -251,7 +251,9 @@ public actor MCPServer {
         let limit = max(0, args["limit"] as? Int ?? 10)
         let matches = await libraryStore.search(query)
         let lines = matches.prefix(limit).map { match in
-            "- `\(match.entryID)` (score \(match.score)) \(match.snippet)"
+            // A title, summary or speaker hit is not spoken anywhere, so it carries no time.
+            let time = match.firstHit.map { ", at \(Timecode.format($0.seconds))" } ?? ""
+            return "- `\(match.entryID)` (score \(match.score)\(time)) \(match.snippet)"
         }
         return MCPToolCallResult(text: lines.joined(separator: "\n"))
     }

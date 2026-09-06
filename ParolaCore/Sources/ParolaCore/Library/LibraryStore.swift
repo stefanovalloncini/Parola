@@ -389,9 +389,7 @@ public actor LibraryStore {
         }
     }
 
-    /// Where each segment lands inside `Transcript.text`, so a search hit can name the time it is spoken.
-    /// Mirrors that property's joining: segments that trim to nothing contribute no text and take the
-    /// offset of the segment after them, which keeps this array indexed by segment.
+    /// Where each segment lands in `Transcript.text`; a segment that trims to nothing takes the offset of the next one, so this stays indexed by segment.
     static func segmentBoundaries(for transcript: Transcript) -> [LibrarySearchIndex.SegmentBoundary] {
         var boundaries: [LibrarySearchIndex.SegmentBoundary] = []
         boundaries.reserveCapacity(transcript.segments.count)

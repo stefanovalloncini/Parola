@@ -320,12 +320,15 @@ struct MCPServerTests {
         #expect(limitedText.split(separator: "\n").count == 2)
     }
 
-    @Test("parola_search_library returns matching entries with score and snippet")
+    @Test("parola_search_library returns matching entries with score, time and snippet")
     func searchLibraryReturnsMatches() async throws {
         let (store, tmp) = try tempLibrary()
         defer { try? FileManager.default.removeItem(at: tmp) }
         let transcript = Transcript(
-            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "sprint planning meeting")],
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 60, text: "opening remarks"),
+                TranscriptSegment(id: 1, start: 74, end: 90, text: "sprint planning meeting")
+            ],
             language: "en",
             modelName: "tiny"
         )
@@ -339,6 +342,15 @@ struct MCPServerTests {
         let text = try textBlock(from: json)
         #expect(text.contains(entry.id), "search output should include the matching entry id")
         #expect(text.contains("score"), "search output should include a score label per match")
+        #expect(text.contains("at 01:14"), "a body hit should carry the time it is spoken")
+
+        // "notes" is in the title alone, so there is no time to report.
+        let titleOnly = try await server.handle(
+            toolCall(name: "parola_search_library", arguments: ["query": "notes"], id: 106)
+        )
+        let titleOnlyText = try textBlock(from: try encode(titleOnly))
+        #expect(titleOnlyText.contains(entry.id))
+        #expect(!titleOnlyText.contains(", at "), "a title-only hit has no time to report")
     }
 
     @Test("library tools clamp a negative limit instead of trapping")
