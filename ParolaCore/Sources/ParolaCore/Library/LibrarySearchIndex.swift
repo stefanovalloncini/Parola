@@ -16,12 +16,21 @@ public actor LibrarySearchIndex {
     public struct Match: Sendable, Equatable {
         public let entryID: String
         public let score: Int
+        /// How many times the query's terms occur in everything indexed for the entry, title included.
+        public let matchCount: Int
         public let snippet: String
         public let highlights: [Highlight]
 
-        public init(entryID: String, score: Int, snippet: String, highlights: [Highlight] = []) {
+        public init(
+            entryID: String,
+            score: Int,
+            matchCount: Int = 0,
+            snippet: String,
+            highlights: [Highlight] = []
+        ) {
             self.entryID = entryID
             self.score = score
+            self.matchCount = matchCount
             self.snippet = snippet
             self.highlights = highlights
         }
@@ -53,6 +62,7 @@ public actor LibrarySearchIndex {
         let title: String
         let excerpt: String
         let tokens: [String]
+        let counts: [Int]
         let fingerprint: String
     }
 
@@ -61,6 +71,7 @@ public actor LibrarySearchIndex {
         let title: String
         let excerpt: String
         let tokens: [String]
+        let counts: [Int]
         let fingerprint: String
     }
 
@@ -97,7 +108,7 @@ public actor LibrarySearchIndex {
         case failed(any Error)
     }
 
-    private static let snapshotVersion = 5
+    private static let snapshotVersion = 6
     private static let excerptLength = 200
     private static let snapshotPrefix = Data(#"{"version":\#(snapshotVersion),"entries":["#.utf8)
     private static let snapshotSeparator = Data(",".utf8)
@@ -179,12 +190,17 @@ public actor LibrarySearchIndex {
         if sortedTokens == nil { sortedTokens = inverted.keys.sorted() }
         let tokens = sortedTokens ?? []
         var scores: [String: Int] = [:]
+        var hits: [String: Int] = [:]
         for queryToken in Set(queryTokens) {
             // Prefix matches sort contiguously; binary-search the range instead of scanning the whole vocabulary.
             let lower = Self.firstIndex(in: tokens, atLeast: queryToken)
             let upper = Self.firstIndex(in: tokens, atLeast: queryToken + "\u{10FFFF}")
             for indexToken in tokens[lower..<upper] where indexToken.hasPrefix(queryToken) {
-                for id in inverted[indexToken] ?? [] { scores[id, default: 0] += 1 }
+                for id in inverted[indexToken] ?? [] {
+                    scores[id, default: 0] += 1
+                    guard let entry = entries[id] else { continue }
+                    hits[id, default: 0] += Self.occurrences(of: indexToken, in: entry)
+                }
             }
         }
 
@@ -196,6 +212,7 @@ public actor LibrarySearchIndex {
                 return Match(
                     entryID: id,
                     score: score,
+                    matchCount: hits[id] ?? 0,
                     snippet: snippet.text,
                     highlights: snippet.highlights
                 )
@@ -230,6 +247,7 @@ public actor LibrarySearchIndex {
             title: existing.title,
             excerpt: existing.excerpt,
             tokens: existing.tokens,
+            counts: existing.counts,
             fingerprint: fingerprint
         )
         entries[id] = updated
@@ -293,6 +311,7 @@ public actor LibrarySearchIndex {
                 title: entry.title,
                 excerpt: entry.excerpt,
                 tokens: entry.tokens,
+                counts: entry.counts,
                 fingerprint: entry.fingerprint
             )
             for token in entry.tokens {
@@ -309,11 +328,16 @@ public actor LibrarySearchIndex {
         auxiliaryText: String,
         fingerprint: String
     ) {
-        let tokens = Set(Self.tokenize(title) + Self.tokenize(text) + Self.tokenize(auxiliaryText)).sorted()
+        var occurrences: [String: Int] = [:]
+        for token in Self.tokenize(title) + Self.tokenize(text) + Self.tokenize(auxiliaryText) {
+            occurrences[token, default: 0] += 1
+        }
+        let tokens = occurrences.keys.sorted()
         let entry = IndexedEntry(
             title: title,
             excerpt: String(text.prefix(Self.excerptLength)),
             tokens: tokens,
+            counts: tokens.map { occurrences[$0] ?? 0 },
             fingerprint: fingerprint
         )
         entries[id] = entry
@@ -348,6 +372,7 @@ public actor LibrarySearchIndex {
             title: entry.title,
             excerpt: entry.excerpt,
             tokens: entry.tokens,
+            counts: entry.counts,
             fingerprint: entry.fingerprint
         )
     }
@@ -360,6 +385,14 @@ public actor LibrarySearchIndex {
             if sorted[mid] < key { low = mid + 1 } else { high = mid }
         }
         return low
+    }
+
+    /// A snapshot written before the counts existed still proves the token is in the entry, so the floor is 1.
+    private static func occurrences(of token: String, in entry: IndexedEntry) -> Int {
+        let position = firstIndex(in: entry.tokens, atLeast: token)
+        guard position < entry.tokens.count, entry.tokens[position] == token,
+              position < entry.counts.count else { return 1 }
+        return max(1, entry.counts[position])
     }
 
     private static func tokenize(_ text: String) -> [String] {

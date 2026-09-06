@@ -117,6 +117,42 @@ struct LibrarySearchIndexTests {
         #expect(once.score == twice.score)
     }
 
+    @Test("the match count sums every occurrence, the title's included")
+    func matchCountSumsOccurrences() async throws {
+        let (index, _) = makeTempIndex()
+        await index.index(
+            id: "e1",
+            title: "Sprint notes",
+            text: "The sprint began late and the sprint ended early.",
+            createdAt: Date()
+        )
+        let match = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
+        #expect(match.matchCount == 3)
+    }
+
+    @Test("a single occurrence counts as one match")
+    func matchCountCountsOnce() async throws {
+        let (index, _) = makeTempIndex()
+        await index.index(id: "e1", title: "Notes", text: "One sprint only.", createdAt: Date())
+        let match = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
+        #expect(match.matchCount == 1)
+    }
+
+    @Test("the match count survives the snapshot round trip")
+    func matchCountRoundTrips() async throws {
+        let (index1, url) = makeTempIndex()
+        await index1.index(
+            id: "e1",
+            title: "Notes",
+            text: "Sprint one, sprint two, sprint three.",
+            createdAt: Date()
+        )
+        await index1.flush()
+        let index2 = LibrarySearchIndex(indexURL: url)
+        let match = try #require(await index2.search("sprint").first(where: { $0.entryID == "e1" }))
+        #expect(match.matchCount == 3)
+    }
+
     @Test("match snippet includes highlight ranges around each hit")
     func snippetHighlights() async throws {
         let (index, _) = makeTempIndex()
