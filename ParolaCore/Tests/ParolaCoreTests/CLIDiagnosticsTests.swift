@@ -40,6 +40,7 @@ struct CLIDiagnosticsTests {
 
         let foreign = CapturingDiagnosticsSink()
         ParolaLog.install(foreign)
+        defer { ParolaLog.uninstall() }
 
         await CLIDiagnostics.flush()
 
