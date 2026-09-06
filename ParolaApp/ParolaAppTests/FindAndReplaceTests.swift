@@ -213,4 +213,26 @@ struct FindAndReplaceTests {
         #expect(model.findQuery == "Goodbye")
         #expect(await waitForMatches(model, on: [2]))
     }
+
+    @Test("opening a search result opens Find on the query it matched")
+    func revealOpensFindOnABodyHit() {
+        model.revealInTranscript("world")
+        #expect(model.findIsOpen)
+        #expect(model.findQuery == "world")
+    }
+
+    /// An entry can match on its title, summary or speaker names, none of which the transcript body holds.
+    @Test("a match the transcript body does not hold leaves Find closed")
+    func revealSkipsWhenTheBodyHasNoHit() {
+        model.revealInTranscript("ornitorinco")
+        #expect(!model.findIsOpen)
+        #expect(model.findQuery.isEmpty)
+    }
+
+    @Test("opening a result with no transcript loaded leaves Find closed")
+    func revealSkipsWithoutATranscript() {
+        model.transcript = nil
+        model.revealInTranscript("world")
+        #expect(!model.findIsOpen)
+    }
 }

@@ -40,7 +40,9 @@ extension AppModel {
     }
 
     /// Find already knows how to walk a query's hits, so opening it is how a search result lands on its first one.
+    /// An entry that matched on its title, summary or speakers has none, and Find would open on nothing.
     func revealInTranscript(_ query: String) {
+        guard let transcript, transcript.text.range(of: query, options: .caseInsensitive) != nil else { return }
         findIsOpen = true
         if findQuery == query { scheduleRecomputeMatches() } else { findQuery = query }
     }

@@ -4,12 +4,20 @@ struct SearchPill: View {
     @Binding var text: String
     var placeholder: LocalizedStringKey
     var prompt: String?
+    var clearsOnEscape: Bool
     var identifier: String
 
-    init(text: Binding<String>, placeholder: LocalizedStringKey = "Search", prompt: String? = nil, identifier: String = "search.field") {
+    init(
+        text: Binding<String>,
+        placeholder: LocalizedStringKey = "Search",
+        prompt: String? = nil,
+        clearsOnEscape: Bool = false,
+        identifier: String = "search.field"
+    ) {
         self._text = text
         self.placeholder = placeholder
         self.prompt = prompt
+        self.clearsOnEscape = clearsOnEscape
         self.identifier = identifier
     }
 
@@ -22,9 +30,9 @@ struct SearchPill: View {
                 .textFieldStyle(.plain)
                 .font(DS.Font.subheadline)
                 .accessibilityIdentifier(identifier)
-                // Ignored when there is nothing to clear, so Esc still reaches the sheet the field sits in.
+                // Opt-in, and ignored when there is nothing to clear, so Esc still reaches the sheet the field sits in.
                 .onKeyPress(.escape) {
-                    guard !text.isEmpty else { return .ignored }
+                    guard clearsOnEscape, !text.isEmpty else { return .ignored }
                     text = ""
                     return .handled
                 }

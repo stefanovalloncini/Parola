@@ -102,6 +102,19 @@ enum LibraryListContent {
         return "\(transcripts) · \(matchesLabel(matches, locale: locale))"
     }
 
+    /// Reads the counts live: a query edit can leave the same entries matching a different number of times.
+    static func searchTotalsLabel(
+        for ids: [LibraryEntry.ID],
+        matches: [String: LibrarySearchIndex.Match],
+        locale: Locale = AppFormat.locale
+    ) -> String? {
+        searchTotalsLabel(
+            entries: ids.count,
+            matches: ids.reduce(0) { $0 + (matches[$1]?.matchCount ?? 0) },
+            locale: locale
+        )
+    }
+
     static func matchesLabel(_ count: Int, locale: Locale = AppFormat.locale) -> String {
         if count == 1 { return String(localized: "1 match", locale: locale) }
         return String(localized: "\(count) matches", locale: locale)
@@ -205,12 +218,7 @@ struct LibraryListView: View {
         displayCache = cache
         entries = displays
         // The count alone: bundle sizes land later and only for audio, so the label used to change shape.
-        if searchResults == nil {
-            totalsLabel = LibraryListContent.totalsLabel(for: displays.count) ?? ""
-        } else {
-            let matches = displays.reduce(0) { $0 + (model.searchMatches[$1.id]?.matchCount ?? 0) }
-            totalsLabel = LibraryListContent.searchTotalsLabel(entries: displays.count, matches: matches) ?? ""
-        }
+        totalsLabel = LibraryListContent.totalsLabel(for: displays.count) ?? ""
         totalsHelp = totalBytes > 0 ? String(localized: "Total size: \(AppFormat.byteSize(totalBytes))") : nil
         return displays
     }
@@ -337,7 +345,7 @@ struct LibraryListView: View {
     @ViewBuilder
     private func rowContent(for row: LibraryRowDisplay) -> some View {
         if searchResults == nil {
-            LibraryRow(display: row)
+            LibraryRow(display: row, isSelected: selection.contains(row.id))
         } else {
             SearchResultRow(
                 display: row,
@@ -348,10 +356,16 @@ struct LibraryListView: View {
         }
     }
 
+    /// Computed, not stored: the entry set can stay put while a query edit changes how often each one matches.
+    private var headerCount: String? {
+        guard searchResults != nil else { return totalsLabel.isEmpty ? nil : totalsLabel }
+        return LibraryListContent.searchTotalsLabel(for: entries.map(\.id), matches: model.searchMatches)
+    }
+
     private var header: some View {
         PageHeader(
             title: headerTitle,
-            count: totalsLabel.isEmpty ? nil : totalsLabel,
+            count: headerCount,
             countHelp: searchResults == nil ? totalsHelp : nil,
             leading: {
                 if searchResults == nil {
@@ -543,12 +557,20 @@ struct LibraryRow: View {
 
     let display: LibraryRowDisplay
     var style: Style = .library
+    var isSelected: Bool = false
 
     @Environment(AppModel.self) private var model
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .body) private var compactHeight: CGFloat = 35
     @ScaledMetric(relativeTo: .body) private var regularHeight: CGFloat = 39
+    @State private var isHovering = false
     private var compact: Bool { model.sidebarDensity == "compact" }
+
+    /// The palette's secondary is a fixed grey; on the accent fill of a selected row only the system's flips with it.
+    private var secondaryStyle: Color {
+        isSelected ? .secondary : DS.Color.secondaryText
+    }
 
     /// Declaring the height keeps NSTableView off its uncached automatic-row-height path; accessibility sizes outgrow the constant, so they go back to measuring.
     private var rowHeight: CGFloat? {
@@ -588,28 +610,28 @@ struct LibraryRow: View {
                     Text(display.timestamp)
                     if let duration = display.durationLabel {
                         Text("·")
-                            .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
+                            .foregroundStyle(secondaryStyle.opacity(0.5))
                         Text(duration)
                             .monospacedDigit()
                     }
                     if let size = display.sizeLabel {
                         Text("·")
-                            .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
+                            .foregroundStyle(secondaryStyle.opacity(0.5))
                         Text(size)
                     }
                     if let lang = display.languageLabel {
                         Text("·")
-                            .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
+                            .foregroundStyle(secondaryStyle.opacity(0.5))
                         Text(lang)
                     }
                     if style == .library, !compact, let opened = display.lastOpened {
                         Text("·")
-                            .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
+                            .foregroundStyle(secondaryStyle.opacity(0.5))
                         Text("Last opened: \(opened)")
                     }
                 }
                 .font(DS.Font.caption)
-                .foregroundStyle(DS.Color.secondaryText)
+                .foregroundStyle(secondaryStyle)
                 .lineLimit(1)
             }
             Spacer(minLength: DS.Spacing.regular)
@@ -617,7 +639,19 @@ struct LibraryRow: View {
         }
         .padding(.vertical, compact ? DS.Spacing.tight / 2 : DS.Spacing.tight)
         .frame(height: rowHeight)
+        .background(rowBackground)
         .help(display.tooltip)
+        .animation(reduceMotion ? nil : DS.Motion.rowState, value: isHovering)
+        .onHover { isHovering = $0 }
+    }
+
+    /// Home draws its own hover behind the whole button, so only the library list's rows carry one here.
+    @ViewBuilder
+    private var rowBackground: some View {
+        if style == .library, isHovering, !isSelected {
+            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                .fill(DS.Palette.surfaceHover)
+        }
     }
 
     @ViewBuilder
@@ -640,7 +674,7 @@ struct LibraryRow: View {
     private func chip(_ label: Text) -> some View {
         label
             .font(DS.Font.caption)
-            .foregroundStyle(DS.Color.secondaryText)
+            .foregroundStyle(secondaryStyle)
             .lineLimit(1)
             .chipChrome(isSelected: false, size: .regular)
     }

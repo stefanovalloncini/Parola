@@ -5,7 +5,7 @@ struct SearchResultRow: View {
     nonisolated private static let glyphWidth: CGFloat = 22
 
     /// Where the row's separator starts, so it runs under the text instead of under the glyph column.
-    nonisolated static let separatorInset: CGFloat = glyphWidth + DS.Spacing.regular
+    nonisolated static let separatorInset: CGFloat = DS.Spacing.small + glyphWidth + DS.Spacing.regular
 
     let display: LibraryRowDisplay
     let match: LibrarySearchIndex.Match?

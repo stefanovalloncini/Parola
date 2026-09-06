@@ -244,6 +244,12 @@ extension ThemeColor {
     private static let highlightChromaFloor = 0.15
     private static let highlightFallback = RGBA(0.30, 0.56, 0.98)
 
+    /// True when this color is saturated enough to read as a tint on text rather than as lighter body text.
+    var readsAsTint: Bool {
+        let variants = appearanceVariants
+        return min(variants.light.chroma, variants.dark.chroma) >= Self.highlightChromaFloor
+    }
+
     var asHighlight: ThemeColor {
         func legible(_ rgba: RGBA) -> RGBA {
             rgba.chroma >= Self.highlightChromaFloor ? rgba : Self.highlightFallback

@@ -3,8 +3,12 @@ import ParolaCore
 
 /// The matching line under a search result, with the terms the index found picked out.
 enum SearchSnippetText {
+    /// The Mono preset's accent is a grey: tinting with it would read as lighter body text, not as a hit.
+    static var accentReadsAsTint: Bool { DS.theme.accentText.readsAsTint }
+
     /// `tinted` is off on a selected row, where the accent is already the background: the weight carries the hit instead.
     static func attributed(_ match: LibrarySearchIndex.Match, tinted: Bool = true) -> AttributedString {
+        let tints = tinted && accentReadsAsTint
         let characters = Array(match.snippet)
         var text = AttributedString()
         var cursor = 0
@@ -13,7 +17,7 @@ enum SearchSnippetText {
                 text.append(AttributedString(String(characters[cursor..<range.lowerBound])))
             }
             var hit = AttributedString(String(characters[range]))
-            if tinted { hit.foregroundColor = DS.Color.accentText }
+            if tints { hit.foregroundColor = DS.Color.accentText }
             hit.font = DS.Font.captionEmphasized
             text.append(hit)
             cursor = range.upperBound

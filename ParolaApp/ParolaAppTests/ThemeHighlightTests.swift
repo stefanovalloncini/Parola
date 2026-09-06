@@ -24,6 +24,14 @@ struct ThemeHighlightTests {
         #expect(dark.chroma >= 0.15)
     }
 
+    @Test("a grey accent cannot tint text, a vivid one can", arguments: [
+        ThemePreset.terracotta, .blue, .mint, .purple, .pink, .yellow,
+    ])
+    func vividAccentsReadAsATint(_ preset: ThemePreset) {
+        #expect(preset.palette.accentText.readsAsTint)
+        #expect(ThemePreset.graphite.palette.accentText.readsAsTint == false)
+    }
+
     @Test("chroma is near zero for greys and large for saturated colors")
     func chromaProxy() {
         #expect(RGBA(0.42, 0.43, 0.47).chroma < 0.15)

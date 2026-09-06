@@ -292,6 +292,27 @@ struct LibraryListContentTests {
         )
     }
 
+    /// A query edit can leave the same entries matching a different number of times; the caption has to follow.
+    @Test("the search caption follows the hit counts when the entry set does not change")
+    func searchCaptionFollowsTheCounts() {
+        let english = Locale(identifier: "en_US")
+        let ids = ["a", "b"]
+        func matches(_ counts: [Int]) -> [String: LibrarySearchIndex.Match] {
+            Dictionary(uniqueKeysWithValues: zip(ids, counts).map { id, count in
+                (id, LibrarySearchIndex.Match(entryID: id, score: 1, matchCount: count, snippet: "s"))
+            })
+        }
+        #expect(
+            LibraryListContent.searchTotalsLabel(for: ids, matches: matches([3, 4]), locale: english)
+                == "2 transcripts · 7 matches"
+        )
+        #expect(
+            LibraryListContent.searchTotalsLabel(for: ids, matches: matches([1, 1]), locale: english)
+                == "2 transcripts · 2 matches"
+        )
+        #expect(LibraryListContent.searchTotalsLabel(for: [], matches: matches([3, 4]), locale: english) == nil)
+    }
+
     /// An index written before the counts existed answers 0, and a caption reading "· 0 matches" would be a lie.
     @Test("the search caption drops the hit count when the index has none")
     func searchTotalsLabelWithoutCounts() {

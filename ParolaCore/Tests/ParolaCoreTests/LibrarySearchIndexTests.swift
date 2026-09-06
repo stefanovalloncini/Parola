@@ -153,6 +153,46 @@ struct LibrarySearchIndexTests {
         #expect(match.matchCount == 3)
     }
 
+    @Test("a snapshot written before the counts existed is discarded and rebuilt")
+    func snapshotBeforeCountsIsDiscarded() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-search-v5-\(UUID().uuidString).json")
+        let v5 = #"{"version":5,"entries":[{"id":"e1","title":"Notes","excerpt":"Sprint planning","#
+            + #""tokens":["notes","planning","sprint"],"fingerprint":"f1"}]}"#
+        try Data(v5.utf8).write(to: url)
+        let index = LibrarySearchIndex(indexURL: url)
+        #expect(await index.search("sprint").isEmpty)
+        #expect(await index.needsRebuild(matching: ["e1": "f1"]))
+        await index.rebuild(entries: [
+            .init(id: "e1", title: "Notes", text: "Sprint planning and sprint retro", fingerprint: "f1")
+        ])
+        let match = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
+        #expect(match.matchCount == 2)
+    }
+
+    @Test("an entry whose counts went missing still counts its hit once")
+    func missingCountsFallBackToOne() async throws {
+        let (index1, url) = makeTempIndex()
+        await index1.index(id: "e1", title: "Notes", text: "Sprint planning and sprint retro", createdAt: Date())
+        await index1.flush()
+        // Empty the counts out of the snapshot the actor just wrote, keeping its version and every other field.
+        var snapshot = try #require(
+            try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        )
+        var entries = try #require(snapshot["entries"] as? [[String: Any]])
+        entries = entries.map { entry in
+            var stripped = entry
+            stripped["counts"] = [Int]()
+            return stripped
+        }
+        snapshot["entries"] = entries
+        try JSONSerialization.data(withJSONObject: snapshot).write(to: url)
+
+        let index2 = LibrarySearchIndex(indexURL: url)
+        let match = try #require(await index2.search("sprint").first(where: { $0.entryID == "e1" }))
+        #expect(match.matchCount == 1)
+    }
+
     @Test("match snippet includes highlight ranges around each hit")
     func snippetHighlights() async throws {
         let (index, _) = makeTempIndex()
