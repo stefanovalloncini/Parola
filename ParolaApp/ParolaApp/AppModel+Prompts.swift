@@ -109,8 +109,7 @@ extension AppModel {
         if smartChapters != saved { smartChapters = saved }
     }
 
-    /// Keeps a saved summary's chapters in step with the runtime list, so reopening the entry can't resurrect the old one.
-    /// Entries with no saved summary keep their chapters in memory, as they did before.
+    /// Keeps a saved summary's chapters in step with the runtime list; unsaved entries keep theirs in memory only.
     func persistChapters(_ chapters: [Chapter]) {
         guard transcript?.summary != nil, transcript?.summary?.chapters != chapters else { return }
         transcript?.summary?.chapters = chapters

@@ -47,8 +47,7 @@ enum LibraryListContent {
         var isEmpty: Bool { label == nil && language == nil && dateRange == .all }
     }
 
-    /// The list keeps its filters across a category switch, but a filter the new category has no row for is
-    /// dropped: carrying it over would show an empty list that reads as "this category is empty".
+    /// Filters survive a category switch, but one the new category has no row for is dropped, not carried over empty.
     static func filters(
         _ active: ActiveFilters,
         survivingIn category: EntryCategory?,
@@ -190,8 +189,7 @@ struct LibraryListView: View {
         recomputeEntries(with: activeFilters)
     }
 
-    /// Takes the filters explicitly so a category switch can recompute with the ones it just dropped, without
-    /// reading `@State` it wrote in the same pass.
+    /// Takes filters explicitly so a category switch can recompute with the ones it just dropped, not `@State` it just wrote.
     @discardableResult
     private func recomputeEntries(with filters: LibraryListContent.ActiveFilters) -> [LibraryRowDisplay] {
         let computed: [LibraryEntry]
@@ -289,8 +287,7 @@ struct LibraryListView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { recomputeEntries() }
-        // A later transaction than onAppear's first fill, so the rows the route opens with don't
-        // animate in; everything after that does.
+        // Later than onAppear's first fill, so the rows the route opens with don't animate in.
         .task { animatesRows = true }
         .onChange(of: model.libraryVersion) { _, _ in
             let newEntries = recomputeEntries()

@@ -40,8 +40,7 @@ struct ContentRoutes: View {
         }
     }
 
-    /// Coarse on purpose: the phase machine keeps its own cross-fade, and every library filter is one
-    /// case so switching category keeps the list's identity and its `onChange` handlers.
+    /// Coarse on purpose: one case per library filter keeps the list's identity across a category switch.
     private var routeID: RouteID {
         if model.mode == .test, model.settingsRoutePreview { return .settingsPreview }
         switch model.route {

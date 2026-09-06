@@ -71,8 +71,7 @@ struct LibraryRowDisplay: Identifiable {
     }
 }
 
-/// Building a display formats three dates, and the list rebuilds its rows on every filter, sort and category
-/// change. The entries only change with the library version, so displays are kept until one of those moves.
+/// Caches the three formatted dates a row needs, since the list rebuilds rows on every filter and sort change.
 struct LibraryRowDisplayCache {
     private(set) var libraryVersion = -1
     private(set) var sizesVersion = -1

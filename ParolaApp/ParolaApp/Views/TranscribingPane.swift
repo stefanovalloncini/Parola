@@ -48,8 +48,7 @@ struct TranscribingPane: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             header
-            // Priority over the spacer, or the stack splits the leftover height between them and
-            // the box lands at half the pane instead of at its own.
+            // Priority over the spacer, or the stack splits the leftover height and the box halves.
             transcriptBox
                 .layoutPriority(1)
             Spacer(minLength: 0)
@@ -212,8 +211,7 @@ struct TranscribingPane: View {
             .mask { topFadeMask }
         }
         .onPreferenceChange(StreamedTextHeight.self) { streamedTextHeight = $0 }
-        // maxHeight tracks the text so the box grows with the run; the pane still clamps it to
-        // whatever height is left, and the ScrollView takes over from there.
+        // maxHeight tracks the text so the box grows with the run, still clamped by what height is left.
         .frame(
             maxWidth: .infinity,
             minHeight: DS.Size.liveTranscriptMinHeight,

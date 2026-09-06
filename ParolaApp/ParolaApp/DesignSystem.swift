@@ -25,8 +25,7 @@ enum DS {
         static let idealWidth: CGFloat = 320
     }
 
-    /// Durations for chrome that moves on its own. Every site pairs these with
-    /// `accessibilityReduceMotion` and passes `nil` instead when it is set.
+    /// Durations for chrome that moves on its own; every site pairs these with `accessibilityReduceMotion`.
     enum Motion {
         static let route = SwiftUI.Animation.easeInOut(duration: 0.2)
         static let rowState = SwiftUI.Animation.easeOut(duration: 0.12)
@@ -205,8 +204,7 @@ enum DS {
         }
     }
 
-    /// One pair per hue: the single shared value read at 3.2-4.7 against the segment card in both
-    /// schemes. Each variant here clears 5.0 on `surfaceElevated` — see `SpeakerPaletteTests`.
+    /// One pair per hue, each clearing 5.0 on `surfaceElevated` and 3.2-4.7 on the segment card — see `SpeakerPaletteTests`.
     static let speakerTints: [ThemeColor] = [
         .dynamic(light: RGBA(0.272, 0.407, 0.616), dark: RGBA(0.538, 0.640, 0.796)),  // dusty blue
         .dynamic(light: RGBA(0.539, 0.365, 0.261), dark: RGBA(0.761, 0.601, 0.506)),  // warm tan
@@ -269,8 +267,7 @@ extension View {
         )
     }
 
-    /// A live readout that has to hold the accent on video. A solid accent fill would need
-    /// `onAccent`, which picks its side by luminance and lands under AA on five of the seven presets.
+    /// A live readout that must hold the accent on video — `onAccent` fill lands under AA on five of seven presets.
     func accentPill() -> some View {
         font(DS.Font.captionMono)
             .foregroundStyle(DS.Color.accentText)
@@ -279,8 +276,7 @@ extension View {
             .background(Capsule(style: .continuous).fill(DS.Color.accentWash))
     }
 
-    /// A text field's border and focus ring, drawn by us. AppKit draws `.roundedBorder`'s ring with
-    /// `NSColor.controlAccentColor`, which comes from the AccentColor asset and ignores the palette.
+    /// A text field's border and focus ring, drawn by us — AppKit's own ring ignores the palette.
     func fieldChrome(focused: Bool) -> some View {
         padding(.horizontal, DS.Spacing.small)
             .padding(.vertical, DS.Spacing.snug)

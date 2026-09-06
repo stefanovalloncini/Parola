@@ -63,8 +63,7 @@ struct RGBA: Sendable, Codable, Equatable {
     /// Max-min RGB spread — a cheap saturation proxy, near zero for greys.
     var chroma: Double { Swift.max(r, g, b) - Swift.min(r, g, b) }
 
-    /// WCAG contrast ratio, 1 (identical) to 21 (black on white). Alpha is ignored: every pair the
-    /// app measures is an opaque token on an opaque surface.
+    /// WCAG contrast ratio, 1 (identical) to 21 (black on white), between two opaque tokens.
     func contrast(against other: RGBA) -> Double {
         let (high, low) = (Swift.max(relativeLuminance, other.relativeLuminance),
                            Swift.min(relativeLuminance, other.relativeLuminance))
@@ -78,8 +77,7 @@ struct RGBA: Sendable, Codable, Equatable {
         RGBA(r + (target.r - r) * amount, g + (target.g - g) * amount, b + (target.b - b) * amount, a)
     }
 
-    /// This color moved toward whichever of black or white the backdrop is not, by the smallest
-    /// amount that reaches `textContrastMinimum`. Unchanged when it already clears.
+    /// Moved toward black or white, whichever the backdrop isn't, by the smallest amount that clears `textContrastMinimum`.
     func legible(on backdrop: RGBA) -> RGBA {
         guard contrast(against: backdrop) < Self.textContrastMinimum else { return self }
         let target = backdrop.relativeLuminance > relativeLuminance ? RGBA(0, 0, 0) : RGBA(1, 1, 1)
@@ -152,9 +150,7 @@ struct ThemePalette: Sendable, Codable, Equatable {
 }
 
 extension ThemePalette {
-    /// Neutrals shared by every built-in preset. The dark surfaces sit above the main window's
-    /// `NSColor.windowBackgroundColor` (#1E1E1E) so a raised card reads as raised, and
-    /// `textSecondary` is a fixed pair because `.secondary` composites to #808080 on white — 3.95.
+    /// Neutrals shared by every built-in preset; `textSecondary` is fixed since `.secondary` only clears 3.95 on white.
     static let sharedNeutrals = (
         canvas: ThemeColor.dynamic(light: RGBA(0.972, 0.972, 0.970), dark: RGBA(0.098, 0.098, 0.098)),
         surface: ThemeColor.dynamic(light: RGBA(1, 1, 1), dark: RGBA(0.157, 0.157, 0.157)),
@@ -163,13 +159,11 @@ extension ThemePalette {
         textSecondary: ThemeColor.dynamic(light: RGBA(0.412, 0.412, 0.412), dark: RGBA(0.63, 0.63, 0.63)),
         success: ThemeColor.uniform(RGBA(0.32, 0.74, 0.42)),
         warning: ThemeColor.uniform(RGBA(0.95, 0.66, 0.20)),
-        // The two values `Color.red` already resolved to; spelled out so text derived from them can
-        // be computed instead of waiting for a drawing appearance.
+        // `Color.red`'s two resolved values, spelled out so derived text doesn't wait for a drawing appearance.
         danger: ThemeColor.dynamic(light: RGBA(1.0, 0.220, 0.235), dark: RGBA(1.0, 0.259, 0.271))
     )
 
-    /// A preset that recolors only the accent and keeps the shared neutrals, so switching accent
-    /// never moves a background or a text contrast ratio.
+    /// Recolors only the accent, keeping the shared neutrals, so switching accent never moves a contrast ratio.
     static func accented(_ accent: ThemeColor) -> ThemePalette {
         ThemePalette(
             accent: accent,
@@ -185,8 +179,7 @@ extension ThemePalette {
         )
     }
 
-    /// How much accent a live readout's fill carries. Opaque, so the text on it clears AA wherever
-    /// the readout lands rather than only over the surface it was measured against.
+    /// How much accent a live readout's fill carries; opaque, so its text clears AA wherever it lands.
     static let accentWashOpacity = 0.15
 
     var accentWash: ThemeColor {
@@ -198,19 +191,16 @@ extension ThemePalette {
         )
     }
 
-    /// The accent as small text, legible on both surfaces the app sets accent text on: the card fill
-    /// and `accentWash`. Amber on the card reads 1.4 untouched.
+    /// The accent as small text, legible on both surfaces it's set on — the card fill and `accentWash`.
     var accentText: ThemeColor {
         accent.legibleText(on: surfaceElevated).legibleText(on: accentWash)
     }
 
-    /// Red and green as small text. The raised dark surfaces put the raw system red at 3.7 on a card,
-    /// and green has been under AA in light mode all along.
+    /// Red and green as small text — the raw system red only reaches 3.7 on a card, green was under AA in light mode.
     var dangerText: ThemeColor { danger.legibleText(on: surfaceElevated) }
     var successText: ThemeColor { success.legibleText(on: surfaceElevated) }
 
-    /// `dangerText` pinned to its dark value for chrome that paints its own dark scrim and writes on
-    /// it in white, so the app's surfaces — and the light variant derived from them — don't apply.
+    /// `dangerText` pinned to its dark value, for chrome that paints its own dark scrim regardless of appearance.
     var dangerOnDark: ThemeColor { .uniform(dangerText.appearanceVariants.dark) }
 
     /// Active-segment highlight tint: the accent, unless it's too grey to stand out (Mono) — then azure.
@@ -218,8 +208,7 @@ extension ThemePalette {
 }
 
 extension ThemeColor {
-    /// This color darkened (light appearance) or lightened (dark) until small text on `backdrop`
-    /// clears AA in that appearance. Unchanged where it already clears.
+    /// Darkened or lightened per appearance until small text on `backdrop` clears AA there.
     func legibleText(on backdrop: ThemeColor) -> ThemeColor {
         let tint = appearanceVariants
         let behind = backdrop.appearanceVariants

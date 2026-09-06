@@ -9,8 +9,7 @@ enum TranscriptDerive {
     static let paragraphPauseSeconds: TimeInterval = 1.5
 }
 
-/// The paragraph rule the continuous transcript renders and the Copy button writes to the pasteboard.
-/// Both go through here so the two can't drift apart.
+/// The paragraph rule shared by the continuous transcript's render and the Copy button's pasteboard write.
 enum TranscriptParagraphs {
     static func breaksParagraph(
         after previousEnd: Double?,

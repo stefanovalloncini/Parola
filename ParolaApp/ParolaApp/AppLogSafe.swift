@@ -2,8 +2,7 @@ import AVFoundation
 import Foundation
 import ParolaCore
 
-/// The three answers a permission check can give, in a form safe to log. Apple's own
-/// `AVAuthorizationStatus` must not conform to `LogSafe`, so it maps in here.
+/// The three answers a permission check can give, mapped in here since `AVAuthorizationStatus` must not conform to `LogSafe`.
 enum PermissionState: String, LogSafe {
     case granted
     case denied
@@ -57,8 +56,7 @@ extension BootstrapSideEffect: LogSafe {
     }
 }
 
-/// One field-sized value for a set of tokens. Sorted, so two launches of the same build read
-/// the same in an export.
+/// One field-sized value for a set of tokens, sorted so two launches of the same build read the same.
 struct TokenList: LogSafe {
     let logToken: String
 
@@ -68,8 +66,7 @@ struct TokenList: LogSafe {
     }
 }
 
-/// The bundle's version and build. Echoed only when they look like the numbers they should be:
-/// an Info.plist can hold anything.
+/// The bundle's version and build, echoed only when they look like real numbers — an Info.plist can hold anything.
 struct AppVersionToken: LogSafe {
     private let short: String
     private let build: String

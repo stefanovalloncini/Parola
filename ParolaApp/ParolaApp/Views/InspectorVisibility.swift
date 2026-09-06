@@ -1,7 +1,6 @@
 import Foundation
 
-/// Whether the transcript inspector shows. A comfortable pane follows the standing preference;
-/// a narrow one hides it until the reader asks for it, and forgets that ask once the window widens.
+/// Whether the transcript inspector shows: a comfortable pane follows the preference, a narrow one hides it until asked.
 enum InspectorVisibility {
     static let preferenceKey = "inspectorVisible"
     static let forcedAtNarrowWidthKey = "inspectorForcedAtNarrowWidth"

@@ -117,8 +117,7 @@ extension AppModel {
         return undetermined ? .undetermined : .denied
     }
 
-    /// `CGPreflightScreenCaptureAccess` and `AXIsProcessTrusted` answer yes or no, so a pending
-    /// grant is indistinguishable from a refusal here.
+    /// A pending grant is indistinguishable from a refusal — the OS APIs here only answer yes or no.
     static func diagnosticsPermission(granted: Bool) -> DiagnosticsEnvironment.Permission {
         granted ? .granted : .denied
     }

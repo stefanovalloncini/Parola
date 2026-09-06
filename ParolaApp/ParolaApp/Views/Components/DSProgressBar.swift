@@ -1,7 +1,6 @@
 import SwiftUI
 
-// `ProgressView(.linear)` hands its fill to NSProgressIndicator, which drops to system grey while the
-// window is not key — most of a screen recording. Drawing the bar keeps the accent through the run.
+// `ProgressView(.linear)` hands its fill to NSProgressIndicator, which drops to grey while the window isn't key.
 struct DSProgressBar: View {
     /// Nil while the run can't say how far along it is; the bar sweeps instead of filling.
     let value: Double?

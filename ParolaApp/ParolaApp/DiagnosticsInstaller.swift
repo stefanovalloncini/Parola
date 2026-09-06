@@ -17,8 +17,7 @@ final class DiagnosticsInstaller {
         flushInterval: Duration = .seconds(2)
     ) {
         self.directory = directory
-        // The bootstrap also registers an atexit drain, which backs up the 2s terminate barrier
-        // when it runs out of time; `stopPeriodicFlush` runs before that barrier, so they never race.
+        // `stopPeriodicFlush` runs before the bootstrap's own atexit drain, so the two never race.
         self.bootstrap = DiagnosticsBootstrap(
             directory: directory,
             environment: environment,
@@ -27,8 +26,7 @@ final class DiagnosticsInstaller {
         )
     }
 
-    /// A unit-test host must not install the sink: seeded failures and mock records would land in
-    /// the store the user exports to support, and the budget trim would evict their real records.
+    /// A unit-test host must not install the sink — seeded failures would land in the user's own export.
     @discardableResult
     static func installIfWanted(
         sideEffects: Set<BootstrapSideEffect>,

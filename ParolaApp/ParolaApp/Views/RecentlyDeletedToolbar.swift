@@ -189,8 +189,7 @@ struct RecentlyDeletedFilterBar: View {
     @Binding var categoryFilter: RecentlyDeletedCategoryFilter
 
     var body: some View {
-        // Both groups on one line at the ideal sheet width; stacked at the minimum, where the
-        // last kind pill would otherwise sit outside the sheet.
+        // Both groups on one line at the ideal width; stacked at the minimum, where a pill would overflow.
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 6) {
                 whenGroup
