@@ -49,12 +49,24 @@ struct SearchResultRow: View {
         }
     }
 
+    /// nil for an entry matched on its title, summary or speakers, none of which are spoken at a time.
+    nonisolated static func timestamp(for match: LibrarySearchIndex.Match?) -> String? {
+        match?.firstHit.map { Timecode.format($0.seconds) }
+    }
+
     private var snippet: some View {
-        Text(snippetText)
-            .font(DS.Font.caption)
-            .foregroundStyle(DS.Color.primaryText)
-            .lineLimit(2)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
+            if let timestamp = Self.timestamp(for: match) {
+                Text(timestamp)
+                    .font(DS.Font.captionMono)
+                    .foregroundStyle(secondaryStyle)
+            }
+            Text(snippetText)
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.primaryText)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     /// A space, not nothing: an entry matched on its title alone still has to be as tall as its neighbours.

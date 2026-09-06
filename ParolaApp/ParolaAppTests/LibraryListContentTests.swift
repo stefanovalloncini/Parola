@@ -337,12 +337,34 @@ struct LibraryListContentTests {
         )
     }
 
+    @Test("a result row shows the time of its first hit, and nothing for a title-only match")
+    func searchRowTimestamp() {
+        func match(_ seconds: Double?) -> LibrarySearchIndex.Match {
+            LibrarySearchIndex.Match(
+                entryID: "a",
+                score: 1,
+                snippet: "s",
+                firstHit: seconds.map { .init(seconds: $0, segmentIndex: 2, textOffset: 40) }
+            )
+        }
+        #expect(SearchResultRow.timestamp(for: match(754)) == "12:34")
+        #expect(SearchResultRow.timestamp(for: match(3754)) == "1:02:34")
+        #expect(SearchResultRow.timestamp(for: match(nil)) == nil)
+        #expect(SearchResultRow.timestamp(for: nil) == nil)
+    }
+
     /// However long the snippet runs, the row stops at two lines — that is what keeps the list from being a text dump.
-    @Test("a search result row clamps its snippet to two lines")
+    @Test("a search result row clamps its snippet to two lines, timestamp or not")
     func searchRowClampsSnippetToTwoLines() {
         let display = LibraryRowDisplay(entry: entry(id: "a", title: "Alpha", offset: 0), sizeBytes: 1_000_000)
-        func height(_ snippet: String) -> CGFloat {
-            let match = LibrarySearchIndex.Match(entryID: "a", score: 1, matchCount: 2, snippet: snippet)
+        func height(_ snippet: String, at seconds: Double? = nil) -> CGFloat {
+            let match = LibrarySearchIndex.Match(
+                entryID: "a",
+                score: 1,
+                matchCount: 2,
+                snippet: snippet,
+                firstHit: seconds.map { .init(seconds: $0, segmentIndex: 2, textOffset: 40) }
+            )
             // The width has to be on the view: `fittingSize` proposes its own, and the snippet never wraps.
             let host = NSHostingView(
                 rootView: SearchResultRow(display: display, match: match)
@@ -355,5 +377,7 @@ struct LibraryListContentTests {
         #expect(twoLines == height(String(repeating: "parola ", count: 400)))
         #expect(height("breve") < twoLines)
         #expect(height("") == height("breve"))
+        #expect(height("breve", at: 754) == height("breve"))
+        #expect(height(String(repeating: "parola ", count: 400), at: 754) == twoLines)
     }
 }
