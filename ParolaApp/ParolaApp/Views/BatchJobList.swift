@@ -11,15 +11,6 @@ struct BatchJobList: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Group {
-                    if model.batchJobs.count == 1 {
-                        Text("1 file")
-                    } else {
-                        Text("\(model.batchJobs.count) files")
-                    }
-                }
-                .font(DS.Font.caption)
-                .foregroundStyle(DS.Color.secondaryText)
                 Spacer()
                 Button("Clear") { model.clearBatch() }
                     .buttonStyle(.borderless)
