@@ -22,6 +22,12 @@ struct SearchPill: View {
                 .textFieldStyle(.plain)
                 .font(DS.Font.subheadline)
                 .accessibilityIdentifier(identifier)
+                // Ignored when there is nothing to clear, so Esc still reaches the sheet the field sits in.
+                .onKeyPress(.escape) {
+                    guard !text.isEmpty else { return .ignored }
+                    text = ""
+                    return .handled
+                }
             if !text.isEmpty {
                 Button {
                     text = ""
