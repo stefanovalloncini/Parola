@@ -609,6 +609,51 @@ struct LibraryStoreTests {
         #expect(try snapshotWrittenAt(dir) == before, "a rebuild would rewrite the snapshot")
     }
 
+    @Test("an unreadable bundle does not reindex the library on every launch")
+    func unreadableBundleLeavesTheIndexFresh() async throws {
+        let (store, dir) = try makeTempLibrary()
+        _ = try await store.add(transcript: makeTranscript(), audioSource: nil, title: "wholemarker")
+        let broken = try await store.add(
+            transcript: makeTranscript(), audioSource: nil, title: "brokenmarker"
+        )
+        await store.flush()
+        try Data("not json".utf8).write(to: broken.bundleURL.appendingPathComponent("transcript.json"))
+        try FileManager.default.removeItem(at: dir.appendingPathComponent(".search-index.json"))
+
+        let first = LibraryStore(libraryURL: dir, extraIndexer: nil)
+        #expect(await first.search("brokenmarker").count == 1, "the title stays searchable")
+        await first.flush()
+        let before = try #require(try snapshotWrittenAt(dir))
+
+        let relaunched = LibraryStore(libraryURL: dir, extraIndexer: nil)
+        #expect(await relaunched.search("wholemarker").count == 1)
+        await relaunched.flush()
+
+        #expect(try snapshotWrittenAt(dir) == before, "a rebuild would rewrite the snapshot")
+    }
+
+    @Test("repairing an unreadable bundle puts its transcript back in the index")
+    func repairingAnUnreadableBundleReindexesIt() async throws {
+        let (store, dir) = try makeTempLibrary()
+        let broken = try await store.add(
+            transcript: makeTranscript(), audioSource: nil, title: "brokenmarker"
+        )
+        await store.flush()
+        let transcriptURL = broken.bundleURL.appendingPathComponent("transcript.json")
+        let good = try Data(contentsOf: transcriptURL)
+        try Data("not json".utf8).write(to: transcriptURL)
+        try FileManager.default.removeItem(at: dir.appendingPathComponent(".search-index.json"))
+
+        let degraded = LibraryStore(libraryURL: dir, extraIndexer: nil)
+        #expect(await degraded.search("hi").isEmpty)
+        await degraded.flush()
+
+        try good.write(to: transcriptURL)
+        let repaired = LibraryStore(libraryURL: dir, extraIndexer: nil)
+
+        #expect(await repaired.search("hi").count == 1)
+    }
+
     @Test("a timing-only write leaves the index fresh for the next launch")
     func timingOnlyWriteKeepsTheIndexFresh() async throws {
         let (store, dir) = try makeTempLibrary()

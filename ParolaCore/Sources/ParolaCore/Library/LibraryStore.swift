@@ -165,24 +165,39 @@ public actor LibraryStore {
         guard await searchIndex.needsRebuild(matching: scan.fingerprints) else { return }
         let indexable = scan.entries.filter { $0.deletedAt == nil }
         let rebuilt = await offActorIO(qos: .utility) {
-            indexable.compactMap { entry -> LibrarySearchIndex.RebuildEntry? in
-                guard let doc = try? ParolaDocument.read(at: entry.bundleURL) else { return nil }
+            var unreadable = 0
+            let entries = indexable.map { entry -> LibrarySearchIndex.RebuildEntry in
+                let fingerprint = scan.fingerprints[entry.id] ?? ""
+                // An unreadable bundle is indexed on its title alone: dropping it would leave the
+                // index one short of the fingerprints for good, rebuilding the whole library on
+                // every launch. Repairing it changes the fingerprint, which asks for the rebuild.
+                guard let doc = try? ParolaDocument.read(at: entry.bundleURL) else {
+                    unreadable += 1
+                    return .init(
+                        id: entry.id, title: entry.title, text: "",
+                        auxiliaryText: "", fingerprint: fingerprint
+                    )
+                }
                 return .init(
                     id: entry.id,
                     title: entry.title,
                     text: doc.transcript.text,
                     auxiliaryText: Self.searchAuxiliaryText(notes: entry.segmentNotes, transcript: doc.transcript),
-                    fingerprint: scan.fingerprints[entry.id] ?? ""
+                    fingerprint: fingerprint
                 )
             }
+            return (entries: entries, unreadable: unreadable)
         }
         // One count, never one record per bundle: a library whose folder went unreadable would
         // otherwise write a line for every entry it holds.
-        let skipped = indexable.count - rebuilt.count
-        if skipped > 0 {
-            ParolaLog.notice(.libraryIndex, "bundles skipped during index rebuild", [.count: .int(skipped)])
+        if rebuilt.unreadable > 0 {
+            ParolaLog.notice(
+                .libraryIndex,
+                "bundles indexed on their title alone",
+                [.count: .int(rebuilt.unreadable)]
+            )
         }
-        await searchIndex.rebuild(entries: rebuilt)
+        await searchIndex.rebuild(entries: rebuilt.entries)
     }
 
     private struct IndexScan: Sendable {

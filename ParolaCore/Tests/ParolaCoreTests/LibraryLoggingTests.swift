@@ -75,28 +75,32 @@ struct LibraryLoggingTests {
 
     @Test("bundles that cannot be read during a rebuild are counted once, not listed")
     func unreadableBundlesDuringRebuild() async throws {
-        try await withSink { sink in
-            let libraryURL = try makeLibraryURL()
-            let audio = try makeAudio()
-            let seed = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
-            let broken = try await seed.add(transcript: makeTranscript("first"), audioSource: audio)
-            _ = try await seed.add(transcript: makeTranscript("second"), audioSource: audio)
-            await seed.flush()
-            try Data("not json".utf8).write(to: broken.bundleURL.appendingPathComponent("transcript.json"))
-            try FileManager.default.removeItem(at: libraryURL.appendingPathComponent(".search-index.json"))
-            sink.clear()
+        let sink = ScopedCapturingSink()
+        ParolaLog.install(sink)
+        defer { ParolaLog.uninstall() }
 
+        let libraryURL = try makeLibraryURL()
+        let audio = try makeAudio()
+        let seed = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+        let broken = try await seed.add(transcript: makeTranscript("first"), audioSource: audio)
+        _ = try await seed.add(transcript: makeTranscript("second"), audioSource: audio)
+        await seed.flush()
+        try Data("not json".utf8).write(to: broken.bundleURL.appendingPathComponent("transcript.json"))
+        try FileManager.default.removeItem(at: libraryURL.appendingPathComponent(".search-index.json"))
+
+        await sink.scope {
             let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
             _ = await store.search("second")
-
-            let record = try #require(
-                await waitForRecord(sink, .libraryIndex, message: "bundles skipped during index rebuild")
-            )
-            #expect(record.level == .notice)
-            #expect(record.fields[.count]?.text == "1")
-            #expect(records(sink, .libraryIndex, message: "bundles skipped during index rebuild").count == 1)
-            #expect(record.formattedLine.contains(broken.id) == false)
         }
+
+        let matching = sink.records.filter {
+            $0.category == .libraryIndex && $0.message.rendered == "bundles indexed on their title alone"
+        }
+        let record = try #require(matching.first)
+        #expect(record.level == .notice)
+        #expect(record.fields[.count]?.text == "1")
+        #expect(matching.count == 1)
+        #expect(record.formattedLine.contains(broken.id) == false)
     }
 
     @Test("a transcript write that leaves disk ahead of memory is logged with its error kind")
