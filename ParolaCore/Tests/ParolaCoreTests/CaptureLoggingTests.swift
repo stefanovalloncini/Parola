@@ -3,13 +3,12 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
+// .logFacade: RecordingScratchTests reads the same process-wide scratch directory this suite redirects.
 @Suite("Capture logging", .serialized, .logFacade)
 struct CaptureLoggingTests {
     private func withSink(_ body: (CapturingDiagnosticsSink) throws -> Void) rethrows {
         let sink = CapturingDiagnosticsSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-        try body(sink)
+        try ParolaLog.withSink(sink) { try body(sink) }
     }
 
     private func records(
@@ -39,8 +38,8 @@ struct CaptureLoggingTests {
     }
 
     @Test("a clean take reports nothing")
-    func cleanTakeIsSilent() throws {
-        try withSink { sink in
+    func cleanTakeIsSilent() {
+        withSink { sink in
             let writer = CaptureFileWriter { _ in }
             writer.noteDrop()
             for _ in 0..<32 { writer.write(Self.buffer()) }

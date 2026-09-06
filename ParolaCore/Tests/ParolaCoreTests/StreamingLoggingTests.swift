@@ -25,13 +25,11 @@ private final class FakeStreamingCapture: Sendable {
     }
 }
 
-@Suite("Streaming logging", .serialized, .logFacade)
+@Suite("Streaming logging", .serialized)
 struct StreamingLoggingTests {
     private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
         let sink = CapturingDiagnosticsSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-        try await body(sink)
+        try await ParolaLog.withSink(sink) { try await body(sink) }
     }
 
     private func streamingRecords(

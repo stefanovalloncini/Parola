@@ -3,7 +3,7 @@ import Testing
 @testable import ParolaCore
 @testable import ParolaDictation
 
-@Suite("Dictation logging", .serialized, .logFacade)
+@Suite("Dictation logging", .serialized)
 struct DictationLoggingTests {
     private actor SilentHotkey: HotkeyMonitor {
         func start(handler: @escaping @Sendable (HotkeyEvent) -> Void) async {}
@@ -50,9 +50,7 @@ struct DictationLoggingTests {
 
     private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
         let sink = CapturingDiagnosticsSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-        try await body(sink)
+        try await ParolaLog.withSink(sink) { try await body(sink) }
     }
 
     private func dictationRecords(_ sink: CapturingDiagnosticsSink) -> [LogRecord] {
@@ -111,8 +109,8 @@ struct DictationLoggingTests {
     }
 
     @Test("every state transition is a debug record, in order")
-    func stateTransitions() async throws {
-        try await withSink { sink in
+    func stateTransitions() async {
+        await withSink { sink in
             let coordinator = makeCoordinator(.text("hello"))
             await coordinator.startMonitoring()
             await coordinator.handle(.press)
@@ -131,8 +129,8 @@ struct DictationLoggingTests {
     }
 
     @Test("a failed transition logs the case name, never the failure text")
-    func failedTransitionDropsItsPayload() async throws {
-        try await withSink { sink in
+    func failedTransitionDropsItsPayload() async {
+        await withSink { sink in
             let coordinator = makeCoordinator(.transcribeThrows)
             await coordinator.startMonitoring()
             await coordinator.handle(.press)

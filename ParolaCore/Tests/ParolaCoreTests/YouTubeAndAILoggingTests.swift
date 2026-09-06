@@ -10,13 +10,11 @@ private struct ThrowingLanguageModel: LanguageModel {
     }
 }
 
-@Suite("YouTube and AI logging", .serialized, .logFacade)
+@Suite("YouTube and AI logging", .serialized)
 struct YouTubeAndAILoggingTests {
     private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
         let sink = CapturingDiagnosticsSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-        try await body(sink)
+        try await ParolaLog.withSink(sink) { try await body(sink) }
     }
 
     private func records(

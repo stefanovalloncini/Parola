@@ -15,16 +15,14 @@ struct ParolaLogTests {
         func flush() async { state.withLock { $0 += 1 } }
     }
 
-    private func withSink(_ body: (ScopedCapturingSink) throws -> Void) async rethrows {
-        let sink = ScopedCapturingSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-        try await sink.scope { try body(sink) }
+    private func withSink(_ body: (CapturingDiagnosticsSink) throws -> Void) rethrows {
+        let sink = CapturingDiagnosticsSink()
+        try ParolaLog.withSink(sink) { try body(sink) }
     }
 
-    @Test("an emitted record reaches the installed sink")
-    func reachesSink() async throws {
-        try await withSink { sink in
+    @Test("an emitted record reaches the sink")
+    func reachesSink() throws {
+        try withSink { sink in
             ParolaLog.error(.models, "download failed", [.model: .safe(ModelToken("openai_whisper-large-v3_turbo"))])
             let records = sink.records.filter { $0.category == .models }
             #expect(records.count == 1)
@@ -37,8 +35,8 @@ struct ParolaLogTests {
     }
 
     @Test("call site metadata is captured automatically")
-    func capturesCallSite() async throws {
-        try await withSink { sink in
+    func capturesCallSite() throws {
+        try withSink { sink in
             ParolaLog.notice(.library, "swept")
             let records = sink.records.filter { $0.category == .library }
             let record = try #require(records.first)
@@ -78,8 +76,8 @@ struct ParolaLogTests {
     }
 
     @Test("every level reaches the sink")
-    func allLevels() async {
-        await withSink { sink in
+    func allLevels() {
+        withSink { sink in
             ParolaLog.debug(.cli, "d")
             ParolaLog.info(.cli, "i")
             ParolaLog.notice(.cli, "n")
@@ -106,9 +104,9 @@ struct ParolaLogTests {
         #expect(builds == 0)
     }
 
-    @Test("a call an installed sink will see builds its message and fields")
-    func capturedCallBuildsEverything() async {
-        await withSink { sink in
+    @Test("a call the sink will see builds its message and fields")
+    func capturedCallBuildsEverything() {
+        withSink { sink in
             var builds = 0
             func token() -> ModelToken {
                 builds += 1
@@ -121,8 +119,8 @@ struct ParolaLogTests {
     }
 
     @Test("a record's subsystem follows its category, not the host process")
-    func subsystemFollowsCategory() async throws {
-        try await withSink { sink in
+    func subsystemFollowsCategory() {
+        withSink { sink in
             ParolaLog.info(.appLifecycle, "launched")
             ParolaLog.info(.library, "swept")
             ParolaLog.info(.cli, "ran")

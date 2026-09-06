@@ -2,13 +2,11 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-@Suite("Engine logging", .serialized, .logFacade)
+@Suite("Engine logging", .serialized)
 struct EngineLoggingTests {
     private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
         let sink = CapturingDiagnosticsSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-        try await body(sink)
+        try await ParolaLog.withSink(sink) { try await body(sink) }
     }
 
     private func temporaryStore() throws -> ModelStore {

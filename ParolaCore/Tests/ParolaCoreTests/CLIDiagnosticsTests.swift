@@ -38,7 +38,7 @@ struct CLIDiagnosticsTests {
         )
         ParolaLog.info(.cli, "cli diagnostics flush test")
 
-        let foreign = ScopedCapturingSink()
+        let foreign = CapturingDiagnosticsSink()
         ParolaLog.install(foreign)
 
         await CLIDiagnostics.flush()

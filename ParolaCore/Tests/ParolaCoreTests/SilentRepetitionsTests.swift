@@ -437,15 +437,12 @@ struct SessionSilentRepetitionsTests {
     }
 }
 
-@Suite("Repeated line diagnostics", .serialized, .logFacade)
+@Suite("Repeated line diagnostics", .serialized)
 struct SilentRepetitionsLoggingTests {
     @Test("every drop reports its offset, its level and the floor")
     func logsEveryDrop() async throws {
-        let sink = ScopedCapturingSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-
-        try await sink.scope {
+        let sink = CapturingDiagnosticsSink()
+        ParolaLog.withSink(sink) {
             let segments = (0..<3).map {
                 TranscriptSegment(id: $0, start: Double($0) * 20, end: Double($0) * 20 + 19, text: "Grazie.")
             }
@@ -467,16 +464,13 @@ struct SilentRepetitionsLoggingTests {
 
     @Test("audio the probe cannot open is reported once")
     func reportsAMissingProbe() async throws {
-        let sink = ScopedCapturingSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-
+        let sink = CapturingDiagnosticsSink()
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-not-audio-\(UUID().uuidString).wav")
         try Data("RIFFstub".utf8).write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        await sink.scope {
+        ParolaLog.withSink(sink) {
             #expect(AudioFileEnergyProbe(url: url) == nil)
         }
         #expect(sink.records.contains {

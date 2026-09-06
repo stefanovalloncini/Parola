@@ -2,16 +2,14 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-@Suite("Model download logging", .serialized, .logFacade)
+@Suite("Model download logging", .serialized)
 struct ModelDownloadLoggingTests {
     private static let parakeet = "nvidia_parakeet-tdt-0.6b-v2"
     private static let tiny = "openai_whisper-tiny"
 
     private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
         let sink = CapturingDiagnosticsSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-        try await body(sink)
+        try await ParolaLog.withSink(sink) { try await body(sink) }
     }
 
     private func modelRecords(

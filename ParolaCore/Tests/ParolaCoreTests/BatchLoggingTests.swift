@@ -2,17 +2,15 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-@Suite("Batch logging", .serialized, .logFacade)
+@Suite("Batch logging", .serialized)
 struct BatchLoggingTests {
-    private func withSink(_ body: (ScopedCapturingSink) async throws -> Void) async rethrows {
-        let sink = ScopedCapturingSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-        try await sink.scope { try await body(sink) }
+    private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
+        let sink = CapturingDiagnosticsSink()
+        try await ParolaLog.withSink(sink) { try await body(sink) }
     }
 
     private func batchRecords(
-        _ sink: ScopedCapturingSink, message: String
+        _ sink: CapturingDiagnosticsSink, message: String
     ) -> [LogRecord] {
         sink.records.filter { $0.category == .batch && $0.message.rendered == message }
     }

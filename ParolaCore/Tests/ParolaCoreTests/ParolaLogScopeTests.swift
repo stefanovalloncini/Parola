@@ -43,10 +43,10 @@ struct ParolaLogScopeTests {
     }
 
     @Test("the innermost scope takes the record, and the outer one takes it back")
-    func nestedScopesNestProperly() async {
+    func nestedScopesNestProperly() {
         let outer = CapturingDiagnosticsSink()
         let inner = CapturingDiagnosticsSink()
-        await ParolaLog.withSink(outer) {
+        ParolaLog.withSink(outer) {
             ParolaLog.withSink(inner) { ParolaLog.info(.cli, "scope probe: inner") }
             ParolaLog.info(.cli, "scope probe: outer again")
         }

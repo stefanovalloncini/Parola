@@ -1,8 +1,8 @@
 import Testing
 
-/// Serializes suites that install a `ParolaLog` sink or construct a `FileDiagnosticsSink`, whose
-/// init-time sweep can log. `.serialized` only orders tests within one suite, so without this two
-/// such suites overlap and one captures the other's records.
+/// Serializes the suites that still share a process-wide override: an installed `ParolaLog` sink, a
+/// `FileDiagnosticsSink` whose init-time sweep logs, or `RecordingScratch`'s directory. Suites that
+/// only capture their own records scope them with `ParolaLog.withSink` and need no gate.
 struct LogFacadeTrait: SuiteTrait, TestTrait, TestScoping {
     var isRecursive: Bool { true }
 

@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import ParolaCore
 
-// .logFacade: CaptureLoggingTests drives the same process-wide override under that gate.
+// .logFacade: CaptureLoggingTests redirects the same process-wide scratch directory under that gate.
 @Suite("RecordingScratch", .serialized, .logFacade)
 struct RecordingScratchTests {
 

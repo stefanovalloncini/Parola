@@ -3,13 +3,11 @@ import os
 import Testing
 @testable import ParolaCore
 
-@Suite("Library logging", .serialized, .logFacade, .tags(.fileSystem))
+@Suite("Library logging", .serialized, .tags(.fileSystem))
 struct LibraryLoggingTests {
     private func withSink(_ body: (CapturingDiagnosticsSink) async throws -> Void) async rethrows {
         let sink = CapturingDiagnosticsSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-        try await body(sink)
+        try await ParolaLog.withSink(sink) { try await body(sink) }
     }
 
     private func records(
@@ -55,31 +53,31 @@ struct LibraryLoggingTests {
         try FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: url.path)
     }
 
-    @Test("a library folder that cannot be listed is logged, and never by its path")
+    // .logFacade: `list()` logs this one from a GCD hop, which no scope reaches, so it needs the installed sink.
+    @Test("a library folder that cannot be listed is logged, and never by its path", .logFacade)
     func unreadableLibraryFolder() async throws {
-        try await withSink { sink in
-            let libraryURL = try makeLibraryURL()
-            defer { try? FileManager.default.removeItem(at: libraryURL) }
-            try setPermissions(0o000, on: libraryURL)
-            defer { try? setPermissions(0o700, on: libraryURL) }
+        let sink = CapturingDiagnosticsSink()
+        ParolaLog.install(sink)
+        defer { ParolaLog.uninstall() }
 
-            let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
-            #expect(await store.list().isEmpty)
+        let libraryURL = try makeLibraryURL()
+        defer { try? FileManager.default.removeItem(at: libraryURL) }
+        try setPermissions(0o000, on: libraryURL)
+        defer { try? setPermissions(0o700, on: libraryURL) }
 
-            let record = try #require(
-                await waitForRecord(sink, .library, message: "library folder could not be listed")
-            )
-            #expect(record.level == .error)
-            #expect(record.formattedLine.contains("/") == false)
-        }
+        let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+        #expect(await store.list().isEmpty)
+
+        let record = try #require(
+            await waitForRecord(sink, .library, message: "library folder could not be listed")
+        )
+        #expect(record.level == .error)
+        #expect(record.formattedLine.contains("/") == false)
     }
 
     @Test("bundles that cannot be read during a rebuild are counted once, not listed")
     func unreadableBundlesDuringRebuild() async throws {
-        let sink = ScopedCapturingSink()
-        ParolaLog.install(sink)
-        defer { ParolaLog.uninstall() }
-
+        let sink = CapturingDiagnosticsSink()
         let libraryURL = try makeLibraryURL()
         defer { try? FileManager.default.removeItem(at: libraryURL) }
         let audio = try makeAudio()
@@ -91,7 +89,7 @@ struct LibraryLoggingTests {
         try Data("not json".utf8).write(to: broken.bundleURL.appendingPathComponent("transcript.json"))
         try FileManager.default.removeItem(at: libraryURL.appendingPathComponent(".search-index.json"))
 
-        await sink.scope {
+        await ParolaLog.withSink(sink) {
             let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
             _ = await store.search("second")
         }
