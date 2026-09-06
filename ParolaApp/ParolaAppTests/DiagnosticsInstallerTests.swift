@@ -3,7 +3,7 @@ import Testing
 @testable import Parola
 import ParolaCore
 
-@Suite("Diagnostics installer", .serialized)
+@Suite("Diagnostics installer", .serialized, .logFacade)
 struct DiagnosticsInstallerTests {
     private func scratchDirectory() -> URL {
         FileManager.default.temporaryDirectory
