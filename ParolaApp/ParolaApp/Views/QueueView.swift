@@ -1,6 +1,18 @@
 import SwiftUI
 import ParolaCore
 
+enum QueueCount {
+    static func count(for jobs: [BatchJob]) -> Int {
+        jobs.count { $0.status == .pending || $0.status == .transcribing }
+    }
+
+    static func label(for jobs: [BatchJob], locale: Locale = AppFormat.locale) -> String? {
+        let n = count(for: jobs)
+        guard n > 0 else { return nil }
+        return String(localized: "\(n) in queue", locale: locale)
+    }
+}
+
 struct QueueView: View {
     @Environment(AppModel.self) private var model
     @State private var searchText: String = ""
@@ -30,33 +42,24 @@ struct QueueView: View {
     }
 
     private var toolbar: some View {
-        HStack(spacing: DS.Spacing.regular) {
-            Text("Queue").font(DS.Font.title)
-            Spacer()
-            SearchPill(text: $searchText, placeholder: "Search queue")
-                .frame(maxWidth: 240)
-            sortMenu
-            Button {
-                model.clearFinishedBatchJobs()
-            } label: {
-                Text("Clear Finished")
-                    .font(DS.Font.callout)
-                    .padding(.horizontal, DS.Spacing.regular)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule().fill(DS.Color.surfaceElevated)
-                    )
-                    .overlay(
-                        Capsule().strokeBorder(DS.Color.separator, lineWidth: 0.5)
-                    )
+        PageHeader(
+            title: "Queue",
+            count: QueueCount.label(for: model.batchJobs),
+            trailing: {
+                SearchPill(text: $searchText, placeholder: "Search queue")
+                    .frame(maxWidth: 240)
+                sortMenu
+                Button {
+                    model.clearFinishedBatchJobs()
+                } label: {
+                    Text("Clear Finished")
+                }
+                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                .disabled(!hasFinishedJobs)
+                .opacity(hasFinishedJobs ? 1 : 0.5)
+                .axLeaf("Toolbar.Button.ClearFinished")
             }
-            .buttonStyle(.plain)
-            .disabled(!hasFinishedJobs)
-            .opacity(hasFinishedJobs ? 1 : 0.5)
-            .axLeaf("Toolbar.Button.ClearFinished")
-        }
-        .padding(.horizontal, DS.Spacing.large)
-        .padding(.vertical, DS.Spacing.regular)
+        )
     }
 
     private var sortMenu: some View {

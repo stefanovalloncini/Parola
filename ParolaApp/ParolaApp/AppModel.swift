@@ -245,7 +245,7 @@ final class AppModel {
 
     var batchJobs: [BatchJob] = [] {
         didSet {
-            let active = batchJobs.count { $0.status == .pending || $0.status == .transcribing }
+            let active = QueueCount.count(for: batchJobs)
             if active != activeBatchJobCount { activeBatchJobCount = active }
             saveBatchQueueSnapshot()
         }
