@@ -168,9 +168,7 @@ public actor LibraryStore {
             var unreadable = 0
             let entries = indexable.map { entry -> LibrarySearchIndex.RebuildEntry in
                 let fingerprint = scan.fingerprints[entry.id] ?? ""
-                // An unreadable bundle is indexed on its title alone: dropping it would leave the
-                // index one short of the fingerprints for good, rebuilding the whole library on
-                // every launch. Repairing it changes the fingerprint, which asks for the rebuild.
+                // Dropping it would leave the index short of the fingerprints and rebuild for ever.
                 guard let doc = try? ParolaDocument.read(at: entry.bundleURL) else {
                     unreadable += 1
                     return .init(

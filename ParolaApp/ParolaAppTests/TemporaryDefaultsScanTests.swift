@@ -4,8 +4,7 @@ import Testing
 @Suite("Temporary defaults coverage")
 struct TemporaryDefaultsScanTests {
 
-    /// The at-exit sweeper only knows the suites `temporarySuiteName` registered, so a suite built
-    /// straight from `UserDefaults(suiteName:)` leaves its plist in ~/Library/Preferences for good.
+    /// The at-exit sweeper only knows the suites `temporarySuiteName` registered; the rest are permanent.
     @Test("every test-built defaults suite is registered with the sweeper")
     func suitesGoThroughTheHelper() throws {
         let here = URL(fileURLWithPath: #filePath)

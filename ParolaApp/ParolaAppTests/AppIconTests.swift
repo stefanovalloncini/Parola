@@ -111,8 +111,7 @@ struct AppIconTests {
         ))
         let rep = NSBitmapImageRep(cgImage: image)
         let expected = Int((Double(pixels) * 100 / 1024).rounded())
-        // The rounded square's leftmost and topmost points sit on the mid lines, so a scan there
-        // reads the inset itself rather than the corner radius.
+        // The rounded square's extremes sit on the mid lines, clear of the corner radius.
         let mid = pixels / 2
 
         let column = try #require(firstOpaqueColumn(rep, row: mid))

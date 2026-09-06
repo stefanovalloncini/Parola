@@ -307,8 +307,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             let date = values?.contentModificationDate ?? now
             let size = values?.fileSize ?? 0
             let name = url.lastPathComponent
-            // An idle process writes nothing, so its mtime never advances and the cutoff catches a
-            // file it is still holding open; unlinking that leaves it writing to a lost inode.
+            // An idle process's mtime never advances, so the cutoff reaches a file it still holds.
             let heldLive = !name.hasPrefix(baseName) && Self.isOwnedByLiveProcess(name)
             if date < cutoff && name != openFile && !heldLive {
                 try? manager.removeItem(at: url)

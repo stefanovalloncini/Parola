@@ -48,8 +48,7 @@ extension AppModel {
         libraryEntries = entries
     }
 
-    /// A refresh whose only difference is `lastOpenedAt` is masked out, so the writers that change
-    /// one manifest patch their own row here rather than wait for an unrelated library change.
+    /// A refresh differing only in `lastOpenedAt` is masked out, so its writer patches the row here.
     func patchLibraryEntry(id: LibraryEntry.ID, _ edit: (inout ParolaDocument.Manifest) -> Void) {
         guard let index = libraryEntries.firstIndex(where: { $0.id == id }) else { return }
         let current = libraryEntries[index]

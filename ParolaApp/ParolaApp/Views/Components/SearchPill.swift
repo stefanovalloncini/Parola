@@ -21,8 +21,7 @@ struct SearchPill: View {
         self.identifier = identifier
     }
 
-    /// Esc clears only where a screen asked for it, and only with something to clear: everywhere
-    /// else it has to keep reaching the sheet or window the field sits in.
+    /// Esc has to keep reaching the sheet or window unless a screen asked for it and has text.
     enum EscapeOutcome: Equatable {
         case clear
         case ignore
