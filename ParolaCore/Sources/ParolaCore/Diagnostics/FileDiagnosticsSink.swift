@@ -155,14 +155,23 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     public func startNewFile() async {
         await withCheckedContinuation { continuation in
             fileQueue.async {
-                self.drainOnQueue()
-                try? self.fileState.handle?.close()
-                self.fileState.handle = nil
-                self.fileState.bytesWritten = 0
-                self.rotationState.withLock { $0 += 1 }
+                self.rotateOnQueue()
                 continuation.resume()
             }
         }
+    }
+
+    /// Test seam: rotates without an await, so a `sweep` hook can force one mid-sweep.
+    func rotateSynchronously() {
+        fileQueue.sync { rotateOnQueue() }
+    }
+
+    private func rotateOnQueue() {
+        drainOnQueue()
+        try? fileState.handle?.close()
+        fileState.handle = nil
+        fileState.bytesWritten = 0
+        rotationState.withLock { $0 += 1 }
     }
 
     /// Blocks the caller until the buffer is on disk. Never call it from `fileQueue` itself:
@@ -286,7 +295,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     }
 
     @discardableResult
-    func sweep(now: Date) -> SweepOutcome {
+    func sweep(now: Date, beforeUnlink: () -> Void = {}) -> SweepOutcome {
         let manager = FileManager.default
         guard let entries = try? manager.contentsOfDirectory(
             at: directory,
@@ -303,8 +312,6 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         var surviving: [(url: URL, date: Date, size: Int)] = []
         var liveSkips: Set<String> = []
         let cutoff = now.addingTimeInterval(-Double(retentionDays) * 86_400)
-        // Only the file still open is exempt; this sink's earlier rotations are closed and ours to trim.
-        let openFile = currentFileName
         for url in mine {
             let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
             let date = values?.contentModificationDate ?? now
@@ -312,7 +319,13 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             let name = url.lastPathComponent
             // An idle process's mtime never advances, so the cutoff reaches a file it still holds.
             let heldLive = !name.hasPrefix(baseName) && Self.isOwnedByLiveProcess(name)
-            if date < cutoff && name != openFile && !heldLive {
+            if date < cutoff && !heldLive {
+                beforeUnlink()
+                // Only the open file is exempt, and it is read here: a rotation mid-sweep moves it.
+                guard name != currentFileName else {
+                    surviving.append((url, date, size))
+                    continue
+                }
                 try? manager.removeItem(at: url)
                 if manager.fileExists(atPath: url.path) {
                     surviving.append((url, date, size))
@@ -332,13 +345,14 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         while total > totalBudgetBytes, index < surviving.count {
             let candidate = surviving[index]
             let name = candidate.url.lastPathComponent
-            if name == openFile {
-                index += 1
-                continue
-            }
             // Our own pid is live, so the liveness skip has to let our closed rotations through.
             if !name.hasPrefix(baseName), Self.isOwnedByLiveProcess(name) {
                 liveSkips.insert(name)
+                index += 1
+                continue
+            }
+            beforeUnlink()
+            if name == currentFileName {
                 index += 1
                 continue
             }

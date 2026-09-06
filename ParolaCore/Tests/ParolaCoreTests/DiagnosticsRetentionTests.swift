@@ -173,6 +173,30 @@ struct DiagnosticsRetentionTests {
         #expect(outcome.ownRotations == 2)
     }
 
+    @Test("a rotation inside one sweep spares the file it made the open one")
+    func rotationInsideASweepSparesTheNewOpenFile() async throws {
+        let dir = tempDirectory()
+        let sink = FileDiagnosticsSink(directory: dir, retentionDays: 7, totalBudgetBytes: 100)
+        try await sink.waitForInstallSweep()
+        let base = sink.currentFileURL.deletingPathExtension().lastPathComponent
+        try Data(repeating: 0x61, count: 600).write(to: sink.currentFileURL)
+        let next = try makeFile(dir, "\(base)-1.jsonl", bytes: 600, ageDays: 9)
+
+        var rotations = 0
+        let outcome = sink.sweep(now: Date()) {
+            guard rotations == 0 else { return }
+            rotations += 1
+            sink.rotateSynchronously()
+        }
+
+        #expect(rotations == 1)
+        #expect(
+            FileManager.default.fileExists(atPath: next.path),
+            "the sweep unlinked the file the rotation had just made the open one"
+        )
+        #expect(outcome.ownRotations == 1, "the file the rotation closed is the one it may reclaim")
+    }
+
     @Test("a sink's trim spares the file another sink in this process holds open")
     func sparesASiblingSinksOpenFile() async throws {
         let dir = tempDirectory()
