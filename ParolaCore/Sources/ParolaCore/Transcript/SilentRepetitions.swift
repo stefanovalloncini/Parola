@@ -8,8 +8,7 @@ protocol SegmentEnergyProbe {
     func energy(from start: Double, to end: Double) -> Double?
 }
 
-/// Drops a repeated line only when its span is quiet and another copy sits right beside it — filler
-/// arrives back to back, a line the other speaker talks around does not.
+/// Drops a repeated line only when its span is quiet and another copy sits right beside it.
 enum SilentRepetitions {
     static let minimumRepeats = 3
 
