@@ -71,7 +71,9 @@ struct DiagnosticsBootstrapTests {
     func noPeriodicFlushLeavesTheBufferAlone() async throws {
         let directory = scratchDirectory()
         let bootstrap = DiagnosticsBootstrap(directory: directory, environment: [:], periodicFlush: false)
-        defer { ParolaLog.uninstall() }
+        // The install notice is already buffered, and flush() drains the sink directly, so taking
+        // the sink off the facade keeps another suite's `.error` from draining it mid-assertion.
+        ParolaLog.uninstall()
 
         try await Task.sleep(for: .milliseconds(200))
         #expect(try sinkText(in: directory).isEmpty)

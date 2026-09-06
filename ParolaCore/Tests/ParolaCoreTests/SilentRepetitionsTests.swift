@@ -434,15 +434,17 @@ struct SessionSilentRepetitionsTests {
 @Suite("Repeated line diagnostics", .serialized, .logFacade)
 struct SilentRepetitionsLoggingTests {
     @Test("every drop reports its offset, its level and the floor")
-    func logsEveryDrop() throws {
-        let sink = CapturingDiagnosticsSink()
+    func logsEveryDrop() async throws {
+        let sink = ScopedCapturingSink()
         ParolaLog.install(sink)
         defer { ParolaLog.uninstall() }
 
-        let segments = (0..<3).map {
-            TranscriptSegment(id: $0, start: Double($0) * 20, end: Double($0) * 20 + 19, text: "Grazie.")
+        try await sink.scope {
+            let segments = (0..<3).map {
+                TranscriptSegment(id: $0, start: Double($0) * 20, end: Double($0) * 20 + 19, text: "Grazie.")
+            }
+            #expect(SilentRepetitions.dropped(from: segments, probe: StubEnergyProbe()).isEmpty)
         }
-        #expect(SilentRepetitions.dropped(from: segments, probe: StubEnergyProbe()).isEmpty)
 
         let drops = sink.records.filter { $0.message.rendered == "dropping a repeated line over silence" }
         #expect(drops.map { $0.fields[.offset]?.text } == ["0.00", "20.00", "40.00"])
@@ -458,8 +460,8 @@ struct SilentRepetitionsLoggingTests {
     }
 
     @Test("audio the probe cannot open is reported once")
-    func reportsAMissingProbe() throws {
-        let sink = CapturingDiagnosticsSink()
+    func reportsAMissingProbe() async throws {
+        let sink = ScopedCapturingSink()
         ParolaLog.install(sink)
         defer { ParolaLog.uninstall() }
 
@@ -468,7 +470,9 @@ struct SilentRepetitionsLoggingTests {
         try Data("RIFFstub".utf8).write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        #expect(AudioFileEnergyProbe(url: url) == nil)
+        await sink.scope {
+            #expect(AudioFileEnergyProbe(url: url) == nil)
+        }
         #expect(sink.records.contains {
             $0.level == .notice && $0.message.rendered == "no energy probe: the audio would not open"
         })
