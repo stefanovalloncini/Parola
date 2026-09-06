@@ -9,6 +9,7 @@ struct MacLibrarySidebar: View {
         case .queue: return .queue
         case .batch: return .batch
         case .transcript:
+            if model.searchResults != nil { return .search }
             if let filter = model.libraryFilter { return .category(filter) }
             if model.libraryBrowsingAll { return .all }
             return .home
@@ -189,6 +190,8 @@ struct MacLibrarySidebar: View {
 }
 
 private enum SidebarRoute: Hashable {
+    /// No row owns the search results, so none is highlighted while they show.
+    case search
     case home
     case all
     case queue
