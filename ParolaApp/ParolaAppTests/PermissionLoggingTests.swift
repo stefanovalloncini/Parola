@@ -88,7 +88,7 @@ struct PermissionLoggingTests {
         try await withSink { sink in
             let model = AppModel(
                 skipBootstrap: true,
-                defaults: UserDefaults(suiteName: "permission-logging-\(UUID().uuidString)")!,
+                defaults: temporaryDefaults("permission-logging-"),
                 libraryURL: makeTempLibraryURL("permission-logging")
             )
             let server = try ParolaAutomationServer(model: model)

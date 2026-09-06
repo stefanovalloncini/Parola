@@ -10,7 +10,7 @@ struct IntakeSettingsVisibilityTests {
     private func makeModel() -> AppModel {
         AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "test-intake-visibility-\(UUID())")!,
+            defaults: temporaryDefaults("test-intake-visibility-"),
             libraryURL: makeTempLibraryURL("intake-visibility")
         )
     }

@@ -33,7 +33,7 @@ struct RecoveryLoggingTests {
     private func makeModel(libraryURL: URL) -> AppModel {
         AppModel(
             skipBootstrap: true,
-            defaults: UserDefaults(suiteName: "recovery-logging-\(UUID().uuidString)")!,
+            defaults: temporaryDefaults("recovery-logging-"),
             libraryURL: libraryURL
         )
     }

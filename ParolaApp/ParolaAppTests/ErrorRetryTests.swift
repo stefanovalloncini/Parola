@@ -12,7 +12,7 @@ extension TranscriberMockSuites {
             let bootstrap = AppBootstrap(
                 mode: .test,
                 library: makeTempLibraryURL("error-retry"),
-                defaultsOverride: UserDefaults(suiteName: "test-\(UUID())")!,
+                defaultsOverride: temporaryDefaults(),
                 sideEffects: [],
                 filePicker: TestFilePicker(),
                 clock: ContinuousClock()

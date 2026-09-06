@@ -28,7 +28,7 @@ struct LifecycleLoggingTests {
             let bootstrap = AppBootstrap(
                 mode: .test,
                 library: makeTempLibraryURL("lifecycle-logging"),
-                defaultsOverride: UserDefaults(suiteName: "lifecycle-\(UUID().uuidString)")!,
+                defaultsOverride: temporaryDefaults("lifecycle-"),
                 sideEffects: [.automationBridge, .diagnosticsLog],
                 filePicker: TestFilePicker(),
                 enabledFeaturesOverride: [.ai, .batch]
@@ -49,7 +49,7 @@ struct LifecycleLoggingTests {
         try await withSink { sink in
             let model = AppModel(
                 skipBootstrap: true,
-                defaults: UserDefaults(suiteName: "lifecycle-\(UUID().uuidString)")!,
+                defaults: temporaryDefaults("lifecycle-"),
                 libraryURL: makeTempLibraryURL("lifecycle-logging-empty"),
                 features: []
             )
