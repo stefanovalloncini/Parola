@@ -192,6 +192,30 @@ struct LibrarySearchIndexTests {
         #expect(match.snippet == "sprint retro")
     }
 
+    @Test("a cut snippet starts and ends on whole words")
+    func snippetCutsOnWordBoundaries() async throws {
+        let (index, _) = makeTempIndex()
+        let body = "Nella conferenza di apertura parliamo del lavoro ibrido e del lancio "
+            + "di nuove abitudini con le macchine nuove del reparto"
+        await index.index(id: "e1", title: "Notes", text: body, createdAt: Date())
+        let match = try #require(await index.search("lancio").first(where: { $0.entryID == "e1" }))
+        #expect(match.snippet.hasPrefix("…"))
+        #expect(match.snippet.hasSuffix("…"))
+        let cut = match.snippet.trimmingCharacters(in: CharacterSet(charactersIn: "…"))
+        let range = try #require(body.range(of: cut))
+        #expect(body[body.index(before: range.lowerBound)] == " ")
+        #expect(body[range.upperBound] == " ")
+    }
+
+    @Test("the snippet's leading cut lands on a word even when the hit is close to it")
+    func snippetLeadingCutStopsAtTheHit() async throws {
+        let (index, _) = makeTempIndex()
+        let body = String(repeating: "x", count: 60) + " sprint planning"
+        await index.index(id: "e1", title: "Notes", text: body, createdAt: Date())
+        let match = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
+        #expect(match.snippet == "…sprint planning")
+    }
+
     @Test("snippet surfaces the hit when text changes length when lowercased")
     func snippetNonASCIICaseFold() async throws {
         let (index, _) = makeTempIndex()

@@ -417,14 +417,15 @@ public actor LibrarySearchIndex {
                 break
             }
         }
-        let snippetRange: Range<String.Index>
+        let window: Range<String.Index>
         if let firstHit {
             let lowerIdx = text.index(firstHit.lowerBound, offsetBy: -40, limitedBy: text.startIndex) ?? text.startIndex
             let upperIdx = text.index(firstHit.upperBound, offsetBy: 40, limitedBy: text.endIndex) ?? text.endIndex
-            snippetRange = lowerIdx..<upperIdx
+            window = lowerIdx..<upperIdx
         } else {
-            snippetRange = text.startIndex..<(text.index(text.startIndex, offsetBy: 80, limitedBy: text.endIndex) ?? text.endIndex)
+            window = text.startIndex..<(text.index(text.startIndex, offsetBy: 80, limitedBy: text.endIndex) ?? text.endIndex)
         }
+        let snippetRange = Self.alignedToWords(window, in: text, keeping: firstHit)
         let body = String(text[snippetRange])
         var highlights: [Highlight] = []
         for token in Set(tokens) {
@@ -443,6 +444,28 @@ public actor LibrarySearchIndex {
         let shift = leading.count
         let shifted = shift == 0 ? highlights : highlights.map { Highlight(start: $0.start + shift, length: $0.length) }
         return (leading + body + trailing, mergeOverlapping(shifted))
+    }
+
+    /// Pulls both cuts onto the nearest space, never past the hit itself: a snippet that starts or
+    /// ends mid-word reads as a typo rather than as an excerpt.
+    private static func alignedToWords(
+        _ window: Range<String.Index>,
+        in text: String,
+        keeping hit: Range<String.Index>?
+    ) -> Range<String.Index> {
+        var lower = window.lowerBound
+        var upper = window.upperBound
+        let stopAdvancing = hit?.lowerBound ?? window.upperBound
+        let stopRetreating = hit?.upperBound ?? window.lowerBound
+        if lower > text.startIndex, !text[text.index(before: lower)].isWhitespace {
+            while lower < stopAdvancing, !text[lower].isWhitespace { lower = text.index(after: lower) }
+            while lower < stopAdvancing, text[lower].isWhitespace { lower = text.index(after: lower) }
+        }
+        if upper < text.endIndex, !text[upper].isWhitespace {
+            while upper > stopRetreating, !text[text.index(before: upper)].isWhitespace { upper = text.index(before: upper) }
+            while upper > stopRetreating, text[text.index(before: upper)].isWhitespace { upper = text.index(before: upper) }
+        }
+        return lower < upper ? lower..<upper : window
     }
 
     private static func mergeOverlapping(_ highlights: [Highlight]) -> [Highlight] {
