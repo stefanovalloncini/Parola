@@ -1,8 +1,6 @@
 import SwiftUI
 
-/// The title row every library-adjacent page opens with: a title, an optional count beside it,
-/// page-specific controls, then right-aligned actions. Ax ids for anything inside `leading`/`trailing`
-/// are the caller's own — this view adds no branch of its own.
+/// Ax ids for anything inside `leading`/`trailing` are the caller's own — this view adds no branch of its own.
 struct PageHeader<Leading: View, Trailing: View>: View {
     let title: LocalizedStringKey
     let count: String?

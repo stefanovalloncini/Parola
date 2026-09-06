@@ -1,18 +1,6 @@
 import SwiftUI
 import ParolaCore
 
-enum QueueCount {
-    static func count(for jobs: [BatchJob]) -> Int {
-        jobs.count { $0.status == .pending || $0.status == .transcribing }
-    }
-
-    static func label(for jobs: [BatchJob], locale: Locale = AppFormat.locale) -> String? {
-        let n = count(for: jobs)
-        guard n > 0 else { return nil }
-        return String(localized: "\(n) in queue", locale: locale)
-    }
-}
-
 struct QueueView: View {
     @Environment(AppModel.self) private var model
     @State private var searchText: String = ""
