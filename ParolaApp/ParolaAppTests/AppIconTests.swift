@@ -102,6 +102,20 @@ struct AppIconTests {
         expectClose(pixel(image, xFraction: 0.5, yFraction: 0.5), foreground, "center bar")
     }
 
+    @Test("the artwork sits on the macOS icon grid, inset from the canvas edge")
+    func artworkIsInsetFromTheCanvas() throws {
+        let image = try #require(AppIconArtwork.cgImage(
+            pixels: 256,
+            background: AppIconArtwork.brandBackground,
+            foreground: AppIconArtwork.brandForeground
+        ))
+
+        #expect(pixel(image, xFraction: 0.05, yFraction: 0.5).a == 0)
+        #expect(pixel(image, xFraction: 0.05, yFraction: 0.05).a == 0)
+        expectClose(pixel(image, xFraction: 0.12, yFraction: 0.5), RGBA(0.42, 0.54, 0.42), "background")
+        expectClose(pixel(image, xFraction: 0.5, yFraction: 0.5), RGBA(0.99, 0.95, 0.90), "center bar")
+    }
+
     @Test("the brand icon on disk stays sage")
     func brandColorsUnchanged() {
         expectClose(rgba(AppIconArtwork.brandBackground), RGBA(0.42, 0.54, 0.42), "sage background")

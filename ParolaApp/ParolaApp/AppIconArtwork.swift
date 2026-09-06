@@ -22,11 +22,14 @@ enum AppIconArtwork {
     ]
 
     static func draw(into context: CGContext, size: CGFloat, background: NSColor, foreground: NSColor) {
-        let rect = CGRect(x: 0, y: 0, width: size, height: size)
+        // Apple's macOS icon grid insets the rounded square by 100/1024 of the canvas per side.
+        let inset = size * 100 / 1024
+        let artworkSide = size - inset * 2
+        let rect = CGRect(x: inset, y: inset, width: artworkSide, height: artworkSide)
         context.saveGState()
 
         // Background with macOS-style continuous corner radius (~22% of side).
-        let cornerRadius = size * 0.22
+        let cornerRadius = artworkSide * 0.22
         let path = CGPath(roundedRect: rect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
         context.addPath(path)
         context.setFillColor(background.cgColor)
@@ -35,11 +38,11 @@ enum AppIconArtwork {
         // Bars representing a waveform. Heights chosen to look symmetric and intentional.
         let bars: [CGFloat] = [0.32, 0.62, 0.84, 0.50, 0.92, 0.50, 0.84, 0.62, 0.32]
         let barCount = CGFloat(bars.count)
-        let usableWidth = size * 0.56
-        let usableHeight = size * 0.72
+        let usableWidth = artworkSide * 0.56
+        let usableHeight = artworkSide * 0.72
         let spacing = usableWidth / (barCount * 2)
         let barWidth = (usableWidth - spacing * (barCount - 1)) / barCount
-        let originX = (size - usableWidth) / 2
+        let originX = inset + (artworkSide - usableWidth) / 2
         let centerY = size / 2
 
         context.setFillColor(foreground.cgColor)
