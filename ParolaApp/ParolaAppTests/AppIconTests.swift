@@ -102,18 +102,40 @@ struct AppIconTests {
         expectClose(pixel(image, xFraction: 0.5, yFraction: 0.5), foreground, "center bar")
     }
 
-    @Test("the artwork sits on the macOS icon grid, inset from the canvas edge")
-    func artworkIsInsetFromTheCanvas() throws {
+    @Test("the artwork sits on Apple's 100/1024 icon grid at every size", arguments: [1024, 128])
+    func artworkIsInsetFromTheCanvas(pixels: Int) throws {
         let image = try #require(AppIconArtwork.cgImage(
-            pixels: 256,
+            pixels: pixels,
             background: AppIconArtwork.brandBackground,
             foreground: AppIconArtwork.brandForeground
         ))
+        let rep = NSBitmapImageRep(cgImage: image)
+        let expected = Int((Double(pixels) * 100 / 1024).rounded())
+        // The rounded square's leftmost and topmost points sit on the mid lines, so a scan there
+        // reads the inset itself rather than the corner radius.
+        let mid = pixels / 2
 
-        #expect(pixel(image, xFraction: 0.05, yFraction: 0.5).a == 0)
-        #expect(pixel(image, xFraction: 0.05, yFraction: 0.05).a == 0)
-        expectClose(pixel(image, xFraction: 0.12, yFraction: 0.5), RGBA(0.42, 0.54, 0.42), "background")
+        let column = try #require(firstOpaqueColumn(rep, row: mid))
+        let row = try #require(firstOpaqueRow(rep, column: mid))
+        #expect(abs(column - expected) <= 1, "left inset at \(pixels)px")
+        #expect(abs(row - expected) <= 1, "top inset at \(pixels)px")
+
+        for (x, y) in [(0, 0), (pixels - 1, 0), (0, pixels - 1), (pixels - 1, pixels - 1)] {
+            #expect(alpha(rep, x: x, y: y) == 0, "corner \(x),\(y) at \(pixels)px")
+        }
         expectClose(pixel(image, xFraction: 0.5, yFraction: 0.5), RGBA(0.99, 0.95, 0.90), "center bar")
+    }
+
+    private func alpha(_ rep: NSBitmapImageRep, x: Int, y: Int) -> Double {
+        Double(rep.colorAt(x: x, y: y)?.alphaComponent ?? 0)
+    }
+
+    private func firstOpaqueColumn(_ rep: NSBitmapImageRep, row: Int) -> Int? {
+        (0..<rep.pixelsWide).first { alpha(rep, x: $0, y: row) > 0.5 }
+    }
+
+    private func firstOpaqueRow(_ rep: NSBitmapImageRep, column: Int) -> Int? {
+        (0..<rep.pixelsHigh).first { alpha(rep, x: column, y: $0) > 0.5 }
     }
 
     @Test("the brand icon on disk stays sage")
