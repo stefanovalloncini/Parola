@@ -737,6 +737,29 @@ struct LibraryStoreTests {
         #expect(boundaries[1].textOffset == boundaries[2].textOffset)
     }
 
+    @Test("a search result carries the time of its first transcript hit, rebuild included")
+    func searchReportsFirstHitTime() async throws {
+        let (store1, libraryURL) = try makeTempLibrary()
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 3, text: "Buongiorno a tutti"),
+                TranscriptSegment(id: 1, start: 12.4, end: 20, text: "parliamo del lancio di primavera")
+            ],
+            language: "it",
+            modelName: "tiny"
+        )
+        let entry = try await store1.add(transcript: transcript, audioSource: nil)
+        let added = try #require(await store1.search("lancio").first(where: { $0.entryID == entry.id })?.firstHit)
+        #expect(added.segmentIndex == 1)
+        #expect(added.seconds == 12.4)
+        await store1.flush()
+
+        try FileManager.default.removeItem(at: libraryURL.appendingPathComponent(".search-index.json"))
+        let store2 = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+        let rebuilt = try #require(await store2.search("lancio").first(where: { $0.entryID == entry.id })?.firstHit)
+        #expect(rebuilt == added)
+    }
+
     @Test("search returns active entries and filters soft-deleted")
     func searchFiltersSoftDeleted() async throws {
         let (store, _) = try makeTempLibrary()

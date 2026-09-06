@@ -236,6 +236,96 @@ struct LibrarySearchIndexTests {
         #expect(match.matchCount == 1)
     }
 
+    private func makeTranscript(_ segments: [(start: Double, text: String)]) -> Transcript {
+        Transcript(
+            segments: segments.enumerated().map {
+                TranscriptSegment(id: $0.offset, start: $0.element.start, end: $0.element.start + 1, text: $0.element.text)
+            },
+            language: "it",
+            modelName: "tiny"
+        )
+    }
+
+    private func indexTranscript(
+        _ transcript: Transcript,
+        title: String,
+        in index: LibrarySearchIndex,
+        id: String = "e1"
+    ) async {
+        await index.index(
+            id: id,
+            title: title,
+            text: transcript.text,
+            boundaries: LibraryStore.segmentBoundaries(for: transcript),
+            createdAt: Date()
+        )
+    }
+
+    private static let meeting: [(start: Double, text: String)] = [
+        (0, "Buongiorno a tutti"),
+        (12.4, "parliamo del lancio di primavera"),
+        (30, "poi le domande")
+    ]
+
+    @Test("a match reports the segment its first hit falls in")
+    func firstHitReportsItsSegment() async throws {
+        let (index, _) = makeTempIndex()
+        let transcript = makeTranscript(Self.meeting)
+        await indexTranscript(transcript, title: "Riunione", in: index)
+        let match = try #require(await index.search("lancio").first(where: { $0.entryID == "e1" }))
+        let hit = try #require(match.firstHit)
+        #expect(hit.segmentIndex == 1)
+        #expect(hit.seconds == 12.4)
+        let text = transcript.text
+        let start = text.index(text.startIndex, offsetBy: hit.textOffset)
+        #expect(text[start...].hasPrefix("lancio"))
+    }
+
+    @Test("a prefix query reports the same first hit as the whole word")
+    func firstHitCountsPrefixMatches() async throws {
+        let (index, _) = makeTempIndex()
+        await indexTranscript(makeTranscript(Self.meeting), title: "Riunione", in: index)
+        let whole = try #require(await index.search("lancio").first?.firstHit)
+        let prefix = try #require(await index.search("lanc").first?.firstHit)
+        #expect(prefix == whole)
+    }
+
+    @Test("a two-term query reports the earlier of the two hits")
+    func firstHitTakesTheEarliestTerm() async throws {
+        let (index, _) = makeTempIndex()
+        await indexTranscript(makeTranscript(Self.meeting), title: "Riunione", in: index)
+        let hit = try #require(await index.search("domande lancio").first?.firstHit)
+        #expect(hit.segmentIndex == 1)
+    }
+
+    @Test("an entry matched on its title alone has no first hit")
+    func titleOnlyMatchHasNoFirstHit() async throws {
+        let (index, _) = makeTempIndex()
+        await indexTranscript(makeTranscript(Self.meeting), title: "Riunione", in: index)
+        let match = try #require(await index.search("riunione").first(where: { $0.entryID == "e1" }))
+        #expect(match.firstHit == nil)
+        #expect(match.matchCount == 1)
+    }
+
+    @Test("an entry indexed without boundaries has no first hit")
+    func matchWithoutBoundariesHasNoFirstHit() async throws {
+        let (index, _) = makeTempIndex()
+        await index.index(id: "e1", title: "Notes", text: "sprint planning", createdAt: Date())
+        let match = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
+        #expect(match.firstHit == nil)
+    }
+
+    @Test("the first hit survives the snapshot round trip")
+    func firstHitRoundTrips() async throws {
+        let (index1, url) = makeTempIndex()
+        await indexTranscript(makeTranscript(Self.meeting), title: "Riunione", in: index1)
+        await index1.flush()
+        let index2 = LibrarySearchIndex(indexURL: url)
+        let hit = try #require(await index2.search("lancio").first?.firstHit)
+        #expect(hit.segmentIndex == 1)
+        #expect(hit.seconds == 12.4)
+    }
+
     @Test("match snippet includes highlight ranges around each hit")
     func snippetHighlights() async throws {
         let (index, _) = makeTempIndex()

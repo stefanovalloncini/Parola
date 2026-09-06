@@ -25,25 +25,42 @@ public actor LibrarySearchIndex {
     }
 
     public struct Match: Sendable, Equatable {
+        /// The earliest place in the transcript body where any of the query's terms occurs.
+        public struct FirstHit: Sendable, Equatable {
+            public let seconds: Double
+            public let segmentIndex: Int
+            public let textOffset: Int
+
+            public init(seconds: Double, segmentIndex: Int, textOffset: Int) {
+                self.seconds = seconds
+                self.segmentIndex = segmentIndex
+                self.textOffset = textOffset
+            }
+        }
+
         public let entryID: String
         public let score: Int
         /// How many times the query's terms occur in everything indexed for the entry, title included.
         public let matchCount: Int
         public let snippet: String
         public let highlights: [Highlight]
+        /// nil when the entry matched on its title, summary or speakers alone.
+        public let firstHit: FirstHit?
 
         public init(
             entryID: String,
             score: Int,
             matchCount: Int = 0,
             snippet: String,
-            highlights: [Highlight] = []
+            highlights: [Highlight] = [],
+            firstHit: FirstHit? = nil
         ) {
             self.entryID = entryID
             self.score = score
             self.matchCount = matchCount
             self.snippet = snippet
             self.highlights = highlights
+            self.firstHit = firstHit
         }
     }
 
@@ -220,6 +237,7 @@ public actor LibrarySearchIndex {
         let tokens = sortedTokens ?? []
         var scores: [String: Int] = [:]
         var hits: [String: Int] = [:]
+        var earliest: [String: Int] = [:]
         for queryToken in Set(queryTokens) {
             // Prefix matches sort contiguously; binary-search the range instead of scanning the whole vocabulary.
             let lower = Self.firstIndex(in: tokens, atLeast: queryToken)
@@ -228,7 +246,11 @@ public actor LibrarySearchIndex {
                 for id in inverted[indexToken] ?? [] {
                     scores[id, default: 0] += 1
                     guard let entry = entries[id] else { continue }
-                    hits[id, default: 0] += Self.occurrences(at: Self.position(of: indexToken, in: entry), in: entry)
+                    let position = Self.position(of: indexToken, in: entry)
+                    hits[id, default: 0] += Self.occurrences(at: position, in: entry)
+                    if let offset = Self.bodyOffset(at: position, in: entry) {
+                        earliest[id] = min(earliest[id] ?? offset, offset)
+                    }
                 }
             }
         }
@@ -243,7 +265,8 @@ public actor LibrarySearchIndex {
                     score: score,
                     matchCount: hits[id] ?? 0,
                     snippet: snippet.text,
-                    highlights: snippet.highlights
+                    highlights: snippet.highlights,
+                    firstHit: earliest[id].flatMap { Self.firstHit(atOffset: $0, in: entry) }
                 )
             }
     }
@@ -449,6 +472,32 @@ public actor LibrarySearchIndex {
     private static func occurrences(at position: Int?, in entry: IndexedEntry) -> Int {
         guard let position, position < entry.counts.count else { return 1 }
         return max(1, entry.counts[position])
+    }
+
+    /// nil for a token that only occurs in the title or the auxiliary text, which have no position.
+    private static func bodyOffset(at position: Int?, in entry: IndexedEntry) -> Int? {
+        guard let position, position < entry.offsets.count else { return nil }
+        let offset = entry.offsets[position]
+        return offset >= 0 ? offset : nil
+    }
+
+    private static func firstHit(atOffset offset: Int, in entry: IndexedEntry) -> Match.FirstHit? {
+        guard !entry.boundaryOffsets.isEmpty,
+              entry.boundaryCentiseconds.count == entry.boundaryOffsets.count else { return nil }
+        // Segments that join no text share the offset of the one after them, so the last boundary at
+        // or before the hit is always the segment that holds it.
+        var low = 0
+        var high = entry.boundaryOffsets.count
+        while low < high {
+            let mid = (low + high) / 2
+            if entry.boundaryOffsets[mid] <= offset { low = mid + 1 } else { high = mid }
+        }
+        let index = max(0, low - 1)
+        return Match.FirstHit(
+            seconds: Double(entry.boundaryCentiseconds[index]) / 100,
+            segmentIndex: index,
+            textOffset: offset
+        )
     }
 
     private static func tokenize(_ text: String) -> [String] {
