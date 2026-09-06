@@ -185,7 +185,10 @@ public actor LibraryStore {
                     unreadable += 1
                     return .init(
                         id: entry.id, title: entry.title, text: "",
-                        auxiliaryText: "", fingerprint: fingerprint
+                        auxiliaryText: Self.searchAuxiliaryText(
+                            notes: entry.segmentNotes, transcript: nil
+                        ),
+                        fingerprint: fingerprint
                     )
                 }
                 return .init(
@@ -425,11 +428,13 @@ public actor LibraryStore {
         return boundaries
     }
 
-    static func searchAuxiliaryText(notes: [String: String], transcript: Transcript) -> String {
+    /// `transcript` is nil for a bundle whose transcript is unreadable; its manifest notes are
+    /// still indexable.
+    static func searchAuxiliaryText(notes: [String: String], transcript: Transcript?) -> String {
         var parts: [String] = []
-        if let summary = transcript.summary?.text, !summary.isEmpty { parts.append(summary) }
+        if let summary = transcript?.summary?.text, !summary.isEmpty { parts.append(summary) }
         parts.append(contentsOf: notes.sorted { $0.key < $1.key }.map(\.value))
-        parts.append(contentsOf: transcript.uniqueSpeakers)
+        parts.append(contentsOf: transcript?.uniqueSpeakers ?? [])
         return parts.joined(separator: "\n")
     }
 

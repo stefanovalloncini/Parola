@@ -655,6 +655,23 @@ struct LibraryStoreTests {
         #expect(try snapshotWrittenAt(dir) == before, "a rebuild would rewrite the snapshot")
     }
 
+    @Test("an unreadable bundle keeps its manifest notes searchable")
+    func unreadableBundleKeepsItsNotesSearchable() async throws {
+        let (store, dir) = try makeTempLibrary()
+        let broken = try await store.add(
+            transcript: makeTranscript(), audioSource: nil, title: "brokenmarker"
+        )
+        try await store.setSegmentNote("notemarker", segmentID: 0, for: broken.id)
+        await store.flush()
+        try Data("not json".utf8).write(to: broken.bundleURL.appendingPathComponent("transcript.json"))
+        try FileManager.default.removeItem(at: dir.appendingPathComponent(".search-index.json"))
+
+        let degraded = LibraryStore(libraryURL: dir, extraIndexer: nil)
+
+        #expect(await degraded.search("notemarker").count == 1)
+        #expect(await degraded.search("hi").isEmpty, "the transcript itself is still unreadable")
+    }
+
     @Test("repairing an unreadable bundle puts its transcript back in the index")
     func repairingAnUnreadableBundleReindexesIt() async throws {
         let (store, dir) = try makeTempLibrary()
