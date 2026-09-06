@@ -40,5 +40,9 @@ struct QueueCountTests {
 
         #expect(model.activeBatchJobCount == QueueCount.count(for: jobs))
         #expect(model.activeBatchJobCount == 2)
+        #expect(
+            QueueCount.label(for: jobs, locale: Locale(identifier: "en_US"))
+                == "\(model.activeBatchJobCount) in queue"
+        )
     }
 }

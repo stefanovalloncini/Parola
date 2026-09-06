@@ -168,7 +168,7 @@ struct LibraryListContentTests {
         model.sidebarDensity = density
         let display = LibraryRowDisplay(entry: entry(id: "a", title: "Alpha", offset: 0), sizeBytes: 1_000_000)
         let host = NSHostingView(rootView: LibraryRow(display: display, style: style).environment(model))
-        host.frame = NSRect(x: 0, y: 0, width: 480, height: 200)
+        host.frame = NSRect(x: 0, y: 0, width: MainWindowLayout.transcriptReadableWidth, height: 200)
         host.layoutSubtreeIfNeeded()
         return host.fittingSize.height
     }
@@ -344,7 +344,10 @@ struct LibraryListContentTests {
         func height(_ snippet: String) -> CGFloat {
             let match = LibrarySearchIndex.Match(entryID: "a", score: 1, matchCount: 2, snippet: snippet)
             // The width has to be on the view: `fittingSize` proposes its own, and the snippet never wraps.
-            let host = NSHostingView(rootView: SearchResultRow(display: display, match: match).frame(width: 480))
+            let host = NSHostingView(
+                rootView: SearchResultRow(display: display, match: match)
+                    .frame(width: MainWindowLayout.transcriptReadableWidth)
+            )
             host.layoutSubtreeIfNeeded()
             return host.fittingSize.height
         }
