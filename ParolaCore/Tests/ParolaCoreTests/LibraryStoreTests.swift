@@ -285,8 +285,11 @@ struct LibraryStoreTests {
         try await store.delete(recent.id, at: now)
         try await store.delete(old.id, at: now.addingTimeInterval(-31 * 86_400))
 
-        await store.purgeDeletedOlderThan(days: 30, now: now)
+        let result = await store.purgeDeletedOlderThan(days: 30, now: now)
 
+        #expect(result.purgedIDs == [old.id])
+        #expect(result.purged == 1)
+        #expect(result.failed == 0)
         let deleted = await store.listDeleted()
         #expect(deleted.map(\.id).contains(recent.id))
         #expect(deleted.map(\.id).contains(old.id) == false)

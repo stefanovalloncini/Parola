@@ -1253,7 +1253,15 @@ final class AppModel {
         }
         if sideEffects.contains(.libraryPurgeOnLaunch) {
             Task { [weak self, library] in
-                await library.purgeDeletedOlderThan(days: AppModel.trashRetentionDays, now: Date())
+                let purge = await library.purgeDeletedOlderThan(
+                    days: AppModel.trashRetentionDays, now: Date()
+                )
+                if purge.purged > 0 || purge.failed > 0 {
+                    ParolaLog.info(
+                        .library, "recently deleted purged on launch",
+                        [.count: .int(purge.purged), .failed: .int(purge.failed)]
+                    )
+                }
                 self?.refreshLibrary()
             }
         }

@@ -731,11 +731,21 @@ public actor LibraryStore {
         return VerificationReport(healthy: healthy, problems: problems)
     }
 
+    /// What one Recently-Deleted purge removed, and how many bundles it left on disk.
+    public struct PurgeResult: Sendable, Equatable {
+        public let purgedIDs: [LibraryEntry.ID]
+        public let failed: Int
+
+        public var purged: Int { purgedIDs.count }
+    }
+
     /// Hard-deletes any soft-deleted entry whose `deletedAt` is older than `days` before `now`.
-    public func purgeDeletedOlderThan(days: Int, now: Date) async {
+    @discardableResult
+    public func purgeDeletedOlderThan(days: Int, now: Date) async -> PurgeResult {
         let cutoff = now.addingTimeInterval(-Double(days) * 86_400)
         await primeCaches()
         let toPurge = (cachedDeleted ?? []).filter { ($0.deletedAt ?? .distantFuture) < cutoff }
+        var purgedIDs: [LibraryEntry.ID] = []
         var failed = 0
         var firstFailure: (any Error)?
         for entry in toPurge {
@@ -743,6 +753,7 @@ public actor LibraryStore {
                 try FileManager.default.removeItem(at: entry.bundleURL)
                 cachedLoaded.remove(entry.id)
                 await deindexEntry(id: entry.id)
+                purgedIDs.append(entry.id)
             } catch {
                 failed += 1
                 if firstFailure == nil { firstFailure = error }
@@ -756,6 +767,7 @@ public actor LibraryStore {
             )
         }
         invalidateListCaches()
+        return PurgeResult(purgedIDs: purgedIDs, failed: failed)
     }
 
     private func invalidateListCaches() {

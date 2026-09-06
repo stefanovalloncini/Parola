@@ -201,8 +201,12 @@ struct LibraryLoggingTests {
             try setPermissions(0o500, on: libraryURL)
             defer { try? setPermissions(0o700, on: libraryURL) }
 
-            await store.purgeDeletedOlderThan(days: 0, now: Date().addingTimeInterval(3600))
+            let result = await store.purgeDeletedOlderThan(
+                days: 0, now: Date().addingTimeInterval(3600)
+            )
 
+            #expect(result.failed == 2)
+            #expect(result.purgedIDs.isEmpty)
             let found = records(sink, .library, message: "deleted entries could not be purged")
             #expect(found.count == 1)
             let record = try #require(found.first)
