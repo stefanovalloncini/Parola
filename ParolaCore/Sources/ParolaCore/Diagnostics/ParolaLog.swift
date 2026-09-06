@@ -9,6 +9,27 @@ public enum ParolaLog {
 
     private static let state = OSAllocatedUnfairLock(initialState: State())
 
+    @TaskLocal private static var scopedSink: (any DiagnosticsSink)?
+
+    /// Sends the records this task tree emits to `sink` instead of the installed one, for as long as
+    /// `operation` runs. Structured children and `Task { }` inherit the routing; a `Task.detached`,
+    /// a Dispatch hop or a C callback does not, and keeps logging to the installed sink, so a caller
+    /// must not expect its capture to hold those records.
+    public static func withSink<T>(
+        _ sink: any DiagnosticsSink,
+        isolation: isolated (any Actor)? = #isolation,
+        operation: () async throws -> T
+    ) async rethrows -> T {
+        try await $scopedSink.withValue(sink, operation: operation, isolation: isolation)
+    }
+
+    /// The synchronous half of `withSink(_:operation:)`, under the same routing rule.
+    public static func withSink<T>(
+        _ sink: any DiagnosticsSink, operation: () throws -> T
+    ) rethrows -> T {
+        try $scopedSink.withValue(sink, operation: operation)
+    }
+
     public static func install(_ sink: any DiagnosticsSink) {
         state.withLock { $0.sink = sink }
     }
@@ -18,13 +39,11 @@ public enum ParolaLog {
     }
 
     public static func flush() async {
-        let sink = state.withLock { $0.sink }
-        await sink?.flush()
+        await currentSink()?.flush()
     }
 
     public static func flushSynchronously() {
-        let sink = state.withLock { $0.sink }
-        sink?.flushSynchronously()
+        currentSink()?.flushSynchronously()
     }
 
     public static func debug(
@@ -89,17 +108,23 @@ public enum ParolaLog {
         sink?.enqueue(record)
     }
 
+    private static func currentSink() -> (any DiagnosticsSink)? {
+        scopedSink ?? state.withLock { $0.sink }
+    }
+
     private static func destination(
         for category: LogCategory
     ) -> ((any DiagnosticsSink)?, Logger) {
-        state.withLock { current in
-            if let existing = current.loggers[category] { return (current.sink, existing) }
+        let scoped = scopedSink
+        return state.withLock { current in
+            let sink = scoped ?? current.sink
+            if let existing = current.loggers[category] { return (sink, existing) }
             let logger = Logger(
                 subsystem: category.subsystem.rawValue,
                 category: category.rawValue
             )
             current.loggers[category] = logger
-            return (current.sink, logger)
+            return (sink, logger)
         }
     }
 }
