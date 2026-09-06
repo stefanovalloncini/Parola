@@ -150,7 +150,7 @@ struct ThemePalette: Sendable, Codable, Equatable {
 }
 
 extension ThemePalette {
-    /// Neutrals shared by every built-in preset; `textSecondary` is fixed since `.secondary` only clears 3.95 on white.
+    /// Neutrals shared by every preset: the dark surfaces sit above the window's #1E1E1E so a raised card reads raised, and textSecondary is fixed because .secondary is 3.95 on white.
     static let sharedNeutrals = (
         canvas: ThemeColor.dynamic(light: RGBA(0.972, 0.972, 0.970), dark: RGBA(0.098, 0.098, 0.098)),
         surface: ThemeColor.dynamic(light: RGBA(1, 1, 1), dark: RGBA(0.157, 0.157, 0.157)),

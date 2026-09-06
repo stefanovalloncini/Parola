@@ -27,14 +27,15 @@ struct CLIDiagnosticsTests {
         return ""
     }
 
-    /// `flush()` must drain the bootstrap it installed, not whatever sink happens to be globally
-    /// installed by the time it runs.
+    /// `flush()` must drain the bootstrap it installed, not whatever sink is globally installed later.
     @Test func flushDrainsItsOwnBootstrapEvenAfterAForeignSinkTakesOver() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-cli-diagnostics-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: directory) }
 
-        CLIDiagnostics.installIfWanted(alwaysOn: true, environment: [:], directory: directory)
+        CLIDiagnostics.installIfWanted(
+            alwaysOn: false, environment: ["PAROLA_DIAGNOSTICS": "1"], directory: directory
+        )
         ParolaLog.info(.cli, "cli diagnostics flush test")
 
         let foreign = ScopedCapturingSink()

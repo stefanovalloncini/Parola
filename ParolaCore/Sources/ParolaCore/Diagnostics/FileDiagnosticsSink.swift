@@ -269,10 +269,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
         }
     }
 
-    /// What one sweep did. `overBudget` means the trim ran out of files it was allowed to delete
-    /// — every survivor is either the file still open here or a live sibling's — so the folder
-    /// stays large. `ownRotations` is how many of the deletions were this sink's own rotations.
-    /// `skippedLive` counts both the age-branch and budget-branch skips, deduplicated by path.
+    /// What one sweep did; `skippedLive` counts both the age-branch and budget-branch skips, deduplicated by path.
     struct SweepOutcome: Sendable, Equatable {
         var deleted = 0
         var skippedLive = 0

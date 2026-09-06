@@ -77,8 +77,8 @@ struct AboutPane: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)
             }
-            .onAppear {
-                Task { hasDiagnostics = await model.diagnosticsRecordsExist() }
+            .task {
+                hasDiagnostics = await model.diagnosticsRecordsExist()
             }
 
             Spacer()

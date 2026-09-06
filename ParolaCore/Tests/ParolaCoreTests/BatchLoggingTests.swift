@@ -56,6 +56,7 @@ struct BatchLoggingTests {
             let record = try #require(records.first)
             #expect(record.level == .notice)
             #expect(record.fields[.count]?.text == "2")
+            #expect(batchRecords(sink, message: "batch starting").isEmpty)
             #expect(batchRecords(sink, message: "batch finished").isEmpty)
         }
     }
