@@ -86,13 +86,12 @@ struct BatchJobDetail: View {
         }
     }
 
-    /// For the bar: a fill carries no text, so it keeps the saturated token.
+    // Only the statuses that draw a bar reach this; .pending and .done draw a spacer instead.
     private var statusFill: Color {
         switch job.status {
-        case .pending, .cancelled: return DS.Color.secondaryText
         case .transcribing: return DS.Color.accent
-        case .done: return DS.Palette.success
         case .failed: return DS.Color.danger
+        default: return DS.Color.secondaryText
         }
     }
 }
