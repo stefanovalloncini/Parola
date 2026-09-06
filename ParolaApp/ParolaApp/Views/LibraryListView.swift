@@ -290,57 +290,51 @@ struct LibraryListView: View {
     }
 
     private var header: some View {
-        HStack(spacing: DS.Spacing.regular) {
-            Text(headerTitle)
-                .font(DS.Font.title)
-                .foregroundStyle(DS.Color.primaryText)
-            if searchResults == nil {
-                LibraryFilterBar(
-                    labelFilter: $labelFilter,
-                    languageFilter: $languageFilter,
-                    dateRangeFilter: $dateRangeFilter,
-                    labelOptions: model.knownLabels(in: category),
-                    languageOptions: model.knownLanguages(in: category)
-                )
-            } else {
-                Button("Clear") { model.clearSearch() }
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                    .axLeaf("Search.Button.Clear")
-            }
-            Spacer()
-            if !selection.isEmpty {
-                Menu {
-                    ForEach(ExportFormat.allCases) { format in
-                        Button("\(format.displayName) (.\(format.fileExtension))") {
-                            model.bulkExportEntries(ids: selection, format: format)
+        PageHeader(
+            title: headerTitle,
+            count: totalsLabel.isEmpty ? nil : totalsLabel,
+            countHelp: totalsHelp,
+            leading: {
+                if searchResults == nil {
+                    LibraryFilterBar(
+                        labelFilter: $labelFilter,
+                        languageFilter: $languageFilter,
+                        dateRangeFilter: $dateRangeFilter,
+                        labelOptions: model.knownLabels(in: category),
+                        languageOptions: model.knownLanguages(in: category)
+                    )
+                } else {
+                    Button("Clear") { model.clearSearch() }
+                        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                        .axLeaf("Search.Button.Clear")
+                }
+            },
+            trailing: {
+                if !selection.isEmpty {
+                    Menu {
+                        ForEach(ExportFormat.allCases) { format in
+                            Button("\(format.displayName) (.\(format.fileExtension))") {
+                                model.bulkExportEntries(ids: selection, format: format)
+                            }
+                            .axLeaf("Header.MenuItem.Export\(format.rawValue.capitalized)")
                         }
-                        .axLeaf("Header.MenuItem.Export\(format.rawValue.capitalized)")
+                    } label: {
+                        Label("Export \(selection.count)", systemImage: "square.and.arrow.up")
                     }
-                } label: {
-                    Label("Export \(selection.count)", systemImage: "square.and.arrow.up")
+                    .menuStyle(.borderlessButton)
+                    .controlSize(.small)
+                    .fixedSize()
+                    .axLeaf("Header.Menu.BulkExport")
+                    Button(role: .destructive) {
+                        pendingBulkDelete = true
+                    } label: {
+                        Label("Delete \(selection.count)", systemImage: "trash")
+                    }
+                    .controlSize(.small)
+                    .axLeaf("Header.Button.BulkDelete")
                 }
-                .menuStyle(.borderlessButton)
-                .controlSize(.small)
-                .fixedSize()
-                .axLeaf("Header.Menu.BulkExport")
-                Button(role: .destructive) {
-                    pendingBulkDelete = true
-                } label: {
-                    Label("Delete \(selection.count)", systemImage: "trash")
-                }
-                .controlSize(.small)
-                .axLeaf("Header.Button.BulkDelete")
             }
-            if !totalsLabel.isEmpty {
-                Text(totalsLabel)
-                    .font(DS.Font.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(DS.Color.secondaryText)
-                    .modifier(OptionalHelp(help: totalsHelp))
-            }
-        }
-        .padding(.horizontal, DS.Spacing.large)
-        .padding(.vertical, DS.Spacing.regular)
+        )
     }
 
     private func performBulkDelete() {
