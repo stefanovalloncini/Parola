@@ -13,10 +13,10 @@ struct YouTubeProcessTests {
         process.standardOutput = Pipe()
         process.standardError = Pipe()
         try process.run()
-        let started = Date()
-        try await YouTubeProcess.waitWithTimeout(process, seconds: 5)
-        let elapsed = Date().timeIntervalSince(started)
-        #expect(elapsed < 2.0)
+        // A clock nobody advances can never reach the deadline, so returning at all proves the
+        // process exited on its own.
+        try await YouTubeProcess.waitWithTimeout(process, seconds: 5, clock: TestClock())
+        #expect(process.terminationReason == .exit)
         #expect(process.terminationStatus == 0)
     }
 
@@ -43,7 +43,8 @@ struct YouTubeProcessTests {
         try process.run()
         // Give the process a moment to exit before we start waiting.
         try await Task.sleep(for: .milliseconds(150))
-        try await YouTubeProcess.waitWithTimeout(process, seconds: 5)
+        try await YouTubeProcess.waitWithTimeout(process, seconds: 5, clock: TestClock())
+        #expect(process.terminationReason == .exit)
         #expect(process.terminationStatus == 0)
     }
 
@@ -58,9 +59,10 @@ struct YouTubeProcessTests {
         process.standardError = Pipe()
         let drain = PipeDrain(pipe: stdout)
         try process.run()
-        try await YouTubeProcess.waitWithTimeout(process, seconds: 10)
+        try await YouTubeProcess.waitWithTimeout(process, seconds: 10, clock: TestClock())
         let collected = drain.data()
         #expect(collected.count > 100_000)
+        #expect(process.terminationReason == .exit)
         #expect(process.terminationStatus == 0)
     }
 }
