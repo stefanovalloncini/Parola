@@ -187,6 +187,17 @@
         }
       }
     },
+    "%lld in queue": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld in coda"
+          }
+        }
+      }
+    },
     "%lld installed · %@": {
       "localizations": {
         "en": {
@@ -1285,17 +1296,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "BYOK"
-          }
-        }
-      }
-    },
-    "Back": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Indietro"
           }
         }
       }

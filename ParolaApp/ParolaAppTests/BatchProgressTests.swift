@@ -32,4 +32,13 @@ struct BatchProgressTests {
         #expect(BatchProgress.counts(for: []) == nil)
         #expect(BatchProgress.label(for: []) == nil)
     }
+
+    @Test("the files caption hides for an empty batch and pluralizes otherwise")
+    func filesCaption() {
+        let english = Locale(identifier: "en_US")
+        #expect(BatchProgress.filesLabel(for: [], locale: english) == nil)
+        #expect(BatchProgress.filesLabel(for: [Self.makeJob("a", .done)], locale: english) == "1 file")
+        let three = [Self.makeJob("a", .done), Self.makeJob("b", .pending), Self.makeJob("c", .transcribing)]
+        #expect(BatchProgress.filesLabel(for: three, locale: english) == "3 files")
+    }
 }
