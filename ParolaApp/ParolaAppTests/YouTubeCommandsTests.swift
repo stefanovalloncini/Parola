@@ -104,6 +104,33 @@ struct YouTubeCommandsTests {
         #expect(model.phase == .failed(message: ParolaError.featureDisabled(.youtube).description))
     }
 
+    private static func transcript(_ texts: [String]) -> Transcript {
+        Transcript(
+            segments: texts.enumerated().map {
+                TranscriptSegment(id: $0.offset, start: Double($0.offset), end: Double($0.offset) + 1, text: $0.element)
+            },
+            language: "en",
+            modelName: "tiny"
+        )
+    }
+
+    /// The subtitles run swaps the pane without a bundle or a player, so nothing else drops a stale reveal,
+    /// and segment ids are positions: kept, it would hold an unrelated line of the fetched transcript.
+    @Test("a fetched subtitle transcript drops the reveal an earlier search left")
+    func fetchedSubtitlesEndAPendingReveal() throws {
+        let (model, server, _, _) = try makeRig()
+        model.transcript = Self.transcript(["Hello world.", "Hello again.", "Goodbye world!"])
+        model.revealInTranscript("Goodbye Hello", at: .init(seconds: 1, segmentIndex: 1, textOffset: 0))
+        try #require(model.pendingRevealSegmentID == 1)
+
+        model.installFetchedSubtitles(Self.transcript(["Fetched captions", "second line"]))
+        withExtendedLifetime(server) {}
+
+        #expect(model.pendingRevealSegmentID == nil)
+        #expect(model.selectedEntryID == nil)
+        #expect(model.transcript?.segments.first?.text == "Fetched captions")
+    }
+
     @Test("a URL yt-dlp cannot take is neither started nor parked")
     func fetchYouTubeSubsReportsRefusal() async throws {
         let (model, server, context, commands) = try makeRig()

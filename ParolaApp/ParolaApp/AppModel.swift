@@ -1938,9 +1938,7 @@ final class AppModel {
                 let result = try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: selectedLanguage)
                 try Task.checkCancellation()
                 let processed = await postProcessDetached(result)
-                clearDerivedArtifacts()
-                selectedEntryID = nil
-                transcript = processed
+                installFetchedSubtitles(processed)
                 phase = .ready
                 persistToLibrary(processed, audioSource: nil)
             } catch {

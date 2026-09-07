@@ -88,6 +88,8 @@ extension AppModel {
     func clearDerivedArtifacts() {
         // Whole stack, not just our target: field-editor typing undo shares the window's manager and is stale context too.
         undoManager?.removeAllActions()
+        // Segment ids are positions, not identities, so a reveal left over from the last transcript would hold an unrelated line in the next one.
+        pendingRevealSegmentID = nil
         derivedArtifactsGeneration &+= 1
         if promptOutput != nil { promptOutput = nil }
         if !actionItems.isEmpty { actionItems = [] }
@@ -99,9 +101,14 @@ extension AppModel {
     /// The one way a stored document takes over the pane: drop what the last transcript derived, then adopt what this one saved.
     func installStoredTranscript(_ stored: Transcript) {
         clearDerivedArtifacts()
-        pendingRevealSegmentID = nil
         transcript = stored
         adoptSavedChapters()
+    }
+
+    /// A subtitles fetch brings no bundle and no media, so this swap is the whole handover: no entry, and the same seam a stored document takes.
+    func installFetchedSubtitles(_ fetched: Transcript) {
+        selectedEntryID = nil
+        installStoredTranscript(fetched)
     }
 
     /// Call after the transcript installs — `clearDerivedArtifacts()` runs before it, and Chapters reads runtime state only.
