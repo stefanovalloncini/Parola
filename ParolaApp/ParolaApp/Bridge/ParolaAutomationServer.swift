@@ -479,7 +479,7 @@ final class ParolaAutomationServer {
             "themeIsCustom": .bool(themeIsCustom),
             "hasTranscript": .bool(model.transcript != nil),
             "transcriptSegments": .int(model.transcript?.segments.count ?? 0),
-            "availableModels": .array(model.availableModels.map { .string($0.name) }),
+            "availableModels": .array(AppModel.selectableModelNames(model.availableModels).map { .string($0) }),
             "isRunningPrompt": .bool(model.isRunningPrompt),
             "youtubeSheetOpen": .bool(model.youtubeSheetOpen),
             "liveCaptionsActive": .bool(model.liveCaptions?.isActive ?? false),

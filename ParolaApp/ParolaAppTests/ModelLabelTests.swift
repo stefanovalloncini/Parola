@@ -121,6 +121,45 @@ struct SelectedModelCorrectionTests {
     }
 }
 
+@Suite("Selectable model names")
+struct SelectableModelNamesTests {
+    private func info(_ name: String) -> ModelInfo {
+        ModelInfo(name: name, label: name, approximateSizeBytes: 0, isMultilingual: true, isInstalled: true)
+    }
+
+    @Test("a junk folder isn't offered as a selectable model")
+    func junkFolderExcluded() {
+        let names = AppModel.selectableModelNames([
+            info("openai_whisper-large-v3_turbo"),
+            info("apple-speech-analyzer"),
+            info("parakeet-tdt-0.6b-v2-coreml"),
+        ])
+        #expect(names == ["openai_whisper-large-v3_turbo", "apple-speech-analyzer"])
+    }
+
+    @Test("a real junk directory on disk is scanned as installed but still filtered out")
+    func realJunkDirectoryStillFiltered() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SelectableModelNamesTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let junk = root
+            .appendingPathComponent("models/FluidInference/junk-orphan-model", isDirectory: true)
+        try FileManager.default.createDirectory(at: junk, withIntermediateDirectories: true)
+        try Data("weights".utf8).write(to: junk.appendingPathComponent("model.bin"))
+
+        let store = ModelStore(modelsDirectory: root)
+        let scan = store.scan()
+        let availableModels = scan.catalog + scan.installed.filter { entry in
+            !scan.catalog.contains { $0.name == entry.name }
+        }
+
+        #expect(scan.installed.contains { $0.name == "junk-orphan-model" })
+        let names = AppModel.selectableModelNames(availableModels)
+        #expect(!names.contains("junk-orphan-model"))
+        #expect(names.contains("apple-speech-analyzer"))
+    }
+}
+
 @Suite("Model deletion")
 struct ModelDeletionTests {
     private static let variant = "openai_whisper-large-v3_turbo"
