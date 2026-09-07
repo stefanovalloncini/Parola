@@ -163,6 +163,11 @@ public actor TranscriptionSession {
             ),
             energy: engineID == .whisperKit ? AudioFileEnergyProbe(url: audioURL) : nil
         )
+        // After the energy pass, which reads each segment's own span off disk: clamping first
+        // would point that read at three seconds of a window the engine had padded.
+        if engineID == .whisperKit {
+            transcript.segments = PaddedSegmentSpan.clamped(transcript.segments)
+        }
         if options.diarize {
             try Task.checkCancellation()
             transcript = try await diarize(

@@ -186,7 +186,7 @@ actor WhisperKitTranscriber: Transcriber {
 
         // durationSeconds comes from the source asset, not the engine: TranscriptionSession fills it in.
         return Transcript(
-            segments: PaddedSegmentSpan.clamped(segments).chronologicallyOrdered(),
+            segments: segments.chronologicallyOrdered(),
             language: detectedLanguage,
             modelName: modelName,
             sourceURL: url,

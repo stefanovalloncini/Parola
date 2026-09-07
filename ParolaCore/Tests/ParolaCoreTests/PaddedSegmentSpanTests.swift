@@ -50,6 +50,23 @@ struct PaddedSegmentSpanTests {
         #expect(clamped.end == 103)
     }
 
+    @Test("a long segment in a script without spaces keeps its span")
+    func spaceFreeScriptsAreNotPads() {
+        let japanese = segment(
+            start: 100, end: 115,
+            text: "今日はみなさんこんにちは、はじめましょう。ダッシュボードの話からいきます。まず最初の項目を見ていきましょう。それから残りの数字を確認します。"
+        )
+        #expect(PaddedSegmentSpan.wordCount(japanese.text) == 1)
+        #expect(PaddedSegmentSpan.clamped(japanese).end == 115)
+
+        let thai = segment(start: 0, end: 20, text: "สวัสดีครับทุกคนวันนี้เราจะมาพูดคุยกันเรื่องแดชบอร์ด")
+        #expect(PaddedSegmentSpan.clamped(thai).end == 20)
+
+        // A short space-free line over a long window is still a pad.
+        let padded = segment(start: 0, end: 21, text: "ありがとう")
+        #expect(PaddedSegmentSpan.clamped(padded).end == 3)
+    }
+
     @Test("ordinary segments are left alone")
     func ordinarySegmentsAreUntouched() {
         let sentence = segment(start: 0, end: 22, text: "una frase lunga che dura parecchio e non è un riempitivo")
@@ -57,6 +74,14 @@ struct PaddedSegmentSpanTests {
 
         let short = segment(start: 0, end: 4, text: "Grazie a tutti.")
         #expect(PaddedSegmentSpan.clamped(short).end == 4)
+    }
+
+    @Test("padding is judged on both word count and length")
+    func paddingNeedsShortTextAndFewWords() {
+        #expect(PaddedSegmentSpan.isPadding("Grazie a tutti."))
+        #expect(PaddedSegmentSpan.isPadding("ありがとう"))
+        #expect(!PaddedSegmentSpan.isPadding("今日はみなさんこんにちは、はじめましょう。ダッシュボードの話からいきます。"))
+        #expect(!PaddedSegmentSpan.isPadding("una frase con parecchie parole dentro"))
     }
 
     @Test("clamping never reorders or drops a segment")

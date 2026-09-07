@@ -7,6 +7,10 @@ import Foundation
 enum PaddedSegmentSpan {
     static let longestUnpaddedSpan = 10.0
     static let paddedTextWordLimit = 3
+    /// Chinese, Japanese and Thai write without spaces, so a whole paragraph counts as one "word".
+    /// The padded phrases this exists for top out around seventeen characters, while ten seconds of
+    /// real speech runs past seventy in any script, so the two never meet.
+    static let paddedTextCharacterLimit = 24
     static let assumedSpokenSpan = 3.0
 
     static func clamped(_ segments: [TranscriptSegment]) -> [TranscriptSegment] {
@@ -14,8 +18,7 @@ enum PaddedSegmentSpan {
     }
 
     static func clamped(_ segment: TranscriptSegment) -> TranscriptSegment {
-        guard segment.end - segment.start > longestUnpaddedSpan,
-              wordCount(segment.text) <= paddedTextWordLimit else {
+        guard segment.end - segment.start > longestUnpaddedSpan, isPadding(segment.text) else {
             return segment
         }
         var out = segment
@@ -27,6 +30,11 @@ enum PaddedSegmentSpan {
             out.end = segment.start + assumedSpokenSpan
         }
         return out
+    }
+
+    static func isPadding(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return wordCount(trimmed) <= paddedTextWordLimit && trimmed.count <= paddedTextCharacterLimit
     }
 
     static func wordCount(_ text: String) -> Int {
