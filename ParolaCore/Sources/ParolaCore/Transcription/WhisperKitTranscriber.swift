@@ -130,7 +130,7 @@ actor WhisperKitTranscriber: Transcriber {
                 if let onPartial = handlers.onPartial, let text {
                     onPartial(text)
                 }
-                if let onProgress = handlers.onProgress, let latest = segments.map({ Double($0.end) }).max() {
+                if let onProgress = handlers.onProgress, let latest = Self.absolutePosition(for: segments) {
                     onProgress(latest)
                 }
             }
@@ -208,6 +208,13 @@ actor WhisperKitTranscriber: Transcriber {
             fields[.audioSeconds] = .seconds(seconds)
         }
         return fields
+    }
+
+    /// `segmentDiscoveryCallback` reports chunk-local start/end times, but `.vad` chunking adjusts
+    /// `seek` to the chunk's absolute sample offset (WhisperKit.swift's `batchedSegmentCallback`), so
+    /// offset + chunk-local end gives the segment's true position in the source file.
+    static func absolutePosition(for segments: [TranscriptionSegment]) -> Double? {
+        segments.map { Double($0.seek) / Double(WhisperKit.sampleRate) + Double($0.end) }.max()
     }
 
     private static let languageProbeWindows = 5
