@@ -59,6 +59,7 @@ struct FindReplacePane: View {
                     Label("Import pack", systemImage: "tray.and.arrow.down")
                 }
                 .menuStyle(.button)
+                .buttonStyle(.borderless)
                 .fixedSize()
                 .axLeaf("FindReplace.Menu.ImportPack")
 
