@@ -9,7 +9,7 @@ private let streamingSampleRate = 16_000
 private struct StreamingLogFailure: Error {}
 
 private final class FakeStreamingCapture: Sendable {
-    // A named struct, not a tuple: a tuple element sits at the lock's opaque abstraction level, so every `withLock` would wrap the callback in another pair of reabstraction thunks that retain the last pair, and releasing that chain recurses per link.
+    // A named struct, not a tuple: a tuple element is lowered at the lock's opaque abstraction, so every `withLock` adds a reabstraction-thunk pair to the callback.
     private struct State {
         var callback: (@Sendable ([Float]) -> Void)?
         var installed = false
@@ -183,7 +183,6 @@ struct StreamingLoggingTests {
         }
     }
 
-    // The nesting this guards against took the whole suite down with a deep-release stack overflow.
     @Test("polling the capture leaves its callback one frame deep")
     func pollingDoesNotNestTheCallback() {
         let capture = FakeStreamingCapture()
