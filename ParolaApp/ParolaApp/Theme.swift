@@ -196,9 +196,10 @@ extension ThemePalette {
         accent.legibleText(on: surfaceElevated).legibleText(on: accentWash)
     }
 
-    /// Red and green as small text — the raw system red only reaches 3.7 on a card, green was under AA in light mode.
+    /// Red, green and amber as small text — the raw system red only reaches 3.7 on a card, green was under AA in light mode.
     var dangerText: ThemeColor { danger.legibleText(on: surfaceElevated) }
     var successText: ThemeColor { success.legibleText(on: surfaceElevated) }
+    var warningText: ThemeColor { warning.legibleText(on: surfaceElevated) }
 
     /// `dangerText` pinned to its dark value, for chrome that paints its own dark scrim regardless of appearance.
     var dangerOnDark: ThemeColor { .uniform(dangerText.appearanceVariants.dark) }

@@ -219,8 +219,8 @@ extension RecentlyDeletedCopy.Tier {
     var color: Color {
         switch self {
         case .calm: return DS.Color.secondaryText
-        case .soon: return DS.Palette.warning
-        case .critical, .overdue: return DS.Color.danger
+        case .soon: return DS.Color.warningText
+        case .critical, .overdue: return DS.Color.dangerText
         case .undated: return DS.Color.separator
         }
     }
