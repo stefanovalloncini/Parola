@@ -61,8 +61,10 @@ public actor TranscriptionSession {
         progressHandler: (@Sendable (Double) -> Void)? = nil,
         stageHandler: (@Sendable (TranscribeStage) -> Void)? = nil
     ) async throws -> Transcript {
-        // Whole runs are serialized: interleaved calls would swap each other's transcriber out
-        // via ensureTranscriber's unload and cross-wire the partial/progress callbacks.
+        // Whole runs are serialized: interleaved calls would swap each other's transcriber out via
+        // ensureTranscriber's unload and cross-wire the partial/progress callbacks. The exception
+        // is a run abandoned after a cancel — its engine may still emit, so callers stamp their
+        // handlers with a run of their own and drop what arrives late.
         let runID = try await acquireTranscribeSlot()
         defer { releaseTranscribeSlot(runID) }
 

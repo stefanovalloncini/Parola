@@ -993,6 +993,9 @@ final class AppModel {
     @ObservationIgnored var fileTranscribeTask: Task<Void, Never>?
     @ObservationIgnored var fileReadDeadline: Duration = FileReadDeadline.header
     @ObservationIgnored private var unsettledCancels = 0
+    /// Bumped by every file run. An abandoned run's engine can keep emitting after the slot has
+    /// moved on, and its partials would land in the pane the next run is filling.
+    @ObservationIgnored private(set) var fileRunGeneration = 0
     @ObservationIgnored var recordingOutcomeWaiters: [CheckedContinuation<String, any Error>] = []
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>?
@@ -1706,6 +1709,8 @@ final class AppModel {
 
     /// The run itself, past the routing an arriving file goes through: Retry means this file, now.
     private func startFileTranscription(fileURL: URL, translateOverride: Bool?) {
+        fileRunGeneration &+= 1
+        let runToken = fileRunGeneration
         noteRecentFile(fileURL)
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
@@ -1715,7 +1720,7 @@ final class AppModel {
             let probe = await BoundedFileRead.run(deadline: deadline) {
                 probeSource.synchronousDuration()
             }
-            guard let self, self.sourceFileURL == fileURL else { return }
+            guard let self, self.fileRunGeneration == runToken else { return }
             guard case .done(let duration) = probe else {
                 self.failFileReadTimeout(fileURL)
                 return
@@ -1740,9 +1745,9 @@ final class AppModel {
                     source: FileAudioSource(url: fileURL),
                     options: makeOptions(task: task),
                     downloadProgress: makeDownloadProgressHandler(for: selectedModel),
-                    partialHandler: makeFilePartialHandler(),
-                    progressHandler: makeFileProgressHandler(),
-                    stageHandler: makeFileStageHandler(fileURL: fileURL)
+                    partialHandler: makeFilePartialHandler(runToken: runToken),
+                    progressHandler: makeFileProgressHandler(runToken: runToken),
+                    stageHandler: makeFileStageHandler(fileURL: fileURL, runToken: runToken)
                 )
                 try Task.checkCancellation()
                 let processed = await postProcessDetached(result)
@@ -1783,19 +1788,19 @@ final class AppModel {
         )
     }
 
-    private func makeFilePartialHandler() -> @Sendable (String) -> Void {
+    func makeFilePartialHandler(runToken: Int) -> @Sendable (String) -> Void {
         return { [weak self] text in
             Task { @MainActor in
-                guard let self, self.filePartialText != text else { return }
+                guard let self, self.fileRunGeneration == runToken, self.filePartialText != text else { return }
                 self.filePartialText = text
             }
         }
     }
 
-    private func makeFileStageHandler(fileURL: URL) -> @Sendable (TranscribeStage) -> Void {
+    func makeFileStageHandler(fileURL: URL, runToken: Int) -> @Sendable (TranscribeStage) -> Void {
         return { [weak self] stage in
             Task { @MainActor in
-                guard let self else { return }
+                guard let self, self.fileRunGeneration == runToken else { return }
                 self.fileTranscribeStage = stage
                 // First stage event means the model finished loading/downloading; until then the
                 // phase keeps showing that wait instead of jumping straight to "transcribing".
@@ -1871,11 +1876,12 @@ final class AppModel {
         var lastFraction: Double = 0
     }
 
-    private func makeFileProgressHandler() -> @Sendable (Double) -> Void {
+    func makeFileProgressHandler(runToken: Int) -> @Sendable (Double) -> Void {
         let throttle = FileProgressThrottle()
         return { [weak self] seconds in
             Task { @MainActor [weak self] in
-                guard let self, let duration = self.mediaDurationSeconds, duration > 0 else { return }
+                guard let self, self.fileRunGeneration == runToken,
+                      let duration = self.mediaDurationSeconds, duration > 0 else { return }
                 let fraction = min(1, max(throttle.lastFraction, seconds / duration))
                 let percent = Int(fraction * 100)
                 guard percent != throttle.lastPercent else { return }
