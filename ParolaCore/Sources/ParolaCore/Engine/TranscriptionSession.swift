@@ -155,18 +155,17 @@ public actor TranscriptionSession {
         // The source asset's own duration, not whatever the engine decoded: engines disagree with
         // each other and Parakeet reports none at all.
         transcript.durationSeconds = probedDuration ?? transcript.durationSeconds
-        transcript = TranscriptCleanup.apply(
-            to: transcript,
-            options: TranscriptCleanupOptions(
-                filtersHallucinations: options.filtersHallucinations,
-                mergesSentences: false
-            ),
-            energy: engineID == .whisperKit ? AudioFileEnergyProbe(url: audioURL) : nil
+        let cleanupOptions = TranscriptCleanupOptions(
+            filtersHallucinations: options.filtersHallucinations,
+            mergesSentences: false
         )
-        // After the energy pass, which reads each segment's own span off disk: clamping first
-        // would point that read at three seconds of a window the engine had padded.
         if engineID == .whisperKit {
+            transcript = await cleanedWithEnergy(transcript, at: audioURL, options: cleanupOptions)
+            // After the energy pass, which reads each segment's own span off disk: clamping first
+            // would point that read at three seconds of a window the engine had padded.
             transcript.segments = PaddedSegmentSpan.clamped(transcript.segments)
+        } else {
+            transcript = TranscriptCleanup.apply(to: transcript, options: cleanupOptions, energy: nil)
         }
         if options.diarize {
             try Task.checkCancellation()
@@ -195,6 +194,24 @@ public actor TranscriptionSession {
             ]
         )
         return transcript
+    }
+
+    /// The energy probe opens the source file and seeks through it. On the actor and without a
+    /// deadline that is the wedge the readability gate exists to stop, one step further along — a
+    /// volume pulled mid-run would park the session itself with the slot still held.
+    private func cleanedWithEnergy(
+        _ transcript: Transcript, at audioURL: URL, options: TranscriptCleanupOptions
+    ) async -> Transcript {
+        let read = await BoundedFileRead.run(deadline: fileReadDeadline) {
+            TranscriptCleanup.apply(
+                to: transcript, options: options, energy: AudioFileEnergyProbe(url: audioURL)
+            )
+        }
+        guard case .done(let cleaned) = read else {
+            ParolaLog.notice(.models, "skipped the energy pass: the file stopped reading")
+            return TranscriptCleanup.apply(to: transcript, options: options, energy: nil)
+        }
+        return cleaned
     }
 
     /// Stages speaker labels in place of SpeakerKit. Internal, so the CLI and both apps always

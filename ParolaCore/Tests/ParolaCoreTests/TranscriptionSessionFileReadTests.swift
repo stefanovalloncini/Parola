@@ -27,11 +27,41 @@ struct TranscriptionSessionFileReadTests {
         }
     }
 
+    /// Stands in for a volume pulled after the readability gate has already passed: the file the
+    /// energy probe reaches for is a FIFO nothing will ever write to.
+    actor SwapsTheFileForAFifo: Transcriber {
+        static let engineID = EngineID.whisperKit
+        static let capabilities = EngineCapabilities.whisperKitDefaults
+
+        private var loaded: String?
+
+        func load(model: String) async throws { loaded = model }
+        func unload() async { loaded = nil }
+        func loadedModelName() async -> String? { loaded }
+
+        func transcribe(
+            url: URL, options: TranscriptionOptions, handlers: TranscribeHandlers
+        ) async throws -> Transcript {
+            try FileManager.default.removeItem(at: url)
+            guard mkfifo(url.path, 0o644) == 0 else {
+                throw ParolaError.ioError("could not create the FIFO the test needs")
+            }
+            return Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "ok")],
+                language: "en",
+                modelName: loaded ?? "?",
+                sourceURL: url,
+                durationSeconds: 1
+            )
+        }
+    }
+
     private func makeSession(
-        in directory: URL
+        in directory: URL,
+        transcriber: (any Transcriber)? = nil
     ) async throws -> TranscriptionSession {
         let registry = EngineRegistry()
-        let stub = StubTranscriber()
+        let stub = transcriber ?? StubTranscriber()
         await registry.register(
             engineID: .whisperKit,
             capabilities: .whisperKitDefaults
@@ -88,5 +118,30 @@ struct TranscriptionSessionFileReadTests {
         let elapsed = started.duration(to: .now)
         #expect(transcript.segments.count == 1)
         #expect(elapsed < .seconds(5), "the next run waited \(elapsed) behind the wedged one")
+    }
+
+    @Test("a file that stops reading after the gate skips the energy pass instead of parking")
+    func wedgedEnergyProbeSkipsInsteadOfParking() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-energy-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let audioURL = dir.appendingPathComponent("vanishes.wav")
+        try Data("RIFFstub".utf8).write(to: audioURL)
+        defer {
+            let writer = open(audioURL.path, O_WRONLY | O_NONBLOCK)
+            if writer >= 0 { close(writer) }
+        }
+
+        let session = try await makeSession(in: dir, transcriber: SwapsTheFileForAFifo())
+        let started = ContinuousClock.now
+        let transcript = try await session.transcribe(
+            source: FileAudioSource(url: audioURL),
+            options: TranscriptionOptions(model: "openai_whisper-tiny")
+        )
+        let elapsed = started.duration(to: .now)
+        #expect(transcript.segments.count == 1)
+        #expect(elapsed < .seconds(10), "the run took \(elapsed); the energy probe was not bounded")
     }
 }
