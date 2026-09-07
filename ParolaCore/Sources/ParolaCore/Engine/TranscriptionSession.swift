@@ -21,12 +21,16 @@ public actor TranscriptionSession {
     private var diarizerIdleTask: Task<Void, Never>?
     private var idleEpoch: Int = 0
     private var pressureSource: (any DispatchSourceMemoryPressure)?
-    private var transcribeRunning = false
+    private var activeRun: Int?
+    private var lastRunID = 0
     private var transcribeWaiters: [CheckedContinuation<Void, Never>] = []
     private var diarizeStep: DiarizeStep?
 
     /// How long the readability probe waits before the file counts as out of reach.
     private let fileReadDeadline: Duration
+
+    /// How long a cancelled run has to unwind before its slot is taken away from it.
+    private let abandonGrace: Duration
 
     typealias DiarizeStep = @Sendable (Transcript, URL, Int?) async throws -> Transcript
 
@@ -36,7 +40,8 @@ public actor TranscriptionSession {
         idleTimeout: TimeInterval = 600,
         clock: any Clock<Duration> = ContinuousClock(),
         managedConfiguration: ManagedConfiguration = .shared,
-        fileReadDeadline: Duration = FileReadDeadline.header
+        fileReadDeadline: Duration = FileReadDeadline.header,
+        abandonGrace: Duration = .seconds(5)
     ) {
         self.modelStore = modelStore
         self.registry = registry
@@ -44,6 +49,7 @@ public actor TranscriptionSession {
         self.clock = clock
         self.managedConfiguration = managedConfiguration
         self.fileReadDeadline = fileReadDeadline
+        self.abandonGrace = abandonGrace
     }
 
     /// Transcribes from an AudioSource. Downloads the requested model on demand.
@@ -57,8 +63,8 @@ public actor TranscriptionSession {
     ) async throws -> Transcript {
         // Whole runs are serialized: interleaved calls would swap each other's transcriber out
         // via ensureTranscriber's unload and cross-wire the partial/progress callbacks.
-        try await acquireTranscribeSlot()
-        defer { releaseTranscribeSlot() }
+        let runID = try await acquireTranscribeSlot()
+        defer { releaseTranscribeSlot(runID) }
 
         installPressureSourceIfNeeded()
         await ensureBootstrap()
@@ -93,8 +99,9 @@ public actor TranscriptionSession {
         try Task.checkCancellation()
         cancelIdleTimer()
         // Rearm on every exit: a throw below (incl. cancellation) would otherwise leave the
-        // loaded model resident with no idle timer until the next successful run.
-        defer { scheduleIdleUnload() }
+        // loaded model resident with no idle timer until the next successful run. An abandoned
+        // run no longer owns the slot, and its timers would outlive whatever took it over.
+        defer { if activeRun == runID { scheduleIdleUnload() } }
         let activeTranscriber = try await ensureTranscriber(for: engineID)
         try await activeTranscriber.load(model: modelName)
         try Task.checkCancellation()
@@ -128,7 +135,7 @@ public actor TranscriptionSession {
                     )
                 )
             } onCancel: {
-                Task { await self.cancelInFlight() }
+                Task { await self.abandonIfCancelledRunStalls(runID) }
             }
         } catch {
             // Every engine hits this differently (a raw AVAudioFile throw, a wrapped CoreAudio
@@ -206,8 +213,8 @@ public actor TranscriptionSession {
         )
     }
 
-    private func acquireTranscribeSlot() async throws {
-        while transcribeRunning {
+    private func acquireTranscribeSlot() async throws -> Int {
+        while activeRun != nil {
             try Task.checkCancellation()
             // On cancel, wake every waiter: the cancelled one re-loops into the check above
             // and throws; the rest re-queue.
@@ -217,18 +224,38 @@ public actor TranscriptionSession {
                 Task { await self.wakeTranscribeWaiters() }
             }
         }
-        transcribeRunning = true
+        return claimTranscribeSlot()
     }
 
-    private func tryAcquireTranscribeSlot() -> Bool {
-        guard !transcribeRunning, transcribeWaiters.isEmpty else { return false }
-        transcribeRunning = true
-        return true
+    private func tryAcquireTranscribeSlot() -> Int? {
+        guard activeRun == nil, transcribeWaiters.isEmpty else { return nil }
+        return claimTranscribeSlot()
     }
 
-    private func releaseTranscribeSlot() {
-        transcribeRunning = false
+    private func claimTranscribeSlot() -> Int {
+        lastRunID &+= 1
+        activeRun = lastRunID
+        return lastRunID
+    }
+
+    private func releaseTranscribeSlot(_ runID: Int) {
+        guard activeRun == runID else { return }
+        activeRun = nil
         wakeTranscribeWaiters()
+    }
+
+    /// A cancelled run still inside the engine after the grace loses its slot and its transcriber.
+    /// The engine may be parked in a read no cancel reaches, and every later run would otherwise
+    /// queue behind it until the app is relaunched.
+    private func abandonIfCancelledRunStalls(_ runID: Int) async {
+        await cancelInFlight()
+        try? await Task.sleep(for: abandonGrace)
+        guard activeRun == runID else { return }
+        activeRun = nil
+        wakeTranscribeWaiters()
+        transcriber = nil
+        transcriberEngineID = nil
+        ParolaLog.notice(.models, "abandoned a cancelled run that never unwound")
     }
 
     private func wakeTranscribeWaiters() {
@@ -244,8 +271,8 @@ public actor TranscriptionSession {
         await ensureBootstrap()
         // Holds the transcribe slot: an overlapping prewarm would re-arm the idle timers
         // mid-run and swap the active transcriber out from under the run.
-        guard modelStore.isInstalled(modelName), tryAcquireTranscribeSlot() else { return }
-        defer { releaseTranscribeSlot() }
+        guard modelStore.isInstalled(modelName), let runID = tryAcquireTranscribeSlot() else { return }
+        defer { releaseTranscribeSlot(runID) }
         let engineID = ModelCatalog.variant(id: modelName)?.engineID ?? .whisperKit
         do {
             cancelIdleTimer()

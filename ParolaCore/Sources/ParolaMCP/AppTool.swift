@@ -224,7 +224,7 @@ public enum AppTools {
         AppTool(
             name: "parola_app_cancel",
             bridgeCmd: "cancel",
-            description: "Cancel any in-flight transcription, YouTube download, batch run, streaming mic session, or recording. Restores phase to idle. Returns {cancelled: true} if there was work to cancel.",
+            description: "Cancel any in-flight transcription, YouTube download, batch run, streaming mic session, or recording. Restores phase to idle. Returns {cancelled: true} once the run has stopped, {cancelling: true} if it is still unwinding, and {cancelled: false} if there was nothing to cancel.",
             properties: [],
             required: []
         ),

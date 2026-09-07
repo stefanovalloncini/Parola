@@ -992,6 +992,7 @@ final class AppModel {
     @ObservationIgnored var streamingConsumer: Task<Void, Never>?
     @ObservationIgnored var fileTranscribeTask: Task<Void, Never>?
     @ObservationIgnored var fileReadDeadline: Duration = FileReadDeadline.header
+    @ObservationIgnored private var unsettledCancels = 0
     @ObservationIgnored var recordingOutcomeWaiters: [CheckedContinuation<String, any Error>] = []
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>?
@@ -1058,19 +1059,37 @@ final class AppModel {
         cancelAllInFlightBatchJobs()
         deferredArrivals = []
         deferredLinks = []
-        downloadTask?.cancel()
-        downloadTask = nil
-        fileTranscribeTask?.cancel()
-        fileTranscribeTask = nil
-        youtubeTranscribeTask?.cancel()
-        youtubeTranscribeTask = nil
-        youtubeSubsTask?.cancel()
-        youtubeSubsTask = nil
-        burnTask?.cancel()
-        burnTask = nil
+        cancelAndTrack(&downloadTask)
+        cancelAndTrack(&fileTranscribeTask)
+        cancelAndTrack(&youtubeTranscribeTask)
+        cancelAndTrack(&youtubeSubsTask)
+        cancelAndTrack(&burnTask)
         teardownActiveCapture()
         resolveRecordingOutcome(.failure(IntentActionError.cancelled))
         if hadWork || phase != .ready { phase = .idle }
+    }
+
+    private func cancelAndTrack(_ task: inout Task<Void, Never>?) {
+        guard let running = task else { return }
+        running.cancel()
+        task = nil
+        unsettledCancels += 1
+        Task { [weak self] in
+            await running.value
+            self?.unsettledCancels -= 1
+        }
+    }
+
+    /// True once every run `cancel()` asked to stop has actually unwound. A run parked in a
+    /// blocking read has not, and calling that cancelled is how the wedge went unnoticed.
+    var cancelSettled: Bool { unsettledCancels == 0 }
+
+    func awaitCancelSettled(within budget: Duration) async -> Bool {
+        let deadline = ContinuousClock.now + budget
+        while !cancelSettled, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(25))
+        }
+        return cancelSettled
     }
 
     func cancelAllTasks() {
@@ -1757,9 +1776,8 @@ final class AppModel {
     /// A probe that never came back means the file itself is out of reach, so the run reading the
     /// same bytes is not going to report anything of its own.
     private func failFileReadTimeout(_ fileURL: URL) {
-        guard let task = fileTranscribeTask else { return }
-        task.cancel()
-        fileTranscribeTask = nil
+        guard fileTranscribeTask != nil else { return }
+        cancelAndTrack(&fileTranscribeTask)
         applyTranscriptionError(
             ParolaError.fileReadTimedOut(name: fileURL.lastPathComponent), source: fileURL
         )
