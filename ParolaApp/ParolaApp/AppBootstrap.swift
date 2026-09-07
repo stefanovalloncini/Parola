@@ -13,6 +13,7 @@ struct AppBootstrap: @unchecked Sendable {
     let filePicker: FilePicker
     let clock: any Clock<Duration>  // `any Clock<Duration>` isn't Sendable-marked, but the clocks we hand out (ContinuousClock, TestClock, ImmediateClock) are all immutable, safe-to-share instances.
     let enabledFeaturesOverride: Set<ParolaFeature>?
+    let fileReadDeadline: Duration
 
     init(
         mode: Mode,
@@ -23,7 +24,8 @@ struct AppBootstrap: @unchecked Sendable {
         sideEffects: Set<BootstrapSideEffect>,
         filePicker: FilePicker,
         clock: any Clock<Duration> = ContinuousClock(),
-        enabledFeaturesOverride: Set<ParolaFeature>? = nil
+        enabledFeaturesOverride: Set<ParolaFeature>? = nil,
+        fileReadDeadline: Duration = FileReadDeadline.header
     ) {
         self.mode = mode
         self.library = library
@@ -34,6 +36,7 @@ struct AppBootstrap: @unchecked Sendable {
         self.filePicker = filePicker
         self.clock = clock
         self.enabledFeaturesOverride = enabledFeaturesOverride
+        self.fileReadDeadline = fileReadDeadline
     }
 
     static let normal: AppBootstrap = AppBootstrap(

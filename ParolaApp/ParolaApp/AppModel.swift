@@ -991,7 +991,7 @@ final class AppModel {
     @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
     @ObservationIgnored var streamingConsumer: Task<Void, Never>?
     @ObservationIgnored var fileTranscribeTask: Task<Void, Never>?
-    @ObservationIgnored var fileReadDeadline: Duration = FileReadDeadline.header
+    @ObservationIgnored let fileReadDeadline: Duration
     @ObservationIgnored private var cancelPass = 0
     @ObservationIgnored private var unsettledInPass = 0
     /// Bumped by every file run. An abandoned run's engine can keep emitting after the slot has
@@ -1224,6 +1224,7 @@ final class AppModel {
         self.filePicker = bootstrap.filePicker
         self.mode = bootstrap.mode
         self.clock = bootstrap.clock
+        self.fileReadDeadline = bootstrap.fileReadDeadline
         self.library = LibraryStore(libraryURL: bootstrap.library ?? LibraryStore.defaultLibraryURL)
         // Takes must outlive a failed transcription, a crash, and the OS temp purge.
         RecordingScratch.setDirectory(library.libraryURL.appendingPathComponent("inflight", isDirectory: true))

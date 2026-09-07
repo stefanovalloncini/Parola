@@ -9,14 +9,15 @@ extension TranscriberMockSuites {
     @Suite("File read deadline", .serialized)
     struct FileReadDeadlineTests {
 
-        private func makeModel() -> AppModel {
+        private func makeModel(fileReadDeadline: Duration = FileReadDeadline.header) -> AppModel {
             let bootstrap = AppBootstrap(
                 mode: .test,
                 library: makeTempLibraryURL("file-read-deadline"),
                 defaultsOverride: temporaryDefaults(),
                 sideEffects: [],
                 filePicker: TestFilePicker(),
-                clock: ContinuousClock()
+                clock: ContinuousClock(),
+                fileReadDeadline: fileReadDeadline
             )
             return AppModel(bootstrap: bootstrap)
         }
@@ -54,8 +55,7 @@ extension TranscriberMockSuites {
                 )
             )
 
-            let model = makeModel()
-            model.fileReadDeadline = .milliseconds(200)
+            let model = makeModel(fileReadDeadline: .milliseconds(200))
             model.transcribe(fileURL: wedged)
 
             let failed = await waitUntil(timeoutMs: 5_000) {
