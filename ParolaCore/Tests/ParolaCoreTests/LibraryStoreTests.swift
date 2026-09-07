@@ -12,7 +12,7 @@ struct LibraryStoreTests {
             .appendingPathComponent("parola-library-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         let store = LibraryStore(
-            libraryURL: tmp, extraIndexer: nil,
+            storeAt: tmp, extraIndexer: nil,
             seams: LibraryStore.TestSeams(didWriteBundle: didWriteBundle)
         )
         return (store, tmp)

@@ -69,8 +69,9 @@ public actor LibraryStore {
         self.init(libraryURL: libraryURL, extraIndexer: SpotlightIndexer())
     }
 
+    /// Delegates through `storeAt:`, a label this init cannot itself spell, so dropping `seams:` here is a compile error, not a self-delegating recursion.
     public init(libraryURL: URL, extraIndexer: LibraryIndexer?) {
-        self.init(libraryURL: libraryURL, extraIndexer: extraIndexer, seams: TestSeams())
+        self.init(storeAt: libraryURL, extraIndexer: extraIndexer, seams: TestSeams())
     }
 
     /// One struct, not two params, so this init's signature can never collide with the public ones by argument count; the hooks run off the actor after a decode and after `add` writes a bundle.
@@ -85,7 +86,7 @@ public actor LibraryStore {
     }
 
     init(
-        libraryURL: URL,
+        storeAt libraryURL: URL,
         extraIndexer: LibraryIndexer?,
         seams: TestSeams
     ) {
