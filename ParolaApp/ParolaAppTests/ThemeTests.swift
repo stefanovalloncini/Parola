@@ -168,6 +168,17 @@ struct ThemePaletteTests {
         #expect(graphiteDark.relativeLuminance < 0.55)
     }
 
+    /// Owner's call: keep white on light terracotta (matches the platform's own accent buttons; a darker preset would change filmed demos) — floors it at the WCAG UI-component bar so a future edit can't silently drop lower.
+    @Test("light terracotta keeps a white foreground, at or above the UI-component contrast floor")
+    func lightTerracottaKeepsWhiteForeground() throws {
+        guard case .dynamic(let terracottaLight, _) = ThemePreset.terracotta.accent else {
+            Issue.record("terracotta's accent is expected to be a dynamic color")
+            return
+        }
+        #expect(terracottaLight.relativeLuminance <= RGBA.darkForegroundLuminance)
+        #expect(terracottaLight.contrast(against: RGBA(1, 1, 1)) >= 3.0)
+    }
+
     @Test("a palette round-trips through Codable")
     func paletteCodableRoundTrip() throws {
         let palette = ThemePreset.terracotta.palette
