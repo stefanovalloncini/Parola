@@ -119,6 +119,24 @@ struct SelectedModelCorrectionTests {
         )
         #expect(corrected == "apple-speech-analyzer")
     }
+
+    @Test("a selection whose download is in flight survives a scan even though it isn't installed yet")
+    func downloadingSelectionSurvivesScan() {
+        let models = [info("openai_whisper-small", installed: false)]
+        let corrected = AppModel.correctedSelectedModel(
+            "openai_whisper-small", in: models, downloading: "openai_whisper-small", defaultModelID: "should-not-be-used"
+        )
+        #expect(corrected == nil)
+    }
+
+    @Test("a download in flight for a different model does not protect the current, uninstalled selection")
+    func downloadingUnrelatedModelDoesNotProtect() {
+        let models = [info("openai_whisper-small", installed: false)]
+        let corrected = AppModel.correctedSelectedModel(
+            "openai_whisper-small", in: models, downloading: "openai_whisper-base", defaultModelID: "apple-speech-analyzer"
+        )
+        #expect(corrected == "apple-speech-analyzer")
+    }
 }
 
 @Suite("Selectable model names")

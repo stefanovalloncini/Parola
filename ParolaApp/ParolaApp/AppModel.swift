@@ -1399,21 +1399,33 @@ final class AppModel {
         }
         availableModels = curated + extra
 
-        if let corrected = AppModel.correctedSelectedModel(selectedModel, in: availableModels) {
+        if let corrected = AppModel.correctedSelectedModel(
+            selectedModel, in: availableModels, downloading: downloadingModelName
+        ) {
             selectedModel = corrected
         }
         refreshModelSizes()
     }
 
-    /// nil when `current` is a model the scan found actually installed; otherwise the default to
-    /// fall back to. A stale selection (deleted model, fresh profile) can name a real catalog id
-    /// that simply isn't downloaded yet, so the check has to look at `isInstalled`, not just
-    /// whether the id is known.
+    /// The model `downloadModel` is actively fetching, or nil. A scan landing mid-download must not
+    /// treat "not installed yet" as a stale selection to correct away from.
+    private var downloadingModelName: String? {
+        if case .downloadingModel(let name, _) = phase { return name }
+        return nil
+    }
+
+    /// nil when `current` is a model the scan found actually installed, or one whose download is
+    /// still running; otherwise the default to fall back to. A stale selection (deleted model, fresh
+    /// profile) can name a real catalog id that simply isn't downloaded yet, so the check has to look
+    /// at `isInstalled`, not just whether the id is known — but a deliberate pick that's still
+    /// downloading must survive a scan landing in that same window.
     nonisolated static func correctedSelectedModel(
         _ current: String,
         in availableModels: [ModelInfo],
+        downloading: String? = nil,
         defaultModelID: @autoclosure () -> String = ModelCatalog.defaultModelID()
     ) -> String? {
+        if current == downloading { return nil }
         let installed = availableModels.filter(\.isInstalled)
         if installed.contains(where: { $0.name == current }) { return nil }
         return defaultModelID()
