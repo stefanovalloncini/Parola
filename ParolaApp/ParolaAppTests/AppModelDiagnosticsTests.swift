@@ -239,7 +239,9 @@ struct AppModelDiagnosticsTests {
             .appendingPathComponent("ParolaApp/Views/Settings/AboutPane.swift")
         let text = try String(contentsOf: source, encoding: .utf8)
         let group = try #require(text.range(of: "SettingsSection(\"Diagnostics\")"))
-        let diagnostics = text[group.lowerBound...]
+        let rest = text[group.upperBound...]
+        let end = rest.range(of: "SettingsSection(")?.lowerBound ?? text.endIndex
+        let diagnostics = text[group.lowerBound..<end]
         for (control, identifier) in [
             ("Button(\"Export…\")", "About.Button.ExportDiagnostics"),
             ("Button(\"Reveal in Finder\")", "About.Button.RevealDiagnostics"),
