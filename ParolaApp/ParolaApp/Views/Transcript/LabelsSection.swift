@@ -72,10 +72,11 @@ struct LabelsSection: View {
                     }
                 } label: {
                     Image(systemName: "tag")
-                        .font(DS.Font.subheadline)
                 }
-                .menuStyle(.borderlessButton)
-                .frame(width: 24, height: 22)
+                .menuStyle(.button)
+                .buttonStyle(DSIconChipButtonStyle(side: 22))
+                .menuIndicator(.hidden)
+                .fixedSize()
                 .accessibilityLabel("Add label")
                 .axLeaf("Labels.Menu.Suggestions")
             }

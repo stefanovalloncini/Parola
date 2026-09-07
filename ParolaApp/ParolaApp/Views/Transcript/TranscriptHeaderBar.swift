@@ -88,7 +88,8 @@ struct TranscriptHeaderBar: View {
                 .axLeaf("HeaderBar.Button.OpenChat")
 
                 PromptsMenu()
-                    .menuStyle(.borderlessButton)
+                    .menuStyle(.button)
+                    .buttonStyle(.borderless)
                     .fixedSize()
                     .disabled(model.isRunningPrompt)
             }

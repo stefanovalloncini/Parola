@@ -401,7 +401,7 @@ struct LibraryListView: View {
                     } label: {
                         Label("Export \(selection.count)", systemImage: "square.and.arrow.up")
                     }
-                    .menuStyle(.borderlessButton)
+                    .menuStyle(.button)
                     .controlSize(.small)
                     .fixedSize()
                     .axLeaf("Header.Menu.BulkExport")
