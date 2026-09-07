@@ -52,6 +52,16 @@ struct AppleSpeechTranscriberTests {
         #expect(store.isInstalled(AppleSpeechTranscriber.syntheticModelID))
     }
 
+    @Test("an unreported tail is measured from the last result, not from the last segment kept")
+    func unreportedTailMeasuresTheGap() {
+        let gap = try? #require(AppleSpeechTranscriber.unreportedTail(duration: 650.07, lastResultEnd: 607.02))
+        #expect(abs((gap ?? 0) - 43.05) < 0.001)
+        #expect(AppleSpeechTranscriber.unreportedTail(duration: 951.04, lastResultEnd: 951.0) == nil)
+        #expect(AppleSpeechTranscriber.unreportedTail(duration: 20, lastResultEnd: nil) == 20)
+        #expect(AppleSpeechTranscriber.unreportedTail(duration: 10, lastResultEnd: nil) == nil)
+        #expect(AppleSpeechTranscriber.unreportedTail(duration: 0, lastResultEnd: nil) == nil)
+    }
+
     @Test("cancelInFlight without a running transcribe is a no-op")
     func cancelInFlightIdle() async {
         guard #available(macOS 26.0, iOS 26.0, *) else { return }

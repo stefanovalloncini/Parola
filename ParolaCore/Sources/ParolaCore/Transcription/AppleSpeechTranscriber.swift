@@ -163,14 +163,15 @@ actor AppleSpeechTranscriber: Transcriber {
             return (segments, meter.value)
         }
 
-        let run: (segments: [TranscriptSegment], confidence: Double?)
+        let run: (analyzedThrough: Double?, segments: [TranscriptSegment], confidence: Double?)
         let startedAt = ContinuousClock.now
         do {
             run = try await withTaskCancellationHandler {
                 try Task.checkCancellation()
-                _ = try await analyzer.analyzeSequence(from: audioFile)
+                let lastAnalyzed = try await analyzer.analyzeSequence(from: audioFile)
                 try await analyzer.finalizeAndFinishThroughEndOfInput()
-                return try await collectorTask.value
+                let collected = try await collectorTask.value
+                return (lastAnalyzed?.seconds, collected.segments, collected.confidence)
             } onCancel: {
                 collectorTask.cancel()
                 Task { await cancellation.cancel() }
@@ -191,6 +192,11 @@ actor AppleSpeechTranscriber: Transcriber {
             throw ParolaError.transcriptionFailed("Apple Speech failed: \(error.localizedDescription)")
         }
 
+        Self.logUnreportedTail(
+            duration: durationSeconds,
+            analyzedThrough: run.analyzedThrough,
+            lastResultEnd: run.segments.last?.end
+        )
         let resolvedLanguage = locale.language.languageCode?.identifier
             ?? options.language
             ?? "en"
@@ -299,6 +305,33 @@ actor AppleSpeechTranscriber: Transcriber {
         }
     }
     #endif
+
+    /// Under a quarter-minute of trailing silence is ordinary; past that the transcript looks
+    /// truncated to a reader and it is worth knowing whether the analyzer read that far.
+    static let notableTailSeconds = 15.0
+
+    static func unreportedTail(duration: Double, lastResultEnd: Double?) -> Double? {
+        guard duration.isFinite, duration > 0 else { return nil }
+        let tail = duration - max(0, lastResultEnd ?? 0)
+        return tail >= notableTailSeconds ? tail : nil
+    }
+
+    /// Speech reads a file to the end and still returns nothing for a quiet tail, which is
+    /// indistinguishable downstream from a run that stopped short. The two numbers separate them.
+    private static func logUnreportedTail(
+        duration: Double, analyzedThrough: Double?, lastResultEnd: Double?
+    ) {
+        guard let tail = unreportedTail(duration: duration, lastResultEnd: lastResultEnd) else { return }
+        ParolaLog.notice(
+            .engineAppleSpeech, "analyzer returned nothing for the tail",
+            [
+                .audioSeconds: .seconds(duration),
+                .analyzed: .seconds(analyzedThrough ?? 0),
+                .offset: .seconds(lastResultEnd ?? 0),
+                .count: .int(Int(tail.rounded())),
+            ]
+        )
+    }
 
     static let regionDefaults: [String: String] = [
         "en": "US", "it": "IT", "fr": "FR", "de": "DE", "es": "ES",

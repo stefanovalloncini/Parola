@@ -71,6 +71,7 @@ enum LogDecimal {
 }
 
 public enum LogField: String, Sendable, CaseIterable, Comparable {
+    case analyzed
     case attempt
     case audioSeconds
     case bytes
