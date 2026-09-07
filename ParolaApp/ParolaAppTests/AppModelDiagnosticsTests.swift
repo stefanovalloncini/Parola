@@ -229,6 +229,8 @@ struct AppModelDiagnosticsTests {
         #expect(known[.parakeet] == true)
     }
 
+    /// SwiftUI builds no accessibility elements for a hosted view until an assistive client
+    /// attaches, so the ids are pinned in the source; the live harness checks them on the real app.
     @Test("the About pane tags the diagnostics group for the bridge")
     func aboutPaneExposesAccessibilityIdentifiers() throws {
         let source = URL(fileURLWithPath: #filePath)
@@ -236,13 +238,18 @@ struct AppModelDiagnosticsTests {
             .deletingLastPathComponent()
             .appendingPathComponent("ParolaApp/Views/Settings/AboutPane.swift")
         let text = try String(contentsOf: source, encoding: .utf8)
-        for identifier in [
-            "About.Button.ExportDiagnostics",
-            "About.Button.RevealDiagnostics",
-            "About.Button.DeleteDiagnostics",
-            "About.Text.DiagnosticsRetention",
+        let group = try #require(text.range(of: "SettingsSection(\"Diagnostics\")"))
+        let diagnostics = text[group.lowerBound...]
+        for (control, identifier) in [
+            ("Button(\"Export…\")", "About.Button.ExportDiagnostics"),
+            ("Button(\"Reveal in Finder\")", "About.Button.RevealDiagnostics"),
+            ("Button(\"Delete Diagnostics\"", "About.Button.DeleteDiagnostics"),
+            ("Text(\"Kept for", "About.Text.DiagnosticsRetention"),
         ] {
-            #expect(text.contains("axLeaf(\"\(identifier)\")"), "AboutPane.swift lost \(identifier)")
+            let tag = ".axLeaf(\"\(identifier)\")"
+            let start = try #require(diagnostics.range(of: control), "AboutPane lost \(control)")
+            let tagged = try #require(diagnostics.range(of: tag), "AboutPane lost \(identifier)")
+            #expect(tagged.lowerBound > start.lowerBound, "\(identifier) no longer tags \(control)")
         }
     }
 }
