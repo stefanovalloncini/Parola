@@ -286,7 +286,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
     }
 
     @discardableResult
-    func sweep(now: Date, beforeUnlink: () -> Void = {}) -> SweepOutcome {
+    func sweep(now: Date, beforeOpenFileCheck: () -> Void = {}) -> SweepOutcome {
         let manager = FileManager.default
         guard let entries = try? manager.contentsOfDirectory(
             at: directory,
@@ -311,7 +311,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
             // An idle process's mtime never advances, so the cutoff reaches a file it still holds.
             let heldLive = !name.hasPrefix(baseName) && Self.isOwnedByLiveProcess(name)
             if date < cutoff && !heldLive {
-                beforeUnlink()
+                beforeOpenFileCheck()
                 // Only the open file is exempt, and it is read here: a rotation mid-sweep moves it.
                 guard name != currentFileName else {
                     surviving.append((url, date, size))
@@ -342,7 +342,7 @@ public final class FileDiagnosticsSink: DiagnosticsSink, @unchecked Sendable {
                 index += 1
                 continue
             }
-            beforeUnlink()
+            beforeOpenFileCheck()
             if name == currentFileName {
                 index += 1
                 continue

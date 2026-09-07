@@ -120,6 +120,8 @@ struct DiagnosticsReading: Sendable {
     var skippedLines: Int = 0
     var skippedFiles: Int = 0
     var truncated: Bool = false
+    /// The cap this reading was produced with, so the report quotes the budget it was actually cut to.
+    var maxBytes: Int = DiagnosticsExport.maxReadBytes
 }
 
 public enum DiagnosticsExport {
@@ -153,6 +155,7 @@ public enum DiagnosticsExport {
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
         let budget = readBudget(for: files, maxBytes: maxBytes)
         reading.truncated = budget.truncated
+        reading.maxBytes = maxBytes
         for file in files {
             guard let limit = budget.limits[file] else { continue }
             guard let tail = readTail(of: file, limit: limit) else {
@@ -183,7 +186,8 @@ public enum DiagnosticsExport {
     ) -> (limits: [URL: Int], truncated: Bool) {
         let described = files.map { url -> (url: URL, date: Date, size: Int) in
             let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
-            return (url, values?.contentModificationDate ?? .distantPast, values?.fileSize ?? 0)
+            // A size the volume won't report charges the whole budget: counting it as 0 let `readTail` read past the cap.
+            return (url, values?.contentModificationDate ?? .distantPast, values?.fileSize ?? maxBytes)
         }
         guard described.reduce(0, { $0 + $1.size }) > maxBytes else {
             return (Dictionary(uniqueKeysWithValues: files.map { ($0, Int.max) }), false)

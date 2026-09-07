@@ -344,11 +344,12 @@ struct DiagnosticsExportTests {
         let record = try line(ts: "2026-08-22T13:58:01.000Z", message: "kept")
         try write([record, record], to: directory, named: "parola-100-1755871000.jsonl")
 
-        let reading = DiagnosticsExport.read(directory: directory, maxBytes: record.utf8.count + 1)
+        let cap = record.utf8.count + 1
+        let reading = DiagnosticsExport.read(directory: directory, maxBytes: cap)
         let text = DiagnosticsExport.render(
             reading: reading, environment: emptyEnvironment, generatedAt: Date()
         )
-        #expect(text.contains("Oldest records dropped: the store is over the export's 10 MB cap."))
+        #expect(text.contains("Oldest records dropped: the store is over the export's \(cap) bytes cap."))
     }
 
     @Test("an absent directory renders a report with no records")
