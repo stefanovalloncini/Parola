@@ -208,11 +208,11 @@ actor WhisperKitTranscriber: Transcriber {
         return fields
     }
 
-    /// `segmentDiscoveryCallback` reports chunk-local start/end times, but `.vad` chunking adjusts
-    /// `seek` to the chunk's absolute sample offset (WhisperKit.swift's `batchedSegmentCallback`), so
-    /// offset + chunk-local end gives the segment's true position in the source file.
+    /// `seek` already carries the within-chunk window offset that `start`/`end` also carry (a chunk
+    /// spanning two windows would double-count it), so the batch's minimum `start` backs it out.
     static func absolutePosition(for segments: [TranscriptionSegment]) -> Double? {
-        segments.map { Double($0.seek) / Double(WhisperKit.sampleRate) + Double($0.end) }.max()
+        guard let windowOffset = segments.map({ Double($0.start) }).min() else { return nil }
+        return segments.map { Double($0.seek) / Double(WhisperKit.sampleRate) + Double($0.end) - windowOffset }.max()
     }
 
     private static let languageProbeWindows = 5
