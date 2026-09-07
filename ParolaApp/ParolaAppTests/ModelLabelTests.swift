@@ -158,6 +158,16 @@ struct SelectableModelNamesTests {
         #expect(!names.contains("junk-orphan-model"))
         #expect(names.contains("apple-speech-analyzer"))
     }
+
+    @Test("selectableModels (the ModelInfo-returning form TranscriptionDefaultsPane's picker uses) drops the same orphan")
+    func selectableModelsDropsOrphanToo() {
+        let models = AppModel.selectableModels([
+            info("openai_whisper-large-v3_turbo"),
+            info("apple-speech-analyzer"),
+            info("parakeet-tdt-0.6b-v2-coreml"),
+        ])
+        #expect(models.map(\.name) == ["openai_whisper-large-v3_turbo", "apple-speech-analyzer"])
+    }
 }
 
 @Suite("Model deletion")

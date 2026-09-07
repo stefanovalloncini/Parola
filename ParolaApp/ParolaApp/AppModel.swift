@@ -1423,8 +1423,12 @@ final class AppModel {
     /// engine's leftover, a stale download) so the Models settings pane can offer them for
     /// deletion. They aren't real choices, so anything that lists selectable models filters
     /// down to catalog ids first — the install validation an orphan can't pass by definition.
+    nonisolated static func selectableModels(_ models: [ModelInfo]) -> [ModelInfo] {
+        models.filter { ModelCatalog.variant(id: $0.name) != nil }
+    }
+
     nonisolated static func selectableModelNames(_ models: [ModelInfo]) -> [String] {
-        models.filter { ModelCatalog.variant(id: $0.name) != nil }.map(\.name)
+        selectableModels(models).map(\.name)
     }
 
     func refreshModelSizes() {

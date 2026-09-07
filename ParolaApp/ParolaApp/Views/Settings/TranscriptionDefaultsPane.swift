@@ -15,7 +15,7 @@ struct TranscriptionDefaultsPane: View {
                         get: { model.selectedModel },
                         set: { model.activateModel($0) }
                     )) {
-                        ForEach(model.availableModels, id: \.name) { info in
+                        ForEach(AppModel.selectableModels(model.availableModels), id: \.name) { info in
                             Text(info.label).tag(info.name)
                         }
                     }
