@@ -28,6 +28,7 @@ public actor LibrarySearchIndex {
         /// The earliest place in the transcript body where any of the query's terms occurs.
         public struct FirstHit: Sendable, Equatable {
             public let seconds: Double
+            /// A position in the blank-dropped segment list `LibraryStore.load` returns, not in the raw `transcript.json`.
             public let segmentIndex: Int
             public let textOffset: Int
 
@@ -159,7 +160,7 @@ public actor LibrarySearchIndex {
         case failed(any Error)
     }
 
-    private static let snapshotVersion = 7
+    private static let snapshotVersion = 8
     private static let excerptLength = 200
     private static let noOffset = -1
     private static let snapshotPrefix = Data(#"{"version":\#(snapshotVersion),"entries":["#.utf8)
@@ -495,7 +496,7 @@ public actor LibrarySearchIndex {
     private static func firstHit(atOffset offset: Int, in entry: IndexedEntry) -> Match.FirstHit? {
         guard !entry.boundaryOffsets.isEmpty,
               entry.boundaryCentiseconds.count == entry.boundaryOffsets.count else { return nil }
-        // Segments that join no text share the next one's offset, so the *last* boundary at or before the hit holds it.
+        // The offsets rise strictly, so the hit belongs to the last boundary at or before it.
         var low = 0
         var high = entry.boundaryOffsets.count
         while low < high {

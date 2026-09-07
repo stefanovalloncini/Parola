@@ -804,23 +804,23 @@ struct LibraryStoreTests {
             modelName: "tiny"
         )
         let boundaries = LibraryStore.segmentBoundaries(for: transcript)
+        let cleaned = transcript.segments.droppingBlankText()
         let text = transcript.text
-        #expect(boundaries.count == transcript.segments.count)
-        #expect(boundaries.map(\.seconds) == [0, 4.5, 9])
-        for (segment, boundary) in zip(transcript.segments, boundaries) {
+        #expect(boundaries.count == cleaned.count)
+        #expect(boundaries.map(\.seconds) == [0, 9])
+        for (segment, boundary) in zip(cleaned, boundaries) {
             let trimmed = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { continue }
             let start = text.index(text.startIndex, offsetBy: boundary.textOffset)
             #expect(text[start...].hasPrefix(trimmed))
         }
-        #expect(boundaries[1].textOffset == boundaries[2].textOffset)
     }
 
-    /// The silent segment shares its offset with the one that follows; a hit there belongs to the later one.
-    @Test("a hit on a shared boundary offset resolves to the segment that holds the text")
-    func sharedBoundaryOffsetResolvesToTheLaterSegment() async throws {
+    /// The silent segment never reaches the app, so the hit after it is index 1, not 2.
+    @Test("a hit past a silent segment resolves to its place in the cleaned transcript")
+    func hitPastASilentSegmentResolvesToTheCleanedIndex() async throws {
         let indexURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-boundary-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: indexURL) }
         let index = LibrarySearchIndex(indexURL: indexURL)
         let transcript = Transcript(
             segments: [
@@ -839,8 +839,39 @@ struct LibraryStoreTests {
             createdAt: Date()
         )
         let hit = try #require(await index.search("lancio").first?.firstHit)
-        #expect(hit.segmentIndex == 2)
+        #expect(hit.segmentIndex == 1)
         #expect(hit.seconds == 9)
+        await index.flush()
+    }
+
+    /// A legacy bundle carries the silent rows on disk; the rebuild must index the list `load` returns.
+    @Test("a rebuilt legacy bundle reports the index the loaded transcript holds")
+    func rebuiltBoundariesAddressTheLoadedTranscript() async throws {
+        let (store1, libraryURL) = try makeTempLibrary()
+        defer { try? FileManager.default.removeItem(at: libraryURL) }
+        let transcript = Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 1, text: "   "),
+                TranscriptSegment(id: 1, start: 2, end: 4, text: "Buongiorno a tutti"),
+                TranscriptSegment(id: 2, start: 5, end: 6, text: ""),
+                TranscriptSegment(id: 3, start: 9, end: 12, text: "parliamo del lancio")
+            ],
+            language: "it",
+            modelName: "tiny"
+        )
+        let entry = try await store1.add(transcript: transcript, audioSource: nil)
+        await store1.flush()
+
+        try FileManager.default.removeItem(at: libraryURL.appendingPathComponent(".search-index.json"))
+        let store2 = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
+        let hit = try #require(await store2.search("lancio").first(where: { $0.entryID == entry.id })?.firstHit)
+        let loaded = try await store2.load(entry.id).document.transcript.segments
+
+        #expect(loaded.count == 2)
+        #expect(loaded.indices.contains(hit.segmentIndex))
+        #expect(loaded[hit.segmentIndex].text == "parliamo del lancio")
+        #expect(hit.seconds == 9)
+        await store2.flush()
     }
 
     @Test("a search result carries the time of its first transcript hit, rebuild included")

@@ -424,22 +424,17 @@ public actor LibraryStore {
         }
     }
 
-    /// Where each segment lands in `Transcript.text`; a segment that trims to nothing takes the offset of the next one, so this stays indexed by segment.
+    /// Where each segment lands in `Transcript.text`, over the blank-dropped list `load` hands the app, so a hit's `segmentIndex` addresses the transcript the app actually holds.
     static func segmentBoundaries(for transcript: Transcript) -> [LibrarySearchIndex.SegmentBoundary] {
         var boundaries: [LibrarySearchIndex.SegmentBoundary] = []
         boundaries.reserveCapacity(transcript.segments.count)
         var offset = 0
-        var joinedAny = false
         for segment in transcript.segments {
             let trimmed = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else {
-                boundaries.append(.init(textOffset: offset + (joinedAny ? 1 : 0), seconds: segment.start))
-                continue
-            }
-            if joinedAny { offset += 1 }
+            guard !trimmed.isEmpty else { continue }
+            if !boundaries.isEmpty { offset += 1 }
             boundaries.append(.init(textOffset: offset, seconds: segment.start))
             offset += trimmed.count
-            joinedAny = true
         }
         return boundaries
     }

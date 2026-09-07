@@ -208,7 +208,7 @@ struct LibrarySearchIndexTests {
         )
         await index.flush()
         let raw = try #require(String(data: Data(contentsOf: url), encoding: .utf8))
-        #expect(raw.contains(#""version":7"#))
+        #expect(raw.contains(#""version":8"#))
         #expect(raw.contains(#""boundaryOffsets":[0,23]"#))
         #expect(raw.contains(#""boundaryCentiseconds":[0,1240]"#))
     }
