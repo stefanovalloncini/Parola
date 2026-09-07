@@ -163,7 +163,7 @@ struct ReloadSettingsTests {
         _ = try await reset.handler(reset.validate(AutomationArgs([:])), context)
         withExtendedLifetime(server) {}
 
-        #expect(model.selectedModel == "openai_whisper-tiny")
+        #expect(model.selectedModel == ModelCatalog.defaultModelID())
         #expect(model.selectedLanguage == nil)
         #expect(model.translate == false)
         #expect(model.wordTimestamps == false)

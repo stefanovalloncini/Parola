@@ -1407,7 +1407,7 @@ final class AppModel {
     /// fall back to. A stale selection (deleted model, fresh profile) can name a real catalog id
     /// that simply isn't downloaded yet, so the check has to look at `isInstalled`, not just
     /// whether the id is known.
-    static func correctedSelectedModel(
+    nonisolated static func correctedSelectedModel(
         _ current: String,
         in availableModels: [ModelInfo],
         defaultModelID: @autoclosure () -> String = ModelCatalog.defaultModelID()
