@@ -79,6 +79,9 @@ struct AboutPane: View {
             }
             .task {
                 hasDiagnostics = await model.diagnosticsRecordsExist()
+                for await _ in NotificationCenter.default.notifications(named: NSApplication.didBecomeActiveNotification) {
+                    hasDiagnostics = await model.diagnosticsRecordsExist()
+                }
             }
 
             Spacer()

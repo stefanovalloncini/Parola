@@ -46,10 +46,17 @@ extension AppModel {
             currentSegmentID = id
             pendingRevealSegmentID = id
         }
-        guard !transcript.findMatches(query, caseSensitive: findCaseSensitive).isEmpty else { return }
+        guard Self.transcriptHasMatch(query, caseSensitive: findCaseSensitive, in: transcript.segments) else { return }
         findIsOpen = true
         // The 150 ms recompute this starts re-snaps the selection to the first Find match.
         if findQuery == query { scheduleRecomputeMatches() } else { findQuery = query }
+    }
+
+    /// Stops at the first hit instead of collecting every one, so a Find-closed jump doesn't rescan the whole transcript twice.
+    static func transcriptHasMatch(_ query: String, caseSensitive: Bool, in segments: [TranscriptSegment]) -> Bool {
+        guard !query.isEmpty else { return false }
+        let options: String.CompareOptions = caseSensitive ? [] : [.caseInsensitive]
+        return segments.contains { $0.text.range(of: query, options: options) != nil }
     }
 
     /// The index quantizes a boundary to hundredths, so a segment can start a few milliseconds past the time the row shows.

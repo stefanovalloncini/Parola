@@ -357,4 +357,20 @@ struct FindAndReplaceTests {
         #expect(!model.findIsOpen)
         #expect(model.findQuery.isEmpty)
     }
+
+    /// `transcriptHasMatch` stops at the first hit instead of collecting every one like `findMatches`; the two must still agree on emptiness.
+    @Test("the match probe agrees with a full scan's emptiness")
+    func matchProbeAgreesWithFindMatches() {
+        let transcript = Self.makeTranscript()
+        for (query, caseSensitive) in [
+            ("Hello", false), ("hello", true), ("ornitorinco", false), ("world. Hello", false), ("WORLD", false),
+        ] {
+            let expected = !transcript.findMatches(query, caseSensitive: caseSensitive).isEmpty
+            #expect(
+                AppModel.transcriptHasMatch(query, caseSensitive: caseSensitive, in: transcript.segments) == expected,
+                "mismatch for \"\(query)\" caseSensitive=\(caseSensitive)"
+            )
+        }
+        #expect(AppModel.transcriptHasMatch("", caseSensitive: false, in: transcript.segments) == false)
+    }
 }

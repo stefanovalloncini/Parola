@@ -229,18 +229,39 @@ struct AppModelDiagnosticsTests {
         #expect(known[.parakeet] == true)
     }
 
-    /// A hosted view builds no accessibility elements until a client attaches, so the ids are pinned in source.
-    @Test("the About pane tags the diagnostics group for the bridge")
-    func aboutPaneExposesAccessibilityIdentifiers() throws {
+    private func aboutPaneSource() throws -> String {
         let source = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("ParolaApp/Views/Settings/AboutPane.swift")
-        let text = try String(contentsOf: source, encoding: .utf8)
+        return try String(contentsOf: source, encoding: .utf8)
+    }
+
+    /// Bounds the slice by the group's own braces, not the next `SettingsSection(` call — AboutPane has only one, so that search would never bound anything.
+    private func matchingBraceRange(from openBrace: String.Index, in text: String) -> Range<String.Index> {
+        var depth = 0
+        var cursor = openBrace
+        while cursor < text.endIndex {
+            switch text[cursor] {
+            case "{": depth += 1
+            case "}":
+                depth -= 1
+                if depth == 0 { return openBrace..<text.index(after: cursor) }
+            default: break
+            }
+            cursor = text.index(after: cursor)
+        }
+        return openBrace..<text.endIndex
+    }
+
+    /// A hosted view builds no accessibility elements until a client attaches, so the ids are pinned in source.
+    @Test("the About pane tags the diagnostics group for the bridge")
+    func aboutPaneExposesAccessibilityIdentifiers() throws {
+        let text = try aboutPaneSource()
         let group = try #require(text.range(of: "SettingsSection(\"Diagnostics\")"))
-        let rest = text[group.upperBound...]
-        let end = rest.range(of: "SettingsSection(")?.lowerBound ?? text.endIndex
-        let diagnostics = text[group.lowerBound..<end]
+        let openBrace = try #require(text.range(of: "{", range: group.upperBound..<text.endIndex)).lowerBound
+        let body = matchingBraceRange(from: openBrace, in: text)
+        let diagnostics = text[group.lowerBound..<body.upperBound]
         for (control, identifier) in [
             ("Button(\"Export…\")", "About.Button.ExportDiagnostics"),
             ("Button(\"Reveal in Finder\")", "About.Button.RevealDiagnostics"),
@@ -252,5 +273,20 @@ struct AppModelDiagnosticsTests {
             let tagged = try #require(diagnostics.range(of: tag), "AboutPane lost \(identifier)")
             #expect(tagged.lowerBound > start.lowerBound, "\(identifier) no longer tags \(control)")
         }
+    }
+
+    /// A record written while the pane is open must not leave "Delete Diagnostics" stale until it remounts — pin the refresh, not just the initial read.
+    @Test("the About pane's diagnostics check re-runs on app activation, not only on appear")
+    func aboutPaneRefreshesDiagnosticsOnActivation() throws {
+        let text = try aboutPaneSource()
+        let task = try #require(text.range(of: ".task {"))
+        let openBrace = try #require(text.range(of: "{", range: task.lowerBound..<text.endIndex)).lowerBound
+        let body = matchingBraceRange(from: openBrace, in: text)
+        let taskBody = text[body]
+        #expect(taskBody.contains("diagnosticsRecordsExist()"))
+        #expect(
+            taskBody.contains("NSApplication.didBecomeActiveNotification"),
+            "the diagnostics check should re-run when the app becomes active, not just once on appear"
+        )
     }
 }
