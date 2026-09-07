@@ -80,8 +80,8 @@ public actor LibraryStore {
     init(
         libraryURL: URL,
         extraIndexer: LibraryIndexer?,
-        didDecodeDocument: (@Sendable () -> Void)? = nil,
-        didWriteBundle: (@Sendable () -> Void)? = nil
+        didDecodeDocument: (@Sendable () -> Void)?,
+        didWriteBundle: (@Sendable () -> Void)?
     ) {
         self.libraryURL = libraryURL
         self.extraIndexer = extraIndexer

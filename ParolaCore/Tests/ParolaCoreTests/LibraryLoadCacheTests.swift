@@ -12,7 +12,8 @@ struct LibraryLoadCacheTests {
             .appendingPathComponent("parola-load-cache-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         let store = LibraryStore(
-            libraryURL: tmp, extraIndexer: nil, didDecodeDocument: didDecodeDocument
+            libraryURL: tmp, extraIndexer: nil,
+            didDecodeDocument: didDecodeDocument, didWriteBundle: nil
         )
         return (store, tmp)
     }

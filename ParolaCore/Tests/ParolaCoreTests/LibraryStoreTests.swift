@@ -11,7 +11,10 @@ struct LibraryStoreTests {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-library-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        let store = LibraryStore(libraryURL: tmp, extraIndexer: nil, didWriteBundle: didWriteBundle)
+        let store = LibraryStore(
+            libraryURL: tmp, extraIndexer: nil,
+            didDecodeDocument: nil, didWriteBundle: didWriteBundle
+        )
         return (store, tmp)
     }
 
