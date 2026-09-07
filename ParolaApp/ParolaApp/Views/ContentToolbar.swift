@@ -12,7 +12,7 @@ struct ContentToolbar: ToolbarContent {
                     ModelPickerView()
                     LanguagePickerView()
                         .disabled(selectedModelIsEnglishOnly)
-                        .modifier(EnglishOnlyHelpModifier(isEnglishOnly: selectedModelIsEnglishOnly))
+                        .modifier(LanguageNoticeHelpModifier(notice: languageControlNotice))
                 }
                 // Without this the pills' own capsules run flush into the toolbar's rounded ends.
                 .padding(.horizontal, 5)
@@ -64,6 +64,12 @@ struct ContentToolbar: ToolbarContent {
     private var optionsPopover: some View {
         @Bindable var model = model
         return VStack(alignment: .leading, spacing: DS.Spacing.regular) {
+            if let notice = model.englishOnlyAutoNotice {
+                Label(notice, systemImage: "exclamationmark.triangle.fill")
+                    .font(DS.Font.callout)
+                    .foregroundStyle(DS.Color.warningText)
+                    .axLeaf("Toolbar.Label.EnglishOnlyAutoNotice")
+            }
             if selectedModelSupportsTranslate {
                 Toggle(isOn: $model.translate) {
                     Text("Translate")
@@ -145,6 +151,12 @@ struct ContentToolbar: ToolbarContent {
         model.selectedModelCapabilities.supportsTranslate
     }
 
+    /// Why the disabled language pill reads what it reads: the auto-English notice takes priority
+    /// since it explains what the run will actually do, then the explicit-language mismatch warning.
+    private var languageControlNotice: String? {
+        model.englishOnlyAutoNotice ?? model.languageMismatchWarning
+    }
+
     private var isBusy: Bool {
         switch model.phase {
         case .idle, .ready, .failed: return false
@@ -158,9 +170,9 @@ struct ContentToolbar: ToolbarContent {
     }
 }
 
-private struct EnglishOnlyHelpModifier: ViewModifier {
-    let isEnglishOnly: Bool
+private struct LanguageNoticeHelpModifier: ViewModifier {
+    let notice: String?
     func body(content: Content) -> some View {
-        content.help(isEnglishOnly ? "This model is English-only. Pick a multilingual model (like Whisper) to transcribe other languages." : "")
+        content.help(notice ?? "")
     }
 }
