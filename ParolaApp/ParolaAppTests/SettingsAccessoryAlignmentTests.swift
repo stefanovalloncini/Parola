@@ -3,6 +3,7 @@ import Foundation
 import SwiftUI
 import Testing
 @testable import Parola
+import ParolaTestSupport
 
 @MainActor
 @Suite("Settings accessory alignment", .serialized)

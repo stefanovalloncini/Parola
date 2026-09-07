@@ -3,6 +3,7 @@ import Testing
 import AVFoundation
 @testable import Parola
 import ParolaCore
+import ParolaTestSupport
 
 @MainActor
 @Suite("AppModel player")

@@ -3,6 +3,7 @@ import Foundation
 import Testing
 @testable import Parola
 import ParolaCore
+import ParolaTestSupport
 
 private func makeSilentWAV(seconds: Double, label: String) throws -> URL {
     let sampleRate = 16_000, channels = 1, bytesPerSample = 2

@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import ParolaCore
 @testable import Parola
+import ParolaTestSupport
 
 // @unchecked: only written from the observation callback, which the model raises on the main actor.
 private final class InvalidationFlag: @unchecked Sendable {

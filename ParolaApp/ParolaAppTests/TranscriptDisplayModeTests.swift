@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import Parola
+import ParolaTestSupport
 
 @MainActor
 @Suite("Transcript display mode source of truth")

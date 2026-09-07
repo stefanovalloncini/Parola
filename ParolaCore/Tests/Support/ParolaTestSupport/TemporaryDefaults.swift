@@ -2,22 +2,22 @@ import Foundation
 import os
 
 /// A suite name no other test uses. Its plist is removed once the test process exits.
-func temporarySuiteName(_ prefix: String = "parola-test-") -> String {
+public func temporarySuiteName(_ prefix: String = "parola-test-") -> String {
     let name = prefix + UUID().uuidString
     TemporarySuites.register(name)
     return name
 }
 
 /// A throwaway `UserDefaults` suite, discarded once the test process exits. See `temporarySuiteName`.
-func temporaryDefaults(_ prefix: String = "parola-test-") -> UserDefaults {
+public func temporaryDefaults(_ prefix: String = "parola-test-") -> UserDefaults {
     UserDefaults(suiteName: temporarySuiteName(prefix))!
 }
 
-enum TemporarySuites {
+public enum TemporarySuites {
     private static let registered = OSAllocatedUnfairLock<[String]>(initialState: [])
     private static let sweepAtExit: Void = { _ = atexit { TemporarySuites.discardAll() } }()
 
-    static func register(_ name: String) {
+    public static func register(_ name: String) {
         _ = sweepAtExit
         registered.withLock { $0.append(name) }
     }
@@ -27,7 +27,7 @@ enum TemporarySuites {
     /// from here reappears. On success the list file is deleted; a list file left in `listDirectory`
     /// means the sweeper gave up with files still on disk.
     @discardableResult
-    static func sweep(
+    public static func sweep(
         plists paths: [String],
         listDirectory: URL = FileManager.default.temporaryDirectory,
         interval: Double = 2,

@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import ParolaCore
 @testable import Parola
+import ParolaTestSupport
 
 @MainActor
 @Suite("AppModel AI failures", .serialized)

@@ -9,7 +9,7 @@ struct TemporaryDefaultsScanTests {
     func suitesGoThroughTheHelper() throws {
         let here = URL(fileURLWithPath: #filePath)
         let tests = here.deletingLastPathComponent()
-        let skipped: Set<String> = ["TemporaryDefaults.swift", here.lastPathComponent]
+        let skipped: Set<String> = [here.lastPathComponent]
         let walker = try #require(FileManager.default.enumerator(at: tests, includingPropertiesForKeys: nil))
 
         var scanned = 0

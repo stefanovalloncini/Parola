@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import Parola
+import ParolaTestSupport
 
 @Suite("Settings pane scope")
 struct SettingsPaneScopeTests {

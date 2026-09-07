@@ -4,6 +4,7 @@ import Testing
 @testable import Parola
 import ParolaCore
 import ParolaDictation
+import ParolaTestSupport
 
 @MainActor
 @Suite("AppModel dictation")

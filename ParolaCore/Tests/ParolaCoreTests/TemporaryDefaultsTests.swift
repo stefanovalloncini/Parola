@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ParolaTestSupport
 
 @Suite("Temporary defaults sweeper")
 struct TemporaryDefaultsTests {

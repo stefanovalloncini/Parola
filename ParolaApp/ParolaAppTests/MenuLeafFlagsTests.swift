@@ -2,6 +2,7 @@ import Foundation
 import ParolaCore
 import Testing
 @testable import Parola
+import ParolaTestSupport
 
 @MainActor
 @Suite("Menu leaf flags track the state they mirror")

@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import ParolaCore
 @testable import Parola
+import ParolaTestSupport
 
 private struct ImmediateClock: Clock {
     typealias Instant = ContinuousClock.Instant

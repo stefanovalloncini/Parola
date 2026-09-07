@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Parola
 import ParolaCore
+import ParolaTestSupport
 
 /// A clock whose `sleep` returns at once, so the recording watch ticks without the real 30s wait.
 private struct ImmediateClock: Clock {

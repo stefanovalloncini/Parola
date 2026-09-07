@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "ParolaCore", targets: ["ParolaCore"]),
         .library(name: "ParolaDictation", targets: ["ParolaDictation"]),
         .library(name: "ScenarioKit", targets: ["ScenarioKit"]),
+        .library(name: "ParolaTestSupport", targets: ["ParolaTestSupport"]),
         .executable(name: "parola", targets: ["parola"]),
         .executable(name: "parola-mcp", targets: ["parola-mcp"]),
     ],

@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import ParolaCore
+import ParolaTestSupport
 
 @Suite("Transcription session logging", .serialized)
 struct SessionLoggingTests {

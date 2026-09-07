@@ -3,6 +3,7 @@ import Foundation
 import Testing
 @testable import Parola
 import ParolaCore
+import ParolaTestSupport
 
 @MainActor
 @Suite("Permission and bridge logging", .serialized)

@@ -2,6 +2,7 @@ import Foundation
 import FluidAudio
 import Testing
 @testable import ParolaCore
+import ParolaTestSupport
 
 private final class NameProbe: @unchecked Sendable {
     private let lock = NSLock()

@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Parola
 import ParolaCore
+import ParolaTestSupport
 
 @Suite("Unsupported URL message")
 struct YouTubeURLMessageTests {

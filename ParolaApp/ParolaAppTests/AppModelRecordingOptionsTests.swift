@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Parola
 import ParolaCore
+import ParolaTestSupport
 
 /// A clock whose `sleep` returns at once, so a scheduled recording auto-stop fires without
 /// the real minute-long wait. Only safe on capture paths that have no unbounded `while … sleep`

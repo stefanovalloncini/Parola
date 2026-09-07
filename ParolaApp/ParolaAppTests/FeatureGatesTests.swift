@@ -3,6 +3,7 @@ import Foundation
 import Testing
 @testable import Parola
 import ParolaCore
+import ParolaTestSupport
 
 @Suite("Feature gates in the app")
 @MainActor

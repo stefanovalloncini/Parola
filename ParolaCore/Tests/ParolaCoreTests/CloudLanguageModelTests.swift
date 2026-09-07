@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import ParolaCore
+import ParolaTestSupport
 
 @Suite("BYOK cloud language model", .tags(.networking))
 struct CloudLanguageModelTests {

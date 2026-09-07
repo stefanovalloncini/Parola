@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Parola
 import ParolaCore
+import ParolaTestSupport
 
 /// A throwaway library directory under the temp dir so tests never touch the real on-disk library.
 func makeTempLibraryURL(_ label: String = "appmodel") -> URL {

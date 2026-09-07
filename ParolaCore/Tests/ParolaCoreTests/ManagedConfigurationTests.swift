@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import ParolaCore
+import ParolaTestSupport
 
 @Suite("Managed configuration (MDM)")
 struct ManagedConfigurationTests {

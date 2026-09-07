@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import Clocks
 @testable import ParolaCore
+import ParolaTestSupport
 
 @Suite("Model store policy and download coordination")
 struct ModelStorePolicyTests {

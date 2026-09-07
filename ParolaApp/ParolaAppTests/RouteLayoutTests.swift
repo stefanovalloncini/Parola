@@ -4,6 +4,7 @@ import SwiftUI
 import Testing
 import ParolaCore
 @testable import Parola
+import ParolaTestSupport
 
 @MainActor
 @Suite("Route layout", .serialized)
