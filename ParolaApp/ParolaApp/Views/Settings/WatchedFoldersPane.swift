@@ -79,7 +79,7 @@ private struct WatchedFolderRow: View {
                 if stale {
                     Label("Stale", systemImage: "exclamationmark.triangle.fill")
                         .font(DS.Font.caption)
-                        .foregroundStyle(DS.Palette.warning)
+                        .foregroundStyle(DS.Color.warningText)
                     Button("Re-add") {
                         store.reattach(folder.id)
                     }

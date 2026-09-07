@@ -23,7 +23,7 @@ struct LiveCaptionsPane: View {
                 if let warning = model.translateMismatchWarning {
                     Label(warning, systemImage: "exclamationmark.triangle.fill")
                         .font(DS.Font.callout)
-                        .foregroundStyle(DS.Palette.warning)
+                        .foregroundStyle(DS.Color.warningText)
                         .padding(.top, 2)
                         .axLeaf("LiveCaptions.Label.TranslateWarning")
                 }

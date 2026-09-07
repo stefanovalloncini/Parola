@@ -51,14 +51,14 @@ struct TranscriptionDefaultsPane: View {
             if let warning = model.languageMismatchWarning {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
                     .font(DS.Font.callout)
-                    .foregroundStyle(DS.Palette.warning)
+                    .foregroundStyle(DS.Color.warningText)
                     .padding(.top, 2)
                     .axLeaf("TranscriptionDefaults.Label.LanguageWarning")
             }
             if let warning = model.diarizeMismatchWarning {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
                     .font(DS.Font.callout)
-                    .foregroundStyle(DS.Palette.warning)
+                    .foregroundStyle(DS.Color.warningText)
                     .padding(.top, 2)
                     .axLeaf("TranscriptionDefaults.Label.DiarizeWarning")
             }
