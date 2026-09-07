@@ -682,11 +682,18 @@ struct LibraryRow: View {
         }
     }
 
+    /// On a selected row the accent fill is the backdrop, so the chip wears a veil of the
+    /// foreground colour instead of the surface it would disappear into.
     private func chip(_ label: Text) -> some View {
         label
             .font(DS.Font.caption)
             .foregroundStyle(secondaryStyle)
             .lineLimit(1)
-            .chipChrome(isSelected: false, size: .regular)
+            .chipChrome(
+                isSelected: isSelected,
+                size: .regular,
+                selectedFill: DS.Color.onAccent.opacity(0.18),
+                border: isSelected ? DS.Color.onAccent.opacity(0.35) : nil
+            )
     }
 }
