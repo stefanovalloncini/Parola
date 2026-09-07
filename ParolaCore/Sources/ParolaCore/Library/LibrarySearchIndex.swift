@@ -25,7 +25,9 @@ public actor LibrarySearchIndex {
     }
 
     public struct Match: Sendable, Equatable {
-        /// The earliest place in the transcript body where any of the query's terms occurs.
+        /// The earliest place in the transcript body where any of the query's terms occurs. It
+        /// searches the whole body while `snippet` only covers the first 200 characters, so a hit
+        /// past that renders a correct time beside a snippet with no highlight.
         public struct FirstHit: Sendable, Equatable {
             public let seconds: Double
             /// A position in the blank-dropped segment list `LibraryStore.load` returns, not in the raw `transcript.json`.

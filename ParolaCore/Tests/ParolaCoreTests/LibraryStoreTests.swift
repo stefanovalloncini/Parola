@@ -699,6 +699,7 @@ struct LibraryStoreTests {
     @Test("an unreadable bundle keeps its manifest notes searchable")
     func unreadableBundleKeepsItsNotesSearchable() async throws {
         let (store, dir) = try makeTempLibrary()
+        defer { try? FileManager.default.removeItem(at: dir) }
         let broken = try await store.add(
             transcript: makeTranscript(), audioSource: nil, title: "brokenmarker"
         )

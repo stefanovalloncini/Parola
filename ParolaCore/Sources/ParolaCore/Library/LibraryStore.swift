@@ -212,7 +212,7 @@ public actor LibraryStore {
         if rebuilt.unreadable > 0 {
             ParolaLog.notice(
                 .libraryIndex,
-                "bundles indexed on their title alone",
+                "bundles indexed on their title and notes alone",
                 [.count: .int(rebuilt.unreadable)]
             )
         }
@@ -358,9 +358,16 @@ public actor LibraryStore {
             cancelled = true
         }
         invalidateListCaches()
+        if cancelled {
+            // Best effort from here: the caller matches on CancellationError, so a manifest read
+            // that fails must not surface as a different error.
+            if let entry = try? makeEntry(bundleURL: target) {
+                await indexEntry(entry, transcript: transcript)
+            }
+            throw CancellationError()
+        }
         let entry = try makeEntry(bundleURL: target)
         await indexEntry(entry, transcript: transcript)
-        if cancelled { throw CancellationError() }
         return entry
     }
 
@@ -379,6 +386,10 @@ public actor LibraryStore {
                 try FileManager.default.copyItem(at: url, to: staging)
                 try FileManager.default.moveItem(at: staging, to: target)
             }
+        } catch is CancellationError {
+            try? fm.removeItem(at: staging)
+            try? fm.removeItem(at: target)
+            throw CancellationError()
         } catch {
             ParolaLog.error(.library, "adopting a bundle failed and was rolled back", [.error: .error(error)])
             try? fm.removeItem(at: staging)

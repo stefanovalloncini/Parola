@@ -96,7 +96,7 @@ struct LibraryLoggingTests {
         }
 
         let matching = sink.records.filter {
-            $0.category == .libraryIndex && $0.message.rendered == "bundles indexed on their title alone"
+            $0.category == .libraryIndex && $0.message.rendered == "bundles indexed on their title and notes alone"
         }
         let record = try #require(matching.first)
         #expect(record.level == .notice)
