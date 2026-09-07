@@ -169,6 +169,7 @@ struct StreamingLoggingTests {
             }
             guard capture.installed else {
                 runTask.cancel()
+                _ = await runTask.value
                 Issue.record("capture never installed")
                 return
             }
