@@ -163,10 +163,12 @@ struct StreamingLoggingTests {
         try await withSink { sink in
             let (loop, capture) = makeLoop(transcribeFailure: StreamingLogFailure())
             let runTask = Task { await loop.run() }
-            for _ in 0..<500 where !capture.installed {
+            let deadline = ContinuousClock.now + .seconds(5)
+            while !capture.installed, ContinuousClock.now < deadline {
                 try await Task.sleep(for: .milliseconds(2))
             }
             guard capture.installed else {
+                runTask.cancel()
                 Issue.record("capture never installed")
                 return
             }
