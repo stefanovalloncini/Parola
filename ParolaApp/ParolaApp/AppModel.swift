@@ -621,7 +621,7 @@ final class AppModel {
         self.batchExportIncludeTimestamps = defaults.bool(forKey: "batchExportIncludeTimestamps")
         self.batchExportFormatOptionsJSON = defaults.string(forKey: "batchExportFormatOptions") ?? "{}"
         self.inputDeviceUID = defaults.string(forKey: "inputDeviceUID") ?? ""
-        self.selectedModel = defaults.string(forKey: "selectedModel") ?? ModelCatalog.fallbackModelID
+        self.selectedModel = defaults.string(forKey: "selectedModel") ?? ModelCatalog.defaultModelID()
         self.selectedLanguageRaw = defaults.string(forKey: "selectedLanguageRaw") ?? ""
         self.translate = defaults.bool(forKey: "translate")
         self.appTheme = defaults.string(forKey: "appTheme") ?? "system"
@@ -1397,10 +1397,24 @@ final class AppModel {
         }
         availableModels = curated + extra
 
-        if !availableModels.contains(where: { $0.name == selectedModel }) {
-            selectedModel = availableModels.first?.name ?? ModelCatalog.fallbackModelID
+        if let corrected = AppModel.correctedSelectedModel(selectedModel, in: availableModels) {
+            selectedModel = corrected
         }
         refreshModelSizes()
+    }
+
+    /// nil when `current` is a model the scan found actually installed; otherwise the default to
+    /// fall back to. A stale selection (deleted model, fresh profile) can name a real catalog id
+    /// that simply isn't downloaded yet, so the check has to look at `isInstalled`, not just
+    /// whether the id is known.
+    static func correctedSelectedModel(
+        _ current: String,
+        in availableModels: [ModelInfo],
+        defaultModelID: @autoclosure () -> String = ModelCatalog.defaultModelID()
+    ) -> String? {
+        let installed = availableModels.filter(\.isInstalled)
+        if installed.contains(where: { $0.name == current }) { return nil }
+        return defaultModelID()
     }
 
     func refreshModelSizes() {

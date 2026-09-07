@@ -84,6 +84,43 @@ struct PreparingStageGateTests {
     }
 }
 
+@Suite("Selected-model correction")
+struct SelectedModelCorrectionTests {
+    private func info(_ name: String, installed: Bool) -> ModelInfo {
+        ModelInfo(name: name, label: name, approximateSizeBytes: 0, isMultilingual: true, isInstalled: installed)
+    }
+
+    @Test("a catalog id that isn't actually installed corrects to the default, not just any known id")
+    func uninstalledCatalogSelectionCorrects() {
+        let models = [
+            info("openai_whisper-tiny", installed: false),
+            info("apple-speech-analyzer", installed: true),
+        ]
+        let corrected = AppModel.correctedSelectedModel(
+            "openai_whisper-tiny", in: models, defaultModelID: "apple-speech-analyzer"
+        )
+        #expect(corrected == "apple-speech-analyzer")
+    }
+
+    @Test("an installed selection is left alone")
+    func installedSelectionUntouched() {
+        let models = [info("openai_whisper-tiny", installed: true)]
+        let corrected = AppModel.correctedSelectedModel(
+            "openai_whisper-tiny", in: models, defaultModelID: "should-not-be-used"
+        )
+        #expect(corrected == nil)
+    }
+
+    @Test("an id absent from the scan entirely also corrects")
+    func unknownSelectionCorrects() {
+        let models = [info("apple-speech-analyzer", installed: true)]
+        let corrected = AppModel.correctedSelectedModel(
+            "totally-uninstalled-model", in: models, defaultModelID: "apple-speech-analyzer"
+        )
+        #expect(corrected == "apple-speech-analyzer")
+    }
+}
+
 @Suite("Model deletion")
 struct ModelDeletionTests {
     private static let variant = "openai_whisper-large-v3_turbo"
