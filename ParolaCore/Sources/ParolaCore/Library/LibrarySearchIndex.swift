@@ -242,7 +242,12 @@ public actor LibrarySearchIndex {
         scheduleSave()
     }
 
-    public func search(_ query: String) async -> [Match] {
+    /// `fullText` reads the entry's real transcript text back, for a hit that landed past the
+    /// stored excerpt — the excerpt alone can't produce a snippet that contains it.
+    public func search(
+        _ query: String,
+        fullText: @Sendable (String) async -> String? = { _ in nil }
+    ) async -> [Match] {
         let queryTokens = Self.tokenize(query)
         guard !queryTokens.isEmpty else { return [] }
         await ensureLoaded()
@@ -269,24 +274,30 @@ public actor LibrarySearchIndex {
             }
         }
 
-        return scores
-            .sorted { $0.value > $1.value }
-            .compactMap { (id, score) -> Match? in
-                guard let entry = entries[id] else { return nil }
-                let snippet = Self.makeSnippet(
-                    text: entry.excerpt,
-                    truncated: entry.excerptTruncated,
-                    tokens: queryTokens
-                )
-                return Match(
-                    entryID: id,
-                    score: score,
-                    matchCount: hits[id] ?? 0,
-                    snippet: snippet.text,
-                    highlights: snippet.highlights,
-                    firstHit: earliest[id].flatMap { Self.firstHit(atOffset: $0, in: entry) }
-                )
+        var results: [Match] = []
+        results.reserveCapacity(scores.count)
+        for (id, score) in scores.sorted(by: { $0.value > $1.value }) {
+            guard let entry = entries[id] else { continue }
+            let hitOffset = earliest[id]
+            // The stored excerpt only covers the entry's first `excerptLength` characters; a hit
+            // past that needs the real text to render a snippet that contains and highlights it.
+            let hitOutsideExcerpt = hitOffset.map { $0 >= entry.excerpt.count } ?? false
+            let snippet: (text: String, highlights: [Highlight])
+            if hitOutsideExcerpt, let full = await fullText(id) {
+                snippet = Self.makeSnippet(text: full, truncated: false, tokens: queryTokens)
+            } else {
+                snippet = Self.makeSnippet(text: entry.excerpt, truncated: entry.excerptTruncated, tokens: queryTokens)
             }
+            results.append(Match(
+                entryID: id,
+                score: score,
+                matchCount: hits[id] ?? 0,
+                snippet: snippet.text,
+                highlights: snippet.highlights,
+                firstHit: hitOffset.flatMap { Self.firstHit(atOffset: $0, in: entry) }
+            ))
+        }
+        return results
     }
 
     /// Writes any pending debounced snapshot to disk. Call before app termination.

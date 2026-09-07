@@ -168,6 +168,28 @@ struct LibraryStoreTests {
         #expect(hits.isEmpty == false)
     }
 
+    @Test("a search hit past the excerpt gets a real snippet by re-reading the bundle")
+    func searchBeyondExcerptRereadsBundle() async throws {
+        let (store, _) = try makeTempLibrary()
+        let audio = try makeFakeAudio()
+        let filler = "lorem ipsum dolor sit amet consectetur adipiscing elit"
+        var segments = (0..<90).map { i in
+            TranscriptSegment(id: i, start: Double(i), end: Double(i) + 0.5, text: filler)
+        }
+        segments.append(TranscriptSegment(id: 90, start: 90, end: 90.5, text: "zzyzxmarker tail"))
+        let transcript = Transcript(segments: segments, language: "en", modelName: "tiny")
+        _ = try await store.add(transcript: transcript, audioSource: audio)
+        #expect(transcript.text.distance(
+            from: transcript.text.startIndex,
+            to: try #require(transcript.text.range(of: "zzyzxmarker")).lowerBound
+        ) > 200)
+
+        let hits = await store.search("zzyzxmarker")
+        let hit = try #require(hits.first)
+        #expect(hit.snippet.lowercased().contains("zzyzxmarker"))
+        #expect(hit.highlights.isEmpty == false)
+    }
+
     @Test("a bundle whose manifest version is newer than the app is dropped from the list")
     func futureVersionBundleDropped() async throws {
         let (store, url) = try makeTempLibrary()

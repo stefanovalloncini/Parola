@@ -511,6 +511,39 @@ struct LibrarySearchIndexTests {
         #expect(head.snippet.lowercased().contains("lorem"))
     }
 
+    @Test("a hit past the excerpt renders a real snippet when fullText can supply the source")
+    func snippetBeyondExcerptUsesFullText() async throws {
+        let (index, _) = makeTempIndex()
+        let filler = String(repeating: "lorem ipsum dolor sit amet consectetur adipiscing elit ", count: 100)
+        let text = filler + "zzyzxmarker tail"
+        let hitOffset = text.distance(from: text.startIndex, to: try #require(text.range(of: "zzyzxmarker")).lowerBound)
+        #expect(hitOffset > 5000)
+        await index.index(id: "e1", title: "Notes", text: text, createdAt: Date())
+
+        let matches = await index.search("zzyzxmarker") { id in id == "e1" ? text : nil }
+        let match = try #require(matches.first(where: { $0.entryID == "e1" }))
+
+        #expect(match.snippet.lowercased().contains("zzyzxmarker"))
+        #expect(match.highlights.count >= 1)
+        for highlight in match.highlights {
+            let start = match.snippet.index(match.snippet.startIndex, offsetBy: highlight.start)
+            let end = match.snippet.index(start, offsetBy: highlight.length)
+            #expect(match.snippet[start..<end].lowercased() == "zzyzxmarker")
+        }
+    }
+
+    @Test("without a fullText source, a hit past the excerpt falls back to the truncated snippet")
+    func snippetBeyondExcerptWithoutFullTextFallsBack() async throws {
+        let (index, _) = makeTempIndex()
+        let filler = String(repeating: "lorem ipsum dolor sit amet consectetur adipiscing elit ", count: 90)
+        let text = filler + "zzyzxmarker tail"
+        await index.index(id: "e1", title: "Notes", text: text, createdAt: Date())
+
+        let matches = await index.search("zzyzxmarker")
+        let match = try #require(matches.first(where: { $0.entryID == "e1" }))
+        #expect(match.snippet.lowercased().contains("zzyzxmarker") == false)
+    }
+
     @Test("removing one entry leaves shared tokens for the other")
     func removalKeepsSharedTokens() async throws {
         let (index, _) = makeTempIndex()

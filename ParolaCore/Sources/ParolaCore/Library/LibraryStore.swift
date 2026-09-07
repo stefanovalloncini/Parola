@@ -132,8 +132,13 @@ public actor LibraryStore {
     public func search(_ query: String) async -> [LibrarySearchIndex.Match] {
         await ensureSearchIndexReady()
         if cachedActive == nil { await primeCaches() }
-        let activeIDs = Set((cachedActive ?? []).map(\.id))
-        let matches = await searchIndex.search(query)
+        let activeEntries = cachedActive ?? []
+        let activeIDs = Set(activeEntries.map(\.id))
+        let bundleURLs = Dictionary(uniqueKeysWithValues: activeEntries.map { ($0.id, $0.bundleURL) })
+        let matches = await searchIndex.search(query) { id in
+            guard let bundleURL = bundleURLs[id] else { return nil }
+            return await offActorIO(qos: .utility) { (try? ParolaDocument.read(at: bundleURL))?.transcript.text }
+        }
         return matches.filter { activeIDs.contains($0.entryID) }
     }
 
