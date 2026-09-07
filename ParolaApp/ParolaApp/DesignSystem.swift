@@ -131,6 +131,9 @@ enum DS {
         let canvas: SwiftUI.Color
         let success: SwiftUI.Color
         let warning: SwiftUI.Color
+        let warningChip: (fill: SwiftUI.Color, text: SwiftUI.Color)
+        let successChip: (fill: SwiftUI.Color, text: SwiftUI.Color)
+        let neutralChip: (fill: SwiftUI.Color, text: SwiftUI.Color)
 
         init(_ palette: ThemePalette) {
             accent = palette.accent.color
@@ -151,6 +154,13 @@ enum DS {
             canvas = palette.canvas.color
             success = palette.success.color
             warning = palette.warning.color
+            let chips = [palette.warning, palette.success, palette.textSecondary].map {
+                let pair = palette.statusChip($0)
+                return (fill: pair.fill.color, text: pair.text.color)
+            }
+            warningChip = chips[0]
+            successChip = chips[1]
+            neutralChip = chips[2]
         }
     }
 
@@ -181,6 +191,11 @@ enum DS {
 
         /// `dangerText` for chrome drawn on its own dark scrim rather than on an app surface.
         static var dangerOnDark: SwiftUI.Color { DS.resolved.dangerOnDark }
+
+        /// A status chip on a card: its soft fill and the label colour that clears AA on that fill.
+        static var warningChip: (fill: SwiftUI.Color, text: SwiftUI.Color) { DS.resolved.warningChip }
+        static var successChip: (fill: SwiftUI.Color, text: SwiftUI.Color) { DS.resolved.successChip }
+        static var neutralChip: (fill: SwiftUI.Color, text: SwiftUI.Color) { DS.resolved.neutralChip }
     }
 
     enum Palette {

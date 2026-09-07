@@ -48,8 +48,8 @@ struct AboutInfoView: View {
                                 .font(DS.Font.caption2Emphasized)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 1)
-                                .background(Capsule().fill(DS.Color.accent.opacity(0.18)))
-                                .foregroundStyle(DS.Color.accent)
+                                .background(Capsule().fill(DS.Color.accentWash))
+                                .foregroundStyle(DS.Color.accentText)
                         }
                     }
                 }

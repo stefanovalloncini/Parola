@@ -83,6 +83,7 @@ struct SurfaceContrastTests {
             ("the outline popover's timecodes", palette.surfaceElevated),
             ("the inspector's chapter timecodes", palette.surfaceElevated),
             ("the streaming caret", palette.surface),
+            ("the About sheet's channel badge", palette.accentWash),
         ]
     }
 
@@ -130,6 +131,34 @@ struct SurfaceContrastTests {
             #expect(text.dark.contrast(against: surface.dark) >= Self.minimum, "\(name) dark on surface")
             #expect(text.dark.contrast(against: card.dark) >= Self.minimum, "\(name) dark on card")
         }
+    }
+
+    /// The model card's chips paint their own wash of the status colour and set the label on it.
+    @Test("a status chip's label clears AA on its own fill", arguments: ThemePreset.allCases)
+    func statusChipContrast(preset: ThemePreset) throws {
+        let palette = preset.palette
+        for (name, tint) in [
+            ("warning", palette.warning),
+            ("success", palette.success),
+            ("secondary", palette.textSecondary),
+        ] {
+            let chip = palette.statusChip(tint)
+            let text = try #require(Self.pair(chip.text))
+            let fill = try #require(Self.pair(chip.fill))
+            #expect(text.light.contrast(against: fill.light) >= Self.minimum, "\(preset.rawValue) light, \(name)")
+            #expect(text.dark.contrast(against: fill.dark) >= Self.minimum, "\(preset.rawValue) dark, \(name)")
+        }
+    }
+
+    /// The trash page's group header and the countdown under it read one tier mapping, in legible tokens.
+    @MainActor
+    @Test("the Recently Deleted header reads the same tier colours as its rows")
+    func recentlyDeletedTierColours() {
+        #expect(MacRecentlyDeletedView.Bucket.soon.tint == DS.Color.warningText)
+        #expect(MacRecentlyDeletedView.Bucket.critical.tint == DS.Color.dangerText)
+        #expect(MacRecentlyDeletedView.Bucket.overdue.tint == DS.Color.dangerText)
+        #expect(RecentlyDeletedCopy.Tier.soon.color == DS.Color.warningText)
+        #expect(RecentlyDeletedCopy.Tier.overdue.color == DS.Color.dangerText)
     }
 
     @Test("accent text leaves an accent that already clears AA alone")

@@ -201,6 +201,17 @@ extension ThemePalette {
     var successText: ThemeColor { success.legibleText(on: surfaceElevated) }
     var warningText: ThemeColor { warning.legibleText(on: surfaceElevated) }
 
+    /// A status colour's chip: the wash `accentWash` puts under accent text, over a card, and the tint made legible on it.
+    func statusChip(_ tint: ThemeColor) -> (fill: ThemeColor, text: ThemeColor) {
+        let front = tint.appearanceVariants
+        let behind = surfaceElevated.appearanceVariants
+        let fill = ThemeColor.dynamic(
+            light: front.light.blended(toward: behind.light, amount: 1 - Self.accentWashOpacity),
+            dark: front.dark.blended(toward: behind.dark, amount: 1 - Self.accentWashOpacity)
+        )
+        return (fill, tint.legibleText(on: fill))
+    }
+
     /// `dangerText` pinned to its dark value, for chrome that paints its own dark scrim regardless of appearance.
     var dangerOnDark: ThemeColor { .uniform(dangerText.appearanceVariants.dark) }
 

@@ -307,7 +307,7 @@ struct MacRecentlyDeletedView: View {
         var id: String { bucket.id }
     }
 
-    private enum Bucket {
+    enum Bucket {
         case none
         case overdue
         case critical
@@ -337,13 +337,18 @@ struct MacRecentlyDeletedView: View {
             }
         }
 
-        var tint: Color {
+        var tier: RecentlyDeletedCopy.Tier? {
             switch self {
-            case .none, .calm, .undated: return DS.Color.secondaryText
-            case .soon: return DS.Palette.warning
-            case .critical, .overdue: return DS.Color.danger
+            case .none: return nil
+            case .overdue: return .overdue
+            case .critical: return .critical
+            case .soon: return .soon
+            case .calm: return .calm
+            case .undated: return .undated
             }
         }
+
+        var tint: Color { tier?.color ?? DS.Color.secondaryText }
     }
 
     private func bucket(for entry: LibraryEntry) -> Bucket {

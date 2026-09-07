@@ -30,7 +30,7 @@ struct ModelCardRow: View {
                 if !chips.isEmpty {
                     HStack(spacing: 6) {
                         ForEach(chips) { chip in
-                            ModelTagChip(label: chip.label, color: chip.color)
+                            ModelTagChip(label: chip.label, fill: chip.fill, text: chip.text)
                         }
                     }
                     .padding(.top, 2)
@@ -158,13 +158,13 @@ struct ModelCardRow: View {
     private var chips: [ModelTagChip.Chip] {
         var result: [ModelTagChip.Chip] = []
         if variant.qualityTier == .best {
-            result.append(.init(label: "High accuracy", color: DS.Palette.warning))
+            result.append(.init(label: "High accuracy", tokens: DS.Color.warningChip))
         }
         if variant.speedTier == .fastest {
-            result.append(.init(label: "Fast", color: DS.Palette.success))
+            result.append(.init(label: "Fast", tokens: DS.Color.successChip))
         }
         if case .some(.only(let codes)) = variant.languageScope, codes == ["en"] {
-            result.append(.init(label: "English-only", color: DS.Color.secondaryText))
+            result.append(.init(label: "English-only", tokens: DS.Color.neutralChip))
         }
         return result
     }
@@ -204,20 +204,28 @@ struct ModelCardRow: View {
 struct ModelTagChip: View {
     struct Chip: Identifiable {
         let label: String
-        let color: Color
+        let fill: Color
+        let text: Color
         var id: String { label }
+
+        init(label: String, tokens: (fill: Color, text: Color)) {
+            self.label = label
+            self.fill = tokens.fill
+            self.text = tokens.text
+        }
     }
 
     let label: String
-    let color: Color
+    let fill: Color
+    let text: Color
 
     var body: some View {
         Text(label)
             .font(.caption2.weight(.semibold))
-            .foregroundStyle(color)
+            .foregroundStyle(text)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(color.opacity(0.15), in: Capsule())
+            .background(fill, in: Capsule())
     }
 }
 

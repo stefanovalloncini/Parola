@@ -216,12 +216,12 @@ struct RecentlyDeletedRow: View {
 }
 
 extension RecentlyDeletedCopy.Tier {
+    /// The one tier-to-text mapping: the row's countdown and the group header above it read it alike.
     var color: Color {
         switch self {
-        case .calm: return DS.Color.secondaryText
+        case .calm, .undated: return DS.Color.secondaryText
         case .soon: return DS.Color.warningText
         case .critical, .overdue: return DS.Color.dangerText
-        case .undated: return DS.Color.separator
         }
     }
 
