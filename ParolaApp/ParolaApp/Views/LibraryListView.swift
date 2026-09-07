@@ -261,7 +261,7 @@ struct LibraryListView: View {
                 emptyState
             } else {
                 // Read once for the whole list, not per row: every row has to reserve the same column or none does.
-                let showsTimestamp = LibraryListContent.showsTimestampSlot(
+                let showsTimestamp = searchResults != nil && LibraryListContent.showsTimestampSlot(
                     for: entries.map(\.id),
                     matches: model.searchMatches
                 )

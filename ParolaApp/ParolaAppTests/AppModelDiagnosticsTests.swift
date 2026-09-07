@@ -229,8 +229,7 @@ struct AppModelDiagnosticsTests {
         #expect(known[.parakeet] == true)
     }
 
-    /// SwiftUI builds no accessibility elements for a hosted view until an assistive client
-    /// attaches, so the ids are pinned in the source; the live harness checks them on the real app.
+    /// A hosted view builds no accessibility elements until a client attaches, so the ids are pinned in source.
     @Test("the About pane tags the diagnostics group for the bridge")
     func aboutPaneExposesAccessibilityIdentifiers() throws {
         let source = URL(fileURLWithPath: #filePath)

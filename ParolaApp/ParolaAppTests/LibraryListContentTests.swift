@@ -163,12 +163,15 @@ struct LibraryListContentTests {
         #expect(selection == ["a", "b", "c"])
     }
 
+    /// Library rows are laid out in the sidebar, not the transcript pane; the width is this suite's own.
+    private static let measuredRowWidth: CGFloat = 520
+
     private func rowHeight(density: String, style: LibraryRow.Style) async -> CGFloat {
         let model = await makeModel()
         model.sidebarDensity = density
         let display = LibraryRowDisplay(entry: entry(id: "a", title: "Alpha", offset: 0), sizeBytes: 1_000_000)
         let host = NSHostingView(rootView: LibraryRow(display: display, style: style).environment(model))
-        host.frame = NSRect(x: 0, y: 0, width: MainWindowLayout.transcriptReadableWidth, height: 200)
+        host.frame = NSRect(x: 0, y: 0, width: Self.measuredRowWidth, height: 200)
         host.layoutSubtreeIfNeeded()
         return host.fittingSize.height
     }
@@ -400,7 +403,7 @@ struct LibraryListContentTests {
             let host = NSHostingView(
                 rootView: SearchResultRow(display: display, match: match)
                     .environment(model)
-                    .frame(width: MainWindowLayout.transcriptReadableWidth)
+                    .frame(width: Self.measuredRowWidth)
             )
             host.layoutSubtreeIfNeeded()
             return host.fittingSize.height

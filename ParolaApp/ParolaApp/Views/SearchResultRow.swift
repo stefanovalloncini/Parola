@@ -7,7 +7,7 @@ struct SearchResultRow: View {
     /// Where the row's separator starts, so it runs under the text instead of under the glyph column.
     nonisolated static let separatorInset: CGFloat = DS.Spacing.small + glyphWidth + DS.Spacing.regular
 
-    /// Wide enough for h:mm:ss, so the snippets of a mixed list start on the same column.
+    /// Wide enough for h:mm:ss under ten hours, so the snippets of a mixed list start on the same column.
     nonisolated static let timestampWidth: CGFloat = 52
 
     let display: LibraryRowDisplay
@@ -70,6 +70,7 @@ struct SearchResultRow: View {
                     .foregroundStyle(secondaryStyle)
                     .lineLimit(1)
                     .opacity(timestamp == nil ? 0 : 1)
+                    .accessibilityLabel(Text("First match at \(timestamp ?? "")"))
                     .accessibilityHidden(timestamp == nil)
                     .frame(width: Self.timestampWidth, alignment: .leading)
             }
