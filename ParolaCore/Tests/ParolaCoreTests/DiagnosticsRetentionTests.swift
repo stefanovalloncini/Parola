@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import os
+import ParolaTestSupport
 @testable import ParolaCore
 
 @Suite("Diagnostics retention", .serialized, .logFacade)
@@ -198,7 +199,9 @@ struct DiagnosticsRetentionTests {
                         await sink.startNewFile()
                         rotated.signal()
                     }
-                    rotated.wait()
+                    if rotated.wait(timeout: .now() + 10) == .timedOut {
+                        Issue.record("the rotation never finished")
+                    }
                 }
                 continuation.resume(returning: outcome)
             }
