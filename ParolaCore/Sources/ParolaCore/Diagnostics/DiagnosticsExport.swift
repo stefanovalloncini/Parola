@@ -208,8 +208,15 @@ public enum DiagnosticsExport {
         defer { try? handle.close() }
         do {
             let size = try handle.seekToEnd()
-            let cutHead = size > UInt64(limit)
-            try handle.seek(toOffset: cutHead ? size - UInt64(limit) : 0)
+            guard size > UInt64(limit) else {
+                try handle.seek(toOffset: 0)
+                return (try handle.readToEnd() ?? Data(), false)
+            }
+            let start = size - UInt64(limit)
+            // A cut that lands on a newline starts on a whole record, so nothing has to be dropped.
+            try handle.seek(toOffset: start - 1)
+            let cutHead = try handle.read(upToCount: 1)?.first != 0x0A
+            try handle.seek(toOffset: start)
             return (try handle.readToEnd() ?? Data(), cutHead)
         } catch {
             return nil

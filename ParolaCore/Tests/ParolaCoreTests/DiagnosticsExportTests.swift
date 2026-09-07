@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ParolaTestSupport
 @testable import ParolaCore
 
 @Suite("Diagnostics export", .serialized, .logFacade)
@@ -326,6 +327,14 @@ struct DiagnosticsExportTests {
         #expect(reading.records.map(\.message) == ["second"])
         #expect(reading.skippedLines == 0)
         #expect(reading.truncated)
+
+        // A cut that lands exactly on the newline before a record keeps that record.
+        let onTheBoundary = DiagnosticsExport.read(
+            directory: directory, maxBytes: second.utf8.count + 1
+        )
+        #expect(onTheBoundary.records.map(\.message) == ["second"])
+        #expect(onTheBoundary.skippedLines == 0)
+        #expect(onTheBoundary.truncated)
     }
 
     @Test("the report says when the cap dropped the oldest records")
