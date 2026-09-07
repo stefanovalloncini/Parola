@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 
 public protocol DictationContextSource: Sendable {
     func currentSelection() async -> String?

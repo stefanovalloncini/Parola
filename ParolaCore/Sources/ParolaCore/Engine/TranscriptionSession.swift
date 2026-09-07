@@ -25,6 +25,9 @@ public actor TranscriptionSession {
     private var transcribeWaiters: [CheckedContinuation<Void, Never>] = []
     private var diarizeStep: DiarizeStep?
 
+    /// How long the readability probe waits before the file counts as out of reach.
+    private let fileReadDeadline: Duration
+
     typealias DiarizeStep = @Sendable (Transcript, URL, Int?) async throws -> Transcript
 
     public init(
@@ -32,13 +35,15 @@ public actor TranscriptionSession {
         registry: EngineRegistry = .shared,
         idleTimeout: TimeInterval = 600,
         clock: any Clock<Duration> = ContinuousClock(),
-        managedConfiguration: ManagedConfiguration = .shared
+        managedConfiguration: ManagedConfiguration = .shared,
+        fileReadDeadline: Duration = FileReadDeadline.header
     ) {
         self.modelStore = modelStore
         self.registry = registry
         self.idleTimeout = idleTimeout
         self.clock = clock
         self.managedConfiguration = managedConfiguration
+        self.fileReadDeadline = fileReadDeadline
     }
 
     /// Transcribes from an AudioSource. Downloads the requested model on demand.
@@ -96,6 +101,18 @@ public actor TranscriptionSession {
 
         let audioURL = try await source.prepare()
         try Task.checkCancellation()
+        // The file is proved openable here, off the actor and on a deadline, rather than inside an
+        // engine that would park in the same uninterruptible open() with the transcribe slot held.
+        let probe = await BoundedFileRead.run(deadline: fileReadDeadline) {
+            FileAudioSource(url: audioURL).synchronousDuration()
+        }
+        guard case .done(let probedDuration) = probe else {
+            ParolaLog.error(
+                .models, "file read timed out before the engine ran",
+                [.model: .safe(ModelToken(modelName))]
+            )
+            throw ParolaError.fileReadTimedOut(name: audioURL.lastPathComponent)
+        }
         // Abort engine work when the caller cancels: a hung engine (e.g. a stalled finalize)
         // would otherwise hold the transcribe slot and block every queued run until relaunch.
         var transcript: Transcript
@@ -116,7 +133,7 @@ public actor TranscriptionSession {
         } catch {
             // Every engine hits this differently (a raw AVAudioFile throw, a wrapped CoreAudio
             // OSStatus, …); the file itself not decoding is the one thing they have in common.
-            if !isCancellation(error), FileAudioSource(url: audioURL).synchronousDuration() == nil {
+            if !isCancellation(error), probedDuration == nil {
                 ParolaLog.error(
                     .models, "transcribe failed on an unreadable file",
                     [.model: .safe(ModelToken(modelName)), .error: .error(error)]
@@ -130,7 +147,7 @@ public actor TranscriptionSession {
         }
         // The source asset's own duration, not whatever the engine decoded: engines disagree with
         // each other and Parakeet reports none at all.
-        transcript.durationSeconds = FileAudioSource(url: audioURL).synchronousDuration() ?? transcript.durationSeconds
+        transcript.durationSeconds = probedDuration ?? transcript.durationSeconds
         transcript = TranscriptCleanup.apply(
             to: transcript,
             options: TranscriptCleanupOptions(

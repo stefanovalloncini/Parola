@@ -12,6 +12,9 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
     /// A file no engine could decode — a raw CoreAudio/AVFoundation OSStatus isn't actionable, so
     /// the caller reports this instead and keeps the underlying error in the log line only.
     case unreadableFile(name: String, reason: String?)
+    /// A read that never came back. The syscall cannot be interrupted, so the thread it parked is
+    /// abandoned and the run gives up rather than waiting on a file it may never reach.
+    case fileReadTimedOut(name: String)
     case unsupportedAudioFormat(String)
     case captureUnavailable(String)
     case invalidLanguage(String)
@@ -43,6 +46,8 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
             return "Transcription failed: \(reason)"
         case .unreadableFile(let name, let reason):
             return "Parola couldn't read \(name)." + (reason.map { " \($0)" } ?? "")
+        case .fileReadTimedOut(let name):
+            return "Parola couldn't read \(name) in time."
         case .unsupportedAudioFormat(let detail):
             return "Unsupported audio format: \(detail)"
         case .captureUnavailable(let reason):
@@ -83,6 +88,8 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
             return "ParolaError.transcriptionFailed"
         case .unreadableFile:
             return "ParolaError.unreadableFile"
+        case .fileReadTimedOut:
+            return "ParolaError.fileReadTimedOut"
         case .unsupportedAudioFormat:
             return "ParolaError.unsupportedAudioFormat"
         case .captureUnavailable:

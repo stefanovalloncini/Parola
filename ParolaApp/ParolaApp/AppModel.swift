@@ -991,6 +991,7 @@ final class AppModel {
     @ObservationIgnored private var streamingSession: (any StreamingTranscriber)?
     @ObservationIgnored var streamingConsumer: Task<Void, Never>?
     @ObservationIgnored var fileTranscribeTask: Task<Void, Never>?
+    @ObservationIgnored var fileReadDeadline: Duration = FileReadDeadline.header
     @ObservationIgnored var recordingOutcomeWaiters: [CheckedContinuation<String, any Error>] = []
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
     @ObservationIgnored private var youtubeTranscribeTask: Task<Void, Never>?
@@ -1689,18 +1690,18 @@ final class AppModel {
         noteRecentFile(fileURL)
         sourceFileURL = fileURL
         installPlayer(for: fileURL)
-        // Continuation + GCD, not Task.detached: a detached job resuming a main-actor task
-        // around AVFoundation's NSURL bridging has crashed with EXC_ARM_DA_ALIGN before
-        // (same class as the watched-folder bookmark fix).
         let probeSource = FileAudioSource(url: fileURL)
+        let deadline = fileReadDeadline
         Task { [weak self] in
-            let duration = await withCheckedContinuation { continuation in
-                DispatchQueue.global(qos: .utility).async {
-                    continuation.resume(returning: probeSource.synchronousDuration())
-                }
+            let probe = await BoundedFileRead.run(deadline: deadline) {
+                probeSource.synchronousDuration()
             }
-            guard let self, let duration, self.sourceFileURL == fileURL else { return }
-            if self.mediaDurationSeconds == nil { self.mediaDurationSeconds = duration }
+            guard let self, self.sourceFileURL == fileURL else { return }
+            guard case .done(let duration) = probe else {
+                self.failFileReadTimeout(fileURL)
+                return
+            }
+            if let duration, self.mediaDurationSeconds == nil { self.mediaDurationSeconds = duration }
         }
         filePartialText = ""
         fileTranscribeFraction = nil
@@ -1751,6 +1752,17 @@ final class AppModel {
                 self.drainDeferredArrivals()
             }
         }
+    }
+
+    /// A probe that never came back means the file itself is out of reach, so the run reading the
+    /// same bytes is not going to report anything of its own.
+    private func failFileReadTimeout(_ fileURL: URL) {
+        guard let task = fileTranscribeTask else { return }
+        task.cancel()
+        fileTranscribeTask = nil
+        applyTranscriptionError(
+            ParolaError.fileReadTimedOut(name: fileURL.lastPathComponent), source: fileURL
+        )
     }
 
     private func makeFilePartialHandler() -> @Sendable (String) -> Void {

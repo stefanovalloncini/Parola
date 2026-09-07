@@ -91,7 +91,7 @@ actor WhisperKitTranscriber: Transcriber {
         let interval = signposter.beginInterval("transcribe", "model=\(modelName, privacy: .public)")
         defer { signposter.endInterval("transcribe", interval) }
         handlers.onStage?(.preparingAudio)
-        let probed = options.language == nil ? await probeLanguage(kit: kit, url: url) : nil
+        let probed = options.language == nil ? try await probeLanguage(kit: kit, url: url) : nil
         try Task.checkCancellation()
         let pin = WhisperLanguagePin.resolve(requested: options.language, probed: probed)
         var decoding = DecodingOptions(
@@ -217,12 +217,20 @@ actor WhisperKitTranscriber: Transcriber {
 
     private static let languageProbeWindows = 5
 
-    private func probeLanguage(kit: WhisperKit, url: URL) async -> LanguageDetection? {
+    private func probeLanguage(kit: WhisperKit, url: URL) async throws -> LanguageDetection? {
         guard kit.textDecoder.isModelMultilingual else { return nil }
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-whisper-language-probe-\(UUID().uuidString).caf")
         defer { try? FileManager.default.removeItem(at: scratch) }
-        guard let samples = Self.probeSamples(url: url, scratch: scratch), !samples.isEmpty else { return nil }
+        // Off the actor and on a deadline: extracting the probe windows streams the whole source
+        // file, and a read that parks there would park the engine with it.
+        let read = await BoundedFileRead.run(deadline: FileReadDeadline.forReading(url)) {
+            Self.probeSamples(url: url, scratch: scratch)
+        }
+        guard case .done(let extracted) = read else {
+            throw ParolaError.fileReadTimedOut(name: url.lastPathComponent)
+        }
+        guard let samples = extracted, !samples.isEmpty else { return nil }
         let windowSamples = kit.featureExtractor.windowSamples ?? Constants.defaultWindowSamples
         let offsets = Self.probeWindowOffsets(in: samples, windowSamples: windowSamples)
         // Loudest window first, so a probe cut short by cancellation has read the best evidence.

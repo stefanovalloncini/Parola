@@ -77,17 +77,31 @@ extension AppModel {
                 self.isPlaying = playing
             }
         }
-        let asset = AVURLAsset(url: url)
         Task { [weak self] in
-            let tracks = (try? await asset.loadTracks(withMediaType: .video)) ?? []
-            let assetDuration = (try? await asset.load(.duration)).map(CMTimeGetSeconds)
-            guard let self, self.playerInstallToken == token else { return }
-            self.hasVideo = !tracks.isEmpty
-            if let assetDuration, assetDuration.isFinite, assetDuration > 0 {
+            // An asset load on an unreachable file parks a work-queue thread that no cancel
+            // reaches, so the wait is bounded and the thread abandoned on expiry.
+            let loaded = await AsyncTimeout.run(FileReadDeadline.header) {
+                await Self.loadAssetInfo(url: url)
+            }
+            guard let self, let loaded, self.playerInstallToken == token else { return }
+            self.hasVideo = loaded.hasVideo
+            if let assetDuration = loaded.durationSeconds, assetDuration.isFinite, assetDuration > 0 {
                 self.mediaDurationSeconds = assetDuration
                 self.applyLoadedMediaDuration()
             }
         }
+    }
+
+    private struct LoadedAssetInfo: Sendable {
+        var hasVideo: Bool
+        var durationSeconds: Double?
+    }
+
+    private nonisolated static func loadAssetInfo(url: URL) async -> LoadedAssetInfo {
+        let asset = AVURLAsset(url: url)
+        let tracks = (try? await asset.loadTracks(withMediaType: .video)) ?? []
+        let duration = (try? await asset.load(.duration)).map(CMTimeGetSeconds)
+        return LoadedAssetInfo(hasVideo: !tracks.isEmpty, durationSeconds: duration)
     }
 
     /// Re-points playback at a finished run's own audio: an entry opened mid-run leaves the player on the entry's file.

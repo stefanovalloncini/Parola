@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 import os
-@testable import ParolaDictation
+@testable import ParolaCore
 
 @Suite("Async timeout race")
 struct AsyncTimeoutTests {
