@@ -272,6 +272,28 @@ struct FindAndReplaceTests {
         #expect(model.currentSegmentID == nil)
     }
 
+    /// The write lands before the route builds the transcript view, so the jump has to outlive it.
+    @Test("a reveal with Find closed leaves the hit's segment pending for the transcript view")
+    func revealLeavesAPendingRequest() {
+        model.revealInTranscript("Goodbye Hello", at: .init(seconds: 1, segmentIndex: 1, textOffset: 12))
+        #expect(!model.findIsOpen)
+        #expect(model.currentSegmentID == 1)
+        #expect(model.pendingRevealSegmentID == 1)
+    }
+
+    /// `installPlayer`'s first delivery lands after the reveal and covers t = 0.
+    @Test("the player's first tick leaves a pending reveal where it is")
+    func pendingRevealSurvivesTheFirstTick() {
+        model.revealInTranscript("Goodbye Hello", at: .init(seconds: 1, segmentIndex: 1, textOffset: 12))
+        model.updateCurrentSegment(time: 0)
+        #expect(model.currentSegmentID == 1)
+
+        model.consumePendingReveal(1)
+        model.updateCurrentSegment(time: 0)
+        #expect(model.currentSegmentID == 0)
+        #expect(model.pendingRevealSegmentID == nil)
+    }
+
     /// A position from an index that no longer matches the transcript must not select a segment at random.
     @Test("a position past the end of the transcript falls back to the body")
     func revealIgnoresAStalePosition() {

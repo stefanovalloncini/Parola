@@ -94,6 +94,7 @@ struct SegmentsScroll: View {
                     speakerFilterBinding.wrappedValue = nil
                 }
             }
+            .task(id: model.pendingRevealSegmentID) { await revealPendingSegment(proxy) }
             // Synchronous so a short transcript commits in the same pass the key changed in, not a frame later.
             .onChange(of: derivedKey, initial: true) { _, key in recomputeDerived(for: key) }
             .onChange(of: qcKey, initial: true) { _, key in recomputeQC(for: key) }
@@ -119,6 +120,21 @@ struct SegmentsScroll: View {
             enabled: model.showSubtitleQC,
             captionLength: model.subtitleCaptionLength
         )
+    }
+
+    /// A search result writes its segment before this view is built, so the jump is consumed here
+    /// rather than watched on `currentSegmentID`; the row it names exists only once the derive lands,
+    /// which is a detached hop for a long transcript.
+    private func revealPendingSegment(_ proxy: ScrollViewProxy) async {
+        guard let id = model.pendingRevealSegmentID else { return }
+        for _ in 0..<30 {
+            try? await Task.sleep(for: .milliseconds(16))
+            if derived.visible.contains(where: { $0.id == id }) { break }
+        }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            proxy.scrollTo(id, anchor: .center)
+        }
+        model.consumePendingReveal(id)
     }
 
     private func recomputeDerived(for key: DerivedKey) {

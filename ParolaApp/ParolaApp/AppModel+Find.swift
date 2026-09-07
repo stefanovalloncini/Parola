@@ -43,12 +43,20 @@ extension AppModel {
     func revealInTranscript(_ query: String, at firstHit: LibrarySearchIndex.Match.FirstHit? = nil) {
         guard let transcript else { return }
         if let firstHit, transcript.segments.indices.contains(firstHit.segmentIndex) {
-            currentSegmentID = transcript.segments[firstHit.segmentIndex].id
+            let id = transcript.segments[firstHit.segmentIndex].id
+            currentSegmentID = id
+            pendingRevealSegmentID = id
         }
         guard !transcript.findMatches(query, caseSensitive: findCaseSensitive).isEmpty else { return }
         findIsOpen = true
         // The 150 ms recompute this starts re-snaps the selection to the first Find match.
         if findQuery == query { scheduleRecomputeMatches() } else { findQuery = query }
+    }
+
+    /// Called by the transcript view once it has scrolled to the reveal; the player owns the selection again after it.
+    func consumePendingReveal(_ id: TranscriptSegment.ID) {
+        guard pendingRevealSegmentID == id else { return }
+        pendingRevealSegmentID = nil
     }
 
     func goToNextMatch() {
