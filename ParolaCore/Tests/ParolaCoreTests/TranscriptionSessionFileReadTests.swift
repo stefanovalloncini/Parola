@@ -58,7 +58,9 @@ struct TranscriptionSessionFileReadTests {
 
     private func makeSession(
         in directory: URL,
-        transcriber: (any Transcriber)? = nil
+        transcriber: (any Transcriber)? = nil,
+        fileReadDeadline: Duration = .seconds(3),
+        abandonGrace: Duration = .seconds(5)
     ) async throws -> TranscriptionSession {
         let registry = EngineRegistry()
         let stub = transcriber ?? StubTranscriber()
@@ -71,7 +73,8 @@ struct TranscriptionSessionFileReadTests {
         return TranscriptionSession(
             modelStore: store,
             registry: registry,
-            fileReadDeadline: .seconds(3)
+            fileReadDeadline: fileReadDeadline,
+            abandonGrace: abandonGrace
         )
     }
 
@@ -118,6 +121,42 @@ struct TranscriptionSessionFileReadTests {
         let elapsed = started.duration(to: .now)
         #expect(transcript.segments.count == 1)
         #expect(elapsed < .seconds(5), "the next run waited \(elapsed) behind the wedged one")
+    }
+
+    @Test("cancelling inside the gate hands the slot over without waiting out the deadline")
+    func cancelInsideTheGateFreesTheSlot() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-gatecancel-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let wedged = dir.appendingPathComponent("wedged.wav")
+        #expect(mkfifo(wedged.path, 0o644) == 0, "could not create the FIFO the test needs")
+        defer {
+            let writer = open(wedged.path, O_WRONLY | O_NONBLOCK)
+            if writer >= 0 { close(writer) }
+        }
+        let readable = dir.appendingPathComponent("readable.wav")
+        try Data("RIFFstub".utf8).write(to: readable)
+
+        let session = try await makeSession(
+            in: dir, fileReadDeadline: .seconds(60), abandonGrace: .milliseconds(200)
+        )
+        let options = TranscriptionOptions(model: "openai_whisper-tiny")
+
+        let cancelled = Task {
+            try await session.transcribe(source: FileAudioSource(url: wedged), options: options)
+        }
+        try await Task.sleep(for: .milliseconds(300))
+        cancelled.cancel()
+
+        let started = ContinuousClock.now
+        let transcript = try await session.transcribe(
+            source: FileAudioSource(url: readable), options: options
+        )
+        let elapsed = started.duration(to: .now)
+        #expect(transcript.segments.count == 1)
+        #expect(elapsed < .seconds(10), "the next run waited \(elapsed) on a cancelled gate")
     }
 
     @Test("a file that stops reading after the gate skips the energy pass instead of parking")

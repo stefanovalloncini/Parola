@@ -110,8 +110,14 @@ public actor TranscriptionSession {
         try Task.checkCancellation()
         // The file is proved openable here, off the actor and on a deadline, rather than inside an
         // engine that would park in the same uninterruptible open() with the transcribe slot held.
-        let probe = await BoundedFileRead.run(deadline: fileReadDeadline) {
-            FileAudioSource(url: audioURL).synchronousDuration()
+        // The gate itself can run its full deadline, so a cancel during it arms the same abandon
+        // the engine call uses rather than leaving the next run queued behind a stopped one.
+        let probe = await withTaskCancellationHandler {
+            await BoundedFileRead.run(deadline: fileReadDeadline) {
+                FileAudioSource(url: audioURL).synchronousDuration()
+            }
+        } onCancel: {
+            Task { await self.abandonIfCancelledRunStalls(runID) }
         }
         guard case .done(let probedDuration) = probe else {
             ParolaLog.error(
@@ -270,6 +276,9 @@ public actor TranscriptionSession {
     /// The engine may be parked in a read no cancel reaches, and every later run would otherwise
     /// queue behind it until the app is relaunched.
     private func abandonIfCancelledRunStalls(_ runID: Int) async {
+        // Only this run's own engine: a cancel delivered as the body completes must not reach into
+        // whichever run has taken the slot since.
+        guard activeRun == runID else { return }
         await cancelInFlight()
         try? await Task.sleep(for: abandonGrace)
         guard activeRun == runID else { return }
