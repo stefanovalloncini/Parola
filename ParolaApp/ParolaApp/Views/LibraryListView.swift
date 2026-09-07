@@ -54,7 +54,7 @@ enum LibraryListContent {
         entries: [LibraryEntry]
     ) -> ActiveFilters {
         func matchesSomething(label: String? = nil, language: String? = nil, dateRange: LibraryDateRangeFilter = .all) -> Bool {
-            !rows(from: entries, category: category, labelFilter: label, languageFilter: language, dateRange: dateRange).isEmpty
+            anyRow(in: entries, category: category, labelFilter: label, languageFilter: language, dateRange: dateRange)
         }
         var kept = active
         if kept.label != nil, !matchesSomething(label: kept.label) { kept.label = nil }
@@ -73,15 +73,46 @@ enum LibraryListContent {
         entries: [LibraryEntry]
     ) -> Bool {
         guard !active.isEmpty else { return false }
-        let filtered = rows(
-            from: entries,
+        let anyMatch = anyRow(
+            in: entries,
             category: category,
             labelFilter: active.label,
             languageFilter: active.language,
             dateRange: active.dateRange
         )
-        guard filtered.isEmpty else { return false }
-        return !rows(from: entries, category: category, labelFilter: nil, languageFilter: nil, dateRange: .all).isEmpty
+        guard !anyMatch else { return false }
+        return anyRow(in: entries, category: category, labelFilter: nil, languageFilter: nil, dateRange: .all)
+    }
+
+    /// The same test `rows` applies, without building the array a caller only measures for emptiness.
+    private static func anyRow(
+        in entries: [LibraryEntry],
+        category: EntryCategory?,
+        labelFilter: String?,
+        languageFilter: String?,
+        dateRange: LibraryDateRangeFilter
+    ) -> Bool {
+        let cutoff = dateRange.cutoff
+        return entries.contains {
+            matches($0, category: category, labelFilter: labelFilter, languageFilter: languageFilter, cutoff: cutoff)
+        }
+    }
+
+    private static func matches(
+        _ entry: LibraryEntry,
+        category: EntryCategory?,
+        labelFilter: String?,
+        languageFilter: String?,
+        cutoff: Date?
+    ) -> Bool {
+        if let category, entry.category != category { return false }
+        if let labelFilter,
+           !entry.labels.contains(where: { $0.localizedCaseInsensitiveCompare(labelFilter) == .orderedSame }) {
+            return false
+        }
+        if let languageFilter, LanguageDisplay.code(for: entry.language) != languageFilter { return false }
+        if let cutoff, entry.createdAt < cutoff { return false }
+        return true
     }
 
     static func totalsLabel(for count: Int, locale: Locale = AppFormat.locale) -> String? {
@@ -154,15 +185,8 @@ enum LibraryListContent {
         dateRange: LibraryDateRangeFilter
     ) -> [LibraryEntry] {
         let cutoff = dateRange.cutoff
-        let filtered = entries.filter { entry in
-            if let category, entry.category != category { return false }
-            if let labelFilter,
-               !entry.labels.contains(where: { $0.localizedCaseInsensitiveCompare(labelFilter) == .orderedSame }) {
-                return false
-            }
-            if let languageFilter, LanguageDisplay.code(for: entry.language) != languageFilter { return false }
-            if let cutoff, entry.createdAt < cutoff { return false }
-            return true
+        let filtered = entries.filter {
+            matches($0, category: category, labelFilter: labelFilter, languageFilter: languageFilter, cutoff: cutoff)
         }
         // The entries arrive in the order the sidebar's sort menu picked; only pinning is layered on top.
         return filtered.filter(\.pinned) + filtered.filter { !$0.pinned }
