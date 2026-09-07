@@ -2,7 +2,9 @@ import Foundation
 import FluidAudio
 
 public enum ModelCatalog {
-    public static let all: [ModelVariant] = appleSpeechVariants() + curated
+    /// Turbo before Apple Speech: both are `.recommended`, and `defaultModelID()` walks this
+    /// order to pick the first one that's installed.
+    public static let all: [ModelVariant] = curated + appleSpeechVariants()
 
     private static func appleSpeechVariants() -> [ModelVariant] {
         guard #available(macOS 26.0, iOS 26.0, *) else { return [] }
@@ -151,15 +153,23 @@ public enum ModelCatalog {
     /// Last-resort model when nothing better is known: smallest multilingual Whisper.
     public static let fallbackModelID = "openai_whisper-tiny"
 
-    /// The model to use when the caller doesn't name one: the managed default if set,
-    /// else the first allowed recommended variant, else the first allowed variant at all.
-    public static func defaultModelID(configuration: ManagedConfiguration = .shared) -> String {
+    /// The model to use when the caller doesn't name one: the managed default if set, else the
+    /// first allowed `.recommended` variant that's actually installed (catalogue order, so Turbo
+    /// wins over Apple Speech when both are installed), else Apple Speech — it needs no download.
+    public static func defaultModelID(
+        configuration: ManagedConfiguration = .shared,
+        isInstalled: (String) -> Bool = { ModelStore.shared.isInstalled($0) }
+    ) -> String {
         if let managed = configuration.defaultModel, variant(id: managed) != nil {
             return managed
         }
         let allowed = configuration.filterAllowed(all)
-        if let recommended = allowed.first(where: { $0.category == .recommended }) {
-            return recommended.id
+        let recommended = allowed.filter { $0.category == .recommended }
+        if let installed = recommended.first(where: { isInstalled($0.id) }) {
+            return installed.id
+        }
+        if allowed.contains(where: { $0.id == AppleSpeechTranscriber.syntheticModelID }) {
+            return AppleSpeechTranscriber.syntheticModelID
         }
         return allowed.first?.id ?? fallbackModelID
     }
@@ -168,9 +178,10 @@ public enum ModelCatalog {
     /// diarization or translation (Apple Speech can't do either), falls back to the Whisper that can.
     public static func defaultModelID(
         for options: TranscriptionOptions,
-        configuration: ManagedConfiguration = .shared
+        configuration: ManagedConfiguration = .shared,
+        isInstalled: (String) -> Bool = { ModelStore.shared.isInstalled($0) }
     ) -> String {
-        let id = defaultModelID(configuration: configuration)
+        let id = defaultModelID(configuration: configuration, isInstalled: isInstalled)
         guard let caps = staticCapabilities(forID: id) else { return id }
         if options.diarize && !caps.supportsDiarization { return fallbackModelID }
         if options.task == .translate && !caps.supportsTranslate { return fallbackModelID }

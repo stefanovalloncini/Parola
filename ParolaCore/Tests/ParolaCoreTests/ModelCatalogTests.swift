@@ -75,6 +75,13 @@ struct ModelCatalogTests {
         #expect(categoriesInOrder == categoriesInOrder.sorted { $0.sortOrder < $1.sortOrder })
     }
 
+    @Test("groupedForPicker's Recommended group lists Turbo before Apple Speech, matching defaultModelID's catalogue order")
+    func recommendedGroupOrderMatchesDefault() throws {
+        let groups = ModelCatalog.groupedForPicker()
+        let recommended = try #require(groups.first(where: { $0.0 == .recommended })?.1)
+        #expect(recommended.map(\.id) == ["openai_whisper-large-v3_turbo", "apple-speech-analyzer"])
+    }
+
     @Test("variants(for:) returns only matching engine")
     func variantsForEngine() {
         let parakeet = ModelCatalog.variants(for: .parakeet)
@@ -167,14 +174,33 @@ struct ModelCatalogLookupTests {
     @Test("defaultModelID ignores an unknown managed default")
     func defaultIgnoresUnknownManaged() {
         let config = makeConfig(["defaultModel": "not-a-model"])
-        let id = ModelCatalog.defaultModelID(configuration: config)
+        let id = ModelCatalog.defaultModelID(configuration: config, isInstalled: { _ in false })
         #expect(ModelCatalog.variant(id: id)?.category == .recommended)
+    }
+
+    @Test("defaultModelID prefers Turbo over Apple Speech when both are installed")
+    func defaultPrefersInstalledTurbo() {
+        let id = ModelCatalog.defaultModelID(isInstalled: { _ in true })
+        #expect(id == "openai_whisper-large-v3_turbo")
+    }
+
+    @Test("defaultModelID falls back to Apple Speech when nothing recommended is installed")
+    func defaultFallsBackToAppleSpeechWhenNothingInstalled() {
+        let id = ModelCatalog.defaultModelID(isInstalled: { _ in false })
+        #expect(id == "apple-speech-analyzer")
+    }
+
+    @Test("defaultModelID skips an installed model the allowlist excludes")
+    func defaultSkipsDisallowedInstalledModel() {
+        let config = makeConfig(["allowedEngines": ["apple-speech"]])
+        let id = ModelCatalog.defaultModelID(configuration: config, isInstalled: { _ in true })
+        #expect(id == "apple-speech-analyzer")
     }
 
     @Test("defaultModelID respects the engine allowlist")
     func defaultRespectsAllowlist() {
         let config = makeConfig(["allowedEngines": ["whisperkit"]])
-        let id = ModelCatalog.defaultModelID(configuration: config)
+        let id = ModelCatalog.defaultModelID(configuration: config, isInstalled: { _ in false })
         #expect(id == "openai_whisper-large-v3_turbo")
     }
 
