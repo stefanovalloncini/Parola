@@ -70,23 +70,29 @@ public actor LibraryStore {
     }
 
     public init(libraryURL: URL, extraIndexer: LibraryIndexer?) {
-        self.init(
-            libraryURL: libraryURL, extraIndexer: extraIndexer,
-            didDecodeDocument: nil, didWriteBundle: nil
-        )
+        self.init(libraryURL: libraryURL, extraIndexer: extraIndexer, seams: TestSeams())
     }
 
-    /// The two hooks run off the actor once a decode has read a bundle and once `add` has written one, so a test can land work inside either.
+    /// One struct, not two params, so this init's signature can never collide with the public ones by argument count; the hooks run off the actor after a decode and after `add` writes a bundle.
+    struct TestSeams: Sendable {
+        var didDecodeDocument: (@Sendable () -> Void)?
+        var didWriteBundle: (@Sendable () -> Void)?
+
+        init(didDecodeDocument: (@Sendable () -> Void)? = nil, didWriteBundle: (@Sendable () -> Void)? = nil) {
+            self.didDecodeDocument = didDecodeDocument
+            self.didWriteBundle = didWriteBundle
+        }
+    }
+
     init(
         libraryURL: URL,
         extraIndexer: LibraryIndexer?,
-        didDecodeDocument: (@Sendable () -> Void)?,
-        didWriteBundle: (@Sendable () -> Void)?
+        seams: TestSeams
     ) {
         self.libraryURL = libraryURL
         self.extraIndexer = extraIndexer
-        self.didDecodeDocument = didDecodeDocument
-        self.didWriteBundle = didWriteBundle
+        self.didDecodeDocument = seams.didDecodeDocument
+        self.didWriteBundle = seams.didWriteBundle
         // Extra-indexer calls drain FIFO on one background worker: CoreSpotlight's XPC can
         // stall indefinitely (observed on ad-hoc dev builds), and a best-effort mirror index
         // must never block the library write path.

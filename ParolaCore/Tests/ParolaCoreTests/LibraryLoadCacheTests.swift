@@ -13,7 +13,7 @@ struct LibraryLoadCacheTests {
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         let store = LibraryStore(
             libraryURL: tmp, extraIndexer: nil,
-            didDecodeDocument: didDecodeDocument, didWriteBundle: nil
+            seams: LibraryStore.TestSeams(didDecodeDocument: didDecodeDocument)
         )
         return (store, tmp)
     }

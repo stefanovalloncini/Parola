@@ -13,7 +13,7 @@ struct LibraryStoreTests {
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         let store = LibraryStore(
             libraryURL: tmp, extraIndexer: nil,
-            didDecodeDocument: nil, didWriteBundle: didWriteBundle
+            seams: LibraryStore.TestSeams(didWriteBundle: didWriteBundle)
         )
         return (store, tmp)
     }
