@@ -70,6 +70,7 @@ let package = Package(
                 "ParolaDictation",
                 "ParolaTestSupport",
                 .product(name: "Clocks", package: "swift-clocks"),
+                .product(name: "WhisperKit", package: "WhisperKit"),
             ],
             resources: [
                 .process("Resources/sample.srt"),
