@@ -106,9 +106,10 @@ private func eventually(
     timeoutMs: Int = 5000,
     _ condition: @escaping @Sendable () async -> Bool
 ) async -> Bool {
-    for _ in 0..<(timeoutMs) {
+    let deadline = ContinuousClock.now + .milliseconds(timeoutMs)
+    while ContinuousClock.now < deadline {
         if await condition() { return true }
-        try? await Task.sleep(nanoseconds: 1_000_000)
+        try? await Task.sleep(for: .milliseconds(1))
     }
     return await condition()
 }
