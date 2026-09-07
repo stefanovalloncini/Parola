@@ -706,8 +706,7 @@ struct LibraryRow: View {
         }
     }
 
-    /// On a selected row the accent fill is the backdrop, so the chip wears a veil of the
-    /// foreground colour instead of the surface it would disappear into.
+    /// On a selected row the accent fill is the backdrop, so the chip wears a veil of the foreground.
     private func chip(_ label: Text) -> some View {
         label
             .font(DS.Font.caption)

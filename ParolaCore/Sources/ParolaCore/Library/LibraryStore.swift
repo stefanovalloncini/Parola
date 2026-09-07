@@ -72,8 +72,7 @@ public actor LibraryStore {
         self.init(libraryURL: libraryURL, extraIndexer: extraIndexer, didDecodeDocument: nil)
     }
 
-    /// `didDecodeDocument` runs on the off-actor queue once a decode has read the bundle, so a test
-    /// can force a mutation to land before that decode is handed back instead of timing it.
+    /// `didDecodeDocument` runs off the actor once a decode has read the bundle, so a test can force a mutation into it.
     init(
         libraryURL: URL,
         extraIndexer: LibraryIndexer?,
@@ -428,8 +427,7 @@ public actor LibraryStore {
         return boundaries
     }
 
-    /// `transcript` is nil for a bundle whose transcript is unreadable; its manifest notes are
-    /// still indexable.
+    /// `transcript` is nil for a bundle whose transcript is unreadable; its manifest notes still index.
     static func searchAuxiliaryText(notes: [String: String], transcript: Transcript?) -> String {
         var parts: [String] = []
         if let summary = transcript?.summary?.text, !summary.isEmpty { parts.append(summary) }
@@ -856,8 +854,7 @@ private func offActorIO<T: Sendable>(
     }
 }
 
-/// The hop cannot be cancelled once it is running, so the checks bracket it: a cancelled caller
-/// pays at most one pass of `work` instead of `decodedDocument`'s eight.
+/// The hop cannot be cancelled once running, so the checks bracket it: one pass of `work`, not eight.
 private func offActorThrowingIO<T: Sendable>(
     qos: DispatchQoS.QoSClass = .userInitiated,
     _ work: @escaping @Sendable () throws -> T

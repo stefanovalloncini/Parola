@@ -133,9 +133,7 @@ public enum DiagnosticsExport {
         render(reading: read(directory: directory), environment: environment, generatedAt: generatedAt)
     }
 
-    /// The most one report reads back. The sink enforces the same budget over its directory, but
-    /// only when a sweep runs, so a store that went over it would otherwise render as a
-    /// multi-megabyte plain-text report.
+    /// The most one report reads back; the sink enforces the same budget only when a sweep runs.
     static let maxReadBytes = 10_000_000
 
     static func read(directory: URL, maxBytes: Int = maxReadBytes) -> DiagnosticsReading {
@@ -179,8 +177,7 @@ public enum DiagnosticsExport {
         return reading
     }
 
-    /// Spends the byte budget newest file first, so an over-budget store keeps the records closest
-    /// to the bug. A file that gets no budget at all is left out of the returned limits.
+    /// Spends the budget newest file first; a file that gets none of it is left out of the limits.
     private static func readBudget(
         for files: [URL], maxBytes: Int
     ) -> (limits: [URL: Int], truncated: Bool) {

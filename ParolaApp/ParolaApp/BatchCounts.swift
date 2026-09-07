@@ -8,8 +8,7 @@ enum BatchProgress {
         return (jobs.count { $0.status == .done }, jobs.count)
     }
 
-    /// The header's caption, and whether it is a live progress count: one pass over the queue, so
-    /// the header does not scan it again to decide the accessibility id.
+    /// The header's caption and whether it is a live progress count, in one pass over the queue.
     static func headerLabel(
         for jobs: [BatchJob], locale: Locale = AppFormat.locale
     ) -> (text: String, isProgress: Bool)? {
