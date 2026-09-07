@@ -2,7 +2,7 @@ import Foundation
 
 extension DiagnosticsExport {
     private static let unknown = "unknown"
-    private static let labelWidth = 11
+    private static let labelWidth = 18
 
     static func render(
         reading: DiagnosticsReading,

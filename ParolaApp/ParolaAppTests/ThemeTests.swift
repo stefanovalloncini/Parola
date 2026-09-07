@@ -175,8 +175,13 @@ struct ThemePaletteTests {
             Issue.record("terracotta's accent is expected to be a dynamic color")
             return
         }
-        #expect(terracottaLight.relativeLuminance <= RGBA.darkForegroundLuminance)
-        #expect(terracottaLight.contrast(against: RGBA(1, 1, 1)) >= 3.0)
+        let light = try #require(NSAppearance(named: .aqua))
+        var foreground = RGBA(0, 0, 0)
+        light.performAsCurrentDrawingAppearance {
+            foreground = RGBA(ThemePreset.terracotta.accent.legibleForeground)
+        }
+        #expect(foreground.hex == RGBA(1, 1, 1).hex)
+        #expect(terracottaLight.contrast(against: foreground) >= 3.0)
     }
 
     @Test("a palette round-trips through Codable")

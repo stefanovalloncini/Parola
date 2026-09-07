@@ -64,11 +64,11 @@ struct AppModelDiagnosticsTests {
         #expect(text.hasPrefix("Parola Diagnostics — generated "))
         #expect(text.contains("No transcript text, file names, or paths are included."))
         #expect(text.contains("\nApp "))
-        #expect(text.contains("\nPermissions  "))
+        #expect(text.contains("\nPermissions         "))
         #expect(text.contains("\nEngines registered  whisperkit=ok parakeet=ok apple-speech=ok"))
-        #expect(text.contains("\nModels       "))
-        #expect(text.contains("\nLibrary      "))
-        #expect(text.contains("\nFeatures     "))
+        #expect(text.contains("\nModels              "))
+        #expect(text.contains("\nLibrary             "))
+        #expect(text.contains("\nFeatures            "))
         #expect(text.contains("seeded export record"))
     }
 

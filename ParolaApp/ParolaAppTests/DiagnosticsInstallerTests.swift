@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Parola
 import ParolaCore
+import ParolaTestSupport
 
 @Suite("Diagnostics installer", .serialized, .logFacade)
 struct DiagnosticsInstallerTests {

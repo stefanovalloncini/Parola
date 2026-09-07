@@ -188,13 +188,13 @@ struct DiagnosticsExportTests {
         #expect(text.contains("No transcript text, file names, or paths are included."))
         #expect(text.contains("App 1.0.0 (128)  macOS 26.1 (25B12)  arm64  32 GB  en_GB"))
         #expect(text.contains(
-            "Permissions  microphone=granted screenRecording=denied"
+            "Permissions         microphone=granted screenRecording=denied"
                 + " systemAudio=undetermined accessibility=granted"
         ))
         #expect(text.contains("Engines registered  whisperkit=ok parakeet=ok apple-speech=unavailable"))
-        #expect(text.contains("Models       openai_whisper-large-v3_turbo (1.5 GB)"))
-        #expect(text.contains("Library      143 entries, 12.4 GB"))
-        #expect(text.contains("Features     all enabled"))
+        #expect(text.contains("Models              openai_whisper-large-v3_turbo (1.5 GB)"))
+        #expect(text.contains("Library             143 entries, 12.4 GB"))
+        #expect(text.contains("Features            all enabled"))
         #expect(text.contains("No diagnostics recorded."))
     }
 
@@ -219,11 +219,11 @@ struct DiagnosticsExportTests {
         let text = DiagnosticsExport.render(directory: directory, environment: environment)
 
         #expect(text.contains("App unknown  macOS 26.1  arm64  16 GB  it_IT"))
-        #expect(text.contains("Permissions  unknown"))
+        #expect(text.contains("Permissions         unknown"))
         #expect(text.contains("Engines registered  unknown"))
-        #expect(text.contains("Models       none installed"))
-        #expect(text.contains("Library      unknown entries, not measured"))
-        #expect(text.contains("Features     ai, batch"))
+        #expect(text.contains("Models              none installed"))
+        #expect(text.contains("Library             unknown entries, not measured"))
+        #expect(text.contains("Features            ai, batch"))
     }
 
     @Test("an unrecognized model id never reaches the header")
@@ -234,7 +234,7 @@ struct DiagnosticsExportTests {
         environment.models = [.init(token: ModelToken("/Users/someone/Models/secret"), bytes: nil)]
         let text = DiagnosticsExport.render(directory: directory, environment: environment)
 
-        #expect(text.contains("Models       unrecognized (size unknown)"))
+        #expect(text.contains("Models              unrecognized (size unknown)"))
         #expect(!text.contains("/Users/"))
     }
 
