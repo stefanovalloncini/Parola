@@ -609,11 +609,11 @@ struct LibraryRow: View {
                             Text("\(display.noteCount)")
                                 .font(DS.Font.caption2Medium)
                         }
-                        .foregroundStyle(DS.Color.accent.opacity(0.8))
+                        .foregroundStyle(DS.Color.accentText)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
                         .background(
-                            Capsule().fill(DS.Color.accent.opacity(0.10))
+                            Capsule().fill(DS.Color.accentWash)
                         )
                     }
                 }

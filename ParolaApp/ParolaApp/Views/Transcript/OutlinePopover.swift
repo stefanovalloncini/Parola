@@ -74,7 +74,7 @@ private struct OutlineRow: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(Timecode.format(entry.start))
                     .font(DS.Font.subheadlineMedium.monospacedDigit())
-                    .foregroundStyle(DS.Color.accent)
+                    .foregroundStyle(DS.Color.accentText)
                     .frame(width: 50, alignment: .leading)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(entry.title)

@@ -26,10 +26,10 @@ struct TranscriptHeaderBar: View {
             if let label = languageLabel {
                 Text(label)
                     .font(DS.Font.caption2Emphasized)
-                    .foregroundStyle(DS.Color.accent)
+                    .foregroundStyle(DS.Color.accentText)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Capsule().fill(DS.Color.accent.opacity(0.14)))
+                    .background(Capsule().fill(DS.Color.accentWash))
                     .modifier(LanguagePillHelpModifier(isAssumed: model.assumedLanguageNotice != nil))
             }
 

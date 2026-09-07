@@ -77,6 +77,12 @@ struct SurfaceContrastTests {
         [
             ("the run readout", palette.accentWash),
             ("the inspector's label chips", palette.accentWash),
+            ("the header bar's language pill", palette.accentWash),
+            ("the media bar's speed pill", palette.accentWash),
+            ("the library row's note badge", palette.accentWash),
+            ("the outline popover's timecodes", palette.surfaceElevated),
+            ("the inspector's chapter timecodes", palette.surfaceElevated),
+            ("the streaming caret", palette.surface),
         ]
     }
 
@@ -107,13 +113,17 @@ struct SurfaceContrastTests {
         #expect(wash.dark != surface.dark)
     }
 
-    @Test("red and green as text clear AA on both surfaces, both schemes",
+    @Test("red, green and amber as text clear AA on both surfaces, both schemes",
           arguments: ThemePreset.allCases)
     func statusTextContrast(preset: ThemePreset) throws {
         let palette = preset.palette
         let surface = try #require(Self.pair(palette.surface))
         let card = try #require(Self.pair(palette.surfaceElevated))
-        for (name, token) in [("danger", palette.dangerText), ("success", palette.successText)] {
+        for (name, token) in [
+            ("danger", palette.dangerText),
+            ("success", palette.successText),
+            ("warning", palette.warningText),
+        ] {
             let text = try #require(Self.pair(token))
             #expect(text.light.contrast(against: surface.light) >= Self.minimum, "\(name) light on surface")
             #expect(text.light.contrast(against: card.light) >= Self.minimum, "\(name) light on card")

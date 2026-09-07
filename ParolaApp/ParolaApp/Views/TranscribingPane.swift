@@ -169,7 +169,7 @@ struct TranscribingPane: View {
 
     private func caret(visible: Bool) -> Text {
         Text(verbatim: "\u{258F}")
-            .foregroundStyle(DS.Color.accent.opacity(visible ? 1 : 0))
+            .foregroundStyle(DS.Color.accentText.opacity(visible ? 1 : 0))
     }
 
     private var transcriptBox: some View {

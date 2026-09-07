@@ -148,11 +148,12 @@ private struct SpeedPillStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(DS.Font.calloutMonoEmphasized)
-            .foregroundStyle(DS.Color.accent)
+            .foregroundStyle(DS.Color.accentText)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(Capsule().fill(DS.Color.accent.opacity(configuration.isPressed ? 0.24 : 0.14)))
+            .background(Capsule().fill(DS.Color.accentWash))
             .overlay(Capsule().strokeBorder(DS.Color.accent.opacity(0.35), lineWidth: 1))
+            .opacity(configuration.isPressed ? 0.85 : 1)
             .contentShape(Capsule())
     }
 }
