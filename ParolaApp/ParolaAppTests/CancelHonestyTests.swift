@@ -85,6 +85,52 @@ struct CancelHonestyTests {
         #expect(model.cancelSettled)
     }
 
+    @Test("a batch run that is still parked reports cancelling too")
+    func parkedBatchReportsCancelling() async throws {
+        let (model, server, context, command) = try makeRig()
+        let gate = StallGate()
+        defer { gate.open() }
+        model.batchTask = Task { await gate.wait() }
+        #expect(model.canCancel)
+
+        let result = try await command.handler(AutomationArgs([:]), context)
+        withExtendedLifetime(server) {}
+
+        #expect(flag(result, "cancelling") == true)
+        #expect(flag(result, "cancelled") == nil)
+    }
+
+    @Test("a batch run that unwinds reports cancelled")
+    func unwoundBatchReportsCancelled() async throws {
+        let (model, server, context, command) = try makeRig()
+        let gate = StallGate()
+        model.batchTask = Task { await gate.wait() }
+        gate.open()
+
+        let result = try await command.handler(AutomationArgs([:]), context)
+        withExtendedLifetime(server) {}
+
+        #expect(flag(result, "cancelled") == true)
+    }
+
+    @Test("a run left parked by an earlier pass does not taint the next cancel")
+    func anOldZombieDoesNotTaintTheNextPass() async throws {
+        let (model, server, context, command) = try makeRig()
+        let zombie = StallGate()
+        defer { zombie.open() }
+        model.fileTranscribeTask = Task { await zombie.wait() }
+        _ = try await command.handler(AutomationArgs([:]), context)
+        #expect(!model.cancelSettled)
+
+        let quick = StallGate()
+        model.fileTranscribeTask = Task { await quick.wait() }
+        quick.open()
+        let result = try await command.handler(AutomationArgs([:]), context)
+        withExtendedLifetime(server) {}
+
+        #expect(flag(result, "cancelled") == true)
+    }
+
     @Test("nothing in flight still reports cancelled false")
     func idleReportsNothingCancelled() async throws {
         let (model, server, context, command) = try makeRig()

@@ -373,8 +373,7 @@ extension AppModel {
     }
 
     func cancelAllInFlightBatchJobs() {
-        batchTask?.cancel()
-        batchTask = nil
+        cancelAndTrack(&batchTask)
         for idx in batchJobs.indices where batchJobs[idx].status == .pending || batchJobs[idx].status == .transcribing {
             batchJobs[idx].status = .cancelled
         }

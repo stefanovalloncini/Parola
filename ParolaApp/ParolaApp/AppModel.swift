@@ -992,7 +992,8 @@ final class AppModel {
     @ObservationIgnored var streamingConsumer: Task<Void, Never>?
     @ObservationIgnored var fileTranscribeTask: Task<Void, Never>?
     @ObservationIgnored var fileReadDeadline: Duration = FileReadDeadline.header
-    @ObservationIgnored private var unsettledCancels = 0
+    @ObservationIgnored private var cancelPass = 0
+    @ObservationIgnored private var unsettledInPass = 0
     /// Bumped by every file run. An abandoned run's engine can keep emitting after the slot has
     /// moved on, and its partials would land in the pane the next run is filling.
     @ObservationIgnored private(set) var fileRunGeneration = 0
@@ -1043,8 +1044,7 @@ final class AppModel {
         stopRecordingWatch()
         endActiveRecovery()
         liveRecordingAudioURL = nil
-        streamingConsumer?.cancel()
-        streamingConsumer = nil
+        cancelAndTrack(&streamingConsumer)
         if let s = streamingSession {
             streamingSession = nil
             Task { await s.stop() }
@@ -1059,6 +1059,10 @@ final class AppModel {
 
     func cancelCurrentWork() {
         let hadWork = canCancel || liveSource != nil
+        // A new pass reports on its own runs only: one abandoned an hour ago must not make an
+        // honest cancel look like it never finished.
+        cancelPass &+= 1
+        unsettledInPass = 0
         cancelAllInFlightBatchJobs()
         deferredArrivals = []
         deferredLinks = []
@@ -1072,20 +1076,22 @@ final class AppModel {
         if hadWork || phase != .ready { phase = .idle }
     }
 
-    private func cancelAndTrack(_ task: inout Task<Void, Never>?) {
+    func cancelAndTrack(_ task: inout Task<Void, Never>?) {
         guard let running = task else { return }
         running.cancel()
         task = nil
-        unsettledCancels += 1
+        let pass = cancelPass
+        unsettledInPass += 1
         Task { [weak self] in
             await running.value
-            self?.unsettledCancels -= 1
+            guard let self, self.cancelPass == pass else { return }
+            self.unsettledInPass -= 1
         }
     }
 
-    /// True once every run `cancel()` asked to stop has actually unwound. A run parked in a
+    /// True once every run this pass asked to stop has actually unwound. A run parked in a
     /// blocking read has not, and calling that cancelled is how the wedge went unnoticed.
-    var cancelSettled: Bool { unsettledCancels == 0 }
+    var cancelSettled: Bool { unsettledInPass == 0 }
 
     func awaitCancelSettled(within budget: Duration) async -> Bool {
         let deadline = ContinuousClock.now + budget
