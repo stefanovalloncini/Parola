@@ -43,7 +43,13 @@ struct CLIEntryLoggingTests {
             try (["enabledFeatures": ["meetings", "batch"]] as NSDictionary).write(to: plist)
             var overrides = environment
             overrides["PAROLA_MANAGED_PLIST"] = plist.path
-            let run = try runParola(["record"], environment: overrides, currentDirectory: home)
+            // `--seconds` bounds the take: without it a regressed gate records until Ctrl-C.
+            let run = try runParola(
+                ["record", "--seconds", "0.2"],
+                environment: overrides,
+                currentDirectory: home,
+                timeout: 30
+            )
 
             #expect(run.status != 0)
             #expect(run.output.contains("disabled in this deployment"))

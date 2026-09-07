@@ -33,11 +33,14 @@ struct ParolaRun {
 }
 
 /// Spawns the real binary. The two streams land in files rather than pipes so a chatty child can
-/// never fill a pipe buffer while the test is draining the other one.
+/// never fill a pipe buffer while the test is draining the other one. The wait is bounded: a child
+/// that stops exiting on its own (a regressed `record` gate listens on the mic until Ctrl-C) has to
+/// fail the test, not wedge `swift test`.
 func runParola(
     _ arguments: [String],
     environment overrides: [String: String] = [:],
-    currentDirectory: URL? = nil
+    currentDirectory: URL? = nil,
+    timeout: TimeInterval = 120
 ) throws -> ParolaRun {
     let binary = try #require(parolaBinaryURL)
     let scratch = FileManager.default.temporaryDirectory
@@ -62,13 +65,28 @@ func runParola(
     process.standardOutput = try FileHandle(forWritingTo: outURL)
     process.standardError = try FileHandle(forWritingTo: errURL)
     try process.run()
-    process.waitUntilExit()
+    if !waitForExit(process, within: timeout) {
+        Issue.record("`parola \(arguments.joined(separator: " "))` did not exit within \(Int(timeout))s")
+        process.terminate()
+        if !waitForExit(process, within: 5) {
+            kill(process.processIdentifier, SIGKILL)
+            _ = waitForExit(process, within: 5)
+        }
+    }
 
     return ParolaRun(
         stdout: (try? String(contentsOf: outURL, encoding: .utf8)) ?? "",
         stderr: (try? String(contentsOf: errURL, encoding: .utf8)) ?? "",
-        status: process.terminationStatus
+        status: process.isRunning ? -1 : process.terminationStatus
     )
+}
+
+private func waitForExit(_ process: Process, within seconds: TimeInterval) -> Bool {
+    let deadline = Date().addingTimeInterval(seconds)
+    while process.isRunning, Date() < deadline {
+        Thread.sleep(forTimeInterval: 0.02)
+    }
+    return !process.isRunning
 }
 
 /// `HOME` alone does not move `~/Library/Caches`: `NSHomeDirectory()` reads the password database.
