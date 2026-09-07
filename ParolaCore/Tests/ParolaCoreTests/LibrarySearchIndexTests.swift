@@ -193,6 +193,38 @@ struct LibrarySearchIndexTests {
         #expect(match.matchCount == 2)
     }
 
+    /// v7 boundaries counted blank segments, so their indices address a transcript the app never sees.
+    @Test("a v7 snapshot's raw-segment boundaries are discarded")
+    func snapshotWithRawSegmentBoundariesIsDiscarded() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-search-v7-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let v7 = #"{"version":7,"entries":[{"id":"e1","title":"Riunione","excerpt":"Buongiorno a tutti lancio",""#
+            + #""excerptTruncated":false,"tokens":["buongiorno","lancio","riunione","tutti"],"counts":[1,1,1,1],"#
+            + #""offsets":[0,19,-1,14],"boundaryOffsets":[0,19,19],"boundaryCentiseconds":[0,450,900],"#
+            + #""fingerprint":"f1"}]}"#
+        try Data(v7.utf8).write(to: url)
+        let index = LibrarySearchIndex(indexURL: url)
+
+        #expect(await index.search("lancio").isEmpty)
+        #expect(await index.needsRebuild(matching: ["e1": "f1"]))
+
+        let transcript = makeTranscript([(0, "Buongiorno a tutti"), (4.5, ""), (9, "lancio di primavera")])
+        await index.rebuild(entries: [
+            .init(
+                id: "e1",
+                title: "Riunione",
+                text: transcript.text,
+                boundaries: LibraryStore.segmentBoundaries(for: transcript),
+                fingerprint: "f1"
+            )
+        ])
+        let hit = try #require(await index.search("lancio").first(where: { $0.entryID == "e1" })?.firstHit)
+        #expect(hit.segmentIndex == 1)
+        #expect(hit.seconds == 9)
+        await index.flush()
+    }
+
     @Test("the snapshot carries each entry's segment boundaries")
     func snapshotStoresSegmentBoundaries() async throws {
         let (index, url) = makeTempIndex()

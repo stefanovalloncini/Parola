@@ -134,17 +134,33 @@ extension AppModel {
         return segments.binarySearchSegmentIndex(coveringTime: time)
     }
 
+    /// Every seek the user asks for lands here: it hands the selection back from a reveal first, so
+    /// the highlight follows a scrub made without pressing play. `precise` is false for the scrubber,
+    /// which reads better with the tolerance AVPlayer picks.
+    func seekPlayer(to seconds: Double, precise: Bool = true) {
+        guard seconds.isFinite else { return }
+        let target = max(0, seconds)
+        pendingRevealSegmentID = nil
+        currentTimeSeconds = target
+        updateCurrentSegment(time: target)
+        guard let player else { return }
+        let time = CMTime(seconds: target, preferredTimescale: 600)
+        if precise {
+            player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+        } else {
+            player.seek(to: time)
+        }
+    }
+
     func seek(to segment: TranscriptSegment) {
         guard let player else { return }
-        let t = CMTime(seconds: segment.start, preferredTimescale: 600)
-        player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
+        seekPlayer(to: segment.start)
         player.play()
     }
 
     func seekTo(chapter: Chapter) {
         guard let player else { return }
-        let t = CMTime(seconds: chapter.start, preferredTimescale: 600)
-        player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
+        seekPlayer(to: chapter.start)
         player.play()
     }
 
@@ -178,8 +194,7 @@ extension AppModel {
 
     func seekTo(seconds: Double) {
         guard let player, seconds.isFinite else { return }
-        let t = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
-        player.seek(to: t, toleranceBefore: .zero, toleranceAfter: .zero)
+        seekPlayer(to: seconds)
         player.play()
     }
 
@@ -196,10 +211,7 @@ extension AppModel {
         guard let player else { return }
         let current = CMTimeGetSeconds(player.currentTime())
         guard current.isFinite else { return }
-        let target = Self.skipTarget(current: current, by: seconds)
-        player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
-        currentTimeSeconds = target
-        updateCurrentSegment(time: target)
+        seekPlayer(to: Self.skipTarget(current: current, by: seconds))
     }
 
     func seekToSegment(id: TranscriptSegment.ID) {

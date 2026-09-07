@@ -99,6 +99,7 @@ extension AppModel {
     /// The one way a stored document takes over the pane: drop what the last transcript derived, then adopt what this one saved.
     func installStoredTranscript(_ stored: Transcript) {
         clearDerivedArtifacts()
+        pendingRevealSegmentID = nil
         transcript = stored
         adoptSavedChapters()
     }

@@ -119,7 +119,7 @@ struct MediaBar: View {
         let wasPlaying = model.player?.timeControlStatus == .playing
         let duration = model.transcript?.durationSeconds ?? 0
         if !wasPlaying, duration > 0, model.currentTimeSeconds >= duration - 0.05 {
-            model.player?.seek(to: .zero)
+            model.seekPlayer(to: 0, precise: false)
         }
         model.togglePlayPause()
         if !wasPlaying {
@@ -169,7 +169,7 @@ struct PlaybackProgressView: View {
             duration: duration,
             onScrub: { scrubbingTo = $0 },
             onCommit: { target in
-                model.player?.seek(to: CMTime(seconds: target, preferredTimescale: 600))
+                model.seekPlayer(to: target, precise: false)
                 scrubbingTo = nil
             }
         )

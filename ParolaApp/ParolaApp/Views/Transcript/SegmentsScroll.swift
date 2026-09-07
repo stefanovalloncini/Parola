@@ -131,6 +131,7 @@ struct SegmentsScroll: View {
             try? await Task.sleep(for: .milliseconds(16))
             if derived.visible.contains(where: { $0.id == id }) { break }
         }
+        guard derived.visible.contains(where: { $0.id == id }) else { return }
         withAnimation(.easeInOut(duration: 0.2)) {
             proxy.scrollTo(id, anchor: .center)
         }

@@ -294,6 +294,26 @@ struct FindAndReplaceTests {
         #expect(model.currentSegmentID == 0)
     }
 
+    /// The scrubber, the restart seek and skip all land on `seekPlayer`, and none of them presses play.
+    @Test("a seek takes the selection back from a reveal")
+    func aSeekEndsTheReveal() {
+        model.revealInTranscript("Goodbye Hello", at: .init(seconds: 1, segmentIndex: 1, textOffset: 12))
+        #expect(model.currentSegmentID == 1)
+
+        model.seekPlayer(to: 2.5)
+
+        #expect(model.pendingRevealSegmentID == nil)
+        #expect(model.currentSegmentID == 2)
+    }
+
+    /// A summary run and the YouTube-subtitles path swap the transcript without touching the player.
+    @Test("installing another stored transcript drops the reveal")
+    func aTranscriptSwapEndsTheReveal() {
+        model.revealInTranscript("Goodbye Hello", at: .init(seconds: 1, segmentIndex: 1, textOffset: 12))
+        model.installStoredTranscript(Self.makeTranscript())
+        #expect(model.pendingRevealSegmentID == nil)
+    }
+
     /// Every entry the app opens installs or tears down a player before the reveal runs.
     @Test("opening another entry drops the reveal the last one carried")
     func revealDoesNotOutliveItsEntry() {
