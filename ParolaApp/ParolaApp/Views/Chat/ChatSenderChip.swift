@@ -25,21 +25,33 @@ struct ChatSenderChip: View {
                 Image(systemName: "chevron.down")
                     .font(DS.Font.caption2Emphasized)
             }
+        }
+        .menuStyle(.button)
+        .buttonStyle(SenderChipButtonStyle(isFiltered: selection != .all))
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Filter by sender")
+    }
+}
+
+/// The chip's own chrome as a style: `.borderlessButton` hands the label to AppKit, which drops it.
+private struct SenderChipButtonStyle: ButtonStyle {
+    let isFiltered: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
             .padding(.horizontal, 10)
             .frame(height: 28)
-            .foregroundStyle(selection == .all ? Color.primary.opacity(0.85) : Color.white)
+            .foregroundStyle(isFiltered ? DS.Color.onAccent : Color.primary.opacity(0.85))
             .background(
                 RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
-                    .fill(selection == .all ? DS.Color.surfaceElevated.opacity(0.85) : DS.Color.accent)
+                    .fill(isFiltered ? DS.Color.accent : DS.Color.surfaceElevated.opacity(0.85))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
                     .stroke(DS.Color.separator.opacity(0.4), lineWidth: 0.5)
             )
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Filter by sender")
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .contentShape(RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous))
     }
 }

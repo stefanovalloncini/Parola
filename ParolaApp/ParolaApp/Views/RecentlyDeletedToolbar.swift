@@ -145,10 +145,9 @@ struct RecentlyDeletedToolbar: View {
             Image(systemName: "chevron.up.chevron.down")
                 .font(DS.Font.subheadlineEmphasized)
                 .foregroundStyle(.secondary)
-                .frame(width: 28, height: 26)
-                .background(RecentlyDeletedPillChrome())
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(RecentlyDeletedPillButtonStyle())
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort")
@@ -172,10 +171,9 @@ struct RecentlyDeletedToolbar: View {
         } label: {
             Image(systemName: "ellipsis")
                 .font(DS.Font.heading)
-                .frame(width: 28, height: 26)
-                .background(RecentlyDeletedPillChrome())
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(RecentlyDeletedPillButtonStyle())
         .menuIndicator(.hidden)
         .fixedSize()
         .help("More actions")
@@ -248,6 +246,17 @@ struct RecentlyDeletedFilterBar: View {
     private func dot(for option: RecentlyDeletedCategoryFilter) -> Color? {
         guard let category = option.category, categoryFilter != option else { return nil }
         return DS.categoryTint(for: category)
+    }
+}
+
+/// The page's own pill as a style: `.borderlessButton` hands the label to AppKit, which drops it.
+struct RecentlyDeletedPillButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(width: 28, height: 26)
+            .background(RecentlyDeletedPillChrome())
+            .opacity(configuration.isPressed ? 0.7 : 1)
+            .contentShape(Capsule(style: .continuous))
     }
 }
 
