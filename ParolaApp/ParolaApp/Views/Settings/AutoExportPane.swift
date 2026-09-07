@@ -164,9 +164,9 @@ struct AutoExportPane: View {
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
-                .font(DS.Font.calloutMedium)
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(DSIconChipButtonStyle(side: 28))
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Sort")

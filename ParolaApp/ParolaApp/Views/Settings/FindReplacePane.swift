@@ -58,7 +58,7 @@ struct FindReplacePane: View {
                 } label: {
                     Label("Import pack", systemImage: "tray.and.arrow.down")
                 }
-                .menuStyle(.borderlessButton)
+                .menuStyle(.button)
                 .fixedSize()
                 .axLeaf("FindReplace.Menu.ImportPack")
 
@@ -138,10 +138,9 @@ struct FindReplacePane: View {
                 }
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
-                    .font(DS.Font.calloutEmphasized)
-                    .foregroundStyle(.secondary)
             }
-            .menuStyle(.borderlessButton)
+            .menuStyle(.button)
+            .buttonStyle(DSIconChipButtonStyle(side: 28))
             .menuIndicator(.hidden)
             .fixedSize()
             .help("Sort rules")
