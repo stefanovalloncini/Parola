@@ -1,14 +1,18 @@
 import Testing
 import Foundation
+import os
 @testable import ParolaCore
 
 @Suite("LibraryStore", .tags(.fileSystem))
 struct LibraryStoreTests {
-    private func makeTempLibrary() throws -> (LibraryStore, URL) {
+    private func makeTempLibrary(
+        didWriteBundle: (@Sendable () -> Void)? = nil
+    ) throws -> (LibraryStore, URL) {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-library-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        return (LibraryStore(libraryURL: tmp, extraIndexer: nil), tmp)
+        let store = LibraryStore(libraryURL: tmp, extraIndexer: nil, didWriteBundle: didWriteBundle)
+        return (store, tmp)
     }
 
     private func makeFakeAudio() throws -> URL {
@@ -313,6 +317,43 @@ struct LibraryStoreTests {
 
         await #expect(throws: CancellationError.self) { try await loading.value }
         #expect(try await store.load(entry.id).entry.id == entry.id)
+    }
+
+    @Test("an add cancelled after the write still lists and indexes the bundle")
+    func cancelledAddKeepsTheBundleListed() async throws {
+        let written = OSAllocatedUnfairLock(initialState: false)
+        let proceed = DispatchSemaphore(value: 0)
+        let (store, tmp) = try makeTempLibrary(didWriteBundle: {
+            written.withLock { $0 = true }
+            proceed.wait()
+        })
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "kangaroo invoice")],
+            language: "en",
+            modelName: "tiny"
+        )
+
+        // Primes the list and index caches, which are what a skipped bookkeeping pass would strand.
+        #expect(await store.list().isEmpty)
+        #expect(await store.search("kangaroo").isEmpty)
+
+        let adding = Task { try await store.add(transcript: transcript, audioSource: nil) }
+        let deadline = ContinuousClock.now + .seconds(10)
+        while !written.withLock({ $0 }) {
+            if ContinuousClock.now > deadline {
+                Issue.record("the bundle was never written")
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(1))
+        }
+        adding.cancel()
+        proceed.signal()
+
+        await #expect(throws: CancellationError.self) { _ = try await adding.value }
+        let entries = await store.list()
+        #expect(entries.count == 1, "a bundle on disk that no list shows is invisible until relaunch")
+        #expect(await store.search("kangaroo").count == 1, "the cancelled add left the entry unindexed")
     }
 
     @Test("delete invalidates the list cache so the entry no longer appears")

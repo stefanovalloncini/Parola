@@ -63,24 +63,30 @@ public actor LibraryStore {
     private var indexReadyTask: Task<Void, Never>?
     private nonisolated let extraIndexerJobs: AsyncStream<@Sendable () async -> Void>.Continuation?
     private nonisolated let didDecodeDocument: (@Sendable () -> Void)?
+    private nonisolated let didWriteBundle: (@Sendable () -> Void)?
 
     public init(libraryURL: URL = LibraryStore.defaultLibraryURL) {
         self.init(libraryURL: libraryURL, extraIndexer: SpotlightIndexer())
     }
 
     public init(libraryURL: URL, extraIndexer: LibraryIndexer?) {
-        self.init(libraryURL: libraryURL, extraIndexer: extraIndexer, didDecodeDocument: nil)
+        self.init(
+            libraryURL: libraryURL, extraIndexer: extraIndexer,
+            didDecodeDocument: nil, didWriteBundle: nil
+        )
     }
 
-    /// `didDecodeDocument` runs off the actor once a decode has read the bundle, so a test can force a mutation into it.
+    /// The two hooks run off the actor once a decode has read a bundle and once `add` has written one, so a test can land work inside either.
     init(
         libraryURL: URL,
         extraIndexer: LibraryIndexer?,
-        didDecodeDocument: (@Sendable () -> Void)?
+        didDecodeDocument: (@Sendable () -> Void)? = nil,
+        didWriteBundle: (@Sendable () -> Void)? = nil
     ) {
         self.libraryURL = libraryURL
         self.extraIndexer = extraIndexer
         self.didDecodeDocument = didDecodeDocument
+        self.didWriteBundle = didWriteBundle
         // Extra-indexer calls drain FIFO on one background worker: CoreSpotlight's XPC can
         // stall indefinitely (observed on ad-hoc dev builds), and a best-effort mirror index
         // must never block the library write path.
@@ -330,20 +336,31 @@ public actor LibraryStore {
     ) async throws -> LibraryEntry {
         let name = uniqueEntryName(at: Date())
         let bundleURL = libraryURL.appendingPathComponent(name)
-        // Off the actor: writing the bundle copies the source media, which can take seconds for long
-        // recordings and would stall every other library call on this actor.
-        try await offActorThrowingIO {
-            _ = try ParolaDocument.write(
-                transcript: transcript,
-                audioURL: audioSource,
-                to: bundleURL,
-                category: category,
-                titleOverride: title
-            )
+        let target = bundleURL.appendingPathExtension("parola")
+        var cancelled = false
+        do {
+            // Off the actor: writing the bundle copies the source media, which can take seconds for long
+            // recordings and would stall every other library call on this actor.
+            try await offActorThrowingIO { [didWriteBundle] in
+                _ = try ParolaDocument.write(
+                    transcript: transcript,
+                    audioURL: audioSource,
+                    to: bundleURL,
+                    category: category,
+                    titleOverride: title
+                )
+                didWriteBundle?()
+            }
+        } catch is CancellationError {
+            // A bundle already on disk is listed and indexed before the cancel is reported: the caches
+            // are memoized, so skipping the bookkeeping would hide it until the next launch.
+            guard FileManager.default.fileExists(atPath: target.path) else { throw CancellationError() }
+            cancelled = true
         }
         invalidateListCaches()
-        let entry = try makeEntry(bundleURL: bundleURL.appendingPathExtension("parola"))
+        let entry = try makeEntry(bundleURL: target)
         await indexEntry(entry, transcript: transcript)
+        if cancelled { throw CancellationError() }
         return entry
     }
 
