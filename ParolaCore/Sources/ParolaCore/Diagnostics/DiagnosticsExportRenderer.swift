@@ -39,7 +39,7 @@ extension DiagnosticsExport {
                 environment.localeIdentifier,
             ].joined(separator: "  "),
             row("Permissions", permissionsText(environment)),
-            row("Engines", enginesText(environment.engines)),
+            row("Engines registered", enginesText(environment.engines)),
             row("Models", modelsText(environment.models)),
             row("Library", libraryText(environment)),
             row("Features", featuresText(environment.features)),
@@ -68,11 +68,17 @@ extension DiagnosticsExport {
         return rendered.isEmpty ? "unknown" : rendered.joined(separator: " ")
     }
 
+    /// The order the app and CLI register engines in, so the row reads the same way every time.
+    private static let engineOrder: [EngineID] = [.whisperKit, .parakeet, .appleSpeech]
+
     private static func enginesText(_ engines: [EngineID: Bool]) -> String {
         guard !engines.isEmpty else { return unknown }
-        return engines
-            .map { "\($0.key.logToken)=\($0.value ? "ok" : "unavailable")" }
-            .sorted()
+        let known = engineOrder.compactMap { id in engines[id].map { (id, $0) } }
+        let extra = engines.keys.filter { !engineOrder.contains($0) }
+            .sorted { $0.rawValue < $1.rawValue }
+            .compactMap { id in engines[id].map { (id, $0) } }
+        return (known + extra)
+            .map { "\($0.0.logToken)=\($0.1 ? "ok" : "unavailable")" }
             .joined(separator: " ")
     }
 

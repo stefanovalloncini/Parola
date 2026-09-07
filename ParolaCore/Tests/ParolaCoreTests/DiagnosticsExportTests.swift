@@ -191,11 +191,23 @@ struct DiagnosticsExportTests {
             "Permissions  microphone=granted screenRecording=denied"
                 + " systemAudio=undetermined accessibility=granted"
         ))
-        #expect(text.contains("Engines      apple-speech=unavailable parakeet=ok whisperkit=ok"))
+        #expect(text.contains("Engines registered  whisperkit=ok parakeet=ok apple-speech=unavailable"))
         #expect(text.contains("Models       openai_whisper-large-v3_turbo (1.5 GB)"))
         #expect(text.contains("Library      143 entries, 12.4 GB"))
         #expect(text.contains("Features     all enabled"))
         #expect(text.contains("No diagnostics recorded."))
+    }
+
+    /// The row asserts registration, not a model-load probe — every known engine, in the order the app and CLI register them, regardless of the dictionary's own iteration order.
+    @Test("the engines row lists every known engine by name, in registry order")
+    func engineRowListsKnownEnginesInRegistryOrder() throws {
+        let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var environment = emptyEnvironment
+        environment.engines = [.appleSpeech: false, .whisperKit: true, .parakeet: true]
+        let text = DiagnosticsExport.render(directory: directory, environment: environment)
+
+        #expect(text.contains("Engines registered  whisperkit=ok parakeet=ok apple-speech=unavailable"))
     }
 
     @Test("the header degrades where the frontend has no answer")
@@ -208,7 +220,7 @@ struct DiagnosticsExportTests {
 
         #expect(text.contains("App unknown  macOS 26.1  arm64  16 GB  it_IT"))
         #expect(text.contains("Permissions  unknown"))
-        #expect(text.contains("Engines      unknown"))
+        #expect(text.contains("Engines registered  unknown"))
         #expect(text.contains("Models       none installed"))
         #expect(text.contains("Library      unknown entries, not measured"))
         #expect(text.contains("Features     ai, batch"))
