@@ -294,6 +294,14 @@ struct FindAndReplaceTests {
         #expect(model.pendingRevealSegmentID == nil)
     }
 
+    /// The index counts segments the app never sees, so the time beside the hit decides which line it is.
+    @Test("a stale segment index loses to the hit's time")
+    func revealResolvesAStaleIndexByTime() {
+        model.revealInTranscript("world", at: .init(seconds: 2, segmentIndex: 0, textOffset: 0))
+        #expect(model.currentSegmentID == 2)
+        #expect(model.pendingRevealSegmentID == 2)
+    }
+
     /// A position from an index that no longer matches the transcript must not select a segment at random.
     @Test("a position past the end of the transcript falls back to the body")
     func revealIgnoresAStalePosition() {
