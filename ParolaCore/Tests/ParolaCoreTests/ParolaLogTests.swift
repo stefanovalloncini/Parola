@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import os
+import ParolaTestSupport
 @testable import ParolaCore
 
 @Suite("Parola log facade", .serialized, .logFacade)

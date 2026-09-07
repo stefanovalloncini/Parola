@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import Testing
+import ParolaTestSupport
 @testable import ParolaCore
 
 // .logFacade: RecordingScratchTests reads the same process-wide scratch directory this suite redirects.

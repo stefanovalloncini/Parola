@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ParolaTestSupport
 @testable import ParolaCore
 
 // .logFacade: CaptureLoggingTests redirects the same process-wide scratch directory under that gate.

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ParolaTestSupport
 @testable import ParolaCore
 
 private final class DownloadProbe: @unchecked Sendable {

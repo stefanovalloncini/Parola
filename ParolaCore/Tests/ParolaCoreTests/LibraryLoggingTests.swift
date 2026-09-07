@@ -1,6 +1,7 @@
 import Foundation
 import os
 import Testing
+import ParolaTestSupport
 @testable import ParolaCore
 
 @Suite("Library logging", .serialized, .tags(.fileSystem))

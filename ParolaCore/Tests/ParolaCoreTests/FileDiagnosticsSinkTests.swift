@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ParolaTestSupport
 @testable import ParolaCore
 
 @Suite("File diagnostics sink", .serialized, .logFacade)
