@@ -330,6 +330,13 @@ final class AppModel {
         return "\(AppModel.modelLabel(selectedModel)) is English-only. Pick a multilingual model (like Whisper) to transcribe other languages."
     }
 
+    /// English-only model on Auto: TranscriptionSession pins the run to English regardless, so this
+    /// only explains it — it doesn't touch `selectedLanguage`, unlike the rewrite it replaced.
+    var englishOnlyAutoNotice: String? {
+        guard selectedLanguage == nil, selectedModelCapabilities.supportedLanguages.isEnglishOnly else { return nil }
+        return "\(AppModel.modelLabel(selectedModel)) only transcribes English; transcribing as English."
+    }
+
     /// Set when the loaded transcript's language was a fallback rather than something the engine
     /// heard; nil for a detected language and for entries saved before the field existed.
     var assumedLanguageNotice: String? {
@@ -353,13 +360,8 @@ final class AppModel {
         set { selectedLanguageRaw = newValue ?? "" }
     }
 
-    /// Selects a model and pins the language to English for English-only engines,
-    /// so activation from any surface behaves like the toolbar picker.
     func activateModel(_ id: String) {
         selectedModel = id
-        if case .some(.only(let codes)) = ModelCatalog.variant(id: id)?.languageScope, codes == ["en"] {
-            selectedLanguage = "en"
-        }
     }
 
     var availableModels: [ModelInfo] = []

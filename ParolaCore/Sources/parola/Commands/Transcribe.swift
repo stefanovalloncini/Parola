@@ -79,6 +79,9 @@ struct Transcribe: AsyncParsableCommand {
             expectedSpeakers: speakers
         )
         opts.model = model ?? ModelCatalog.defaultModelID(for: opts)
+        if let resolvedModel = opts.model, opts.language == nil {
+            printEnglishOnlyAutoNotice(model: resolvedModel)
+        }
 
         if resolved.count == 1 {
             try await transcribeSingle(input: resolved[0], options: opts)

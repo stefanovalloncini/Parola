@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 
 func stderr(_ line: String) {
     FileHandle.standardError.write(Data((line + "\n").utf8))
@@ -18,6 +19,22 @@ func withStdoutRedirectedToStderr<T>(_ body: () async throws -> T) async rethrow
         close(savedStdout)
     }
     return try await body()
+}
+
+/// The notice for a run about to proceed as English on an English-only model instead of silently
+/// probing a language it can't act on. nil for a multilingual model. The CLI refuses an explicit
+/// `-l` on the wrong language elsewhere; this only covers the auto-language case.
+func englishOnlyAutoNoticeText(model: String) -> String? {
+    guard let variant = ModelCatalog.variant(id: model),
+          ModelCatalog.staticCapabilities(for: variant)?.supportedLanguages.isEnglishOnly == true
+    else { return nil }
+    return "\(variant.displayName) only transcribes English; transcribing as English. Pass -l to pick a multilingual model."
+}
+
+func printEnglishOnlyAutoNotice(model: String) {
+    if let text = englishOnlyAutoNoticeText(model: model) {
+        stderr(text)
+    }
 }
 
 func humanBytes(_ bytes: Int) -> String {

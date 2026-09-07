@@ -66,6 +66,12 @@ public actor TranscriptionSession {
 
         let variant = ModelCatalog.variant(id: modelName)
         let engineID = variant?.engineID ?? .whisperKit
+        // An English-only model on auto language used to run per-chunk detection it can't act on;
+        // pin it to English instead of leaving the run ambiguous. The frontends warn about this
+        // themselves, since only they know whether to print it or show it inline.
+        if options.language == nil, ModelCatalog.staticCapabilities(forID: modelName)?.supportedLanguages.isEnglishOnly == true {
+            options.language = "en"
+        }
 
         try await validate(options: options, engineID: engineID, variant: variant)
         let startedAt = ContinuousClock.now

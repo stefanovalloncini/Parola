@@ -89,6 +89,9 @@ struct Record: AsyncParsableCommand {
             initialPrompt: prompt
         )
         opts.model = model ?? ModelCatalog.defaultModelID(for: opts)
+        if let resolvedModel = opts.model, opts.language == nil {
+            printEnglishOnlyAutoNotice(model: resolvedModel)
+        }
 
         let progress = ProgressReporter(label: "downloading \(opts.model ?? "model")")
         let transcript = try await withStdoutRedirectedToStderr {

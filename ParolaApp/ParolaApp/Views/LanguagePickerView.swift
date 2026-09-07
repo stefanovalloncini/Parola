@@ -26,7 +26,12 @@ struct LanguagePickerView: View {
     }
 
     private var currentLabel: String {
-        guard let code = model.selectedLanguage else { return autoLabel }
+        guard let code = model.selectedLanguage else {
+            // Auto on an English-only model runs as English regardless (TranscriptionSession pins
+            // it); showing that here beats a label that's true about the setting but not the run.
+            return model.selectedModelCapabilities.supportedLanguages.isEnglishOnly
+                ? displayName(for: "en") : autoLabel
+        }
         return displayName(for: code)
     }
 
