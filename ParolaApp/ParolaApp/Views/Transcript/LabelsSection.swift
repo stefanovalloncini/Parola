@@ -50,8 +50,9 @@ struct LabelsSection: View {
         .foregroundStyle(DS.Color.accentText)
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
+        // The measured fill: a 12% accent over the inspector's material is a pair nothing measures.
         .background(
-            Capsule().fill(DS.Color.accent.opacity(0.12))
+            Capsule().fill(DS.Color.accentWash)
         )
     }
 

@@ -72,13 +72,29 @@ struct SurfaceContrastTests {
         #expect(text.dark.contrast(against: fill.dark) >= Self.minimum, "\(preset.rawValue) dark")
     }
 
-    @Test("the run readout clears AA on its own fill for every preset", arguments: ThemePreset.allCases)
+    /// Every fill an accent-coloured label is set on. A new one belongs here, not on an eyeballed pair.
+    private static func accentTextBackdrops(_ palette: ThemePalette) -> [(String, ThemeColor)] {
+        [
+            ("the run readout", palette.accentWash),
+            ("the inspector's label chips", palette.accentWash),
+        ]
+    }
+
+    @Test("accent text clears AA on every fill it is set on", arguments: ThemePreset.allCases)
     func accentPillContrast(preset: ThemePreset) throws {
         let palette = preset.palette
         let text = try #require(Self.pair(palette.accentText))
-        let wash = try #require(Self.pair(palette.accentWash))
-        #expect(text.light.contrast(against: wash.light) >= Self.minimum, "\(preset.rawValue) light")
-        #expect(text.dark.contrast(against: wash.dark) >= Self.minimum, "\(preset.rawValue) dark")
+        for (site, backdrop) in Self.accentTextBackdrops(palette) {
+            let fill = try #require(Self.pair(backdrop))
+            #expect(
+                text.light.contrast(against: fill.light) >= Self.minimum,
+                "\(preset.rawValue) light, \(site)"
+            )
+            #expect(
+                text.dark.contrast(against: fill.dark) >= Self.minimum,
+                "\(preset.rawValue) dark, \(site)"
+            )
+        }
     }
 
     @Test("the readout fill still carries accent rather than collapsing into the surface",
