@@ -105,6 +105,9 @@ public actor TranscriptionSession {
         } onCancel: {
             Task { await self.cancelInFlight() }
         }
+        // The source asset's own duration, not whatever the engine decoded: engines disagree with
+        // each other and Parakeet reports none at all.
+        transcript.durationSeconds = FileAudioSource(url: audioURL).synchronousDuration() ?? transcript.durationSeconds
         transcript = TranscriptCleanup.apply(
             to: transcript,
             options: TranscriptCleanupOptions(

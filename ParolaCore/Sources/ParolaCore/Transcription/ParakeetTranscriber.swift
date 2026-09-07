@@ -83,12 +83,12 @@ actor ParakeetTranscriber: Transcriber {
         }
 
         let segments = Self.makeSegments(from: result, includeWords: options.wordTimestamps)
+        // durationSeconds comes from the source asset, not the engine: TranscriptionSession fills it in.
         return Transcript(
             segments: segments,
             language: "en",
             modelName: modelName,
-            sourceURL: url,
-            durationSeconds: result.duration > 0 ? result.duration : nil
+            sourceURL: url
         )
     }
 

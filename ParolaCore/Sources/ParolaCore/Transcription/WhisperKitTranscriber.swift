@@ -161,7 +161,6 @@ actor WhisperKitTranscriber: Transcriber {
         var segments: [TranscriptSegment] = []
         var detectedLanguage = options.language ?? "auto"
         var nextID = 0
-        var maxEnd: Double = 0
         for result in outcomes {
             detectedLanguage = result.language
             for seg in result.segments {
@@ -182,16 +181,15 @@ actor WhisperKitTranscriber: Transcriber {
                     words: words
                 ))
                 nextID += 1
-                maxEnd = max(maxEnd, Double(seg.end))
             }
         }
 
+        // durationSeconds comes from the source asset, not the engine: TranscriptionSession fills it in.
         return Transcript(
             segments: segments.chronologicallyOrdered(),
             language: detectedLanguage,
             modelName: modelName,
             sourceURL: url,
-            durationSeconds: maxEnd > 0 ? maxEnd : nil,
             languageDetection: WhisperLanguagePin.detection(
                 requested: options.language,
                 probed: probed,

@@ -194,12 +194,12 @@ actor AppleSpeechTranscriber: Transcriber {
         let resolvedLanguage = locale.language.languageCode?.identifier
             ?? options.language
             ?? "en"
+        // durationSeconds comes from the source asset, not the engine: TranscriptionSession fills it in.
         return Transcript(
             segments: run.segments,
             language: resolvedLanguage,
             modelName: modelName,
             sourceURL: url,
-            durationSeconds: durationSeconds > 0 ? durationSeconds : nil,
             languageDetection: resolution.detection(
                 afterRun: run.confidence,
                 isEmpty: run.segments.isEmpty
