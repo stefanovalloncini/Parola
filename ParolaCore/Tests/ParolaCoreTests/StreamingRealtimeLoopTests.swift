@@ -7,9 +7,13 @@ import os
 private let sampleRate = 16_000
 
 private final class FakeCapture: Sendable {
-    private let state = OSAllocatedUnfairLock<(callback: (@Sendable ([Float]) -> Void)?, stops: Int)>(
-        initialState: (nil, 0)
-    )
+    // A named struct, not a tuple: a tuple element sits at the lock's opaque abstraction level, so every `withLock` would wrap the callback in another pair of reabstraction thunks that retain the last pair, and releasing that chain recurses per link.
+    private struct State {
+        var callback: (@Sendable ([Float]) -> Void)?
+        var stops = 0
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
 
     func install(_ callback: @escaping @Sendable ([Float]) -> Void) {
         state.withLock { $0.callback = callback }
@@ -147,6 +151,20 @@ private func makeLoop(
 
 @Suite("Streaming realtime loop")
 struct StreamingRealtimeLoopTests {
+    // The nesting this guards against took the whole suite down with a deep-release stack overflow.
+    @Test("polling the capture leaves its callback one frame deep")
+    func pollingDoesNotNestTheCallback() {
+        let capture = FakeCapture()
+        let depths = OSAllocatedUnfairLock<[Int]>(initialState: [])
+        capture.install { _ in depths.withLock { $0.append(Thread.callStackSymbols.count) } }
+        capture.push([])
+        for _ in 0..<200 { _ = capture.installed }
+        capture.push([])
+        let measured = depths.withLock { $0 }
+        #expect(measured.count == 2)
+        #expect(measured.first == measured.last)
+    }
+
     @Test("confirmed timestamps stay absolute across a purge boundary")
     func timestampsAbsoluteAcrossPurge() async throws {
         let (loop, capture, script, recorder) = makeLoop(responses: [

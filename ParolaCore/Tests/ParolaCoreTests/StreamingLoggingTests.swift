@@ -9,12 +9,16 @@ private let streamingSampleRate = 16_000
 private struct StreamingLogFailure: Error {}
 
 private final class FakeStreamingCapture: Sendable {
-    private let state = OSAllocatedUnfairLock<(callback: (@Sendable ([Float]) -> Void)?, installed: Bool)>(
-        initialState: (nil, false)
-    )
+    // A named struct, not a tuple: a tuple element sits at the lock's opaque abstraction level, so every `withLock` would wrap the callback in another pair of reabstraction thunks that retain the last pair, and releasing that chain recurses per link.
+    private struct State {
+        var callback: (@Sendable ([Float]) -> Void)?
+        var installed = false
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
 
     func install(_ callback: @escaping @Sendable ([Float]) -> Void) {
-        state.withLock { $0 = (callback, true) }
+        state.withLock { $0 = State(callback: callback, installed: true) }
     }
 
     var installed: Bool { state.withLock { $0.installed } }
@@ -175,6 +179,20 @@ struct StreamingLoggingTests {
             #expect(record.fields[.error] != nil)
             #expect(record.fields[.elapsed] != nil)
         }
+    }
+
+    // The nesting this guards against took the whole suite down with a deep-release stack overflow.
+    @Test("polling the capture leaves its callback one frame deep")
+    func pollingDoesNotNestTheCallback() {
+        let capture = FakeStreamingCapture()
+        let depths = OSAllocatedUnfairLock<[Int]>(initialState: [])
+        capture.install { _ in depths.withLock { $0.append(Thread.callStackSymbols.count) } }
+        capture.push(seconds: 0, value: 0)
+        for _ in 0..<200 { _ = capture.installed }
+        capture.push(seconds: 0, value: 0)
+        let measured = depths.withLock { $0 }
+        #expect(measured.count == 2)
+        #expect(measured.first == measured.last)
     }
 
     // MARK: - Model cache
