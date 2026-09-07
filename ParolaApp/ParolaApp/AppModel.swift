@@ -66,7 +66,6 @@ final class AppModel {
             transcriptMatchesLoadedMedia = false
             if transcript == nil, promptOutput != nil { promptOutput = nil }
             currentSegmentIndex = nil
-            pendingRevealSegmentID = nil
             cachedTranscriptText = nil
             let speakers = transcript?.uniqueSpeakers ?? []
             if speakers != transcriptSpeakers { transcriptSpeakers = speakers }
@@ -96,8 +95,8 @@ final class AppModel {
     var showingTrash: Bool = false
     var currentSegmentID: TranscriptSegment.ID?
     /// A segment a search result asked the transcript to open on. The write lands before the route
-    /// builds the transcript view, so the view consumes this on appear rather than watching
-    /// `currentSegmentID`; until it does, the player's first tick leaves the selection alone.
+    /// builds the transcript view, so the view scrolls to this on appear rather than watching
+    /// `currentSegmentID`; it holds the selection against the player's ticks until playback starts.
     var pendingRevealSegmentID: TranscriptSegment.ID?
     var currentWordID: WordTiming.ID?
     // Playback-tick cache: index of currentSegmentID in transcript.segments, so the 5 Hz tick

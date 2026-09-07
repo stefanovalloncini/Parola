@@ -89,20 +89,18 @@ struct ContinuousChunks: View {
         .task(id: model.pendingRevealSegmentID) { await revealPendingSegment() }
     }
 
-    /// A search result writes its segment before this view is built, so the jump is consumed here
-    /// rather than watched on `currentSegmentID`; the chunk holding it exists only once the build lands.
+    /// A search result writes its segment before this view is built, so the jump is read here rather
+    /// than watched on `currentSegmentID`; the chunk holding it exists only once the build lands.
     private func revealPendingSegment() async {
         guard let id = model.pendingRevealSegmentID else { return }
         for _ in 0..<30 {
             try? await Task.sleep(for: .milliseconds(16))
             if chunkIndexBySegment[id] != nil { break }
         }
-        if let chunkID = chunkIndexBySegment[id] {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                scrollProxy.scrollTo(chunkID, anchor: .center)
-            }
+        guard let chunkID = chunkIndexBySegment[id] else { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            scrollProxy.scrollTo(chunkID, anchor: .center)
         }
-        model.consumePendingReveal(id)
     }
 
     static let synchronousBuildCap = 200

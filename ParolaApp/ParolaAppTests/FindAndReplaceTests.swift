@@ -282,16 +282,34 @@ struct FindAndReplaceTests {
     }
 
     /// `installPlayer`'s first delivery lands after the reveal and covers t = 0.
-    @Test("the player's first tick leaves a pending reveal where it is")
-    func pendingRevealSurvivesTheFirstTick() {
+    @Test("a paused player's ticks leave a revealed segment where it is")
+    func revealSurvivesThePlayersTicks() {
         model.revealInTranscript("Goodbye Hello", at: .init(seconds: 1, segmentIndex: 1, textOffset: 12))
+        model.updateCurrentSegment(time: 0)
         model.updateCurrentSegment(time: 0)
         #expect(model.currentSegmentID == 1)
 
-        model.consumePendingReveal(1)
+        model.pendingRevealSegmentID = nil
         model.updateCurrentSegment(time: 0)
         #expect(model.currentSegmentID == 0)
+    }
+
+    /// Every entry the app opens installs or tears down a player before the reveal runs.
+    @Test("opening another entry drops the reveal the last one carried")
+    func revealDoesNotOutliveItsEntry() {
+        model.revealInTranscript("Goodbye Hello", at: .init(seconds: 1, segmentIndex: 1, textOffset: 12))
+        model.tearDownPlayer()
         #expect(model.pendingRevealSegmentID == nil)
+    }
+
+    /// The media's real length is backfilled into the transcript a moment after the entry opens.
+    @Test("a duration backfill does not cancel the reveal")
+    func revealSurvivesATranscriptPatch() {
+        model.revealInTranscript("Goodbye Hello", at: .init(seconds: 1, segmentIndex: 1, textOffset: 12))
+        var patched = model.transcript
+        patched?.durationSeconds = 42
+        model.transcript = patched
+        #expect(model.pendingRevealSegmentID == 1)
     }
 
     /// The index counts segments the app never sees, so the time beside the hit decides which line it is.

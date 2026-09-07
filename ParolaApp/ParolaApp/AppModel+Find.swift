@@ -76,12 +76,6 @@ extension AppModel {
         return low > 0 ? segments[low - 1].id : nil
     }
 
-    /// Called by the transcript view once it has scrolled to the reveal; the player owns the selection again after it.
-    func consumePendingReveal(_ id: TranscriptSegment.ID) {
-        guard pendingRevealSegmentID == id else { return }
-        pendingRevealSegmentID = nil
-    }
-
     func goToNextMatch() {
         guard !matches.isEmpty else { return }
         currentMatchIndex = (currentMatchIndex + 1) % matches.count

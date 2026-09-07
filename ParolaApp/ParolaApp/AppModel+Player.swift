@@ -99,9 +99,12 @@ extension AppModel {
 
     func updateCurrentSegment(time: Double) {
         guard let segments = transcript?.segments else { return }
-        // A freshly installed player delivers t = 0 after the reveal wrote its segment; that tick
-        // would drag the selection back to the top of a transcript the user opened at a search hit.
-        guard pendingRevealSegmentID == nil || player?.timeControlStatus == .playing else { return }
+        // A reveal owns the selection until playback starts: the player's first tick lands after it,
+        // covers t = 0, and would drag a transcript opened at a search hit back to the top.
+        if pendingRevealSegmentID != nil {
+            guard player?.timeControlStatus == .playing else { return }
+            pendingRevealSegmentID = nil
+        }
         let matchIndex = cachedOrSearchedIndex(in: segments, coveringTime: time)
         currentSegmentIndex = matchIndex
         let match = matchIndex.map { segments[$0] }
