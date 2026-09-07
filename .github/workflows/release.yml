@@ -55,7 +55,7 @@ jobs:
       - name: swift build + test
         working-directory: ParolaCore
         run: |
-          swift build -c release
+          swift build -c release --product parola --product parola-mcp
           swift test --parallel
 
       - name: Generate Xcode project
