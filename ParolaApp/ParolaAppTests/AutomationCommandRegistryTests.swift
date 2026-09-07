@@ -39,6 +39,19 @@ struct AutomationCommandRegistryTests {
         }
     }
 
+    @Test("the missing-required-arg message reads as a sentence, not 'missing required a string'")
+    func missingRequiredMessageIsGrammatical() {
+        let cmd = makeCommand(args: stringAndBool)
+        do {
+            _ = try cmd.validate(AutomationArgs())
+            Issue.record("expected validate to throw")
+        } catch let error as AutomationError {
+            #expect(error.message == "Invalid args for 'name': a string is required")
+        } catch {
+            Issue.record("unexpected error \(error)")
+        }
+    }
+
     @Test("validate throws invalidArgs when a required arg has the wrong type")
     func wrongTypeThrows() {
         let cmd = makeCommand(args: stringAndBool)

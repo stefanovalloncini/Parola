@@ -98,18 +98,35 @@ public actor TranscriptionSession {
         try Task.checkCancellation()
         // Abort engine work when the caller cancels: a hung engine (e.g. a stalled finalize)
         // would otherwise hold the transcribe slot and block every queued run until relaunch.
-        var transcript = try await withTaskCancellationHandler {
-            try await activeTranscriber.transcribe(
-                url: audioURL,
-                options: options,
-                handlers: TranscribeHandlers(
-                    onPartial: partialHandler,
-                    onProgress: progressHandler,
-                    onStage: stageHandler
+        var transcript: Transcript
+        do {
+            transcript = try await withTaskCancellationHandler {
+                try await activeTranscriber.transcribe(
+                    url: audioURL,
+                    options: options,
+                    handlers: TranscribeHandlers(
+                        onPartial: partialHandler,
+                        onProgress: progressHandler,
+                        onStage: stageHandler
+                    )
                 )
-            )
-        } onCancel: {
-            Task { await self.cancelInFlight() }
+            } onCancel: {
+                Task { await self.cancelInFlight() }
+            }
+        } catch {
+            // Every engine hits this differently (a raw AVAudioFile throw, a wrapped CoreAudio
+            // OSStatus, …); the file itself not decoding is the one thing they have in common.
+            if !isCancellation(error), FileAudioSource(url: audioURL).synchronousDuration() == nil {
+                ParolaLog.error(
+                    .models, "transcribe failed on an unreadable file",
+                    [.model: .safe(ModelToken(modelName)), .error: .error(error)]
+                )
+                throw ParolaError.unreadableFile(
+                    name: audioURL.lastPathComponent,
+                    reason: Self.unreadableFileReason(at: audioURL)
+                )
+            }
+            throw error
         }
         // The source asset's own duration, not whatever the engine decoded: engines disagree with
         // each other and Parakeet reports none at all.
@@ -284,6 +301,15 @@ public actor TranscriptionSession {
             ParolaLog.notice(.models, "engine \(engineID) rejected diarize")
             throw ParolaError.unsupportedForEngine("\(engineID.displayName) does not support speaker labels.")
         }
+    }
+
+    /// The only cause worth naming without inspecting the file's actual bytes; everything else
+    /// (wrong container, truncated encode, a text file wearing a media extension) stays silent
+    /// rather than guess.
+    static func unreadableFileReason(at url: URL) -> String? {
+        guard let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? UInt64,
+              size == 0 else { return nil }
+        return "The file is empty."
     }
 
     /// Names the model rather than the engine: the usual cause is an English-only variant on an

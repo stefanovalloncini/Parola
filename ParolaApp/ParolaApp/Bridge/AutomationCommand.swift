@@ -74,7 +74,7 @@ struct AutomationCommand: Sendable {
             } else if let fallback = arg.defaultValue {
                 merged[arg.name] = fallback
             } else if arg.required {
-                throw AutomationError.invalidArgs(field: arg.name, reason: "missing required \(typeLabel(arg.kind))")
+                throw AutomationError.invalidArgs(field: arg.name, reason: "\(typeLabel(arg.kind)) is required")
             }
         }
         return AutomationArgs(merged)

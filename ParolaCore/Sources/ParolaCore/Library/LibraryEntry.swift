@@ -28,6 +28,7 @@ public struct LibraryEntry: Identifiable, Hashable, Sendable {
     public var pinned: Bool { manifest.pinned }
     public var durationSeconds: Double? { manifest.durationSeconds }
     public var language: String { manifest.language }
+    public var modelName: String { manifest.modelName }
 
     public func note(forSegment id: Int) -> String? {
         manifest.segmentNotes[String(id)]

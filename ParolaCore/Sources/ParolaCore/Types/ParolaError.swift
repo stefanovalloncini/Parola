@@ -9,6 +9,9 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
     case modelChecksumMismatch(file: String, expected: String, got: String)
     case audioLoadFailed(URL, underlying: String)
     case transcriptionFailed(String)
+    /// A file no engine could decode — a raw CoreAudio/AVFoundation OSStatus isn't actionable, so
+    /// the caller reports this instead and keeps the underlying error in the log line only.
+    case unreadableFile(name: String, reason: String?)
     case unsupportedAudioFormat(String)
     case captureUnavailable(String)
     case invalidLanguage(String)
@@ -38,6 +41,8 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
             return "Failed to load audio at \(url.path): \(underlying)"
         case .transcriptionFailed(let reason):
             return "Transcription failed: \(reason)"
+        case .unreadableFile(let name, let reason):
+            return "Parola couldn't read \(name)." + (reason.map { " \($0)" } ?? "")
         case .unsupportedAudioFormat(let detail):
             return "Unsupported audio format: \(detail)"
         case .captureUnavailable(let reason):
@@ -76,6 +81,8 @@ public enum ParolaError: LocalizedError, CustomStringConvertible, Sendable {
             return "ParolaError.audioLoadFailed"
         case .transcriptionFailed:
             return "ParolaError.transcriptionFailed"
+        case .unreadableFile:
+            return "ParolaError.unreadableFile"
         case .unsupportedAudioFormat:
             return "ParolaError.unsupportedAudioFormat"
         case .captureUnavailable:

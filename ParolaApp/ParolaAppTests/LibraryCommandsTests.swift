@@ -68,8 +68,10 @@ struct LibraryCommandsTests {
         }
         #expect(first["durationSeconds"] == .double(650.0693))
         #expect(first["language"] == .string("it"))
+        #expect(first["modelName"] == .string("stub"))
         #expect(second["durationSeconds"] == .null, "an entry with no measured duration reports null")
         #expect(second["language"] == .string("en"))
+        #expect(second["modelName"] == .string("stub"))
     }
 
     @Test("listDeletedEntries clamps a negative limit to empty instead of trapping")
