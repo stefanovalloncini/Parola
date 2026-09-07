@@ -137,8 +137,14 @@ actor WhisperKitTranscriber: Transcriber {
         }
         defer { kit.segmentDiscoveryCallback = nil }
 
+        let samples = try await Self.loadSamples(
+            url: url,
+            channelMode: kit.audioInputConfig.channelMode,
+            deadline: FileReadDeadline.forReading(url)
+        )
+        try Task.checkCancellation()
         let results = await kit.transcribe(
-            audioPaths: [url.path],
+            audioArrays: [samples],
             decodeOptions: decoding,
             callback: nil
         )
@@ -199,6 +205,26 @@ actor WhisperKitTranscriber: Transcriber {
         )
     }
 
+    /// `transcribe(audioPaths:)` is this load followed by `transcribe(audioArrays:)`, and its own
+    /// half of that pair is the unbounded read the wedge sampled. Doing the load here puts the
+    /// largest read of the run under the same deadline as every other one.
+    static func loadSamples(
+        url: URL,
+        channelMode: AudioInputConfig.ChannelMode,
+        deadline: Duration
+    ) async throws -> [Float] {
+        let read = await BoundedFileRead.run(deadline: deadline) {
+            try? AudioProcessor.loadAudioAsFloatArray(fromPath: url.path, channelMode: channelMode)
+        }
+        guard case .done(let loaded) = read else {
+            throw ParolaError.fileReadTimedOut(name: url.lastPathComponent)
+        }
+        guard let samples = loaded, !samples.isEmpty else {
+            throw ParolaError.audioLoadFailed(url, underlying: "the decoder returned no samples")
+        }
+        return samples
+    }
+
     /// Reads the length back off the file header, which only a run that already failed pays for.
     private static func emptyResultFields(model: String, url: URL) -> [LogField: LogValue] {
         var fields: [LogField: LogValue] = [.model: .safe(ModelToken(model))]
@@ -222,8 +248,8 @@ actor WhisperKitTranscriber: Transcriber {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("parola-whisper-language-probe-\(UUID().uuidString).caf")
         defer { try? FileManager.default.removeItem(at: scratch) }
-        // Off the actor and on a deadline: extracting the probe windows streams the whole source
-        // file, and a read that parks there would park the engine with it.
+        // Off the actor and on a deadline: the extractor seeks across the whole file to pick its
+        // windows, and a read that parks there would park the engine with it.
         let read = await BoundedFileRead.run(deadline: FileReadDeadline.forReading(url)) {
             Self.probeSamples(url: url, scratch: scratch)
         }
