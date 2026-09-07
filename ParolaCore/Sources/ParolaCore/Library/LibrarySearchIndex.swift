@@ -25,9 +25,7 @@ public actor LibrarySearchIndex {
     }
 
     public struct Match: Sendable, Equatable {
-        /// The earliest place in the transcript body where any of the query's terms occurs. It
-        /// searches the whole body while `snippet` only covers the first 200 characters, so a hit
-        /// past that renders a correct time beside a snippet with no highlight.
+        /// The earliest place in the transcript body where any of the query's terms occurs.
         public struct FirstHit: Sendable, Equatable {
             public let seconds: Double
             /// A position in the blank-dropped segment list `LibraryStore.load` returns, not in the raw `transcript.json`.
@@ -105,8 +103,8 @@ public actor LibrarySearchIndex {
 
     private struct IndexedEntry: Sendable {
         let title: String
-        let excerpt: String
-        let excerptTruncated: Bool
+        /// The full body text, kept in memory so a snippet never needs a disk read at query time.
+        let text: String
         let tokens: [String]
         let counts: [Int]
         /// Parallel to `tokens`: where the token first occurs in the body, `noOffset` for title-only tokens.
@@ -119,8 +117,7 @@ public actor LibrarySearchIndex {
     private struct SnapshotEntry: Codable, Sendable {
         let id: String
         let title: String
-        let excerpt: String
-        let excerptTruncated: Bool
+        let text: String
         let tokens: [String]
         let counts: [Int]
         let offsets: [Int]
@@ -162,8 +159,9 @@ public actor LibrarySearchIndex {
         case failed(any Error)
     }
 
-    private static let snapshotVersion = 8
-    private static let excerptLength = 200
+    // v9: stores each entry's full body text instead of a 200-char excerpt, so a snippet never
+    // needs a disk read at query time. A v8 (or older) snapshot is discarded and rebuilt.
+    private static let snapshotVersion = 9
     private static let noOffset = -1
     private static let snapshotPrefix = Data(#"{"version":\#(snapshotVersion),"entries":["#.utf8)
     private static let snapshotSeparator = Data(",".utf8)
@@ -242,12 +240,7 @@ public actor LibrarySearchIndex {
         scheduleSave()
     }
 
-    /// `fullText` reads the entry's real transcript text back, for a hit that landed past the
-    /// stored excerpt — the excerpt alone can't produce a snippet that contains it.
-    public func search(
-        _ query: String,
-        fullText: @Sendable (String) async -> String? = { _ in nil }
-    ) async -> [Match] {
+    public func search(_ query: String) async -> [Match] {
         let queryTokens = Self.tokenize(query)
         guard !queryTokens.isEmpty else { return [] }
         await ensureLoaded()
@@ -279,15 +272,7 @@ public actor LibrarySearchIndex {
         for (id, score) in scores.sorted(by: { $0.value > $1.value }) {
             guard let entry = entries[id] else { continue }
             let hitOffset = earliest[id]
-            // The stored excerpt only covers the entry's first `excerptLength` characters; a hit
-            // past that needs the real text to render a snippet that contains and highlights it.
-            let hitOutsideExcerpt = hitOffset.map { $0 >= entry.excerpt.count } ?? false
-            let snippet: (text: String, highlights: [Highlight])
-            if hitOutsideExcerpt, let full = await fullText(id) {
-                snippet = Self.makeSnippet(text: full, truncated: false, tokens: queryTokens)
-            } else {
-                snippet = Self.makeSnippet(text: entry.excerpt, truncated: entry.excerptTruncated, tokens: queryTokens)
-            }
+            let snippet = Self.makeSnippet(text: entry.text, tokens: queryTokens)
             results.append(Match(
                 entryID: id,
                 score: score,
@@ -326,8 +311,7 @@ public actor LibrarySearchIndex {
         guard let existing = entries[id], existing.fingerprint != fingerprint else { return }
         let updated = IndexedEntry(
             title: existing.title,
-            excerpt: existing.excerpt,
-            excerptTruncated: existing.excerptTruncated,
+            text: existing.text,
             tokens: existing.tokens,
             counts: existing.counts,
             offsets: existing.offsets,
@@ -395,8 +379,7 @@ public actor LibrarySearchIndex {
         for entry in snapshot.entries {
             entries[entry.id] = IndexedEntry(
                 title: entry.title,
-                excerpt: entry.excerpt,
-                excerptTruncated: entry.excerptTruncated,
+                text: entry.text,
                 tokens: entry.tokens,
                 counts: entry.counts,
                 offsets: entry.offsets,
@@ -424,11 +407,9 @@ public actor LibrarySearchIndex {
         Self.enumerateTokens(in: text) { token, offset in tallies[token, default: Tally()].add(at: offset) }
         Self.enumerateTokens(in: auxiliaryText) { token, _ in tallies[token, default: Tally()].count += 1 }
         let tokens = tallies.keys.sorted()
-        let excerpt = Self.excerpt(of: text)
         let entry = IndexedEntry(
             title: title,
-            excerpt: excerpt.text,
-            excerptTruncated: excerpt.truncated,
+            text: text,
             tokens: tokens,
             counts: tokens.map { tallies[$0]?.count ?? 0 },
             offsets: tokens.map { tallies[$0]?.offset ?? Self.noOffset },
@@ -466,8 +447,7 @@ public actor LibrarySearchIndex {
         SnapshotEntry(
             id: id,
             title: entry.title,
-            excerpt: entry.excerpt,
-            excerptTruncated: entry.excerptTruncated,
+            text: entry.text,
             tokens: entry.tokens,
             counts: entry.counts,
             offsets: entry.offsets,
@@ -548,13 +528,6 @@ public actor LibrarySearchIndex {
         }
     }
 
-    private static func excerpt(of text: String) -> (text: String, truncated: Bool) {
-        guard let cut = text.index(text.startIndex, offsetBy: excerptLength, limitedBy: text.endIndex) else {
-            return (text, false)
-        }
-        return (String(text[..<cut]), cut < text.endIndex)
-    }
-
     /// Engine timings are Float32 widened to Double, which JSON writes as `12.399999618530273`;
     /// hundredths keep the snapshot small and still land on the right second.
     private static func centiseconds(_ seconds: Double) -> Int {
@@ -564,7 +537,6 @@ public actor LibrarySearchIndex {
 
     private static func makeSnippet(
         text: String,
-        truncated: Bool,
         tokens: [String]
     ) -> (text: String, highlights: [Highlight]) {
         guard !text.isEmpty else { return ("", []) }
@@ -598,8 +570,7 @@ public actor LibrarySearchIndex {
         highlights.sort { $0.start < $1.start }
         // An ellipsis says the line was cut out of a longer one; the leading one shifts every offset.
         let leading = snippetRange.lowerBound == text.startIndex ? "" : "…"
-        // `text` is the excerpt: reaching its end is still mid-line when the entry's text ran past it.
-        let trailing = snippetRange.upperBound < text.endIndex || truncated ? "…" : ""
+        let trailing = snippetRange.upperBound < text.endIndex ? "…" : ""
         let shift = leading.count
         let shifted = shift == 0 ? highlights : highlights.map { Highlight(start: $0.start + shift, length: $0.length) }
         return (leading + body + trailing, mergeOverlapping(shifted))

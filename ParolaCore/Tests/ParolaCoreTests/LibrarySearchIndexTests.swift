@@ -241,7 +241,7 @@ struct LibrarySearchIndexTests {
         )
         await index.flush()
         let raw = try #require(String(data: Data(contentsOf: url), encoding: .utf8))
-        #expect(raw.contains(#""version":8"#))
+        #expect(raw.contains(#""version":9"#))
         #expect(raw.contains(#""boundaryOffsets":[0,23]"#))
         #expect(raw.contains(#""boundaryCentiseconds":[0,1240]"#))
     }
@@ -389,35 +389,25 @@ struct LibrarySearchIndexTests {
         }
     }
 
-    @Test("a hit near the excerpt's cap is still marked as cut, since the line may continue past it")
-    func snippetNearExcerptCapKeepsTrailingEllipsis() async throws {
+    @Test("a hit followed by more real text keeps the trailing ellipsis")
+    func snippetFollowedByMoreTextKeepsTrailingEllipsis() async throws {
         let (index, _) = makeTempIndex()
         let body = String(repeating: "ab ", count: 60) + "sprint" + String(repeating: " cd", count: 30)
-        #expect(body.count > 200)
+        #expect(body.count > 200) // well past where the old excerpt cap used to sit
         await index.index(id: "e1", title: "Notes", text: body, createdAt: Date())
         let match = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
         #expect(match.snippet.hasSuffix("…"))
     }
 
-    @Test("a text exactly as long as the excerpt is not marked as cut")
-    func snippetAtExcerptLengthIsNotMarked() async throws {
+    @Test("a hit at the true end of a long document is not marked as cut")
+    func snippetAtTheDocumentsEndIsNotMarked() async throws {
         let (index, _) = makeTempIndex()
-        let body = String(repeating: "ab ", count: 64) + "z " + "sprint"
-        #expect(body.count == 200)
+        let body = String(repeating: "ab ", count: 80) + "z " + "sprint"
+        #expect(body.count > 200) // the whole document, well past the old excerpt cap, ends right here
         await index.index(id: "e1", title: "Notes", text: body, createdAt: Date())
         let match = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
         #expect(match.snippet.hasPrefix("…"))
         #expect(match.snippet.hasSuffix("sprint"))
-    }
-
-    @Test("one character past the excerpt puts the trailing mark back")
-    func snippetPastExcerptLengthIsMarked() async throws {
-        let (index, _) = makeTempIndex()
-        let body = String(repeating: "ab ", count: 64) + "z " + "sprint!"
-        #expect(body.count == 201)
-        await index.index(id: "e1", title: "Notes", text: body, createdAt: Date())
-        let match = try #require(await index.search("sprint").first(where: { $0.entryID == "e1" }))
-        #expect(match.snippet.hasSuffix("…"))
     }
 
     @Test("a snippet that is the whole line carries no ellipsis")
@@ -480,8 +470,8 @@ struct LibrarySearchIndexTests {
         #expect(exists)
     }
 
-    @Test("snapshot stores an excerpt, not the full text")
-    func snapshotExcerptOnly() async throws {
+    @Test("the snapshot stores the full body text, not a truncated excerpt")
+    func snapshotStoresFullText() async throws {
         let (index, url) = makeTempIndex()
         let filler = String(repeating: "lorem ipsum dolor sit amet ", count: 10)
         let text = filler + "ZzyzxMarker closing remarks"
@@ -489,15 +479,14 @@ struct LibrarySearchIndexTests {
         await index.flush()
 
         let raw = try #require(String(data: Data(contentsOf: url), encoding: .utf8))
-        #expect(!raw.contains("ZzyzxMarker"))
-        #expect(raw.contains("zzyzxmarker"))
+        #expect(raw.contains("ZzyzxMarker"))
 
         let matches = await index.search("zzyzxmarker")
         #expect(matches.contains(where: { $0.entryID == "e1" }))
     }
 
-    @Test("tokens beyond the excerpt survive a reload")
-    func tokensBeyondExcerptSurviveReload() async throws {
+    @Test("tokens far into a long document survive a reload")
+    func tokensFarIntoDocumentSurviveReload() async throws {
         let (index1, url) = makeTempIndex()
         let filler = String(repeating: "lorem ipsum dolor sit amet ", count: 10)
         await index1.index(id: "e1", title: "Notes", text: filler + "zzyzxmarker tail", createdAt: Date())
@@ -511,8 +500,8 @@ struct LibrarySearchIndexTests {
         #expect(head.snippet.lowercased().contains("lorem"))
     }
 
-    @Test("a hit past the excerpt renders a real snippet when fullText can supply the source")
-    func snippetBeyondExcerptUsesFullText() async throws {
+    @Test("a hit past 200 characters gets a real, highlighted snippet with no re-read needed")
+    func snippetFarIntoDocumentIsReal() async throws {
         let (index, _) = makeTempIndex()
         let filler = String(repeating: "lorem ipsum dolor sit amet consectetur adipiscing elit ", count: 100)
         let text = filler + "zzyzxmarker tail"
@@ -520,7 +509,7 @@ struct LibrarySearchIndexTests {
         #expect(hitOffset > 5000)
         await index.index(id: "e1", title: "Notes", text: text, createdAt: Date())
 
-        let matches = await index.search("zzyzxmarker") { id in id == "e1" ? text : nil }
+        let matches = await index.search("zzyzxmarker")
         let match = try #require(matches.first(where: { $0.entryID == "e1" }))
 
         #expect(match.snippet.lowercased().contains("zzyzxmarker"))
@@ -530,18 +519,6 @@ struct LibrarySearchIndexTests {
             let end = match.snippet.index(start, offsetBy: highlight.length)
             #expect(match.snippet[start..<end].lowercased() == "zzyzxmarker")
         }
-    }
-
-    @Test("without a fullText source, a hit past the excerpt falls back to the truncated snippet")
-    func snippetBeyondExcerptWithoutFullTextFallsBack() async throws {
-        let (index, _) = makeTempIndex()
-        let filler = String(repeating: "lorem ipsum dolor sit amet consectetur adipiscing elit ", count: 90)
-        let text = filler + "zzyzxmarker tail"
-        await index.index(id: "e1", title: "Notes", text: text, createdAt: Date())
-
-        let matches = await index.search("zzyzxmarker")
-        let match = try #require(matches.first(where: { $0.entryID == "e1" }))
-        #expect(match.snippet.lowercased().contains("zzyzxmarker") == false)
     }
 
     @Test("removing one entry leaves shared tokens for the other")

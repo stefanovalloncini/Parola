@@ -168,8 +168,8 @@ struct LibraryStoreTests {
         #expect(hits.isEmpty == false)
     }
 
-    @Test("a search hit past the excerpt gets a real snippet by re-reading the bundle")
-    func searchBeyondExcerptRereadsBundle() async throws {
+    @Test("a search hit past 200 characters gets a real snippet, end to end through the store")
+    func searchFarIntoTranscriptGetsRealSnippet() async throws {
         let (store, _) = try makeTempLibrary()
         let audio = try makeFakeAudio()
         let filler = "lorem ipsum dolor sit amet consectetur adipiscing elit"
@@ -188,6 +188,33 @@ struct LibraryStoreTests {
         let hit = try #require(hits.first)
         #expect(hit.snippet.lowercased().contains("zzyzxmarker"))
         #expect(hit.highlights.isEmpty == false)
+    }
+
+    /// Fix round 1, R1.4 finding #5: the query path must never read a bundle off disk. This times
+    /// `search` against a scratch library holding one entry the size of Stefano's 1h42m real file
+    /// (961 segments, ~64,000 characters) to show the in-memory v9 index keeps it fast.
+    @Test("search stays fast on a scratch library with one multi-hour entry")
+    func searchQueryPathTimingOnAMultiHourEntry() async throws {
+        let (store, _) = try makeTempLibrary()
+        let audio = try makeFakeAudio()
+        let words = "grazie a tutti per la vostra pazienza durante questa lunga riunione di oggi pomeriggio"
+        var segments = (0..<960).map { i in
+            TranscriptSegment(id: i, start: Double(i) * 6, end: Double(i) * 6 + 5, text: words)
+        }
+        segments.append(TranscriptSegment(id: 960, start: 5760, end: 5765, text: "zzyzxmarker closing remarks"))
+        let transcript = Transcript(segments: segments, language: "it", modelName: "tiny")
+        #expect(transcript.text.count > 60_000)
+        _ = try await store.add(transcript: transcript, audioSource: audio)
+        await store.flush()
+
+        let clock = ContinuousClock()
+        let start = clock.now
+        let hits = await store.search("zzyzxmarker")
+        let elapsed = clock.now - start
+
+        #expect(hits.first?.snippet.lowercased().contains("zzyzxmarker") == true)
+        print("search-query-path-timing: \(transcript.text.count) chars, 961 segments, elapsed \(elapsed)")
+        #expect(elapsed < .milliseconds(50))
     }
 
     @Test("a bundle whose manifest version is newer than the app is dropped from the list")
