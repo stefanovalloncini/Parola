@@ -93,6 +93,12 @@ final class AppModel {
         return !transcript.segments.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
     var showingTrash: Bool = false
+    /// The import waiting on the "Already in your library" sheet. Nil the rest of the time.
+    var duplicateImport: DuplicateImport?
+    /// How many files the last batch import dropped because the library already had them.
+    var batchDuplicatesSkipped: Int = 0
+    @ObservationIgnored var duplicateCheckTask: Task<Void, Never>?
+    @ObservationIgnored var batchImportTask: Task<Void, Never>?
     var currentSegmentID: TranscriptSegment.ID?
     /// A segment a search result asked the transcript to open on. The write lands before the route
     /// builds the transcript view, so the view scrolls to this on appear rather than watching
@@ -1008,6 +1014,7 @@ final class AppModel {
 
     var transcribeTaskRunning: Bool {
         fileTranscribeTask != nil || youtubeTranscribeTask != nil || youtubeSubsTask != nil
+            || duplicateCheckTask != nil
     }
 
     /// A stop held for the startup window: no transcribe task yet, but the take still resolves an outcome.
@@ -1018,6 +1025,8 @@ final class AppModel {
     /// A user-initiated start (file open, YouTube, recording) replaces whichever of these runs
     /// is in flight; letting the old one finish would stomp the new run's transcript later.
     private func cancelTranscriptionRuns() {
+        duplicateCheckTask?.cancel()
+        duplicateCheckTask = nil
         fileTranscribeTask?.cancel()
         fileTranscribeTask = nil
         youtubeTranscribeTask?.cancel()
@@ -1345,7 +1354,13 @@ final class AppModel {
 
     /// `activate: false` saves without taking the selection, auto-titling, or running
     /// auto-exports — for interrupted or failed takes that only need to survive.
-    func persistToLibrary(_ result: Transcript, audioSource: URL?, title: String? = nil, activate: Bool = true) {
+    func persistToLibrary(
+        _ result: Transcript,
+        audioSource: URL?,
+        title: String? = nil,
+        activate: Bool = true,
+        sourceDigest: String? = nil
+    ) {
         let category = pendingRecordingCategory
         pendingRecordingCategory = .transcription
         let navigationGeneration = loadEntryGeneration
@@ -1356,7 +1371,8 @@ final class AppModel {
                     transcript: result,
                     audioSource: audioSource,
                     category: category,
-                    title: title
+                    title: title,
+                    sourceDigest: sourceDigest
                 )
                 refreshLibrary()
                 // library.add copies media for seconds; if the user navigated meanwhile,
@@ -1632,9 +1648,9 @@ final class AppModel {
             return
         }
         if batchIsRunning {
-            addBatchFiles(files.media)
+            importBatchFiles(files.media)
         } else if files.media.count > 1, features.isEnabled(.batch) {
-            startBatch(urls: files.media)
+            importBatchFiles(files.media)
         } else {
             transcribe(fileURL: files.media[0], translateOverride: translateOverride)
             deferredArrivals.append(contentsOf: files.media.dropFirst())
@@ -1713,14 +1729,15 @@ final class AppModel {
             return
         }
         if batchIsRunning {
-            addBatchFiles([fileURL])
+            importBatchFiles([fileURL])
             return
         }
-        startFileTranscription(fileURL: fileURL, translateOverride: translateOverride)
+        startFileImport(fileURL: fileURL, translateOverride: translateOverride)
     }
 
-    /// The run itself, past the routing an arriving file goes through: Retry means this file, now.
-    private func startFileTranscription(fileURL: URL, translateOverride: Bool?) {
+    /// The run itself, past the routing and the duplicate check an arriving file goes through:
+    /// Retry means this file, now.
+    func beginFileTranscription(fileURL: URL, translateOverride: Bool?, sourceDigest: String? = nil) {
         fileRunGeneration &+= 1
         let runToken = fileRunGeneration
         noteRecentFile(fileURL)
@@ -1773,7 +1790,7 @@ final class AppModel {
                 fileTranscribeStage = nil
                 endRecovery(recoveryToken)
                 phase = .ready
-                persistToLibrary(processed, audioSource: fileURL)
+                persistToLibrary(processed, audioSource: fileURL, sourceDigest: sourceDigest)
             } catch {
                 endRecovery(recoveryToken)
                 filePartialText = ""
@@ -2678,7 +2695,7 @@ final class AppModel {
             return
         }
         guard let url = failedFileURL else { return }
-        startFileTranscription(fileURL: url, translateOverride: failedTranslateOverride)
+        beginFileTranscription(fileURL: url, translateOverride: failedTranslateOverride)
     }
 
     func revealFailedFile() {

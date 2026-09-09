@@ -893,6 +893,7 @@ struct AppModelBatchTests {
         await model.handleBatchEvent(.started(jobID: model.batchJobs[0].id))
         let url = URL(fileURLWithPath: "/tmp/late.wav")
         model.transcribe(fileURL: url)
+        await model.awaitBatchImport()
         #expect(model.batchJobs.contains { $0.url == url && $0.status == .pending })
         #expect(model.deferredArrivals.isEmpty)
     }

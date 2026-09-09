@@ -200,7 +200,7 @@ struct SubtitleImportTests {
     }
 
     @Test("handleIncomingFiles splits subtitles from media")
-    func handleIncomingFilesPartitions() throws {
+    func handleIncomingFilesPartitions() async throws {
         let scratch = try Self.makeScratchDirectory()
         defer { try? FileManager.default.removeItem(at: scratch) }
         let model = makeModel()
@@ -209,6 +209,7 @@ struct SubtitleImportTests {
         let wav2 = URL(fileURLWithPath: "/tmp/two.wav")
 
         model.handleIncomingFiles([srt, wav1, wav2])
+        await model.awaitBatchImport()
 
         #expect(model.transcript?.modelName == "imported-srt")
         #expect(model.batchJobs.map(\.url) == [wav1, wav2])

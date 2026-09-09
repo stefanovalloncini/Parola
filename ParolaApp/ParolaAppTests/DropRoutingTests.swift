@@ -66,11 +66,12 @@ struct DropRoutingTests {
     }
 
     @Test("the Transcribe Now half joins a running batch instead of racing it")
-    func transcribeNowJoinsARunningBatch() {
+    func transcribeNowJoinsARunningBatch() async {
         let model = makeModel()
         model.batchJobs = [BatchJob(url: Self.media("running.wav"), status: .transcribing)]
 
         model.transcribeNow(urls: [Self.media("late.wav")])
+        await model.awaitBatchImport()
 
         #expect(model.route == .batch)
         #expect(model.batchJobs.map(\.url.lastPathComponent) == ["running.wav", "late.wav"])
@@ -78,11 +79,12 @@ struct DropRoutingTests {
     }
 
     @Test("the Add to Queue half appends to the queue and shows it")
-    func addToQueueAppends() {
+    func addToQueueAppends() async {
         let model = makeModel()
         model.batchJobs = [BatchJob(url: Self.media("running.wav"), status: .transcribing)]
 
         model.addToQueue(urls: [Self.media("a.wav"), Self.media("b.wav")])
+        await model.awaitBatchImport()
 
         #expect(model.route == .batch)
         #expect(model.batchJobs.map(\.url.lastPathComponent) == ["running.wav", "a.wav", "b.wav"])
@@ -101,7 +103,7 @@ struct DropRoutingTests {
     }
 
     @Test("a dropped folder of mkv files reaches the queue")
-    func folderOfMkvReachesTheQueue() throws {
+    func folderOfMkvReachesTheQueue() async throws {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("DropRoutingTests-mkv-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -112,6 +114,7 @@ struct DropRoutingTests {
         model.batchJobs = [BatchJob(url: Self.media("running.wav"), status: .transcribing)]
 
         model.addToQueue(urls: [dir])
+        await model.awaitBatchImport()
 
         #expect(model.batchJobs.map(\.url.lastPathComponent) == ["running.wav", "one.mkv", "two.mkv"])
     }
@@ -301,7 +304,7 @@ struct DropRoutingTests {
     }
 
     @Test("Open With collects every file before routing them")
-    func openedFilesArriveAsOneBatch() {
+    func openedFilesArriveAsOneBatch() async {
         let model = makeModel()
         model.batchJobs = [BatchJob(url: Self.media("running.wav"), status: .transcribing)]
 
@@ -311,6 +314,7 @@ struct DropRoutingTests {
         #expect(model.pendingOpenedFiles.count == 3)
 
         model.flushOpenedFiles()
+        await model.awaitBatchImport()
 
         #expect(model.batchJobs.map(\.url.lastPathComponent) == ["running.wav", "one.wav", "two.wav", "three.wav"])
         #expect(model.pendingOpenedFiles.isEmpty)

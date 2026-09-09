@@ -67,6 +67,17 @@
         }
       }
     },
+    "%@ matches a transcript you already have.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ corrisponde a una trascrizione che hai già."
+          }
+        }
+      }
+    },
     "%@ rewrite preset": {
       "extractionState": "manual",
       "localizations": {
@@ -112,6 +123,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld"
+          }
+        }
+      }
+    },
+    "%lld already in your library": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld già nella tua libreria"
           }
         }
       }
@@ -384,6 +406,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "00:03"
+          }
+        }
+      }
+    },
+    "1 already in your library": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 già nella tua libreria"
           }
         }
       }
@@ -988,6 +1021,17 @@
         }
       }
     },
+    "Added": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiunto"
+          }
+        }
+      }
+    },
     "Added first": {
       "extractionState": "manual",
       "localizations": {
@@ -1083,6 +1127,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tutte le etichette"
+          }
+        }
+      }
+    },
+    "Already in your library": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Già nella tua libreria"
           }
         }
       }
@@ -4676,6 +4731,17 @@
         }
       }
     },
+    "Length": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durata"
+          }
+        }
+      }
+    },
     "Less than an hour left": {
       "extractionState": "manual",
       "localizations": {
@@ -5956,6 +6022,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apri audio…"
+          }
+        }
+      }
+    },
+    "Open Existing": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri esistente"
           }
         }
       }
@@ -9298,6 +9375,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrivi"
+          }
+        }
+      }
+    },
+    "Transcribe Again": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivi di nuovo"
           }
         }
       }

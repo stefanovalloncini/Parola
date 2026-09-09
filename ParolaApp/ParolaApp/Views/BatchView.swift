@@ -9,6 +9,10 @@ struct BatchView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            if let notice = model.batchDuplicateNotice {
+                duplicateNotice(notice)
+                Divider()
+            }
             // Not an HSplitView: it lays out at its panes' combined ideal width and clips both window edges.
             HStack(spacing: 0) {
                 queuePane
@@ -72,6 +76,22 @@ struct BatchView: View {
                 .axLeaf("Header.Button.ToggleExportPane")
             }
         )
+    }
+
+    private func duplicateNotice(_ text: String) -> some View {
+        HStack(spacing: DS.Spacing.small) {
+            Image(systemName: "doc.on.doc")
+                .foregroundStyle(DS.Color.secondaryText)
+            Text(text)
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.secondaryText)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.small)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DS.Palette.subtleFill)
+        .axLeaf("Batch.Text.DuplicatesSkipped")
     }
 
     private var queuePane: some View {

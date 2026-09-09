@@ -65,6 +65,7 @@ extension TranscriberMockSuites {
         }
 
         private func flushRecoveryWrites(_ model: AppModel) async {
+            await model.awaitDuplicateCheck()
             await model.pendingRecoveryWrite?.value
         }
 

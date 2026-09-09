@@ -27,6 +27,30 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "waitForDuplicateImport",
+                area: .library,
+                summary: "Resolves once the \"Already in your library\" sheet is open, or closed when open is false.",
+                kind: .waiter,
+                args: [
+                    .init(name: "open", kind: .boolean, required: false, summary: "State to wait for", defaultValue: .bool(true)),
+                    .init(name: "timeoutMs", kind: .integer, required: false, summary: "Timeout in ms", defaultValue: .int(10_000)),
+                ],
+                handler: { args, ctx in
+                    let wanted = (try args.optionalBool("open")) ?? true
+                    let timeoutMs = (try args.optionalInt("timeoutMs")) ?? 10_000
+                    return await waitForCondition(
+                        ctx: ctx,
+                        timeoutMs: timeoutMs,
+                        observed: { ["open": .bool(ctx.model.duplicateImport != nil)] },
+                        predicate: { (ctx.model.duplicateImport != nil) == wanted },
+                        successFields: {
+                            ["entryID": ctx.model.duplicateImport.map { .string($0.entryID) } ?? .null]
+                        }
+                    )
+                }
+            ),
+
+            AutomationCommand(
                 name: "waitForBatchJob",
                 area: .batch,
                 summary: "Resolves when the named batch job reaches a final state, including removal.",

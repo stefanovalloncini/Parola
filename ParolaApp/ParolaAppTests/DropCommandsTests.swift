@@ -48,6 +48,7 @@ struct DropCommandsTests {
         ]))
 
         let result = try await command.handler(args, context)
+        await model.awaitBatchImport()
         withExtendedLifetime(server) {}
 
         #expect(result == .object([

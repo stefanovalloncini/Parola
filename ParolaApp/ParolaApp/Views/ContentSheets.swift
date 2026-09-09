@@ -22,6 +22,9 @@ struct ContentSheetsModifier: ViewModifier {
                 WelcomeSheet()
             }
             .sheet(isPresented: $model.youtubeSheetOpen) { YouTubeURLSheet() }
+            .sheet(item: $model.duplicateImport) { pending in
+                DuplicateImportSheet(pending: pending)
+            }
             .sheet(isPresented: $model.showingTrash) { MacRecentlyDeletedView() }
             .sheet(item: $model.promptOutput) { output in
                 PromptOutputSheet(output: output)

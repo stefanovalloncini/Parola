@@ -109,6 +109,55 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "getDuplicateImport",
+                area: .library,
+                summary: "Reports the \"Already in your library\" sheet: whether it is open, which entry it matched, and how many files the last batch import skipped as duplicates.",
+                kind: .sync,
+                handler: { _, ctx in
+                    let pending = ctx.model.duplicateImport
+                    return .object([
+                        "open": .bool(pending != nil),
+                        "entryID": pending.map { .string($0.entryID) } ?? .null,
+                        "entryTitle": pending.map { .string($0.entryTitle) } ?? .null,
+                        "modelName": pending.map { .string($0.modelName) } ?? .null,
+                        "createdAt": pending.map { .double($0.createdAt.timeIntervalSince1970) } ?? .null,
+                        "durationSeconds": pending?.durationSeconds.map { .double($0) } ?? .null,
+                        "file": pending.map { .string($0.fileURL.path) } ?? .null,
+                        "batchDuplicatesSkipped": .int(ctx.model.batchDuplicatesSkipped),
+                        "batchNotice": ctx.model.batchDuplicateNotice.map { .string($0) } ?? .null,
+                    ])
+                }
+            ),
+
+            AutomationCommand(
+                name: "resolveDuplicateImport",
+                area: .library,
+                summary: "Presses one of the duplicate sheet's buttons: openExisting, transcribeAgain or dismiss.",
+                kind: .mutating,
+                args: [
+                    .init(
+                        name: "choice",
+                        kind: .string(enum: ["openExisting", "transcribeAgain", "dismiss"]),
+                        required: true,
+                        summary: "Which button to press"
+                    ),
+                ],
+                followsWith: ["waitForPhase"],
+                handler: { args, ctx in
+                    guard ctx.model.duplicateImport != nil else {
+                        throw AutomationError.invalidArgs(field: "choice", reason: "no duplicate sheet is open")
+                    }
+                    let choice = try args.string("choice")
+                    switch choice {
+                    case "openExisting": ctx.model.openExistingDuplicate()
+                    case "transcribeAgain": ctx.model.transcribeDuplicateAgain()
+                    default: ctx.model.dismissDuplicateImport()
+                    }
+                    return .object(["choice": .string(choice)])
+                }
+            ),
+
+            AutomationCommand(
                 name: "restoreEntry",
                 area: .library,
                 summary: "Restores a soft-deleted entry.",

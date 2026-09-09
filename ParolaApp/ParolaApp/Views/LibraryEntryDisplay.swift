@@ -6,6 +6,14 @@ enum LibraryEntryDisplay {
         title(raw: entry.title, createdAt: entry.createdAt)
     }
 
+    /// The catalogue's name for the model an entry was transcribed with, falling back to the
+    /// stored id for imports and models the catalogue no longer lists.
+    static func modelName(raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return ModelCatalog.variant(id: trimmed)?.displayName ?? trimmed
+    }
+
     static func title(raw: String, createdAt: Date) -> String {
         guard isMachineName(raw) else { return raw }
         let stamp = AppFormat.dateAndTime(createdAt)

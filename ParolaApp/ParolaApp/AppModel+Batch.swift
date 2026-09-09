@@ -335,7 +335,7 @@ extension AppModel {
         panel.allowsMultipleSelection = true
         panel.message = "Select audio or video files to transcribe."
         guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
-        addBatchFiles(panel.urls)
+        importBatchFiles(panel.urls)
     }
 
     private func isCancelled(_ id: BatchJob.ID) -> Bool {
@@ -370,6 +370,7 @@ extension AppModel {
         batchTask = nil
         batchJobs = []
         selectedBatchJobID = nil
+        batchDuplicatesSkipped = 0
     }
 
     func cancelAllInFlightBatchJobs() {

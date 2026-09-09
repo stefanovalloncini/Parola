@@ -43,7 +43,7 @@ extension AppModel {
             return
         }
         if batchIsRunning {
-            addBatchFiles(files.media)
+            importBatchFiles(files.media)
             route = .batch
             return
         }
@@ -76,7 +76,7 @@ extension AppModel {
             transcribeNow(urls: files.media)
             return
         }
-        addBatchFiles(files.media)
+        importBatchFiles(files.media)
         if !batchJobs.isEmpty { route = .batch }
     }
 
