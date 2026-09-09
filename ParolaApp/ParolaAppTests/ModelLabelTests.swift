@@ -139,6 +139,58 @@ struct SelectedModelCorrectionTests {
     }
 }
 
+@MainActor
+@Suite("A refused or failed download does not strand the selection")
+struct DownloadRefusalCorrectionTests {
+    private func makeModel() -> AppModel {
+        AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("download-refusal"))
+    }
+
+    private func waitUntil(timeoutMs: Int = 5_000, _ condition: @MainActor () -> Bool) async -> Bool {
+        var elapsed = 0
+        while elapsed < timeoutMs {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(15))
+            elapsed += 15
+        }
+        return condition()
+    }
+
+    @Test("a download refused while another job runs corrects the pick back to the default")
+    func refusedDownloadCorrectsSelection() {
+        let model = makeModel()
+        model.availableModels = [
+            ModelInfo(name: "openai_whisper-tiny", label: "Whisper Tiny", approximateSizeBytes: 0, isMultilingual: true, isInstalled: false),
+        ]
+        model.phase = .transcribing(file: URL(fileURLWithPath: "/dev/null"))
+        model.activateModel("openai_whisper-tiny")
+
+        let started = model.downloadModel("openai_whisper-tiny")
+
+        #expect(started == false)
+        #expect(model.modelActionError != nil)
+        #expect(model.selectedModel == ModelCatalog.defaultModelID())
+    }
+
+    @Test("a download that fails after starting corrects the pick instead of leaving it stuck")
+    func failedDownloadCorrectsSelection() async throws {
+        let model = makeModel()
+        // Not a real catalog id, but a close enough match that ModelStore rejects it before any
+        // network call — the async catch path this proves must fire the same way a real failure would.
+        let pickedID = "whisper-large-v3_turbo"
+        model.availableModels = []
+        model.activateModel(pickedID)
+
+        let started = model.downloadModel(pickedID)
+        #expect(started == true)
+
+        let corrected = await waitUntil { model.selectedModel != pickedID }
+        #expect(corrected)
+        #expect(model.selectedModel == ModelCatalog.defaultModelID())
+        #expect(model.modelActionError != nil)
+    }
+}
+
 @Suite("Selectable model names")
 struct SelectableModelNamesTests {
     private func info(_ name: String) -> ModelInfo {

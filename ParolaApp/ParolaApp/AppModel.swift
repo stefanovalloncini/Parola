@@ -287,7 +287,7 @@ final class AppModel {
         inputDeviceUID.isEmpty ? nil : inputDeviceUID
     }
 
-    var selectedModel: String = ModelCatalog.fallbackModelID {
+    var selectedModel: String = ModelCatalog.defaultModelID() {
         didSet {
             defaults.set(selectedModel, forKey: "selectedModel")
             if !isReloadingSettings {
@@ -1437,18 +1437,13 @@ final class AppModel {
         refreshModelSizes()
     }
 
-    /// The model `downloadModel` is actively fetching, or nil. A scan landing mid-download must not
-    /// treat "not installed yet" as a stale selection to correct away from.
+    /// The model `downloadModel` is fetching, or nil — a scan mid-download must not correct it away as if uninstalled.
     private var downloadingModelName: String? {
         if case .downloadingModel(let name, _) = phase { return name }
         return nil
     }
 
-    /// nil when `current` is a model the scan found actually installed, or one whose download is
-    /// still running; otherwise the default to fall back to. A stale selection (deleted model, fresh
-    /// profile) can name a real catalog id that simply isn't downloaded yet, so the check has to look
-    /// at `isInstalled`, not just whether the id is known — but a deliberate pick that's still
-    /// downloading must survive a scan landing in that same window.
+    /// nil when `current` is installed or still downloading, else the default — a deliberate pick must survive a scan landing mid-download.
     nonisolated static func correctedSelectedModel(
         _ current: String,
         in availableModels: [ModelInfo],
@@ -1461,10 +1456,7 @@ final class AppModel {
         return defaultModelID()
     }
 
-    /// `availableModels` also carries orphan folders `ModelStore` finds on disk (an old
-    /// engine's leftover, a stale download) so the Models settings pane can offer them for
-    /// deletion. They aren't real choices, so anything that lists selectable models filters
-    /// down to catalog ids first — the install validation an orphan can't pass by definition.
+    /// Drops orphan folders `ModelStore` surfaces for deletion — they aren't real choices, since they fail the catalog-id check by definition.
     nonisolated static func selectableModels(_ models: [ModelInfo]) -> [ModelInfo] {
         models.filter { ModelCatalog.variant(id: $0.name) != nil }
     }
@@ -1550,14 +1542,26 @@ final class AppModel {
         }
     }
 
+    /// A pick that never starts downloading, or stops without installing, must not stick as the
+    /// selection — nothing besides a scan otherwise re-applies `correctedSelectedModel`.
+    private func correctSelectionIfNeeded() {
+        if let corrected = AppModel.correctedSelectedModel(
+            selectedModel, in: availableModels, downloading: downloadingModelName
+        ) {
+            selectedModel = corrected
+        }
+    }
+
     @discardableResult
     func downloadModel(_ name: String) -> Bool {
         guard downloadTask == nil else {
             modelActionError = "Another download is already running. Wait for it to finish."
+            correctSelectionIfNeeded()
             return false
         }
         if let reason = downloadBlockedReason {
             modelActionError = reason
+            correctSelectionIfNeeded()
             return false
         }
         let progress = makeDownloadProgressHandler(for: name)
@@ -1576,6 +1580,7 @@ final class AppModel {
                         ?? "Download failed: \(error.localizedDescription)"
                     phase = .failed(message: message)
                     modelActionError = message
+                    correctSelectionIfNeeded()
                 }
             }
             if !Task.isCancelled { downloadTask = nil }

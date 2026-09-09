@@ -309,10 +309,10 @@ struct ModelsSettingsPane: View {
 
         if installFilter != .available {
             sections.installed = sorted(matching(allowed.filter { installedIDs.contains($0.id) }))
-            let catalogIDs = Set(ModelCatalog.all.map(\.id))
+            let selectableNames = Set(AppModel.selectableModelNames(model.availableModels))
             let needle = searchNeedle
             sections.orphans = model.availableModels.filter { info in
-                guard info.isInstalled, !catalogIDs.contains(info.name) else { return false }
+                guard info.isInstalled, !selectableNames.contains(info.name) else { return false }
                 guard let needle else { return true }
                 return info.name.lowercased().contains(needle)
             }

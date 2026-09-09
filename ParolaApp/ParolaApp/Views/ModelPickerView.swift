@@ -160,10 +160,12 @@ struct ModelPickerView: View {
     }
 
     private func select(variant: ModelVariant) {
+        // Activate first: a refused or already-failing download corrects the selection
+        // synchronously against what was just picked, not against whatever came before it.
+        model.activateModel(variant.id)
         if !isInstalled(variant) {
             model.downloadModel(variant.id)
         }
-        model.activateModel(variant.id)
     }
 
     private var currentLabel: String {
