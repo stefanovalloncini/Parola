@@ -12,8 +12,16 @@ enum LibraryEntryDisplay {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         // A subtitle import ran no model, so naming the importer would read as one.
         guard !trimmed.isEmpty, !trimmed.hasPrefix("imported-") else { return nil }
+        if let captions = captionSource[trimmed] { return captions }
         return ModelCatalog.variant(id: trimmed)?.displayName ?? trimmed
     }
+
+    /// The sentinels `YouTubeSubsFetcher` stamps when it takes a video's own captions instead of
+    /// transcribing it.
+    private static let captionSource: [String: String] = [
+        "youtube-subs": String(localized: "YouTube subtitles"),
+        "youtube-auto-subs": String(localized: "YouTube auto subtitles"),
+    ]
 
     static func title(raw: String, createdAt: Date) -> String {
         guard isMachineName(raw) else { return raw }

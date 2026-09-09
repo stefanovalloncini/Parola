@@ -108,6 +108,12 @@ struct LibraryEntryDisplayTests {
         #expect(display(modelName: "imported-vtt").modelLabel == nil)
     }
 
+    @Test("a video's own captions read as captions, not as an internal id")
+    func youtubeCaptionsReadPlainly() {
+        #expect(display(modelName: "youtube-subs").modelLabel == "YouTube subtitles")
+        #expect(display(modelName: "youtube-auto-subs").modelLabel == "YouTube auto subtitles")
+    }
+
     @Test("two runs of the same recording differ by their model caption")
     func sameRecordingDifferentModels() {
         let turbo = display(modelName: "openai_whisper-large-v3_turbo")

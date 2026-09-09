@@ -10317,6 +10317,28 @@
         }
       }
     },
+    "YouTube auto subtitles": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli automatici YouTube"
+          }
+        }
+      }
+    },
+    "YouTube subtitles": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli YouTube"
+          }
+        }
+      }
+    },
     "Your transcript appears here as you speak": {
       "extractionState": "manual",
       "localizations": {
