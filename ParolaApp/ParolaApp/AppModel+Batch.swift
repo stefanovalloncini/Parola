@@ -246,7 +246,7 @@ extension AppModel {
         for url in subtitleURLs { importSubtitle(fileURL: url) }
         if !audioURLs.isEmpty {
             if features.isEnabled(.batch) {
-                addBatchFiles(audioURLs)
+                importBatchFiles(audioURLs)
             } else {
                 transcribe(fileURL: audioURLs[0])
                 deferredArrivals.append(contentsOf: audioURLs.dropFirst())

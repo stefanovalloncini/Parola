@@ -168,6 +168,10 @@ extension TranscriberMockSuites {
 
         @Test("a batch import skips the duplicates and counts them once")
         func batchImportSkipsDuplicates() async throws {
+            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "queued")]
+            ))
+            defer { Task { await MockTranscriberRegistry.shared.clear() } }
             let model = makeModel()
             let known = try makeWAV("known")
             let fresh = try makeWAV("unknown", seconds: 0.4)
@@ -204,6 +208,35 @@ extension TranscriberMockSuites {
             #expect(model.batchJobs.isEmpty)
             #expect(model.batchDuplicateNotice == "2 already in your library")
             #expect(model.route == .batch)
+        }
+
+        @Test("a duplicate deferred during a run is still filtered when the queue drains")
+        func deferredArrivalsAreFiltered() async throws {
+            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "drained")]
+            ))
+            defer { Task { await MockTranscriberRegistry.shared.clear() } }
+            let model = makeModel()
+            let known = try makeWAV("deferred-known")
+            let fresh = try makeWAV("deferred-fresh", seconds: 0.4)
+            defer {
+                try? FileManager.default.removeItem(at: known)
+                try? FileManager.default.removeItem(at: fresh)
+            }
+            _ = try await seedLibrary(model, with: known)
+
+            model.fileTranscribeTask = Task {}
+            model.transcribeNow(urls: [known, fresh])
+            #expect(model.deferredArrivals == [known, fresh])
+
+            model.fileTranscribeTask?.cancel()
+            model.fileTranscribeTask = nil
+            model.drainDeferredArrivals()
+            await model.awaitBatchImport()
+
+            #expect(model.batchJobs.map(\.url) == [fresh])
+            #expect(model.batchDuplicateNotice == "1 already in your library")
+            model.clearBatch()
         }
 
         @Test("a deleted entry stops holding up its file")

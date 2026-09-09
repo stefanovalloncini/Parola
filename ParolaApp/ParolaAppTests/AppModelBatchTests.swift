@@ -674,7 +674,7 @@ struct AppModelBatchTests {
     }
 
     @Test("a batch deferred behind a single-file run starts when that run drains")
-    func deferredBatchStartsAfterFileTranscription() {
+    func deferredBatchStartsAfterFileTranscription() async {
         let model = makeModel()
         model.fileTranscribeTask = Task {}
         let url = URL(fileURLWithPath: "/tmp/queued.wav")
@@ -686,6 +686,7 @@ struct AppModelBatchTests {
         model.transcript = Self.makeTranscript()
         model.phase = .ready
         model.drainDeferredArrivals()
+        await model.awaitBatchImport()
 
         #expect(model.deferredArrivals.isEmpty)
         #expect(model.batchJobs.map(\.url) == [url])
@@ -693,7 +694,7 @@ struct AppModelBatchTests {
     }
 
     @Test("addBatchFiles defers onto a finished queue while a single-file run is in flight")
-    func addBatchFilesDefersDuringFileTranscription() {
+    func addBatchFilesDefersDuringFileTranscription() async {
         let model = makeModel()
         model.batchJobs = [Self.makeJob("finished", status: .done)]
         model.fileTranscribeTask = Task {}
@@ -709,6 +710,7 @@ struct AppModelBatchTests {
         model.fileTranscribeTask = nil
         model.phase = .ready
         model.drainDeferredArrivals()
+        await model.awaitBatchImport()
 
         #expect(model.deferredArrivals.isEmpty)
         #expect(model.batchJobs.contains { $0.url == url })
@@ -770,6 +772,7 @@ struct AppModelBatchTests {
 
         await model.handleBatchEvent(.completed(jobID: jobID, transcript: Self.makeTranscript()))
         await model.handleBatchEvent(.finished)
+        await model.awaitBatchImport()
 
         #expect(model.deferredArrivals.isEmpty)
         #expect(model.batchJobs.contains { $0.url == parked })
@@ -788,6 +791,7 @@ struct AppModelBatchTests {
         await model.handleBatchEvent(.failed(jobID: failed, reason: "boom"))
         await model.handleBatchEvent(.cancelled(jobID: cancelled))
         await model.handleBatchEvent(.finished)
+        await model.awaitBatchImport()
 
         #expect(model.deferredArrivals.isEmpty)
         #expect(model.batchJobs.contains { $0.url == parked })
@@ -812,6 +816,7 @@ struct AppModelBatchTests {
 
         model.batchJobs[1].status = .done
         await model.handleBatchEvent(.finished)
+        await model.awaitBatchImport()
 
         #expect(model.deferredArrivals.isEmpty)
         #expect(model.batchJobs.contains { $0.url == parked })
@@ -872,6 +877,7 @@ struct AppModelBatchTests {
         model.transcribe(fileURL: url)
         let final = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")], language: "en", modelName: "m")
         await model.handleStreamingEvent(.finished(final))
+        await model.awaitBatchImport()
         #expect(model.deferredArrivals.isEmpty)
         #expect(model.batchJobs.contains { $0.url == url })
     }
@@ -921,6 +927,7 @@ struct AppModelBatchTests {
         #expect(model.deferredArrivals == [audio, parola])
         let final = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "t")], language: "en", modelName: "m")
         await model.handleStreamingEvent(.finished(final))
+        await model.awaitBatchImport()
         #expect(model.deferredArrivals.isEmpty)
         #expect(model.batchJobs.contains { $0.url == audio })
         #expect(!model.batchJobs.contains { $0.url == parola })
