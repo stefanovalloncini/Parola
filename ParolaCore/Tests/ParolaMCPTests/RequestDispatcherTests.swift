@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 import Testing
 @testable import ParolaMCP
 
@@ -53,7 +54,7 @@ struct RequestDispatcherTests {
     func shutdownFiresCallbackAfterResponse() async throws {
         let collector = OutputCollector()
         let dispatcher = RequestDispatcher(
-            server: MCPServer(bridge: GatedBridge()),
+            server: MCPServer(libraryStore: scratchLibraryStore(), bridge: GatedBridge()),
             output: { message in Task { await collector.record(message) } },
             onShutdown: { Task { await collector.waitForResponses(1); await collector.recordShutdown() } }
         )
@@ -92,7 +93,7 @@ struct RequestDispatcherTests {
 
     private func makeDispatcher(bridge: any BridgeProtocol, collector: OutputCollector) -> RequestDispatcher {
         RequestDispatcher(
-            server: MCPServer(bridge: bridge),
+            server: MCPServer(libraryStore: scratchLibraryStore(), bridge: bridge),
             output: { message in Task { await collector.record(message) } }
         )
     }

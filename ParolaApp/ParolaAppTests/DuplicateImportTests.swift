@@ -226,6 +226,11 @@ extension TranscriberMockSuites {
             model.cancelCurrentWork()
         }
 
+        @Test("the app test host is recognised as a test process too")
+        func testProcessIsDetected() {
+            #expect(LibraryStore.isTestProcess)
+        }
+
         @Test("the batch notice stays quiet when nothing was skipped")
         func noticeIsQuietWithoutDuplicates() {
             let model = makeModel()

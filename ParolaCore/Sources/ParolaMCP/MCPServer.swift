@@ -13,10 +13,12 @@ public actor MCPServer {
     private let features: FeatureSet
     private(set) var shouldExit: Bool = false
 
+    /// `libraryStore` carries no default on purpose: the only store a missing argument could pick
+    /// is the user's real library, and a test that inherited it would rewrite their manifests.
     public init(
         session: TranscriptionSession = TranscriptionSession(),
         modelStore: ModelStore = .shared,
-        libraryStore: LibraryStore = .shared,
+        libraryStore: LibraryStore,
         bridge: any BridgeProtocol = BridgeClient(),
         features: FeatureSet = .resolveFromAppDomain()
     ) {

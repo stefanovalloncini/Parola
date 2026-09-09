@@ -112,6 +112,11 @@ struct DuplicateImportTests {
         #expect(await store.findEntry(digest: digest)?.id == entry.id)
     }
 
+    @Test("a test process is recognised as one, so the shared store stays out of reach")
+    func testProcessIsDetected() {
+        #expect(LibraryStore.isTestProcess)
+    }
+
     @Test("a manifest written before digests decodes without one")
     func oldManifestDecodes() throws {
         let json = """

@@ -1,4 +1,5 @@
 import Foundation
+import MachO
 
 public actor LibraryStore {
     public enum LibraryError: Error, LocalizedError {
@@ -48,7 +49,26 @@ public actor LibraryStore {
         }
     }
 
-    public static let shared = LibraryStore()
+    public static let shared: LibraryStore = {
+        precondition(
+            !isTestProcess,
+            "LibraryStore.shared is the user's real library; a test must inject a scratch one."
+        )
+        return LibraryStore()
+    }()
+
+    /// Whether a test bundle is loaded into this process. Neither `XCTestConfigurationFilePath` nor
+    /// `Bundle.main` identifies a `swift test` run — its main bundle is swiftpm-testing-helper and it
+    /// loads no XCTest — so the check is on the loaded images, which both runners agree on.
+    public static var isTestProcess: Bool {
+        if NSClassFromString("XCTestCase") != nil { return true }
+        for index in 0..<_dyld_image_count() {
+            guard let name = _dyld_get_image_name(index) else { continue }
+            if String(cString: name).contains(".xctest") { return true }
+        }
+        return false
+    }
+
     public static var defaultLibraryURL: URL {
         URL.applicationSupportDirectory.appending(path: "Parola/Library", directoryHint: .isDirectory)
     }

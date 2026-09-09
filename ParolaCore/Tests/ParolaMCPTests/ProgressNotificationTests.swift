@@ -149,7 +149,7 @@ struct ProgressNotificationTests {
     func notificationsPrecedeTheResponse() async throws {
         let bridge = GateBridge()
         let log = MessageLog()
-        let dispatcher = RequestDispatcher(server: MCPServer(bridge: bridge), output: { log.append($0) })
+        let dispatcher = RequestDispatcher(server: MCPServer(libraryStore: scratchLibraryStore(), bridge: bridge), output: { log.append($0) })
 
         let task = await dispatcher.dispatch(toolCall(name: "parola_get_state", id: 1))
         await dispatcher.notify(progress(1), for: .int(1))
@@ -164,7 +164,7 @@ struct ProgressNotificationTests {
     func cancelledCallWritesNoNotifications() async throws {
         let bridge = GateBridge()
         let log = MessageLog()
-        let dispatcher = RequestDispatcher(server: MCPServer(bridge: bridge), output: { log.append($0) })
+        let dispatcher = RequestDispatcher(server: MCPServer(libraryStore: scratchLibraryStore(), bridge: bridge), output: { log.append($0) })
 
         let task = await dispatcher.dispatch(toolCall(name: "parola_get_state", id: 1))
         await dispatcher.dispatch(JSONRPCRequest(
@@ -183,7 +183,7 @@ struct ProgressNotificationTests {
     @Test("a notification for a call that never ran is dropped")
     func unknownCallWritesNoNotifications() async throws {
         let log = MessageLog()
-        let dispatcher = RequestDispatcher(server: MCPServer(bridge: GateBridge()), output: { log.append($0) })
+        let dispatcher = RequestDispatcher(server: MCPServer(libraryStore: scratchLibraryStore(), bridge: GateBridge()), output: { log.append($0) })
 
         await dispatcher.notify(progress(1), for: .int(42))
 

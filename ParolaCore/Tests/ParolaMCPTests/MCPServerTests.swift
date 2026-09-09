@@ -6,7 +6,7 @@ import ParolaCore
 @Suite("MCPServer JSON-RPC dispatch")
 struct MCPServerTests {
     private func makeServer() -> MCPServer {
-        MCPServer(bridge: NullBridge())
+        MCPServer(libraryStore: scratchLibraryStore(), bridge: NullBridge())
     }
 
     private func makeServer(libraryStore: LibraryStore, bridge: any BridgeProtocol = NullBridge()) -> MCPServer {
@@ -120,7 +120,7 @@ struct MCPServerTests {
 
     @Test("a tool-internal CancellationError is contained as isError, not thrown")
     func toolInternalCancellationContained() async throws {
-        let server = MCPServer(bridge: CancellingBridge())
+        let server = MCPServer(libraryStore: scratchLibraryStore(), bridge: CancellingBridge())
         let response = try await server.handle(
             toolCall(name: "parola_select_model", arguments: ["name": "openai_whisper-tiny"], id: 200)
         )

@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import ParolaCore
 import ParolaMCP
 
 struct MCP: AsyncParsableCommand {
@@ -10,7 +11,7 @@ struct MCP: AsyncParsableCommand {
 
     func run() async throws {
         CLIDiagnostics.installIfWanted(alwaysOn: true)
-        await StdioRunner.run()
+        await StdioRunner.run(server: MCPServer(libraryStore: .shared))
         await CLIDiagnostics.flush()
     }
 }

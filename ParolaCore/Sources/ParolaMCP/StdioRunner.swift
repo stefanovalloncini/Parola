@@ -4,7 +4,7 @@ import ParolaCore
 
 /// Drives an `MCPServer` from line-delimited JSON-RPC over stdin/stdout.
 public enum StdioRunner {
-    public static func run(server: MCPServer = MCPServer()) async {
+    public static func run(server: MCPServer) async {
         let decoder = JSONDecoder()
 
         log("parola-mcp listening on stdio")
