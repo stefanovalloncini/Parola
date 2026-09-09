@@ -10,7 +10,8 @@ enum LibraryEntryDisplay {
     /// stored id for imports and models the catalogue no longer lists.
     static func modelName(raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
+        // A subtitle import ran no model, so naming the importer would read as one.
+        guard !trimmed.isEmpty, !trimmed.hasPrefix("imported-") else { return nil }
         return ModelCatalog.variant(id: trimmed)?.displayName ?? trimmed
     }
 
@@ -44,6 +45,7 @@ struct LibraryRowDisplay: Identifiable {
     let shortDate: String
     let sizeLabel: String?
     let durationLabel: String?
+    let modelLabel: String?
     let languageLabel: String?
     let lastOpened: String?
     let tooltip: String
@@ -65,6 +67,7 @@ struct LibraryRowDisplay: Identifiable {
             sizeLabel = nil
         }
         durationLabel = entry.durationSeconds.flatMap { $0 > 0 ? Timecode.format($0) : nil }
+        modelLabel = LibraryEntryDisplay.modelName(raw: entry.modelName)
         languageLabel = LanguageDisplay.name(for: entry.language)
         lastOpened = entry.lastOpenedAt.map { AppFormat.relativeDate($0) }
 

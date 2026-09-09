@@ -39,11 +39,16 @@ struct LibraryEntryDisplayTests {
         #expect(title.contains(stamp))
     }
 
-    private func display(lastOpenedAt: Date? = nil, labels: [String] = [], pinned: Bool = false) -> LibraryRowDisplay {
+    private func display(
+        lastOpenedAt: Date? = nil,
+        labels: [String] = [],
+        pinned: Bool = false,
+        modelName: String = "stub"
+    ) -> LibraryRowDisplay {
         let manifest = ParolaDocument.Manifest(
             createdAt: date,
             originalAudioName: "Weekly sync.m4a",
-            modelName: "stub",
+            modelName: modelName,
             language: "en",
             lastOpenedAt: lastOpenedAt,
             labels: labels,
@@ -88,6 +93,28 @@ struct LibraryEntryDisplayTests {
 
         #expect(first.sizeLabel == second.sizeLabel)
         #expect(second.sizeLabel == ByteCountFormatter.string(fromByteCount: 1_000_000, countStyle: .file))
+    }
+
+    @Test("the row caption names the model the entry was transcribed with")
+    func rowCarriesTheModelName() {
+        #expect(display(modelName: "openai_whisper-large-v3_turbo").modelLabel == "Whisper Large v3 Turbo")
+        #expect(display(modelName: "stub").modelLabel == "stub")
+        #expect(display(modelName: "  ").modelLabel == nil)
+    }
+
+    @Test("a subtitle import names no model")
+    func importedSubtitlesHaveNoModel() {
+        #expect(display(modelName: "imported-srt").modelLabel == nil)
+        #expect(display(modelName: "imported-vtt").modelLabel == nil)
+    }
+
+    @Test("two runs of the same recording differ by their model caption")
+    func sameRecordingDifferentModels() {
+        let turbo = display(modelName: "openai_whisper-large-v3_turbo")
+        let speech = display(modelName: "apple-speech-analyzer")
+        #expect(turbo.title == speech.title)
+        #expect(turbo.timestamp == speech.timestamp)
+        #expect(turbo.modelLabel != speech.modelLabel)
     }
 
     @Test("the row's relative and hover strings are formatted with the entry, not with every cell")

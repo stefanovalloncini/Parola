@@ -649,6 +649,11 @@ struct LibraryRow: View {
                         Text(duration)
                             .monospacedDigit()
                     }
+                    if let modelName = display.modelLabel {
+                        Text("·")
+                            .foregroundStyle(secondaryStyle.opacity(0.5))
+                        Text(modelName)
+                    }
                     if let size = display.sizeLabel {
                         Text("·")
                             .foregroundStyle(secondaryStyle.opacity(0.5))

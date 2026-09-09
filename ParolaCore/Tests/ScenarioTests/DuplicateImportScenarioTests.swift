@@ -54,19 +54,28 @@ extension ScenarioSuite {
             let afterOpen = try await client.send("listEntries", ["limit": 10])
             #expect(afterOpen.arrayValue?.count == 1, "Open Existing must not add a second bundle")
 
+            // A second model on the same audio: the two rows must be tellable apart afterwards.
+            _ = try await client.send("installMockTranscriber", ["engineID": "all", "response": [
+                "segments": [["start": 0.0, "end": 1.5, "text": "Same recording, twice."]],
+                "language": "en",
+                "modelName": "apple-speech-analyzer",
+            ]])
             _ = try await client.send("transcribeFile", ["path": audioURL.path])
             _ = try await client.send("waitForDuplicateImport", ["open": true, "timeoutMs": 15000])
             _ = try await client.send("resolveDuplicateImport", ["choice": "transcribeAgain"])
             let secondRun = try await client.send("waitForPhase", ["phase": "ready", "timeoutMs": 20000])
             #expect(secondRun["matched"]?.boolValue == true)
 
-            var entryCount = 0
+            var entries: [JSONValue] = []
             for _ in 0..<40 {
-                entryCount = (try await client.send("listEntries", ["limit": 10])).arrayValue?.count ?? 0
-                if entryCount == 2 { break }
+                entries = (try await client.send("listEntries", ["limit": 10])).arrayValue ?? []
+                if entries.count == 2 { break }
                 try await Task.sleep(for: .milliseconds(100))
             }
-            #expect(entryCount == 2, "Transcribe Again must write a second bundle")
+            #expect(entries.count == 2, "Transcribe Again must write a second bundle")
+            let models = Set(entries.compactMap { $0["modelName"]?.stringValue })
+            #expect(models == ["openai_whisper-tiny", "apple-speech-analyzer"])
+            #expect(Set(entries.compactMap { $0["title"]?.stringValue }).count == 1)
 
             _ = try await client.send("clearMocks", ["scope": "all"])
         }
