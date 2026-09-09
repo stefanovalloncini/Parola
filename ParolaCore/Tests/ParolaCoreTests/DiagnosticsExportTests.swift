@@ -210,6 +210,19 @@ struct DiagnosticsExportTests {
         #expect(text.contains("Engines registered  whisperkit=ok parakeet=ok apple-speech=unavailable"))
     }
 
+    @Test("an unregistered engine id is appended after the known ones, scrubbed like any other unknown token")
+    func engineRowAppendsUnknownEngineAfterKnownOnes() throws {
+        let directory = try scratchDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var environment = emptyEnvironment
+        environment.engines = [.appleSpeech: false, .whisperKit: true, .parakeet: true, EngineID("acme"): true]
+        let text = DiagnosticsExport.render(directory: directory, environment: environment)
+
+        #expect(text.contains(
+            "Engines registered  whisperkit=ok parakeet=ok apple-speech=unavailable unrecognized=ok"
+        ))
+    }
+
     @Test("the header degrades where the frontend has no answer")
     func headerDegradesForMissingValues() throws {
         let directory = try scratchDirectory()

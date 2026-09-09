@@ -262,6 +262,8 @@ struct AppModelDiagnosticsTests {
         let group = try #require(text.range(of: "SettingsSection(\"Diagnostics\")"))
         let openBrace = try #require(text.range(of: "{", range: group.upperBound..<text.endIndex)).lowerBound
         let body = matchingBraceRange(from: openBrace, in: text)
+        let task = try #require(text.range(of: ".task {"))
+        #expect(body.upperBound <= task.lowerBound, "brace matching overran into the .task modifier")
         let diagnostics = text[group.lowerBound..<body.upperBound]
         for (control, identifier) in [
             ("Button(\"Export…\")", "About.Button.ExportDiagnostics"),
