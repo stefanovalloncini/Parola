@@ -161,8 +161,18 @@ public actor TranscriptionSession {
             throw error
         }
         // The source asset's own duration, not whatever the engine decoded: engines disagree with
-        // each other and Parakeet reports none at all.
-        transcript.durationSeconds = probedDuration ?? transcript.durationSeconds
+        // each other and Parakeet reports none at all. AVAudioFile can't open every container
+        // FluidAudio decodes, so fall back to the AVURLAsset probe (on the same deadline as the
+        // readability gate — AVFoundation's own asset queue can wedge exactly like AVAudioFile),
+        // then the transcript itself.
+        let estimatedDuration: Double? = probedDuration == nil
+            ? await AsyncTimeout.run(fileReadDeadline) {
+                await FileAudioSource(url: audioURL).estimatedDuration()
+            } ?? nil
+            : nil
+        transcript.durationSeconds = probedDuration
+            ?? estimatedDuration
+            ?? transcript.segments.map(\.end).max()
         let cleanupOptions = TranscriptCleanupOptions(
             filtersHallucinations: options.filtersHallucinations,
             mergesSentences: false
@@ -204,9 +214,7 @@ public actor TranscriptionSession {
         return transcript
     }
 
-    /// The energy probe opens the source file and seeks through it. On the actor and without a
-    /// deadline that is the wedge the readability gate exists to stop, one step further along — a
-    /// volume pulled mid-run would park the session itself with the slot still held.
+    /// Same wedge the readability gate stops, one step later: unbounded here would park the session with the slot still held.
     private func cleanedWithEnergy(
         _ transcript: Transcript, at audioURL: URL, options: TranscriptCleanupOptions
     ) async -> Transcript {
@@ -274,9 +282,7 @@ public actor TranscriptionSession {
         wakeTranscribeWaiters()
     }
 
-    /// A cancelled run still inside the engine after the grace loses its slot and its transcriber.
-    /// The engine may be parked in a read no cancel reaches, and every later run would otherwise
-    /// queue behind it until the app is relaunched.
+    /// A cancelled run still inside the engine after the grace loses its slot and transcriber, so a parked read can't block every later run until relaunch.
     private func abandonIfCancelledRunStalls(_ runID: Int) async {
         // Only this run's own engine: a cancel delivered as the body completes must not reach into
         // whichever run has taken the slot since.
@@ -284,11 +290,17 @@ public actor TranscriptionSession {
         await cancelInFlight()
         try? await Task.sleep(for: abandonGrace)
         guard activeRun == runID else { return }
+        // The zombie's engine keeps its weights resident until its parked read finally returns —
+        // unload() would itself block, so the next run just loads a second copy.
+        let zombieModel = await transcriber?.loadedModelName() ?? "unknown"
         activeRun = nil
         wakeTranscribeWaiters()
         transcriber = nil
         transcriberEngineID = nil
-        ParolaLog.notice(.models, "abandoned a cancelled run that never unwound")
+        ParolaLog.notice(
+            .models, "abandoned a cancelled run that never unwound",
+            [.model: .safe(ModelToken(zombieModel))]
+        )
     }
 
     private func wakeTranscribeWaiters() {
@@ -380,9 +392,7 @@ public actor TranscriptionSession {
         }
     }
 
-    /// The only cause worth naming without inspecting the file's actual bytes; everything else
-    /// (wrong container, truncated encode, a text file wearing a media extension) stays silent
-    /// rather than guess.
+    /// The only cause worth naming without reading the file's bytes — everything else stays silent rather than guess.
     static func unreadableFileReason(at url: URL) -> String? {
         guard let size = try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? UInt64,
               size == 0 else { return nil }

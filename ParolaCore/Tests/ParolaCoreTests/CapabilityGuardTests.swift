@@ -142,6 +142,23 @@ struct CapabilityGuardTests {
         #expect(fallback.category == .recommended)
     }
 
+    @Test("variantSupporting's recommended fallback prefers an installed candidate")
+    func variantSupportingFallbackPrefersInstalled() throws {
+        let notInstalled = try #require(ModelCatalog.variantSupporting(
+            language: "it",
+            preferring: .parakeet,
+            isInstalled: { _ in false }
+        ))
+        #expect(notInstalled.id == "openai_whisper-large-v3_turbo")
+
+        let installed = try #require(ModelCatalog.variantSupporting(
+            language: "it",
+            preferring: .parakeet,
+            isInstalled: { $0 == "apple-speech-analyzer" }
+        ))
+        #expect(installed.id == "apple-speech-analyzer")
+    }
+
     @Test("Parakeet rejects translate task")
     func parakeetRejectsTranslate() async throws {
         let session = await makeSession()

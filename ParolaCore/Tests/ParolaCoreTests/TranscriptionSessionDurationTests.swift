@@ -87,4 +87,21 @@ struct TranscriptionSessionDurationTests {
         let duration = try #require(transcript.durationSeconds)
         #expect(abs(duration - 2.0) < 0.05)
     }
+
+    @Test("falls back to the transcript's own segments when neither probe can read the file")
+    func durationFallsBackToSegmentsWhenUnprobeable() async throws {
+        let session = try await makeSession(engineID: .parakeet, engineReportedDuration: 999)
+        let audioURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-duration-garbage-\(UUID().uuidString).bin")
+        try Data("not an audio file".utf8).write(to: audioURL)
+        defer { try? FileManager.default.removeItem(at: audioURL) }
+
+        let transcript = try await session.transcribe(
+            source: FileAudioSource(url: audioURL),
+            options: TranscriptionOptions(model: Self.modelID(for: .parakeet))
+        )
+        await session.unloadModel()
+
+        #expect(transcript.durationSeconds == 1.0)
+    }
 }

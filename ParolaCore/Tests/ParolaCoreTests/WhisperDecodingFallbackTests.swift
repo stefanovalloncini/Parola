@@ -15,4 +15,17 @@ struct WhisperDecodingFallbackTests {
         #expect(defaults.logProbThreshold == -1.0)
         #expect(defaults.temperatureFallbackCount == 5)
     }
+
+    @Test("our call site leaves those thresholds untouched")
+    func callSiteDoesNotOverrideTheThresholds() {
+        let decoding = WhisperKitTranscriber.decodingOptions(
+            for: TranscriptionOptions(),
+            pin: (language: nil, detectLanguage: true)
+        )
+        let defaults = DecodingOptions()
+        #expect(decoding.noSpeechThreshold == defaults.noSpeechThreshold)
+        #expect(decoding.compressionRatioThreshold == defaults.compressionRatioThreshold)
+        #expect(decoding.logProbThreshold == defaults.logProbThreshold)
+        #expect(decoding.temperatureFallbackCount == defaults.temperatureFallbackCount)
+    }
 }

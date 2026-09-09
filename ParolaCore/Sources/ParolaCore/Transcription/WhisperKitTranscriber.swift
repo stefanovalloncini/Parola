@@ -94,15 +94,7 @@ actor WhisperKitTranscriber: Transcriber {
         let probed = options.language == nil ? try await probeLanguage(kit: kit, url: url) : nil
         try Task.checkCancellation()
         let pin = WhisperLanguagePin.resolve(requested: options.language, probed: probed)
-        var decoding = DecodingOptions(
-            verbose: options.verbose,
-            task: options.task == .translate ? .translate : .transcribe,
-            language: pin.language,
-            detectLanguage: pin.detectLanguage,
-            skipSpecialTokens: true,
-            wordTimestamps: options.wordTimestamps,
-            chunkingStrategy: .vad
-        )
+        var decoding = Self.decodingOptions(for: options, pin: pin)
         if let tokens = promptTokens(options.initialPrompt, tokenizer: kit.tokenizer) {
             decoding.promptTokens = tokens
             decoding.usePrefillPrompt = true
@@ -202,6 +194,23 @@ actor WhisperKitTranscriber: Transcriber {
                 ranAs: detectedLanguage,
                 canDetect: kit.textDecoder.isModelMultilingual
             )
+        )
+    }
+
+    /// Leans on WhisperKit's own silence/fallback defaults rather than restating them here — see
+    /// `WhisperDecodingFallbackTests`, which pins this call site's output against them.
+    static func decodingOptions(
+        for options: TranscriptionOptions,
+        pin: (language: String?, detectLanguage: Bool)
+    ) -> DecodingOptions {
+        DecodingOptions(
+            verbose: options.verbose,
+            task: options.task == .translate ? .translate : .transcribe,
+            language: pin.language,
+            detectLanguage: pin.detectLanguage,
+            skipSpecialTokens: true,
+            wordTimestamps: options.wordTimestamps,
+            chunkingStrategy: .vad
         )
     }
 

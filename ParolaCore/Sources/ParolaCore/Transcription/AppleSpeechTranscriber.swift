@@ -195,7 +195,7 @@ actor AppleSpeechTranscriber: Transcriber {
         Self.logUnreportedTail(
             duration: durationSeconds,
             analyzedThrough: run.analyzedThrough,
-            lastResultEnd: run.segments.last?.end
+            lastResultEnd: run.segments.map(\.end).max()
         )
         let resolvedLanguage = locale.language.languageCode?.identifier
             ?? options.language

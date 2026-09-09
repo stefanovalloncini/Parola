@@ -214,13 +214,15 @@ public enum ModelCatalog {
     public static func variantSupporting(
         language: String,
         preferring engineID: EngineID? = nil,
-        configuration: ManagedConfiguration = .shared
+        configuration: ManagedConfiguration = .shared,
+        isInstalled: (String) -> Bool = { ModelStore.shared.isInstalled($0) }
     ) -> ModelVariant? {
         let candidates = configuration.filterAllowed(all).filter {
             staticCapabilities(for: $0)?.supportedLanguages.allows(language) == true
         }
         return candidates.first { $0.engineID == engineID && $0.category == .recommended }
             ?? candidates.first { $0.engineID == engineID }
+            ?? candidates.first { $0.category == .recommended && isInstalled($0.id) }
             ?? candidates.first { $0.category == .recommended }
             ?? candidates.first
     }
