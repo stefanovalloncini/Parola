@@ -26,6 +26,7 @@ struct TranscribeRequest: Sendable {
     let format: TranscribeFormat
     let outputURL: URL?
     let save: Bool
+    let skipDuplicates: Bool
 
     init(args: [String: Any]) throws {
         guard let path = Self.text(args["path"]) else {
@@ -46,6 +47,7 @@ struct TranscribeRequest: Sendable {
         )
         outputURL = try Self.outputURL(args["output_path"])
         save = args["save"] as? Bool ?? false
+        skipDuplicates = args["skip_duplicates"] as? Bool ?? false
     }
 
     /// Writes the rendered transcript where the call asked for it, creating missing parents, and

@@ -27,6 +27,7 @@ public enum EngineTool: String, CaseIterable, Sendable {
                         "initial_prompt": ["type": "string", "description": "Words or proper nouns to bias decoding toward. Whisper truncates it internally to about 224 tokens, so keep it short."],
                         "output_path": ["type": "string", "description": "Absolute path to write the transcript to, in the chosen format. Missing parent directories are created, and an existing file at that path is overwritten. The result then carries a short report and a preview instead of the whole transcript."],
                         "save": ["type": "boolean", "default": false, "description": "Also store the transcript in Parola's library, where parola_search_library and parola_list_recent can find it. The entry keeps a copy of the source file, so a large recording is duplicated on disk."],
+                        "skip_duplicates": ["type": "boolean", "default": false, "description": "Return the existing entry's details instead of transcribing when the library already holds this exact file. Off by default: the run proceeds and the result carries a note."],
                     ],
                     "required": ["path"],
                 ] as [String: Any])

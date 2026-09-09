@@ -185,10 +185,10 @@ public actor LibraryStore {
             indexReadyTask = nil
             return
         }
-        startSourceDigestBackfill(scan.entries)
         // The list caches want the same scan; skip it if a mutation landed while it ran.
         if cachedActive == nil, epoch == listCacheEpoch { applyScan(scan.entries) }
         guard await searchIndex.needsRebuild(matching: scan.fingerprints) else { return }
+        startSourceDigestBackfill(scan.entries)
         let indexable = scan.entries.filter { $0.deletedAt == nil }
         let rebuilt = await offActorIO(qos: .utility) {
             var unreadable = 0

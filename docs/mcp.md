@@ -109,6 +109,7 @@ answers. The wire protocol and the bridge's own gating live in
 | `initial_prompt` | string | Words or proper nouns to bias decoding toward. Whisper truncates it internally to about 224 tokens, so keep it short. |
 | `output_path` | string | Absolute path to write the transcript to. Missing parent directories are created, and an existing file there is overwritten. A path nothing can be written to is refused before the audio is touched. |
 | `save` | bool | Also store the transcript in Parola's library. The entry keeps a copy of the source file. |
+| `skip_duplicates` | bool | Return the existing entry's details instead of transcribing when the library already holds this exact file. Off by default. |
 
 An example call:
 
@@ -152,6 +153,11 @@ An existing file at `output_path` is replaced. Nothing warns first, so don't
 point a run at a transcript someone has edited by hand. If the write fails
 anyway — the disk filled, the folder went away — the transcript comes back in
 the result with the failure next to it, rather than being lost.
+
+Parola knows a file by the SHA-256 of its bytes, so a call on a recording the
+library already holds gets an extra text block saying which entry it is and when
+it was made. The run still happens; `skip_duplicates: true` returns that block on
+its own and transcribes nothing.
 
 `save` adds a second text block naming the library entry, which
 `parola_search_library` and `parola_list_recent` can then find. The entry keeps

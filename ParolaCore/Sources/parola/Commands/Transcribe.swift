@@ -56,6 +56,12 @@ struct Transcribe: AsyncParsableCommand {
     @Flag(name: .long, help: "Emit NDJSON progress on stderr and one MCP-shaped JSON content block on stdout.")
     var mcp: Bool = false
 
+    @Flag(name: .long, help: "Skip a file the library already holds instead of transcribing it again.")
+    var skipDuplicates: Bool = false
+
+    @Option(name: .long, help: "Library folder to check for duplicates. Defaults to the app's library.")
+    var library: String?
+
     func run() async throws {
         CLIDiagnostics.installIfWanted(alwaysOn: false)
         guard !inputs.isEmpty else {
@@ -86,8 +92,31 @@ struct Transcribe: AsyncParsableCommand {
         if resolved.count == 1 {
             try await transcribeSingle(input: resolved[0], options: opts)
         } else {
-            try await transcribeBatch(urls: resolved.map(\.url), options: opts)
+            let kept = await keepingNewFiles(resolved.map(\.url))
+            guard !kept.isEmpty else { return }
+            try await transcribeBatch(urls: kept, options: opts)
         }
+    }
+
+    private var libraryStore: LibraryStore {
+        library.map { LibraryStore(libraryURL: URL(fileURLWithPath: $0, isDirectory: true), extraIndexer: nil) }
+            ?? .shared
+    }
+
+    /// Prints the notice for every file the library already holds, and drops them when
+    /// `--skip-duplicates` says to.
+    private func keepingNewFiles(_ urls: [URL]) async -> [URL] {
+        let store = libraryStore
+        var kept: [URL] = []
+        for url in urls {
+            guard let existing = await DuplicateNotice.lookup(for: url, in: store).entry else {
+                kept.append(url)
+                continue
+            }
+            stderr(DuplicateNotice.text(for: existing, skipping: skipDuplicates))
+            if !skipDuplicates { kept.append(url) }
+        }
+        return kept
     }
 
     private enum ResolvedInput {
@@ -113,6 +142,8 @@ struct Transcribe: AsyncParsableCommand {
 
     private func transcribeSingle(input: ResolvedInput, options: TranscriptionOptions) async throws {
         let emitter = MCPProgressEmitter(enabled: mcp)
+
+        if case .file(let url) = input, await keepingNewFiles([url]).isEmpty { return }
 
         if case .youtube(let url) = input, preferExistingSubs {
             stderr("Fetching captions from \(url.absoluteString)…")

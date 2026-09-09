@@ -143,6 +143,10 @@ public actor MCPServer {
 
     private func transcribe(args: [String: Any], progress: ProgressSink?) async throws -> MCPToolCallResult {
         let request = try TranscribeRequest(args: args)
+        let duplicate = await DuplicateNotice.lookup(for: request.sourceURL, in: libraryStore)
+        if let existing = duplicate.entry, request.skipDuplicates {
+            return MCPToolCallResult(text: DuplicateNotice.text(for: existing, skipping: true))
+        }
         let transcript = try await transcribe(
             source: FileAudioSource(url: request.sourceURL),
             options: request.options,
@@ -150,8 +154,13 @@ public actor MCPServer {
         )
         let rendered = try request.format.render(transcript)
         var blocks = outputBlocks(for: transcript, rendered: rendered, request: request)
+        if let existing = duplicate.entry {
+            blocks.append(DuplicateNotice.text(for: existing, skipping: false))
+        }
         if request.save {
-            blocks.append(await saveNote(for: transcript, sourceURL: request.sourceURL))
+            blocks.append(await saveNote(
+                for: transcript, sourceURL: request.sourceURL, digest: duplicate.digest
+            ))
         }
         return MCPToolCallResult(texts: blocks)
     }
@@ -176,9 +185,11 @@ public actor MCPServer {
 
     /// A failed library save is reported rather than thrown: the transcription itself succeeded and
     /// the caller still wants its text back.
-    func saveNote(for transcript: Transcript, sourceURL: URL) async -> String {
+    func saveNote(for transcript: Transcript, sourceURL: URL, digest: String? = nil) async -> String {
         do {
-            let entry = try await libraryStore.add(transcript: transcript, audioSource: sourceURL)
+            let entry = try await libraryStore.add(
+                transcript: transcript, audioSource: sourceURL, sourceDigest: digest
+            )
             // The search index saves on a debounce; this process can exit before it fires.
             await libraryStore.flush()
             return "Saved to the library as `\(entry.id)`."
