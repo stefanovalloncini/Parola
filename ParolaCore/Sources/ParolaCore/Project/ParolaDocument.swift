@@ -3,7 +3,7 @@ import Foundation
 /// `.parola` document — a directory bundle with manifest, transcript JSON, and optional audio.
 public struct ParolaDocument: Sendable {
     public struct Manifest: Codable, Sendable, Equatable {
-        public static let currentVersion = 1
+        public static let currentVersion = 2
 
         public var version: Int
         public var createdAt: Date
@@ -23,6 +23,9 @@ public struct ParolaDocument: Sendable {
         public var pinned: Bool
         /// Media length in seconds. Absent on bundles written before it was recorded.
         public var durationSeconds: Double?
+        /// SHA-256 of the imported file's bytes, the key the duplicate check works on. Absent on
+        /// bundles written before version 2, and on transcripts imported without their media.
+        public var sourceDigest: String?
 
         public init(
             version: Int = Manifest.currentVersion,
@@ -39,7 +42,8 @@ public struct ParolaDocument: Sendable {
             labels: [String] = [],
             segmentNotes: [String: String] = [:],
             pinned: Bool = false,
-            durationSeconds: Double? = nil
+            durationSeconds: Double? = nil,
+            sourceDigest: String? = nil
         ) {
             self.version = version
             self.createdAt = createdAt
@@ -56,6 +60,7 @@ public struct ParolaDocument: Sendable {
             self.segmentNotes = segmentNotes
             self.pinned = pinned
             self.durationSeconds = durationSeconds
+            self.sourceDigest = sourceDigest
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -74,6 +79,7 @@ public struct ParolaDocument: Sendable {
             case segmentNotes
             case pinned
             case durationSeconds
+            case sourceDigest
         }
 
         public init(from decoder: any Decoder) throws {
@@ -93,6 +99,7 @@ public struct ParolaDocument: Sendable {
             segmentNotes = try c.decodeIfPresent([String: String].self, forKey: .segmentNotes) ?? [:]
             pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
             durationSeconds = try c.decodeIfPresent(Double.self, forKey: .durationSeconds)
+            sourceDigest = try c.decodeIfPresent(String.self, forKey: .sourceDigest)
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -118,6 +125,7 @@ public struct ParolaDocument: Sendable {
                 try c.encode(pinned, forKey: .pinned)
             }
             try c.encodeIfPresent(durationSeconds, forKey: .durationSeconds)
+            try c.encodeIfPresent(sourceDigest, forKey: .sourceDigest)
         }
     }
 
@@ -140,7 +148,8 @@ public struct ParolaDocument: Sendable {
         to destination: URL,
         category: EntryCategory = .transcription,
         deletedAt: Date? = nil,
-        titleOverride: String? = nil
+        titleOverride: String? = nil,
+        sourceDigest: String? = nil
     ) throws -> URL {
         let target = destination.pathExtension == "parola"
             ? destination
@@ -173,7 +182,8 @@ public struct ParolaDocument: Sendable {
                 category: category,
                 deletedAt: deletedAt,
                 audioFilename: audioFilename,
-                durationSeconds: transcript.durationSeconds.flatMap { $0 > 0 ? $0 : nil }
+                durationSeconds: transcript.durationSeconds.flatMap { $0 > 0 ? $0 : nil },
+                sourceDigest: source == nil ? nil : sourceDigest
             )
             try writeJSON(manifest, to: staging.appendingPathComponent("manifest.json"))
             // Word timings make transcript.json the biggest file in the bundle; indenting it costs more than it's worth.
@@ -221,12 +231,12 @@ public struct ParolaDocument: Sendable {
         }
         let transcript: Transcript = try readJSON(at: url.appendingPathComponent("transcript.json"))
 
-        let audioURL = resolveAudioURL(in: url, manifest: manifest)
+        let audioURL = audioURL(in: url, manifest: manifest)
 
         return ParolaDocument(transcript: transcript, audioURL: audioURL, manifest: manifest)
     }
 
-    private static func resolveAudioURL(in bundleURL: URL, manifest: Manifest) -> URL? {
+    static func audioURL(in bundleURL: URL, manifest: Manifest) -> URL? {
         let fm = FileManager.default
         if let stamped = manifest.audioFilename, !stamped.isEmpty {
             let candidate = bundleURL.appendingPathComponent(stamped)

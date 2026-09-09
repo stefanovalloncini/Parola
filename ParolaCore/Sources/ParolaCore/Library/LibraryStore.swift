@@ -61,6 +61,7 @@ public actor LibraryStore {
     private var cachedLoaded = LoadedEntryCache(capacity: 3)
     private var listCacheEpoch = 0
     private var indexReadyTask: Task<Void, Never>?
+    private var digestBackfillTask: Task<Void, Never>?
     private nonisolated let extraIndexerJobs: AsyncStream<@Sendable () async -> Void>.Continuation?
     private nonisolated let didDecodeDocument: (@Sendable () -> Void)?
     private nonisolated let didWriteBundle: (@Sendable () -> Void)?
@@ -184,6 +185,7 @@ public actor LibraryStore {
             indexReadyTask = nil
             return
         }
+        startSourceDigestBackfill(scan.entries)
         // The list caches want the same scan; skip it if a mutation landed while it ran.
         if cachedActive == nil, epoch == listCacheEpoch { applyScan(scan.entries) }
         guard await searchIndex.needsRebuild(matching: scan.fingerprints) else { return }
@@ -224,6 +226,35 @@ public actor LibraryStore {
             )
         }
         await searchIndex.rebuild(entries: rebuilt.entries)
+    }
+
+    /// Bundles written before the manifest carried a digest pick one up here, once per store, in
+    /// the background — a search must never wait on a library's worth of hashing.
+    private func startSourceDigestBackfill(_ entries: [LibraryEntry]) {
+        guard digestBackfillTask == nil else { return }
+        let pending = entries.filter { $0.deletedAt == nil && $0.manifest.sourceDigest == nil }
+        guard !pending.isEmpty else { return }
+        digestBackfillTask = Task.detached(priority: .utility) { [weak self] in
+            for entry in pending {
+                guard !Task.isCancelled, let self else { return }
+                guard let audio = ParolaDocument.audioURL(in: entry.bundleURL, manifest: entry.manifest),
+                      let digest = await SourceDigest.digest(of: audio)
+                else { continue }
+                await self.stampSourceDigest(digest, for: entry)
+            }
+        }
+    }
+
+    private func stampSourceDigest(_ digest: String, for entry: LibraryEntry) {
+        try? ParolaDocument.updateManifest(at: entry.bundleURL) { manifest in
+            guard manifest.sourceDigest == nil else { return }
+            manifest.sourceDigest = digest
+        }
+        try? recacheEntry(at: entry.bundleURL)
+    }
+
+    func waitForSourceDigestBackfill() async {
+        await digestBackfillTask?.value
     }
 
     private struct IndexScan: Sendable {
@@ -335,15 +366,25 @@ public actor LibraryStore {
         return doc
     }
 
+    /// The newest active entry imported from these exact bytes. Recently Deleted entries don't
+    /// count — the user already threw that copy away.
+    public func findEntry(digest: String) async -> LibraryEntry? {
+        guard !digest.isEmpty else { return nil }
+        if cachedActive == nil { await primeCaches() }
+        return (cachedActive ?? []).first { $0.manifest.sourceDigest == digest }
+    }
+
     public func add(
         transcript: Transcript,
         audioSource: URL?,
         category: EntryCategory = .transcription,
-        title: String? = nil
+        title: String? = nil,
+        sourceDigest: String? = nil
     ) async throws -> LibraryEntry {
         let name = uniqueEntryName(at: Date())
         let bundleURL = libraryURL.appendingPathComponent(name)
         let target = bundleURL.appendingPathExtension("parola")
+        let digest = await resolvedDigest(sourceDigest, for: audioSource)
         var cancelled = false
         do {
             // Off the actor: writing the bundle copies the source media, which can take seconds for long
@@ -354,7 +395,8 @@ public actor LibraryStore {
                     audioURL: audioSource,
                     to: bundleURL,
                     category: category,
-                    titleOverride: title
+                    titleOverride: title,
+                    sourceDigest: digest
                 )
                 didWriteBundle?()
             }
@@ -376,6 +418,14 @@ public actor LibraryStore {
         let entry = try makeEntry(bundleURL: target)
         await indexEntry(entry, transcript: transcript)
         return entry
+    }
+
+    /// The caller's digest when it already hashed the file to check for a duplicate, otherwise one
+    /// taken here. A hash that can't be had leaves the bundle without one for the backfill to fill.
+    private func resolvedDigest(_ provided: String?, for audioSource: URL?) async -> String? {
+        if let provided { return provided }
+        guard let audioSource else { return nil }
+        return await SourceDigest.digest(of: audioSource)
     }
 
     public func adopt(parolaBundle url: URL) async throws -> LibraryEntry {
@@ -739,7 +789,10 @@ public actor LibraryStore {
     /// Walks every `.parola` bundle in the library and reports half-written or invalid ones.
     public func verify() async -> VerificationReport {
         let url = libraryURL
-        return await offActorIO { Self.verifySync(at: url) }
+        let report = await offActorIO { Self.verifySync(at: url) }
+        // The walk stamps missing digests as it goes, so every cached manifest may now be stale.
+        invalidateListCaches()
+        return report
     }
 
     nonisolated static func verifySync(at libraryURL: URL) -> VerificationReport {
@@ -775,9 +828,26 @@ public actor LibraryStore {
                 continue
             }
             let id = (bundleURL.lastPathComponent as NSString).deletingPathExtension
-            healthy.append(LibraryEntry(id: id, bundleURL: bundleURL, manifest: manifest))
+            healthy.append(
+                LibraryEntry(id: id, bundleURL: bundleURL, manifest: stampingDigest(manifest, at: bundleURL))
+            )
         }
         return VerificationReport(healthy: healthy, problems: problems)
+    }
+
+    /// Verify already walks every bundle, so it is where a pre-digest bundle picks one up.
+    private nonisolated static func stampingDigest(
+        _ manifest: ParolaDocument.Manifest,
+        at bundleURL: URL
+    ) -> ParolaDocument.Manifest {
+        guard manifest.sourceDigest == nil,
+              let audio = ParolaDocument.audioURL(in: bundleURL, manifest: manifest),
+              let digest = (try? SourceDigest.compute(contentsOf: audio)) ?? nil
+        else { return manifest }
+        try? ParolaDocument.updateManifest(at: bundleURL) { $0.sourceDigest = digest }
+        var stamped = manifest
+        stamped.sourceDigest = digest
+        return stamped
     }
 
     /// What one Recently-Deleted purge removed, and how many bundles it left on disk.
