@@ -184,7 +184,7 @@ struct ParolaApp: App {
                     .keyboardShortcut("e", modifiers: [.command, .option])
                     .disabled(!model.findIsOpen || !model.hasMatches)
                 Divider()
-                Button("Auto-detect Language") { model.selectedLanguage = nil }
+                Button("Auto-Detect Language") { model.selectedLanguage = nil }
                     .keyboardShortcut("d", modifiers: [.command, .shift])
                 FocusChatComposerCommand()
             }

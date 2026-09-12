@@ -56,7 +56,7 @@ struct ActionItemsSection: View {
 
     private var actionsRow: some View {
         HStack(spacing: DS.Spacing.small) {
-            Button("Re-extract") { model.extractActionItems() }
+            Button("Re-Extract") { model.extractActionItems() }
                 .controlSize(.small)
                 .disabled(!model.isAIAvailable)
                 .axLeaf("ActionItems.Button.Reextract")

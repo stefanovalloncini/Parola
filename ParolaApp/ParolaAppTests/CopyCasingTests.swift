@@ -13,10 +13,12 @@ private func isTitleCase(_ string: String) -> Bool {
     let words = string.split(separator: " ").map(String.init)
     guard let first = words.first else { return false }
     for word in words {
-        guard let head = word.split(separator: "-").first?.first, head.isLetter else { continue }
-        if head.isUppercase { continue }
-        if word == first { return false }
-        if !small.contains(word.lowercased()) { return false }
+        for segment in word.split(separator: "-") {
+            guard let head = segment.first, head.isLetter else { continue }
+            if head.isUppercase { continue }
+            if word == first { return false }
+            if !small.contains(word.lowercased()) { return false }
+        }
     }
     return true
 }
@@ -61,8 +63,16 @@ struct CopyCasingTests {
     func ruleRejectsSentenceCase() {
         #expect(isTitleCase("No Jobs Yet"))
         #expect(isTitleCase("Export as TXT"))
-        #expect(isTitleCase("Auto-detect Language"))
         #expect(!isTitleCase("No jobs yet"))
         #expect(!isTitleCase("mic recording hotkey"))
+    }
+
+    @Test("both halves of a hyphenated compound need capitalizing")
+    func hyphenatedCompoundsNeedBothHalvesCapitalized() {
+        #expect(isTitleCase("Auto-Export"))
+        #expect(isTitleCase("Auto-Detect Language"))
+        #expect(isTitleCase("Re-Extract"))
+        #expect(!isTitleCase("Auto-detect Language"))
+        #expect(!isTitleCase("Re-extract"))
     }
 }

@@ -1328,6 +1328,16 @@
         }
       }
     },
+    "Auto-Detect Language": {
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rileva lingua automaticamente"
+          }
+        }
+      }
+    },
     "Auto-Export": {
       "extractionState": "manual",
       "localizations": {
@@ -1341,16 +1351,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esportazione automatica"
-          }
-        }
-      }
-    },
-    "Auto-detect Language": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rileva lingua automaticamente"
           }
         }
       }
@@ -6968,6 +6968,17 @@
         }
       }
     },
+    "Re-Extract": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ri-estrai"
+          }
+        }
+      }
+    },
     "Re-add": {
       "extractionState": "manual",
       "localizations": {
@@ -6975,17 +6986,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riaggiungi"
-          }
-        }
-      }
-    },
-    "Re-extract": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ri-estrai"
           }
         }
       }
