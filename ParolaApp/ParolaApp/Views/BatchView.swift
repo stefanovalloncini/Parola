@@ -31,8 +31,8 @@ struct BatchView: View {
         let caption = BatchProgress.headerLabel(for: model.batchJobs)
         return PageHeader(
             title: "Batch",
-            count: caption?.text,
-            countAxID: caption?.isProgress == true ? "Header.Text.Progress" : nil,
+            subtitle: caption?.text,
+            subtitleAxID: caption?.isProgress == true ? "Header.Text.Progress" : nil,
             trailing: {
                 Menu {
                     ForEach(ExportFormat.allCases, id: \.self) { format in

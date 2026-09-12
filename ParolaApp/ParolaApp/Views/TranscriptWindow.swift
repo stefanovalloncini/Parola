@@ -78,7 +78,7 @@ struct TranscriptWindowView: View {
     private var header: some View {
         PageHeader(
             title: title.isEmpty ? "Transcript" : title,
-            count: SegmentCount.label(transcript.segments.count),
+            subtitle: SegmentCount.label(transcript.segments.count),
             trailing: { EmptyView() }
         )
     }

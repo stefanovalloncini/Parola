@@ -32,7 +32,7 @@ struct QueueView: View {
     private var toolbar: some View {
         PageHeader(
             title: "Queue",
-            count: QueueCount.label(for: model.batchJobs),
+            subtitle: QueueCount.label(for: model.batchJobs),
             trailing: {
                 SearchPill(text: $searchText, placeholder: "Search queue")
                     .frame(maxWidth: 240)

@@ -121,6 +121,17 @@ enum LibraryListContent {
         return String(localized: "\(count) transcripts", locale: locale)
     }
 
+    /// The line under a list's title: how many entries, and how long they run between them.
+    static func listSubtitle(
+        count: Int,
+        totalSeconds: Double,
+        locale: Locale = AppFormat.locale
+    ) -> String? {
+        guard let transcripts = totalsLabel(for: count, locale: locale) else { return nil }
+        guard let span = AppFormat.duration(seconds: totalSeconds, locale: locale) else { return transcripts }
+        return "\(transcripts) · \(span)"
+    }
+
     /// The search page counts two things: the entries that matched, and the hits they hold between them.
     static func searchTotalsLabel(
         entries: Int,
@@ -238,17 +249,19 @@ struct LibraryListView: View {
         }
         let sizes = model.libraryBundleSizes
         var totalBytes: Int64 = 0
+        var totalSeconds: Double = 0
         var cache = displayCache
         cache.invalidate(libraryVersion: model.libraryVersion, sizesVersion: model.libraryBundleSizesVersion)
         let displays = computed.map { entry -> LibraryRowDisplay in
             let size = sizes[entry.id]
             totalBytes += size ?? 0
+            totalSeconds += entry.durationSeconds ?? 0
             return cache.display(for: entry, sizeBytes: size)
         }
         displayCache = cache
         entries = displays
-        // The count alone: bundle sizes land later and only for audio, so the label used to change shape.
-        totalsLabel = LibraryListContent.totalsLabel(for: displays.count) ?? ""
+        // Count and duration, never size: bundle sizes land later and only for audio, so the label used to change shape.
+        totalsLabel = LibraryListContent.listSubtitle(count: displays.count, totalSeconds: totalSeconds) ?? ""
         totalsHelp = totalBytes > 0 ? String(localized: "Total size: \(AppFormat.byteSize(totalBytes))") : nil
         return displays
     }
@@ -392,7 +405,7 @@ struct LibraryListView: View {
     }
 
     /// Computed, not stored: the entry set can stay put while a query edit changes how often each one matches.
-    private var headerCount: String? {
+    private var headerSubtitle: String? {
         guard searchResults != nil else { return totalsLabel.isEmpty ? nil : totalsLabel }
         return LibraryListContent.searchTotalsLabel(for: entries.map(\.id), matches: model.searchMatches)
     }
@@ -400,8 +413,8 @@ struct LibraryListView: View {
     private var header: some View {
         PageHeader(
             title: headerTitle,
-            count: headerCount,
-            countHelp: searchResults == nil ? totalsHelp : nil,
+            subtitle: headerSubtitle,
+            subtitleHelp: searchResults == nil ? totalsHelp : nil,
             leading: {
                 if searchResults == nil {
                     LibraryFilterBar(

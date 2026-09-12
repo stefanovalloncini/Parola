@@ -25,6 +25,18 @@ struct AppFormatTests {
         #expect(AppFormat.day(moment, locale: italian).contains("lug"))
     }
 
+    @Test("a span picks the units that carry meaning and hides the rest")
+    func durationPicksItsUnits() {
+        let english = Locale(identifier: "en_US")
+        #expect(AppFormat.duration(seconds: 0, locale: english) == nil)
+        #expect(AppFormat.duration(seconds: -30, locale: english) == nil)
+        #expect(AppFormat.duration(seconds: 0.4, locale: english) == nil)
+        #expect(AppFormat.duration(seconds: 40, locale: english) == "40 sec")
+        #expect(AppFormat.duration(seconds: 1_200, locale: english) == "20 min")
+        #expect(AppFormat.duration(seconds: 7_200, locale: english) == "2 hr")
+        #expect(AppFormat.duration(seconds: 4_800, locale: english) == "1 hr, 20 min")
+    }
+
     @Test("sizes carry a unit and a separator, not raw bytes")
     func sizesCarryAUnit() {
         let label = AppFormat.byteSize(76_700_000, locale: Locale(identifier: "en_US"))

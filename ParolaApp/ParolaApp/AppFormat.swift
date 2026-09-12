@@ -31,4 +31,21 @@ enum AppFormat {
     static func day(_ date: Date, locale: Locale = AppFormat.locale) -> String {
         date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale))
     }
+
+    /// A rounded span for a header line, not a timecode: the largest two units that carry
+    /// meaning, so a list of short memos reads in seconds and a day of meetings in hours.
+    static func duration(seconds: Double, locale: Locale = AppFormat.locale) -> String? {
+        let total = Int(max(0, seconds).rounded())
+        guard total > 0 else { return nil }
+        let allowed: Set<Duration.UnitsFormatStyle.Unit>
+        if total >= 3600 {
+            allowed = [.hours, .minutes]
+        } else if total >= 60 {
+            allowed = [.minutes]
+        } else {
+            allowed = [.seconds]
+        }
+        return Duration.seconds(total)
+            .formatted(.units(allowed: allowed, width: .abbreviated, zeroValueUnits: .hide).locale(locale))
+    }
 }

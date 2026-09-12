@@ -281,6 +281,26 @@ struct LibraryListContentTests {
         #expect(LibraryListContent.totalsLabel(for: 3, locale: english) == "3 transcripts")
     }
 
+    @Test("the header subtitle adds how long the listed entries run, and drops it at zero")
+    func listSubtitleCarriesTheSpan() {
+        let english = Locale(identifier: "en_US")
+        #expect(LibraryListContent.listSubtitle(count: 0, totalSeconds: 900, locale: english) == nil)
+        #expect(LibraryListContent.listSubtitle(count: 1, totalSeconds: 0, locale: english) == "1 transcript")
+        #expect(LibraryListContent.listSubtitle(count: 3, totalSeconds: 0.4, locale: english) == "3 transcripts")
+        #expect(
+            LibraryListContent.listSubtitle(count: 11, totalSeconds: 4800, locale: english)
+                == "11 transcripts · 1 hr, 20 min"
+        )
+    }
+
+    /// The subtitle is one string with two locales' worth of formatting in it; both halves take the same one.
+    @Test("the header subtitle formats its span in the locale it was handed")
+    func listSubtitleFollowsTheLocale() {
+        let italian = LibraryListContent.listSubtitle(count: 2, totalSeconds: 120, locale: Locale(identifier: "it_IT"))
+        #expect(italian?.contains("min") == true)
+        #expect(italian?.hasPrefix("2 ") == true)
+    }
+
     @Test("the search caption counts the entries and the hits inside them")
     func searchTotalsLabelCountsBoth() {
         let english = Locale(identifier: "en_US")
