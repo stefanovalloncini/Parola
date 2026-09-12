@@ -31,28 +31,15 @@ struct BatchJobDetail: View {
         case .pending:
             Color.clear.frame(height: 3)
         case .transcribing:
-            if job.progress > 0 {
-                ProgressView(value: job.progress)
-                    .progressViewStyle(.linear)
-                    .tint(statusFill)
-                    .frame(height: 3)
-            } else {
-                ProgressView()
-                    .progressViewStyle(.linear)
-                    .tint(statusFill)
-                    .frame(height: 3)
-            }
+            DSProgressBar(value: job.progress > 0 ? job.progress : nil, fill: statusFill)
+                .frame(height: 3)
         case .done:
             Color.clear.frame(height: 3)
         case .failed:
-            ProgressView(value: 1)
-                .progressViewStyle(.linear)
-                .tint(statusFill)
+            DSProgressBar(value: 1, fill: statusFill)
                 .frame(height: 3)
         case .cancelled:
-            ProgressView(value: job.progress)
-                .progressViewStyle(.linear)
-                .tint(statusFill)
+            DSProgressBar(value: job.progress, fill: statusFill)
                 .frame(height: 3)
         }
     }

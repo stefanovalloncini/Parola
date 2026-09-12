@@ -21,9 +21,7 @@ struct QueueRow: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                 if showsProgressBar {
-                    ProgressView(value: job.progress)
-                        .progressViewStyle(.linear)
-                        .tint(DS.Color.accent)
+                    DSProgressBar(value: job.progress)
                         .padding(.top, 2)
                 }
             }

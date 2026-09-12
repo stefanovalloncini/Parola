@@ -4,6 +4,7 @@ import SwiftUI
 struct DSProgressBar: View {
     /// Nil while the run can't say how far along it is; the bar sweeps instead of filling.
     let value: Double?
+    var fill: Color? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -11,6 +12,7 @@ struct DSProgressBar: View {
     private static let sweepPeriod: Double = 1.4
 
     private var fraction: Double? { value.map { min(max($0, 0), 1) } }
+    var resolvedFill: Color { fill ?? DS.Color.accent }
 
     var body: some View {
         GeometryReader { geometry in
@@ -19,7 +21,7 @@ struct DSProgressBar: View {
                     .fill(DS.Palette.subtleFill)
                 if let fraction {
                     Capsule(style: .continuous)
-                        .fill(DS.Color.accent)
+                        .fill(resolvedFill)
                         .frame(width: geometry.size.width * fraction)
                 } else {
                     sweep(across: geometry.size.width)
@@ -44,13 +46,13 @@ struct DSProgressBar: View {
         let span = width * Self.sweepSpan
         if reduceMotion {
             Capsule(style: .continuous)
-                .fill(DS.Color.accent.opacity(0.35))
+                .fill(resolvedFill.opacity(0.35))
         } else {
             TimelineView(.animation) { context in
                 let elapsed = context.date.timeIntervalSinceReferenceDate
                 let phase = elapsed.truncatingRemainder(dividingBy: Self.sweepPeriod) / Self.sweepPeriod
                 Capsule(style: .continuous)
-                    .fill(DS.Color.accent)
+                    .fill(resolvedFill)
                     .frame(width: span)
                     .offset(x: (width + span) * phase - span)
             }

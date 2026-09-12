@@ -124,8 +124,7 @@ struct ModelCardRow: View {
                 .axLeaf("Card.Button.Download")
             case .downloading(let progress):
                 HStack(spacing: 8) {
-                    ProgressView(value: progress)
-                        .progressViewStyle(.linear)
+                    DSProgressBar(value: progress)
                         .frame(width: 80)
                     Text(progressPercent(progress))
                         .font(.caption.monospacedDigit())
