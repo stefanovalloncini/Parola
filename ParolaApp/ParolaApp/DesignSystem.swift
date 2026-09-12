@@ -20,11 +20,6 @@ enum DS {
         static let large: CGFloat = 14
     }
 
-    enum Sidebar {
-        static let minWidth: CGFloat = 280
-        static let idealWidth: CGFloat = 320
-    }
-
     /// Durations for chrome that moves on its own; every site pairs these with `accessibilityReduceMotion`.
     enum Motion {
         static let route = SwiftUI.Animation.easeInOut(duration: 0.2)
