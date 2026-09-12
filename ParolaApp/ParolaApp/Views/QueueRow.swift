@@ -12,11 +12,11 @@ struct QueueRow: View {
             iconSquare
             VStack(alignment: .leading, spacing: 2) {
                 Text(job.url.lastPathComponent)
-                    .font(.headline)
+                    .font(DS.Font.body.weight(.medium))
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(statusLine)
-                    .font(.caption)
+                    .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.secondaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
