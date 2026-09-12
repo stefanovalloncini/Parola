@@ -2889,13 +2889,13 @@
         }
       }
     },
-    "Deleted transcripts appear here for %lld days.": {
+    "Deleted transcripts stay here for %lld days, then they're removed for good.": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le trascrizioni eliminate restano qui per %lld giorni."
+            "value": "Le trascrizioni eliminate restano qui per %lld giorni, poi vengono rimosse definitivamente."
           }
         }
       }

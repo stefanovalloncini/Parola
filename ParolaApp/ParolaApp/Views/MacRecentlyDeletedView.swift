@@ -217,7 +217,7 @@ struct MacRecentlyDeletedView: View {
                 Text("Nothing's Been Deleted")
                     .font(DS.Font.title3)
                     .foregroundStyle(DS.Color.primaryText)
-                Text("Deleted transcripts appear here for \(AppModel.trashRetentionDays) days.")
+                Text("Deleted transcripts stay here for \(AppModel.trashRetentionDays) days, then they're removed for good.")
                     .font(DS.Font.callout)
                     .foregroundStyle(DS.Color.secondaryText)
                     .multilineTextAlignment(.center)
