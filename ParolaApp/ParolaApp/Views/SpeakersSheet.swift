@@ -19,6 +19,7 @@ struct SpeakersSheet: View {
             content: { contentBody },
             footer: { footerBody }
         )
+        .hidesCloseButton()
         .task {
             suggestions = await model.peopleStore.suggestions(limit: 8)
         }

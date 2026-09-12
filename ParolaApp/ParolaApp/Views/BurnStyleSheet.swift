@@ -13,6 +13,7 @@ struct BurnStyleSheet: View {
             content: { contentBody },
             footer: { footerBody }
         )
+        .hidesCloseButton()
     }
 
     private var contentBody: some View {

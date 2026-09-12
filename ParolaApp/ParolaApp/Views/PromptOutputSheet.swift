@@ -16,6 +16,7 @@ struct PromptOutputSheet: View {
             content: { contentBody },
             footer: { footerBody }
         )
+        .hidesCloseButton()
         .onDisappear {
             resetTask?.cancel()
             resetTask = nil
