@@ -16,7 +16,7 @@ struct CorrectionsPane: View {
                     InlineEmptyText("No corrections yet")
                 } else if visible.isEmpty {
                     HStack {
-                        Text("No corrections match.").foregroundStyle(.secondary).font(.body)
+                        Text("No corrections match.").foregroundStyle(DS.Color.secondaryText).font(.body)
                         Spacer()
                     }
                     .padding(16)
@@ -94,7 +94,7 @@ private struct CorrectionRow: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 180)
                     .axLeaf("Corrections.TextField.From")
-                Text("→").foregroundStyle(.secondary)
+                Text("→").foregroundStyle(DS.Color.secondaryText)
                 TextField("write", text: $rule.to)
                     .textFieldStyle(.roundedBorder)
                     .axLeaf("Corrections.TextField.To")

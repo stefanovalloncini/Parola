@@ -18,7 +18,7 @@ struct FindReplacePane: View {
                     InlineEmptyText("No rules yet")
                 } else if visible.isEmpty {
                     HStack {
-                        Text("No rules match.").foregroundStyle(.secondary).font(DS.Font.body)
+                        Text("No rules match.").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
                         Spacer()
                     }
                     .padding(16)
@@ -200,7 +200,7 @@ private struct FindReplaceRuleRow: View {
                                 .strokeBorder(regexError == nil ? Color.clear : Color.red.opacity(0.8), lineWidth: 1)
                         )
                         .axLeaf("FindReplace.TextField.Find")
-                    Text("→").foregroundStyle(.secondary)
+                    Text("→").foregroundStyle(DS.Color.secondaryText)
                     TextField("replace with", text: $rule.replace).textFieldStyle(.roundedBorder)
                         .axLeaf("FindReplace.TextField.Replace")
                     Button(role: .destructive, action: onDelete) {

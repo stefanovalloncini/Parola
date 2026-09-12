@@ -112,7 +112,7 @@ struct RecentlyDeletedToolbar: View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .font(DS.Font.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
             TextField("Search", text: $searchText)
                 .textFieldStyle(.plain)
                 .frame(minWidth: 140, maxWidth: 200)
@@ -121,7 +121,7 @@ struct RecentlyDeletedToolbar: View {
                 Button { searchText = "" } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(DS.Font.callout)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Clear search")
@@ -144,7 +144,7 @@ struct RecentlyDeletedToolbar: View {
         } label: {
             Image(systemName: "chevron.up.chevron.down")
                 .font(DS.Font.subheadlineEmphasized)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
         }
         .menuStyle(.button)
         .buttonStyle(RecentlyDeletedPillButtonStyle())

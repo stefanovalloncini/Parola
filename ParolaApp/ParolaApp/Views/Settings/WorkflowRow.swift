@@ -48,7 +48,7 @@ struct WorkflowRow: View {
                                     .font(DS.Font.subheadline)
                             }
                             .buttonStyle(.borderless)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.Color.secondaryText)
                             .axLeaf("Workflow.Button.AddURLRule")
                             Spacer()
                         }
@@ -61,7 +61,7 @@ struct WorkflowRow: View {
     private var draftRuleRow: some View {
         HStack(spacing: 8) {
             Image(systemName: "link")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
                 .frame(width: 14)
             TextField(String(localized: "Example: gmail.com"), text: $draftPattern)
                 .textFieldStyle(.roundedBorder)
@@ -78,7 +78,7 @@ struct WorkflowRow: View {
                 Image(systemName: "xmark.circle")
             }
             .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(DS.Color.secondaryText)
             .axLeaf("Workflow.Button.CancelURLRule")
             Spacer()
         }

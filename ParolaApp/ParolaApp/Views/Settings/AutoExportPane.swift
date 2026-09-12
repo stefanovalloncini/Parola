@@ -23,7 +23,7 @@ struct AutoExportPane: View {
                     InlineEmptyText("No rules yet")
                 } else if displayedRules.isEmpty {
                     HStack {
-                        Text("No matches").foregroundStyle(.secondary).font(.body)
+                        Text("No matches").foregroundStyle(DS.Color.secondaryText).font(.body)
                         Spacer()
                     }
                     .padding(16)
@@ -210,7 +210,7 @@ private struct AutoExportRuleRow: View {
                     .axLeaf("AutoExport.Button.DeleteRule")
                 }
                 HStack {
-                    Text("When source is").font(.caption).foregroundStyle(.secondary)
+                    Text("When source is").font(.caption).foregroundStyle(DS.Color.secondaryText)
                     TextField("mp4, mov", text: $extensionsText)
                         .textFieldStyle(.roundedBorder)
                         .axLeaf("AutoExport.TextField.Extensions")
@@ -223,7 +223,7 @@ private struct AutoExportRuleRow: View {
                         }
                 }
                 HStack(alignment: .top) {
-                    Text("Also write").font(.caption).foregroundStyle(.secondary)
+                    Text("Also write").font(.caption).foregroundStyle(DS.Color.secondaryText)
                     AutoExportFormatChips(selected: $rule.outputFormats)
                 }
             }

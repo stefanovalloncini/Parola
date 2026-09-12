@@ -14,7 +14,7 @@ struct AdvancedPane: View {
                         .font(.system(.caption, design: .monospaced))
                         .lineLimit(1)
                         .truncationMode(.head)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                     Button("Reveal in Finder") { model.revealCacheDirectory() }
                         .axLeaf("Advanced.Button.RevealCache")
                 }
@@ -25,7 +25,7 @@ struct AdvancedPane: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Save your settings to a `.parola-settings` file, or restore one. Downloaded models and the prompt library are not included.")
                         .font(DS.Font.secondary)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                     HStack(spacing: 8) {
                         Button("Export Settings…") {
                             transferFailure = SettingsExportService.presentExportPanel()
@@ -56,7 +56,7 @@ struct AdvancedPane: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Returns every setting to its default. Models on disk are untouched.")
                         .font(DS.Font.secondary)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                     Button(role: .destructive) {
                         resetAllConfirming = true
                     } label: {

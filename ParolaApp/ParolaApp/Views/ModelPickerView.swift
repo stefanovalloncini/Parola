@@ -27,7 +27,7 @@ struct ModelPickerView: View {
                 if filtered.isEmpty {
                     Text("No models match")
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
                         .frame(maxWidth: .infinity, alignment: .leading)

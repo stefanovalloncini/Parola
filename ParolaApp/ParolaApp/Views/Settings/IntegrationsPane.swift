@@ -42,7 +42,7 @@ private struct ToolStatusRow: View {
                     Text(verbatim: name).font(.body.weight(.semibold))
                     Text(available ? "Installed" : "Not installed")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                     Spacer()
                     if !available {
                         Button(action: install) {
@@ -62,7 +62,7 @@ private struct ToolStatusRow: View {
                 }
                 Text(description)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 if let error {
                     Text(error)

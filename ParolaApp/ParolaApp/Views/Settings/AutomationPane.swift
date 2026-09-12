@@ -75,7 +75,7 @@ struct AutomationPane: View {
                         statusRow
                         Text(bridgeBlurb)
                             .font(DS.Font.secondary)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.Color.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(16)
@@ -88,7 +88,7 @@ struct AutomationPane: View {
                                 .font(.system(.caption, design: .monospaced))
                                 .lineLimit(1)
                                 .truncationMode(.middle)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(DS.Color.secondaryText)
                             HStack(spacing: 8) {
                                 Button("Reveal in Finder") { reveal(path: path) }
                                     .axLeaf("Automation.Button.RevealMcpBinary")
@@ -105,11 +105,11 @@ struct AutomationPane: View {
                             #if DEBUG
                             Text("Run `swift build --product parola-mcp` in ParolaCore and relaunch.")
                                 .font(.system(.caption, design: .monospaced))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(DS.Color.secondaryText)
                             #else
                             Text("This build doesn't include parola-mcp. Reinstall from the official DMG, or build it from the Parola source.")
                                 .font(DS.Font.secondary)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(DS.Color.secondaryText)
                             #endif
                         }
                     }
@@ -121,7 +121,7 @@ struct AutomationPane: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Drop this into your MCP client's config (Claude Code .mcp.json, Codex, etc.)")
                                 .font(DS.Font.secondary)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(DS.Color.secondaryText)
                             ScrollView {
                                 Text(snippet)
                                     .font(.system(.caption, design: .monospaced))
@@ -147,7 +147,7 @@ struct AutomationPane: View {
                             .foregroundStyle(DS.Color.successText)
                         Text(confirmation)
                             .font(DS.Font.secondary)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.Color.secondaryText)
                     }
                     .transition(.opacity)
                 }
@@ -169,11 +169,11 @@ struct AutomationPane: View {
             } else if model.automationBridgeRunning {
                 Text("Starting…")
                     .font(DS.Font.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
             } else {
                 Text("Bridge disabled")
                     .font(DS.Font.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
             }
             Spacer()
         }

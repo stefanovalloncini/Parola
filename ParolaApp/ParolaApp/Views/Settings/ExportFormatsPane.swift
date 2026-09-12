@@ -11,7 +11,7 @@ struct ExportFormatsPane: View {
                     SettingRow(titleVerbatim: format.rawValue.uppercased(),
                                description: Self.blurb(for: format),
                                isFirst: idx == 0) {
-                        Text(verbatim: ".\(format.fileExtension)").foregroundStyle(.secondary)
+                        Text(verbatim: ".\(format.fileExtension)").foregroundStyle(DS.Color.secondaryText)
                     }
                 }
             }
@@ -47,7 +47,7 @@ struct BatchExportSettingsPane: View {
                 SettingRow("Multi-file transcription",
                            description: "Open multiple audio files at once to queue them for batch transcription.",
                            isFirst: true) {
-                    Text("Drag & Drop").foregroundStyle(.secondary)
+                    Text("Drag & Drop").foregroundStyle(DS.Color.secondaryText)
                 }
                 SettingRow("Sidecar files",
                            description: "Pick formats and per-format options in the Batch view. Parola writes them next to each file as its transcription finishes.") {

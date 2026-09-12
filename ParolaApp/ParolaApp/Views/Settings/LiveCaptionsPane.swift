@@ -10,7 +10,7 @@ struct LiveCaptionsPane: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Live captions transcribe the microphone as you speak and show the words in a floating panel that stays above other windows.")
                 .font(DS.Font.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             SettingsSection {
                 SettingRow("Translate to English",
@@ -30,7 +30,7 @@ struct LiveCaptionsPane: View {
                 SettingRow("Status",
                            description: "Whether captions are running right now.") {
                     Text(liveCaptions.isActive ? "Running" : "Stopped")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                 }
             }
             SettingHelper(text: "Start and stop live captions from the Captions menu (⇧⌘L).")

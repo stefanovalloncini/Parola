@@ -30,7 +30,7 @@ private struct WatchedFoldersPaneBody: View {
                         .foregroundStyle(DS.Palette.warning)
                     Text(error)
                         .font(DS.Font.secondary)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()

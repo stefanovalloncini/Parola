@@ -184,7 +184,7 @@ private struct SettingsSidebar: View {
                         if let title = group.title {
                             Text(title)
                                 .font(DS.Font.captionEmphasized)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(DS.Color.secondaryText)
                                 .padding(.horizontal, 16)
                                 .padding(.top, 4)
                         }
@@ -230,7 +230,7 @@ private struct SettingsDetail: View {
                         .font(DS.Font.title3)
                     Text(route.localizedSummaryKey)
                         .font(DS.Font.callout)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.top, 20)
@@ -349,7 +349,7 @@ struct SettingRow<Trailing: View>: View {
                     if let descriptionText {
                         descriptionText
                             .font(DS.Font.secondary)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.Color.secondaryText)
                     }
                 }
                 Spacer(minLength: 12)
@@ -367,7 +367,7 @@ struct SettingHelper: View {
     var body: some View {
         Text(text)
             .font(DS.Font.secondary)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(DS.Color.secondaryText)
             .padding(.horizontal, 4)
     }
 }

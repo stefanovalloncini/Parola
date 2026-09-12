@@ -9,7 +9,7 @@ struct DictationHUDPreview: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Preview")
                 .font(DS.Font.subheadlineEmphasized)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color.primary.opacity(0.04))

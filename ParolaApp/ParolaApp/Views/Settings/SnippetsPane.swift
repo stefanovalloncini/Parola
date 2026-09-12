@@ -16,7 +16,7 @@ struct SnippetsPane: View {
                     InlineEmptyText("No snippets yet")
                 } else if visible.isEmpty {
                     HStack {
-                        Text("No snippets match.").foregroundStyle(.secondary).font(.body)
+                        Text("No snippets match.").foregroundStyle(DS.Color.secondaryText).font(.body)
                         Spacer()
                     }
                     .padding(16)
@@ -58,7 +58,7 @@ struct SnippetsPane: View {
             SettingHelper(text: "Triggers fire on dictated text only; matching is case-insensitive and word-bounded.")
             Text("These placeholders expand in the replacement text: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}")
                 .font(DS.Font.subheadlineMono)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
                 .padding(.horizontal, 4)
             ResetPaneButton(scope: .snippets)
         }
@@ -115,7 +115,7 @@ private struct SnippetRow: View {
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: 200)
                         .axLeaf("Snippets.TextField.Trigger")
-                    Text("→").foregroundStyle(.secondary)
+                    Text("→").foregroundStyle(DS.Color.secondaryText)
                     TextField("replacement", text: $snippet.replacement)
                         .textFieldStyle(.roundedBorder)
                         .axLeaf("Snippets.TextField.Replacement")

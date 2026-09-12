@@ -42,7 +42,7 @@ struct AboutInfoView: View {
                     HStack(spacing: 6) {
                         Text("Version \(AboutInfo.versionString)")
                             .font(DS.Font.callout)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.Color.secondaryText)
                         if let channel = AboutInfo.channelLabel {
                             Text(channel)
                                 .font(DS.Font.caption2Emphasized)
@@ -79,7 +79,7 @@ struct AboutInfoView: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(title)
                 .font(DS.Font.subheadlineEmphasized)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
                 .frame(width: 90, alignment: .leading)
             Text(verbatim: value)
                 .font(DS.Font.callout)

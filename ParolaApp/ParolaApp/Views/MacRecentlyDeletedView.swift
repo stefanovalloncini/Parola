@@ -111,7 +111,7 @@ struct MacRecentlyDeletedView: View {
                 .axLeaf("Selection.Button.DeletePermanently")
             Button("Clear Selection") { selection = [] }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
                 .axLeaf("Selection.Button.ClearSelection")
         }
         .padding(.horizontal, DS.Spacing.regular)

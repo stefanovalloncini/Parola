@@ -56,11 +56,11 @@ struct TranscriptWindowView: View {
                             HStack(spacing: 8) {
                                 Text(Timecode.format(segment.start))
                                     .font(DS.Font.subheadlineMono)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(DS.Color.secondaryText)
                                 if let speaker = SegmentCard.speakerLabel(for: segment.speaker) {
                                     Text(speaker)
                                         .font(DS.Font.subheadlineEmphasized)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(DS.Color.secondaryText)
                                 }
                             }
                             Text(segment.text.trimmingCharacters(in: .whitespaces))

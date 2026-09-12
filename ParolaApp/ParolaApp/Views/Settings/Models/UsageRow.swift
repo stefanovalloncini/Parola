@@ -8,10 +8,10 @@ struct UsageRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
             Text(label)
                 .font(DS.Font.calloutMedium)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
             Text(value)
                 .font(DS.Font.callout)
                 .monospacedDigit()

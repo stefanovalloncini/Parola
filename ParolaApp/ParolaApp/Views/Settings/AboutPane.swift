@@ -34,7 +34,7 @@ struct AboutPane: View {
             if ManagedConfiguration.shared.isActive {
                 Text("Some features are managed by your deployment.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
                     .axLeaf("About.Text.ManagedNote")
             }
 
@@ -42,7 +42,7 @@ struct AboutPane: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Kept for 7 days, up to 10 MB. No transcript text, file names, or paths.")
                         .font(DS.Font.secondary)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                         .axLeaf("About.Text.DiagnosticsRetention")
                     HStack(spacing: 8) {
                         Button("Export…") { exportDiagnostics() }

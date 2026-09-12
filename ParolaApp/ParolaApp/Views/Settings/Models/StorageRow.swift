@@ -9,10 +9,10 @@ struct StorageRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "folder")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
             Text("Storage:")
                 .font(DS.Font.calloutMedium)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
             Text(displayPath)
                 .font(DS.Font.calloutMono)
                 .foregroundStyle(.primary)

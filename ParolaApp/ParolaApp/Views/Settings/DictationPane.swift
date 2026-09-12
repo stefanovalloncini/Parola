@@ -66,7 +66,7 @@ struct DictationPane: View {
                            description: "Dictation uses the model picked in the main toolbar.") {
                     Text(AppModel.modelLabel(model.selectedModel))
                         .font(DS.Font.callout)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                         .axLeaf("Dictation.Label.Model")
                 }
                 ForEach(model.dictationModelWarnings, id: \.self) { warning in
@@ -114,7 +114,7 @@ struct DictationPane: View {
                             .axLeaf("Dictation.Slider.HudOpacity")
                         Text("\(Int(model.dictationHudOpacity * 100))%")
                             .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.Color.secondaryText)
                             .frame(width: 40, alignment: .trailing)
                     }
                 }
@@ -135,7 +135,7 @@ struct DictationPane: View {
                             .axLeaf("Dictation.Slider.PasteDelay")
                         Text("\(model.dictationPasteDelayMs) ms")
                             .font(DS.Font.subheadlineMono)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.Color.secondaryText)
                             .frame(width: 56, alignment: .trailing)
                     }
                 }

@@ -17,7 +17,7 @@ struct PermissionRow: View {
                     .frame(width: 8, height: 8)
                 Text(granted ? String(localized: "Granted") : String(localized: "Not granted"))
                     .font(DS.Font.caption2Medium)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
                 if !granted {
                     Button(actionLabel, action: action)
                         .axLeaf(axID)

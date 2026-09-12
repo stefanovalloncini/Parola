@@ -25,9 +25,9 @@ struct DownloadedEmpty: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "tray")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
             Text("No models on disk yet. Switch the filter to All to download one.")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
             Spacer()
         }
         .padding(14)

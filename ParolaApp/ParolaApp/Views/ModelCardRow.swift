@@ -26,7 +26,7 @@ struct ModelCardRow: View {
                     .font(.headline)
                 Text(meta)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
                 if !chips.isEmpty {
                     HStack(spacing: 6) {
                         ForEach(chips) { chip in
@@ -80,7 +80,7 @@ struct ModelCardRow: View {
                 ProgressView().controlSize(.small)
                 Text("Deleting…")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
             }
         } else {
             switch kind {
@@ -97,7 +97,7 @@ struct ModelCardRow: View {
                                 .font(.callout.weight(.semibold))
                         }
                         .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                         .help("Delete this model from disk")
                         .accessibilityLabel("Delete \(variant.displayName)")
                         .accessibilityIdentifier("model.\(variant.id).delete")
@@ -128,11 +128,11 @@ struct ModelCardRow: View {
                         .frame(width: 80)
                     Text(progressPercent(progress))
                         .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                     if let cancelAction {
                         Button(action: cancelAction) {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(DS.Color.secondaryText)
                         }
                         .buttonStyle(.plain)
                         .help("Cancel this download")

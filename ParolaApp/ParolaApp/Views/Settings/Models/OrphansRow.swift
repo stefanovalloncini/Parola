@@ -10,7 +10,7 @@ struct OrphansRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "tray.full")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
                 .frame(width: 24, height: 24)
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
@@ -18,7 +18,7 @@ struct OrphansRow: View {
                 if let bytes = displaySize {
                     Text(AppFormat.byteSize(bytes))
                         .font(DS.Font.secondary)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                 }
             }
             Spacer()
@@ -26,13 +26,13 @@ struct OrphansRow: View {
                 ProgressView().controlSize(.small)
                 Text("Deleting…")
                     .font(DS.Font.secondary)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
             } else {
                 Button(action: onDelete) {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
                 .help("Delete this folder from disk")
                 .accessibilityLabel("Delete \(entry.name)")
                 .accessibilityIdentifier("orphan.\(entry.name).delete")

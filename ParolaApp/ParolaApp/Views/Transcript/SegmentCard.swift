@@ -60,7 +60,7 @@ struct SegmentCard: View {
                 if !qcIssues.isEmpty {
                     Image(systemName: "exclamationmark.triangle")
                         .font(DS.Font.secondary)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                         .help(Self.qcHelpText(qcIssues))
                         .accessibilityLabel("Subtitle warnings")
                         .axLeaf("Card.Badge.SubtitleQC")
@@ -304,7 +304,7 @@ struct SegmentCard: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .foregroundStyle(.secondary)
+        .foregroundStyle(DS.Color.secondaryText)
         .help("More actions")
         .accessibilityLabel("More actions")
         .axLeaf("Card.Menu.More")
@@ -322,7 +322,7 @@ struct SegmentCard: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(DS.Color.secondaryText)
         .help(help)
         .accessibilityLabel(help)
     }

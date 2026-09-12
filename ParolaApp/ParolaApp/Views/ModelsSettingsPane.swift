@@ -195,7 +195,7 @@ struct ModelsSettingsPane: View {
             sectionHeader("Other files on disk", count: entries.count)
             Text("These directories aren't in the current model catalog — usually leftovers from older app versions. Safe to delete.")
                 .font(DS.Font.secondary)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
             LazyVStack(spacing: 8) {
                 ForEach(entries) { entry in
                     let displaySize = model.modelSizes[entry.name]
@@ -266,7 +266,7 @@ struct ModelsSettingsPane: View {
                 .foregroundStyle(DS.Palette.warning)
             Text(message)
                 .font(DS.Font.secondary)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()
@@ -366,7 +366,7 @@ struct ModelsSettingsPane: View {
             if let count, count > 0 {
                 Text("\(count)")
                     .font(DS.Font.calloutMedium)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
             }
             Spacer()
         }
