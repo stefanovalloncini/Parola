@@ -142,7 +142,7 @@ struct ParolaApp: App {
                 }
             }
             CommandGroup(replacing: .newItem) {
-                Button("Open Audio…") { model.presentOpenPanel() }
+                Button("Open…") { model.presentOpenPanel() }
                     .keyboardShortcut("o")
                 Menu("Open Recent") {
                     let recents = model.recentFiles

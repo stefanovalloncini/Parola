@@ -27,11 +27,11 @@ struct AdvancedPane: View {
                         .font(DS.Font.caption)
                         .foregroundStyle(.secondary)
                     HStack(spacing: 8) {
-                        Button("Export settings…") {
+                        Button("Export Settings…") {
                             transferFailure = SettingsExportService.presentExportPanel()
                         }
                         .axLeaf("Advanced.Button.ExportSettings")
-                        Button("Import settings…") {
+                        Button("Import Settings…") {
                             transferFailure = SettingsExportService.presentImportPanel()
                         }
                         .axLeaf("Advanced.Button.ImportSettings")

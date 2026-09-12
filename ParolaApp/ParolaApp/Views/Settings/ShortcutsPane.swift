@@ -8,7 +8,7 @@ struct ShortcutsPane: View {
         @Bindable var model = model
         return VStack(alignment: .leading, spacing: 12) {
             SettingsSection("Menu equivalents") {
-                SettingRow("Open Audio…", isFirst: true) { Text("⌘O").foregroundStyle(.secondary) }
+                SettingRow("Open…", isFirst: true) { Text("⌘O").foregroundStyle(.secondary) }
                 SettingRow("Save Document") { Text("⌘S").foregroundStyle(.secondary) }
                 SettingRow("Find") { Text("⌘F").foregroundStyle(.secondary) }
                 SettingRow("Toggle Live Captions") { Text("⇧⌘L").foregroundStyle(.secondary) }

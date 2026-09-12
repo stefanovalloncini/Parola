@@ -32,7 +32,7 @@ struct BatchJobList: View {
                 Button {
                     model.presentBatchOpenPanel()
                 } label: {
-                    Label("Add Files", systemImage: "plus")
+                    Label("Add Files…", systemImage: "plus")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
@@ -113,11 +113,11 @@ struct BatchJobList: View {
             .modifier(PendingBatchJobReorder(jobID: job.id, isPending: isPending))
             .contextMenu {
                 if isPending {
-                    Button("Move to top") { model.moveBatchJobToTop(job.id) }
+                    Button("Move to Top") { model.moveBatchJobToTop(job.id) }
                         .axLeaf("Row.ContextMenuItem.MoveToTop")
                 }
                 if job.status == .done {
-                    Button("Open transcript") { model.openBatchJobTranscript(job.id) }
+                    Button("Open Transcript") { model.openBatchJobTranscript(job.id) }
                         .axLeaf("Row.ContextMenuItem.OpenTranscript")
                 }
                 Button(job.status == .transcribing ? "Cancel" : "Remove", role: .destructive) {

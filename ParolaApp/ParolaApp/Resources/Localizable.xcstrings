@@ -856,13 +856,13 @@
         }
       }
     },
-    "Add Files": {
+    "Add Files…": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aggiungi file"
+            "value": "Aggiungi file…"
           }
         }
       }
@@ -1120,13 +1120,24 @@
         }
       }
     },
-    "All labels": {
+    "All Labels": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Tutte le etichette"
+          }
+        }
+      }
+    },
+    "All Languages": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutte le lingue"
           }
         }
       }
@@ -1648,7 +1659,7 @@
         }
       }
     },
-    "Cancel batch": {
+    "Cancel Batch": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -1895,7 +1906,7 @@
         }
       }
     },
-    "Check for updates…": {
+    "Check for Updates…": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -1913,16 +1924,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Controlla ora"
-          }
-        }
-      }
-    },
-    "Choose Files…": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Scegli i file…"
           }
         }
       }
@@ -2277,6 +2278,28 @@
         }
       }
     },
+    "Copy Command": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copia comando"
+          }
+        }
+      }
+    },
+    "Copy Link to This Segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copia il link al segmento"
+          }
+        }
+      }
+    },
     "Copy Plain Text": {
       "extractionState": "manual",
       "localizations": {
@@ -2306,28 +2329,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Copia come SRT"
-          }
-        }
-      }
-    },
-    "Copy command": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Copia comando"
-          }
-        }
-      }
-    },
-    "Copy link to this segment": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Copia il link al segmento"
           }
         }
       }
@@ -2743,6 +2744,17 @@
         }
       }
     },
+    "Delete Segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina segmento"
+          }
+        }
+      }
+    },
     "Delete all items now?": {
       "extractionState": "manual",
       "localizations": {
@@ -2794,17 +2806,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Elimina prompt"
-          }
-        }
-      }
-    },
-    "Delete segment": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Elimina segmento"
           }
         }
       }
@@ -3518,6 +3519,17 @@
         }
       }
     },
+    "Export Settings…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta impostazioni…"
+          }
+        }
+      }
+    },
     "Export as TXT": {
       "extractionState": "manual",
       "localizations": {
@@ -3558,17 +3570,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esporta pack"
-          }
-        }
-      }
-    },
-    "Export settings…": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esporta impostazioni…"
           }
         }
       }
@@ -3735,6 +3736,17 @@
         }
       }
     },
+    "Find Action Items": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trova azioni"
+          }
+        }
+      }
+    },
     "Find A→Z": {
       "extractionState": "manual",
       "localizations": {
@@ -3775,17 +3787,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Find Z→A"
-          }
-        }
-      }
-    },
-    "Find action items": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trova azioni"
           }
         }
       }
@@ -3948,23 +3949,23 @@
         }
       }
     },
-    "Generate a short overview with chapter markers you can jump to.": {
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Genera una panoramica breve con dei capitoli a cui puoi saltare."
-          }
-        }
-      }
-    },
-    "Generate chapters": {
+    "Generate Chapters": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Genera capitoli"
+          }
+        }
+      }
+    },
+    "Generate a short overview with chapter markers you can jump to.": {
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genera una panoramica breve con dei capitoli a cui puoi saltare."
           }
         }
       }
@@ -4211,6 +4212,17 @@
         }
       }
     },
+    "Import Settings…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importa impostazioni…"
+          }
+        }
+      }
+    },
     "Import Subtitles": {
       "extractionState": "manual",
       "localizations": {
@@ -4240,17 +4252,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Importa pack"
-          }
-        }
-      }
-    },
-    "Import settings…": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Importa impostazioni…"
           }
         }
       }
@@ -5115,7 +5116,7 @@
         }
       }
     },
-    "Merge with next segment": {
+    "Merge with Next Segment": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -5330,7 +5331,7 @@
         }
       }
     },
-    "Move to top": {
+    "Move to Top": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -5856,6 +5857,17 @@
         }
       }
     },
+    "Not Now": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non ora"
+          }
+        }
+      }
+    },
     "Not a valid settings file.": {
       "extractionState": "manual",
       "localizations": {
@@ -5874,17 +5886,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Non installato"
-          }
-        }
-      }
-    },
-    "Not now": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Non ora"
           }
         }
       }
@@ -5922,7 +5923,7 @@
         }
       }
     },
-    "Nudge timing…": {
+    "Nudge Timing…": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -6009,23 +6010,6 @@
         }
       }
     },
-    "Open Audio…": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open Audio…"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apri audio…"
-          }
-        }
-      }
-    },
     "Open Existing": {
       "extractionState": "manual",
       "localizations": {
@@ -6054,7 +6038,7 @@
         }
       }
     },
-    "Open File…": {
+    "Open Files…": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -6109,6 +6093,17 @@
         }
       }
     },
+    "Open Repository": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri repository"
+          }
+        }
+      }
+    },
     "Open System Settings → Privacy & Security → Microphone and grant Parola access.": {
       "extractionState": "manual",
       "localizations": {
@@ -6127,6 +6122,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apri Impostazioni di Sistema…"
+          }
+        }
+      }
+    },
+    "Open Transcript": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri trascrizione"
           }
         }
       }
@@ -6188,17 +6194,6 @@
         }
       }
     },
-    "Open file…": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apri file…"
-          }
-        }
-      }
-    },
     "Open in New Window": {
       "extractionState": "manual",
       "localizations": {
@@ -6232,17 +6227,6 @@
         }
       }
     },
-    "Open repository": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apri repository"
-          }
-        }
-      }
-    },
     "Open the batch transcription page.": {
       "extractionState": "manual",
       "localizations": {
@@ -6265,13 +6249,13 @@
         }
       }
     },
-    "Open transcript": {
+    "Open…": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apri trascrizione"
+            "value": "Apri…"
           }
         }
       }
@@ -6629,7 +6613,7 @@
         }
       }
     },
-    "Pin to top": {
+    "Pin to Top": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -7160,6 +7144,17 @@
         }
       }
     },
+    "Record This Meeting": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra questa riunione"
+          }
+        }
+      }
+    },
     "Record from Microphone": {
       "extractionState": "manual",
       "localizations": {
@@ -7178,17 +7173,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registra dal microfono o dall'audio di sistema."
-          }
-        }
-      }
-    },
-    "Record this meeting": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registra questa riunione"
           }
         }
       }
@@ -8496,7 +8480,7 @@
         }
       }
     },
-    "Split segment": {
+    "Split Segment": {
       "extractionState": "manual",
       "localizations": {
         "it": {

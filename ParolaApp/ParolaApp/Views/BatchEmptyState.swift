@@ -12,7 +12,7 @@ struct BatchEmptyState: View {
             Button {
                 model.presentBatchOpenPanel()
             } label: {
-                Text("Add Files")
+                Text("Add Files…")
             }
             .buttonStyle(DSPillButtonStyle(kind: .primary))
             .accessibilityIdentifier("batch.addFiles")

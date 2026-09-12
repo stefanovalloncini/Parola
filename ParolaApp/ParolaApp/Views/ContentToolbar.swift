@@ -108,7 +108,7 @@ struct ContentToolbar: ToolbarContent {
 
     private var newMenu: some View {
         Menu {
-            Button("Open File…") { model.presentOpenPanel() }
+            Button("Open Files…") { model.presentOpenPanel() }
                 .accessibilityIdentifier("toolbar.openFile")
                 .axLeaf("Toolbar.MenuItem.NewOpenFile")
             if model.features.isEnabled(.micRecording) || model.features.isEnabled(.meetings) {

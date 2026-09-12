@@ -282,17 +282,17 @@ struct SegmentCard: View {
 
     private var moreMenu: some View {
         Menu {
-            Button("Nudge timing…") { timingPopoverOpen = true }
+            Button("Nudge Timing…") { timingPopoverOpen = true }
                 .axLeaf("Card.Button.Timing")
-            Button("Split segment") { splitSegment() }
+            Button("Split Segment") { splitSegment() }
                 .axLeaf("Card.Button.Split")
-            Button("Merge with next segment") { model.mergeSegmentWithNext(id: segment.id) }
+            Button("Merge with Next Segment") { model.mergeSegmentWithNext(id: segment.id) }
                 .disabled(isLastSegment)
                 .axLeaf("Card.Button.Merge")
-            Button("Copy link to this segment") { copyDeeplink() }
+            Button("Copy Link to This Segment") { copyDeeplink() }
                 .axLeaf("Card.Button.CopyLink")
             Divider()
-            Button("Delete segment", role: .destructive) { model.deleteSegment(id: segment.id) }
+            Button("Delete Segment", role: .destructive) { model.deleteSegment(id: segment.id) }
                 .axLeaf("Card.Button.Delete")
         } label: {
             Image(systemName: "ellipsis")

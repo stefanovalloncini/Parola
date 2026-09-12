@@ -146,7 +146,7 @@ final class MenuBarController {
         if snapshot.showsSystemAudio {
             menu.addItem(menuItem(title: String(localized: "Record System Audio"), action: #selector(recordSystem), target: self))
         }
-        menu.addItem(menuItem(title: String(localized: "Open File…"), action: #selector(openFile), target: self))
+        menu.addItem(menuItem(title: String(localized: "Open Files…"), action: #selector(openFile), target: self))
         if snapshot.showsDictation {
             menu.addItem(menuItem(title: snapshot.dictateTitle, action: #selector(toggleDictation), target: self))
         }

@@ -35,7 +35,7 @@ struct ActionItemsSection: View {
 
     private var emptyRow: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            Button("Find action items") { model.extractActionItems() }
+            Button("Find Action Items") { model.extractActionItems() }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(!model.isAIAvailable)

@@ -67,7 +67,7 @@ struct ModelPickerView: View {
                                 if model.pinnedModel == variant.id {
                                     Button("Unpin") { model.pinnedModel = "" }
                                 } else {
-                                    Button("Pin to top") { model.pinnedModel = variant.id }
+                                    Button("Pin to Top") { model.pinnedModel = variant.id }
                                 }
                             }
                         }

@@ -134,7 +134,7 @@ struct EmptyDropZone: View {
             Button {
                 model.presentOpenPanel()
             } label: {
-                Label("Open Audio…", systemImage: "doc.badge.plus")
+                Label("Open Files…", systemImage: "doc.badge.plus")
             }
             .buttonStyle(DSPillButtonStyle(kind: .primary))
             .axLeaf("Home.Empty.OpenAudio")
@@ -246,7 +246,7 @@ private struct IntakeDropWell: View {
                 }
                 Spacer(minLength: DS.Spacing.regular)
                 // A shape, not just the accent: under the Mono accent the dashed well alone reads as disabled.
-                Label("Choose Files…", systemImage: "folder")
+                Label("Open Files…", systemImage: "folder")
                     .font(DS.Font.subheadlineMedium)
                     .foregroundStyle(DS.Color.primaryText)
                     .chipChrome(

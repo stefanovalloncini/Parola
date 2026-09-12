@@ -38,7 +38,7 @@ struct OutlinePopover: View {
                 .foregroundStyle(DS.Color.secondaryText)
             Spacer()
             if model.smartChapters.isEmpty {
-                Button("Generate chapters") { model.extractSmartChapters() }
+                Button("Generate Chapters") { model.extractSmartChapters() }
                     .controlSize(.small)
                     .disabled(model.isExtractingChapters || !model.isAIAvailable)
                     .help(model.aiUnavailableReason ?? "")

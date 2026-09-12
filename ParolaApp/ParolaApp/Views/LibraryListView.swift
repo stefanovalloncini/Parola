@@ -550,7 +550,7 @@ struct LibraryListView: View {
 extension LibraryEmptyAction {
     var title: LocalizedStringKey {
         switch self {
-        case .openFile: return "Open file…"
+        case .openFile: return "Open Files…"
         case .recordMicrophone: return "Record"
         case .recordSystemAudio: return "Record System Audio"
         case .startDictation: return "Start Dictation"

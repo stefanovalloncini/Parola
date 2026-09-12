@@ -29,7 +29,7 @@ struct UpdatesPane: View {
                 }
                 SettingRow("Check now",
                            description: "Looks for a new version straight away.") {
-                    Button("Check for updates…") {
+                    Button("Check for Updates…") {
                         SparkleUpdater.shared.checkForUpdates()
                     }
                     .disabled(!feedConfigured)

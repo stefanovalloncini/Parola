@@ -44,7 +44,7 @@ struct QueueRow: View {
         .contextMenu {
             switch job.status {
             case .pending, .transcribing:
-                Button("Cancel batch") { model.cancelAllInFlightBatchJobs() }
+                Button("Cancel Batch") { model.cancelAllInFlightBatchJobs() }
                     .axLeaf("Row.ContextMenuItem.CancelBatch")
             case .failed, .cancelled:
                 Button("Retry") { model.retryBatchJob(job.id) }
@@ -114,7 +114,7 @@ struct QueueRow: View {
     private var trailingActions: some View {
         switch job.status {
         case .pending, .transcribing:
-            actionButton("Cancel batch", systemImage: "xmark.circle.fill") {
+            actionButton("Cancel Batch", systemImage: "xmark.circle.fill") {
                 model.cancelAllInFlightBatchJobs()
             }
         case .failed, .cancelled:

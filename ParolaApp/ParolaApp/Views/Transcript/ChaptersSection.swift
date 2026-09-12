@@ -35,7 +35,7 @@ struct ChaptersSection: View {
 
     private var emptyRow: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            Button("Generate chapters") { model.extractSmartChapters() }
+            Button("Generate Chapters") { model.extractSmartChapters() }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(!model.isAIAvailable)

@@ -150,7 +150,7 @@ private struct YtDlpBanner: View {
                 .disabled(model.ytDlpInstalling)
                 .axLeaf("YouTube.Button.InstallYtDlp")
 
-                Button("Copy command") {
+                Button("Copy Command") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString("brew install yt-dlp", forType: .string)
                 }

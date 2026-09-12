@@ -14,7 +14,7 @@ struct AboutPane: View {
                 .padding(.top, 8)
 
             HStack(spacing: 10) {
-                Button("Open repository") {
+                Button("Open Repository") {
                     NSWorkspace.shared.open(SupportLinks.repository)
                 }
                 .axLeaf("About.Button.OpenRepository")

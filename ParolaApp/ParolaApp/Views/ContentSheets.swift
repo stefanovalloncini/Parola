@@ -45,9 +45,9 @@ struct ContentSheetsModifier: ViewModifier {
                 "\(meetingAppSnapshot) is running",
                 isPresented: meetingPromptBinding
             ) {
-                Button("Record this meeting") { model.startMeetingRecording() }
+                Button("Record This Meeting") { model.startMeetingRecording() }
                     .axLeaf("Meeting.Button.Record")
-                Button("Not now", role: .cancel) { model.dismissMeetingPrompt() }
+                Button("Not Now", role: .cancel) { model.dismissMeetingPrompt() }
                     .axLeaf("Meeting.Button.NotNow")
             } message: {
                 Text("Start a system-audio recording? The result lands in your library as a Meeting.")

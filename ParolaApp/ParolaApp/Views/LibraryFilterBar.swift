@@ -35,7 +35,7 @@ struct LibraryFilterBar: View {
         Group {
             if !labelOptions.isEmpty {
                 Menu {
-                    Button("All labels") { labelFilter = nil }
+                    Button("All Labels") { labelFilter = nil }
                         .axLeaf("Filter.MenuItem.AllLabels")
                     Divider()
                     ForEach(labelOptions, id: \.self) { label in
@@ -43,7 +43,7 @@ struct LibraryFilterBar: View {
                             .axLeaf("Filter.MenuItem.Label.\(label)")
                     }
                 } label: {
-                    pill(systemImage: "tag", label: labelFilter.map { Text(verbatim: $0) } ?? Text("All labels"))
+                    pill(systemImage: "tag", label: labelFilter.map { Text(verbatim: $0) } ?? Text("All Labels"))
                 }
                 .menuStyle(.button)
                 .buttonStyle(ChipButtonStyle(isSelected: labelFilter != nil))
@@ -53,7 +53,7 @@ struct LibraryFilterBar: View {
             }
             if languageOptions.count >= 2 {
                 Menu {
-                    Button("All languages") { languageFilter = nil }
+                    Button("All Languages") { languageFilter = nil }
                         .axLeaf("Filter.MenuItem.AllLanguages")
                     Divider()
                     ForEach(languageOptions, id: \.self) { code in
@@ -63,7 +63,7 @@ struct LibraryFilterBar: View {
                 } label: {
                     pill(
                         systemImage: "globe",
-                        label: languageFilter.map { Text(verbatim: languageName($0)) } ?? Text("All languages")
+                        label: languageFilter.map { Text(verbatim: languageName($0)) } ?? Text("All Languages")
                     )
                 }
                 .menuStyle(.button)
