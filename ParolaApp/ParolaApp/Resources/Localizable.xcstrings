@@ -856,6 +856,17 @@
         }
       }
     },
+    "Add Correction": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi correzione"
+          }
+        }
+      }
+    },
     "Add Files…": {
       "extractionState": "manual",
       "localizations": {
@@ -889,6 +900,17 @@
         }
       }
     },
+    "Add Pattern": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi pattern"
+          }
+        }
+      }
+    },
     "Add People": {
       "extractionState": "manual",
       "localizations": {
@@ -900,7 +922,40 @@
         }
       }
     },
-    "Add URL rule": {
+    "Add Prompt": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi prompt"
+          }
+        }
+      }
+    },
+    "Add Rule": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi regola"
+          }
+        }
+      }
+    },
+    "Add Snippet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi snippet"
+          }
+        }
+      }
+    },
+    "Add URL Rule": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -933,17 +988,6 @@
         }
       }
     },
-    "Add correction": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiungi correzione"
-          }
-        }
-      }
-    },
     "Add label": {
       "extractionState": "manual",
       "localizations": {
@@ -951,50 +995,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aggiungi etichetta"
-          }
-        }
-      }
-    },
-    "Add pattern": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiungi pattern"
-          }
-        }
-      }
-    },
-    "Add prompt": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiungi prompt"
-          }
-        }
-      }
-    },
-    "Add rule": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiungi regola"
-          }
-        }
-      }
-    },
-    "Add snippet": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiungi snippet"
           }
         }
       }
@@ -2300,6 +2300,17 @@
         }
       }
     },
+    "Copy Path": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copia percorso"
+          }
+        }
+      }
+    },
     "Copy Plain Text": {
       "extractionState": "manual",
       "localizations": {
@@ -2307,6 +2318,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Copia testo semplice"
+          }
+        }
+      }
+    },
+    "Copy Snippet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copia snippet"
+          }
+        }
+      }
+    },
+    "Copy Version": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copia versione"
           }
         }
       }
@@ -2333,28 +2366,6 @@
         }
       }
     },
-    "Copy path": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Copia percorso"
-          }
-        }
-      }
-    },
-    "Copy snippet": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Copia snippet"
-          }
-        }
-      }
-    },
     "Copy transcript": {
       "extractionState": "manual",
       "localizations": {
@@ -2362,17 +2373,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Copia trascrizione"
-          }
-        }
-      }
-    },
-    "Copy version": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Copia versione"
           }
         }
       }
@@ -2773,6 +2773,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Elimina ogni elemento da Eliminati di recente"
+          }
+        }
+      }
+    },
+    "Delete from Disk": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancella dal disco"
           }
         }
       }
@@ -3508,6 +3519,17 @@
         }
       }
     },
+    "Export Pack": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta pack"
+          }
+        }
+      }
+    },
     "Export Segment Notes…": {
       "extractionState": "manual",
       "localizations": {
@@ -3559,17 +3581,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Opzioni di export"
-          }
-        }
-      }
-    },
-    "Export pack": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esporta pack"
           }
         }
       }
@@ -4212,6 +4223,17 @@
         }
       }
     },
+    "Import Pack": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importa pack"
+          }
+        }
+      }
+    },
     "Import Settings…": {
       "extractionState": "manual",
       "localizations": {
@@ -4234,24 +4256,13 @@
         }
       }
     },
-    "Import from file…": {
+    "Import from File…": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
             "value": "Importa da file…"
-          }
-        }
-      }
-    },
-    "Import pack": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Importa pack"
           }
         }
       }
@@ -8972,7 +8983,7 @@
         }
       }
     },
-    "Tech terms (English)": {
+    "Tech Terms (English)": {
       "extractionState": "manual",
       "localizations": {
         "it": {

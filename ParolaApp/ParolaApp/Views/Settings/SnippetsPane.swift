@@ -36,7 +36,7 @@ struct SnippetsPane: View {
                     searchText = ""
                     model.snippets.append(Snippet(trigger: "", replacement: ""))
                 } label: {
-                    Label("Add snippet", systemImage: "plus.circle")
+                    Label("Add Snippet", systemImage: "plus.circle")
                 }
                 .axLeaf("Snippets.Button.AddSnippet")
                 Spacer()

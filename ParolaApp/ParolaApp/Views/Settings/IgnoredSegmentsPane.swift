@@ -43,7 +43,7 @@ struct IgnoredSegmentsPane: View {
                 enabledFilter = .all
                 model.ignoredSegmentRules.append(IgnoredSegmentRule(pattern: ""))
             } label: {
-                Label("Add pattern", systemImage: "plus.circle")
+                Label("Add Pattern", systemImage: "plus.circle")
             }
             .axLeaf("IgnoredSegments.Button.AddPattern")
 

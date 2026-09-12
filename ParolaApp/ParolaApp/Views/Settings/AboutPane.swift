@@ -18,7 +18,7 @@ struct AboutPane: View {
                     NSWorkspace.shared.open(SupportLinks.repository)
                 }
                 .axLeaf("About.Button.OpenRepository")
-                Button(copiedVersion ? "Copied" : "Copy version") {
+                Button(copiedVersion ? "Copied" : "Copy Version") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString("Parola \(AboutInfo.versionString)", forType: .string)
                     copiedVersion = true

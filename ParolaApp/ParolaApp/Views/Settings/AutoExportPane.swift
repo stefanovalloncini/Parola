@@ -48,7 +48,7 @@ struct AutoExportPane: View {
                 searchText = ""
                 enabledFilter = .all
             } label: {
-                Label("Add rule", systemImage: "plus.circle")
+                Label("Add Rule", systemImage: "plus.circle")
             }
             .axLeaf("AutoExport.Button.AddRule")
 

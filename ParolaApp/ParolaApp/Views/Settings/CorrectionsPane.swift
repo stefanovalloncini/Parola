@@ -35,7 +35,7 @@ struct CorrectionsPane: View {
                 searchText = ""
                 model.correctionRules.append(CorrectionRule(from: "", to: ""))
             } label: {
-                Label("Add correction", systemImage: "plus.circle")
+                Label("Add Correction", systemImage: "plus.circle")
             }
             .axLeaf("Corrections.Button.AddCorrection")
 

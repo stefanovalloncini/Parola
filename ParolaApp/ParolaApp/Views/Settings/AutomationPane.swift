@@ -92,7 +92,7 @@ struct AutomationPane: View {
                             HStack(spacing: 8) {
                                 Button("Reveal in Finder") { reveal(path: path) }
                                     .axLeaf("Automation.Button.RevealMcpBinary")
-                                Button("Copy path") { copy(path, label: String(localized: "Path copied")) }
+                                Button("Copy Path") { copy(path, label: String(localized: "Path copied")) }
                                     .axLeaf("Automation.Button.CopyMcpPath")
                             }
                         } else {
@@ -134,7 +134,7 @@ struct AutomationPane: View {
                                 RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                                     .fill(Color.primary.opacity(0.05))
                             )
-                            Button("Copy snippet") { copy(snippet, label: String(localized: "Snippet copied")) }
+                            Button("Copy Snippet") { copy(snippet, label: String(localized: "Snippet copied")) }
                                 .axLeaf("Automation.Button.CopySnippet")
                         }
                         .padding(16)

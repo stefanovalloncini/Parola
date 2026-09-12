@@ -39,7 +39,7 @@ struct PromptsPane: View {
                 Button {
                     editing = PromptEditDraft(prompt: Prompt(name: "", instructions: "", isBuiltIn: false))
                 } label: {
-                    Label("Add prompt", systemImage: "plus.circle")
+                    Label("Add Prompt", systemImage: "plus.circle")
                 }
                 .axLeaf("Prompts.Button.AddPrompt")
                 Spacer()

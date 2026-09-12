@@ -39,20 +39,20 @@ struct FindReplacePane: View {
                     statusFilter = .all
                     model.findReplaceRules.append(FindReplaceRule(find: "", replace: ""))
                 } label: {
-                    Label("Add rule", systemImage: "plus.circle")
+                    Label("Add Rule", systemImage: "plus.circle")
                 }
                 .axLeaf("FindReplace.Button.AddRule")
                 Spacer()
                 Menu {
-                    Button("Tech terms (English)") { model.importBundledTermPack(named: "tech-terms-en") }
+                    Button("Tech Terms (English)") { model.importBundledTermPack(named: "tech-terms-en") }
                         .axLeaf("FindReplace.MenuItem.PackTechTermsEn")
                     Button("Termini tecnici (Italiano)") { model.importBundledTermPack(named: "tech-terms-it") }
                         .axLeaf("FindReplace.MenuItem.PackTechTermsIt")
                     Divider()
-                    Button("Import from file…") { model.presentTermPackImporter() }
+                    Button("Import from File…") { model.presentTermPackImporter() }
                         .axLeaf("FindReplace.MenuItem.ImportFromFile")
                 } label: {
-                    Label("Import pack", systemImage: "tray.and.arrow.down")
+                    Label("Import Pack", systemImage: "tray.and.arrow.down")
                 }
                 .menuStyle(.button)
                 .buttonStyle(.borderless)
@@ -62,7 +62,7 @@ struct FindReplacePane: View {
                 Button {
                     model.presentTermPackExporter()
                 } label: {
-                    Label("Export pack", systemImage: "tray.and.arrow.up")
+                    Label("Export Pack", systemImage: "tray.and.arrow.up")
                 }
                 .disabled(model.findReplaceRules.isEmpty)
                 .axLeaf("FindReplace.Button.ExportPack")

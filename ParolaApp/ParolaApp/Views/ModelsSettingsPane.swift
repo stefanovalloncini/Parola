@@ -58,7 +58,7 @@ struct ModelsSettingsPane: View {
             titleVisibility: .visible,
             presenting: pendingDeletion
         ) { item in
-            Button("Delete from disk", role: .destructive) {
+            Button("Delete from Disk", role: .destructive) {
                 model.deleteModel(item.id)
                 pendingDeletion = nil
             }
