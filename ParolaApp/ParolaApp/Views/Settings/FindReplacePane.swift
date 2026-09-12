@@ -15,11 +15,7 @@ struct FindReplacePane: View {
             SettingsSection {
                 let visible = visibleRules
                 if model.findReplaceRules.isEmpty {
-                    HStack {
-                        Text("No rules yet.").foregroundStyle(.secondary).font(DS.Font.body)
-                        Spacer()
-                    }
-                    .padding(16)
+                    InlineEmptyText("No rules yet")
                 } else if visible.isEmpty {
                     HStack {
                         Text("No rules match.").foregroundStyle(.secondary).font(DS.Font.body)

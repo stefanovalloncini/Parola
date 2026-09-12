@@ -13,16 +13,16 @@ struct BatchExportPanel: View {
                     .padding(.top, DS.Spacing.regular)
 
                 if model.batchExportFormats.isEmpty {
-                    VStack(alignment: .leading, spacing: DS.Spacing.small) {
-                        Text("No formats selected.")
-                            .font(DS.Font.body)
-                            .foregroundStyle(DS.Color.secondaryText)
+                    VStack(spacing: DS.Spacing.small) {
+                        InlineEmptyText("No formats selected")
                         Text("Use Add Format above to pick the files Parola writes next to each transcribed audio or video.")
                             .font(DS.Font.caption)
                             .foregroundStyle(DS.Color.secondaryText)
+                            .multilineTextAlignment(.center)
                     }
-                    .padding(DS.Spacing.regular)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, DS.Spacing.regular)
+                    .padding(.bottom, DS.Spacing.regular)
+                    .frame(maxWidth: .infinity, alignment: .center)
                     .background(
                         RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
                             .fill(DS.Color.surface)

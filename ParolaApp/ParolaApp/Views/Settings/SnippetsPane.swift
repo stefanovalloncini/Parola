@@ -13,11 +13,7 @@ struct SnippetsPane: View {
             SettingsSection {
                 let visible = visibleSnippets
                 if model.snippets.isEmpty {
-                    HStack {
-                        Text("No snippets yet.").foregroundStyle(.secondary).font(.body)
-                        Spacer()
-                    }
-                    .padding(16)
+                    InlineEmptyText("No snippets yet")
                 } else if visible.isEmpty {
                     HStack {
                         Text("No snippets match.").foregroundStyle(.secondary).font(.body)

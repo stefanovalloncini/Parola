@@ -13,11 +13,7 @@ struct CorrectionsPane: View {
             SettingsSection {
                 let visible = visibleRules
                 if model.correctionRules.isEmpty {
-                    HStack {
-                        Text("No corrections yet.").foregroundStyle(.secondary).font(.body)
-                        Spacer()
-                    }
-                    .padding(16)
+                    InlineEmptyText("No corrections yet")
                 } else if visible.isEmpty {
                     HStack {
                         Text("No corrections match.").foregroundStyle(.secondary).font(.body)

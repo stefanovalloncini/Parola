@@ -20,11 +20,7 @@ struct AutoExportPane: View {
 
             SettingsSection {
                 if model.autoExportRules.isEmpty {
-                    HStack {
-                        Text("No rules yet.").foregroundStyle(.secondary).font(.body)
-                        Spacer()
-                    }
-                    .padding(16)
+                    InlineEmptyText("No rules yet")
                 } else if displayedRules.isEmpty {
                     HStack {
                         Text("No matches").foregroundStyle(.secondary).font(.body)

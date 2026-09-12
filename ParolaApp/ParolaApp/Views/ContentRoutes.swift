@@ -142,17 +142,17 @@ struct ContentRoutes: View {
             case .running:
                 ProgressPane(title: "Transcribing batch…", progress: nil)
             case .selectFile:
-                ContentUnavailableView {
-                    Label("Select a file", systemImage: "doc.text")
-                } description: {
-                    Text("Choose a completed file to see its transcript.")
-                }
+                EmptyStateView(
+                    systemImage: "doc.text",
+                    title: "Select a File",
+                    message: "Choose a completed file to see its transcript."
+                )
             case .noTranscripts:
-                ContentUnavailableView {
-                    Label("No transcripts", systemImage: "exclamationmark.triangle")
-                } description: {
-                    Text("None of these files was transcribed. Check the list for details.")
-                }
+                EmptyStateView(
+                    systemImage: "exclamationmark.triangle",
+                    title: "No Transcripts",
+                    message: "None of these files was transcribed. Check the list for details."
+                )
             }
         }
     }

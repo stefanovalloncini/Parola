@@ -16,13 +16,7 @@ private struct WatchedFoldersPaneBody: View {
         VStack(alignment: .leading, spacing: 16) {
             SettingsSection {
                 if store.folders.isEmpty {
-                    HStack {
-                        Text("No watched folders yet.")
-                            .foregroundStyle(.secondary)
-                            .font(DS.Font.body)
-                        Spacer()
-                    }
-                    .padding(16)
+                    InlineEmptyText("No watched folders yet")
                 } else {
                     ForEach(Array(store.folders.enumerated()), id: \.element.id) { idx, folder in
                         WatchedFolderRow(store: store, folder: folder, isFirst: idx == 0)
