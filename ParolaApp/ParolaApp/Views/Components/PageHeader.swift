@@ -64,7 +64,7 @@ struct PageHeader<Leading: View, Trailing: View>: View {
     @ViewBuilder
     private func countText(_ count: String) -> some View {
         let text = Text(count)
-            .font(DS.Font.caption)
+            .font(DS.Font.secondary)
             .monospacedDigit()
             .foregroundStyle(DS.Color.secondaryText)
             .modifier(OptionalHelp(help: countHelp))

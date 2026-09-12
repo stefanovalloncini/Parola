@@ -74,7 +74,7 @@ struct AutomationPane: View {
                     VStack(alignment: .leading, spacing: 10) {
                         statusRow
                         Text(bridgeBlurb)
-                            .font(DS.Font.caption)
+                            .font(DS.Font.secondary)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -100,7 +100,7 @@ struct AutomationPane: View {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .foregroundStyle(DS.Palette.warning)
                                 Text("parola-mcp isn't bundled in this build.")
-                                    .font(DS.Font.caption)
+                                    .font(DS.Font.secondary)
                             }
                             #if DEBUG
                             Text("Run `swift build --product parola-mcp` in ParolaCore and relaunch.")
@@ -108,7 +108,7 @@ struct AutomationPane: View {
                                 .foregroundStyle(.secondary)
                             #else
                             Text("This build doesn't include parola-mcp. Reinstall from the official DMG, or build it from the Parola source.")
-                                .font(DS.Font.caption)
+                                .font(DS.Font.secondary)
                                 .foregroundStyle(.secondary)
                             #endif
                         }
@@ -120,7 +120,7 @@ struct AutomationPane: View {
                     SettingsSection("MCP client snippet") {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Drop this into your MCP client's config (Claude Code .mcp.json, Codex, etc.)")
-                                .font(DS.Font.caption)
+                                .font(DS.Font.secondary)
                                 .foregroundStyle(.secondary)
                             ScrollView {
                                 Text(snippet)
@@ -146,7 +146,7 @@ struct AutomationPane: View {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(DS.Color.successText)
                         Text(confirmation)
-                            .font(DS.Font.caption)
+                            .font(DS.Font.secondary)
                             .foregroundStyle(.secondary)
                     }
                     .transition(.opacity)

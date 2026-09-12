@@ -60,14 +60,14 @@ struct ConfidenceSection: View {
                     .foregroundStyle(DS.Color.accentText)
                     .frame(width: 50, alignment: .leading)
                 Text(seg.text)
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.primaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Spacer(minLength: 0)
                 if let value = SegmentConfidence.average(for: seg) {
                     Text(percentLabel(value))
-                        .font(DS.Font.caption.monospacedDigit())
+                        .font(DS.Font.secondary.monospacedDigit())
                         .foregroundStyle(DS.Color.secondaryText)
                 }
             }

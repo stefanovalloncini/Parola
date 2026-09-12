@@ -88,7 +88,7 @@ struct GeneralPane: View {
                         .textFieldStyle(.roundedBorder)
                         .axLeaf("General.TextField.InitialPrompt")
                     Text("A short list of names or jargon helps Whisper get unusual words right. Other engines ignore it.")
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(.secondary)
                 }
                 .padding(16)

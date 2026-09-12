@@ -41,7 +41,7 @@ struct AboutPane: View {
             SettingsSection("Diagnostics") {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Kept for 7 days, up to 10 MB. No transcript text, file names, or paths.")
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(.secondary)
                         .axLeaf("About.Text.DiagnosticsRetention")
                     HStack(spacing: 8) {

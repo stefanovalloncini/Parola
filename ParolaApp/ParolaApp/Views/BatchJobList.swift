@@ -81,7 +81,7 @@ struct BatchJobList: View {
                         ForEach(statusGroups(from: matches), id: \.status) { group in
                             VStack(alignment: .leading, spacing: DS.Spacing.small) {
                                 Text(group.title)
-                                    .font(DS.Font.caption.weight(.semibold))
+                                    .font(DS.Font.secondary.weight(.semibold))
                                     .foregroundStyle(DS.Color.secondaryText)
                                     .padding(.top, DS.Spacing.small)
                                 ForEach(group.jobs) { job in

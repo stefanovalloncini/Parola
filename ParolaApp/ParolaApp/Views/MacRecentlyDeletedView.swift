@@ -185,7 +185,7 @@ struct MacRecentlyDeletedView: View {
     private var footer: some View {
         HStack(spacing: DS.Spacing.regular) {
             Text("Items are removed for good after \(AppModel.trashRetentionDays) days.")
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.secondaryText)
             Spacer(minLength: DS.Spacing.regular)
             Button("Delete All Now", role: .destructive) { confirmingEmpty = true }

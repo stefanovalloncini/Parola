@@ -215,7 +215,7 @@ private struct FindReplaceRuleRow: View {
                     Toggle("Regex", isOn: $rule.regex).toggleStyle(.checkbox)
                         .axLeaf("FindReplace.Toggle.Regex")
                 }
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 if let regexError {
                     HStack(spacing: 4) {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -223,7 +223,7 @@ private struct FindReplaceRuleRow: View {
                         Text(regexError)
                             .foregroundStyle(DS.Color.dangerText)
                     }
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                 }
             }
             .padding(.horizontal, 16)

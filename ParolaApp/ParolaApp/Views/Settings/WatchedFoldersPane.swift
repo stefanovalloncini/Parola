@@ -29,7 +29,7 @@ private struct WatchedFoldersPaneBody: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(DS.Palette.warning)
                     Text(error)
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
@@ -72,7 +72,7 @@ private struct WatchedFolderRow: View {
             HStack(spacing: 6) {
                 if stale {
                     Label("Stale", systemImage: "exclamationmark.triangle.fill")
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.warningText)
                     Button("Re-Add") {
                         store.reattach(folder.id)

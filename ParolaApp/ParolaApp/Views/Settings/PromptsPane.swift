@@ -94,7 +94,7 @@ struct PromptsPane: View {
                 Text("Couldn't save your prompts")
                     .font(DS.Font.calloutMedium)
                 Text("The change is only in this session. Check that Parola can write to its Application Support folder.")
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -197,7 +197,7 @@ private struct PromptRow: View {
         SettingRow(titleVerbatim: prompt.name, isFirst: isFirst) {
             HStack(spacing: 6) {
                 Text(prompt.isBuiltIn ? "Built-in" : "Custom")
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(.secondary)
                 if !prompt.isBuiltIn {
                     Button {
@@ -264,14 +264,14 @@ private struct PromptEditor: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Name").font(DS.Font.caption).foregroundStyle(.secondary)
+                Text("Name").font(DS.Font.secondary).foregroundStyle(.secondary)
                 TextField("Name", text: $draft.name)
                     .textFieldStyle(.roundedBorder)
                     .axLeaf("PromptEditor.TextField.Name")
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Instructions").font(DS.Font.caption).foregroundStyle(.secondary)
+                Text("Instructions").font(DS.Font.secondary).foregroundStyle(.secondary)
                 TextEditor(text: $draft.instructions)
                     .font(DS.Font.subheadline)
                     .frame(minHeight: 160)
@@ -283,12 +283,12 @@ private struct PromptEditor: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Trigger words").font(DS.Font.caption).foregroundStyle(.secondary)
+                Text("Trigger words").font(DS.Font.secondary).foregroundStyle(.secondary)
                 TextField("summary, recap", text: $draft.triggerWordsText)
                     .textFieldStyle(.roundedBorder)
                     .axLeaf("PromptEditor.TextField.TriggerWords")
                 Text("Words that switch to this prompt for one dictation. Separate with commas.")
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(.secondary)
             }
 
@@ -296,7 +296,7 @@ private struct PromptEditor: View {
                 Toggle("Assistant mode", isOn: $draft.assistantMode)
                     .axLeaf("PromptEditor.Toggle.AssistantMode")
                 Text("When on, the LLM answers your dictation instead of cleaning it up. Use this for voice Q&A.")
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(.secondary)
             }
 

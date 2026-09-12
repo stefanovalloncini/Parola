@@ -30,11 +30,11 @@ struct EmptyStateView<Actions: View>: View {
                 .foregroundStyle(DS.Color.secondaryText.opacity(0.55))
                 .padding(.bottom, DS.Spacing.tight)
             Text(title)
-                .font(DS.Font.title2)
+                .font(DS.Font.display)
                 .foregroundStyle(DS.Color.primaryText)
             if let message {
                 Text(message)
-                    .font(DS.Font.callout)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)

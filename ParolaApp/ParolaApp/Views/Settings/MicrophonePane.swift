@@ -155,7 +155,7 @@ struct MicrophonePane: View {
                 Text("Microphone access is off")
                     .font(DS.Font.calloutMedium)
                 Text("Parola needs the microphone to record and dictate.")
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -219,11 +219,11 @@ private struct MicErrorBanner: View {
                     .font(DS.Font.calloutMedium)
             }
             Text(message)
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
             Text(hint)
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .foregroundStyle(.secondary)
             if looksLikePermissionError {
                 Button("Open System Settings…") { openMicrophonePrivacySettings() }

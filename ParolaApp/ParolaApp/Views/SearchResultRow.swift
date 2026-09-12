@@ -48,7 +48,7 @@ struct SearchResultRow: View {
                 .lineLimit(1)
             Spacer(minLength: DS.Spacing.small)
             Text(meta)
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .foregroundStyle(secondaryStyle)
                 .lineLimit(1)
                 .layoutPriority(1)
@@ -66,7 +66,7 @@ struct SearchResultRow: View {
             if showsTimestamp {
                 // Hidden rather than empty: an empty Text sits on a different baseline and shifts the row.
                 Text(timestamp ?? "00:00")
-                    .font(model.monospacedTimestamps ? DS.Font.captionMono : DS.Font.caption)
+                    .font(model.monospacedTimestamps ? DS.Font.captionMono : DS.Font.secondary)
                     .foregroundStyle(secondaryStyle)
                     .lineLimit(1)
                     .opacity(timestamp == nil ? 0 : 1)
@@ -75,7 +75,7 @@ struct SearchResultRow: View {
                     .frame(width: Self.timestampWidth, alignment: .leading)
             }
             Text(snippetText)
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.primaryText)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)

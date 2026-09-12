@@ -356,7 +356,7 @@ struct ActionCard: View {
                         .foregroundStyle(DS.Color.primaryText)
                     if let subtitle {
                         Text(subtitle)
-                            .font(DS.Font.caption)
+                            .font(DS.Font.secondary)
                             .foregroundStyle(DS.Color.secondaryText)
                     }
                 }

@@ -54,11 +54,11 @@ struct DuplicateImportSheet: View {
     private func detail(_ label: LocalizedStringKey, _ value: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
             Text(label)
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.secondaryText)
                 .frame(width: 56, alignment: .leading)
             Text(value)
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .lineLimit(1)
         }
     }

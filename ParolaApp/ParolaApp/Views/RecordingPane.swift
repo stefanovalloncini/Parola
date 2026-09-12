@@ -121,7 +121,7 @@ struct RecordingCard: View {
                         .padding(.top, 2)
                 }
                 Text(source.label)
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText.opacity(0.7))
             }
 

@@ -68,12 +68,12 @@ struct WelcomeSheet: View {
                 }
 
                 Text("Grant each permission the first time you use its feature.")
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
 
                 if let modelDownloadNote {
                     Text(modelDownloadNote)
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
                 }
             }

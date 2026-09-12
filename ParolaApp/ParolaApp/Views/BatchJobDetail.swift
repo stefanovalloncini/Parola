@@ -15,10 +15,10 @@ struct BatchJobDetail: View {
             HStack(spacing: 4) {
                 if let statusSymbol {
                     Image(systemName: statusSymbol)
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                 }
                 Text(statusText)
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
             }
             .foregroundStyle(statusColor)
         }

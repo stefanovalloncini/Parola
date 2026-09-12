@@ -70,7 +70,7 @@ struct DisplayModeCard: View {
             VStack(spacing: DS.Spacing.small) {
                 Image(systemName: icon)
                     .font(DS.Font.titleRegular)
-                Text(title).font(DS.Font.caption)
+                Text(title).font(DS.Font.secondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, DS.Spacing.medium)

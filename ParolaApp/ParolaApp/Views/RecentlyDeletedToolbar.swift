@@ -80,7 +80,7 @@ struct RecentlyDeletedToolbar: View {
                     .font(DS.Font.title2)
                 if !model.deletedEntries.isEmpty {
                     subtitle
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
                 }
             }

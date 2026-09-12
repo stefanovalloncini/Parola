@@ -348,7 +348,7 @@ struct SettingRow<Trailing: View>: View {
                     titleText.font(DS.Font.subheadline)
                     if let descriptionText {
                         descriptionText
-                            .font(DS.Font.caption)
+                            .font(DS.Font.secondary)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -366,7 +366,7 @@ struct SettingHelper: View {
     let text: LocalizedStringKey
     var body: some View {
         Text(text)
-            .font(DS.Font.caption)
+            .font(DS.Font.secondary)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 4)
     }

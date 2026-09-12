@@ -184,8 +184,8 @@ struct LibraryListContentTests {
         let comfortable = await rowHeight(density: "comfortable", style: .home)
         let compact = await rowHeight(density: "compact", style: .home)
 
-        #expect(comfortable == 39)
-        #expect(compact == 35)
+        #expect(comfortable == 41)
+        #expect(compact == 37)
         #expect(await rowHeight(density: "comfortable", style: .library) == comfortable)
         #expect(await rowHeight(density: "compact", style: .library) == compact)
         #expect(comfortable - compact == DS.Spacing.tight)

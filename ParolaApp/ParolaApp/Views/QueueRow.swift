@@ -16,7 +16,7 @@ struct QueueRow: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(statusLine)
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)

@@ -105,7 +105,7 @@ private struct ActionItemRow: View {
             }
             if let due = item.dueDate {
                 Text("by \(due)")
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
                     .padding(.leading, 18)
             }

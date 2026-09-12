@@ -65,7 +65,7 @@ struct ExportOptionsSheet: View {
                     .font(DS.Font.body)
                     .foregroundStyle(DS.Color.primaryText)
                 Text(detail)
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
             }
             Spacer()

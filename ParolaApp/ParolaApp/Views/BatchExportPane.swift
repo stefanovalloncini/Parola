@@ -16,7 +16,7 @@ struct BatchExportPanel: View {
                     VStack(spacing: DS.Spacing.small) {
                         InlineEmptyText("No formats selected")
                         Text("Use Add Format above to pick the files Parola writes next to each transcribed audio or video.")
-                            .font(DS.Font.caption)
+                            .font(DS.Font.secondary)
                             .foregroundStyle(DS.Color.secondaryText)
                             .multilineTextAlignment(.center)
                     }
@@ -164,7 +164,7 @@ struct BatchSettingRow<Control: View>: View {
                     .foregroundStyle(DS.Color.primaryText)
                 if let description {
                     Text(description)
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }

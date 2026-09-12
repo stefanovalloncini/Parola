@@ -21,7 +21,7 @@ struct ChatSenderChip: View {
                 Image(systemName: "person.crop.circle")
                     .font(DS.Font.captionEmphasized)
                 Text(selection.label)
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                 Image(systemName: "chevron.down")
                     .font(DS.Font.caption2Emphasized)
             }

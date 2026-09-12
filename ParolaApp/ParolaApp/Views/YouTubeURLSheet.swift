@@ -48,7 +48,7 @@ struct YouTubeURLSheet: View {
 
                 if let error = model.youtubeURLError {
                     Text(error)
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.dangerText)
                         .fixedSize(horizontal: false, vertical: true)
                         .axLeaf("YouTube.Text.URLError")
@@ -66,7 +66,7 @@ struct YouTubeURLSheet: View {
         HStack(spacing: DS.Spacing.small) {
             if !model.ytDlpAvailable {
                 Text("Install yt-dlp to transcribe a link.")
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
                     .axLeaf("YouTube.Text.DownloaderMissing")
             }
@@ -119,7 +119,7 @@ private struct YtDlpBanner: View {
                     Text("yt-dlp isn't installed")
                         .font(DS.Font.heading)
                     Text("Parola uses yt-dlp to fetch YouTube audio locally. Install it once and you're set.")
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -128,7 +128,7 @@ private struct YtDlpBanner: View {
 
             if let error = model.ytDlpInstallError {
                 Text(error)
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.dangerText)
                     .fixedSize(horizontal: false, vertical: true)
             }

@@ -597,8 +597,8 @@ struct LibraryRow: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ScaledMetric(relativeTo: .body) private var compactHeight: CGFloat = 35
-    @ScaledMetric(relativeTo: .body) private var regularHeight: CGFloat = 39
+    @ScaledMetric(relativeTo: .body) private var compactHeight: CGFloat = 37
+    @ScaledMetric(relativeTo: .body) private var regularHeight: CGFloat = 41
     @State private var isHovering = false
     private var compact: Bool { model.sidebarDensity == "compact" }
 
@@ -670,7 +670,7 @@ struct LibraryRow: View {
                         Text("Last opened: \(opened)")
                     }
                 }
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .foregroundStyle(secondaryStyle)
                 .lineLimit(1)
             }
@@ -714,7 +714,7 @@ struct LibraryRow: View {
     /// On a selected row the accent fill is the backdrop, so the chip wears a veil of the foreground.
     private func chip(_ label: Text) -> some View {
         label
-            .font(DS.Font.caption)
+            .font(DS.Font.secondary)
             .foregroundStyle(secondaryStyle)
             .lineLimit(1)
             .chipChrome(

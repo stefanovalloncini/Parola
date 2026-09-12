@@ -34,7 +34,7 @@ struct SegmentCard: View {
                     if model.player != nil { model.seek(to: segment) }
                 } label: {
                     Text(Timecode.format(segment.start))
-                        .font(model.monospacedTimestamps ? DS.Font.captionMono : DS.Font.caption)
+                        .font(model.monospacedTimestamps ? DS.Font.captionMono : DS.Font.secondary)
                         .foregroundStyle(isCurrent ? DS.Color.highlight : DS.Color.secondaryText)
                 }
                 .buttonStyle(.plain)
@@ -44,7 +44,7 @@ struct SegmentCard: View {
                 .contextMenu { assignSpeakerMenu }
                 if let rawSpeaker = segment.speaker, let speaker = Self.speakerLabel(for: rawSpeaker) {
                     Text(speaker)
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.speakerColor(for: rawSpeaker))
                         .onHover { hovering in
                             hoveredSpeaker.wrappedValue = hovering ? rawSpeaker : nil
@@ -59,7 +59,7 @@ struct SegmentCard: View {
                 }
                 if !qcIssues.isEmpty {
                     Image(systemName: "exclamationmark.triangle")
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(.secondary)
                         .help(Self.qcHelpText(qcIssues))
                         .accessibilityLabel("Subtitle warnings")
@@ -149,7 +149,7 @@ struct SegmentCard: View {
                 .font(DS.Font.caption2)
                 .foregroundStyle(DS.Color.accent)
             Text(text)
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.primaryText.opacity(0.85))
                 .lineLimit(2)
             Spacer(minLength: 0)

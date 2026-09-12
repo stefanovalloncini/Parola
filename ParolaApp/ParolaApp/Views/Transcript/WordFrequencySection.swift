@@ -46,7 +46,7 @@ private struct WordFrequencyBar: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Text(word)
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.primaryText)
                     .frame(width: 80, alignment: .leading)
                     .lineLimit(1)

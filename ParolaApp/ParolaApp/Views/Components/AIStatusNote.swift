@@ -24,7 +24,7 @@ struct AIStatusNote: View {
         } icon: {
             Image(systemName: kind.symbol)
         }
-        .font(DS.Font.caption)
+        .font(DS.Font.secondary)
         .foregroundStyle(kind == .failure ? DS.Color.dangerText : DS.Color.secondaryText)
         .frame(maxWidth: .infinity, alignment: .leading)
     }

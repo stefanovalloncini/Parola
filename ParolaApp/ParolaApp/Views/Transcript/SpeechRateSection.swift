@@ -15,11 +15,11 @@ struct SpeechRateSection: View {
                         .frame(height: 44)
                     HStack {
                         Text("Avg \(Int(average)) wpm")
-                            .font(DS.Font.caption)
+                            .font(DS.Font.secondary)
                             .foregroundStyle(DS.Color.secondaryText)
                         Spacer()
                         Text("Peak \(Int(maxValue)) wpm")
-                            .font(DS.Font.caption)
+                            .font(DS.Font.secondary)
                             .foregroundStyle(DS.Color.secondaryText)
                     }
                 }

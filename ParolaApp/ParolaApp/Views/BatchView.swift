@@ -83,7 +83,7 @@ struct BatchView: View {
             Image(systemName: "doc.on.doc")
                 .foregroundStyle(DS.Color.secondaryText)
             Text(text)
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.secondaryText)
             Spacer(minLength: 0)
         }

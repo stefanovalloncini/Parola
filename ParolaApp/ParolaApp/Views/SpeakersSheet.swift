@@ -33,13 +33,13 @@ struct SpeakersSheet: View {
                 }
                 if transcript.uniqueSpeakers.isEmpty {
                     Text("This transcript wasn't diarized — turn on Identify speakers in Settings before transcribing.")
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if filteredSpeakers.isEmpty && !transcript.uniqueSpeakers.isEmpty {
                     Text("No speakers match")
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
                 }
                 ForEach(filteredSpeakers, id: \.self) { speaker in
@@ -48,7 +48,7 @@ struct SpeakersSheet: View {
                 if Self.offersSuggestions(hasSpeakers: !transcript.uniqueSpeakers.isEmpty, hasSuggestions: !filteredSuggestions.isEmpty) {
                     Divider().padding(.vertical, 2)
                     Text("Recent")
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
                     FlowChips(items: filteredSuggestions.map(\.name)) { name in
                         applySuggestion(name)

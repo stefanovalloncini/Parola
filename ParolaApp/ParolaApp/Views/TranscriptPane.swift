@@ -31,7 +31,7 @@ struct AssumedLanguageNote: View {
         } icon: {
             Image(systemName: "globe.badge.chevron.backward")
         }
-        .font(DS.Font.caption)
+        .font(DS.Font.secondary)
         .foregroundStyle(DS.Color.secondaryText)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, DS.Spacing.regular)

@@ -141,9 +141,9 @@ struct ChipButtonStyle: ButtonStyle {
 extension Chip.Size {
     func font(weight: Font.Weight) -> Font {
         switch self {
-        case .compact: return DS.Font.subheadline.weight(weight)
-        case .regular: return DS.Font.caption.weight(weight)
-        case .prominent: return DS.Font.callout.weight(weight)
+        case .compact: return DS.Font.caption.weight(weight)
+        case .regular: return DS.Font.secondary.weight(weight)
+        case .prominent: return DS.Font.body.weight(weight)
         }
     }
 

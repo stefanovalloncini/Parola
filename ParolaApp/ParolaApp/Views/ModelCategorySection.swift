@@ -64,7 +64,7 @@ struct ModelCategoryRow: View {
                 Text(category.title)
                     .font(DS.Font.heading)
                 Text(category.description)
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(.secondary)
             }
             Spacer()

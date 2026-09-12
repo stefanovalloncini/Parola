@@ -49,7 +49,7 @@ private struct BatchRow: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(subtitle)
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
             }
             Spacer()

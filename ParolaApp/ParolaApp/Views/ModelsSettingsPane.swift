@@ -194,7 +194,7 @@ struct ModelsSettingsPane: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Other files on disk", count: entries.count)
             Text("These directories aren't in the current model catalog — usually leftovers from older app versions. Safe to delete.")
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .foregroundStyle(.secondary)
             LazyVStack(spacing: 8) {
                 ForEach(entries) { entry in
@@ -265,7 +265,7 @@ struct ModelsSettingsPane: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(DS.Palette.warning)
             Text(message)
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)

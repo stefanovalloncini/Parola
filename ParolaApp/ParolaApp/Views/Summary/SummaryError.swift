@@ -9,7 +9,7 @@ struct SummaryError: View {
                 .font(DS.Font.heading)
                 .foregroundStyle(DS.Color.dangerText)
             Text(message)
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.secondaryText)
         }
         .padding(DS.Spacing.large)

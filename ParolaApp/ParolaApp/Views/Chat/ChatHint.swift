@@ -9,7 +9,7 @@ struct ChatHint: View {
                 .font(.system(size: iconSize, weight: .light))
                 .foregroundStyle(DS.Color.secondaryText)
             Text("Ask anything about this transcript.")
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.secondaryText)
         }
         .frame(maxWidth: .infinity)

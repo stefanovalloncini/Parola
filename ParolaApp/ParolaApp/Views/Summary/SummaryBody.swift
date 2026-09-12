@@ -48,7 +48,7 @@ struct SummaryBody: View {
     private var chaptersSection: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             Text("Chapters")
-                .font(DS.Font.caption.smallCaps())
+                .font(DS.Font.secondary.smallCaps())
                 .foregroundStyle(DS.Color.secondaryText)
                 .tracking(0.6)
 

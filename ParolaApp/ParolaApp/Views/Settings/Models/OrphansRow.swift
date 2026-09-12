@@ -17,7 +17,7 @@ struct OrphansRow: View {
                     .font(DS.Font.subheadline)
                 if let bytes = displaySize {
                     Text(AppFormat.byteSize(bytes))
-                        .font(DS.Font.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -25,7 +25,7 @@ struct OrphansRow: View {
             if isDeleting {
                 ProgressView().controlSize(.small)
                 Text("Deleting…")
-                    .font(DS.Font.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(.secondary)
             } else {
                 Button(action: onDelete) {

@@ -80,7 +80,7 @@ struct InspectorSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             titleText
-                .font(DS.Font.caption)
+                .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.secondaryText)
                 .textCase(.uppercase)
             content
