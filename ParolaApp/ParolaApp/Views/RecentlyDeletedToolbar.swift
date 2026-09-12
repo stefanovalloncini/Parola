@@ -236,11 +236,7 @@ struct RecentlyDeletedFilterBar: View {
     }
 
     private func caption(_ text: LocalizedStringKey) -> some View {
-        Text(text)
-            .font(DS.Font.caption2Emphasized)
-            .textCase(.uppercase)
-            .tracking(0.6)
-            .foregroundStyle(DS.Color.secondaryText)
+        SectionCaption(text)
     }
 
     private func dot(for option: RecentlyDeletedCategoryFilter) -> Color? {

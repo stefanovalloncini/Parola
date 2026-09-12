@@ -203,11 +203,7 @@ private struct SectionLabel: View {
     let text: LocalizedStringKey
     init(_ text: LocalizedStringKey) { self.text = text }
     var body: some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .textCase(.uppercase)
-            .tracking(0.6)
-            .foregroundStyle(.secondary)
+        SectionCaption(text)
             .padding(.horizontal, 10)
             .padding(.bottom, 4)
     }

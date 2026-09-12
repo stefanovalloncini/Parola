@@ -182,9 +182,7 @@ private struct SettingsSidebar: View {
                 VStack(alignment: .leading, spacing: 14) {
                     ForEach(filteredGroups) { group in
                         if let title = group.title {
-                            Text(title)
-                                .font(DS.Font.captionEmphasized)
-                                .foregroundStyle(DS.Color.secondaryText)
+                            SectionCaption(title)
                                 .padding(.horizontal, 16)
                                 .padding(.top, 4)
                         }

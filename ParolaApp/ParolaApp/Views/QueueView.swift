@@ -143,11 +143,7 @@ struct QueueView: View {
         let matching = statuses.flatMap { status in jobs.filter { $0.status == status } }
         if !matching.isEmpty {
             VStack(alignment: .leading, spacing: DS.Spacing.small) {
-                Text(title)
-                    .textCase(.uppercase)
-                    .font(DS.Font.captionMedium)
-                    .tracking(0.6)
-                    .foregroundStyle(DS.Color.secondaryText)
+                SectionCaption(title)
                 VStack(spacing: 1) {
                     ForEach(matching) { job in
                         QueueRow(job: job, isFocused: focusedJob == job.id)

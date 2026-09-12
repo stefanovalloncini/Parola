@@ -164,11 +164,7 @@ struct MacRecentlyDeletedView: View {
     private func sectionHeader(_ group: BucketGroup, isFirst: Bool) -> some View {
         if let header = group.bucket.header {
             HStack(spacing: DS.Spacing.small) {
-                header
-                    .textCase(.uppercase)
-                    .font(DS.Font.caption2Emphasized)
-                    .tracking(0.6)
-                    .foregroundStyle(group.bucket.tint)
+                SectionCaption(header, tint: group.bucket.tint)
                 Rectangle()
                     .fill(DS.Color.separator.opacity(0.5))
                     .frame(height: 1)
