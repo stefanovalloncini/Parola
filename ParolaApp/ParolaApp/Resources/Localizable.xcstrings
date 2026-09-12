@@ -1488,17 +1488,6 @@
         }
       }
     },
-    "Batch transcriptions appear here. They stay until you clear them.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le trascrizioni batch appaiono qui. Restano finché non le svuoti."
-          }
-        }
-      }
-    },
     "Batch — %@ files": {
       "extractionState": "stale",
       "localizations": {
@@ -6908,6 +6897,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "In coda"
+          }
+        }
+      }
+    },
+    "Queued transcriptions appear here. They stay until you clear them.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le trascrizioni in coda compaiono qui. Restano finché non le cancelli."
           }
         }
       }
