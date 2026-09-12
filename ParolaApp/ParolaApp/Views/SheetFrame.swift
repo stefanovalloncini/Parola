@@ -122,6 +122,7 @@ struct SheetFrame<Content: View, Footer: View>: View {
                 }
                 .buttonStyle(.plain)
                 .keyboardShortcut(.cancelAction)
+                .help("Close")
                 .accessibilityLabel("Close")
                 .axLeaf(closeAXLeaf)
             }
