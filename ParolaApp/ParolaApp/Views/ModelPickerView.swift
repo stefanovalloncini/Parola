@@ -98,32 +98,11 @@ struct ModelPickerView: View {
     }
 
     private var searchField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .font(DS.Font.calloutMedium)
-                .foregroundStyle(.secondary)
-            TextField("Search models", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-                .axLeaf("ModelPicker.TextField.Search")
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(DS.Font.callout)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Clear search")
-                .axLeaf("ModelPicker.Button.ClearSearch")
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            Capsule(style: .continuous)
-                .fill(DS.Color.surfaceElevated)
+        SearchPill(
+            text: $searchText,
+            placeholder: "Search models",
+            identifier: "ModelPicker.TextField.Search",
+            clearButtonIdentifier: "ModelPicker.Button.ClearSearch"
         )
     }
 

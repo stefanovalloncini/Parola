@@ -6,19 +6,22 @@ struct SearchPill: View {
     var prompt: String?
     var clearsOnEscape: Bool
     var identifier: String
+    var clearButtonIdentifier: String
 
     init(
         text: Binding<String>,
         placeholder: LocalizedStringKey = "Search",
         prompt: String? = nil,
         clearsOnEscape: Bool = false,
-        identifier: String = "search.field"
+        identifier: String = "search.field",
+        clearButtonIdentifier: String = "search.field.clear"
     ) {
         self._text = text
         self.placeholder = placeholder
         self.prompt = prompt
         self.clearsOnEscape = clearsOnEscape
         self.identifier = identifier
+        self.clearButtonIdentifier = clearButtonIdentifier
     }
 
     /// Esc has to keep reaching the sheet or window unless a screen asked for it and has text.
@@ -58,6 +61,7 @@ struct SearchPill: View {
                 .buttonStyle(.plain)
                 .help("Clear")
                 .accessibilityLabel("Clear")
+                .accessibilityIdentifier(clearButtonIdentifier)
             }
         }
         .padding(.horizontal, 8)
