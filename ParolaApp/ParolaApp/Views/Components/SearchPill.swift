@@ -59,8 +59,8 @@ struct SearchPill: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Clear")
-                .accessibilityLabel("Clear")
+                .help("Clear search")
+                .accessibilityLabel("Clear search")
                 .accessibilityIdentifier(clearButtonIdentifier)
             }
         }
