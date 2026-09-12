@@ -60,7 +60,7 @@ struct SearchSnippetTextTests {
     func untintedHitKeepsItsWeight() {
         let text = SearchSnippetText.attributed(match("il lancio", [(3, 6)]), tinted: false)
         #expect(text.runs.allSatisfy { $0.foregroundColor == nil })
-        let bold = text.runs.filter { $0.font == DS.Font.captionEmphasized }.map { String(text[$0.range].characters) }
+        let bold = text.runs.filter { $0.font == DS.Font.bodyStrong }.map { String(text[$0.range].characters) }
         #expect(bold == ["lancio"])
     }
 }

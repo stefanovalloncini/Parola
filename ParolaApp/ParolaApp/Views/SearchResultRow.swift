@@ -43,14 +43,11 @@ struct SearchResultRow: View {
     private var titleLine: some View {
         HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
             Text(display.title)
-                .font(DS.Font.body)
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(DS.Color.primaryText)
                 .lineLimit(1)
             Spacer(minLength: DS.Spacing.small)
-            Text(meta)
-                .font(DS.Font.secondary)
-                .foregroundStyle(secondaryStyle)
-                .lineLimit(1)
+            MetaLine([meta], tint: secondaryStyle)
                 .layoutPriority(1)
         }
     }
@@ -66,7 +63,7 @@ struct SearchResultRow: View {
             if showsTimestamp {
                 // Hidden rather than empty: an empty Text sits on a different baseline and shifts the row.
                 Text(timestamp ?? "00:00")
-                    .font(model.monospacedTimestamps ? DS.Font.captionMono : DS.Font.secondary)
+                    .font(model.monospacedTimestamps ? DS.Font.mono : DS.Font.secondary)
                     .foregroundStyle(secondaryStyle)
                     .lineLimit(1)
                     .opacity(timestamp == nil ? 0 : 1)
@@ -75,7 +72,7 @@ struct SearchResultRow: View {
                     .frame(width: Self.timestampWidth, alignment: .leading)
             }
             Text(snippetText)
-                .font(DS.Font.secondary)
+                .font(DS.Font.body)
                 .foregroundStyle(DS.Color.primaryText)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)

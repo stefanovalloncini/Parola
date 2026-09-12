@@ -626,6 +626,20 @@ struct LibraryRow: View {
         return compact ? compactHeight : regularHeight
     }
 
+    /// Home reuses the row in a narrower column, and a compact list trades the last-opened stamp for height.
+    private var metaParts: [String?] {
+        [
+            display.timestamp,
+            display.durationLabel,
+            display.modelLabel,
+            display.sizeLabel,
+            display.languageLabel,
+            style == .library && !compact
+                ? display.lastOpened.map { String(localized: "Last opened: \($0)") }
+                : nil,
+        ]
+    }
+
     var body: some View {
         HStack(spacing: DS.Spacing.regular) {
             VStack(alignment: .leading, spacing: 2) {
@@ -636,7 +650,7 @@ struct LibraryRow: View {
                             .foregroundStyle(DS.Color.accent)
                     }
                     Text(display.title)
-                        .font(DS.Font.body)
+                        .font(DS.Font.bodyStrong)
                         .foregroundStyle(DS.Color.primaryText)
                         .lineLimit(1)
                     if display.noteCount > 0 {
@@ -654,38 +668,7 @@ struct LibraryRow: View {
                         )
                     }
                 }
-                HStack(spacing: 6) {
-                    Text(display.timestamp)
-                    if let duration = display.durationLabel {
-                        Text("·")
-                            .foregroundStyle(secondaryStyle.opacity(0.5))
-                        Text(duration)
-                            .monospacedDigit()
-                    }
-                    if let modelName = display.modelLabel {
-                        Text("·")
-                            .foregroundStyle(secondaryStyle.opacity(0.5))
-                        Text(modelName)
-                    }
-                    if let size = display.sizeLabel {
-                        Text("·")
-                            .foregroundStyle(secondaryStyle.opacity(0.5))
-                        Text(size)
-                    }
-                    if let lang = display.languageLabel {
-                        Text("·")
-                            .foregroundStyle(secondaryStyle.opacity(0.5))
-                        Text(lang)
-                    }
-                    if style == .library, !compact, let opened = display.lastOpened {
-                        Text("·")
-                            .foregroundStyle(secondaryStyle.opacity(0.5))
-                        Text("Last opened: \(opened)")
-                    }
-                }
-                .font(DS.Font.secondary)
-                .foregroundStyle(secondaryStyle)
-                .lineLimit(1)
+                MetaLine(metaParts, tint: secondaryStyle)
             }
             Spacer(minLength: DS.Spacing.regular)
             labelChips

@@ -18,7 +18,7 @@ enum SearchSnippetText {
             }
             var hit = AttributedString(String(characters[range]))
             if tints { hit.foregroundColor = DS.Color.accentText }
-            hit.font = DS.Font.captionEmphasized
+            hit.font = DS.Font.bodyStrong
             text.append(hit)
             cursor = range.upperBound
         }

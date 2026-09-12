@@ -94,7 +94,7 @@ struct RecentlyDeletedRow: View {
     private var titleLine: some View {
         HStack(spacing: DS.Spacing.small) {
             Text(entry.title)
-                .font(DS.Font.heading)
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(DS.Color.primaryText)
                 .lineLimit(1)
             Spacer(minLength: DS.Spacing.small)

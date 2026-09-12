@@ -7,7 +7,7 @@ struct BatchJobDetail: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(job.url.lastPathComponent)
-                .font(DS.Font.body.weight(.medium))
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(DS.Color.primaryText)
                 .lineLimit(1)
                 .truncationMode(.middle)
