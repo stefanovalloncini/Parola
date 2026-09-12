@@ -74,7 +74,7 @@ private struct WatchedFolderRow: View {
                     Label("Stale", systemImage: "exclamationmark.triangle.fill")
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.Color.warningText)
-                    Button("Re-add") {
+                    Button("Re-Add") {
                         store.reattach(folder.id)
                     }
                     .controlSize(.small)

@@ -107,7 +107,7 @@ struct LiveCaptionsView: View {
                 .axLeaf("ContextMenu.MenuItem.Opacity50")
         }
         .axLeaf("ContextMenu.Menu.Opacity")
-        Menu("Caption size") {
+        Menu("Caption Size") {
             Button("Small") { fontSize = 18 }
                 .axLeaf("ContextMenu.MenuItem.SizeSmall")
             Button("Medium") { fontSize = 22 }

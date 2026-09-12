@@ -176,7 +176,7 @@ struct DictationPane: View {
                     model.presentAddDictationAppPanel()
                     customApps = model.customDictationOverrideApps()
                 } label: {
-                    Label("Add app…", systemImage: "plus.circle")
+                    Label("Add App…", systemImage: "plus.circle")
                 }
                 .axLeaf("Dictation.Button.AddApp")
                 Spacer()

@@ -20,7 +20,7 @@ struct ChatMessageList: View {
                         ContentUnavailableView.search(text: trimmedQuery)
                             .padding(.top, DS.Spacing.xlarge)
                     } else if visible.isEmpty && hasActiveFilter {
-                        ContentUnavailableView("No messages", systemImage: "line.3.horizontal.decrease.circle")
+                        ContentUnavailableView("No Messages", systemImage: "line.3.horizontal.decrease.circle")
                             .padding(.top, DS.Spacing.xlarge)
                     }
                     ForEach(visible) { msg in

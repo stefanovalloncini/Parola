@@ -5,7 +5,7 @@ struct SummaryError: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            Label("Couldn't generate a summary", systemImage: "exclamationmark.triangle")
+            Label("Couldn't Generate a Summary", systemImage: "exclamationmark.triangle")
                 .font(DS.Font.heading)
                 .foregroundStyle(DS.Color.dangerText)
             Text(message)

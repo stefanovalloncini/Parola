@@ -26,7 +26,7 @@ struct PromptOutputSheet: View {
     @ViewBuilder private var contentBody: some View {
         if let failure = output.failure {
             ContentUnavailableView {
-                Label("Couldn't run this prompt", systemImage: "exclamationmark.triangle")
+                Label("Couldn't Run This Prompt", systemImage: "exclamationmark.triangle")
             } description: {
                 Text(verbatim: failure)
             }

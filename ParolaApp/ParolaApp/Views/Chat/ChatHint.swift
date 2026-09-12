@@ -21,7 +21,7 @@ struct ChatUnavailable: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label("Chat unavailable", systemImage: "bubble.left.and.exclamationmark.bubble.right")
+            Label("Chat Unavailable", systemImage: "bubble.left.and.exclamationmark.bubble.right")
         } description: {
             Text(message)
         }
@@ -32,7 +32,7 @@ struct ChatUnavailable: View {
 struct ChatEmpty: View {
     var body: some View {
         ContentUnavailableView {
-            Label("No transcript", systemImage: "bubble.left.and.text.bubble.right")
+            Label("No Transcript", systemImage: "bubble.left.and.text.bubble.right")
         } description: {
             Text("Open a transcript to start chatting.")
         }

@@ -856,6 +856,17 @@
         }
       }
     },
+    "Add App…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi app…"
+          }
+        }
+      }
+    },
     "Add Correction": {
       "extractionState": "manual",
       "localizations": {
@@ -973,17 +984,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aggiungi una persona…"
-          }
-        }
-      }
-    },
-    "Add app…": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aggiungi app…"
           }
         }
       }
@@ -1670,7 +1670,7 @@
         }
       }
     },
-    "Caption size": {
+    "Caption Size": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -1862,7 +1862,7 @@
         }
       }
     },
-    "Chat unavailable": {
+    "Chat Unavailable": {
       "extractionState": "manual",
       "localizations": {
         "it": {
@@ -2388,6 +2388,28 @@
         }
       }
     },
+    "Couldn't Generate a Summary": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile generare un riepilogo"
+          }
+        }
+      }
+    },
+    "Couldn't Run This Prompt": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile eseguire questo prompt"
+          }
+        }
+      }
+    },
     "Couldn't export diagnostics": {
       "extractionState": "manual",
       "localizations": {
@@ -2421,17 +2443,6 @@
         }
       }
     },
-    "Couldn't generate a summary": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossibile generare un riepilogo"
-          }
-        }
-      }
-    },
     "Couldn't import settings": {
       "extractionState": "manual",
       "localizations": {
@@ -2450,17 +2461,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Impossibile aprire il microfono"
-          }
-        }
-      }
-    },
-    "Couldn't run this prompt": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Impossibile eseguire questo prompt"
           }
         }
       }
@@ -5551,6 +5551,17 @@
         }
       }
     },
+    "No Messages": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun messaggio"
+          }
+        }
+      }
+    },
     "No Recent Files": {
       "extractionState": "manual",
       "localizations": {
@@ -5569,6 +5580,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nessun parlato rilevato"
+          }
+        }
+      }
+    },
+    "No Transcript": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna trascrizione"
           }
         }
       }
@@ -5788,17 +5810,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ancora nessun riepilogo"
-          }
-        }
-      }
-    },
-    "No transcript": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nessuna trascrizione"
           }
         }
       }
@@ -6968,6 +6979,17 @@
         }
       }
     },
+    "Re-Add": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riaggiungi"
+          }
+        }
+      }
+    },
     "Re-Extract": {
       "extractionState": "manual",
       "localizations": {
@@ -6975,17 +6997,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ri-estrai"
-          }
-        }
-      }
-    },
-    "Re-add": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Riaggiungi"
           }
         }
       }
@@ -8889,7 +8900,7 @@
         }
       }
     },
-    "Summaries need Apple Intelligence": {
+    "Summaries Need Apple Intelligence": {
       "extractionState": "manual",
       "localizations": {
         "it": {
