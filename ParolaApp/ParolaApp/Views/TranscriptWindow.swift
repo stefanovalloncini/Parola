@@ -70,21 +70,16 @@ struct TranscriptWindowView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .padding(20)
+                .padding(DS.Spacing.large)
             }
         }
     }
 
     private var header: some View {
-        HStack {
-            Text(title.isEmpty ? "Transcript" : title)
-                .font(.title3.weight(.semibold))
-            Spacer()
-            Text("\(transcript.segments.count) segments")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
+        PageHeader(
+            title: title.isEmpty ? "Transcript" : title,
+            count: SegmentCount.label(transcript.segments.count),
+            trailing: { EmptyView() }
+        )
     }
 }
