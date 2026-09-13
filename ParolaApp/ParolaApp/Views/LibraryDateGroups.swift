@@ -20,6 +20,7 @@ enum LibraryDateGroups {
     static func groups(
         for rows: [LibraryRowDisplay],
         sortOrder: LibrarySortOrder = .newest,
+        pinsFirst: Bool = true,
         now: Date = Date(),
         calendar: Calendar = .autoupdatingCurrent,
         locale: Locale = AppFormat.locale
@@ -27,7 +28,7 @@ enum LibraryDateGroups {
         guard sortOrder.isChronological else { return ungrouped(rows) }
         guard !rows.isEmpty else { return [] }
         var groups: [Group] = []
-        let pinned = rows.filter(\.pinned)
+        let pinned = pinsFirst ? rows.filter(\.pinned) : []
         if !pinned.isEmpty {
             groups.append(Group(
                 id: "pinned",
@@ -38,7 +39,7 @@ enum LibraryDateGroups {
         }
         var order: [Date] = []
         var byDay: [Date: [LibraryRowDisplay]] = [:]
-        for row in rows where !row.pinned {
+        for row in rows where !(pinsFirst && row.pinned) {
             let day = calendar.startOfDay(for: row.entry.createdAt)
             if byDay[day] == nil { order.append(day) }
             byDay[day, default: []].append(row)
@@ -73,9 +74,10 @@ enum LibraryDateGroups {
         _ groups: [Group],
         toHeight height: CGFloat,
         rowHeight: CGFloat,
-        headerHeight: CGFloat
+        headerHeight: CGFloat,
+        beforeMeasuring fallbackRows: Int = RecentEntries.homeFallback
     ) -> [Group] {
-        guard rowHeight > 0 else { return groups }
+        guard height > 0, rowHeight > 0 else { return first(fallbackRows, of: groups) }
         var remaining = height
         var kept: [Group] = []
         for group in groups {
@@ -88,8 +90,16 @@ enum LibraryDateGroups {
             if rows.count < group.rows.count { break }
         }
         // A window too short for even one row still shows one, the way it did before the headers existed.
-        if kept.isEmpty, let first = groups.first, let row = first.rows.first {
-            kept = [Group(id: first.id, title: first.title, showsTime: first.showsTime, rows: [row])]
+        return kept.isEmpty ? first(1, of: groups) : kept
+    }
+
+    private static func first(_ count: Int, of groups: [Group]) -> [Group] {
+        var remaining = max(0, count)
+        var kept: [Group] = []
+        for group in groups where remaining > 0 {
+            let rows = Array(group.rows.prefix(remaining))
+            remaining -= rows.count
+            kept.append(Group(id: group.id, title: group.title, showsTime: group.showsTime, rows: rows))
         }
         return kept
     }

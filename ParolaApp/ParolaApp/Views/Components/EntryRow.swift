@@ -52,11 +52,34 @@ enum EntrySourceKind: Equatable {
     }
 }
 
+/// What a row is tall, by density and by whether it has something to say under its title.
+enum EntryRowMetrics {
+    static let detail: CGFloat = 66
+    static let compactDetail: CGFloat = 42
+    /// The badge, not the text, is what a row with nothing to quote is as tall as.
+    static let titleOnly: CGFloat = 44
+    static let compactTitleOnly: CGFloat = 36
+    static let badgeSide: CGFloat = 28
+    /// Where a row's text starts, so a separator runs under the text instead of under the badge.
+    static let textInset: CGFloat = badgeSide + DS.Spacing.regular
+    /// Wide enough for h:mm:ss under ten hours, so the snippets of a mixed list start on the same column.
+    static let timecodeWidth: CGFloat = 52
+
+    static func height(compact: Bool, hasDetail: Bool) -> CGFloat {
+        switch (compact, hasDetail) {
+        case (false, true): return detail
+        case (true, true): return compactDetail
+        case (false, false): return titleOnly
+        case (true, false): return compactTitleOnly
+        }
+    }
+}
+
 /// The tinted square a row or a job leads with.
 struct EntryBadge: View {
     let kind: EntrySourceKind
     var isSelected: Bool = false
-    var side: CGFloat = 28
+    var side: CGFloat = EntryRowMetrics.badgeSide
 
     var body: some View {
         RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
@@ -82,26 +105,6 @@ enum EntryRowStyle {
 enum EntryRowDetail {
     case excerpt(String?)
     case snippet(AttributedString, timecode: String?, reservesTimecode: Bool)
-}
-
-/// What a row is tall, by density and by whether it has something to say under its title.
-enum EntryRowMetrics {
-    static let detail: CGFloat = 66
-    static let compactDetail: CGFloat = 42
-    /// The badge, not the text, is what a row with nothing to quote is as tall as.
-    static let titleOnly: CGFloat = 44
-    static let compactTitleOnly: CGFloat = 36
-    /// Wide enough for h:mm:ss under ten hours, so the snippets of a mixed list start on the same column.
-    static let timecodeWidth: CGFloat = 52
-
-    static func height(compact: Bool, hasDetail: Bool) -> CGFloat {
-        switch (compact, hasDetail) {
-        case (false, true): return detail
-        case (true, true): return compactDetail
-        case (false, false): return titleOnly
-        case (true, false): return compactTitleOnly
-        }
-    }
 }
 
 /// The one row every list of entries draws: Home Recent, the library lists, search results and Recently Deleted.
@@ -177,7 +180,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
             trailingActions
         }
         .padding(.vertical, compact ? DS.Spacing.tight : DS.Spacing.small)
-        .padding(.horizontal, style == .list ? 0 : DS.Spacing.small)
+        .padding(.horizontal, style == .plain ? DS.Spacing.small : 0)
         .frame(height: rowHeight, alignment: .top)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(rowBackground)

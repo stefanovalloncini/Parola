@@ -8,7 +8,8 @@ struct EmptyDropZone: View {
     @Environment(AppModel.self) private var model
     @State private var paneHeight: CGFloat = 0
     @State private var recentRowSpace: CGFloat = 0
-    @ScaledMetric(relativeTo: .body) private var recentRowHeight: CGFloat = 49
+    /// A day header costs the list what it measures: `heading` plus the space above and below it.
+    private static let recentHeaderHeight: CGFloat = 18 + DS.Spacing.regular + DS.Spacing.tight
 
     var body: some View {
         ScrollView {
@@ -151,10 +152,9 @@ struct EmptyDropZone: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    @ViewBuilder
-    private var recentSection: some View {
-        let recents = RecentEntries
-            .most(of: model.libraryEntries, limit: RecentEntries.rowsThatFit(inHeight: recentRowSpace, rowHeight: recentRowHeight))
+    private var recentGroups: [LibraryDateGroups.Group] {
+        let displays = RecentEntries
+            .most(of: model.libraryEntries, limit: RecentEntries.homeMaximum)
             .map {
                 LibraryRowDisplay(
                     entry: $0,
@@ -162,6 +162,22 @@ struct EmptyDropZone: View {
                     excerpt: model.libraryExcerpts[$0.id]
                 )
             }
+        return LibraryDateGroups.trimmed(
+            LibraryDateGroups.groups(for: displays, pinsFirst: false),
+            toHeight: recentRowSpace,
+            rowHeight: recentRowHeight,
+            headerHeight: Self.recentHeaderHeight
+        )
+    }
+
+    /// Recent rows quote their transcripts, so the tall variant is what Home has to fit.
+    private var recentRowHeight: CGFloat {
+        EntryRowMetrics.height(compact: model.sidebarDensity == "compact", hasDetail: true)
+    }
+
+    @ViewBuilder
+    private var recentSection: some View {
+        let groups = recentGroups
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             HStack(spacing: DS.Spacing.small) {
                 Text("Recent")
@@ -179,24 +195,26 @@ struct EmptyDropZone: View {
                 // A floor of one row: a short window would otherwise measure zero and clip the list away.
                 .frame(minHeight: recentRowHeight)
                 .overlay(alignment: .top) {
-                    VStack(spacing: 0) {
-                        ForEach(Array(recents.enumerated()), id: \.element.id) { index, display in
-                            RecentEntryRow(display: display)
-                            if index < recents.count - 1 {
-                                Divider()
-                                    .padding(.leading, DS.Spacing.regular)
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(groups) { group in
+                            if let title = group.title {
+                                Text(verbatim: title)
+                                    .font(DS.Font.heading)
+                                    .foregroundStyle(DS.Color.primaryText)
+                                    .padding(.top, DS.Spacing.regular)
+                                    .padding(.bottom, DS.Spacing.tight)
+                                    .accessibilityAddTraits(.isHeader)
+                            }
+                            ForEach(group.rows) { display in
+                                RecentEntryRow(display: display, showsTime: group.showsTime)
+                                if display.id != group.rows.last?.id {
+                                    Divider()
+                                        .padding(.leading, EntryRowMetrics.textInset)
+                                }
                             }
                         }
                     }
-                    .background(
-                        RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                            .fill(DS.Color.surfaceElevated)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                            .strokeBorder(DS.Color.separator.opacity(0.5), lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .clipped()
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { recentRowSpace = $0 }
@@ -290,18 +308,22 @@ private struct IntakeDropWell: View {
 private struct RecentEntryRow: View {
     @Environment(AppModel.self) private var model
     let display: LibraryRowDisplay
+    var showsTime: Bool = true
     @State private var isHovering = false
 
     var body: some View {
         Button {
             model.loadEntry(display.id)
         } label: {
-            EntryRow(display: display, style: .home, detail: .excerpt(display.excerpt))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, DS.Spacing.regular)
-                .padding(.vertical, DS.Spacing.tight)
-                .background(DS.Palette.surfaceHover.opacity(isHovering ? 1 : 0))
-                .contentShape(Rectangle())
+            EntryRow(
+                display: display,
+                style: .home,
+                detail: .excerpt(display.excerpt),
+                showsTimeOnly: showsTime
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DS.Palette.surfaceHover.opacity(isHovering ? 1 : 0))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering in

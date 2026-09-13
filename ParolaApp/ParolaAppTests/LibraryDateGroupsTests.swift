@@ -140,7 +140,19 @@ struct LibraryDateGroupsTests {
         let trimmed = LibraryDateGroups.trimmed(grouped, toHeight: 160, rowHeight: 60, headerHeight: 20)
 
         #expect(trimmed.map { $0.rows.map(\.id) } == [["a"], ["b"]])
-        #expect(LibraryDateGroups.trimmed(grouped, toHeight: 0, rowHeight: 60, headerHeight: 20)
+        #expect(LibraryDateGroups.trimmed(grouped, toHeight: 40, rowHeight: 60, headerHeight: 20)
             .map { $0.rows.map(\.id) } == [["a"]])
+    }
+
+    /// Home measures its space one frame late; until it does, the list shows the count it always did.
+    @Test("an unmeasured list falls back to a fixed number of rows")
+    func unmeasuredHeightFallsBack() {
+        let grouped = groups(
+            [row("a", "2026-09-13T09:00"), row("b", "2026-09-12T09:00"), row("c", "2026-09-12T08:00")],
+            now: "2026-09-13T10:00"
+        )
+        let fallback = LibraryDateGroups.trimmed(grouped, toHeight: 0, rowHeight: 60, headerHeight: 20, beforeMeasuring: 2)
+
+        #expect(fallback.map { $0.rows.map(\.id) } == [["a"], ["b"]])
     }
 }
