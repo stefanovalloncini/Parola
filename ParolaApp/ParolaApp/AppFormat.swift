@@ -20,10 +20,6 @@ enum AppFormat {
         date.formatted(Date.FormatStyle(date: .long, time: .shortened).locale(locale))
     }
 
-    static func relativeDate(_ date: Date, locale: Locale = AppFormat.locale) -> String {
-        date.formatted(Date.RelativeFormatStyle(presentation: .named).locale(locale))
-    }
-
     static func dayAndMonth(_ date: Date, locale: Locale = AppFormat.locale) -> String {
         date.formatted(.dateTime.month(.abbreviated).day().locale(locale))
     }

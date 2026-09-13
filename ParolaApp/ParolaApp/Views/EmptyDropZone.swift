@@ -157,19 +157,11 @@ struct EmptyDropZone: View {
     /// Recomputed on the changes that move it, never inside `body`: a row's strings cost formatters to build.
     private func recomputeRecents() {
         var cache = recentCache
-        cache.invalidate(
-            libraryVersion: model.libraryVersion,
-            sizesVersion: model.libraryBundleSizesVersion,
-            excerptsVersion: model.libraryExcerptsVersion
-        )
+        cache.invalidate(libraryVersion: model.libraryVersion, excerptsVersion: model.libraryExcerptsVersion)
         let displays = RecentEntries
             .most(of: model.libraryEntries, limit: RecentEntries.homeMaximum)
             .map {
-                cache.display(
-                    for: $0,
-                    sizeBytes: model.libraryBundleSizes[$0.id],
-                    excerpt: model.libraryExcerpts[$0.id]
-                )
+                cache.display(for: $0, excerpt: model.libraryExcerpts[$0.id])
             }
         recentCache = cache
         recentGroups = LibraryDateGroups.trimmed(
@@ -233,7 +225,6 @@ struct EmptyDropZone: View {
         .onChange(of: recentRowSpace) { _, _ in recomputeRecents() }
         .onChange(of: model.libraryVersion) { _, _ in recomputeRecents() }
         .onChange(of: model.libraryExcerptsVersion) { _, _ in recomputeRecents() }
-        .onChange(of: model.libraryBundleSizesVersion) { _, _ in recomputeRecents() }
         .onChange(of: model.sidebarDensity) { _, _ in recomputeRecents() }
     }
 }

@@ -49,14 +49,11 @@ enum LibraryEntryDisplay {
 struct LibraryRowDisplay: Identifiable {
     let entry: LibraryEntry
     let title: String
-    let timestamp: String
     let timeOfDay: String
     let shortDate: String
-    let sizeLabel: String?
     let durationLabel: String?
     let modelLabel: String?
     let languageLabel: String?
-    let lastOpened: String?
     let tooltip: String
     /// The opening of the transcript, read from the search index. nil until the index has the entry.
     let excerpt: String?
@@ -68,25 +65,18 @@ struct LibraryRowDisplay: Identifiable {
     var labels: [String] { entry.labels }
 
     /// `date` is what the row states; Recently Deleted passes the deletion, where the creation says less.
-    init(entry: LibraryEntry, sizeBytes: Int64?, excerpt: String? = nil, date: Date? = nil) {
+    init(entry: LibraryEntry, excerpt: String? = nil, date: Date? = nil) {
         let title = LibraryEntryDisplay.title(for: entry)
         let stated = date ?? entry.createdAt
         self.entry = entry
         self.title = title
         self.excerpt = excerpt
         sourceKind = EntrySourceKind(entry: entry)
-        timestamp = AppFormat.dateAndTime(stated)
         timeOfDay = AppFormat.timeOfDay(stated)
         shortDate = AppFormat.dayAndMonth(stated)
-        if let sizeBytes, sizeBytes > 0 {
-            sizeLabel = AppFormat.byteSize(sizeBytes)
-        } else {
-            sizeLabel = nil
-        }
         durationLabel = entry.durationSeconds.flatMap { $0 > 0 ? Timecode.format($0) : nil }
         modelLabel = LibraryEntryDisplay.modelName(raw: entry.modelName)
         languageLabel = LanguageDisplay.name(for: entry.language)
-        lastOpened = entry.lastOpenedAt.map { AppFormat.relativeDate($0) }
 
         var parts = [title, AppFormat.longDateAndTime(entry.createdAt)]
         if !entry.labels.isEmpty {
@@ -99,31 +89,22 @@ struct LibraryRowDisplay: Identifiable {
     }
 }
 
-/// Caches the three formatted dates a row needs, since the list rebuilds rows on every filter and sort change.
+/// Caches the strings a row needs, since the list rebuilds rows on every filter and sort change.
 struct LibraryRowDisplayCache {
     private(set) var libraryVersion = -1
-    private(set) var sizesVersion = -1
     private(set) var excerptsVersion = -1
     private(set) var displays: [LibraryEntry.ID: LibraryRowDisplay] = [:]
 
-    mutating func invalidate(libraryVersion: Int, sizesVersion: Int, excerptsVersion: Int) {
-        guard self.libraryVersion != libraryVersion
-                || self.sizesVersion != sizesVersion
-                || self.excerptsVersion != excerptsVersion else { return }
+    mutating func invalidate(libraryVersion: Int, excerptsVersion: Int) {
+        guard self.libraryVersion != libraryVersion || self.excerptsVersion != excerptsVersion else { return }
         displays.removeAll(keepingCapacity: true)
         self.libraryVersion = libraryVersion
-        self.sizesVersion = sizesVersion
         self.excerptsVersion = excerptsVersion
     }
 
-    mutating func display(
-        for entry: LibraryEntry,
-        sizeBytes: Int64?,
-        excerpt: String? = nil,
-        date: Date? = nil
-    ) -> LibraryRowDisplay {
+    mutating func display(for entry: LibraryEntry, excerpt: String? = nil, date: Date? = nil) -> LibraryRowDisplay {
         if let cached = displays[entry.id], cached.excerpt == excerpt { return cached }
-        let display = LibraryRowDisplay(entry: entry, sizeBytes: sizeBytes, excerpt: excerpt, date: date)
+        let display = LibraryRowDisplay(entry: entry, excerpt: excerpt, date: date)
         displays[entry.id] = display
         return display
     }

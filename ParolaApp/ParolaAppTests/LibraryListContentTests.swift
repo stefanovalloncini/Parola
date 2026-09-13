@@ -179,7 +179,6 @@ struct LibraryListContentTests {
         model.sidebarDensity = density
         let display = LibraryRowDisplay(
             entry: entry(id: "a", title: "Alpha", offset: 0, labels: labels),
-            sizeBytes: 1_000_000,
             excerpt: excerpt
         )
         let host = NSHostingView(
@@ -457,7 +456,7 @@ struct LibraryListContentTests {
     @Test("a search result row is the same height whatever its snippet says")
     func searchRowHoldsOneHeight() async {
         let model = await makeModel()
-        let display = LibraryRowDisplay(entry: entry(id: "a", title: "Alpha", offset: 0), sizeBytes: 1_000_000)
+        let display = LibraryRowDisplay(entry: entry(id: "a", title: "Alpha", offset: 0))
         func height(_ snippet: String, at seconds: Double? = nil) -> CGFloat {
             let match = LibrarySearchIndex.Match(
                 entryID: "a",

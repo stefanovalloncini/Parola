@@ -232,16 +232,12 @@ struct LibraryListView: View {
         var totalBytes: Int64 = 0
         var totalSeconds: Double = 0
         var cache = displayCache
-        cache.invalidate(
-            libraryVersion: model.libraryVersion,
-            sizesVersion: model.libraryBundleSizesVersion,
-            excerptsVersion: model.libraryExcerptsVersion
-        )
+        cache.invalidate(libraryVersion: model.libraryVersion, excerptsVersion: model.libraryExcerptsVersion)
         let displays = computed.map { entry -> LibraryRowDisplay in
             let size = sizes[entry.id]
             totalBytes += size ?? 0
             totalSeconds += entry.durationSeconds ?? 0
-            return cache.display(for: entry, sizeBytes: size, excerpt: model.libraryExcerpts[entry.id])
+            return cache.display(for: entry, excerpt: model.libraryExcerpts[entry.id])
         }
         displayCache = cache
         entries = displays

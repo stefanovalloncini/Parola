@@ -59,26 +59,26 @@ struct LibraryEntryDisplayTests {
             bundleURL: URL(fileURLWithPath: "/tmp/LibraryEntryDisplayTests/e.parola"),
             manifest: manifest
         )
-        return LibraryRowDisplay(entry: entry, sizeBytes: nil)
+        return LibraryRowDisplay(entry: entry)
     }
 
-    @Test("row displays are reused until the library, the bundle sizes or the excerpts move")
+    @Test("row displays are reused until the library or the excerpts move")
     func displayCacheHoldsUntilItsVersionsChange() {
         let entry = display().entry
         var cache = LibraryRowDisplayCache()
 
-        cache.invalidate(libraryVersion: 1, sizesVersion: 4, excerptsVersion: 7)
-        _ = cache.display(for: entry, sizeBytes: nil)
+        cache.invalidate(libraryVersion: 1, excerptsVersion: 7)
+        _ = cache.display(for: entry)
         #expect(cache.displays.count == 1)
 
-        cache.invalidate(libraryVersion: 1, sizesVersion: 4, excerptsVersion: 7)
+        cache.invalidate(libraryVersion: 1, excerptsVersion: 7)
         #expect(cache.displays.count == 1)
 
-        cache.invalidate(libraryVersion: 2, sizesVersion: 4, excerptsVersion: 7)
+        cache.invalidate(libraryVersion: 2, excerptsVersion: 7)
         #expect(cache.displays.isEmpty)
 
-        _ = cache.display(for: entry, sizeBytes: 2_000_000)
-        cache.invalidate(libraryVersion: 2, sizesVersion: 5, excerptsVersion: 7)
+        _ = cache.display(for: entry)
+        cache.invalidate(libraryVersion: 2, excerptsVersion: 8)
         #expect(cache.displays.isEmpty)
     }
 
@@ -88,25 +88,26 @@ struct LibraryEntryDisplayTests {
         let entry = display().entry
         var cache = LibraryRowDisplayCache()
 
-        cache.invalidate(libraryVersion: 1, sizesVersion: 1, excerptsVersion: 1)
-        #expect(cache.display(for: entry, sizeBytes: nil, excerpt: nil).excerpt == nil)
+        cache.invalidate(libraryVersion: 1, excerptsVersion: 1)
+        #expect(cache.display(for: entry, excerpt: nil).excerpt == nil)
 
-        cache.invalidate(libraryVersion: 1, sizesVersion: 1, excerptsVersion: 2)
+        cache.invalidate(libraryVersion: 1, excerptsVersion: 2)
         #expect(cache.displays.isEmpty)
-        #expect(cache.display(for: entry, sizeBytes: nil, excerpt: "Prime parole.").excerpt == "Prime parole.")
+        #expect(cache.display(for: entry, excerpt: "Prime parole.").excerpt == "Prime parole.")
     }
 
-    @Test("a cached display keeps the size it was built with")
+    @Test("a cached display is handed back rather than formatted again")
     func displayCacheReturnsTheSameRow() {
         let entry = display().entry
         var cache = LibraryRowDisplayCache()
-        cache.invalidate(libraryVersion: 1, sizesVersion: 1, excerptsVersion: 1)
+        cache.invalidate(libraryVersion: 1, excerptsVersion: 1)
 
-        let first = cache.display(for: entry, sizeBytes: 1_000_000)
-        let second = cache.display(for: entry, sizeBytes: 9_000_000)
+        let first = cache.display(for: entry, excerpt: "Prime parole.")
+        let second = cache.display(for: entry, excerpt: "Prime parole.")
 
-        #expect(first.sizeLabel == second.sizeLabel)
-        #expect(second.sizeLabel == ByteCountFormatter.string(fromByteCount: 1_000_000, countStyle: .file))
+        #expect(first.id == second.id)
+        #expect(first.title == second.title)
+        #expect(cache.displays.count == 1)
     }
 
     @Test("the row caption names the model the entry was transcribed with")
@@ -133,17 +134,14 @@ struct LibraryEntryDisplayTests {
         let turbo = display(modelName: "openai_whisper-large-v3_turbo")
         let speech = display(modelName: "apple-speech-analyzer")
         #expect(turbo.title == speech.title)
-        #expect(turbo.timestamp == speech.timestamp)
+        #expect(turbo.shortDate == speech.shortDate)
         #expect(turbo.modelLabel != speech.modelLabel)
     }
 
-    @Test("the row's relative and hover strings are formatted with the entry, not with every cell")
+    @Test("the row's hover strings are formatted with the entry, not with every cell")
     func rowStringsAreFormattedOnce() {
-        #expect(display().lastOpened == nil)
-
         let opened = date.addingTimeInterval(3600)
         let row = display(lastOpenedAt: opened, labels: ["work", "urgent"], pinned: true)
-        #expect(row.lastOpened == AppFormat.relativeDate(opened))
 
         let lines = row.tooltip.split(separator: "\n").map(String.init)
         #expect(lines.first == "Weekly sync")

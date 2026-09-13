@@ -43,8 +43,7 @@ struct LibraryDateGroupsTests {
                 id: id,
                 bundleURL: URL(fileURLWithPath: "/tmp/LibraryDateGroupsTests/\(id).parola"),
                 manifest: manifest
-            ),
-            sizeBytes: nil
+            )
         )
     }
 

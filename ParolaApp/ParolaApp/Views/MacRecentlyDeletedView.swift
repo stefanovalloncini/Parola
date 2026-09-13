@@ -454,7 +454,6 @@ struct MacRecentlyDeletedView: View {
     private func makeDisplay(for entry: LibraryEntry) -> LibraryRowDisplay {
         LibraryRowDisplay(
             entry: entry,
-            sizeBytes: nil,
             excerpt: RecentlyDeletedRow.previewText(previews[entry.id]),
             date: entry.deletedAt
         )
