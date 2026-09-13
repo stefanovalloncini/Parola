@@ -282,52 +282,16 @@ struct LibraryListView: View {
                     for: entries.map(\.id),
                     matches: model.searchMatches
                 )
-                List(entries, id: \.id, selection: $selection) { row in
-                    let entry = row.entry
-                    rowContent(for: row, showsTimestamp: showsTimestamp)
-                        .contentShape(Rectangle())
-                        .draggable(entry.bundleURL)
-                        .onTapGesture(count: 2) {
-                            model.loadEntry(entry.id)
+                List(selection: $selection) {
+                    ForEach(rowGroups) { group in
+                        Section {
+                            ForEach(group.rows) { row in
+                                listRow(row, showsTime: group.showsTime, showsTimestamp: showsTimestamp)
+                            }
+                        } header: {
+                            groupHeader(group)
                         }
-                        .contextMenu {
-                            Button("Open") {
-                                model.loadEntry(entry.id)
-                            }
-                            Button(entry.pinned ? "Unpin" : "Pin") {
-                                model.togglePinned(for: entry.id)
-                            }
-                            .accessibilityIdentifier("library.row.\(entry.id).\(entry.pinned ? "unpin" : "pin")")
-                            Menu("Move to") {
-                                ForEach(EntryCategory.allCases.filter { $0 != entry.category }, id: \.self) { target in
-                                    Button(libraryCategoryName(target)) {
-                                        model.moveEntry(entry.id, to: target)
-                                    }
-                                }
-                            }
-                            .accessibilityIdentifier("library.row.\(entry.id).moveTo")
-                            Button("Reveal in Finder") {
-                                NSWorkspace.shared.activateFileViewerSelecting([entry.bundleURL])
-                            }
-                            .accessibilityIdentifier("library.row.\(entry.id).revealInFinder")
-                            Button("Rename…") {
-                                renameDraft = entry.title
-                                renamingEntry = entry
-                            }
-                            .accessibilityIdentifier("library.row.\(entry.id).rename")
-                            Button("Delete", role: .destructive) {
-                                model.deleteEntry(entry.id)
-                            }
-                            .accessibilityIdentifier("library.row.\(entry.id).delete")
-                        }
-                        .accessibilityIdentifier("library.row.\(entry.id)")
-                        // List(.inset) indents its rows by 16pt of its own; this lands them on the 24pt gutter.
-                        .listRowInsets(EdgeInsets(
-                            top: DS.Spacing.tight,
-                            leading: DS.Spacing.small,
-                            bottom: DS.Spacing.tight,
-                            trailing: DS.Spacing.small
-                        ))
+                    }
                 }
                 .listStyle(.inset)
                 .tint(DS.Color.accent)
@@ -394,10 +358,86 @@ struct LibraryListView: View {
         .axBranch("Library")
     }
 
+    /// Groups are content, not new lists: the `List` itself stays one view across category switches.
+    private var rowGroups: [LibraryDateGroups.Group] {
+        guard searchResults == nil else { return LibraryDateGroups.ungrouped(entries, id: "results") }
+        return LibraryDateGroups.groups(for: entries, sortOrder: model.librarySortOrder)
+    }
+
     @ViewBuilder
-    private func rowContent(for row: LibraryRowDisplay, showsTimestamp: Bool) -> some View {
+    private func groupHeader(_ group: LibraryDateGroups.Group) -> some View {
+        if let title = group.title {
+            Text(verbatim: title)
+                .font(DS.Font.heading)
+                .foregroundStyle(DS.Color.primaryText)
+                .textCase(nil)
+                .listRowInsets(EdgeInsets(
+                    top: DS.Spacing.regular,
+                    leading: DS.Spacing.small,
+                    bottom: DS.Spacing.tight,
+                    trailing: DS.Spacing.small
+                ))
+                .accessibilityAddTraits(.isHeader)
+        }
+    }
+
+    private func listRow(_ row: LibraryRowDisplay, showsTime: Bool, showsTimestamp: Bool) -> some View {
+        let entry = row.entry
+        return rowContent(for: row, showsTime: showsTime, showsTimestamp: showsTimestamp)
+            .contentShape(Rectangle())
+            .draggable(entry.bundleURL)
+            .onTapGesture(count: 2) {
+                model.loadEntry(entry.id)
+            }
+            .contextMenu {
+                Button("Open") {
+                    model.loadEntry(entry.id)
+                }
+                Button(entry.pinned ? "Unpin" : "Pin") {
+                    model.togglePinned(for: entry.id)
+                }
+                .accessibilityIdentifier("library.row.\(entry.id).\(entry.pinned ? "unpin" : "pin")")
+                Menu("Move to") {
+                    ForEach(EntryCategory.allCases.filter { $0 != entry.category }, id: \.self) { target in
+                        Button(libraryCategoryName(target)) {
+                            model.moveEntry(entry.id, to: target)
+                        }
+                    }
+                }
+                .accessibilityIdentifier("library.row.\(entry.id).moveTo")
+                Button("Reveal in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([entry.bundleURL])
+                }
+                .accessibilityIdentifier("library.row.\(entry.id).revealInFinder")
+                Button("Rename…") {
+                    renameDraft = entry.title
+                    renamingEntry = entry
+                }
+                .accessibilityIdentifier("library.row.\(entry.id).rename")
+                Button("Delete", role: .destructive) {
+                    model.deleteEntry(entry.id)
+                }
+                .accessibilityIdentifier("library.row.\(entry.id).delete")
+            }
+            .accessibilityIdentifier("library.row.\(entry.id)")
+            // List(.inset) indents its rows by 16pt of its own; this lands them on the 24pt gutter.
+            .listRowInsets(EdgeInsets(
+                top: DS.Spacing.tight,
+                leading: DS.Spacing.small,
+                bottom: DS.Spacing.tight,
+                trailing: DS.Spacing.small
+            ))
+    }
+
+    @ViewBuilder
+    private func rowContent(for row: LibraryRowDisplay, showsTime: Bool, showsTimestamp: Bool) -> some View {
         if searchResults == nil {
-            EntryRow(display: row, detail: .excerpt(row.excerpt), isSelected: selection.contains(row.id))
+            EntryRow(
+                display: row,
+                detail: .excerpt(row.excerpt),
+                isSelected: selection.contains(row.id),
+                showsTimeOnly: showsTime
+            )
         } else {
             SearchResultRow(
                 display: row,
