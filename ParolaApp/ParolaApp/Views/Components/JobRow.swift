@@ -81,13 +81,16 @@ struct JobRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovering = false
 
+    /// Only the sidebar's selection is a solid accent fill; the pages wash theirs, where onAccent would vanish.
+    private var onAccent: Bool { isSelected && compact }
+
     var body: some View {
         HStack(alignment: .top, spacing: DS.Spacing.regular) {
-            EntryBadge(kind: EntrySourceKind(url: job.url), isSelected: isSelected)
+            EntryBadge(kind: EntrySourceKind(url: job.url), isSelected: onAccent)
             VStack(alignment: .leading, spacing: DS.Spacing.hair) {
                 Text(job.url.lastPathComponent)
                     .font(DS.Font.bodyStrong)
-                    .foregroundStyle(DS.Color.primaryText)
+                    .foregroundStyle(onAccent ? DS.Color.onAccent : DS.Color.primaryText)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 statusLine
@@ -123,7 +126,7 @@ struct JobRow: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
-        .foregroundStyle(BatchJobStatus.tint(for: job.status))
+        .foregroundStyle(onAccent ? DS.Color.onAccent : BatchJobStatus.tint(for: job.status))
     }
 
     @ViewBuilder
@@ -161,7 +164,7 @@ struct JobRow: View {
 
     @ViewBuilder
     private var rowBackground: some View {
-        if isSelected {
+        if isSelected, !compact {
             RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                 .fill(DS.Color.accent.opacity(0.12))
                 .overlay(

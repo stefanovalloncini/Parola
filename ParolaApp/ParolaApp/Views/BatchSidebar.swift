@@ -24,7 +24,8 @@ struct BatchSidebar: View {
 
             List(selection: $model.selectedBatchJobID) {
                 ForEach(model.batchJobs) { job in
-                    JobRow(job: job, compact: true).tag(BatchJob.ID?.some(job.id))
+                    JobRow(job: job, isSelected: model.selectedBatchJobID == job.id, compact: true)
+                        .tag(BatchJob.ID?.some(job.id))
                 }
             }
             .listStyle(.sidebar)
