@@ -144,22 +144,54 @@ struct QueueView: View {
         if !matching.isEmpty {
             VStack(alignment: .leading, spacing: DS.Spacing.small) {
                 SectionCaption(title)
-                VStack(spacing: 1) {
+                VStack(spacing: 0) {
                     ForEach(matching) { job in
-                        QueueRow(job: job, isFocused: focusedJob == job.id)
-                            .focusable(true)
-                            .focusEffectDisabled()
-                            .focused($focusedJob, equals: job.id)
-                            .onKeyPress(.return) {
-                                handleReturn(job: job); return .handled
-                            }
-                            .onKeyPress(.delete) {
-                                handleDelete(job: job); return .handled
-                            }
+                        jobRow(job)
+                        if job.id != matching.last?.id {
+                            Divider()
+                                .padding(.leading, DS.Spacing.small + EntryRowMetrics.textInset)
+                        }
                     }
                 }
             }
         }
+    }
+
+    private func jobRow(_ job: BatchJob) -> some View {
+        JobRow(job: job, isSelected: focusedJob == job.id)
+            .focusable(true)
+            .focusEffectDisabled()
+            .focused($focusedJob, equals: job.id)
+            .onKeyPress(.return) {
+                handleReturn(job: job); return .handled
+            }
+            .onKeyPress(.delete) {
+                handleDelete(job: job); return .handled
+            }
+            .contextMenu {
+                switch job.status {
+                case .pending, .transcribing:
+                    Button("Cancel Batch") { model.cancelAllInFlightBatchJobs() }
+                        .axLeaf("Row.ContextMenuItem.CancelBatch")
+                case .failed, .cancelled:
+                    Button("Retry") { model.retryBatchJob(job.id) }
+                        .axLeaf("Row.ContextMenuItem.Retry")
+                case .done:
+                    Button("Open") { model.openBatchJobTranscript(job.id) }
+                        .axLeaf("Row.ContextMenuItem.Open")
+                    Button("Reveal in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([job.url])
+                    }
+                    .axLeaf("Row.ContextMenuItem.RevealInFinder")
+                }
+            }
+            .onDrag {
+                guard case .done = job.status else { return NSItemProvider() }
+                let exports = model.batchExportFormats
+                    .map { job.url.deletingPathExtension().appendingPathExtension($0.fileExtension) }
+                    .filter { FileManager.default.fileExists(atPath: $0.path) }
+                return NSItemProvider(object: (exports.first ?? job.url) as NSURL)
+            }
     }
 
     private func handleReturn(job: BatchJob) {
