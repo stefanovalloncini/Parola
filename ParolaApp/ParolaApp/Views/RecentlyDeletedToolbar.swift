@@ -77,7 +77,7 @@ struct RecentlyDeletedToolbar: View {
         HStack(spacing: DS.Spacing.regular) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Recently Deleted")
-                    .font(DS.Font.title2)
+                    .font(DS.Font.title)
                 if !model.deletedEntries.isEmpty {
                     subtitle
                         .font(DS.Font.secondary)

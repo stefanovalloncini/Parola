@@ -33,7 +33,6 @@ struct TypeScaleTests {
     @Test("every legacy name resolves to a tier")
     func legacyNamesAreAliases() {
         #expect(DS.Font.largeTitle == DS.Font.display)
-        #expect(DS.Font.title2 == DS.Font.heading)
         #expect(DS.Font.title3 == DS.Font.heading)
         #expect(DS.Font.callout == DS.Font.secondary)
         #expect(DS.Font.subheadline == DS.Font.secondary)

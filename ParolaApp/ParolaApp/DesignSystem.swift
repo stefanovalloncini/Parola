@@ -61,8 +61,6 @@ enum DS {
         static let titleRegular = SwiftUI.Font.system(size: 22)
         static let titleRounded = SwiftUI.Font.system(size: 22, weight: .semibold, design: .rounded)
 
-        static let title2 = heading
-        static let title2Regular = SwiftUI.Font.system(size: 15)
         static let title3 = heading
         static let title3Regular = SwiftUI.Font.system(size: 15)
         static let title3Medium = SwiftUI.Font.system(size: 15, weight: .medium)
