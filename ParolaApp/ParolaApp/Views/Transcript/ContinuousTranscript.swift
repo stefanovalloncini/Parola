@@ -58,15 +58,13 @@ struct ContinuousChunks: View {
     @State private var highlightedSegmentID: TranscriptSegment.ID?
     @State private var gate = BuildGate()
     @State private var buildTask: Task<Void, Never>?
-    @ScaledMetric(relativeTo: .body) private var compactSize: CGFloat = 14
-    @ScaledMetric(relativeTo: .body) private var comfortableSize: CGFloat = 18
 
     var body: some View {
-        LazyVStack(alignment: .leading, spacing: model.transcriptCompact ? DS.Spacing.small : DS.Spacing.medium) {
+        LazyVStack(alignment: .leading, spacing: DS.Spacing.regular) {
             ForEach(chunks) { chunk in
                 Text(chunk.text)
-                    .font(.system(size: model.transcriptCompact ? compactSize : comfortableSize, weight: .regular))
-                    .lineSpacing(model.transcriptCompact ? 3 : 6)
+                    .font(model.transcriptCompact ? DS.Font.transcriptCompact : DS.Font.transcript)
+                    .lineSpacing(model.transcriptCompact ? 3 : 5)
                     .textSelection(.enabled)
                     // Definite height; without it the inspector's constraint pass re-typesets the chunk Text in a loop (main-thread freeze on long audio).
                     .fixedSize(horizontal: false, vertical: true)
@@ -231,13 +229,13 @@ struct ContinuousChunks: View {
             guard !body.isEmpty else { continue }
             let pauseBreak = TranscriptParagraphs.breaksParagraph(after: lastEnd, start: seg.start, pause: paragraphPause)
             lastEnd = seg.end
-            let baseColor: Color? = useSpeakerColor ? seg.speaker.map(DS.speakerColor(for:)) : nil
+            let speakerTint: Color? = useSpeakerColor ? seg.speaker.map(DS.speakerColor(for:)) : nil
             if let label = useSpeakerColor ? SegmentCard.speakerLabel(for: seg.speaker) : nil,
                label != shownSpeaker {
                 closeChunk()
                 var heading = AttributedString(label + "\n")
-                heading.foregroundColor = baseColor
-                heading.inlinePresentationIntent = .stronglyEmphasized
+                heading.foregroundColor = speakerTint
+                heading.font = DS.Font.bodyStrong
                 offset += heading.characters.count
                 text.append(heading)
                 shownSpeaker = label
@@ -251,12 +249,11 @@ struct ContinuousChunks: View {
             }
             let startsLine = text.characters.isEmpty || text.characters.last == "\n"
             var piece = AttributedString(startsLine ? body : " " + body)
-            let displayColor = baseColor ?? primaryText
-            piece.foregroundColor = displayColor
+            piece.foregroundColor = primaryText
             piece.link = URL(string: "parola-seek://\(seg.id)")
             piece.underlineStyle = nil
             let length = piece.characters.count
-            runs[seg.id] = SegmentRun(offsets: offset..<offset + length, baseColor: displayColor)
+            runs[seg.id] = SegmentRun(offsets: offset..<offset + length, baseColor: primaryText)
             offset += length
             text.append(piece)
             segmentCount += 1

@@ -26,45 +26,17 @@ struct SegmentCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            speakerLine
             content
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: DS.Spacing.small) {
-                Button {
-                    if model.player != nil { model.seek(to: segment) }
-                } label: {
-                    Text(Timecode.format(segment.start))
-                        .font(model.monospacedTimestamps ? DS.Font.captionMono : DS.Font.secondary)
-                        .foregroundStyle(isCurrent ? DS.Color.highlight : DS.Color.secondaryText)
-                }
-                .buttonStyle(.plain)
-                .help("Play from here")
-                .axLeaf("Card.Button.SeekTimestamp")
-                // A speakerless segment renders no chip, so the timestamp carries the assign menu too.
-                .contextMenu { assignSpeakerMenu }
-                if let rawSpeaker = segment.speaker, let speaker = Self.speakerLabel(for: rawSpeaker) {
-                    Text(speaker)
-                        .font(DS.Font.secondary)
-                        .foregroundStyle(DS.speakerColor(for: rawSpeaker))
-                        .onHover { hovering in
-                            hoveredSpeaker.wrappedValue = hovering ? rawSpeaker : nil
-                        }
-                        .contextMenu {
-                            Button("Rename \(speaker)…") {
-                                draftSpeakerName = speaker
-                                renamingSpeaker = true
-                            }
-                            assignSpeakerMenu
-                        }
-                }
-                if !qcIssues.isEmpty {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(DS.Font.secondary)
-                        .foregroundStyle(DS.Color.secondaryText)
-                        .help(Self.qcHelpText(qcIssues))
-                        .accessibilityLabel("Subtitle warnings")
-                        .axLeaf("Card.Badge.SubtitleQC")
-                }
+            if !qcIssues.isEmpty {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(DS.Font.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
+                    .help(Self.qcHelpText(qcIssues))
+                    .accessibilityLabel("Subtitle warnings")
+                    .axLeaf("Card.Badge.SubtitleQC")
             }
             if let note = model.currentSegmentNote(for: segment.id), !note.isEmpty {
                 noteRow(text: note)
@@ -134,6 +106,39 @@ struct SegmentCard: View {
                     model.setSegmentNote(nil, segmentID: segment.id)
                 }
             }
+        }
+    }
+
+    private var speakerLine: some View {
+        HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
+            if let rawSpeaker = segment.speaker, let speaker = Self.speakerLabel(for: rawSpeaker) {
+                Text(speaker)
+                    .font(DS.Font.bodyStrong)
+                    .foregroundStyle(DS.speakerColor(for: rawSpeaker))
+                    .onHover { hovering in
+                        hoveredSpeaker.wrappedValue = hovering ? rawSpeaker : nil
+                    }
+                    .contextMenu {
+                        Button("Rename \(speaker)…") {
+                            draftSpeakerName = speaker
+                            renamingSpeaker = true
+                        }
+                        assignSpeakerMenu
+                    }
+            }
+            Spacer(minLength: DS.Spacing.small)
+            Button {
+                if model.player != nil { model.seek(to: segment) }
+            } label: {
+                Text(Timecode.format(segment.start))
+                    .font(model.monospacedTimestamps ? DS.Font.mono : DS.Font.secondary)
+                    .foregroundStyle(isCurrent ? DS.Color.highlight : DS.Color.secondaryText)
+            }
+            .buttonStyle(.plain)
+            .help("Play from here")
+            .axLeaf("Card.Button.SeekTimestamp")
+            // A speakerless segment renders no chip, so the timestamp carries the assign menu too.
+            .contextMenu { assignSpeakerMenu }
         }
     }
 

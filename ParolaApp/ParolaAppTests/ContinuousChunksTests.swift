@@ -308,6 +308,18 @@ struct ContinuousChunksTests {
         #expect(links == ["parola-seek://0", "parola-seek://1", "parola-seek://2", "parola-seek://3"])
     }
 
+    /// Tinting a whole paragraph made a three-speaker transcript read as three colours of body text.
+    @Test("the speaker tint stays on the name; the paragraph under it is body text")
+    func onlyTheHeadingCarriesTheSpeakerTint() {
+        let segments = [segment(0, "Hi.", speaker: "Alice"), segment(1, "Yo.", speaker: "Bob")]
+        let chunks = build(segments, useSpeakerColor: true)
+        let heading = chunks[0].text.runs.first
+        #expect(heading?.foregroundColor == DS.speakerColor(for: "Alice"))
+        #expect(heading?.font == DS.Font.bodyStrong)
+        #expect(chunks[0].runs[0]?.baseColor == DS.Color.primaryText)
+        #expect(chunks[1].runs[1]?.baseColor == DS.Color.primaryText)
+    }
+
     @Test("heading runs carry no seek link")
     func headingRunsCarryNoLink() {
         let segments = [segment(0, "Hi.", speaker: "Alice"), segment(1, "Yo.", speaker: "Bob")]
@@ -340,14 +352,14 @@ struct ContinuousChunksTests {
         #expect(linkColor(of: 1, in: chunks[0]) == .red)
     }
 
-    @Test("de-highlighting restores the speaker display color, not nil")
-    func dehighlightRestoresSpeakerColor() {
+    @Test("de-highlighting restores the body colour, not the speaker tint")
+    func dehighlightRestoresBodyColor() {
         let segments = [segment(0, "Hi.", speaker: "Alice"), segment(1, "Yo.", speaker: "Bob")]
         var chunks = build(segments, useSpeakerColor: true)
         move(&chunks, from: nil, to: 0)
         move(&chunks, from: 0, to: 1)
         #expect(linkColor(of: 0, in: chunks[0]) != nil)
-        #expect(linkColor(of: 0, in: chunks[0]) == DS.speakerColor(for: "Alice"))
+        #expect(linkColor(of: 0, in: chunks[0]) == DS.Color.primaryText)
         #expect(linkColor(of: 1, in: chunks[1]) == .red)
     }
 
