@@ -252,7 +252,7 @@ extension AppModel {
     }
 
     nonisolated static func recoveredRecordingTitle(startedAt: Date) -> String {
-        "Recording \(startedAt.formatted(date: .abbreviated, time: .shortened)) (recovered)"
+        "Recording \(AppFormat.dateAndTime(startedAt)) (recovered)"
     }
 
     // MARK: - Inflight sweep

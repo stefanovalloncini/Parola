@@ -32,6 +32,10 @@ enum AppFormat {
         date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale))
     }
 
+    static func percent(_ fraction: Double, fractionDigits: Int = 0, locale: Locale = AppFormat.locale) -> String {
+        fraction.formatted(.percent.precision(.fractionLength(fractionDigits)).locale(locale))
+    }
+
     /// A rounded span for a header line, not a timecode: the largest two units that carry
     /// meaning, so a list of short memos reads in seconds and a day of meetings in hours.
     static func duration(seconds: Double, locale: Locale = AppFormat.locale) -> String? {

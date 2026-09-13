@@ -112,7 +112,7 @@ struct DictationPane: View {
                         Slider(value: $model.dictationHudOpacity, in: 0.4...1.0)
                             .frame(width: 160)
                             .axLeaf("Dictation.Slider.HudOpacity")
-                        Text("\(Int(model.dictationHudOpacity * 100))%")
+                        Text(AppFormat.percent(model.dictationHudOpacity))
                             .font(DS.Font.mono)
                             .foregroundStyle(DS.Color.secondaryText)
                             .frame(width: 40, alignment: .trailing)

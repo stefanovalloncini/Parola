@@ -93,14 +93,14 @@ struct QueueRow: View {
     }
 
     private var statusLine: String {
-        let percent = Int((job.progress * 100).rounded())
         switch job.status {
         case .pending:
             return "Queued"
         case .transcribing:
-            return percent > 0 ? "Transcribing… \(percent)%" : "Transcribing…"
+            guard job.progress >= 0.005 else { return "Transcribing…" }
+            return "Transcribing… \(AppFormat.percent(job.progress))"
         case .cancelled:
-            let fraction = job.progress.formatted(.percent.precision(.fractionLength(1)))
+            let fraction = AppFormat.percent(job.progress, fractionDigits: 1)
             return "Progress: \(fraction) – Cancelled"
         case .failed:
             return "Failed: \(job.error ?? "unknown reason")"

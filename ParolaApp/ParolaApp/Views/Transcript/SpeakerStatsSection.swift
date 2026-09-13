@@ -27,7 +27,7 @@ private struct StatRow: View {
                 Text(stats.speaker)
                     .font(DS.Font.body.weight(.medium))
                 Spacer()
-                Text("\(Int((stats.share * 100).rounded()))%")
+                Text(AppFormat.percent(stats.share))
                     .font(DS.Font.mono)
                     .foregroundStyle(DS.Color.secondaryText)
             }

@@ -2138,7 +2138,7 @@ final class AppModel {
     /// Live takes capture to a temp file whose UUID name would otherwise leak into the
     /// library title when auto-titling is unavailable.
     nonisolated static func liveRecordingTitle(category: EntryCategory, endedAt: Date) -> String {
-        let stamp = endedAt.formatted(date: .abbreviated, time: .shortened)
+        let stamp = AppFormat.dateAndTime(endedAt)
         return category == .meeting ? "Meeting \(stamp)" : "Recording \(stamp)"
     }
 

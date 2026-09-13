@@ -25,6 +25,18 @@ struct AppFormatTests {
         #expect(AppFormat.day(moment, locale: italian).contains("lug"))
     }
 
+    /// R1 read "6,4 MB" beside "12 Sep 2026" as two locales on one card; both come from AppFormat,
+    /// so the seam that decides it is the injected locale, not the call site.
+    @Test("one locale drives every number on a card, whatever the system is set to")
+    func oneLocaleDrivesTheWholeCard() {
+        let english = Locale(identifier: "en_US")
+        #expect(AppFormat.byteSize(6_400_000, locale: english) == "6.4 MB")
+        #expect(AppFormat.byteSize(6_400_000, locale: Locale(identifier: "it_IT")) == "6,4 MB")
+        #expect(AppFormat.percent(0.45, locale: english) == "45%")
+        #expect(AppFormat.percent(0.455, fractionDigits: 1, locale: english) == "45.5%")
+        #expect(AppFormat.percent(0.455, fractionDigits: 1, locale: Locale(identifier: "it_IT")) == "45,5%")
+    }
+
     @Test("a span picks the units that carry meaning and hides the rest")
     func durationPicksItsUnits() {
         let english = Locale(identifier: "en_US")

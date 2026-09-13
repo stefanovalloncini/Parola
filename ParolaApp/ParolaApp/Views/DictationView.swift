@@ -282,7 +282,7 @@ struct DictationView: View {
 
     private var label: String {
         if let progress = controller.modelDownloadProgress {
-            return String(localized: "Downloading model… \(Int(progress * 100))%")
+            return String(localized: "Downloading model… \(AppFormat.percent(progress))")
         }
         switch state {
         case .idle: return String(localized: "Ready")

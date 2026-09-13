@@ -49,7 +49,7 @@ struct BatchJobDetail: View {
         case .pending: return String(localized: "Queued")
         case .transcribing:
             if job.progress > 0 {
-                return String(localized: "Transcribing \(Int(job.progress * 100))%")
+                return String(localized: "Transcribing \(AppFormat.percent(job.progress))")
             }
             return String(localized: "Transcribing…")
         case .done: return String(localized: "Complete")

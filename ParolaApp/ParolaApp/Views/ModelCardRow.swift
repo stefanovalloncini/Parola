@@ -196,7 +196,7 @@ struct ModelCardRow: View {
 
     private func progressPercent(_ value: Double) -> String {
         let clamped = max(0, min(1, value))
-        return "\(Int(clamped * 100))%"
+        return AppFormat.percent(clamped)
     }
 }
 

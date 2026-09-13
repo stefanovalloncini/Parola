@@ -38,7 +38,7 @@ struct DSProgressBar: View {
 
     private var accessibilityValue: Text {
         guard let fraction else { return Text("In progress") }
-        return Text(fraction.formatted(.percent.precision(.fractionLength(0))))
+        return Text(AppFormat.percent(fraction))
     }
 
     @ViewBuilder

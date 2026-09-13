@@ -82,6 +82,6 @@ struct ConfidenceSection: View {
     }
 
     private func percentLabel(_ value: Double) -> String {
-        "\(Int((value * 100).rounded()))%"
+        AppFormat.percent(value)
     }
 }

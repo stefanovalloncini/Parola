@@ -23,7 +23,7 @@ struct ProgressPane: View {
                 .frame(width: 280)
             if let progress {
                 HStack(spacing: DS.Spacing.tight) {
-                    Text("\(Int(progress * 100))%")
+                    Text(AppFormat.percent(progress))
                         .contentTransition(.numericText())
                     if let etaLabel {
                         Text(verbatim: "·")

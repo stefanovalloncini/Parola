@@ -118,7 +118,7 @@ struct TranscribingPane: View {
                 .transition(.opacity)
         } else if let progress {
             HStack(spacing: DS.Spacing.tight) {
-                Text("\(Int(progress * 100))%")
+                Text(AppFormat.percent(progress))
                     .contentTransition(.numericText())
                     .animation(reduceMotion ? nil : DS.Motion.progress, value: progress)
                 if let etaDeadline {
