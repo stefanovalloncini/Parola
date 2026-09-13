@@ -392,7 +392,7 @@ struct LibraryListView: View {
     @ViewBuilder
     private func rowContent(for row: LibraryRowDisplay, showsTimestamp: Bool) -> some View {
         if searchResults == nil {
-            LibraryRow(display: row, isSelected: selection.contains(row.id))
+            EntryRow(display: row, detail: .excerpt(row.excerpt), isSelected: selection.contains(row.id))
         } else {
             SearchResultRow(
                 display: row,
@@ -594,130 +594,5 @@ private func libraryCategoryName(_ category: EntryCategory) -> LocalizedStringKe
     case .transcription: return "Transcriptions"
     case .meeting: return "Meetings"
     case .dictation: return "Dictations"
-    }
-}
-
-struct LibraryRow: View {
-    enum Style {
-        case library
-        case home
-    }
-
-    let display: LibraryRowDisplay
-    var style: Style = .library
-    var isSelected: Bool = false
-
-    @Environment(AppModel.self) private var model
-    @Environment(\.dynamicTypeSize) private var typeSize
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    private static let compactHeight: CGFloat = 37
-    private static let regularHeight: CGFloat = 41
-    @State private var isHovering = false
-    private var compact: Bool { model.sidebarDensity == "compact" }
-
-    /// The palette's secondary is a fixed grey; on the accent fill of a selected row only the system's flips with it.
-    private var secondaryStyle: Color {
-        isSelected ? .secondary : DS.Color.secondaryText
-    }
-
-    /// Declaring the height keeps NSTableView off its uncached automatic-row-height path; accessibility sizes outgrow the constant, so they go back to measuring.
-    private var rowHeight: CGFloat? {
-        guard style == .library, !typeSize.isAccessibilitySize else { return nil }
-        return compact ? Self.compactHeight : Self.regularHeight
-    }
-
-    /// Home reuses the row in a narrower column, and a compact list trades the last-opened stamp for height.
-    private var metaParts: [String?] {
-        [
-            display.timestamp,
-            display.durationLabel,
-            display.modelLabel,
-            display.sizeLabel,
-            display.languageLabel,
-            style == .library && !compact
-                ? display.lastOpened.map { String(localized: "Last opened: \($0)") }
-                : nil,
-        ]
-    }
-
-    var body: some View {
-        HStack(spacing: DS.Spacing.regular) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
-                    if display.pinned {
-                        Image(systemName: "pin.fill")
-                            .font(DS.Font.caption2)
-                            .foregroundStyle(DS.Color.accent)
-                    }
-                    Text(display.title)
-                        .font(DS.Font.bodyStrong)
-                        .foregroundStyle(DS.Color.primaryText)
-                        .lineLimit(1)
-                    if display.noteCount > 0 {
-                        HStack(spacing: 2) {
-                            Image(systemName: "note.text")
-                                .font(DS.Font.caption2)
-                            Text("\(display.noteCount)")
-                                .font(DS.Font.caption2Medium)
-                        }
-                        .foregroundStyle(DS.Color.accentText)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(
-                            Capsule().fill(DS.Color.accentWash)
-                        )
-                    }
-                }
-                MetaLine(metaParts, tint: secondaryStyle)
-            }
-            Spacer(minLength: DS.Spacing.regular)
-            labelChips
-        }
-        .padding(.vertical, compact ? DS.Spacing.tight / 2 : DS.Spacing.tight)
-        .frame(height: rowHeight)
-        .background(rowBackground)
-        .help(display.tooltip)
-        .animation(reduceMotion ? nil : DS.Motion.rowState, value: isHovering)
-        .onHover { isHovering = $0 }
-    }
-
-    /// Home draws its own hover behind the whole button, so only the library list's rows carry one here.
-    @ViewBuilder
-    private var rowBackground: some View {
-        if style == .library, isHovering, !isSelected {
-            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                .fill(DS.Palette.surfaceHover)
-        }
-    }
-
-    @ViewBuilder
-    private var labelChips: some View {
-        let shown = Array(display.labels.prefix(2))
-        let hidden = display.labels.count - shown.count
-        if !shown.isEmpty {
-            HStack(spacing: 4) {
-                ForEach(shown, id: \.self) { label in
-                    chip(Text(verbatim: label))
-                }
-                if hidden > 0 {
-                    chip(Text(verbatim: "+\(hidden)"))
-                }
-            }
-            .help(display.labels.joined(separator: ", "))
-        }
-    }
-
-    /// On a selected row the accent fill is the backdrop, so the chip wears a veil of the foreground.
-    private func chip(_ label: Text) -> some View {
-        label
-            .font(DS.Font.secondary)
-            .foregroundStyle(secondaryStyle)
-            .lineLimit(1)
-            .chipChrome(
-                isSelected: isSelected,
-                size: .regular,
-                selectedFill: DS.Color.onAccent.opacity(0.18),
-                border: isSelected ? DS.Color.onAccent.opacity(0.35) : nil
-            )
     }
 }

@@ -50,6 +50,7 @@ struct LibraryRowDisplay: Identifiable {
     let entry: LibraryEntry
     let title: String
     let timestamp: String
+    let timeOfDay: String
     let shortDate: String
     let sizeLabel: String?
     let durationLabel: String?
@@ -57,17 +58,23 @@ struct LibraryRowDisplay: Identifiable {
     let languageLabel: String?
     let lastOpened: String?
     let tooltip: String
+    /// The opening of the transcript, read from the search index. nil until the index has the entry.
+    let excerpt: String?
+    let sourceKind: EntrySourceKind
 
     var id: LibraryEntry.ID { entry.id }
     var pinned: Bool { entry.pinned }
     var noteCount: Int { entry.segmentNotes.count }
     var labels: [String] { entry.labels }
 
-    init(entry: LibraryEntry, sizeBytes: Int64?) {
+    init(entry: LibraryEntry, sizeBytes: Int64?, excerpt: String? = nil) {
         let title = LibraryEntryDisplay.title(for: entry)
         self.entry = entry
         self.title = title
+        self.excerpt = excerpt
+        sourceKind = EntrySourceKind(entry: entry)
         timestamp = AppFormat.dateAndTime(entry.createdAt)
+        timeOfDay = AppFormat.timeOfDay(entry.createdAt)
         shortDate = AppFormat.dayAndMonth(entry.createdAt)
         if let sizeBytes, sizeBytes > 0 {
             sizeLabel = AppFormat.byteSize(sizeBytes)
@@ -103,9 +110,9 @@ struct LibraryRowDisplayCache {
         self.sizesVersion = sizesVersion
     }
 
-    mutating func display(for entry: LibraryEntry, sizeBytes: Int64?) -> LibraryRowDisplay {
+    mutating func display(for entry: LibraryEntry, sizeBytes: Int64?, excerpt: String? = nil) -> LibraryRowDisplay {
         if let cached = displays[entry.id] { return cached }
-        let display = LibraryRowDisplay(entry: entry, sizeBytes: sizeBytes)
+        let display = LibraryRowDisplay(entry: entry, sizeBytes: sizeBytes, excerpt: excerpt)
         displays[entry.id] = display
         return display
     }

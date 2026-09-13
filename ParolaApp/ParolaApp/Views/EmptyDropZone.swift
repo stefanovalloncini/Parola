@@ -290,7 +290,7 @@ private struct RecentEntryRow: View {
         Button {
             model.loadEntry(display.id)
         } label: {
-            LibraryRow(display: display, style: .home)
+            EntryRow(display: display, style: .home, detail: .excerpt(display.excerpt))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, DS.Spacing.regular)
                 .padding(.vertical, DS.Spacing.tight)

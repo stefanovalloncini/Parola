@@ -167,12 +167,23 @@ struct LibraryListContentTests {
     /// Library rows are laid out in the sidebar, not the transcript pane; the width is this suite's own.
     private static let measuredRowWidth: CGFloat = 520
 
-    private func rowHeight(density: String, style: LibraryRow.Style) async -> CGFloat {
+    private func rowHeight(
+        density: String,
+        style: EntryRowStyle,
+        excerpt: String? = nil
+    ) async -> CGFloat {
         let model = await makeModel()
         model.sidebarDensity = density
-        let display = LibraryRowDisplay(entry: entry(id: "a", title: "Alpha", offset: 0), sizeBytes: 1_000_000)
-        let host = NSHostingView(rootView: LibraryRow(display: display, style: style).environment(model))
-        host.frame = NSRect(x: 0, y: 0, width: Self.measuredRowWidth, height: 200)
+        let display = LibraryRowDisplay(
+            entry: entry(id: "a", title: "Alpha", offset: 0),
+            sizeBytes: 1_000_000,
+            excerpt: excerpt
+        )
+        let host = NSHostingView(
+            rootView: EntryRow(display: display, style: style, detail: .excerpt(excerpt))
+                .environment(model)
+                .frame(width: Self.measuredRowWidth)
+        )
         host.layoutSubtreeIfNeeded()
         return host.fittingSize.height
     }
@@ -181,14 +192,19 @@ struct LibraryListContentTests {
     /// is pinned to. Comparing the two is what can fail: asserting the library row's own constant cannot.
     @Test("the declared library row height is the height the row would have measured")
     func rowHeightMatchesMeasuredContent() async {
-        let comfortable = await rowHeight(density: "comfortable", style: .home)
-        let compact = await rowHeight(density: "compact", style: .home)
+        let excerpt = String(repeating: "parola ", count: 60)
+        let comfortable = await rowHeight(density: "comfortable", style: .home, excerpt: excerpt)
+        let compact = await rowHeight(density: "compact", style: .home, excerpt: excerpt)
+        let titleOnly = await rowHeight(density: "comfortable", style: .home)
+        let compactTitleOnly = await rowHeight(density: "compact", style: .home)
 
-        #expect(comfortable == 41)
-        #expect(compact == 37)
-        #expect(await rowHeight(density: "comfortable", style: .library) == comfortable)
-        #expect(await rowHeight(density: "compact", style: .library) == compact)
-        #expect(comfortable - compact == DS.Spacing.tight)
+        #expect(comfortable == EntryRowMetrics.detail)
+        #expect(compact == EntryRowMetrics.compactDetail)
+        #expect(titleOnly == EntryRowMetrics.titleOnly)
+        #expect(compactTitleOnly == EntryRowMetrics.compactTitleOnly)
+        #expect(await rowHeight(density: "comfortable", style: .list, excerpt: excerpt) == comfortable)
+        #expect(await rowHeight(density: "compact", style: .list, excerpt: excerpt) == compact)
+        #expect(await rowHeight(density: "comfortable", style: .list) == titleOnly)
     }
 
     private func mixedLibrary() -> [LibraryEntry] {
