@@ -1,7 +1,9 @@
 import Foundation
 
 enum SegmentCount {
-    static func label(_ count: Int) -> String {
-        count == 1 ? "1 segment" : "\(count) segments"
+    static func label(_ count: Int, locale: Locale = AppFormat.locale) -> String {
+        count == 1
+            ? String(localized: "1 segment", locale: locale)
+            : String(localized: "\(count) segments", locale: locale)
     }
 }

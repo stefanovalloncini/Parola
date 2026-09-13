@@ -107,7 +107,9 @@ struct JobRowTests {
     @Test("a job says where it is, in words")
     func statusReadsInWords() {
         #expect(BatchJobStatus.text(for: job(.pending)) == "Queued")
-        #expect(BatchJobStatus.text(for: job(.transcribing, progress: 0.32)).contains("32"))
+        let running = BatchJobStatus.text(for: job(.transcribing, progress: 0.32))
+        #expect(running.contains("32"))
+        #expect(running.hasPrefix("Transcribing · "))
         #expect(BatchJobStatus.text(for: job(.cancelled, progress: 0.4)) == "Cancelled")
         #expect(BatchJobStatus.text(for: job(.failed, error: "no audio track")) == "Failed: no audio track")
         #expect(BatchJobStatus.text(for: job(.failed)) == "Failed")

@@ -520,6 +520,17 @@
         }
       }
     },
+    "1 segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 segmento"
+          }
+        }
+      }
+    },
     "1 selected": {
       "extractionState": "manual",
       "localizations": {
@@ -9496,17 +9507,6 @@
         }
       }
     },
-    "Transcribing %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trascrizione %@"
-          }
-        }
-      }
-    },
     "Transcribing %@…": {
       "extractionState": "manual",
       "localizations": {
@@ -9525,6 +9525,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione batch…"
+          }
+        }
+      }
+    },
+    "Transcribing · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione · %@"
           }
         }
       }

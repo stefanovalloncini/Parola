@@ -10,7 +10,7 @@ enum BatchJobStatus {
         case .transcribing:
             // Under a percent the rounding would print "0%", which reads as stuck rather than starting.
             guard job.progress >= 0.01 else { return String(localized: "Transcribing…") }
-            return String(localized: "Transcribing \(AppFormat.percent(job.progress))")
+            return String(localized: "Transcribing · \(AppFormat.percent(job.progress))")
         case .cancelled:
             return String(localized: "Cancelled")
         case .failed:
