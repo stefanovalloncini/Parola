@@ -8,7 +8,7 @@ struct EmptyStateView<Actions: View>: View {
     @ViewBuilder let actions: Actions
     private let hasActions: Bool
 
-    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 40
+    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 44
 
     init(
         systemImage: String,
@@ -30,7 +30,7 @@ struct EmptyStateView<Actions: View>: View {
                 .foregroundStyle(DS.Color.secondaryText.opacity(0.55))
                 .padding(.bottom, DS.Spacing.tight)
             Text(title)
-                .font(DS.Font.display)
+                .font(DS.Font.title)
                 .foregroundStyle(DS.Color.primaryText)
             if let message {
                 Text(message)
