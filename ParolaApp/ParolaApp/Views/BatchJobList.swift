@@ -76,34 +76,41 @@ struct BatchJobList: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
-                LazyVStack(spacing: DS.Spacing.small) {
+                LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {
                     if sortOrder == .status {
                         ForEach(statusGroups(from: matches), id: \.status) { group in
                             VStack(alignment: .leading, spacing: DS.Spacing.small) {
-                                Text(group.title)
-                                    .font(DS.Font.secondary.weight(.semibold))
-                                    .foregroundStyle(DS.Color.secondaryText)
+                                SectionCaption(Text(verbatim: group.title))
                                     .padding(.top, DS.Spacing.small)
-                                ForEach(group.jobs) { job in
-                                    rowWithKeyboardSupport(job: job)
-                                }
+                                rows(group.jobs)
                             }
                         }
                     } else {
-                        ForEach(sorted(matches)) { job in
-                            rowWithKeyboardSupport(job: job)
-                        }
+                        rows(sorted(matches))
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, DS.Spacing.large)
                 .padding(.bottom, DS.Spacing.large)
             }
         }
     }
 
+    private func rows(_ jobs: [BatchJob]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(jobs) { job in
+                rowWithKeyboardSupport(job: job)
+                if job.id != jobs.last?.id {
+                    Divider()
+                        .padding(.leading, DS.Spacing.small + EntryRowMetrics.textInset)
+                }
+            }
+        }
+    }
+
     private func rowWithKeyboardSupport(job: BatchJob) -> some View {
         let isPending = job.status == .pending
-        return BatchJobRow(job: job)
+        return JobRow(job: job, isSelected: model.selectedBatchJobID == job.id)
             .focusable(true)
             .focusEffectDisabled()
             .focused($focusedJob, equals: job.id)

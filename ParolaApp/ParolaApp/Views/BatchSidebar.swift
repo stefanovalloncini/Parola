@@ -24,7 +24,7 @@ struct BatchSidebar: View {
 
             List(selection: $model.selectedBatchJobID) {
                 ForEach(model.batchJobs) { job in
-                    BatchRow(job: job).tag(BatchJob.ID?.some(job.id))
+                    JobRow(job: job, compact: true).tag(BatchJob.ID?.some(job.id))
                 }
             }
             .listStyle(.sidebar)
@@ -32,60 +32,6 @@ struct BatchSidebar: View {
             .onChange(of: model.selectedBatchJobID) { _, newValue in
                 if let id = newValue { model.selectBatchJob(id) }
             }
-        }
-    }
-}
-
-private struct BatchRow: View {
-    let job: BatchJob
-
-    var body: some View {
-        HStack(spacing: DS.Spacing.regular) {
-            statusGlyph
-                .frame(width: 18)
-            VStack(alignment: .leading, spacing: DS.Spacing.tight) {
-                Text(job.url.lastPathComponent)
-                    .font(DS.Font.body)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(subtitle)
-                    .font(DS.Font.secondary)
-                    .foregroundStyle(DS.Color.secondaryText)
-            }
-            Spacer()
-        }
-        .padding(.vertical, DS.Spacing.tight)
-    }
-
-    @ViewBuilder
-    private var statusGlyph: some View {
-        switch job.status {
-        case .pending:
-            Image(systemName: "circle")
-                .foregroundStyle(DS.Color.secondaryText)
-        case .transcribing:
-            ProgressView().controlSize(.small)
-        case .done:
-            Image(systemName: "checkmark")
-                .foregroundStyle(DS.Color.accent)
-        case .failed:
-            Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(DS.Color.dangerText)
-        case .cancelled:
-            Image(systemName: "xmark.circle")
-                .foregroundStyle(DS.Color.secondaryText)
-        }
-    }
-
-    private var subtitle: String {
-        switch job.status {
-        case .pending: return "Pending"
-        case .transcribing: return "Transcribing…"
-        case .done:
-            let count = job.transcript?.segments.count ?? 0
-            return SegmentCount.label(count)
-        case .failed: return job.error ?? "Failed"
-        case .cancelled: return "Cancelled"
         }
     }
 }
