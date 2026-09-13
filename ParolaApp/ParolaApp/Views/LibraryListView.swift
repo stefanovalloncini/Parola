@@ -169,25 +169,6 @@ enum LibraryListContent {
         return String(localized: "\(count) matches", locale: locale)
     }
 
-    static func categoryName(_ category: EntryCategory, locale: Locale = AppFormat.locale) -> String {
-        switch category {
-        case .transcription: return String(localized: "Transcription", locale: locale)
-        case .meeting: return String(localized: "Meeting", locale: locale)
-        case .dictation: return String(localized: "Dictation", locale: locale)
-        }
-    }
-
-    static func resultMeta(
-        category: EntryCategory,
-        date: String,
-        matches: Int,
-        locale: Locale = AppFormat.locale
-    ) -> String {
-        var parts = [categoryName(category, locale: locale), date]
-        if matches > 0 { parts.append(matchesLabel(matches, locale: locale)) }
-        return parts.joined(separator: " · ")
-    }
-
     static func rows(
         from entries: [LibraryEntry],
         category: EntryCategory?,
