@@ -9474,6 +9474,17 @@
         }
       }
     },
+    "Transcribing %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione %@"
+          }
+        }
+      }
+    },
     "Transcribing %@…": {
       "extractionState": "manual",
       "localizations": {
@@ -9481,17 +9492,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione %@…"
-          }
-        }
-      }
-    },
-    "Transcribing %lld%%": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Trascrizione %lld%%"
           }
         }
       }
