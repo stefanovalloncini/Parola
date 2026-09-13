@@ -32,7 +32,7 @@ struct RuleEnabledFilterChips: View {
                     filter = option
                 } label: {
                     Text(option.title)
-                        .font(.caption.weight(.medium))
+                        .font(DS.Font.caption)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .foregroundStyle(filter == option ? Color.white : Color.primary.opacity(0.85))

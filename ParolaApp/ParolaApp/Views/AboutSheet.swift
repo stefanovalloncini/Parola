@@ -62,16 +62,18 @@ struct AboutInfoView: View {
                 creditRow(title: "Transcription", value: "WhisperKit · FluidAudio Parakeet · Apple Speech")
                 creditRow(title: "Local LLM", value: "Apple Foundation Models")
                 creditRow(title: "Auto-update", value: "Sparkle")
-                creditRow(title: "Models on disk", value: modelsOnDiskLabel)
+                if let modelsOnDiskLabel {
+                    creditRow(title: "Models on disk", value: modelsOnDiskLabel)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .task { model.refreshModelList() }
     }
 
-    private var modelsOnDiskLabel: String {
+    private var modelsOnDiskLabel: String? {
         let summary = model.modelsOnDiskSummary
-        if summary.bytes == 0 { return "—" }
+        guard summary.bytes > 0 else { return nil }
         return "\(summary.count) · \(AppFormat.byteSize(summary.bytes))"
     }
 

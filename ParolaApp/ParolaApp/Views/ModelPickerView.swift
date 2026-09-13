@@ -26,7 +26,7 @@ struct ModelPickerView: View {
                 let filtered = filteredGroups
                 if filtered.isEmpty {
                     Text("No models match")
-                        .font(.caption2.weight(.semibold))
+                        .font(DS.Font.caption)
                         .foregroundStyle(DS.Color.secondaryText)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
@@ -109,7 +109,7 @@ struct ModelPickerView: View {
     private var installedOnlyToggle: some View {
         Toggle(isOn: $installedOnly) {
             Text("Installed only")
-                .font(.caption)
+                .font(DS.Font.secondary)
         }
         .toggleStyle(.switch)
         .controlSize(.mini)

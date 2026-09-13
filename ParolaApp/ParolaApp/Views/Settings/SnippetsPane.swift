@@ -16,7 +16,7 @@ struct SnippetsPane: View {
                     InlineEmptyText("No snippets yet")
                 } else if visible.isEmpty {
                     HStack {
-                        Text("No snippets match.").foregroundStyle(DS.Color.secondaryText).font(.body)
+                        Text("No snippets match.").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
                         Spacer()
                     }
                     .padding(16)

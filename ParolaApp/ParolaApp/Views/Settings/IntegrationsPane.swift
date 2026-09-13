@@ -39,9 +39,9 @@ private struct ToolStatusRow: View {
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: available ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                         .foregroundStyle(available ? Color.green : Color.orange)
-                    Text(verbatim: name).font(.body.weight(.semibold))
+                    Text(verbatim: name).font(DS.Font.bodyStrong)
                     Text(available ? "Installed" : "Not installed")
-                        .font(.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
                     Spacer()
                     if !available {
@@ -61,12 +61,12 @@ private struct ToolStatusRow: View {
                     }
                 }
                 Text(description)
-                    .font(.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 if let error {
                     Text(error)
-                        .font(.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.dangerText)
                         .fixedSize(horizontal: false, vertical: true)
                 }

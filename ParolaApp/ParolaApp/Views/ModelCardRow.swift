@@ -23,9 +23,9 @@ struct ModelCardRow: View {
             iconTile
             VStack(alignment: .leading, spacing: 6) {
                 Text(variant.displayName)
-                    .font(.headline)
+                    .font(DS.Font.heading)
                 Text(meta)
-                    .font(.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
                 if !chips.isEmpty {
                     HStack(spacing: 6) {
@@ -79,14 +79,14 @@ struct ModelCardRow: View {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
                 Text("Deleting…")
-                    .font(.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
             }
         } else {
             switch kind {
             case .active:
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.title2)
+                    .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.accent)
                     .accessibilityLabel("Active model")
             case .installed:
@@ -94,7 +94,7 @@ struct ModelCardRow: View {
                     if let deleteAction {
                         Button(action: deleteAction) {
                             Image(systemName: "trash")
-                                .font(.callout.weight(.semibold))
+                                .font(DS.Font.bodyStrong)
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(DS.Color.secondaryText)
@@ -127,7 +127,7 @@ struct ModelCardRow: View {
                     DSProgressBar(value: progress)
                         .frame(width: 80)
                     Text(progressPercent(progress))
-                        .font(.caption.monospacedDigit())
+                        .font(DS.Font.mono)
                         .foregroundStyle(DS.Color.secondaryText)
                     if let cancelAction {
                         Button(action: cancelAction) {
@@ -220,7 +220,7 @@ struct ModelTagChip: View {
 
     var body: some View {
         Text(label)
-            .font(.caption2.weight(.semibold))
+            .font(DS.Font.caption)
             .foregroundStyle(text)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)

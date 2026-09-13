@@ -16,7 +16,7 @@ struct CorrectionsPane: View {
                     InlineEmptyText("No corrections yet")
                 } else if visible.isEmpty {
                     HStack {
-                        Text("No corrections match.").foregroundStyle(DS.Color.secondaryText).font(.body)
+                        Text("No corrections match.").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
                         Spacer()
                     }
                     .padding(16)

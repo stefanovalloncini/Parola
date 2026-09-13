@@ -21,7 +21,7 @@ struct InfoInspector: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.large) {
             InspectorSection(title: "Properties") {
-                InfoRow(icon: "clock", label: "Audio duration", value: durationLabel)
+                InfoRow(icon: "clock", label: "Audio duration", value: durationLabel, numeric: true)
                 InfoRow(icon: "calendar", label: "Created", value: dateLabel(entry?.createdAt))
                 if let updated = entry?.updatedAt {
                     InfoRow(icon: "calendar.badge.clock", label: "Updated", value: dateLabel(updated))
@@ -34,15 +34,15 @@ struct InfoInspector: View {
                 if let engineLabel {
                     InfoRow(icon: "cpu", label: "Engine", value: engineLabel)
                 }
-                InfoRow(icon: "character", label: "Characters", value: "\(charCount)")
-                InfoRow(icon: "text.word.spacing", label: "Words", value: "\(wordCount)")
-                InfoRow(icon: "text.alignleft", label: "Sentences", value: "\(sentenceCount)")
-                InfoRow(icon: "book", label: "Reading time", value: readingTimeLabel)
+                InfoRow(icon: "character", label: "Characters", value: "\(charCount)", numeric: true)
+                InfoRow(icon: "text.word.spacing", label: "Words", value: "\(wordCount)", numeric: true)
+                InfoRow(icon: "text.alignleft", label: "Sentences", value: "\(sentenceCount)", numeric: true)
+                InfoRow(icon: "book", label: "Reading time", value: readingTimeLabel, numeric: true)
                 if speakerCount > 0 {
-                    InfoRow(icon: "person.2", label: "Speakers", value: "\(speakerCount)")
+                    InfoRow(icon: "person.2", label: "Speakers", value: "\(speakerCount)", numeric: true)
                 }
                 if fillerCount > 0 {
-                    InfoRow(icon: "exclamationmark.bubble", label: "Filler words", value: "\(fillerCount)")
+                    InfoRow(icon: "exclamationmark.bubble", label: "Filler words", value: "\(fillerCount)", numeric: true)
                 }
             }
 
@@ -90,8 +90,8 @@ struct InfoInspector: View {
         LanguageDisplay.name(for: model.transcript?.language) ?? String(localized: "Auto")
     }
 
-    private var modelLabel: String {
-        guard let modelName = model.transcript?.modelName else { return "—" }
+    private var modelLabel: String? {
+        guard let modelName = model.transcript?.modelName else { return nil }
         return AppModel.modelLabel(modelName)
     }
 
@@ -103,14 +103,12 @@ struct InfoInspector: View {
         return variant.engineID.displayName
     }
 
-    private var durationLabel: String {
-        guard let d = model.transcript?.durationSeconds else { return "—" }
-        return Timecode.format(d.rounded())
+    private var durationLabel: String? {
+        model.transcript?.durationSeconds.map { Timecode.format($0.rounded()) }
     }
 
-    private func dateLabel(_ date: Date?) -> String {
-        guard let date else { return "—" }
-        return AppFormat.dateAndTime(date)
+    private func dateLabel(_ date: Date?) -> String? {
+        date.map { AppFormat.dateAndTime($0) }
     }
 
     private var charCount: Int { derived.text.charCount }
@@ -121,8 +119,10 @@ struct InfoInspector: View {
 
     private var fillerCount: Int { derived.text.fillerCount }
 
-    private var readingTimeLabel: String {
-        ReadingTime.label(forMinutes: ReadingTime.minutes(forWordCount: wordCount))
+    private var readingTimeLabel: String? {
+        let minutes = ReadingTime.minutes(forWordCount: wordCount)
+        guard minutes > 0 else { return nil }
+        return ReadingTime.label(forMinutes: minutes)
     }
 
     private var sentenceCount: Int { derived.text.sentenceCount }
@@ -133,21 +133,29 @@ struct InfoInspector: View {
 struct InfoRow: View {
     let icon: String
     let label: LocalizedStringKey
-    let value: String
+    let value: String?
+    /// Counts, timecodes and sizes take the mono tier so the column of values lines up; names do not.
+    var numeric: Bool = false
 
     var body: some View {
-        HStack(spacing: DS.Spacing.small) {
-            Image(systemName: icon)
-                .foregroundStyle(DS.Color.secondaryText)
-                .frame(width: 16)
-            Text(label).foregroundStyle(.primary)
-            Spacer()
-            Text(value)
-                .foregroundStyle(DS.Color.secondaryText)
-                .lineLimit(1)
-                .truncationMode(.middle)
+        // A fact the document does not carry is left out: an em dash reads as a placeholder nobody designed.
+        if let value, !value.isEmpty {
+            HStack(spacing: DS.Spacing.small) {
+                Image(systemName: icon)
+                    .font(DS.Font.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
+                    .frame(width: 16)
+                Text(label)
+                    .font(DS.Font.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
+                Spacer()
+                Text(value)
+                    .font(numeric ? DS.Font.mono : DS.Font.body)
+                    .foregroundStyle(DS.Color.primaryText)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
         }
-        .font(DS.Font.body)
     }
 }
 

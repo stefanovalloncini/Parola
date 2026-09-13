@@ -67,7 +67,7 @@ struct ConfidenceSection: View {
                 Spacer(minLength: 0)
                 if let value = SegmentConfidence.average(for: seg) {
                     Text(percentLabel(value))
-                        .font(DS.Font.secondary.monospacedDigit())
+                        .font(DS.Font.mono)
                         .foregroundStyle(DS.Color.secondaryText)
                 }
             }

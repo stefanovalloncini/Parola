@@ -28,7 +28,7 @@ private struct StatRow: View {
                     .font(DS.Font.body.weight(.medium))
                 Spacer()
                 Text("\(Int((stats.share * 100).rounded()))%")
-                    .font(DS.Font.secondary.monospacedDigit())
+                    .font(DS.Font.mono)
                     .foregroundStyle(DS.Color.secondaryText)
             }
             HStack(spacing: 12) {
@@ -36,7 +36,7 @@ private struct StatRow: View {
                 Label("\(stats.characterCount)", systemImage: "character")
                 Label(durationLabel, systemImage: "clock")
             }
-            .font(DS.Font.secondary.monospacedDigit())
+            .font(DS.Font.mono)
             .foregroundStyle(DS.Color.secondaryText)
             .labelStyle(.titleAndIcon)
         }

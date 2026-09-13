@@ -85,7 +85,7 @@ struct AutomationPane: View {
                     VStack(alignment: .leading, spacing: 8) {
                         if let path = Self.resolvedBinaryPath {
                             Text(path)
-                                .font(.system(.caption, design: .monospaced))
+                                .font(DS.Font.mono)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                                 .foregroundStyle(DS.Color.secondaryText)
@@ -104,7 +104,7 @@ struct AutomationPane: View {
                             }
                             #if DEBUG
                             Text("Run `swift build --product parola-mcp` in ParolaCore and relaunch.")
-                                .font(.system(.caption, design: .monospaced))
+                                .font(DS.Font.mono)
                                 .foregroundStyle(DS.Color.secondaryText)
                             #else
                             Text("This build doesn't include parola-mcp. Reinstall from the official DMG, or build it from the Parola source.")
@@ -124,7 +124,7 @@ struct AutomationPane: View {
                                 .foregroundStyle(DS.Color.secondaryText)
                             ScrollView {
                                 Text(snippet)
-                                    .font(.system(.caption, design: .monospaced))
+                                    .font(DS.Font.mono)
                                     .textSelection(.enabled)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(10)

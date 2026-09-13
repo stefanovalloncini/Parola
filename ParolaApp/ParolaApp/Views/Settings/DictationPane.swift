@@ -113,7 +113,7 @@ struct DictationPane: View {
                             .frame(width: 160)
                             .axLeaf("Dictation.Slider.HudOpacity")
                         Text("\(Int(model.dictationHudOpacity * 100))%")
-                            .font(.system(.caption, design: .monospaced))
+                            .font(DS.Font.mono)
                             .foregroundStyle(DS.Color.secondaryText)
                             .frame(width: 40, alignment: .trailing)
                     }

@@ -33,7 +33,7 @@ struct AboutPane: View {
 
             if ManagedConfiguration.shared.isActive {
                 Text("Some features are managed by your deployment.")
-                    .font(.caption)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
                     .axLeaf("About.Text.ManagedNote")
             }

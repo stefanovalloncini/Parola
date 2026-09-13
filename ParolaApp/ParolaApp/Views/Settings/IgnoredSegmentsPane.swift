@@ -23,7 +23,7 @@ struct IgnoredSegmentsPane: View {
                     InlineEmptyText("No patterns yet")
                 } else if displayedRules.isEmpty {
                     HStack {
-                        Text("No matches").foregroundStyle(DS.Color.secondaryText).font(.body)
+                        Text("No matches").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
                         Spacer()
                     }
                     .padding(16)

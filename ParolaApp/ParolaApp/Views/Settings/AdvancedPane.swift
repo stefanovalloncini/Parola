@@ -11,7 +11,7 @@ struct AdvancedPane: View {
             SettingsSection("Model storage") {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(model.cacheDirectoryDisplayPath)
-                        .font(.system(.caption, design: .monospaced))
+                        .font(DS.Font.mono)
                         .lineLimit(1)
                         .truncationMode(.head)
                         .foregroundStyle(DS.Color.secondaryText)

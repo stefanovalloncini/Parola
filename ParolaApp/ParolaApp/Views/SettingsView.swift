@@ -343,7 +343,9 @@ struct SettingRow<Trailing: View>: View {
             }
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    titleText.font(DS.Font.subheadline)
+                    titleText
+                        .font(DS.Font.body)
+                        .foregroundStyle(DS.Color.primaryText)
                     if let descriptionText {
                         descriptionText
                             .font(DS.Font.secondary)
