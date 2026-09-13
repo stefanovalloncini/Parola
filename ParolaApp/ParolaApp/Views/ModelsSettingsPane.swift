@@ -87,7 +87,6 @@ struct ModelsSettingsPane: View {
     private var usageCard: some View {
         VStack(spacing: 0) {
             StorageRow()
-            Divider()
             modelsUsageRow
             Divider()
             libraryUsageRow
@@ -98,13 +97,17 @@ struct ModelsSettingsPane: View {
         )
     }
 
+    @ViewBuilder
     private var modelsUsageRow: some View {
         let summary = model.modelsOnDiskSummary
-        return UsageRow(
-            icon: "cpu",
-            label: "Models on disk:",
-            value: "\(summary.count) installed · \(AppFormat.byteSize(summary.bytes))"
-        )
+        if summary.bytes > 0 {
+            Divider()
+            UsageRow(
+                icon: "cpu",
+                label: "Models on disk:",
+                value: "\(summary.count) installed · \(AppFormat.byteSize(summary.bytes))"
+            )
+        }
     }
 
     private var libraryUsageRow: some View {
