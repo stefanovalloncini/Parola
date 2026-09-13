@@ -1,8 +1,6 @@
 import SwiftUI
 
-/// The one uppercase caption that heads a group of rows: sidebar sections, inspector sections,
-/// list section headers. `tint` is for the few captions that carry their own colour — a decay
-/// bucket, a chip on a dark scrim — everything else takes the secondary text colour.
+/// The one uppercase caption that heads a group of rows; `tint` is for the few that carry their own colour.
 struct SectionCaption: View {
     private let text: Text
     private let tint: Color?

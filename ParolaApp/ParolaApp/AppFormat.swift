@@ -36,8 +36,7 @@ enum AppFormat {
         fraction.formatted(.percent.precision(.fractionLength(fractionDigits)).locale(locale))
     }
 
-    /// A rounded span for a header line, not a timecode: the largest two units that carry
-    /// meaning, so a list of short memos reads in seconds and a day of meetings in hours.
+    /// A rounded span for a header line, not a timecode: the largest two units that carry meaning.
     static func duration(seconds: Double, locale: Locale = AppFormat.locale) -> String? {
         let total = Int(max(0, seconds).rounded())
         guard total > 0 else { return nil }

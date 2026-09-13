@@ -34,13 +34,8 @@ enum DS {
         static let liveTranscriptMinHeight: CGFloat = 180
     }
 
-    /// The app's type scale. Sizes are ours rather than the system text styles, so a tier means the
-    /// same thing on every surface: `display` 28 semibold for empty-state titles and big numbers,
-    /// `title` 22 semibold for page and sheet titles, `heading` 15 semibold for section and card
-    /// titles, `body` 13 with `bodyStrong` 13 medium for row titles, `secondary` 12 for every
-    /// meta line, `caption` 11 medium for uppercase captions, badges and chips, `mono` 12 for
-    /// timecodes, sizes and counts, `transcript` 15 (`transcriptCompact` 13) for reading text, and
-    /// `timer` 22 for a live readout.
+    /// Eleven fixed tiers, ours rather than the system text styles, so a tier means the same thing
+    /// on every surface. Pick by role — page title, section heading, row title, meta line, caption.
     enum Font {
         static let display = SwiftUI.Font.system(size: 28, weight: .semibold)
         static let title = SwiftUI.Font.system(size: 22, weight: .semibold)

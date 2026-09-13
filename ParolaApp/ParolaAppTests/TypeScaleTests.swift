@@ -30,20 +30,36 @@ struct TypeScaleTests {
         #expect(height(DS.Font.transcriptCompact) == height(DS.Font.body))
     }
 
-    @Test("every legacy name resolves to a tier")
-    func legacyNamesAreAliases() {
-        #expect(DS.Font.largeTitle == DS.Font.display)
-        #expect(DS.Font.title3 == DS.Font.heading)
-        #expect(DS.Font.callout == DS.Font.secondary)
-        #expect(DS.Font.subheadline == DS.Font.secondary)
-        #expect(DS.Font.caption2 == DS.Font.caption)
-        #expect(DS.Font.captionMedium == DS.Font.caption)
-        #expect(DS.Font.bodyEmphasized == DS.Font.bodyStrong)
-        #expect(DS.Font.bodyMedium == DS.Font.bodyStrong)
-        #expect(DS.Font.calloutMedium == DS.Font.bodyStrong)
-        #expect(DS.Font.subheadlineEmphasized == DS.Font.bodyStrong)
-        for mono in [DS.Font.bodyMono, DS.Font.calloutMono, DS.Font.subheadlineMono, DS.Font.captionMono, DS.Font.caption2Mono] {
-            #expect(mono == DS.Font.mono)
+    /// Width as well as height: two tiers can share a line height and differ in weight or design.
+    private func measured(_ font: Font) -> CGSize {
+        NSHostingView(rootView: Text(verbatim: "Hxg 019").font(font)).fittingSize
+    }
+
+    @Test("every legacy name renders as the tier it aliases")
+    func legacyNamesRenderAsTheirTier() {
+        // The measurement has to be able to fail: weight and design both move it.
+        #expect(measured(DS.Font.body) != measured(DS.Font.bodyStrong))
+        #expect(measured(DS.Font.secondary) != measured(DS.Font.mono))
+
+        let aliases: [(Comment, Font, Font)] = [
+            ("largeTitle", DS.Font.largeTitle, DS.Font.display),
+            ("title3", DS.Font.title3, DS.Font.heading),
+            ("callout", DS.Font.callout, DS.Font.secondary),
+            ("subheadline", DS.Font.subheadline, DS.Font.secondary),
+            ("caption2", DS.Font.caption2, DS.Font.caption),
+            ("captionMedium", DS.Font.captionMedium, DS.Font.caption),
+            ("bodyEmphasized", DS.Font.bodyEmphasized, DS.Font.bodyStrong),
+            ("bodyMedium", DS.Font.bodyMedium, DS.Font.bodyStrong),
+            ("calloutMedium", DS.Font.calloutMedium, DS.Font.bodyStrong),
+            ("subheadlineEmphasized", DS.Font.subheadlineEmphasized, DS.Font.bodyStrong),
+            ("bodyMono", DS.Font.bodyMono, DS.Font.mono),
+            ("calloutMono", DS.Font.calloutMono, DS.Font.mono),
+            ("subheadlineMono", DS.Font.subheadlineMono, DS.Font.mono),
+            ("captionMono", DS.Font.captionMono, DS.Font.mono),
+            ("caption2Mono", DS.Font.caption2Mono, DS.Font.mono),
+        ]
+        for (name, alias, tier) in aliases {
+            #expect(measured(alias) == measured(tier), name)
         }
     }
 

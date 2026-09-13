@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// The facts a row states about itself, joined by a middot into one line. One `Text`, not a stack
-/// of them, so the line truncates as a whole instead of dropping a fact at a time.
+/// One `Text`, not a stack of them, so a row's meta line truncates whole instead of losing a fact.
 struct MetaLine: View {
     private let text: String
     private let tint: Color?
