@@ -106,6 +106,7 @@ struct JobRow: View {
         .padding(.horizontal, compact ? 0 : DS.Spacing.small)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(rowBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
         .contentShape(Rectangle())
         .animation(reduceMotion ? nil : DS.Motion.rowState, value: isHovering)
         .onHover { isHovering = $0 }
