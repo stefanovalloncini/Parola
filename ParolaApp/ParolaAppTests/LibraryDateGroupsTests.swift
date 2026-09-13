@@ -144,6 +144,27 @@ struct LibraryDateGroupsTests {
             .map { $0.rows.map(\.id) } == [["a"]])
     }
 
+    /// A tall window is not an invitation to render the whole library into Home's feed.
+    @Test("a window with room to spare still stops at the maximum")
+    func aTallWindowStopsAtTheMaximum() {
+        let rows = (0..<40).map { row("e\($0)", "2026-09-13T09:00") }
+        let trimmed = LibraryDateGroups.trimmed(
+            groups(rows, now: "2026-09-13T10:00"),
+            toHeight: 8000,
+            rowHeight: 60,
+            headerHeight: 20
+        )
+
+        #expect(trimmed.reduce(0) { $0 + $1.rows.count } == RecentEntries.homeMaximum)
+        #expect(LibraryDateGroups.trimmed(
+            groups(rows, now: "2026-09-13T10:00"),
+            toHeight: 8000,
+            rowHeight: 60,
+            headerHeight: 20,
+            atMost: 3
+        ).reduce(0) { $0 + $1.rows.count } == 3)
+    }
+
     /// Home measures its space one frame late; until it does, the list shows the count it always did.
     @Test("an unmeasured list falls back to a fixed number of rows")
     func unmeasuredHeightFallsBack() {

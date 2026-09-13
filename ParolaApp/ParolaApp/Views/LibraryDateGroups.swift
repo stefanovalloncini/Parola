@@ -75,18 +75,21 @@ enum LibraryDateGroups {
         toHeight height: CGFloat,
         rowHeight: CGFloat,
         headerHeight: CGFloat,
-        beforeMeasuring fallbackRows: Int = RecentEntries.homeFallback
+        beforeMeasuring fallbackRows: Int = RecentEntries.homeFallback,
+        atMost maximumRows: Int = RecentEntries.homeMaximum
     ) -> [Group] {
-        guard height > 0, rowHeight > 0 else { return first(fallbackRows, of: groups) }
+        guard height > 0, rowHeight > 0 else { return first(min(fallbackRows, maximumRows), of: groups) }
+        var rowsLeft = maximumRows
         var remaining = height
         var kept: [Group] = []
         for group in groups {
             if group.title != nil { remaining -= headerHeight }
-            let fits = Int(max(0, remaining / rowHeight).rounded(.down))
+            let fits = min(Int(max(0, remaining / rowHeight).rounded(.down)), rowsLeft)
             guard fits > 0 else { break }
             let rows = Array(group.rows.prefix(fits))
             kept.append(Group(id: group.id, title: group.title, showsTime: group.showsTime, rows: rows))
             remaining -= CGFloat(rows.count) * rowHeight
+            rowsLeft -= rows.count
             if rows.count < group.rows.count { break }
         }
         // A window too short for even one row still shows one, the way it did before the headers existed.

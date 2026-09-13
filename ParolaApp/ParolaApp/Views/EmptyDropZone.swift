@@ -8,6 +8,8 @@ struct EmptyDropZone: View {
     @Environment(AppModel.self) private var model
     @State private var paneHeight: CGFloat = 0
     @State private var recentRowSpace: CGFloat = 0
+    @State private var recentGroups: [LibraryDateGroups.Group] = []
+    @State private var recentCache = LibraryRowDisplayCache()
     /// A day header costs the list what it measures: `heading` plus the space above and below it.
     private static let recentHeaderHeight: CGFloat = 18 + DS.Spacing.regular + DS.Spacing.tight
 
@@ -152,17 +154,25 @@ struct EmptyDropZone: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var recentGroups: [LibraryDateGroups.Group] {
+    /// Recomputed on the changes that move it, never inside `body`: a row's strings cost formatters to build.
+    private func recomputeRecents() {
+        var cache = recentCache
+        cache.invalidate(
+            libraryVersion: model.libraryVersion,
+            sizesVersion: model.libraryBundleSizesVersion,
+            excerptsVersion: model.libraryExcerptsVersion
+        )
         let displays = RecentEntries
             .most(of: model.libraryEntries, limit: RecentEntries.homeMaximum)
             .map {
-                LibraryRowDisplay(
-                    entry: $0,
+                cache.display(
+                    for: $0,
                     sizeBytes: model.libraryBundleSizes[$0.id],
                     excerpt: model.libraryExcerpts[$0.id]
                 )
             }
-        return LibraryDateGroups.trimmed(
+        recentCache = cache
+        recentGroups = LibraryDateGroups.trimmed(
             LibraryDateGroups.groups(for: displays, pinsFirst: false),
             toHeight: recentRowSpace,
             rowHeight: recentRowHeight,
@@ -219,6 +229,12 @@ struct EmptyDropZone: View {
                 .clipped()
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { recentRowSpace = $0 }
         }
+        .onAppear { recomputeRecents() }
+        .onChange(of: recentRowSpace) { _, _ in recomputeRecents() }
+        .onChange(of: model.libraryVersion) { _, _ in recomputeRecents() }
+        .onChange(of: model.libraryExcerptsVersion) { _, _ in recomputeRecents() }
+        .onChange(of: model.libraryBundleSizesVersion) { _, _ in recomputeRecents() }
+        .onChange(of: model.sidebarDensity) { _, _ in recomputeRecents() }
     }
 }
 
