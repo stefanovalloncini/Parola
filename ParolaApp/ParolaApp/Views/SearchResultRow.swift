@@ -73,7 +73,7 @@ struct SearchResultRow: View {
             }
             Text(snippetText)
                 .font(DS.Font.body)
-                .foregroundStyle(DS.Color.primaryText)
+                .foregroundStyle(secondaryStyle)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }

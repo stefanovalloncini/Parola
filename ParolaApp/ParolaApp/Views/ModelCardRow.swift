@@ -86,7 +86,7 @@ struct ModelCardRow: View {
             switch kind {
             case .active:
                 Image(systemName: "checkmark.circle.fill")
-                    .font(DS.Font.heading)
+                    .font(DS.Font.title)
                     .foregroundStyle(DS.Color.accent)
                     .accessibilityLabel("Active model")
             case .installed:

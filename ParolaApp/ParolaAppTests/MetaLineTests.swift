@@ -1,3 +1,4 @@
+import SwiftUI
 import Testing
 @testable import Parola
 
@@ -17,5 +18,17 @@ struct MetaLineTests {
         #expect(MetaLine.joined([]) == "")
         #expect(MetaLine.joined([nil, nil]) == "")
         #expect(MetaLine.joined(["", ""]) == "")
+    }
+
+    @Test("the middots sit back from the facts they separate")
+    func separatorsAreDimmed() {
+        let line = MetaLine.attributed(["00:01", "English"], color: .black)
+        let separators = line.runs.filter { String(line[$0.range].characters) == " · " }
+        let facts = line.runs.filter { String(line[$0.range].characters) != " · " }
+        #expect(separators.count == 1)
+        #expect(facts.count == 2)
+        #expect(separators.allSatisfy { $0.foregroundColor == Color.black.opacity(0.5) })
+        #expect(facts.allSatisfy { $0.foregroundColor == Color.black })
+        #expect(String(line.characters) == "00:01 · English")
     }
 }

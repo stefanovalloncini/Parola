@@ -71,10 +71,9 @@ struct LiveCaptionsView: View {
         HStack(spacing: 6) {
             Image(systemName: translating ? "character.bubble" : "mic.fill")
                 .font(DS.Font.caption2Bold)
-            SectionCaption(
-                Text(translating ? "Translate" : "Mic"),
-                tint: translating ? Color.white : Color.white.opacity(0.7)
-            )
+            Text(translating ? "Translate" : "Mic")
+                .font(DS.Font.mono.weight(.semibold))
+                .textCase(.uppercase)
         }
         .foregroundStyle(translating ? Color.white : Color.white.opacity(0.7))
         .padding(.horizontal, 9)
