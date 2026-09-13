@@ -194,6 +194,25 @@ struct AppModelBatchTests {
         #expect(model.selectedBatchJobID == pending.id)
     }
 
+    /// The Batch page's ✕ is per file: the row next to it must still be waiting when the click lands.
+    @Test("cancelling one queued job leaves the rest of the queue alone")
+    func cancelOneJobSparesTheOthers() {
+        let model = makeModel()
+        let first = Self.makeJob("a")
+        let second = Self.makeJob("b")
+        let third = Self.makeJob("c")
+        model.batchJobs = [first, second, third]
+
+        model.cancelBatchJob(second.id)
+
+        #expect(model.batchJobs.map(\.id) == [first.id, third.id])
+        #expect(model.batchJobs.allSatisfy { $0.status == .pending })
+
+        model.cancelAllInFlightBatchJobs()
+
+        #expect(model.batchJobs.allSatisfy { $0.status == .cancelled })
+    }
+
     @Test("clearFinishedBatchJobs keeps pending and running jobs only")
     func clearFinishedKeepsActive() {
         let model = makeModel()

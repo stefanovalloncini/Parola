@@ -158,7 +158,11 @@ struct QueueView: View {
     }
 
     private func jobRow(_ job: BatchJob) -> some View {
-        JobRow(job: job, isSelected: focusedJob == job.id)
+        JobRow(
+            job: job,
+            isSelected: focusedJob == job.id,
+            cancel: .wholeBatch { model.cancelAllInFlightBatchJobs() }
+        )
             .focusable(true)
             .focusEffectDisabled()
             .focused($focusedJob, equals: job.id)

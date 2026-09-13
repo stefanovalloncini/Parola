@@ -130,6 +130,26 @@ struct JobRowTests {
         #expect(!BatchJobStatus.showsProgress(.cancelled))
     }
 
+    /// The Queue's ✕ cancels the run; the Batch page's ✕ must stay the per-file control it was.
+    @Test("each page's cancel keeps its own meaning and its own ax id")
+    func cancelActionsDifferPerPage() {
+        var cancelledRun = 0
+        let queue = JobCancelAction.wholeBatch { cancelledRun += 1 }
+        #expect(queue.axID == "Row.Button.CancelBatch")
+        queue.run()
+        #expect(cancelledRun == 1)
+
+        var cancelledJob = 0
+        let running = JobCancelAction.oneJob(status: .transcribing) { cancelledJob += 1 }
+        let waiting = JobCancelAction.oneJob(status: .pending) { cancelledJob += 1 }
+        #expect(running.axID == "Row.Button.Cancel")
+        #expect(waiting.axID == "Row.Button.Cancel")
+        #expect(running.help != waiting.help)
+        running.run()
+        waiting.run()
+        #expect(cancelledJob == 2)
+    }
+
     @Test("a running job has no glyph, since its bar is the indicator")
     func statusGlyphsMatchTheState() {
         #expect(BatchJobStatus.symbol(for: .transcribing) == nil)

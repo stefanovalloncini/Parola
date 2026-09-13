@@ -110,7 +110,11 @@ struct BatchJobList: View {
 
     private func rowWithKeyboardSupport(job: BatchJob) -> some View {
         let isPending = job.status == .pending
-        return JobRow(job: job, isSelected: model.selectedBatchJobID == job.id)
+        return JobRow(
+            job: job,
+            isSelected: model.selectedBatchJobID == job.id,
+            cancel: .oneJob(status: job.status) { model.cancelBatchJob(job.id) }
+        )
             .focusable(true)
             .focusEffectDisabled()
             .focused($focusedJob, equals: job.id)

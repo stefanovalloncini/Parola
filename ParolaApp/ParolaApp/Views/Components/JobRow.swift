@@ -47,12 +47,35 @@ enum BatchJobStatus {
     }
 }
 
+/// What the ✕ on a row means, which is not the same on both pages: the Queue cancels the run, the Batch page
+/// cancels the one file.
+struct JobCancelAction {
+    let help: LocalizedStringKey
+    let axID: String
+    let run: () -> Void
+
+    /// The Queue page's ✕, as `QueueRow` had it: one control for the whole run.
+    static func wholeBatch(_ run: @escaping () -> Void) -> JobCancelAction {
+        JobCancelAction(help: "Cancel Batch", axID: "Row.Button.CancelBatch", run: run)
+    }
+
+    /// The Batch page's ✕, as `BatchJobRow` had it: a running file is cancelled, a waiting one is removed.
+    static func oneJob(status: BatchJob.Status, _ run: @escaping () -> Void) -> JobCancelAction {
+        JobCancelAction(
+            help: status == .transcribing ? "Cancel" : "Remove",
+            axID: "Row.Button.Cancel",
+            run: run
+        )
+    }
+}
+
 /// The one row a batch job draws, on the Queue page, on the Batch page and in the batch sidebar.
 struct JobRow: View {
     let job: BatchJob
     var isSelected: Bool = false
     /// The sidebar's column is narrow: no progress bar and no trailing action, the status text alone.
     var compact: Bool = false
+    var cancel: JobCancelAction?
 
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -106,28 +129,33 @@ struct JobRow: View {
     private var action: some View {
         switch job.status {
         case .pending, .transcribing:
-            actionButton("Cancel Batch", systemImage: "xmark") {
-                model.cancelAllInFlightBatchJobs()
+            if let cancel {
+                actionButton(cancel.help, systemImage: "xmark", axID: cancel.axID, action: cancel.run)
             }
         case .failed, .cancelled:
-            actionButton("Retry", systemImage: "arrow.clockwise") {
+            actionButton("Retry", systemImage: "arrow.clockwise", axID: "Row.Button.Retry") {
                 model.retryBatchJob(job.id)
             }
         case .done:
-            actionButton("Open", systemImage: "doc.text") {
+            actionButton("Open", systemImage: "doc.text", axID: "Row.Button.Open") {
                 model.openBatchJobTranscript(job.id)
             }
         }
     }
 
-    private func actionButton(_ help: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    private func actionButton(
+        _ help: LocalizedStringKey,
+        systemImage: String,
+        axID: String,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
         }
         .buttonStyle(DSIconChipButtonStyle(side: 26))
         .help(help)
-        .accessibilityLabel(help)
-        .axLeaf("Row.Button.\(help.replacingOccurrences(of: " ", with: ""))")
+        .accessibilityLabel(Text(help))
+        .axLeaf(axID)
     }
 
     @ViewBuilder
