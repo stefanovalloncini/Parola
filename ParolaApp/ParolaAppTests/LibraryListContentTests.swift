@@ -172,12 +172,13 @@ struct LibraryListContentTests {
     private func rowHeight(
         density: String,
         style: EntryRowStyle,
-        excerpt: String? = nil
+        excerpt: String? = nil,
+        labels: [String] = []
     ) async -> CGFloat {
         let model = await makeModel()
         model.sidebarDensity = density
         let display = LibraryRowDisplay(
-            entry: entry(id: "a", title: "Alpha", offset: 0),
+            entry: entry(id: "a", title: "Alpha", offset: 0, labels: labels),
             sizeBytes: 1_000_000,
             excerpt: excerpt
         )
@@ -207,6 +208,25 @@ struct LibraryListContentTests {
         #expect(await rowHeight(density: "comfortable", style: .list, excerpt: excerpt) == comfortable)
         #expect(await rowHeight(density: "compact", style: .list, excerpt: excerpt) == compact)
         #expect(await rowHeight(density: "comfortable", style: .list) == titleOnly)
+    }
+
+    /// A labelled row is the row that says the most about itself; a chip taller than the title line would
+    /// pay for itself with the second line of the excerpt.
+    @Test("label chips leave the excerpt the same room as a row without them")
+    func labelChipsDoNotShortenTheExcerpt() async {
+        let excerpt = String(repeating: "parola ", count: 60)
+        let plain = await rowHeight(density: "comfortable", style: .home, excerpt: excerpt)
+        let labelled = await rowHeight(
+            density: "comfortable",
+            style: .home,
+            excerpt: excerpt,
+            labels: ["draft", "shared", "q4"]
+        )
+
+        #expect(labelled == plain)
+        #expect(labelled == EntryRowMetrics.detail)
+        #expect(await rowHeight(density: "compact", style: .home, excerpt: excerpt, labels: ["draft"])
+            == EntryRowMetrics.compactDetail)
     }
 
     private func mixedLibrary() -> [LibraryEntry] {

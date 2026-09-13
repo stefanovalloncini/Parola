@@ -295,17 +295,24 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         }
     }
 
-    /// On a selected row the accent fill is the backdrop, so the chip wears a veil of the foreground.
+    /// Sized to the text, not to `Chip.Size`: a 24 pt chip on a 16 pt title line takes its 8 pt out of the
+    /// excerpt below. On a selected row the accent fill is the backdrop, so the chip wears a veil of the foreground.
     private func chip(_ label: Text) -> some View {
         label
-            .font(DS.Font.secondary)
+            .font(DS.Font.caption)
             .foregroundStyle(secondaryStyle)
             .lineLimit(1)
-            .chipChrome(
-                isSelected: isSelected,
-                size: .regular,
-                selectedFill: DS.Color.onAccent.opacity(0.18),
-                border: isSelected ? DS.Color.onAccent.opacity(0.35) : nil
+            .padding(.horizontal, DS.Spacing.snug)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(isSelected ? DS.Color.onAccent.opacity(0.18) : DS.Color.surfaceElevated)
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(
+                        isSelected ? DS.Color.onAccent.opacity(0.35) : DS.Color.separator.opacity(0.4),
+                        lineWidth: 0.5
+                    )
             )
     }
 }
