@@ -47,17 +47,14 @@ extension AppModel {
     /// is already in memory, and an entry it has not reached yet simply has none yet.
     func refreshLibraryExcerpts() {
         libraryExcerptsTask?.cancel()
+        // The store compares against what is already on screen, so the main actor never walks the map.
+        let known = libraryExcerpts
         libraryExcerptsTask = Task { [weak self] in
             guard let self else { return }
-            let excerpts = await library.excerpts()
+            guard let excerpts = await library.excerpts(changedFrom: known) else { return }
             guard !Task.isCancelled else { return }
-            setLibraryExcerpts(excerpts)
+            libraryExcerpts = excerpts
         }
-    }
-
-    func setLibraryExcerpts(_ excerpts: [LibraryEntry.ID: String]) {
-        guard excerpts != libraryExcerpts else { return }
-        libraryExcerpts = excerpts
     }
 
     /// A refresh runs on every library touch, most of which change nothing, and reassigning anyway repaints every reader.

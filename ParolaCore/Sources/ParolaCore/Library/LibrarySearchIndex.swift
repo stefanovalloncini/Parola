@@ -285,9 +285,10 @@ public actor LibrarySearchIndex {
         return results
     }
 
-    /// The opening of every indexed entry's text, keyed by entry id. Reads the text the index
-    /// already holds in memory, so a list can show what an entry says without opening a bundle.
-    public func excerpts(maxLength: Int) async -> [String: String] {
+    /// The opening of every indexed entry's text, keyed by entry id, or nil when that is what `previous`
+    /// already holds. Reads the text the index has in memory, so a list can show what an entry says without
+    /// opening a bundle, and the comparison stays on this actor rather than on the caller's.
+    public func excerpts(maxLength: Int, changedFrom previous: [String: String]) async -> [String: String]? {
         await ensureLoaded()
         var opening: [String: String] = [:]
         opening.reserveCapacity(entries.count)
@@ -295,7 +296,7 @@ public actor LibrarySearchIndex {
             guard let excerpt = Self.excerpt(from: entry.text, maxLength: maxLength) else { continue }
             opening[id] = excerpt
         }
-        return opening
+        return opening == previous ? nil : opening
     }
 
     /// Runs of whitespace collapse to one space and the cut lands on the last word that fits,
@@ -305,20 +306,24 @@ public actor LibrarySearchIndex {
         var collapsed = ""
         collapsed.reserveCapacity(maxLength + 1)
         var pendingSpace = false
+        // Counted as it grows: `String.count` walks the whole string, and this loop would ask it per character.
+        var length = 0
         for character in text {
             if character.isWhitespace {
-                pendingSpace = !collapsed.isEmpty
+                pendingSpace = length > 0
                 continue
             }
             if pendingSpace {
                 collapsed.append(" ")
+                length += 1
                 pendingSpace = false
             }
             collapsed.append(character)
-            if collapsed.count > maxLength { break }
+            length += 1
+            if length > maxLength { break }
         }
-        guard !collapsed.isEmpty else { return nil }
-        guard collapsed.count > maxLength else { return collapsed }
+        guard length > 0 else { return nil }
+        guard length > maxLength else { return collapsed }
         let capped = collapsed.prefix(maxLength)
         guard let lastSpace = capped.lastIndex(of: " ") else { return String(capped) + "…" }
         return String(capped[..<lastSpace]) + "…"
