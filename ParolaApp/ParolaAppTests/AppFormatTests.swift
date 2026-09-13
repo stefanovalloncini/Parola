@@ -37,6 +37,14 @@ struct AppFormatTests {
         #expect(AppFormat.percent(0.455, fractionDigits: 1, locale: Locale(identifier: "it_IT")) == "45,5%")
     }
 
+    @Test("a count groups the way its locale groups")
+    func countsTakeTheLocale() {
+        #expect(AppFormat.integer(834, locale: Locale(identifier: "en_US")) == "834")
+        #expect(AppFormat.integer(12_500, locale: Locale(identifier: "en_US")) == "12,500")
+        #expect(AppFormat.integer(12_500, locale: Locale(identifier: "it_IT")) == "12.500")
+        #expect(AppFormat.integer(0, locale: Locale(identifier: "en_US")) == "0")
+    }
+
     @Test("a span picks the units that carry meaning and hides the rest")
     func durationPicksItsUnits() {
         let english = Locale(identifier: "en_US")

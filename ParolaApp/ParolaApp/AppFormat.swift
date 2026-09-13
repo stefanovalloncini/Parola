@@ -32,6 +32,11 @@ enum AppFormat {
         date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale))
     }
 
+    /// A count on screen: grouped the way the locale groups, not by raw interpolation.
+    static func integer(_ value: Int, locale: Locale = AppFormat.locale) -> String {
+        value.formatted(.number.locale(locale))
+    }
+
     static func percent(_ fraction: Double, fractionDigits: Int = 0, locale: Locale = AppFormat.locale) -> String {
         fraction.formatted(.percent.precision(.fractionLength(fractionDigits)).locale(locale))
     }

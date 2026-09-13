@@ -97,7 +97,7 @@ struct QueueRow: View {
         case .pending:
             return "Queued"
         case .transcribing:
-            guard job.progress >= 0.005 else { return "Transcribing…" }
+            guard job.progress >= 0.01 else { return "Transcribing…" }
             return "Transcribing… \(AppFormat.percent(job.progress))"
         case .cancelled:
             let fraction = AppFormat.percent(job.progress, fractionDigits: 1)

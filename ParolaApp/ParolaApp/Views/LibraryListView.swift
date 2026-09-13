@@ -610,8 +610,8 @@ struct LibraryRow: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @ScaledMetric(relativeTo: .body) private var compactHeight: CGFloat = 37
-    @ScaledMetric(relativeTo: .body) private var regularHeight: CGFloat = 41
+    private static let compactHeight: CGFloat = 37
+    private static let regularHeight: CGFloat = 41
     @State private var isHovering = false
     private var compact: Bool { model.sidebarDensity == "compact" }
 
@@ -623,7 +623,7 @@ struct LibraryRow: View {
     /// Declaring the height keeps NSTableView off its uncached automatic-row-height path; accessibility sizes outgrow the constant, so they go back to measuring.
     private var rowHeight: CGFloat? {
         guard style == .library, !typeSize.isAccessibilitySize else { return nil }
-        return compact ? compactHeight : regularHeight
+        return compact ? Self.compactHeight : Self.regularHeight
     }
 
     /// Home reuses the row in a narrower column, and a compact list trades the last-opened stamp for height.

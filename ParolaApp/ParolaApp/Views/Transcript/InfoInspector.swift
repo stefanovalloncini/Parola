@@ -34,15 +34,15 @@ struct InfoInspector: View {
                 if let engineLabel {
                     InfoRow(icon: "cpu", label: "Engine", value: engineLabel)
                 }
-                InfoRow(icon: "character", label: "Characters", value: "\(charCount)", numeric: true)
-                InfoRow(icon: "text.word.spacing", label: "Words", value: "\(wordCount)", numeric: true)
-                InfoRow(icon: "text.alignleft", label: "Sentences", value: "\(sentenceCount)", numeric: true)
+                InfoRow(icon: "character", label: "Characters", value: AppFormat.integer(charCount), numeric: true)
+                InfoRow(icon: "text.word.spacing", label: "Words", value: AppFormat.integer(wordCount), numeric: true)
+                InfoRow(icon: "text.alignleft", label: "Sentences", value: AppFormat.integer(sentenceCount), numeric: true)
                 InfoRow(icon: "book", label: "Reading time", value: readingTimeLabel, numeric: true)
                 if speakerCount > 0 {
-                    InfoRow(icon: "person.2", label: "Speakers", value: "\(speakerCount)", numeric: true)
+                    InfoRow(icon: "person.2", label: "Speakers", value: AppFormat.integer(speakerCount), numeric: true)
                 }
                 if fillerCount > 0 {
-                    InfoRow(icon: "exclamationmark.bubble", label: "Filler words", value: "\(fillerCount)", numeric: true)
+                    InfoRow(icon: "exclamationmark.bubble", label: "Filler words", value: AppFormat.integer(fillerCount), numeric: true)
                 }
             }
 

@@ -168,7 +168,7 @@ struct MacRecentlyDeletedView: View {
                 Rectangle()
                     .fill(DS.Color.separator.opacity(0.5))
                     .frame(height: 1)
-                Text(group.entries.count, format: .number)
+                Text(verbatim: AppFormat.integer(group.entries.count))
                     .font(DS.Font.caption2Mono)
                     .foregroundStyle(DS.Color.secondaryText)
             }

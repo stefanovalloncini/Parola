@@ -367,7 +367,7 @@ struct ModelsSettingsPane: View {
             Text(title)
                 .font(DS.Font.title3)
             if let count, count > 0 {
-                Text("\(count)")
+                Text(verbatim: AppFormat.integer(count))
                     .font(DS.Font.calloutMedium)
                     .foregroundStyle(DS.Color.secondaryText)
             }
