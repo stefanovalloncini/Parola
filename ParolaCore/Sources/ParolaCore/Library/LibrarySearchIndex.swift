@@ -285,6 +285,45 @@ public actor LibrarySearchIndex {
         return results
     }
 
+    /// The opening of every indexed entry's text, keyed by entry id. Reads the text the index
+    /// already holds in memory, so a list can show what an entry says without opening a bundle.
+    public func excerpts(maxLength: Int) async -> [String: String] {
+        await ensureLoaded()
+        var opening: [String: String] = [:]
+        opening.reserveCapacity(entries.count)
+        for (id, entry) in entries {
+            guard let excerpt = Self.excerpt(from: entry.text, maxLength: maxLength) else { continue }
+            opening[id] = excerpt
+        }
+        return opening
+    }
+
+    /// Runs of whitespace collapse to one space and the cut lands on the last word that fits,
+    /// so a row never ends mid-word. nil when the entry has nothing to quote.
+    public nonisolated static func excerpt(from text: String, maxLength: Int) -> String? {
+        guard maxLength > 0 else { return nil }
+        var collapsed = ""
+        collapsed.reserveCapacity(maxLength + 1)
+        var pendingSpace = false
+        for character in text {
+            if character.isWhitespace {
+                pendingSpace = !collapsed.isEmpty
+                continue
+            }
+            if pendingSpace {
+                collapsed.append(" ")
+                pendingSpace = false
+            }
+            collapsed.append(character)
+            if collapsed.count > maxLength { break }
+        }
+        guard !collapsed.isEmpty else { return nil }
+        guard collapsed.count > maxLength else { return collapsed }
+        let capped = collapsed.prefix(maxLength)
+        guard let lastSpace = capped.lastIndex(of: " ") else { return String(capped) + "…" }
+        return String(capped[..<lastSpace]) + "…"
+    }
+
     /// Writes any pending debounced snapshot to disk. Call before app termination.
     public func flush() async {
         let task = pendingSaveTask

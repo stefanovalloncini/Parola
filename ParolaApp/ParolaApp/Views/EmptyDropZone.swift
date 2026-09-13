@@ -155,7 +155,13 @@ struct EmptyDropZone: View {
     private var recentSection: some View {
         let recents = RecentEntries
             .most(of: model.libraryEntries, limit: RecentEntries.rowsThatFit(inHeight: recentRowSpace, rowHeight: recentRowHeight))
-            .map { LibraryRowDisplay(entry: $0, sizeBytes: model.libraryBundleSizes[$0.id]) }
+            .map {
+                LibraryRowDisplay(
+                    entry: $0,
+                    sizeBytes: model.libraryBundleSizes[$0.id],
+                    excerpt: model.libraryExcerpts[$0.id]
+                )
+            }
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             HStack(spacing: DS.Spacing.small) {
                 Text("Recent")

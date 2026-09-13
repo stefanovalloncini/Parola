@@ -101,13 +101,17 @@ struct LibraryRowDisplay: Identifiable {
 struct LibraryRowDisplayCache {
     private(set) var libraryVersion = -1
     private(set) var sizesVersion = -1
+    private(set) var excerptsVersion = -1
     private(set) var displays: [LibraryEntry.ID: LibraryRowDisplay] = [:]
 
-    mutating func invalidate(libraryVersion: Int, sizesVersion: Int) {
-        guard self.libraryVersion != libraryVersion || self.sizesVersion != sizesVersion else { return }
+    mutating func invalidate(libraryVersion: Int, sizesVersion: Int, excerptsVersion: Int) {
+        guard self.libraryVersion != libraryVersion
+                || self.sizesVersion != sizesVersion
+                || self.excerptsVersion != excerptsVersion else { return }
         displays.removeAll(keepingCapacity: true)
         self.libraryVersion = libraryVersion
         self.sizesVersion = sizesVersion
+        self.excerptsVersion = excerptsVersion
     }
 
     mutating func display(for entry: LibraryEntry, sizeBytes: Int64?, excerpt: String? = nil) -> LibraryRowDisplay {

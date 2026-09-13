@@ -158,6 +158,13 @@ public actor LibraryStore {
         return matches.filter { activeIDs.contains($0.entryID) }
     }
 
+    /// The opening text of every indexed entry, so a list can show what an entry says. The index
+    /// answers from memory; nothing here reads a bundle.
+    public func excerpts(maxLength: Int = 240) async -> [String: String] {
+        await ensureSearchIndexReady()
+        return await searchIndex.excerpts(maxLength: maxLength)
+    }
+
     /// Writes any pending debounced search-index snapshot to disk. Call before the app terminates.
     public func flush() async {
         await searchIndex.flush()
@@ -270,7 +277,7 @@ public actor LibraryStore {
             guard manifest.sourceDigest == nil else { return }
             manifest.sourceDigest = digest
         }
-        try? recacheEntry(at: entry.bundleURL)
+        _ = try? recacheEntry(at: entry.bundleURL)
     }
 
     func waitForSourceDigestBackfill() async {

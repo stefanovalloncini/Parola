@@ -39,7 +39,25 @@ extension AppModel {
             setDeletedEntries(deleted)
             refreshBundleSizes(for: active)
             setLibraryEntries(sortedLibraryEntries(active))
+            refreshLibraryExcerpts()
         }
+    }
+
+    /// Rows show the first couple of lines of a transcript; the index is the only place that text
+    /// is already in memory, and an entry it has not reached yet simply has none yet.
+    func refreshLibraryExcerpts() {
+        libraryExcerptsTask?.cancel()
+        libraryExcerptsTask = Task { [weak self] in
+            guard let self else { return }
+            let excerpts = await library.excerpts()
+            guard !Task.isCancelled else { return }
+            setLibraryExcerpts(excerpts)
+        }
+    }
+
+    func setLibraryExcerpts(_ excerpts: [LibraryEntry.ID: String]) {
+        guard excerpts != libraryExcerpts else { return }
+        libraryExcerpts = excerpts
     }
 
     /// A refresh runs on every library touch, most of which change nothing, and reassigning anyway repaints every reader.

@@ -251,12 +251,16 @@ struct LibraryListView: View {
         var totalBytes: Int64 = 0
         var totalSeconds: Double = 0
         var cache = displayCache
-        cache.invalidate(libraryVersion: model.libraryVersion, sizesVersion: model.libraryBundleSizesVersion)
+        cache.invalidate(
+            libraryVersion: model.libraryVersion,
+            sizesVersion: model.libraryBundleSizesVersion,
+            excerptsVersion: model.libraryExcerptsVersion
+        )
         let displays = computed.map { entry -> LibraryRowDisplay in
             let size = sizes[entry.id]
             totalBytes += size ?? 0
             totalSeconds += entry.durationSeconds ?? 0
-            return cache.display(for: entry, sizeBytes: size)
+            return cache.display(for: entry, sizeBytes: size, excerpt: model.libraryExcerpts[entry.id])
         }
         displayCache = cache
         entries = displays
@@ -347,6 +351,7 @@ struct LibraryListView: View {
         .onChange(of: languageFilter) { _, _ in recomputeEntries() }
         .onChange(of: dateRangeFilter) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryBundleSizesVersion) { _, _ in recomputeEntries() }
+        .onChange(of: model.libraryExcerptsVersion) { _, _ in recomputeEntries() }
         .onChange(of: searchResults) { _, _ in
             let newEntries = recomputeEntries()
             selection = selection.intersection(Set(newEntries.map(\.id)))

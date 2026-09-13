@@ -962,6 +962,12 @@ final class AppModel {
     }
     /// The library list watches this instead of diffing a dictionary with one key per entry.
     private(set) var libraryBundleSizesVersion: Int = 0
+    /// The opening of each entry's transcript, read from the search index so a row never opens a bundle.
+    var libraryExcerpts: [LibraryEntry.ID: String] = [:] {
+        didSet { libraryExcerptsVersion &+= 1 }
+    }
+    private(set) var libraryExcerptsVersion: Int = 0
+    @ObservationIgnored var libraryExcerptsTask: Task<Void, Never>?
     @ObservationIgnored var searchTask: Task<Void, Never>?
     @ObservationIgnored var libraryRefreshTask: Task<Void, Never>?
     @ObservationIgnored var pendingTranscriptSaveTask: Task<Void, Never>?
