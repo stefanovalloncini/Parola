@@ -143,8 +143,11 @@ struct MacRecentlyDeletedView: View {
 
     private func row(_ entry: LibraryEntry, isLast: Bool) -> some View {
         RecentlyDeletedRow(
-            entry: entry,
-            preview: previews[entry.id],
+            display: LibraryRowDisplay(
+                entry: entry,
+                sizeBytes: nil,
+                excerpt: RecentlyDeletedRow.previewText(previews[entry.id])
+            ),
             daysLeft: daysLeft(for: entry),
             timeLeft: timeLeft(for: entry),
             isSelected: selection.contains(entry.id),

@@ -2,10 +2,7 @@ import SwiftUI
 import ParolaCore
 
 struct RecentlyDeletedRow: View {
-    private static let glyphWidth: CGFloat = 28
-
-    let entry: LibraryEntry
-    let preview: String?
+    let display: LibraryRowDisplay
     let daysLeft: Int?
     let timeLeft: String
     let isSelected: Bool
@@ -16,11 +13,8 @@ struct RecentlyDeletedRow: View {
     let onTap: () -> Void
     private let helpText: String
 
-    @State private var hovered = false
-
     init(
-        entry: LibraryEntry,
-        preview: String?,
+        display: LibraryRowDisplay,
         daysLeft: Int?,
         timeLeft: String,
         isSelected: Bool = false,
@@ -30,8 +24,7 @@ struct RecentlyDeletedRow: View {
         onPurge: @escaping () -> Void,
         onTap: @escaping () -> Void
     ) {
-        self.entry = entry
-        self.preview = preview
+        self.display = display
         self.daysLeft = daysLeft
         self.timeLeft = timeLeft
         self.isSelected = isSelected
@@ -40,35 +33,25 @@ struct RecentlyDeletedRow: View {
         self.onRestore = onRestore
         self.onPurge = onPurge
         self.onTap = onTap
-        helpText = Self.helpText(deletedAt: entry.deletedAt, daysLeft: daysLeft)
+        helpText = Self.helpText(deletedAt: display.entry.deletedAt, daysLeft: daysLeft)
     }
 
+    private var entry: LibraryEntry { display.entry }
+
     var body: some View {
-        HStack(alignment: .top, spacing: DS.Spacing.regular) {
-            Image(systemName: categoryIcon)
-                .font(DS.Font.bodyMedium)
-                .foregroundStyle(categoryTint)
-                .frame(width: Self.glyphWidth, alignment: .center)
-
-            VStack(alignment: .leading, spacing: 4) {
-                titleLine
-
-                Text(previewText)
-                    .font(DS.Font.subheadline)
-                    .foregroundStyle(DS.Color.secondaryText)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                meterLine
-            }
-        }
-        .padding(.vertical, DS.Spacing.regular)
-        .padding(.horizontal, DS.Spacing.small)
-        .background(rowBackground)
+        EntryRow(
+            display: display,
+            style: .plain,
+            detail: .excerpt(display.excerpt),
+            isSelected: isSelected,
+            showsTimeOnly: false,
+            help: helpText,
+            accessory: { meterLine },
+            trailingActions: { actions }
+        )
         .overlay(alignment: .bottom) { separator }
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
-        .onHover { hovered = $0 }
         .contextMenu {
             Button { onRestore() } label: {
                 Label("Restore", systemImage: "arrow.uturn.backward")
@@ -79,53 +62,37 @@ struct RecentlyDeletedRow: View {
             }
             .axLeaf("Row.ContextMenuItem.Purge")
         }
-        .help(helpText)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(axLabel)
-        .animation(.easeInOut(duration: 0.12), value: hovered)
     }
 
-    var previewText: String {
-        if let preview, !preview.isEmpty { return preview }
-        if preview == nil { return String(localized: "Loading preview…") }
-        return String(localized: "No transcript text.")
-    }
-
-    private var titleLine: some View {
-        HStack(spacing: DS.Spacing.small) {
-            Text(entry.title)
-                .font(DS.Font.bodyStrong)
-                .foregroundStyle(DS.Color.primaryText)
-                .lineLimit(1)
-            Spacer(minLength: DS.Spacing.small)
-            actions
-        }
+    /// The preview the sheet loaded, or why there is none: an empty line would read as a lost transcript.
+    static func previewText(_ preview: String?) -> String {
+        guard let preview else { return String(localized: "Loading preview…") }
+        return preview.isEmpty ? String(localized: "No transcript text.") : preview
     }
 
     private var actions: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: DS.Spacing.tight) {
             RecentlyDeletedCardIconButton(
                 systemName: "arrow.uturn.backward",
                 help: "Restore",
                 hoverTint: DS.Palette.success,
                 action: onRestore
             )
-            .opacity(revealed ? 1 : 0.55)
             RecentlyDeletedCardIconButton(
                 systemName: "trash",
                 help: "Delete Permanently",
                 tint: DS.Color.danger,
                 action: onPurge
             )
-            .opacity(revealed ? 1 : 0)
-            .allowsHitTesting(revealed)
         }
     }
 
     @ViewBuilder
     private var meterLine: some View {
         HStack(spacing: DS.Spacing.small) {
-            if let daysLeft, let deletedAt = entry.deletedAt {
+            if let daysLeft, entry.deletedAt != nil {
                 DecayStrip(
                     daysRemaining: daysLeft,
                     totalDays: AppModel.trashRetentionDays,
@@ -133,51 +100,25 @@ struct RecentlyDeletedRow: View {
                     liveColor: tier.stripColor,
                     collapsed: isPurging
                 )
-                Text(timeLeft)
-                    .font(tier == .calm ? DS.Font.captionMono : DS.Font.captionMonoEmphasized)
-                    .foregroundStyle(tier.color)
-                Text(verbatim: "·")
-                    .font(DS.Font.caption2Mono)
-                    .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
-                Text("Deleted \(AppFormat.dayAndMonth(deletedAt))")
-                    .font(DS.Font.caption2Mono)
-                    .foregroundStyle(DS.Color.secondaryText.opacity(0.75))
-            } else {
-                Text(timeLeft)
-                    .font(DS.Font.caption2Mono)
-                    .foregroundStyle(DS.Color.secondaryText)
             }
-        }
-        .padding(.top, 2)
-    }
-
-    @ViewBuilder
-    private var rowBackground: some View {
-        if isSelected {
-            RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                .fill(DS.Color.accent.opacity(0.12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                        .strokeBorder(DS.Color.accent.opacity(0.35), lineWidth: 1)
-                )
-        } else if hovered {
-            RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                .fill(DS.Palette.surfaceHover)
+            Text(timeLeft)
+                .font(tier == .calm ? DS.Font.mono : DS.Font.calloutMonoEmphasized)
+                .foregroundStyle(tier.color)
+                .lineLimit(1)
+                .fixedSize()
         }
     }
 
     @ViewBuilder
     private var separator: some View {
-        if showsSeparator && !hovered && !isSelected {
+        if showsSeparator {
             Rectangle()
                 .fill(DS.Color.separator.opacity(0.5))
                 .frame(height: 1)
-                .padding(.leading, DS.Spacing.small + Self.glyphWidth + DS.Spacing.regular)
+                .padding(.leading, DS.Spacing.small + EntryRowMetrics.textInset)
                 .padding(.trailing, DS.Spacing.small)
         }
     }
-
-    private var revealed: Bool { hovered || isSelected }
 
     private var tier: RecentlyDeletedCopy.Tier {
         RecentlyDeletedCopy.tier(daysLeft: daysLeft)
@@ -197,7 +138,7 @@ struct RecentlyDeletedRow: View {
     }
 
     private var axLabel: String {
-        "\(entry.title), \(timeLeft), \(categoryName)"
+        "\(display.title), \(timeLeft), \(categoryName)"
     }
 
     private var categoryName: String {
@@ -206,12 +147,6 @@ struct RecentlyDeletedRow: View {
         case .meeting: return String(localized: "Meeting")
         case .dictation: return String(localized: "Dictation")
         }
-    }
-
-    var categoryIcon: String { DS.categorySymbol(for: entry.category) }
-
-    var categoryTint: Color {
-        DS.categoryTint(for: entry.category)
     }
 }
 
