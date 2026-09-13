@@ -13,6 +13,8 @@ struct MacRecentlyDeletedView: View {
     @State private var categoryFilter: RecentlyDeletedCategoryFilter = .all
     @State private var sortOption: RecentlyDeletedSort = .deletedEarliest
     @State private var previews: [LibraryEntry.ID: String] = [:]
+    /// Built once per entry and per preview: the formatters behind a row are what this page loads n of.
+    @State private var displays: [LibraryEntry.ID: LibraryRowDisplay] = [:]
     @State private var selection: Set<LibraryEntry.ID> = []
     @State private var lastSelected: LibraryEntry.ID?
     @State private var purging: Set<LibraryEntry.ID> = []
@@ -47,6 +49,8 @@ struct MacRecentlyDeletedView: View {
         .onChange(of: model.deletedEntries) { _, entries in
             let live = Set(entries.map(\.id))
             previews = previews.filter { live.contains($0.key) }
+            displays = displays.filter { live.contains($0.key) }
+            for entry in entries { refreshDisplay(for: entry) }
             now = Date()
         }
         .task {
@@ -143,11 +147,7 @@ struct MacRecentlyDeletedView: View {
 
     private func row(_ entry: LibraryEntry, isLast: Bool) -> some View {
         RecentlyDeletedRow(
-            display: LibraryRowDisplay(
-                entry: entry,
-                sizeBytes: nil,
-                excerpt: RecentlyDeletedRow.previewText(previews[entry.id])
-            ),
+            display: displays[entry.id] ?? makeDisplay(for: entry),
             daysLeft: daysLeft(for: entry),
             timeLeft: timeLeft(for: entry),
             isSelected: selection.contains(entry.id),
@@ -447,6 +447,25 @@ struct MacRecentlyDeletedView: View {
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         previews[entry.id] = trimmed.isEmpty ? "" : String(trimmed.prefix(280))
+        refreshDisplay(for: entry)
+    }
+
+    /// The row states the date it was deleted: on this page the creation date is the less useful of the two.
+    private func makeDisplay(for entry: LibraryEntry) -> LibraryRowDisplay {
+        LibraryRowDisplay(
+            entry: entry,
+            sizeBytes: nil,
+            excerpt: RecentlyDeletedRow.previewText(previews[entry.id]),
+            date: entry.deletedAt
+        )
+    }
+
+    private func refreshDisplay(for entry: LibraryEntry) {
+        let excerpt = RecentlyDeletedRow.previewText(previews[entry.id])
+        if let cached = displays[entry.id], cached.excerpt == excerpt, cached.entry.manifest == entry.manifest {
+            return
+        }
+        displays[entry.id] = makeDisplay(for: entry)
     }
 
     private var isPurgingSingle: Binding<Bool> {

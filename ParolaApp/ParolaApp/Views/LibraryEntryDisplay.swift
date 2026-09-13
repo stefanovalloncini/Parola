@@ -67,15 +67,17 @@ struct LibraryRowDisplay: Identifiable {
     var noteCount: Int { entry.segmentNotes.count }
     var labels: [String] { entry.labels }
 
-    init(entry: LibraryEntry, sizeBytes: Int64?, excerpt: String? = nil) {
+    /// `date` is what the row states; Recently Deleted passes the deletion, where the creation says less.
+    init(entry: LibraryEntry, sizeBytes: Int64?, excerpt: String? = nil, date: Date? = nil) {
         let title = LibraryEntryDisplay.title(for: entry)
+        let stated = date ?? entry.createdAt
         self.entry = entry
         self.title = title
         self.excerpt = excerpt
         sourceKind = EntrySourceKind(entry: entry)
-        timestamp = AppFormat.dateAndTime(entry.createdAt)
-        timeOfDay = AppFormat.timeOfDay(entry.createdAt)
-        shortDate = AppFormat.dayAndMonth(entry.createdAt)
+        timestamp = AppFormat.dateAndTime(stated)
+        timeOfDay = AppFormat.timeOfDay(stated)
+        shortDate = AppFormat.dayAndMonth(stated)
         if let sizeBytes, sizeBytes > 0 {
             sizeLabel = AppFormat.byteSize(sizeBytes)
         } else {
@@ -114,9 +116,14 @@ struct LibraryRowDisplayCache {
         self.excerptsVersion = excerptsVersion
     }
 
-    mutating func display(for entry: LibraryEntry, sizeBytes: Int64?, excerpt: String? = nil) -> LibraryRowDisplay {
-        if let cached = displays[entry.id] { return cached }
-        let display = LibraryRowDisplay(entry: entry, sizeBytes: sizeBytes, excerpt: excerpt)
+    mutating func display(
+        for entry: LibraryEntry,
+        sizeBytes: Int64?,
+        excerpt: String? = nil,
+        date: Date? = nil
+    ) -> LibraryRowDisplay {
+        if let cached = displays[entry.id], cached.excerpt == excerpt { return cached }
+        let display = LibraryRowDisplay(entry: entry, sizeBytes: sizeBytes, excerpt: excerpt, date: date)
         displays[entry.id] = display
         return display
     }
