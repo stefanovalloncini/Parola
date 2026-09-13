@@ -41,8 +41,9 @@ enum BatchJobStatus {
         }
     }
 
+    /// Only a job that is actually running: a bar under "Queued" reads as work that has started.
     static func showsProgress(_ status: BatchJob.Status) -> Bool {
-        status == .pending || status == .transcribing
+        status == .transcribing
     }
 }
 

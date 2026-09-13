@@ -12,6 +12,7 @@ struct RecentlyDeletedRow: View {
     let onPurge: () -> Void
     let onTap: () -> Void
     private let helpText: String
+    @State private var hovered = false
 
     init(
         display: LibraryRowDisplay,
@@ -51,6 +52,7 @@ struct RecentlyDeletedRow: View {
         )
         .overlay(alignment: .bottom) { separator }
         .contentShape(Rectangle())
+        .onHover { hovered = $0 }
         .onTapGesture { onTap() }
         .contextMenu {
             Button { onRestore() } label: {
@@ -80,12 +82,16 @@ struct RecentlyDeletedRow: View {
                 hoverTint: DS.Palette.success,
                 action: onRestore
             )
+            .opacity(revealed ? 1 : 0.55)
+            // Permanent deletion asks for the pointer first: a red trash on every resting row is a dare.
             RecentlyDeletedCardIconButton(
                 systemName: "trash",
                 help: "Delete Permanently",
                 tint: DS.Color.danger,
                 action: onPurge
             )
+            .opacity(revealed ? 1 : 0)
+            .allowsHitTesting(revealed)
         }
     }
 
@@ -119,6 +125,8 @@ struct RecentlyDeletedRow: View {
                 .padding(.trailing, DS.Spacing.small)
         }
     }
+
+    private var revealed: Bool { hovered || isSelected }
 
     private var tier: RecentlyDeletedCopy.Tier {
         RecentlyDeletedCopy.tier(daysLeft: daysLeft)

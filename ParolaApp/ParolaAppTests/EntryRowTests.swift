@@ -123,7 +123,7 @@ struct JobRowTests {
 
     @Test("only a job that is still going draws a bar")
     func onlyRunningJobsDrawABar() {
-        #expect(BatchJobStatus.showsProgress(.pending))
+        #expect(!BatchJobStatus.showsProgress(.pending))
         #expect(BatchJobStatus.showsProgress(.transcribing))
         #expect(!BatchJobStatus.showsProgress(.done))
         #expect(!BatchJobStatus.showsProgress(.failed))
