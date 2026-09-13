@@ -2213,6 +2213,17 @@
         }
       }
     },
+    "Completed · %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completato · %@"
+          }
+        }
+      }
+    },
     "Confidence": {
       "extractionState": "manual",
       "localizations": {
@@ -3625,6 +3636,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Errore"
+          }
+        }
+      }
+    },
+    "Failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Errore: %@"
           }
         }
       }

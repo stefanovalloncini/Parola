@@ -18,7 +18,8 @@ struct LibraryListContentTests {
         pinned: Bool = false,
         category: EntryCategory = .transcription,
         labels: [String] = [],
-        language: String = "en"
+        language: String = "en",
+        durationSeconds: Double? = nil
     ) -> LibraryEntry {
         let manifest = ParolaDocument.Manifest(
             createdAt: Self.baseDate.addingTimeInterval(offset),
@@ -28,7 +29,8 @@ struct LibraryListContentTests {
             language: language,
             category: category,
             labels: labels,
-            pinned: pinned
+            pinned: pinned,
+            durationSeconds: durationSeconds
         )
         return LibraryEntry(
             id: id,
@@ -351,6 +353,31 @@ struct LibraryListContentTests {
                 == "2 transcripts · 2 matches"
         )
         #expect(LibraryListContent.searchTotalsLabel(for: [], matches: matches([3, 4]), locale: english) == nil)
+    }
+
+    /// The subtitle is the header's claim about the list under it: under a filter it counts what is left.
+    @Test("the header counts the rows the filter left, not the whole library")
+    func subtitleCountsTheFilteredRows() {
+        let english = Locale(identifier: "en_US")
+        let entries = [
+            entry(id: "a", title: "Alpha", offset: 100, durationSeconds: 30),
+            entry(id: "b", title: "Beta", offset: 200, category: .meeting, durationSeconds: 90),
+            entry(id: "c", title: "Gamma", offset: 300, category: .meeting, durationSeconds: 30),
+        ]
+        func subtitle(_ category: EntryCategory?) -> String? {
+            let shown = LibraryListContent.rows(
+                from: entries, category: category, labelFilter: nil, languageFilter: nil, dateRange: .all
+            )
+            return LibraryListContent.listSubtitle(
+                count: shown.count,
+                totalSeconds: shown.reduce(0) { $0 + ($1.durationSeconds ?? 0) },
+                locale: english
+            )
+        }
+
+        #expect(subtitle(nil) == "3 transcripts · 2 min")
+        #expect(subtitle(.meeting) == "2 transcripts · 2 min")
+        #expect(subtitle(.transcription) == "1 transcript · 30 sec")
     }
 
     /// An index written before the counts existed answers 0, and a caption reading "· 0 matches" would be a lie.
