@@ -51,19 +51,13 @@ enum RecentlyDeletedCopy {
         String(localized: "Delete (\(count))…", bundle: bundle)
     }
 
-    static func subtitleCount(_ count: Int, bundle: Bundle = .main) -> String {
-        count == 1
-            ? String(localized: "1 item", bundle: bundle)
-            : String(localized: "\(count) items", bundle: bundle)
-    }
-
     /// The line under the page title: how much is in the trash, and how long the trash keeps it.
     static func subtitle(count: Int, retentionDays: Int, bundle: Bundle = .main) -> String {
-        guard count > 0 else {
-            return String(localized: "Nothing deleted · items are kept \(retentionDays) days", bundle: bundle)
+        switch count {
+        case 0: return String(localized: "Nothing deleted · items are kept \(retentionDays) days", bundle: bundle)
+        case 1: return String(localized: "1 item · removed after \(retentionDays) days", bundle: bundle)
+        default: return String(localized: "\(count) items · removed after \(retentionDays) days", bundle: bundle)
         }
-        let items = subtitleCount(count, bundle: bundle)
-        return String(localized: "\(items) · removed after \(retentionDays) days", bundle: bundle)
     }
 
     static func daysLeft(deletedAt: Date?, now: Date, retentionDays: Int) -> Int? {

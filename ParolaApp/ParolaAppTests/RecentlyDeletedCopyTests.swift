@@ -68,16 +68,6 @@ struct RecentlyDeletedCopyTests {
         }
     }
 
-    @Test("the subtitle count uses the singular for one item")
-    func subtitleCountSingular() {
-        #expect(RecentlyDeletedCopy.subtitleCount(1) == "1 item")
-    }
-
-    @Test("the subtitle count uses the plural for several items")
-    func subtitleCountPlural() {
-        #expect(RecentlyDeletedCopy.subtitleCount(8) == "8 items")
-    }
-
     @Test("the subtitle names the count and the retention window")
     func subtitleWording() {
         #expect(RecentlyDeletedCopy.subtitle(count: 1, retentionDays: 30) == "1 item · removed after 30 days")
@@ -93,7 +83,7 @@ struct RecentlyDeletedCopyTests {
     @Test("the subtitle is localized to Italian on both sides of zero")
     func subtitleWordingItalian() throws {
         let it = try italianBundle()
-        #expect(RecentlyDeletedCopy.subtitle(count: 1, retentionDays: 30, bundle: it) == "1 elemento · rimossi dopo 30 giorni")
+        #expect(RecentlyDeletedCopy.subtitle(count: 1, retentionDays: 30, bundle: it) == "1 elemento · rimosso dopo 30 giorni")
         #expect(RecentlyDeletedCopy.subtitle(count: 3, retentionDays: 30, bundle: it) == "3 elementi · rimossi dopo 30 giorni")
         #expect(RecentlyDeletedCopy.subtitle(count: 0, retentionDays: 30, bundle: it) == "Niente da eliminare · gli elementi restano 30 giorni")
     }
@@ -204,13 +194,6 @@ struct RecentlyDeletedCopyTests {
         #expect(label(deleted(30, offsetHours: 5, before: now), now, bundle: it) == "5 ore rimaste")
         #expect(label(deleted(31, before: now), now, bundle: it) == "Oltre la scadenza")
         #expect(label(nil, now, bundle: it) == "Senza scadenza")
-    }
-
-    @Test("the subtitle pieces are localized to Italian")
-    func subtitleItalian() throws {
-        let it = try italianBundle()
-        #expect(RecentlyDeletedCopy.subtitleCount(1, bundle: it) == "1 elemento")
-        #expect(RecentlyDeletedCopy.subtitleCount(8, bundle: it) == "8 elementi")
     }
 
     private func noon() throws -> Date {

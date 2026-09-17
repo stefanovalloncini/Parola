@@ -89,17 +89,6 @@
         }
       }
     },
-    "%@ · removed after %lld days": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$@ · rimossi dopo %2$lld giorni"
-          }
-        }
-      }
-    },
     "%@%%": {
       "extractionState": "manual",
       "localizations": {
@@ -243,6 +232,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld elementi"
+          }
+        }
+      }
+    },
+    "%lld items · removed after %lld days": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld elementi · rimossi dopo %2$lld giorni"
           }
         }
       }
@@ -461,6 +461,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 elemento sarà eliminato per sempre."
+          }
+        }
+      }
+    },
+    "1 item · removed after %lld days": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 elemento · rimosso dopo %lld giorni"
           }
         }
       }
