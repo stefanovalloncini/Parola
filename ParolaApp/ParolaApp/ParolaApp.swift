@@ -223,6 +223,10 @@ struct ParolaApp: App {
                 }
             }
             CommandMenu("Transcript") {
+                Button("Back") { model.returnToOrigin() }
+                    .keyboardShortcut("[", modifiers: [.command])
+                    .disabled(!model.canReturnToOrigin)
+                Divider()
                 Button("Copy Plain Text") { model.copyTranscriptToPasteboard(withTimestamps: false) }
                     .keyboardShortcut("c", modifiers: [.command, .shift])
                     .disabled(!model.hasTranscript)

@@ -18,6 +18,10 @@ struct TranscriptHeaderBar: View {
 
     var body: some View {
         HStack(spacing: DS.Spacing.small) {
+            if model.canReturnToOrigin {
+                TranscriptBackLink()
+            }
+
             Text(title)
                 .font(DS.Font.heading)
                 .lineLimit(1)

@@ -40,6 +40,8 @@ struct TranscriptPaneLayoutTests {
         var names: [String] = []
         func walk(_ view: NSView) {
             for sub in view.subviews {
+                // AppKit parks its key-view proxy off to the left of the window; it never draws.
+                if String(describing: type(of: sub)) == "KeyViewProxy" { continue }
                 let frame = sub.convert(sub.bounds, to: host)
                 if frame.minX < -0.5 || frame.maxX > host.bounds.width + 0.5 {
                     names.append("\(type(of: sub)) \(frame)")

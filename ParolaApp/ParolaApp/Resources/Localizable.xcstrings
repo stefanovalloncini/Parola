@@ -1432,6 +1432,17 @@
         }
       }
     },
+    "Back": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indietro"
+          }
+        }
+      }
+    },
     "Back 15 seconds": {
       "extractionState": "manual",
       "localizations": {
@@ -1439,6 +1450,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Indietro di 15 secondi"
+          }
+        }
+      }
+    },
+    "Back to %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torna a %@"
+          }
+        }
+      }
+    },
+    "Back to the List": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torna all'elenco"
           }
         }
       }
@@ -7618,6 +7651,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ripristina (%lld)"
+          }
+        }
+      }
+    },
+    "Results": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Risultati"
           }
         }
       }
