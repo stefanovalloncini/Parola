@@ -17,4 +17,11 @@ struct DSProgressBarTests {
         let bar = DSProgressBar(value: 0.5, fill: DS.Color.danger)
         #expect(bar.resolvedFill == DS.Color.danger)
     }
+
+    @Test("a bar is as thick as the design system says unless a caller asks for thinner")
+    func heightDefaultsToTheToken() {
+        #expect(DSProgressBar(value: 0.5).height == DS.Size.progressBarHeight)
+        #expect(DSProgressBar(value: 0.5, height: RecentlyDeletedRow.expiryBarHeight).height == 3)
+        #expect(RecentlyDeletedRow.expiryBarHeight < DS.Size.progressBarHeight)
+    }
 }

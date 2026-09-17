@@ -1,12 +1,34 @@
 import Foundation
 
 enum RecentlyDeletedCopy {
-    enum Tier {
-        case calm
+    /// Where the page turns urgent: its sections, its countdown colour and its expiry bar all split here.
+    static let urgentDaysLeft = 3
+
+    enum ExpiryBucket: String, CaseIterable, Identifiable {
         case soon
-        case critical
-        case overdue
-        case undated
+        case later
+
+        var id: String { rawValue }
+
+        var caption: String {
+            switch self {
+            case .soon: return "Expiring soon"
+            case .later: return "Expiring later"
+            }
+        }
+    }
+
+    static func bucket(daysLeft: Int?) -> ExpiryBucket {
+        guard let daysLeft else { return .later }
+        return daysLeft <= urgentDaysLeft ? .soon : .later
+    }
+
+    /// Soon first whatever the sort picked; a bucket with nothing in it gets no section.
+    static func grouped<T>(_ items: [T], daysLeft: (T) -> Int?) -> [(bucket: ExpiryBucket, items: [T])] {
+        ExpiryBucket.allCases.compactMap { bucket in
+            let matching = items.filter { RecentlyDeletedCopy.bucket(daysLeft: daysLeft($0)) == bucket }
+            return matching.isEmpty ? nil : (bucket, matching)
+        }
     }
 
     static func bulkPurgeTitle(_ count: Int, bundle: Bundle = .main) -> String {
@@ -21,10 +43,12 @@ enum RecentlyDeletedCopy {
             : String(localized: "All \(count) items will be deleted for good.", bundle: bundle)
     }
 
-    static func selectionCount(_ count: Int, bundle: Bundle = .main) -> String {
-        count == 1
-            ? String(localized: "1 selected", bundle: bundle)
-            : String(localized: "\(count) selected", bundle: bundle)
+    static func restoreSelection(_ count: Int, bundle: Bundle = .main) -> String {
+        String(localized: "Restore (\(count))", bundle: bundle)
+    }
+
+    static func deleteSelection(_ count: Int, bundle: Bundle = .main) -> String {
+        String(localized: "Delete (\(count))…", bundle: bundle)
     }
 
     static func subtitleCount(_ count: Int, bundle: Bundle = .main) -> String {
@@ -49,12 +73,16 @@ enum RecentlyDeletedCopy {
         return retentionDays - elapsed
     }
 
-    static func tier(daysLeft: Int?) -> Tier {
-        guard let daysLeft else { return .undated }
-        if daysLeft < 0 { return .overdue }
-        if daysLeft <= 2 { return .critical }
-        if daysLeft <= 7 { return .soon }
-        return .calm
+    /// How much of the retention window is left, for the bar under a row. Nil when nothing dates the entry.
+    static func remainingFraction(daysLeft: Int?, retentionDays: Int) -> Double? {
+        guard let daysLeft, retentionDays > 0 else { return nil }
+        return min(max(Double(daysLeft) / Double(retentionDays), 0), 1)
+    }
+
+    /// The row's date slot, which without the verb would read as the day the transcript was made.
+    static func deletedOn(_ deletedAt: Date?, bundle: Bundle = .main) -> String? {
+        guard let deletedAt else { return nil }
+        return String(localized: "Deleted \(AppFormat.dayAndMonth(deletedAt))", bundle: bundle)
     }
 
     static func deadline(deletedAt: Date, retentionDays: Int) -> Date {

@@ -138,6 +138,26 @@ struct LibraryEntryDisplayTests {
         #expect(turbo.modelLabel != speech.modelLabel)
     }
 
+    @Test("a named date replaces the slot a bare day would fill")
+    func dateLabelNamesTheSlot() {
+        let plain = display()
+        let stated = date.addingTimeInterval(-86_400)
+        let named = LibraryRowDisplay(entry: plain.entry, date: stated, dateLabel: "Deleted 12 Sep")
+
+        #expect(named.shortDate == "Deleted 12 Sep")
+        #expect(named.timeOfDay == "Deleted 12 Sep")
+        #expect(plain.shortDate != named.shortDate)
+    }
+
+    @Test("without a label the stated date is formatted as a day")
+    func statedDateFallsBackToTheDay() {
+        let plain = display()
+        let stated = date.addingTimeInterval(-86_400)
+        let dated = LibraryRowDisplay(entry: plain.entry, date: stated)
+
+        #expect(dated.shortDate == AppFormat.dayAndMonth(stated))
+    }
+
     @Test("the row's hover strings are formatted with the entry, not with every cell")
     func rowStringsAreFormattedOnce() {
         let opened = date.addingTimeInterval(3600)

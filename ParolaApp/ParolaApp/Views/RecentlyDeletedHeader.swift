@@ -56,6 +56,8 @@ struct RecentlyDeletedHeader: View {
     @Binding var categoryFilter: RecentlyDeletedCategoryFilter
     @Binding var sortOption: RecentlyDeletedSort
     @Binding var confirmingEmpty: Bool
+    let onRestoreSelection: () -> Void
+    let onDeleteSelection: () -> Void
     let onDone: () -> Void
 
     var body: some View {
@@ -75,12 +77,38 @@ struct RecentlyDeletedHeader: View {
                 )
                 .frame(maxWidth: 220)
                 sortMenu
-                deleteAllButton
+                if selection.isEmpty {
+                    deleteAllButton
+                } else {
+                    restoreSelectionButton
+                    deleteSelectionButton
+                }
                 Button("Done", action: onDone)
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf("Toolbar.Button.Done")
             }
         )
+    }
+
+    private var selection: Set<LibraryEntry.ID> { model.recentlyDeletedSelection }
+
+    private var restoreSelectionButton: some View {
+        Button(RecentlyDeletedCopy.restoreSelection(selection.count)) { onRestoreSelection() }
+            .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
+            .help("Put the selected items back in your library")
+            .axLeaf("Selection.Button.Restore")
+    }
+
+    private var deleteSelectionButton: some View {
+        Button {
+            onDeleteSelection()
+        } label: {
+            Text(verbatim: RecentlyDeletedCopy.deleteSelection(selection.count))
+                .foregroundStyle(DS.Color.dangerText)
+        }
+        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+        .help("Delete the selected items for good")
+        .axLeaf("Selection.Button.DeletePermanently")
     }
 
     private var kindMenu: some View {

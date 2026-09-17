@@ -877,6 +877,8 @@ final class AppModel {
     }
     private(set) var libraryVersion: Int = 0
     var deletedEntries: [LibraryEntry] = []
+    /// What Recently Deleted's bulk actions act on. It lives here so the page's header and the bridge read one selection.
+    var recentlyDeletedSelection: Set<LibraryEntry.ID> = []
     var searchResults: [LibraryEntry]? {
         didSet { searchResultsVersion &+= 1 }
     }

@@ -64,16 +64,16 @@ struct LibraryRowDisplay: Identifiable {
     var noteCount: Int { entry.segmentNotes.count }
     var labels: [String] { entry.labels }
 
-    /// `date` is what the row states; Recently Deleted passes the deletion, where the creation says less.
-    init(entry: LibraryEntry, excerpt: String? = nil, date: Date? = nil) {
+    /// `date` is what the row states; `dateLabel` names it where the bare day would read as the creation.
+    init(entry: LibraryEntry, excerpt: String? = nil, date: Date? = nil, dateLabel: String? = nil) {
         let title = LibraryEntryDisplay.title(for: entry)
         let stated = date ?? entry.createdAt
         self.entry = entry
         self.title = title
         self.excerpt = excerpt
         sourceKind = EntrySourceKind(entry: entry)
-        timeOfDay = AppFormat.timeOfDay(stated)
-        shortDate = AppFormat.dayAndMonth(stated)
+        timeOfDay = dateLabel ?? AppFormat.timeOfDay(stated)
+        shortDate = dateLabel ?? AppFormat.dayAndMonth(stated)
         durationLabel = entry.durationSeconds.flatMap { $0 > 0 ? Timecode.format($0) : nil }
         modelLabel = LibraryEntryDisplay.modelName(raw: entry.modelName)
         languageLabel = LanguageDisplay.name(for: entry.language)

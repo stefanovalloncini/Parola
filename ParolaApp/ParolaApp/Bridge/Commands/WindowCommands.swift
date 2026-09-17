@@ -132,6 +132,25 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "selectDeletedEntries",
+                area: .window,
+                summary: "Selects rows on the Recently Deleted page, the way a click would. No ids clears the selection.",
+                kind: .mutating,
+                args: [
+                    .init(name: "ids", kind: .stringArray, required: false, summary: "Entry ids; omit to clear the selection"),
+                ],
+                handler: { args, ctx in
+                    let requested = Set(try args.optionalStringArray("ids") ?? [])
+                    let deleted = Set(ctx.model.deletedEntries.map(\.id))
+                    ctx.model.recentlyDeletedSelection = requested.intersection(deleted)
+                    return .object([
+                        "selected": .int(ctx.model.recentlyDeletedSelection.count),
+                        "ids": .array(ctx.model.recentlyDeletedSelection.sorted().map { .string($0) }),
+                    ])
+                }
+            ),
+
+            AutomationCommand(
                 name: "closeRecentlyDeleted",
                 area: .window,
                 summary: "Leaves the Recently Deleted page for the route it was opened from.",

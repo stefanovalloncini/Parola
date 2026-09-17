@@ -5,6 +5,7 @@ struct DSProgressBar: View {
     /// Nil while the run can't say how far along it is; the bar sweeps instead of filling.
     let value: Double?
     var fill: Color? = nil
+    var height: CGFloat = DS.Size.progressBarHeight
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -31,7 +32,7 @@ struct DSProgressBar: View {
                 }
             }
         }
-        .frame(height: DS.Size.progressBarHeight)
+        .frame(height: height)
         .clipped()
         .accessibilityElement()
         .accessibilityAddTraits(.updatesFrequently)

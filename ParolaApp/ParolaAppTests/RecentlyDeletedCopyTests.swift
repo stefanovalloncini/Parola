@@ -39,24 +39,19 @@ struct RecentlyDeletedCopyTests {
         #expect(RecentlyDeletedCopy.emptyTrashMessage(1, bundle: try italianBundle()) == "1 elemento sarà eliminato per sempre.")
     }
 
-    @Test("selection count uses the bare singular for one item")
-    func selectionCountSingular() {
-        #expect(RecentlyDeletedCopy.selectionCount(1) == "1 selected")
+    @Test("the bulk actions count what they will act on")
+    func selectionActionLabels() {
+        #expect(RecentlyDeletedCopy.restoreSelection(1) == "Restore (1)")
+        #expect(RecentlyDeletedCopy.restoreSelection(3) == "Restore (3)")
+        #expect(RecentlyDeletedCopy.deleteSelection(1) == "Delete (1)…")
+        #expect(RecentlyDeletedCopy.deleteSelection(3) == "Delete (3)…")
     }
 
-    @Test("selection count uses the plural for several items")
-    func selectionCountPlural() {
-        #expect(RecentlyDeletedCopy.selectionCount(3) == "3 selected")
-    }
-
-    @Test("the singular selection count is localized to Italian")
-    func selectionCountSingularItalian() throws {
-        #expect(RecentlyDeletedCopy.selectionCount(1, bundle: try italianBundle()) == "1 selezionato")
-    }
-
-    @Test("the plural selection count is localized to Italian")
-    func selectionCountPluralItalian() throws {
-        #expect(RecentlyDeletedCopy.selectionCount(4, bundle: try italianBundle()) == "4 selezionati")
+    @Test("the bulk actions are localized to Italian")
+    func selectionActionLabelsItalian() throws {
+        let it = try italianBundle()
+        #expect(RecentlyDeletedCopy.restoreSelection(2, bundle: it) == "Ripristina (2)")
+        #expect(RecentlyDeletedCopy.deleteSelection(2, bundle: it) == "Elimina (2)…")
     }
 
     @Test("every sort label resolves to Italian")
@@ -121,16 +116,54 @@ struct RecentlyDeletedCopyTests {
         }
     }
 
-    @Test("tiers split on the deadline thresholds")
-    func tierMapping() {
-        #expect(RecentlyDeletedCopy.tier(daysLeft: nil) == .undated)
-        #expect(RecentlyDeletedCopy.tier(daysLeft: -1) == .overdue)
-        #expect(RecentlyDeletedCopy.tier(daysLeft: 0) == .critical)
-        #expect(RecentlyDeletedCopy.tier(daysLeft: 2) == .critical)
-        #expect(RecentlyDeletedCopy.tier(daysLeft: 3) == .soon)
-        #expect(RecentlyDeletedCopy.tier(daysLeft: 7) == .soon)
-        #expect(RecentlyDeletedCopy.tier(daysLeft: 8) == .calm)
-        #expect(RecentlyDeletedCopy.tier(daysLeft: 30) == .calm)
+    @Test("the sections split on the third day")
+    func bucketBoundary() {
+        #expect(RecentlyDeletedCopy.bucket(daysLeft: -1) == .soon)
+        #expect(RecentlyDeletedCopy.bucket(daysLeft: 0) == .soon)
+        #expect(RecentlyDeletedCopy.bucket(daysLeft: 3) == .soon)
+        #expect(RecentlyDeletedCopy.bucket(daysLeft: 4) == .later)
+        #expect(RecentlyDeletedCopy.bucket(daysLeft: 30) == .later)
+    }
+
+    @Test("an item with no deletion date expires later, not soon")
+    func bucketUndated() {
+        #expect(RecentlyDeletedCopy.bucket(daysLeft: nil) == .later)
+    }
+
+    @Test("grouping leads with the urgent bucket and skips the empty one")
+    func grouping() {
+        let mixed = RecentlyDeletedCopy.grouped([12, 2, 30, 0]) { $0 }
+        #expect(mixed.map(\.bucket) == [.soon, .later])
+        #expect(mixed[0].items == [2, 0])
+        #expect(mixed[1].items == [12, 30])
+
+        let calmOnly = RecentlyDeletedCopy.grouped([12, 30]) { $0 }
+        #expect(calmOnly.map(\.bucket) == [.later])
+        #expect(RecentlyDeletedCopy.grouped([Int]()) { $0 }.isEmpty)
+    }
+
+    @Test("the expiry bar reads the share of the window that is left")
+    func remainingFraction() {
+        #expect(RecentlyDeletedCopy.remainingFraction(daysLeft: 30, retentionDays: 30) == 1)
+        #expect(RecentlyDeletedCopy.remainingFraction(daysLeft: 15, retentionDays: 30) == 0.5)
+        #expect(RecentlyDeletedCopy.remainingFraction(daysLeft: -4, retentionDays: 30) == 0)
+        #expect(RecentlyDeletedCopy.remainingFraction(daysLeft: nil, retentionDays: 30) == nil)
+    }
+
+    @Test("the date slot names the deletion instead of leaving a bare day")
+    func deletedOnLabel() throws {
+        let deletedAt = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 12)))
+        let label = try #require(RecentlyDeletedCopy.deletedOn(deletedAt))
+        #expect(label == "Deleted \(AppFormat.dayAndMonth(deletedAt))")
+        #expect(label.hasPrefix("Deleted "))
+        #expect(RecentlyDeletedCopy.deletedOn(nil) == nil)
+    }
+
+    @Test("the date slot is localized to Italian")
+    func deletedOnItalian() throws {
+        let deletedAt = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 9, day: 12)))
+        let label = try #require(RecentlyDeletedCopy.deletedOn(deletedAt, bundle: try italianBundle()))
+        #expect(label.hasPrefix("Eliminato il "))
     }
 
     @Test("the countdown uses days above the final day")

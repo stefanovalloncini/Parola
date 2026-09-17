@@ -150,15 +150,14 @@ struct SurfaceContrastTests {
         }
     }
 
-    /// The trash page's group header and the countdown under it read one tier mapping, in legible tokens.
+    /// The trash page's section caption, its countdown and the bar under it read one bucket, in legible tokens.
     @MainActor
-    @Test("the Recently Deleted header reads the same tier colours as its rows")
-    func recentlyDeletedTierColours() {
-        #expect(MacRecentlyDeletedView.Bucket.soon.tint == DS.Color.warningText)
-        #expect(MacRecentlyDeletedView.Bucket.critical.tint == DS.Color.dangerText)
-        #expect(MacRecentlyDeletedView.Bucket.overdue.tint == DS.Color.dangerText)
-        #expect(RecentlyDeletedCopy.Tier.soon.color == DS.Color.warningText)
-        #expect(RecentlyDeletedCopy.Tier.overdue.color == DS.Color.dangerText)
+    @Test("an expiring item is urgent in every token the row draws it with")
+    func recentlyDeletedBucketColours() {
+        #expect(RecentlyDeletedCopy.ExpiryBucket.soon.countdownColor == DS.Color.dangerText)
+        #expect(RecentlyDeletedCopy.ExpiryBucket.soon.barFill == DS.Color.dangerText)
+        #expect(RecentlyDeletedCopy.ExpiryBucket.later.countdownColor == DS.Color.secondaryText)
+        #expect(RecentlyDeletedCopy.ExpiryBucket.later.barFill == DS.Color.accent)
     }
 
     @Test("accent text leaves an accent that already clears AA alone")

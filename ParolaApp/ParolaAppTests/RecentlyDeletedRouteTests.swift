@@ -16,6 +16,15 @@ struct RecentlyDeletedRouteTests {
         )
     }
 
+    private func entry(_ id: String) -> LibraryEntry {
+        let manifest = ParolaDocument.Manifest(originalAudioName: "\(id).m4a", modelName: "stub", language: "en")
+        return LibraryEntry(
+            id: id,
+            bundleURL: URL(fileURLWithPath: "/tmp/RecentlyDeletedRouteTests/\(id).parola"),
+            manifest: manifest
+        )
+    }
+
     private func makeRig() throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
         let model = makeModel()
         let server = try ParolaAutomationServer(model: model)
@@ -97,6 +106,40 @@ struct RecentlyDeletedRouteTests {
         }
         #expect(fields["open"] == .bool(false))
         #expect(fields["route"] == .string("transcript"))
+    }
+
+    @Test("the bridge selects only rows the page is showing")
+    func bridgeSelectsDeletedEntries() async throws {
+        let (model, server, context, commands) = try makeRig()
+        model.deletedEntries = [entry("a"), entry("b")]
+        let command = try #require(commands["selectDeletedEntries"])
+
+        let result = try await command.handler(
+            try command.validate(AutomationArgs(["ids": .array([.string("b"), .string("ghost")])])),
+            context
+        )
+        withExtendedLifetime(server) {}
+
+        #expect(model.recentlyDeletedSelection == ["b"])
+        guard case .object(let fields) = result else {
+            Issue.record("selectDeletedEntries should answer with an object")
+            return
+        }
+        #expect(fields["selected"] == .int(1))
+        #expect(fields["ids"] == .array([.string("b")]))
+    }
+
+    @Test("the bridge clears the selection when it names nothing")
+    func bridgeClearsSelection() async throws {
+        let (model, server, context, commands) = try makeRig()
+        model.deletedEntries = [entry("a")]
+        model.recentlyDeletedSelection = ["a"]
+        let command = try #require(commands["selectDeletedEntries"])
+
+        _ = try await command.handler(try command.validate(AutomationArgs()), context)
+        withExtendedLifetime(server) {}
+
+        #expect(model.recentlyDeletedSelection.isEmpty)
     }
 
     @Test("setRoute names the page among the routes it accepts")
