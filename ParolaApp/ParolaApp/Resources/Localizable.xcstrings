@@ -89,6 +89,17 @@
         }
       }
     },
+    "%@ · removed after %lld days": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · rimossi dopo %2$lld giorni"
+          }
+        }
+      }
+    },
     "%@%%": {
       "extractionState": "manual",
       "localizations": {
@@ -172,17 +183,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld voci · %@"
-          }
-        }
-      }
-    },
-    "%lld expiring soon": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld in scadenza"
           }
         }
       }
@@ -428,17 +428,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 giorno rimasto"
-          }
-        }
-      }
-    },
-    "1 expiring soon": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 in scadenza"
           }
         }
       }
@@ -1127,6 +1116,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld elementi saranno eliminati per sempre."
+          }
+        }
+      }
+    },
+    "All Kinds": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutti i tipi"
           }
         }
       }
@@ -2733,6 +2733,17 @@
         }
       }
     },
+    "Delete All…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina tutto…"
+          }
+        }
+      }
+    },
     "Delete Diagnostics": {
       "extractionState": "manual",
       "localizations": {
@@ -3686,6 +3697,17 @@
         }
       }
     },
+    "Filter by kind": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtra per tipo"
+          }
+        }
+      }
+    },
     "Filter by sender": {
       "extractionState": "manual",
       "localizations": {
@@ -4501,17 +4523,6 @@
         }
       }
     },
-    "Items are removed for good after %lld days.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gli elementi vengono eliminati per sempre dopo %lld giorni."
-          }
-        }
-      }
-    },
     "JSON (.json)": {
       "extractionState": "manual",
       "localizations": {
@@ -4629,17 +4640,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Battute tasti"
-          }
-        }
-      }
-    },
-    "Kind": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tipo"
           }
         }
       }
@@ -5952,6 +5952,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nota"
+          }
+        }
+      }
+    },
+    "Nothing deleted · items are kept %lld days": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niente da eliminare · gli elementi restano %lld giorni"
           }
         }
       }
@@ -7585,17 +7596,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ripristina"
-          }
-        }
-      }
-    },
-    "Restore All": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ripristina tutto"
           }
         }
       }
@@ -9758,17 +9758,6 @@
         }
       }
     },
-    "Try a different When or Kind filter.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Prova un altro filtro Quando o Tipo."
-          }
-        }
-      }
-    },
     "Try again": {
       "extractionState": "manual",
       "localizations": {
@@ -9776,6 +9765,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riprova"
+          }
+        }
+      }
+    },
+    "Try another kind of transcript.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prova con un altro tipo di trascrizione."
           }
         }
       }
@@ -10106,17 +10106,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cosa succede ai file esportati da un lotto."
-          }
-        }
-      }
-    },
-    "When": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quando"
           }
         }
       }

@@ -8,7 +8,6 @@ struct MacRecentlyDeletedView: View {
     @State private var confirmingPurgeBulk: Set<LibraryEntry.ID> = []
     @State private var confirmingEmpty = false
     @State private var searchText = ""
-    @State private var dateFilter: RecentlyDeletedDateFilter = .all
     @State private var categoryFilter: RecentlyDeletedCategoryFilter = .all
     @State private var sortOption: RecentlyDeletedSort = .deletedEarliest
     @State private var previews: [LibraryEntry.ID: String] = [:]
@@ -21,18 +20,14 @@ struct MacRecentlyDeletedView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            RecentlyDeletedToolbar(
+            RecentlyDeletedHeader(
                 searchText: $searchText,
+                categoryFilter: $categoryFilter,
                 sortOption: $sortOption,
                 confirmingEmpty: $confirmingEmpty,
-                expiringSoon: expiringSoon,
                 onDone: { model.closeRecentlyDeleted() }
             )
-            RecentlyDeletedFilterBar(
-                dateFilter: $dateFilter,
-                categoryFilter: $categoryFilter
-            )
-            Divider().opacity(0.5)
+            Divider()
             if !selection.isEmpty {
                 selectionBar
             }
@@ -43,7 +38,6 @@ struct MacRecentlyDeletedView: View {
             } else {
                 list
             }
-            footer
         }
         .onChange(of: model.deletedEntries) { _, entries in
             let live = Set(entries.map(\.id))
@@ -179,25 +173,6 @@ struct MacRecentlyDeletedView: View {
         }
     }
 
-    private var footer: some View {
-        HStack(spacing: DS.Spacing.regular) {
-            Text("Items are removed for good after \(AppModel.trashRetentionDays) days.")
-                .font(DS.Font.secondary)
-                .foregroundStyle(DS.Color.secondaryText)
-            Spacer(minLength: DS.Spacing.regular)
-            Button("Delete All Now", role: .destructive) { confirmingEmpty = true }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-                .disabled(model.deletedEntries.isEmpty)
-                .help("Delete every item in Recently Deleted")
-                .axLeaf("Toolbar.Button.EmptyTrash")
-        }
-        .padding(.horizontal, DS.Spacing.regular)
-        .padding(.vertical, DS.Spacing.small)
-        .background(DS.Color.surface)
-        .overlay(alignment: .top) { Divider().opacity(0.5) }
-    }
-
     private var empty: some View {
         VStack(spacing: DS.Spacing.large) {
             DecayStrip(
@@ -235,7 +210,7 @@ struct MacRecentlyDeletedView: View {
                     .font(DS.Font.title3)
                     .foregroundStyle(DS.Color.primaryText)
                 if searchText.isEmpty {
-                    Text("Try a different When or Kind filter.")
+                    Text("Try another kind of transcript.")
                         .font(DS.Font.callout)
                         .foregroundStyle(DS.Color.secondaryText)
                         .multilineTextAlignment(.center)
@@ -244,7 +219,6 @@ struct MacRecentlyDeletedView: View {
             }
             Button("Clear Filters") {
                 searchText = ""
-                dateFilter = .all
                 categoryFilter = .all
             }
             .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
@@ -261,7 +235,6 @@ struct MacRecentlyDeletedView: View {
         let q = searchText.lowercased()
         return model.deletedEntries.filter { entry in
             guard categoryFilter.matches(entry.category) else { return false }
-            guard dateFilter.matches(entry.deletedAt, now: now) else { return false }
             guard !q.isEmpty else { return true }
             if entry.title.lowercased().contains(q) { return true }
             return previews[entry.id]?.lowercased().contains(q) ?? false
@@ -372,13 +345,6 @@ struct MacRecentlyDeletedView: View {
             now: now,
             retentionDays: AppModel.trashRetentionDays
         )
-    }
-
-    private var expiringSoon: Int {
-        model.deletedEntries.filter { entry in
-            guard let days = daysLeft(for: entry) else { return false }
-            return days <= 2
-        }.count
     }
 
     private var rowTransition: AnyTransition {

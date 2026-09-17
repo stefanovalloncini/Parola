@@ -46,11 +46,8 @@ struct CopyCasingTests {
         }
     }
 
-    @Test("Recently Deleted filter pills share one casing")
+    @Test("Recently Deleted controls share one casing")
     func recentlyDeletedFiltersAreTitleCase() {
-        for filter in RecentlyDeletedDateFilter.allCases {
-            #expect(isTitleCase(filter.title), "when filter \(filter.title)")
-        }
         for filter in RecentlyDeletedCategoryFilter.allCases {
             #expect(isTitleCase(filter.title), "kind filter \(filter.title)")
         }

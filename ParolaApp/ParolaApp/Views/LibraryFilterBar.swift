@@ -43,7 +43,7 @@ struct LibraryFilterBar: View {
                             .axLeaf("Filter.MenuItem.Label.\(label)")
                     }
                 } label: {
-                    pill(systemImage: "tag", label: labelFilter.map { Text(verbatim: $0) } ?? Text("All Labels"))
+                    FilterPillLabel(systemImage: "tag", label: labelFilter.map { Text(verbatim: $0) } ?? Text("All Labels"))
                 }
                 .menuStyle(.button)
                 .buttonStyle(ChipButtonStyle(isSelected: labelFilter != nil))
@@ -61,7 +61,7 @@ struct LibraryFilterBar: View {
                             .axLeaf("Filter.MenuItem.Language.\(code)")
                     }
                 } label: {
-                    pill(
+                    FilterPillLabel(
                         systemImage: "globe",
                         label: languageFilter.map { Text(verbatim: languageName($0)) } ?? Text("All Languages")
                     )
@@ -78,7 +78,7 @@ struct LibraryFilterBar: View {
                         .axLeaf("Filter.MenuItem.Date.\(option.rawValue)")
                 }
             } label: {
-                pill(systemImage: "calendar", label: Text(dateRangeFilter.label))
+                FilterPillLabel(systemImage: "calendar", label: Text(dateRangeFilter.label))
             }
             .menuStyle(.button)
             .buttonStyle(ChipButtonStyle(isSelected: dateRangeFilter != .all))
@@ -88,14 +88,20 @@ struct LibraryFilterBar: View {
         }
     }
 
-    private func pill(systemImage: String, label: Text) -> some View {
+    private func languageName(_ code: String) -> String {
+        LanguageDisplay.name(for: code) ?? code.uppercased()
+    }
+}
+
+/// The label every filter pull-down wears: a glyph and what the list is filtered to.
+struct FilterPillLabel: View {
+    let systemImage: String
+    let label: Text
+
+    var body: some View {
         HStack(spacing: 4) {
             Image(systemName: systemImage)
             label
         }
-    }
-
-    private func languageName(_ code: String) -> String {
-        LanguageDisplay.name(for: code) ?? code.uppercased()
     }
 }

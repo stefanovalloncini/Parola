@@ -83,14 +83,24 @@ struct RecentlyDeletedCopyTests {
         #expect(RecentlyDeletedCopy.subtitleCount(8) == "8 items")
     }
 
-    @Test("the expiring clause uses the singular for one item")
-    func subtitleExpiringSingular() {
-        #expect(RecentlyDeletedCopy.subtitleExpiring(1) == "1 expiring soon")
+    @Test("the subtitle names the count and the retention window")
+    func subtitleWording() {
+        #expect(RecentlyDeletedCopy.subtitle(count: 1, retentionDays: 30) == "1 item · removed after 30 days")
+        #expect(RecentlyDeletedCopy.subtitle(count: 2, retentionDays: 30) == "2 items · removed after 30 days")
+        #expect(RecentlyDeletedCopy.subtitle(count: 8, retentionDays: 14) == "8 items · removed after 14 days")
     }
 
-    @Test("the expiring clause uses the plural for several items")
-    func subtitleExpiringPlural() {
-        #expect(RecentlyDeletedCopy.subtitleExpiring(2) == "2 expiring soon")
+    @Test("an empty trash says so instead of counting to zero")
+    func subtitleEmpty() {
+        #expect(RecentlyDeletedCopy.subtitle(count: 0, retentionDays: 30) == "Nothing deleted · items are kept 30 days")
+    }
+
+    @Test("the subtitle is localized to Italian on both sides of zero")
+    func subtitleWordingItalian() throws {
+        let it = try italianBundle()
+        #expect(RecentlyDeletedCopy.subtitle(count: 1, retentionDays: 30, bundle: it) == "1 elemento · rimossi dopo 30 giorni")
+        #expect(RecentlyDeletedCopy.subtitle(count: 3, retentionDays: 30, bundle: it) == "3 elementi · rimossi dopo 30 giorni")
+        #expect(RecentlyDeletedCopy.subtitle(count: 0, retentionDays: 30, bundle: it) == "Niente da eliminare · gli elementi restano 30 giorni")
     }
 
     @Test("an entry without a deletion date has no days left")
@@ -168,8 +178,6 @@ struct RecentlyDeletedCopyTests {
         let it = try italianBundle()
         #expect(RecentlyDeletedCopy.subtitleCount(1, bundle: it) == "1 elemento")
         #expect(RecentlyDeletedCopy.subtitleCount(8, bundle: it) == "8 elementi")
-        #expect(RecentlyDeletedCopy.subtitleExpiring(1, bundle: it) == "1 in scadenza")
-        #expect(RecentlyDeletedCopy.subtitleExpiring(2, bundle: it) == "2 in scadenza")
     }
 
     private func noon() throws -> Date {
