@@ -1454,13 +1454,68 @@
         }
       }
     },
-    "Back to %@": {
+    "Back to All": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Torna a %@"
+            "value": "Torna a Tutti"
+          }
+        }
+      }
+    },
+    "Back to Dictations": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torna alle dettature"
+          }
+        }
+      }
+    },
+    "Back to Home": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torna alla Home"
+          }
+        }
+      }
+    },
+    "Back to Meetings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torna alle riunioni"
+          }
+        }
+      }
+    },
+    "Back to Results": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torna ai risultati"
+          }
+        }
+      }
+    },
+    "Back to Transcriptions": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Torna alle trascrizioni"
           }
         }
       }

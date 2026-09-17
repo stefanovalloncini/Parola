@@ -16,32 +16,32 @@ struct TranscriptBackLink: View {
             }
             .font(DS.Font.secondary)
             .foregroundStyle(DS.Color.secondaryText)
-            .padding(.horizontal, DS.Spacing.snug)
-            .frame(height: 22)
-            .background(
-                RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                    .fill(DS.Color.surfaceElevated)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
         }
-        .buttonStyle(.plain)
-        .modifier(BackHelpModifier(name: origin.name))
+        .buttonStyle(DSIconChipButtonStyle(fitsLabel: true))
+        .modifier(BackHelpModifier(origin: origin))
         .axLeaf("HeaderBar.Button.Back")
     }
 }
 
 private struct BackHelpModifier: ViewModifier {
-    let name: String
+    let origin: LibraryOrigin
 
     func body(content: Content) -> some View {
-        let text = TranscriptBackCopy.help(for: name)
+        let text = TranscriptBackCopy.help(for: origin)
         return content.help(text).accessibilityLabel(text)
     }
 }
 
 enum TranscriptBackCopy {
-    static func help(for name: String, locale: Locale = AppFormat.locale) -> String {
-        let list = String(localized: String.LocalizationValue(name), locale: locale)
-        return String(localized: "Back to \(list)", locale: locale)
+    /// Whole sentences per destination: Italian needs the article, which an interpolated name cannot carry.
+    static func help(for origin: LibraryOrigin, bundle: Bundle = .main) -> String {
+        switch origin {
+        case .home: return String(localized: "Back to Home", bundle: bundle)
+        case .all: return String(localized: "Back to All", bundle: bundle)
+        case .search: return String(localized: "Back to Results", bundle: bundle)
+        case .category(.transcription): return String(localized: "Back to Transcriptions", bundle: bundle)
+        case .category(.meeting): return String(localized: "Back to Meetings", bundle: bundle)
+        case .category(.dictation): return String(localized: "Back to Dictations", bundle: bundle)
+        }
     }
 }

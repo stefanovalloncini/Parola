@@ -72,12 +72,15 @@ struct DSSwitchToggleStyle: ToggleStyle {
 /// A drawn icon chip for a pull-down: `.borderlessButton` hands the label to AppKit, which drops it.
 struct DSIconChipButtonStyle: ButtonStyle {
     var side: CGFloat = 22
+    /// A chip carrying a word instead of a glyph: `side` is then only its height, and the label sets the width.
+    var fitsLabel = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(DS.Font.subheadlineEmphasized)
             .foregroundStyle(.secondary)
-            .frame(width: side, height: side)
+            .padding(.horizontal, fitsLabel ? DS.Spacing.snug : 0)
+            .frame(width: fitsLabel ? nil : side, height: side)
             .background(
                 RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                     .fill(configuration.isPressed ? DS.Palette.pillFillHover : DS.Color.surfaceElevated)

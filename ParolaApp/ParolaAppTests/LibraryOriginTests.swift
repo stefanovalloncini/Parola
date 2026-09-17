@@ -397,6 +397,19 @@ struct LibraryOriginTests {
         #expect(!model.isBrowsingLibrary)
     }
 
+    // MARK: - What the link says
+
+    @Test("the help string names the destination in both languages")
+    func helpNamesTheDestination() throws {
+        #expect(TranscriptBackCopy.help(for: .category(.meeting)) == "Back to Meetings")
+
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        #expect(TranscriptBackCopy.help(for: .category(.meeting), bundle: italian) == "Torna alle riunioni")
+        #expect(TranscriptBackCopy.help(for: .home, bundle: italian) == "Torna alla Home")
+        #expect(TranscriptBackCopy.help(for: .search, bundle: italian) == "Torna ai risultati")
+    }
+
     // MARK: - Bridge
 
     private func makeRig() throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {

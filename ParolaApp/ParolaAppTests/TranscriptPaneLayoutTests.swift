@@ -33,6 +33,10 @@ struct TranscriptPaneLayoutTests {
             modelName: "stub"
         )
         model.phase = .ready
+        // The header's back link is only as wide as its label; measure the widest one.
+        model.selectedEntryID = "pane-layout"
+        model.libraryOriginEntryID = "pane-layout"
+        model.libraryOrigin = .category(.transcription)
         return model
     }
 
