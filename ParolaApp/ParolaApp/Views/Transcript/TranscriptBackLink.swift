@@ -5,7 +5,7 @@ import ParolaCore
 struct TranscriptBackLink: View {
     @Environment(AppModel.self) private var model
 
-    private var origin: LibraryOrigin { model.libraryOrigin ?? .home }
+    private var origin: LibraryOrigin { model.transcriptOrigin ?? .home }
 
     var body: some View {
         Button { model.returnToOrigin() } label: {

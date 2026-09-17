@@ -82,7 +82,7 @@ extension ParolaAutomationServer {
                 summary: "Follows the transcript header's back link: unloads the transcript and restores the list it was opened from.",
                 kind: .mutating,
                 handler: { _, ctx in
-                    let origin = ctx.model.libraryOrigin?.bridgeName ?? ""
+                    let origin = ctx.model.transcriptOrigin?.bridgeName ?? ""
                     ctx.model.returnToOrigin()
                     return .object([
                         "origin": .string(origin),

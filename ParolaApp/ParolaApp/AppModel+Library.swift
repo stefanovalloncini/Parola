@@ -391,6 +391,7 @@ extension AppModel {
                 }
                 phase = .ready
                 libraryOrigin = origin
+                libraryOriginEntryID = id
                 if let hit, !hit.isEmpty { revealInTranscript(hit, at: hitPosition) }
                 let openedAt = Date()
                 if (try? await library.markOpened(id: id, at: openedAt)) != nil {
@@ -429,14 +430,19 @@ extension AppModel {
     /// Results outrank every list, so a row that picks one has to retire the query that would mask it.
     private func showList() {
         clearSearch()
-        libraryOrigin = nil
+        forgetLibraryOrigin()
         route = .transcript
         closeTranscript()
     }
 
+    func forgetLibraryOrigin() {
+        libraryOrigin = nil
+        libraryOriginEntryID = nil
+    }
+
     /// The transcript header's back link: leaves the list the entry was opened from exactly as it was.
     func returnToOrigin() {
-        switch libraryOrigin {
+        switch transcriptOrigin {
         case .category(let category):
             libraryFilter = category
             libraryBrowsingAll = false
@@ -449,7 +455,7 @@ extension AppModel {
             libraryFilter = nil
             libraryBrowsingAll = false
         }
-        libraryOrigin = nil
+        forgetLibraryOrigin()
         route = .transcript
         closeTranscript()
     }

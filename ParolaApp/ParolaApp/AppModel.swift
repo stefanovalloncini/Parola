@@ -903,8 +903,15 @@ final class AppModel {
     }
 
     private var openedFromSearch: Bool {
-        if case .search = libraryOrigin { return true }
+        if case .search = transcriptOrigin { return true }
         return false
+    }
+
+    /// The origin belongs to the entry it was recorded for: a transcript installed by an import, a
+    /// recording or a document arrives with none, however recently a list opened something else.
+    var transcriptOrigin: LibraryOrigin? {
+        guard let selectedEntryID, selectedEntryID == libraryOriginEntryID else { return nil }
+        return libraryOrigin
     }
 
     /// The transcript is a drill-down only when it stands alone; in a batch the list is already beside it.
@@ -970,7 +977,9 @@ final class AppModel {
     /// True when the "All" chip is showing the flat all-categories list. Distinguishes All from Home, which both leave libraryFilter nil.
     var libraryBrowsingAll: Bool = false
     /// Which list the open transcript was opened from. Nil when it was opened with no list on screen.
+    /// Read it through `transcriptOrigin`, which pairs it with the entry below.
     var libraryOrigin: LibraryOrigin?
+    var libraryOriginEntryID: LibraryEntry.ID?
     var librarySortOrder: LibrarySortOrder = .newest {
         didSet {
             reapplyLibrarySort()

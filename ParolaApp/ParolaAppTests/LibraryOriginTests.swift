@@ -136,7 +136,7 @@ struct LibraryOriginTests {
 
         #expect(await openEntry(entry.id, in: model))
 
-        #expect(model.libraryOrigin == .category(.meeting))
+        #expect(model.transcriptOrigin == .category(.meeting))
         #expect(model.libraryFilter == .meeting)
         #expect(!model.isBrowsingLibrary, "the transcript takes the content area while it is open")
         #expect(sidebar(model) == .category(.meeting), "the sidebar keeps the row the entry came from")
@@ -151,7 +151,7 @@ struct LibraryOriginTests {
 
         #expect(await openEntry(entry.id, in: model))
 
-        #expect(model.libraryOrigin == .search(query: "bianchi"))
+        #expect(model.transcriptOrigin == .search(query: "bianchi"))
         #expect(model.searchResults?.map(\.id) == [entry.id])
         #expect(model.searchQuery == "bianchi")
         #expect(sidebar(model) == .search, "no row owns the results, so none is highlighted")
@@ -164,7 +164,7 @@ struct LibraryOriginTests {
 
         #expect(await openEntry(entry.id, in: model))
 
-        #expect(model.libraryOrigin == .home)
+        #expect(model.transcriptOrigin == .home)
         #expect(sidebar(model) == .home)
     }
 
@@ -174,11 +174,44 @@ struct LibraryOriginTests {
         let first = try await seedEntry(in: model, text: "first")
         let second = try await seedEntry(in: model, text: "second")
         #expect(await openEntry(first.id, in: model))
-        model.libraryOrigin = nil
+        model.forgetLibraryOrigin()
 
         #expect(await openEntry(second.id, in: model))
 
-        #expect(model.libraryOrigin == nil, "the menu bar extra opens entries with no list behind them")
+        #expect(model.transcriptOrigin == nil, "the menu bar extra opens entries with no list behind them")
+    }
+
+    @Test("a transcript that arrives another way does not inherit the last entry's origin")
+    func documentDoesNotInheritTheOrigin() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, text: "quarterly review", category: .meeting)
+        model.browseCategory(.meeting)
+        #expect(await openEntry(entry.id, in: model))
+        #expect(model.transcriptOrigin == .category(.meeting))
+
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-origin-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let base = dir.appendingPathComponent("take")
+        _ = try ParolaDocument.write(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "opened from the Finder")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioURL: nil,
+            to: base
+        )
+        await model.openProjectDocument(at: base.appendingPathExtension("parola"))
+
+        #expect(model.transcriptOrigin == nil, "this transcript was never in a list")
+        #expect(model.canReturnToOrigin, "the link still shows — reading Home, per B3")
+
+        model.returnToOrigin()
+
+        #expect(await waitUntil { model.transcript == nil })
+        #expect(model.libraryFilter == nil, "no origin means goHome, not the last entry's category")
+        #expect(!model.isBrowsingLibrary)
     }
 
     // MARK: - Going back
@@ -195,7 +228,7 @@ struct LibraryOriginTests {
         #expect(model.libraryFilter == .meeting)
         #expect(model.isBrowsingLibrary)
         #expect(model.selectedEntryID == nil)
-        #expect(model.libraryOrigin == nil)
+        #expect(model.transcriptOrigin == nil)
         #expect(sidebar(model) == .category(.meeting))
     }
 
@@ -250,7 +283,7 @@ struct LibraryOriginTests {
         let entry = try await seedEntry(in: model, text: "opened from the menu bar")
         model.browseCategory(.meeting)
         #expect(await openEntry(entry.id, in: model))
-        model.libraryOrigin = nil
+        model.forgetLibraryOrigin()
 
         #expect(await goBack(in: model))
 
@@ -289,7 +322,7 @@ struct LibraryOriginTests {
 
         #expect(await waitUntil { model.transcript == nil })
         #expect(model.isBrowsingLibrary)
-        #expect(model.libraryOrigin == nil)
+        #expect(model.transcriptOrigin == nil)
     }
 
     @Test("a sidebar list row retires the search that would mask it")
@@ -331,7 +364,7 @@ struct LibraryOriginTests {
         model.search("bianchi")
         model.searchResults = [entry]
 
-        #expect(model.libraryOrigin == nil, "the transcript on screen did not come from this query")
+        #expect(model.transcriptOrigin == nil, "the transcript on screen did not come from this query")
         #expect(model.isBrowsingLibrary)
         #expect(!model.canReturnToOrigin, "the results are the page now, not the transcript")
 
@@ -351,7 +384,7 @@ struct LibraryOriginTests {
 
         model.search("bianchi")
 
-        #expect(model.libraryOrigin == .search(query: "bianchi"))
+        #expect(model.transcriptOrigin == .search(query: "bianchi"))
         #expect(!model.isBrowsingLibrary)
     }
 
