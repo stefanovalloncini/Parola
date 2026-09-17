@@ -409,24 +409,26 @@ extension AppModel {
     func goHome() {
         libraryFilter = nil
         libraryBrowsingAll = false
-        libraryOrigin = nil
-        route = .transcript
-        closeTranscript()
+        showList()
     }
 
     /// Sidebar All.
     func browseAll() {
         libraryFilter = nil
         libraryBrowsingAll = true
-        libraryOrigin = nil
-        route = .transcript
-        closeTranscript()
+        showList()
     }
 
     /// A sidebar category row.
     func browseCategory(_ category: EntryCategory) {
         libraryFilter = category
         libraryBrowsingAll = false
+        showList()
+    }
+
+    /// Results outrank every list, so a row that picks one has to retire the query that would mask it.
+    private func showList() {
+        clearSearch()
         libraryOrigin = nil
         route = .transcript
         closeTranscript()
@@ -491,6 +493,8 @@ extension AppModel {
 
     func search(_ query: String) {
         searchTask?.cancel()
+        // A new query is a list of its own: whatever transcript is open did not come from it.
+        if query != searchQuery { libraryOrigin = nil }
         searchQuery = query
         let q = query.trimmingCharacters(in: .whitespaces)
         if q.isEmpty {
@@ -499,7 +503,6 @@ extension AppModel {
             return
         }
         let clock = clock
-        let generation = loadEntryGeneration
         searchTask = Task { [weak self] in
             try? await Task.sleep(for: Self.searchDebounce, clock: clock)
             guard !Task.isCancelled, let self else { return }
@@ -512,11 +515,6 @@ extension AppModel {
             searchResults = active
                 .filter { matchByID[$0.id] != nil }
                 .sorted { (matchByID[$0.id]?.score ?? 0) > (matchByID[$1.id]?.score ?? 0) }
-            // Asking for results is asking to leave the transcript, unless one was opened while the query ran.
-            if generation == loadEntryGeneration {
-                libraryOrigin = nil
-                closeTranscript()
-            }
         }
     }
 

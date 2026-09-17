@@ -890,18 +890,26 @@ final class AppModel {
     @ObservationIgnored private(set) var searchResultsVersion: Int = 0
     var searchQuery: String = ""
     /// True while the content area shows a library list instead of the phase machine's panes.
-    /// A loaded transcript wins: the list it came from stays in place behind it, for the way back.
     var isBrowsingLibrary: Bool {
-        guard route == .transcript, batchJobs.isEmpty, !hasTranscript else { return false }
+        guard route == .transcript, batchJobs.isEmpty else { return false }
         switch phase {
-        case .idle, .ready: return searchResults != nil || libraryFilter != nil || libraryBrowsingAll
+        case .idle, .ready:
+            // An open transcript holds the content area, with the list it came from waiting behind it;
+            // only results it did not come from take the area back, and give it up again when they clear.
+            if hasTranscript { return searchResults != nil && !openedFromSearch }
+            return searchResults != nil || libraryFilter != nil || libraryBrowsingAll
         default: return false
         }
     }
 
+    private var openedFromSearch: Bool {
+        if case .search = libraryOrigin { return true }
+        return false
+    }
+
     /// The transcript is a drill-down only when it stands alone; in a batch the list is already beside it.
     var canReturnToOrigin: Bool {
-        hasTranscript && batchJobs.isEmpty && route == .transcript
+        hasTranscript && batchJobs.isEmpty && route == .transcript && !isBrowsingLibrary
     }
     /// Why each result matched, keyed by entry: the snippet the results list shows under the row.
     var searchMatches: [String: LibrarySearchIndex.Match] = [:]

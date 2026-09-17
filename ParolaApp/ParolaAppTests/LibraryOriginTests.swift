@@ -292,6 +292,69 @@ struct LibraryOriginTests {
         #expect(model.libraryOrigin == nil)
     }
 
+    @Test("a sidebar list row retires the search that would mask it")
+    func sidebarRowClearsTheSearch() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, text: "bianchi call")
+        model.searchQuery = "bianchi"
+        model.searchResults = [entry]
+
+        model.browseCategory(.meeting)
+
+        #expect(model.searchResults == nil)
+        #expect(model.searchQuery.isEmpty)
+        #expect(sidebar(model) == .category(.meeting))
+    }
+
+    // MARK: - Searching over an open transcript
+
+    @Test("results the transcript was opened from wait behind it")
+    func ownResultsStayBehind() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, text: "bianchi call")
+        model.searchQuery = "bianchi"
+        model.searchResults = [entry]
+
+        #expect(await openEntry(entry.id, in: model))
+
+        #expect(!model.isBrowsingLibrary, "the entry opened from these results, so they don't cover it")
+        #expect(model.canReturnToOrigin)
+    }
+
+    @Test("a new query takes the content area from the open transcript and gives it back")
+    func newQueryOverlaysTheTranscript() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, text: "quarterly review", category: .meeting)
+        model.browseCategory(.meeting)
+        #expect(await openEntry(entry.id, in: model))
+
+        model.search("bianchi")
+        model.searchResults = [entry]
+
+        #expect(model.libraryOrigin == nil, "the transcript on screen did not come from this query")
+        #expect(model.isBrowsingLibrary)
+        #expect(!model.canReturnToOrigin, "the results are the page now, not the transcript")
+
+        model.clearSearch()
+
+        #expect(!model.isBrowsingLibrary, "the transcript was parked, not closed")
+        #expect(model.transcript != nil)
+    }
+
+    @Test("the same query written again leaves the open transcript where it is")
+    func rewritingTheQueryChangesNothing() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, text: "bianchi call")
+        model.searchQuery = "bianchi"
+        model.searchResults = [entry]
+        #expect(await openEntry(entry.id, in: model))
+
+        model.search("bianchi")
+
+        #expect(model.libraryOrigin == .search(query: "bianchi"))
+        #expect(!model.isBrowsingLibrary)
+    }
+
     // MARK: - Bridge
 
     private func makeRig() throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {

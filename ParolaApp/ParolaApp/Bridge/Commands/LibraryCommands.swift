@@ -68,7 +68,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "goHome",
                 area: .library,
-                summary: "Selects the sidebar Home row: clears the library filter and unloads any transcript.",
+                summary: "Selects the sidebar Home row: clears the library filter and any search, and unloads any transcript.",
                 kind: .mutating,
                 handler: { _, ctx in
                     ctx.model.goHome()
