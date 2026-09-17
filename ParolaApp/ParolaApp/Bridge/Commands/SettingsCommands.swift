@@ -164,13 +164,9 @@ extension ParolaAutomationServer {
                         ctx.model.libraryFilter = nil
                         ctx.model.libraryBrowsingAll = false
                     } else if raw == "all" {
-                        ctx.model.libraryFilter = nil
-                        ctx.model.libraryBrowsingAll = true
-                        ctx.model.route = .transcript
+                        ctx.model.browseAll()
                     } else if let cat = EntryCategory(rawValue: raw) {
-                        ctx.model.libraryFilter = cat
-                        ctx.model.libraryBrowsingAll = false
-                        ctx.model.route = .transcript
+                        ctx.model.browseCategory(cat)
                     } else {
                         throw AutomationError.invalidArgs(field: "category", reason: "unknown category: \(raw)")
                     }

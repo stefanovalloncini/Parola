@@ -59,9 +59,7 @@ struct MacLibrarySidebar: View {
                         systemImage: "tray.full",
                         isSelected: selectedRoute == .all
                     ) {
-                        model.libraryFilter = nil
-                        model.libraryBrowsingAll = true
-                        model.route = .transcript
+                        model.browseAll()
                     }
                     .accessibilityIdentifier("library.filter.all")
                     .axLeaf("Sidebar.Button.FilterAll")
@@ -72,9 +70,7 @@ struct MacLibrarySidebar: View {
                             systemImage: item.systemImage,
                             isSelected: selectedRoute == .category(item.category)
                         ) {
-                            model.libraryFilter = item.category
-                            model.libraryBrowsingAll = false
-                            model.route = .transcript
+                            model.browseCategory(item.category)
                         }
                         .accessibilityIdentifier("library.filter.\(item.id)")
                         .axLeaf("Sidebar.Button.Filter\(item.id.capitalized)")

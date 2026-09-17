@@ -26,6 +26,44 @@ enum LibrarySortOrder: String, CaseIterable, Identifiable {
     }
 }
 
+/// The list a transcript was opened from, so the sidebar keeps its row and the header can offer the way back.
+enum LibraryOrigin: Equatable {
+    case home
+    case all
+    case category(EntryCategory)
+    case search(query: String)
+
+    /// Read through the sidebar's own selection, so a search wins over the category filter underneath it.
+    static func capture(sidebar: SidebarRoute, query: String, homeOnScreen: Bool) -> LibraryOrigin? {
+        switch sidebar {
+        case .search: return .search(query: query)
+        case .all: return .all
+        case .category(let category): return .category(category)
+        case .home: return homeOnScreen ? .home : nil
+        case .queue, .batch, .recentlyDeleted: return nil
+        }
+    }
+
+    /// The source key, not a `LocalizedStringKey`, so the back link can both show the name and say "Back to <name>".
+    var name: String {
+        switch self {
+        case .home: return "Home"
+        case .all: return "All"
+        case .category(let category): return libraryCategoryName(category)
+        case .search: return "Results"
+        }
+    }
+
+    var bridgeName: String {
+        switch self {
+        case .home: return "home"
+        case .all: return "all"
+        case .category(let category): return category.rawValue
+        case .search: return "search"
+        }
+    }
+}
+
 extension AppModel {
 
     func refreshLibrary() {
@@ -330,7 +368,8 @@ extension AppModel {
     func loadEntry(_ id: LibraryEntry.ID) {
         loadEntryGeneration &+= 1
         let generation = loadEntryGeneration
-        // Read before the load clears the search: a result opened from the list lands on its first hit.
+        // Read before the transcript takes the content area, which is what hides the list it came from.
+        let origin = captureLibraryOrigin()
         let hit = searchResults == nil ? nil : searchQuery.trimmingCharacters(in: .whitespaces)
         let hitPosition = searchMatches[id]?.firstHit
         Task { [weak self] in
@@ -351,10 +390,7 @@ extension AppModel {
                     tearDownPlayer()
                 }
                 phase = .ready
-                libraryFilter = nil
-                libraryBrowsingAll = false
-                searchResults = nil
-                searchMatches = [:]
+                libraryOrigin = origin
                 if let hit, !hit.isEmpty { revealInTranscript(hit, at: hitPosition) }
                 let openedAt = Date()
                 if (try? await library.markOpened(id: id, at: openedAt)) != nil {
@@ -369,12 +405,69 @@ extension AppModel {
     }
 
     /// Sidebar Home. The launcher only renders with nothing loaded, so a transcript left in
-    /// place would keep showing under a selected Home row; flush first so a debounced edit
-    /// from the last second still reaches the library.
+    /// place would keep showing under a selected Home row.
     func goHome() {
         libraryFilter = nil
         libraryBrowsingAll = false
+        libraryOrigin = nil
         route = .transcript
+        closeTranscript()
+    }
+
+    /// Sidebar All.
+    func browseAll() {
+        libraryFilter = nil
+        libraryBrowsingAll = true
+        libraryOrigin = nil
+        route = .transcript
+        closeTranscript()
+    }
+
+    /// A sidebar category row.
+    func browseCategory(_ category: EntryCategory) {
+        libraryFilter = category
+        libraryBrowsingAll = false
+        libraryOrigin = nil
+        route = .transcript
+        closeTranscript()
+    }
+
+    /// The transcript header's back link: leaves the list the entry was opened from exactly as it was.
+    func returnToOrigin() {
+        switch libraryOrigin {
+        case .category(let category):
+            libraryFilter = category
+            libraryBrowsingAll = false
+        case .all:
+            libraryFilter = nil
+            libraryBrowsingAll = true
+        case .search:
+            break
+        case .home, nil:
+            libraryFilter = nil
+            libraryBrowsingAll = false
+        }
+        libraryOrigin = nil
+        route = .transcript
+        closeTranscript()
+    }
+
+    /// What `loadEntry` writes down. Nil once the transcript itself is what the content area shows.
+    func captureLibraryOrigin() -> LibraryOrigin? {
+        LibraryOrigin.capture(
+            sidebar: SidebarRoute.selected(
+                route: route,
+                searching: searchResults != nil,
+                filter: libraryFilter,
+                browsingAll: libraryBrowsingAll
+            ),
+            query: searchQuery,
+            homeOnScreen: batchJobs.isEmpty && !hasTranscript
+        )
+    }
+
+    /// Flush first, so a debounced edit from the last second still reaches the library.
+    func closeTranscript() {
         guard case .ready = phase, transcript != nil else { return }
         Task { [weak self] in
             await self?.flushPendingTranscriptSave()
@@ -406,6 +499,7 @@ extension AppModel {
             return
         }
         let clock = clock
+        let generation = loadEntryGeneration
         searchTask = Task { [weak self] in
             try? await Task.sleep(for: Self.searchDebounce, clock: clock)
             guard !Task.isCancelled, let self else { return }
@@ -418,6 +512,11 @@ extension AppModel {
             searchResults = active
                 .filter { matchByID[$0.id] != nil }
                 .sorted { (matchByID[$0.id]?.score ?? 0) > (matchByID[$1.id]?.score ?? 0) }
+            // Asking for results is asking to leave the transcript, unless one was opened while the query ran.
+            if generation == loadEntryGeneration {
+                libraryOrigin = nil
+                closeTranscript()
+            }
         }
     }
 

@@ -187,9 +187,7 @@ struct EmptyDropZone: View {
                     .foregroundStyle(DS.Color.primaryText)
                 Spacer(minLength: 0)
                 ViewAllButton(count: model.libraryEntries.count) {
-                    model.libraryFilter = nil
-                    model.libraryBrowsingAll = true
-                    model.route = .transcript
+                    model.browseAll()
                 }
             }
             // Color.clear takes the leftover height, so the row count follows the space, not the reverse.

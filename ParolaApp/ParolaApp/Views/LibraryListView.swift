@@ -376,7 +376,7 @@ struct LibraryListView: View {
                 .accessibilityIdentifier("library.row.\(entry.id).\(entry.pinned ? "unpin" : "pin")")
                 Menu("Move to") {
                     ForEach(EntryCategory.allCases.filter { $0 != entry.category }, id: \.self) { target in
-                        Button(libraryCategoryName(target)) {
+                        Button(LocalizedStringKey(libraryCategoryName(target))) {
                             model.moveEntry(entry.id, to: target)
                         }
                     }
@@ -611,7 +611,8 @@ extension LibraryEmptyAction {
     }
 }
 
-private func libraryCategoryName(_ category: EntryCategory) -> LocalizedStringKey {
+/// The source key, not a `LocalizedStringKey`, so callers can both show it and interpolate it into a sentence.
+func libraryCategoryName(_ category: EntryCategory) -> String {
     switch category {
     case .transcription: return "Transcriptions"
     case .meeting: return "Meetings"
