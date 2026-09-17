@@ -106,11 +106,6 @@ struct MacRecentlyDeletedView: View {
         .listStyle(.inset)
         .tint(DS.Color.accent)
         .animation(reduceMotion ? nil : DS.Motion.listRows, value: model.deletedEntries.map(\.id))
-        .onKeyPress(.return) {
-            guard selection.count == 1, let id = selection.first else { return .ignored }
-            model.loadEntry(id)
-            return .handled
-        }
     }
 
     private func row(_ entry: LibraryEntry) -> some View {
@@ -119,7 +114,6 @@ struct MacRecentlyDeletedView: View {
             daysLeft: daysLeft(for: entry),
             timeLeft: timeLeft(for: entry),
             isSelected: selection.contains(entry.id),
-            onOpen: { model.loadEntry(entry.id) },
             onRestore: { restore([entry.id]) },
             onPurge: { confirmingPurge = entry.id }
         )

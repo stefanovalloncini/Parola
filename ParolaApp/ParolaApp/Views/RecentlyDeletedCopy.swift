@@ -1,7 +1,6 @@
 import Foundation
 
 enum RecentlyDeletedCopy {
-    /// Where the page turns urgent: its sections, its countdown colour and its expiry bar all split here.
     static let urgentDaysLeft = 3
 
     enum ExpiryBucket: String, CaseIterable, Identifiable {

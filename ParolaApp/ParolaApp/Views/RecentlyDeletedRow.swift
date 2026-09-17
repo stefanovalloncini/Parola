@@ -2,14 +2,12 @@ import SwiftUI
 import ParolaCore
 
 struct RecentlyDeletedRow: View {
-    /// The bar is a hairline under the text, not a control: thick enough to read at a glance, thin enough to ignore.
     static let expiryBarHeight: CGFloat = 3
 
     let display: LibraryRowDisplay
     let daysLeft: Int?
     let timeLeft: String
     let isSelected: Bool
-    let onOpen: () -> Void
     let onRestore: () -> Void
     let onPurge: () -> Void
     private let helpText: String
@@ -20,7 +18,6 @@ struct RecentlyDeletedRow: View {
         daysLeft: Int?,
         timeLeft: String,
         isSelected: Bool = false,
-        onOpen: @escaping () -> Void,
         onRestore: @escaping () -> Void,
         onPurge: @escaping () -> Void
     ) {
@@ -28,7 +25,6 @@ struct RecentlyDeletedRow: View {
         self.daysLeft = daysLeft
         self.timeLeft = timeLeft
         self.isSelected = isSelected
-        self.onOpen = onOpen
         self.onRestore = onRestore
         self.onPurge = onPurge
         helpText = Self.helpText(deletedAt: display.entry.deletedAt, daysLeft: daysLeft)
@@ -51,7 +47,6 @@ struct RecentlyDeletedRow: View {
         }
         .contentShape(Rectangle())
         .onHover { hovered = $0 }
-        .onTapGesture(count: 2) { onOpen() }
         .contextMenu {
             Button { onRestore() } label: {
                 Label("Restore", systemImage: "arrow.uturn.backward")
