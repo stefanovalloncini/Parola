@@ -49,13 +49,14 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | Tool | Args | What it does |
 |---|---|---|
 | `parola_app_ping` | — | Returns `{pong: true}`. Use to confirm the bridge is up. |
-| `parola_app_state` | — | Full state snapshot: phase, route, selectedModel, language, libraryFilter, appTheme, availableModels, transcript presence. While transcribing, `phaseDetail` also carries `progress`, `stage` and `hasPartialText`. |
+| `parola_app_state` | — | Full state snapshot: phase, route, selectedModel, language, libraryFilter, libraryOrigin, appTheme, availableModels, transcript presence. While transcribing, `phaseDetail` also carries `progress`, `stage` and `hasPartialText`. |
 | `parola_app_select_model` | **name** | Set selectedModel to a catalog id. |
 | `parola_app_set_language` | code | Two-letter language code, or empty string to auto-detect. |
 | `parola_app_set_theme` | **theme** | `light` / `dark` / `system`. |
 | `parola_app_set_route` | **route** | `transcript` / `batch` / `queue` / `recentlyDeleted`. |
 | `openRecentlyDeleted` | — | Route the main window to the Recently Deleted page. Replies `{open, route}`. |
 | `closeRecentlyDeleted` | — | Leave that page for Home. Replies `{open, route}`. |
+| `goBack` | — | Follow the transcript header's back link: unload the transcript and restore the list it was opened from. Replies `{origin, route, libraryFilter, libraryBrowsingAll}`. |
 | `parola_app_set_library_filter` | category | `transcription` / `meeting` / `dictation`, `all` for the sidebar's All row, or empty to clear. |
 | `parola_app_transcribe_youtube` | **url** | Paste a YouTube URL and start the download-then-transcribe flow. Replies `{started, parked}`: a link handed over during a recording or another run comes back `parked: true` and waits for that work to finish. |
 | `parola_app_fetch_youtube_subs` | **url** | Same input, but fetch existing captions instead of running Whisper. Replies `{started, parked}` on the same terms. |

@@ -291,4 +291,54 @@ struct LibraryOriginTests {
         #expect(model.isBrowsingLibrary)
         #expect(model.libraryOrigin == nil)
     }
+
+    // MARK: - Bridge
+
+    private func makeRig() throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
+        let model = makeModel()
+        let server = try ParolaAutomationServer(model: model)
+        let context = AutomationContext(model: model, server: server)
+        let commands = Dictionary(uniqueKeysWithValues: server.libraryCommands().map { ($0.name, $0) })
+        return (model, server, context, commands)
+    }
+
+    @Test("goBack returns to the list the entry was opened from")
+    func bridgeGoBack() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let entry = try await seedEntry(in: model, text: "quarterly review", category: .meeting)
+        model.browseCategory(.meeting)
+        #expect(await openEntry(entry.id, in: model))
+        let command = try #require(commands["goBack"])
+
+        let result = try await command.handler(try command.validate(AutomationArgs()), context)
+        withExtendedLifetime(server) {}
+
+        #expect(await waitUntil { model.transcript == nil })
+        #expect(model.libraryFilter == .meeting)
+        guard case .object(let fields) = result else {
+            Issue.record("goBack should answer with an object")
+            return
+        }
+        #expect(fields["origin"] == .string("meeting"))
+        #expect(fields["route"] == .string("transcript"))
+    }
+
+    @Test("getState reports the origin a scenario can assert")
+    func bridgeStateCarriesTheOrigin() async throws {
+        let (model, server, _, _) = try makeRig()
+        let entry = try await seedEntry(in: model, text: "bianchi call")
+        model.searchQuery = "bianchi"
+        model.searchResults = [entry]
+        #expect(await openEntry(entry.id, in: model))
+
+        guard case .object(let fields) = server.snapshotState() else {
+            Issue.record("getState should answer with an object")
+            return
+        }
+        #expect(fields["libraryOrigin"] == .string("search"))
+
+        model.goHome()
+        guard case .object(let home) = server.snapshotState() else { return }
+        #expect(home["libraryOrigin"] == .string(""))
+    }
 }

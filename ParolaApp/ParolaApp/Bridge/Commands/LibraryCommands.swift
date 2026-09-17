@@ -77,6 +77,23 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "goBack",
+                area: .library,
+                summary: "Follows the transcript header's back link: unloads the transcript and restores the list it was opened from.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    let origin = ctx.model.libraryOrigin?.bridgeName ?? ""
+                    ctx.model.returnToOrigin()
+                    return .object([
+                        "origin": .string(origin),
+                        "route": .string(ctx.model.route.rawValue),
+                        "libraryFilter": .string(ctx.model.libraryFilter?.rawValue ?? ""),
+                        "libraryBrowsingAll": .bool(ctx.model.libraryBrowsingAll),
+                    ])
+                }
+            ),
+
+            AutomationCommand(
                 name: "search",
                 area: .library,
                 summary: "Searches the library and waits up to 2s for results to land.",
