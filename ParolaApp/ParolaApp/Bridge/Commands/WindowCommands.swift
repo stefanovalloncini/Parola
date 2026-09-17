@@ -153,7 +153,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "closeRecentlyDeleted",
                 area: .window,
-                summary: "Leaves the Recently Deleted page for the route it was opened from.",
+                summary: "Leaves the Recently Deleted page for Home.",
                 kind: .mutating,
                 handler: { _, ctx in
                     ctx.model.closeRecentlyDeleted()

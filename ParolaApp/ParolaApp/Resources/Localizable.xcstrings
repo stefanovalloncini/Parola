@@ -5962,7 +5962,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Niente da eliminare · gli elementi restano %lld giorni"
+            "value": "Nessun elemento eliminato · gli elementi restano %lld giorni"
           }
         }
       }

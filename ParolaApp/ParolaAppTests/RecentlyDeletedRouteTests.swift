@@ -39,24 +39,45 @@ struct RecentlyDeletedRouteTests {
         model.libraryFilter = .meeting
         model.libraryBrowsingAll = true
 
-        model.recentlyDeletedSelection = ["stale"]
-
         model.openRecentlyDeleted()
 
         #expect(model.route == .recentlyDeleted)
         #expect(model.libraryFilter == nil)
         #expect(!model.libraryBrowsingAll)
-        #expect(model.recentlyDeletedSelection.isEmpty, "a visit starts with nothing selected")
     }
 
-    @Test("closing the page leaves the route")
+    @Test("closing the page leaves the route and drops what was selected on it")
     func closeLeavesTheRoute() {
         let model = makeModel()
         model.openRecentlyDeleted()
+        model.recentlyDeletedSelection = ["a", "b"]
 
         model.closeRecentlyDeleted()
 
         #expect(model.route == .transcript)
+        #expect(model.recentlyDeletedSelection.isEmpty)
+    }
+
+    @Test("leaving by any other route drops the selection too")
+    func anyRouteChangeClearsTheSelection() {
+        let model = makeModel()
+        model.openRecentlyDeleted()
+        model.recentlyDeletedSelection = ["a"]
+
+        model.route = .queue
+
+        #expect(model.recentlyDeletedSelection.isEmpty, "setRoute is the bridge's way off the page")
+    }
+
+    @Test("a selection lives as long as the page does")
+    func selectionSurvivesWhileThePageIsUp() {
+        let model = makeModel()
+        model.openRecentlyDeleted()
+        model.recentlyDeletedSelection = ["a"]
+
+        model.libraryFilter = .meeting
+
+        #expect(model.recentlyDeletedSelection == ["a"], "a filter change is not a route change")
     }
 
     @Test("the sidebar highlights the Recently Deleted row while the page shows")

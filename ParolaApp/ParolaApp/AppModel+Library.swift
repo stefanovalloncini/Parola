@@ -385,7 +385,6 @@ extension AppModel {
     func openRecentlyDeleted() {
         libraryFilter = nil
         libraryBrowsingAll = false
-        recentlyDeletedSelection = []
         route = .recentlyDeleted
     }
 

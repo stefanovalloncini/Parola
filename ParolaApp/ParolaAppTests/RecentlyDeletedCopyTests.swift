@@ -85,7 +85,7 @@ struct RecentlyDeletedCopyTests {
         let it = try italianBundle()
         #expect(RecentlyDeletedCopy.subtitle(count: 1, retentionDays: 30, bundle: it) == "1 elemento · rimosso dopo 30 giorni")
         #expect(RecentlyDeletedCopy.subtitle(count: 3, retentionDays: 30, bundle: it) == "3 elementi · rimossi dopo 30 giorni")
-        #expect(RecentlyDeletedCopy.subtitle(count: 0, retentionDays: 30, bundle: it) == "Niente da eliminare · gli elementi restano 30 giorni")
+        #expect(RecentlyDeletedCopy.subtitle(count: 0, retentionDays: 30, bundle: it) == "Nessun elemento eliminato · gli elementi restano 30 giorni")
     }
 
     @Test("an entry without a deletion date has no days left")
