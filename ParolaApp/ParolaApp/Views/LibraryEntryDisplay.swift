@@ -102,9 +102,14 @@ struct LibraryRowDisplayCache {
         self.excerptsVersion = excerptsVersion
     }
 
-    mutating func display(for entry: LibraryEntry, excerpt: String? = nil, date: Date? = nil) -> LibraryRowDisplay {
+    mutating func display(
+        for entry: LibraryEntry,
+        excerpt: String? = nil,
+        date: Date? = nil,
+        dateLabel: String? = nil
+    ) -> LibraryRowDisplay {
         if let cached = displays[entry.id], cached.excerpt == excerpt { return cached }
-        let display = LibraryRowDisplay(entry: entry, excerpt: excerpt, date: date)
+        let display = LibraryRowDisplay(entry: entry, excerpt: excerpt, date: date, dateLabel: dateLabel)
         displays[entry.id] = display
         return display
     }

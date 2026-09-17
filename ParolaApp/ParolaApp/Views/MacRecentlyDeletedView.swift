@@ -11,8 +11,8 @@ struct MacRecentlyDeletedView: View {
     @State private var categoryFilter: RecentlyDeletedCategoryFilter = .all
     @State private var sortOption: RecentlyDeletedSort = .deletedEarliest
     @State private var previews: [LibraryEntry.ID: String] = [:]
-    /// Built once per entry and per preview: the formatters behind a row are what this page loads n of.
-    @State private var displays: [LibraryEntry.ID: LibraryRowDisplay] = [:]
+    @State private var rows: [LibraryRowDisplay] = []
+    @State private var displayCache = LibraryRowDisplayCache()
     @State private var now = Date()
 
     private var selection: Set<LibraryEntry.ID> { model.recentlyDeletedSelection }
@@ -39,13 +39,14 @@ struct MacRecentlyDeletedView: View {
         .onChange(of: model.deletedEntries) { _, entries in
             let live = Set(entries.map(\.id))
             previews = previews.filter { live.contains($0.key) }
-            displays = displays.filter { live.contains($0.key) }
             model.recentlyDeletedSelection = model.recentlyDeletedSelection.intersection(live)
-            for entry in entries { refreshDisplay(for: entry) }
             now = Date()
+            recomputeRows()
         }
-        .task {
+        // Keyed on the entries so an arrival while the page is open gets its preview too.
+        .task(id: model.deletedEntries) {
             now = Date()
+            recomputeRows()
             for entry in model.deletedEntries { await loadPreview(for: entry) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -94,8 +95,8 @@ struct MacRecentlyDeletedView: View {
         return List(selection: $model.recentlyDeletedSelection) {
             ForEach(sections) { group in
                 Section {
-                    ForEach(group.entries) { entry in
-                        row(entry)
+                    ForEach(group.rows) { row in
+                        self.row(row)
                     }
                 } header: {
                     sectionHeader(group)
@@ -107,9 +108,10 @@ struct MacRecentlyDeletedView: View {
         .animation(reduceMotion ? nil : DS.Motion.listRows, value: model.deletedEntries.map(\.id))
     }
 
-    private func row(_ entry: LibraryEntry) -> some View {
-        RecentlyDeletedRow(
-            display: displays[entry.id] ?? makeDisplay(for: entry),
+    private func row(_ display: LibraryRowDisplay) -> some View {
+        let entry = display.entry
+        return RecentlyDeletedRow(
+            display: display,
             daysLeft: daysLeft(for: entry),
             timeLeft: timeLeft(for: entry),
             isSelected: selection.contains(entry.id),
@@ -124,9 +126,6 @@ struct MacRecentlyDeletedView: View {
         ))
         // The expiry bar is the rule between rows; the List's own would run three points under it.
         .listRowSeparator(.hidden)
-        .task(id: entry.id) {
-            await loadPreview(for: entry)
-        }
     }
 
     @ViewBuilder
@@ -137,7 +136,7 @@ struct MacRecentlyDeletedView: View {
                     LocalizedStringKey(bucket.caption),
                     tint: bucket == .soon ? DS.Color.dangerText : nil
                 )
-                Text(verbatim: AppFormat.integer(group.entries.count))
+                Text(verbatim: AppFormat.integer(group.rows.count))
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.secondaryText)
             }
@@ -181,42 +180,42 @@ struct MacRecentlyDeletedView: View {
         searchText.isEmpty ? "No Items Match These Filters" : "No Matches"
     }
 
-    private var filtered: [LibraryEntry] {
+    private var filtered: [LibraryRowDisplay] {
         let q = searchText.lowercased()
-        return model.deletedEntries.filter { entry in
-            guard categoryFilter.matches(entry.category) else { return false }
+        return rows.filter { row in
+            guard categoryFilter.matches(row.entry.category) else { return false }
             guard !q.isEmpty else { return true }
-            if entry.title.lowercased().contains(q) { return true }
-            return previews[entry.id]?.lowercased().contains(q) ?? false
+            if row.entry.title.lowercased().contains(q) { return true }
+            return previews[row.id]?.lowercased().contains(q) ?? false
         }
     }
 
-    private var sorted: [LibraryEntry] {
+    private var sorted: [LibraryRowDisplay] {
         switch sortOption {
         case .recentlyDeleted:
             return filtered.sorted { lhs, rhs in
-                (lhs.deletedAt ?? .distantPast) > (rhs.deletedAt ?? .distantPast)
+                (lhs.entry.deletedAt ?? .distantPast) > (rhs.entry.deletedAt ?? .distantPast)
             }
         case .deletedEarliest:
             return filtered.sorted { lhs, rhs in
-                (lhs.deletedAt ?? .distantFuture) < (rhs.deletedAt ?? .distantFuture)
+                (lhs.entry.deletedAt ?? .distantFuture) < (rhs.entry.deletedAt ?? .distantFuture)
             }
         case .titleAZ:
-            return filtered.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+            return filtered.sorted { $0.entry.title.localizedCaseInsensitiveCompare($1.entry.title) == .orderedAscending }
         case .titleZA:
-            return filtered.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
+            return filtered.sorted { $0.entry.title.localizedCaseInsensitiveCompare($1.entry.title) == .orderedDescending }
         }
     }
 
     private var sections: [BucketGroup] {
-        guard sortOption.groupsByDate else { return [BucketGroup(bucket: nil, entries: sorted)] }
-        return RecentlyDeletedCopy.grouped(sorted) { daysLeft(for: $0) }
-            .map { BucketGroup(bucket: $0.bucket, entries: $0.items) }
+        guard sortOption.groupsByDate else { return [BucketGroup(bucket: nil, rows: sorted)] }
+        return RecentlyDeletedCopy.grouped(sorted) { daysLeft(for: $0.entry) }
+            .map { BucketGroup(bucket: $0.bucket, rows: $0.items) }
     }
 
     private struct BucketGroup: Identifiable {
         let bucket: RecentlyDeletedCopy.ExpiryBucket?
-        let entries: [LibraryEntry]
+        let rows: [LibraryRowDisplay]
         var id: String { bucket?.rawValue ?? "" }
     }
 
@@ -253,24 +252,21 @@ struct MacRecentlyDeletedView: View {
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         previews[entry.id] = trimmed.isEmpty ? "" : String(trimmed.prefix(280))
-        refreshDisplay(for: entry)
+        recomputeRows()
     }
 
-    private func makeDisplay(for entry: LibraryEntry) -> LibraryRowDisplay {
-        LibraryRowDisplay(
-            entry: entry,
-            excerpt: RecentlyDeletedRow.previewText(previews[entry.id]),
-            date: entry.deletedAt,
-            dateLabel: RecentlyDeletedCopy.deletedOn(entry.deletedAt)
-        )
-    }
-
-    private func refreshDisplay(for entry: LibraryEntry) {
-        let excerpt = RecentlyDeletedRow.previewText(previews[entry.id])
-        if let cached = displays[entry.id], cached.excerpt == excerpt, cached.entry.manifest == entry.manifest {
-            return
+    private func recomputeRows() {
+        var cache = displayCache
+        cache.invalidate(libraryVersion: model.libraryVersion, excerptsVersion: model.libraryExcerptsVersion)
+        rows = model.deletedEntries.map { entry in
+            cache.display(
+                for: entry,
+                excerpt: RecentlyDeletedRow.previewText(previews[entry.id]),
+                date: entry.deletedAt,
+                dateLabel: RecentlyDeletedCopy.deletedOn(entry.deletedAt)
+            )
         }
-        displays[entry.id] = makeDisplay(for: entry)
+        displayCache = cache
     }
 
     private var isPurgingSingle: Binding<Bool> {
