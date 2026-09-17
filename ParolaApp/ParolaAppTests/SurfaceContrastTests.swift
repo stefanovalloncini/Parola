@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 
@@ -158,6 +159,27 @@ struct SurfaceContrastTests {
         #expect(RecentlyDeletedCopy.ExpiryBucket.soon.barFill == DS.Color.dangerText)
         #expect(RecentlyDeletedCopy.ExpiryBucket.later.countdownColor == DS.Color.secondaryText)
         #expect(RecentlyDeletedCopy.ExpiryBucket.later.barFill == DS.Color.accent)
+    }
+
+    /// Selection alone is a grey wash; only an emphasized row is filled with the accent, and only there does the hue give way.
+    @MainActor
+    @Test("a row keeps its urgency until the accent is what it sits on")
+    func recentlyDeletedUrgencyFollowsProminence() {
+        let soon = RecentlyDeletedCopy.ExpiryBucket.soon
+        let later = RecentlyDeletedCopy.ExpiryBucket.later
+
+        #expect(soon.countdownColor(isSelected: false, prominence: .standard) == DS.Color.dangerText)
+        #expect(soon.barFill(isSelected: false, prominence: .standard) == DS.Color.dangerText)
+        #expect(later.barFill(isSelected: false, prominence: .increased) == DS.Color.accent)
+
+        #expect(soon.countdownColor(isSelected: true, prominence: .standard) == DS.Color.dangerText)
+        #expect(soon.barFill(isSelected: true, prominence: .standard) == DS.Color.dangerText)
+        #expect(later.countdownColor(isSelected: true, prominence: .standard) == DS.Color.secondaryText)
+
+        #expect(soon.countdownColor(isSelected: true, prominence: .increased) == DS.Color.onAccent)
+        #expect(soon.barFill(isSelected: true, prominence: .increased) == DS.Color.onAccent)
+        #expect(later.countdownColor(isSelected: true, prominence: .increased) == DS.Color.onAccent)
+        #expect(later.barFill(isSelected: true, prominence: .increased) == DS.Color.onAccent)
     }
 
     @Test("accent text leaves an accent that already clears AA alone")

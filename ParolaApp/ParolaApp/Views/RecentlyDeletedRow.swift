@@ -13,6 +13,7 @@ struct RecentlyDeletedRow: View {
     private let helpText: String
     @State private var hovered = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.backgroundProminence) private var backgroundProminence
 
     init(
         display: LibraryRowDisplay,
@@ -71,11 +72,6 @@ struct RecentlyDeletedRow: View {
         return preview.isEmpty ? String(localized: "No transcript text.") : preview
     }
 
-    // The List washes a selected row grey or accent depending on focus; only the system's own hierarchy reads on both.
-    private var urgencyStyle: Color {
-        isSelected ? .secondary : bucket.countdownColor
-    }
-
     @ViewBuilder
     private var hoverWash: some View {
         if hovered, !isSelected {
@@ -87,7 +83,7 @@ struct RecentlyDeletedRow: View {
     private var countdown: some View {
         Text(timeLeft)
             .font(DS.Font.secondary)
-            .foregroundStyle(urgencyStyle)
+            .foregroundStyle(bucket.countdownColor(isSelected: isSelected, prominence: backgroundProminence))
             .lineLimit(1)
             .fixedSize()
     }
@@ -123,7 +119,7 @@ struct RecentlyDeletedRow: View {
         ) {
             DSProgressBar(
                 value: fraction,
-                fill: isSelected ? .secondary : bucket.barFill,
+                fill: bucket.barFill(isSelected: isSelected, prominence: backgroundProminence),
                 height: Self.expiryBarHeight
             )
             .padding(.leading, EntryRowMetrics.textInset)
@@ -177,5 +173,18 @@ extension RecentlyDeletedCopy.ExpiryBucket {
         case .soon: return DS.Color.dangerText
         case .later: return DS.Color.accent
         }
+    }
+
+    /// A List paints a selected row with the accent only while it holds focus; there the hue has to give way to `onAccent`.
+    func countdownColor(isSelected: Bool, prominence: BackgroundProminence) -> Color {
+        Self.emphasized(isSelected, prominence) ? DS.Color.onAccent : countdownColor
+    }
+
+    func barFill(isSelected: Bool, prominence: BackgroundProminence) -> Color {
+        Self.emphasized(isSelected, prominence) ? DS.Color.onAccent : barFill
+    }
+
+    static func emphasized(_ isSelected: Bool, _ prominence: BackgroundProminence) -> Bool {
+        isSelected && prominence == .increased
     }
 }
