@@ -64,17 +64,15 @@ struct LibraryOriginTests {
     func searchBeatsFilter() {
         let origin = LibraryOrigin.capture(
             sidebar: SidebarRoute.selected(route: .transcript, searching: true, filter: .meeting, browsingAll: true),
-            query: "bianchi",
             homeOnScreen: false
         )
-        #expect(origin == .search(query: "bianchi"))
+        #expect(origin == .search)
     }
 
     @Test("a category list is recorded as its category")
     func categoryList() {
         let origin = LibraryOrigin.capture(
             sidebar: SidebarRoute.selected(route: .transcript, searching: false, filter: .dictation, browsingAll: false),
-            query: "",
             homeOnScreen: false
         )
         #expect(origin == .category(.dictation))
@@ -84,7 +82,6 @@ struct LibraryOriginTests {
     func allList() {
         let origin = LibraryOrigin.capture(
             sidebar: SidebarRoute.selected(route: .transcript, searching: false, filter: nil, browsingAll: true),
-            query: "",
             homeOnScreen: false
         )
         #expect(origin == .all)
@@ -94,7 +91,6 @@ struct LibraryOriginTests {
     func homeRecent() {
         let origin = LibraryOrigin.capture(
             sidebar: SidebarRoute.selected(route: .transcript, searching: false, filter: nil, browsingAll: false),
-            query: "",
             homeOnScreen: true
         )
         #expect(origin == .home)
@@ -104,14 +100,12 @@ struct LibraryOriginTests {
     func noList() {
         let noHome = LibraryOrigin.capture(
             sidebar: SidebarRoute.selected(route: .transcript, searching: false, filter: nil, browsingAll: false),
-            query: "",
             homeOnScreen: false
         )
         #expect(noHome == nil)
         for route in [AppModel.Route.queue, .batch, .recentlyDeleted] {
             let origin = LibraryOrigin.capture(
                 sidebar: SidebarRoute.selected(route: route, searching: true, filter: .meeting, browsingAll: true),
-                query: "q",
                 homeOnScreen: true
             )
             #expect(origin == nil, "\(route) is a page of its own, not a list a transcript came from")
@@ -123,7 +117,7 @@ struct LibraryOriginTests {
         #expect(LibraryOrigin.home.bridgeName == "home")
         #expect(LibraryOrigin.all.bridgeName == "all")
         #expect(LibraryOrigin.category(.meeting).bridgeName == EntryCategory.meeting.rawValue)
-        #expect(LibraryOrigin.search(query: "x").bridgeName == "search")
+        #expect(LibraryOrigin.search.bridgeName == "search")
     }
 
     // MARK: - Opening an entry
@@ -151,7 +145,7 @@ struct LibraryOriginTests {
 
         #expect(await openEntry(entry.id, in: model))
 
-        #expect(model.transcriptOrigin == .search(query: "bianchi"))
+        #expect(model.transcriptOrigin == .search)
         #expect(model.searchResults?.map(\.id) == [entry.id])
         #expect(model.searchQuery == "bianchi")
         #expect(sidebar(model) == .search, "no row owns the results, so none is highlighted")
@@ -364,14 +358,29 @@ struct LibraryOriginTests {
         model.search("bianchi")
         model.searchResults = [entry]
 
-        #expect(model.transcriptOrigin == nil, "the transcript on screen did not come from this query")
-        #expect(model.isBrowsingLibrary)
+        #expect(model.transcriptOrigin == .category(.meeting), "the query cannot take the list away")
+        #expect(model.isBrowsingLibrary, "the transcript did not come from these results, so they cover it")
         #expect(!model.canReturnToOrigin, "the results are the page now, not the transcript")
 
         model.clearSearch()
 
         #expect(!model.isBrowsingLibrary, "the transcript was parked, not closed")
         #expect(model.transcript != nil)
+    }
+
+    @Test("a query that comes and goes over a category entry leaves its origin standing")
+    func aQueryDoesNotCostTheCategory() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, text: "quarterly review", category: .meeting)
+        model.browseCategory(.meeting)
+        #expect(await openEntry(entry.id, in: model))
+
+        model.search("bianchi")
+        model.clearSearch()
+
+        #expect(model.transcriptOrigin == .category(.meeting), "the transcript never moved; the query did")
+        #expect(model.canReturnToOrigin)
+        #expect(sidebar(model) == .category(.meeting), "and the header agrees with the sidebar")
     }
 
     @Test("the same query written again leaves the open transcript where it is")
@@ -384,7 +393,7 @@ struct LibraryOriginTests {
 
         model.search("bianchi")
 
-        #expect(model.transcriptOrigin == .search(query: "bianchi"))
+        #expect(model.transcriptOrigin == .search)
         #expect(!model.isBrowsingLibrary)
     }
 

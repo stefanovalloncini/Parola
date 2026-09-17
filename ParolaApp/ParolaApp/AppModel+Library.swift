@@ -31,12 +31,12 @@ enum LibraryOrigin: Equatable {
     case home
     case all
     case category(EntryCategory)
-    case search(query: String)
+    case search
 
     /// Read through the sidebar's own selection, so a search wins over the category filter underneath it.
-    static func capture(sidebar: SidebarRoute, query: String, homeOnScreen: Bool) -> LibraryOrigin? {
+    static func capture(sidebar: SidebarRoute, homeOnScreen: Bool) -> LibraryOrigin? {
         switch sidebar {
-        case .search: return .search(query: query)
+        case .search: return .search
         case .all: return .all
         case .category(let category): return .category(category)
         case .home: return homeOnScreen ? .home : nil
@@ -454,6 +454,7 @@ extension AppModel {
         case .home, nil:
             libraryFilter = nil
             libraryBrowsingAll = false
+            clearSearch()
         }
         forgetLibraryOrigin()
         route = .transcript
@@ -469,7 +470,6 @@ extension AppModel {
                 filter: libraryFilter,
                 browsingAll: libraryBrowsingAll
             ),
-            query: searchQuery,
             homeOnScreen: batchJobs.isEmpty && !hasTranscript
         )
     }
@@ -499,8 +499,8 @@ extension AppModel {
 
     func search(_ query: String) {
         searchTask?.cancel()
-        // A new query is a list of its own: whatever transcript is open did not come from it.
-        if query != searchQuery { libraryOrigin = nil }
+        // Only results can go stale on a new query; a list the transcript came from is still where it was.
+        if query != searchQuery, case .search = libraryOrigin { forgetLibraryOrigin() }
         searchQuery = query
         let q = query.trimmingCharacters(in: .whitespaces)
         if q.isEmpty {
