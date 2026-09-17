@@ -3,7 +3,6 @@ import ParolaCore
 
 struct MacRecentlyDeletedView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var confirmingPurge: LibraryEntry.ID?
     @State private var confirmingPurgeBulk: Set<LibraryEntry.ID> = []
@@ -27,7 +26,7 @@ struct MacRecentlyDeletedView: View {
                 sortOption: $sortOption,
                 confirmingEmpty: $confirmingEmpty,
                 expiringSoon: expiringSoon,
-                onDone: { dismiss() }
+                onDone: { model.closeRecentlyDeleted() }
             )
             RecentlyDeletedFilterBar(
                 dateFilter: $dateFilter,
@@ -57,10 +56,9 @@ struct MacRecentlyDeletedView: View {
             now = Date()
             for entry in model.deletedEntries { await loadPreview(for: entry) }
         }
-        .frame(minWidth: 760, idealWidth: 920, minHeight: 560, idealHeight: 720)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)
         .tint(DS.Color.accent)
-        .ignoresSafeArea(.container, edges: .top)
         .confirmationDialog(
             "Delete permanently?",
             isPresented: isPurgingSingle

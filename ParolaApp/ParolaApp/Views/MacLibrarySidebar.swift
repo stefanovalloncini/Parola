@@ -5,15 +5,12 @@ struct MacLibrarySidebar: View {
     @Environment(AppModel.self) private var model
 
     private var selectedRoute: SidebarRoute {
-        switch model.route {
-        case .queue: return .queue
-        case .batch: return .batch
-        case .transcript:
-            if model.searchResults != nil { return .search }
-            if let filter = model.libraryFilter { return .category(filter) }
-            if model.libraryBrowsingAll { return .all }
-            return .home
-        }
+        SidebarRoute.selected(
+            route: model.route,
+            searching: model.searchResults != nil,
+            filter: model.libraryFilter,
+            browsingAll: model.libraryBrowsingAll
+        )
     }
 
     private var categories: [(title: LocalizedStringKey, id: String, systemImage: String, category: EntryCategory)] {
@@ -171,9 +168,14 @@ struct MacLibrarySidebar: View {
     private var bottomPills: some View {
         VStack(spacing: 6) {
             Button {
-                model.showingTrash = true
+                model.openRecentlyDeleted()
             } label: {
-                PillRowContent(title: "Recently Deleted", systemImage: "trash", badge: deletedBadge)
+                PillRowContent(
+                    title: "Recently Deleted",
+                    systemImage: "trash",
+                    badge: deletedBadge,
+                    isSelected: selectedRoute == .recentlyDeleted
+                )
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("library.recentlyDeleted")
@@ -189,14 +191,32 @@ struct MacLibrarySidebar: View {
     }
 }
 
-private enum SidebarRoute: Hashable {
+enum SidebarRoute: Hashable {
     /// No row owns the search results, so none is highlighted while they show.
     case search
     case home
     case all
     case queue
     case batch
+    case recentlyDeleted
     case category(EntryCategory)
+
+    static func selected(
+        route: AppModel.Route,
+        searching: Bool,
+        filter: EntryCategory?,
+        browsingAll: Bool
+    ) -> SidebarRoute {
+        switch route {
+        case .queue: return .queue
+        case .batch: return .batch
+        case .recentlyDeleted: return .recentlyDeleted
+        case .transcript:
+            if searching { return .search }
+            if let filter { return .category(filter) }
+            return browsingAll ? .all : .home
+        }
+    }
 }
 
 private struct SectionLabel: View {
@@ -213,6 +233,7 @@ private struct PillRowContent: View {
     let title: LocalizedStringKey
     let systemImage: String
     var badge: Int? = nil
+    var isSelected = false
 
     @State private var isHovering = false
 
@@ -221,29 +242,39 @@ private struct PillRowContent: View {
             Image(systemName: systemImage)
                 .font(DS.Font.bodyMedium)
                 .frame(width: 18, alignment: .center)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(isSelected ? DS.Color.onAccent : .secondary)
             Text(title)
                 .font(.subheadline)
             Spacer(minLength: 0)
             if let badge {
                 Text("\(badge)")
                     .font(DS.Font.captionMedium)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isSelected ? DS.Color.onAccent.opacity(0.9) : .secondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 1)
-                    .background(Capsule().fill(Color.primary.opacity(0.10)))
+                    .background(
+                        Capsule().fill(
+                            isSelected ? DS.Color.onAccent.opacity(0.18) : Color.primary.opacity(0.10)
+                        )
+                    )
             }
         }
-        .foregroundStyle(.primary)
+        .foregroundStyle(isSelected ? DS.Color.onAccent : .primary)
         .padding(.horizontal, 10)
         .frame(height: 30)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                .fill(isHovering ? DS.Palette.surfaceHover : Color.clear)
-                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+                .fill(fill)
+                .strokeBorder(isSelected ? Color.clear : Color.primary.opacity(0.12), lineWidth: 1)
         }
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var fill: Color {
+        if isSelected { return DS.Color.accent.opacity(0.85) }
+        return isHovering ? DS.Palette.surfaceHover : .clear
     }
 }

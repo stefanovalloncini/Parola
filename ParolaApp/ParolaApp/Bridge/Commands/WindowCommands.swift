@@ -123,22 +123,22 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "openRecentlyDeleted",
                 area: .window,
-                summary: "Opens the Recently Deleted sheet.",
+                summary: "Routes the main window to the Recently Deleted page.",
                 kind: .mutating,
                 handler: { _, ctx in
-                    ctx.model.showingTrash = true
-                    return .object(["open": .bool(true)])
+                    ctx.model.openRecentlyDeleted()
+                    return .object(["open": .bool(true), "route": .string(ctx.model.route.rawValue)])
                 }
             ),
 
             AutomationCommand(
                 name: "closeRecentlyDeleted",
                 area: .window,
-                summary: "Closes the Recently Deleted sheet.",
+                summary: "Leaves the Recently Deleted page for the route it was opened from.",
                 kind: .mutating,
                 handler: { _, ctx in
-                    ctx.model.showingTrash = false
-                    return .object(["open": .bool(false)])
+                    ctx.model.closeRecentlyDeleted()
+                    return .object(["open": .bool(false), "route": .string(ctx.model.route.rawValue)])
                 }
             ),
 

@@ -34,6 +34,8 @@ struct ContentRoutes: View {
                 BatchView()
             case .queue:
                 QueueView()
+            case .recentlyDeleted:
+                MacRecentlyDeletedView()
             case .transcript:
                 transcriptContent
             }
@@ -46,6 +48,7 @@ struct ContentRoutes: View {
         switch model.route {
         case .batch: return .batch
         case .queue: return .queue
+        case .recentlyDeleted: return .recentlyDeleted
         case .transcript:
             if !model.batchJobs.isEmpty { return .batchDetail }
             return showsLibraryBrowse ? .library : .phase
@@ -56,6 +59,7 @@ struct ContentRoutes: View {
         case settingsPreview
         case batch
         case queue
+        case recentlyDeleted
         case batchDetail
         case library
         case phase

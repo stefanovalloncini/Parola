@@ -48,6 +48,7 @@ final class AppModel {
         case transcript
         case batch
         case queue
+        case recentlyDeleted
     }
 
     var route: Route = .transcript
@@ -92,7 +93,6 @@ final class AppModel {
         guard let transcript else { return false }
         return !transcript.segments.contains { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
-    var showingTrash: Bool = false
     /// The import waiting on the "Already in your library" sheet. Nil the rest of the time.
     var duplicateImport: DuplicateImport?
     /// How many files the last batch import dropped because the library already had them.

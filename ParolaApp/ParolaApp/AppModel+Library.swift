@@ -382,6 +382,17 @@ extension AppModel {
         }
     }
 
+    func openRecentlyDeleted() {
+        libraryFilter = nil
+        libraryBrowsingAll = false
+        route = .recentlyDeleted
+    }
+
+    /// Home is the stand-in destination until routes remember where they were opened from.
+    func closeRecentlyDeleted() {
+        goHome()
+    }
+
     /// Enough to swallow a burst of keystrokes; the index itself answers well inside one.
     static let searchDebounce = Duration.milliseconds(70)
 

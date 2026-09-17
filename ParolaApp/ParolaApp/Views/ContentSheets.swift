@@ -25,7 +25,6 @@ struct ContentSheetsModifier: ViewModifier {
             .sheet(item: $model.duplicateImport) { pending in
                 DuplicateImportSheet(pending: pending)
             }
-            .sheet(isPresented: $model.showingTrash) { MacRecentlyDeletedView() }
             .sheet(item: $model.promptOutput) { output in
                 PromptOutputSheet(output: output)
             }
