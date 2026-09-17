@@ -39,11 +39,14 @@ struct RecentlyDeletedRouteTests {
         model.libraryFilter = .meeting
         model.libraryBrowsingAll = true
 
+        model.recentlyDeletedSelection = ["stale"]
+
         model.openRecentlyDeleted()
 
         #expect(model.route == .recentlyDeleted)
         #expect(model.libraryFilter == nil)
         #expect(!model.libraryBrowsingAll)
+        #expect(model.recentlyDeletedSelection.isEmpty, "a visit starts with nothing selected")
     }
 
     @Test("closing the page leaves the route")

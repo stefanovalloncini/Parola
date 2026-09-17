@@ -18,8 +18,7 @@ struct MacRecentlyDeletedView: View {
     private var selection: Set<LibraryEntry.ID> { model.recentlyDeletedSelection }
 
     var body: some View {
-        @Bindable var model = model
-        return VStack(spacing: 0) {
+        VStack(spacing: 0) {
             RecentlyDeletedHeader(
                 searchText: $searchText,
                 categoryFilter: $categoryFilter,

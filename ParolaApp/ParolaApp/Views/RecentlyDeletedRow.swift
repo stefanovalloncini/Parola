@@ -72,10 +72,15 @@ struct RecentlyDeletedRow: View {
         return preview.isEmpty ? String(localized: "No transcript text.") : preview
     }
 
+    // The List washes a selected row grey or accent depending on focus; only the system's own hierarchy reads on both.
+    private var urgencyStyle: Color {
+        isSelected ? .secondary : bucket.countdownColor
+    }
+
     private var countdown: some View {
         Text(timeLeft)
             .font(DS.Font.secondary)
-            .foregroundStyle(isSelected ? DS.Color.onAccent : bucket.countdownColor)
+            .foregroundStyle(urgencyStyle)
             .lineLimit(1)
             .fixedSize()
     }
@@ -111,7 +116,7 @@ struct RecentlyDeletedRow: View {
         ) {
             DSProgressBar(
                 value: fraction,
-                fill: isSelected ? DS.Color.onAccent : bucket.barFill,
+                fill: isSelected ? .secondary : bucket.barFill,
                 height: Self.expiryBarHeight
             )
             .padding(.leading, EntryRowMetrics.textInset)
