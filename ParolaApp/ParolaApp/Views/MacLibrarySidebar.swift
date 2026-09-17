@@ -167,22 +167,26 @@ struct MacLibrarySidebar: View {
 
     private var bottomPills: some View {
         VStack(spacing: 6) {
-            Button {
+            SidebarRow(
+                title: "Recently Deleted",
+                systemImage: "trash",
+                isSelected: selectedRoute == .recentlyDeleted,
+                badge: deletedBadge,
+                height: 30,
+                bordered: true
+            ) {
                 model.openRecentlyDeleted()
-            } label: {
-                PillRowContent(
-                    title: "Recently Deleted",
-                    systemImage: "trash",
-                    badge: deletedBadge,
-                    isSelected: selectedRoute == .recentlyDeleted
-                )
             }
-            .buttonStyle(.plain)
             .accessibilityIdentifier("library.recentlyDeleted")
             .axLeaf("Sidebar.Button.RecentlyDeleted")
 
             SettingsLink {
-                PillRowContent(title: "Settings", systemImage: "gearshape.fill")
+                SidebarRowLabel(
+                    title: "Settings",
+                    systemImage: "gearshape.fill",
+                    height: 30,
+                    bordered: true
+                )
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("library.settings")
@@ -226,55 +230,5 @@ private struct SectionLabel: View {
         SectionCaption(text)
             .padding(.horizontal, 10)
             .padding(.bottom, 4)
-    }
-}
-
-private struct PillRowContent: View {
-    let title: LocalizedStringKey
-    let systemImage: String
-    var badge: Int? = nil
-    var isSelected = false
-
-    @State private var isHovering = false
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: systemImage)
-                .font(DS.Font.bodyMedium)
-                .frame(width: 18, alignment: .center)
-                .foregroundStyle(isSelected ? DS.Color.onAccent : .secondary)
-            Text(title)
-                .font(.subheadline)
-            Spacer(minLength: 0)
-            if let badge {
-                Text("\(badge)")
-                    .font(DS.Font.captionMedium)
-                    .foregroundStyle(isSelected ? DS.Color.onAccent.opacity(0.9) : .secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(
-                        Capsule().fill(
-                            isSelected ? DS.Color.onAccent.opacity(0.18) : Color.primary.opacity(0.10)
-                        )
-                    )
-            }
-        }
-        .foregroundStyle(isSelected ? DS.Color.onAccent : .primary)
-        .padding(.horizontal, 10)
-        .frame(height: 30)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                .fill(fill)
-                .strokeBorder(isSelected ? Color.clear : Color.primary.opacity(0.12), lineWidth: 1)
-        }
-        .contentShape(Rectangle())
-        .onHover { isHovering = $0 }
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    private var fill: Color {
-        if isSelected { return DS.Color.accent.opacity(0.85) }
-        return isHovering ? DS.Palette.surfaceHover : .clear
     }
 }
