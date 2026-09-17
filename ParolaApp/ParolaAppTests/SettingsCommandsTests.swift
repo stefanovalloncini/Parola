@@ -65,17 +65,20 @@ struct SettingsCommandsTests {
         #expect(model.route == .transcript)
     }
 
-    @Test("an empty category clears both the filter and browse-all")
+    @Test("an empty category selects Home, search and all")
     func setLibraryFilterCleared() async throws {
         let (model, server, context, commands) = try makeRig()
         model.libraryFilter = .dictation
         model.libraryBrowsingAll = true
+        model.searchQuery = "bianchi"
 
         _ = try await run(commands, "setLibraryFilter", ["category": .string("")], context)
         withExtendedLifetime(server) {}
 
         #expect(model.libraryFilter == nil)
         #expect(model.libraryBrowsingAll == false)
+        #expect(model.route == .transcript)
+        #expect(model.searchQuery.isEmpty)
     }
 
     @Test("an unknown category is still rejected")

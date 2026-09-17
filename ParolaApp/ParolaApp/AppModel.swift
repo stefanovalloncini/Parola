@@ -894,8 +894,7 @@ final class AppModel {
         guard route == .transcript, batchJobs.isEmpty else { return false }
         switch phase {
         case .idle, .ready:
-            // An open transcript holds the content area, with the list it came from waiting behind it;
-            // only results it did not come from take the area back, and give it up again when they clear.
+            // Results the transcript did not come from take the content area; clearing them gives it back.
             if hasTranscript { return searchResults != nil && !openedFromSearch }
             return searchResults != nil || libraryFilter != nil || libraryBrowsingAll
         default: return false

@@ -413,14 +413,12 @@ extension AppModel {
         showList()
     }
 
-    /// Sidebar All.
     func browseAll() {
         libraryFilter = nil
         libraryBrowsingAll = true
         showList()
     }
 
-    /// A sidebar category row.
     func browseCategory(_ category: EntryCategory) {
         libraryFilter = category
         libraryBrowsingAll = false
@@ -461,7 +459,7 @@ extension AppModel {
         closeTranscript()
     }
 
-    /// What `loadEntry` writes down. Nil once the transcript itself is what the content area shows.
+    /// Nil when no list is behind the transcript: a root page, a batch, or Home with something already loaded.
     func captureLibraryOrigin() -> LibraryOrigin? {
         LibraryOrigin.capture(
             sidebar: SidebarRoute.selected(
