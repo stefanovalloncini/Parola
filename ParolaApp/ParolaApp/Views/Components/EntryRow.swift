@@ -116,6 +116,8 @@ struct EntryRow<Accessory: View, Actions: View>: View {
     /// Grouped lists carry the day in their header, so their rows show the time of day instead.
     var showsTimeOnly: Bool = true
     var help: String?
+    /// Off for a caller that draws something under the row and washes the two together.
+    var drawsHover: Bool = true
     let accessory: Accessory
     let trailingActions: Actions
 
@@ -131,6 +133,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         isSelected: Bool = false,
         showsTimeOnly: Bool = true,
         help: String? = nil,
+        drawsHover: Bool = true,
         @ViewBuilder accessory: () -> Accessory,
         @ViewBuilder trailingActions: () -> Actions
     ) {
@@ -140,6 +143,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         self.isSelected = isSelected
         self.showsTimeOnly = showsTimeOnly
         self.help = help
+        self.drawsHover = drawsHover
         self.accessory = accessory()
         self.trailingActions = trailingActions()
     }
@@ -244,7 +248,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
     private var rowBackground: some View {
         switch style {
         case .list:
-            if isHovering, !isSelected {
+            if drawsHover, isHovering, !isSelected {
                 RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                     .fill(DS.Palette.surfaceHover)
             }

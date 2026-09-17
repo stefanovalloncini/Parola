@@ -58,7 +58,6 @@ struct RecentlyDeletedHeader: View {
     @Binding var confirmingEmpty: Bool
     let onRestoreSelection: () -> Void
     let onDeleteSelection: () -> Void
-    let onDone: () -> Void
 
     var body: some View {
         PageHeader(
@@ -83,9 +82,6 @@ struct RecentlyDeletedHeader: View {
                     restoreSelectionButton
                     deleteSelectionButton
                 }
-                Button("Done", action: onDone)
-                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                    .axLeaf("Toolbar.Button.Done")
             }
         )
     }

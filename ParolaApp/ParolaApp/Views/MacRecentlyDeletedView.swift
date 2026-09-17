@@ -25,8 +25,7 @@ struct MacRecentlyDeletedView: View {
                 sortOption: $sortOption,
                 confirmingEmpty: $confirmingEmpty,
                 onRestoreSelection: { restore(Array(selection)) },
-                onDeleteSelection: { confirmingPurgeBulk = selection },
-                onDone: { model.closeRecentlyDeleted() }
+                onDeleteSelection: { confirmingPurgeBulk = selection }
             )
             Divider()
             if model.deletedEntries.isEmpty {
@@ -123,6 +122,8 @@ struct MacRecentlyDeletedView: View {
             bottom: DS.Spacing.tight,
             trailing: DS.Spacing.small
         ))
+        // The expiry bar is the rule between rows; the List's own would run three points under it.
+        .listRowSeparator(.hidden)
         .task(id: entry.id) {
             await loadPreview(for: entry)
         }

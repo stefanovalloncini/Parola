@@ -12,6 +12,7 @@ struct RecentlyDeletedRow: View {
     let onPurge: () -> Void
     private let helpText: String
     @State private var hovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(
         display: LibraryRowDisplay,
@@ -40,11 +41,14 @@ struct RecentlyDeletedRow: View {
                 isSelected: isSelected,
                 showsTimeOnly: false,
                 help: helpText,
+                drawsHover: false,
                 accessory: { countdown },
                 trailingActions: { actions }
             )
             expiryBar
         }
+        .background(hoverWash)
+        .animation(reduceMotion ? nil : DS.Motion.rowState, value: hovered)
         .contentShape(Rectangle())
         .onHover { hovered = $0 }
         .contextMenu {
@@ -70,6 +74,14 @@ struct RecentlyDeletedRow: View {
     // The List washes a selected row grey or accent depending on focus; only the system's own hierarchy reads on both.
     private var urgencyStyle: Color {
         isSelected ? .secondary : bucket.countdownColor
+    }
+
+    @ViewBuilder
+    private var hoverWash: some View {
+        if hovered, !isSelected {
+            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                .fill(DS.Palette.surfaceHover)
+        }
     }
 
     private var countdown: some View {
