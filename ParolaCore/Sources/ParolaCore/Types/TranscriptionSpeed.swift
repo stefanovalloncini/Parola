@@ -22,14 +22,16 @@ public enum TranscriptionSpeed {
         return "\(number)×"
     }
 
-    /// A single run's wall time: whole seconds under a minute, minutes and seconds above it.
+    /// A span in the form every tool prints: seconds alone under a minute, then minutes, then hours.
     public static func duration(seconds: Double, locale: Locale = TranscriptionSpeed.toolLocale) -> String {
         let total = Int(max(0, seconds).rounded())
         let whole = { (value: Int) in value.formatted(.number.locale(locale)) }
-        // A run that rounds away to nothing still took time; a bare "0 s" reads as "not measured".
+        let padded = { (value: Int) in value.formatted(.number.precision(.integerLength(2)).locale(locale)) }
+        // A span that rounds away to nothing still took time; a bare "0 s" reads as "not measured".
         if total == 0, seconds > 0 { return "<1 s" }
         guard total >= 60 else { return "\(whole(total)) s" }
-        return "\(whole(total / 60)) min \(String(format: "%02d", total % 60)) s"
+        guard total >= 3600 else { return "\(whole(total / 60)) min \(padded(total % 60)) s" }
+        return "\(whole(total / 3600)) h \(padded((total % 3600) / 60)) min \(padded(total % 60)) s"
     }
 
     /// What a finished run reports outside the app: "Transcribed in 37 s (16× real time)".

@@ -6,18 +6,18 @@ public enum LibraryStatsReport {
         guard !stats.isEmpty else { return "The library is empty." }
         var lines = [
             "Transcripts: \(stats.totals.entries)",
-            "Audio: \(Timecode.format(stats.totals.audioSeconds))",
+            "Audio: \(TranscriptionSpeed.duration(seconds: stats.totals.audioSeconds, locale: locale))",
             "Words: \(stats.totals.words)",
-            "Time transcribing: \(Timecode.format(stats.totals.transcriptionSeconds))",
+            "Time transcribing: \(TranscriptionSpeed.duration(seconds: stats.totals.transcriptionSeconds, locale: locale))",
             "Timed: \(coverage(stats.timed))",
         ]
         if let speed = stats.averageSpeed {
             lines.append("Average speed: \(TranscriptionSpeed.label(speed, locale: locale)) real time")
         }
         if let longest = stats.longestRun {
-            lines.append("Longest run: \(Timecode.format(longest.seconds)) (\(longest.entryID))")
+            lines.append("Longest run: \(TranscriptionSpeed.duration(seconds: longest.seconds, locale: locale)) (\(longest.entryID))")
         }
-        lines.append("Last 30 days: \(stats.last30Days.entries) transcripts, \(Timecode.format(stats.last30Days.audioSeconds))")
+        lines.append("Last 30 days: \(stats.last30Days.entries) transcripts, \(TranscriptionSpeed.duration(seconds: stats.last30Days.audioSeconds, locale: locale))")
         lines.append(EntryCategory.allCases.map { "\(plural($0)): \(stats.totals.count($0))" }.joined(separator: ", "))
         if !stats.perModel.isEmpty {
             lines.append("")
@@ -25,8 +25,8 @@ public enum LibraryStatsReport {
             for row in stats.perModel {
                 var parts = [
                     row.runs == 1 ? "1 run" : "\(row.runs) runs",
-                    "\(Timecode.format(row.audioSeconds)) audio",
-                    "\(Timecode.format(row.transcriptionSeconds)) spent",
+                    "\(TranscriptionSpeed.duration(seconds: row.audioSeconds, locale: locale)) audio",
+                    "\(TranscriptionSpeed.duration(seconds: row.transcriptionSeconds, locale: locale)) spent",
                 ]
                 if let speed = row.speed {
                     parts.append("\(TranscriptionSpeed.label(speed, locale: locale)) real time")

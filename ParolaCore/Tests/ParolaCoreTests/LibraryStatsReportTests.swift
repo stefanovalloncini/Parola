@@ -38,9 +38,9 @@ struct LibraryStatsReportTests {
         let text = LibraryStatsReport.text(stats, locale: english)
 
         #expect(text.contains("Transcripts: 3"))
-        #expect(text.contains("Audio: 30:00"))
+        #expect(text.contains("Audio: 30 min 00 s"))
         #expect(text.contains("Words: 2700"))
-        #expect(text.contains("Time transcribing: 01:15"))
+        #expect(text.contains("Time transcribing: 1 min 15 s"))
         #expect(text.contains("Timed: 2 of 3, since 2025-09-12"))
         #expect(text.contains("Average speed: 16× real time"))
         #expect(text.contains("Transcriptions: 3, Meetings: 0, Dictations: 0"))
@@ -62,6 +62,10 @@ struct LibraryStatsReportTests {
         #expect(
             TranscriptionSpeed.runSummary(seconds: 125, audioSeconds: nil, locale: english)
                 == "Transcribed in 2 min 05 s"
+        )
+        #expect(
+            TranscriptionSpeed.runSummary(seconds: 12_500, audioSeconds: nil, locale: english)
+                == "Transcribed in 3 h 28 min 20 s"
         )
         #expect(
             TranscriptionSpeed.runSummary(seconds: 0.48, audioSeconds: 7.6, locale: english)

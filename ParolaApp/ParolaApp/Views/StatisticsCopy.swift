@@ -10,7 +10,7 @@ enum StatisticsCopy {
         bundle: Bundle = .main,
         locale: Locale = AppFormat.locale
     ) -> String {
-        String(localized: "\(transcripts(entries, bundle: bundle, locale: locale)) · \(audioLabel(audioSeconds, locale: locale)) transcribed", bundle: bundle)
+        String(localized: "\(transcripts(entries, bundle: bundle, locale: locale)) · \(AppFormat.duration(seconds: audioSeconds, locale: locale)) transcribed", bundle: bundle)
     }
 
     /// Why three of the four tiles can cover less than the library does.
@@ -38,18 +38,13 @@ enum StatisticsCopy {
         guard entries > 0 else {
             return String(localized: "Nothing transcribed in the last 30 days", bundle: bundle)
         }
-        return String(localized: "\(transcripts(entries, bundle: bundle, locale: locale)) · \(audioLabel(audioSeconds, locale: locale)) of audio", bundle: bundle)
+        return String(localized: "\(transcripts(entries, bundle: bundle, locale: locale)) · \(AppFormat.duration(seconds: audioSeconds, locale: locale)) of audio", bundle: bundle)
     }
 
     private static func transcripts(_ count: Int, bundle: Bundle, locale: Locale) -> String {
         count == 1
             ? String(localized: "1 transcript", bundle: bundle)
             : String(localized: "\(AppFormat.integer(count, locale: locale)) transcripts", bundle: bundle)
-    }
-
-    /// A span of media in the header form, with a plain "0 s" standing in for a library with no audio yet.
-    private static func audioLabel(_ seconds: Double, locale: Locale) -> String {
-        AppFormat.duration(seconds: seconds, locale: locale) ?? AppFormat.runDuration(seconds: 0, locale: locale)
     }
 
     /// "16× real time", the only form a speed is ever shown in.
@@ -65,7 +60,7 @@ enum StatisticsCopy {
         bundle: Bundle = .main,
         locale: Locale = AppFormat.locale
     ) -> String {
-        let took = AppFormat.runDuration(seconds: seconds, locale: locale)
+        let took = AppFormat.duration(seconds: seconds, locale: locale)
         guard let factor = TranscriptionSpeed.factor(audioSeconds: audioSeconds, transcriptionSeconds: seconds),
               let speed = speed(factor, bundle: bundle, locale: locale)
         else {

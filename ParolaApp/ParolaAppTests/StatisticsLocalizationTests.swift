@@ -20,7 +20,7 @@ struct StatisticsLocalizationTests {
         #expect(StatisticsCopy.speed(16, bundle: bundle, locale: italian) == "16× tempo reale")
         #expect(
             StatisticsCopy.transcribedIn(seconds: 37, audioSeconds: 592, bundle: bundle, locale: italian)
-                == "37 s · 16× tempo reale"
+                == "\(AppFormat.duration(seconds: 37, locale: italian)) · 16× tempo reale"
         )
     }
 
@@ -49,7 +49,7 @@ struct StatisticsLocalizationTests {
     @Test("the interpolated lines resolve against the Italian templates")
     func interpolatedLinesInItalian() throws {
         let bundle = try italianBundle()
-        let audio = try #require(AppFormat.duration(seconds: 4_800, locale: italian))
+        let audio = AppFormat.duration(seconds: 4_800, locale: italian)
 
         #expect(
             StatisticsCopy.subtitle(entries: 12, audioSeconds: 4_800, bundle: bundle, locale: italian)

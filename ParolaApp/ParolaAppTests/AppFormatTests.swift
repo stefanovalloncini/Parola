@@ -45,24 +45,25 @@ struct AppFormatTests {
         #expect(AppFormat.integer(0, locale: Locale(identifier: "en_US")) == "0")
     }
 
-    @Test("a span picks the units that carry meaning and hides the rest")
+    @Test("a span picks the two largest units that carry meaning and hides the rest")
     func durationPicksItsUnits() {
         let english = Locale(identifier: "en_US")
-        #expect(AppFormat.duration(seconds: 0, locale: english) == nil)
-        #expect(AppFormat.duration(seconds: -30, locale: english) == nil)
-        #expect(AppFormat.duration(seconds: 0.4, locale: english) == nil)
         #expect(AppFormat.duration(seconds: 40, locale: english) == "40 sec")
+        #expect(AppFormat.duration(seconds: 125, locale: english) == "2 min, 5 sec")
         #expect(AppFormat.duration(seconds: 1_200, locale: english) == "20 min")
         #expect(AppFormat.duration(seconds: 7_200, locale: english) == "2 hr")
         #expect(AppFormat.duration(seconds: 4_800, locale: english) == "1 hr, 20 min")
+        #expect(AppFormat.duration(seconds: 12_500, locale: english) == "3 hr, 28 min")
     }
 
-    @Test("a run's wall time is seconds alone until it passes a minute")
-    func runDurationSwitchesUnits() {
+    /// Nothing and almost-nothing are different facts: one library has no audio, the other has a run too quick to round.
+    @Test("a span shorter than a second says so, and a true zero says zero")
+    func durationNamesTheSmallSpans() {
         let english = Locale(identifier: "en_US")
-        #expect(AppFormat.runDuration(seconds: 37, locale: english) == "37 s")
-        #expect(AppFormat.runDuration(seconds: 125, locale: english) == "2 min 05 s")
-        #expect(AppFormat.runDuration(seconds: 12_500, locale: Locale(identifier: "it_IT")) == "208 min 20 s")
+        #expect(AppFormat.duration(seconds: 0, locale: english) == "0 sec")
+        #expect(AppFormat.duration(seconds: -30, locale: english) == "0 sec")
+        #expect(AppFormat.duration(seconds: 0.4, locale: english) == "<1 sec")
+        #expect(AppFormat.duration(seconds: 0.4, locale: Locale(identifier: "it_IT")).hasPrefix("<"))
     }
 
     @Test("sizes carry a unit and a separator, not raw bytes")

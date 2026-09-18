@@ -394,7 +394,7 @@ struct LibraryListContentTests {
             )
         }
 
-        #expect(subtitle(nil) == "3 transcripts · 2 min")
+        #expect(subtitle(nil) == "3 transcripts · 2 min, 30 sec")
         #expect(subtitle(.meeting) == "2 transcripts · 2 min")
         #expect(subtitle(.transcription) == "1 transcript · 30 sec")
     }

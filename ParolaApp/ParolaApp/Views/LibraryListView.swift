@@ -128,8 +128,9 @@ enum LibraryListContent {
         locale: Locale = AppFormat.locale
     ) -> String? {
         guard let transcripts = totalsLabel(for: count, locale: locale) else { return nil }
-        guard let span = AppFormat.duration(seconds: totalSeconds, locale: locale) else { return transcripts }
-        return "\(transcripts) · \(span)"
+        // A list whose entries carry no media length says how many there are and stops there.
+        guard totalSeconds.rounded() >= 1 else { return transcripts }
+        return "\(transcripts) · \(AppFormat.duration(seconds: totalSeconds, locale: locale))"
     }
 
     /// The search page counts two things: the entries that matched, and the hits they hold between them.

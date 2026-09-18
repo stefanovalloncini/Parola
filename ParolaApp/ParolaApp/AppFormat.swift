@@ -1,5 +1,4 @@
 import Foundation
-import ParolaCore
 
 /// One locale for every number and date on screen; `ByteCountFormatter` has none of its own.
 enum AppFormat {
@@ -43,24 +42,39 @@ enum AppFormat {
         fraction.formatted(.percent.precision(.fractionLength(fractionDigits)).locale(locale))
     }
 
-    /// A single run's wall time, in the form the CLI prints it in: seconds alone under a minute.
-    static func runDuration(seconds: Double, locale: Locale = AppFormat.locale) -> String {
-        TranscriptionSpeed.duration(seconds: seconds, locale: locale)
-    }
-
-    /// A rounded span for a header line, not a timecode: the largest two units that carry meaning.
-    static func duration(seconds: Double, locale: Locale = AppFormat.locale) -> String? {
+    /// Every span on screen, in one form: the largest two units that carry meaning, abbreviated the
+    /// way the locale abbreviates them. Rounds to whole seconds, so a shorter span reads "<1 sec".
+    static func duration(seconds: Double, locale: Locale = AppFormat.locale) -> String {
         let total = Int(max(0, seconds).rounded())
-        guard total > 0 else { return nil }
+        guard total > 0 else {
+            // A span that rounds away still ran; "0 sec" is kept for a span that truly is nothing.
+            return seconds > 0
+                ? "<" + span(1, allowed: [.seconds], locale: locale)
+                : span(0, allowed: [.seconds], locale: locale, showsZero: true)
+        }
         let allowed: Set<Duration.UnitsFormatStyle.Unit>
         if total >= 3600 {
             allowed = [.hours, .minutes]
         } else if total >= 60 {
-            allowed = [.minutes]
+            allowed = [.minutes, .seconds]
         } else {
             allowed = [.seconds]
         }
-        return Duration.seconds(total)
-            .formatted(.units(allowed: allowed, width: .abbreviated, zeroValueUnits: .hide).locale(locale))
+        return span(total, allowed: allowed, locale: locale)
+    }
+
+    private static func span(
+        _ seconds: Int,
+        allowed: Set<Duration.UnitsFormatStyle.Unit>,
+        locale: Locale,
+        showsZero: Bool = false
+    ) -> String {
+        Duration.seconds(seconds).formatted(
+            .units(
+                allowed: allowed,
+                width: .abbreviated,
+                zeroValueUnits: showsZero ? .show(length: 1) : .hide
+            ).locale(locale)
+        )
     }
 }

@@ -15,7 +15,7 @@ struct StatisticsPageCopyTests {
                 == "12 transcripts · 1 hr, 20 min transcribed"
         )
         #expect(StatisticsCopy.subtitle(entries: 1, audioSeconds: 40, locale: english) == "1 transcript · 40 sec transcribed")
-        #expect(StatisticsCopy.subtitle(entries: 0, audioSeconds: 0, locale: english) == "0 transcripts · 0 s transcribed")
+        #expect(StatisticsCopy.subtitle(entries: 0, audioSeconds: 0, locale: english) == "0 transcripts · 0 sec transcribed")
     }
 
     @Test("the coverage note says when timing started and how much of the library it covers")

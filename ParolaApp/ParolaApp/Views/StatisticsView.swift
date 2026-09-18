@@ -71,12 +71,12 @@ struct StatisticsView: View {
             )
             StatTile(
                 label: "Audio transcribed",
-                value: durationValue(stats.totals.audioSeconds),
+                value: AppFormat.duration(seconds: stats.totals.audioSeconds),
                 axID: "Tile.Audio"
             )
             StatTile(
                 label: "Time transcribing",
-                value: durationValue(stats.totals.transcriptionSeconds),
+                value: AppFormat.duration(seconds: stats.totals.transcriptionSeconds),
                 axID: "Tile.Time"
             )
             StatTile(
@@ -153,10 +153,6 @@ struct StatisticsView: View {
         stats.perModel.compactMap(\.speed).max()
     }
 
-    private func durationValue(_ seconds: Double) -> String {
-        AppFormat.duration(seconds: seconds) ?? AppFormat.runDuration(seconds: 0)
-    }
-
     private func columnHeading(_ title: LocalizedStringKey) -> some View {
         Text(title).frame(width: ModelRowMetrics.numberWidth, alignment: .trailing)
     }
@@ -212,8 +208,8 @@ private struct ModelTableRow: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             number(AppFormat.integer(row.runs))
-            number(AppFormat.duration(seconds: row.audioSeconds) ?? "")
-            number(AppFormat.duration(seconds: row.transcriptionSeconds) ?? "")
+            number(AppFormat.duration(seconds: row.audioSeconds))
+            number(AppFormat.duration(seconds: row.transcriptionSeconds))
             number(row.speed.map { TranscriptionSpeed.label($0, locale: AppFormat.locale) } ?? "")
             speedBar
         }

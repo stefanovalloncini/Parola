@@ -22,7 +22,7 @@ struct InfoRowTests {
         #expect(height("00:04") > 0)
     }
 
-    /// "2 min 05 s · 16× real time" does not fit the 300pt inspector column on one line.
+    /// "2 min, 5 sec · 16× real time" does not fit the 300pt inspector column on one line.
     @Test("a wrapping row takes a second line instead of truncating away half the value")
     func wrappingRowsGrowInstead() {
         func height(wraps: Bool) -> CGFloat {
@@ -30,7 +30,7 @@ struct InfoRowTests {
                 rootView: InfoRow(
                     icon: "stopwatch",
                     label: "Transcribed in",
-                    value: "2 min 05 s · 16× real time",
+                    value: "2 min, 5 sec · 16× real time",
                     numeric: true,
                     wraps: wraps
                 )
