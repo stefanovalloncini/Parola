@@ -4311,6 +4311,17 @@
         }
       }
     },
+    "Hide Live Captions": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nascondi sottotitoli live"
+          }
+        }
+      }
+    },
     "Hide Scratchpad": {
       "extractionState": "manual",
       "localizations": {
@@ -7408,6 +7419,17 @@
         }
       }
     },
+    "Record Meeting": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra riunione"
+          }
+        }
+      }
+    },
     "Record Meetings": {
       "extractionState": "manual",
       "localizations": {
@@ -8419,6 +8441,17 @@
         }
       }
     },
+    "Settings…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impostazioni…"
+          }
+        }
+      }
+    },
     "Short triggers that expand into longer text while you dictate.": {
       "extractionState": "manual",
       "localizations": {
@@ -8437,6 +8470,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scorciatoie"
+          }
+        }
+      }
+    },
+    "Show Live Captions": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra sottotitoli live"
           }
         }
       }
@@ -9265,6 +9309,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riassunto"
+          }
+        }
+      }
+    },
+    "System Audio": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio di sistema"
           }
         }
       }
