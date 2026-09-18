@@ -30,6 +30,8 @@ public struct LibraryEntry: Identifiable, Hashable, Sendable {
     public var language: String { manifest.language }
     public var modelName: String { manifest.modelName }
     public var sourceDigest: String? { manifest.sourceDigest }
+    public var transcriptionSeconds: Double? { manifest.transcriptionSeconds }
+    public var wordCount: Int? { manifest.wordCount }
 
     public func note(forSegment id: Int) -> String? {
         manifest.segmentNotes[String(id)]

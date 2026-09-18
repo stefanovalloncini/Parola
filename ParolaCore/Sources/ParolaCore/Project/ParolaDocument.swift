@@ -26,6 +26,12 @@ public struct ParolaDocument: Sendable {
         /// SHA-256 of the imported file's bytes, the key the duplicate check works on. Absent on
         /// bundles written before version 2, and on transcripts imported without their media.
         public var sourceDigest: String?
+        /// Wall-clock seconds the engine run took. Absent on bundles written before it was
+        /// recorded, and on transcripts that never ran through a file transcription.
+        public var transcriptionSeconds: Double?
+        /// Words of spoken text, counted when the bundle is written so the statistics page never
+        /// has to open transcript.json. Absent on bundles written before it was recorded.
+        public var wordCount: Int?
 
         public init(
             version: Int = Manifest.currentVersion,
@@ -43,7 +49,9 @@ public struct ParolaDocument: Sendable {
             segmentNotes: [String: String] = [:],
             pinned: Bool = false,
             durationSeconds: Double? = nil,
-            sourceDigest: String? = nil
+            sourceDigest: String? = nil,
+            transcriptionSeconds: Double? = nil,
+            wordCount: Int? = nil
         ) {
             self.version = version
             self.createdAt = createdAt
@@ -61,6 +69,8 @@ public struct ParolaDocument: Sendable {
             self.pinned = pinned
             self.durationSeconds = durationSeconds
             self.sourceDigest = sourceDigest
+            self.transcriptionSeconds = transcriptionSeconds
+            self.wordCount = wordCount
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -80,6 +90,8 @@ public struct ParolaDocument: Sendable {
             case pinned
             case durationSeconds
             case sourceDigest
+            case transcriptionSeconds
+            case wordCount
         }
 
         public init(from decoder: any Decoder) throws {
@@ -100,6 +112,8 @@ public struct ParolaDocument: Sendable {
             pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
             durationSeconds = try c.decodeIfPresent(Double.self, forKey: .durationSeconds)
             sourceDigest = try c.decodeIfPresent(String.self, forKey: .sourceDigest)
+            transcriptionSeconds = try c.decodeIfPresent(Double.self, forKey: .transcriptionSeconds)
+            wordCount = try c.decodeIfPresent(Int.self, forKey: .wordCount)
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -126,6 +140,8 @@ public struct ParolaDocument: Sendable {
             }
             try c.encodeIfPresent(durationSeconds, forKey: .durationSeconds)
             try c.encodeIfPresent(sourceDigest, forKey: .sourceDigest)
+            try c.encodeIfPresent(transcriptionSeconds, forKey: .transcriptionSeconds)
+            try c.encodeIfPresent(wordCount, forKey: .wordCount)
         }
     }
 
@@ -183,7 +199,9 @@ public struct ParolaDocument: Sendable {
                 deletedAt: deletedAt,
                 audioFilename: audioFilename,
                 durationSeconds: transcript.durationSeconds.flatMap { $0 > 0 ? $0 : nil },
-                sourceDigest: source == nil ? nil : sourceDigest
+                sourceDigest: source == nil ? nil : sourceDigest,
+                transcriptionSeconds: transcript.transcriptionSeconds,
+                wordCount: transcript.wordCount
             )
             try writeJSON(manifest, to: staging.appendingPathComponent("manifest.json"))
             // Word timings make transcript.json the biggest file in the bundle; indenting it costs more than it's worth.

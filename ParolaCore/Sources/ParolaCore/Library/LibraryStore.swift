@@ -575,6 +575,7 @@ public actor LibraryStore {
             try data.write(to: transcriptURL, options: .atomic)
             try ParolaDocument.updateManifest(at: bundleURL) { manifest in
                 manifest.updatedAt = now
+                manifest.wordCount = transcript.wordCount
                 if let duration = transcript.durationSeconds, duration > 0 {
                     manifest.durationSeconds = duration
                 }
