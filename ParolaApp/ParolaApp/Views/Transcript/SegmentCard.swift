@@ -97,6 +97,7 @@ struct SegmentCard: View {
         }
         .alert("Segment note", isPresented: $editingNote) {
             TextField("Note", text: $draftNote)
+                .writingToolsBehavior(.complete)
             Button("Cancel", role: .cancel) {}
             Button("Save") {
                 model.setSegmentNote(draftNote, segmentID: segment.id)
@@ -188,6 +189,7 @@ struct SegmentCard: View {
                 .textFieldStyle(.plain)
                 .font(DS.Font.transcript)
                 .lineLimit(1...20)
+                .writingToolsBehavior(.complete)
                 .focused($editingFocus)
                 .onChange(of: editingFocus) { _, focused in
                     if !focused { commitEdit() }

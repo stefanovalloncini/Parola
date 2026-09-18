@@ -19,6 +19,7 @@ struct ScratchpadView: View {
 
             TextEditor(text: $controller.text)
                 .font(DS.Font.body)
+                .writingToolsBehavior(.complete)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .background(
