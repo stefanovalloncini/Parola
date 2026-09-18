@@ -45,6 +45,7 @@ struct LibraryStatsReportTests {
         #expect(text.contains("Average speed: 16× real time"))
         #expect(text.contains("Transcriptions: 3, Meetings: 0, Dictations: 0"))
         #expect(text.contains("  whisper: 2 runs"))
+        #expect(LibraryStatsReport.text(stats).contains("2 runs"), "the tool locale is the default")
         #expect(!text.contains("parakeet"), "a model with no measured run has nothing to compare")
     }
 
@@ -61,6 +62,10 @@ struct LibraryStatsReportTests {
         #expect(
             TranscriptionSpeed.runSummary(seconds: 125, audioSeconds: nil, locale: english)
                 == "Transcribed in 2 min 05 s"
+        )
+        #expect(
+            TranscriptionSpeed.runSummary(seconds: 0.48, audioSeconds: 7.6, locale: english)
+                == "Transcribed in <1 s (16× real time)"
         )
     }
 }
@@ -102,6 +107,7 @@ struct CLIStatsProcessTests {
         #expect(run.stdout.contains("Timed: 1 of 2, since "))
         #expect(run.stdout.contains("Average speed: 16× real time"))
         #expect(run.stdout.contains("By model"))
+        #expect(run.stdout.contains("1 run,"), "a single run is not '1 runs'")
     }
 
     @Test("--json answers with the same numbers a script can read")

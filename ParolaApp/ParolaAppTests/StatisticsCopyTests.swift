@@ -10,6 +10,7 @@ struct StatisticsCopyTests {
     @Test("a run under a minute reads in seconds, a longer one in minutes and seconds")
     func runDurationForm() {
         #expect(AppFormat.runDuration(seconds: 0, locale: english) == "0 s")
+        #expect(AppFormat.runDuration(seconds: 0.48, locale: english) == "<1 s")
         #expect(AppFormat.runDuration(seconds: -4, locale: english) == "0 s")
         #expect(AppFormat.runDuration(seconds: 37.4, locale: english) == "37 s")
         #expect(AppFormat.runDuration(seconds: 59.6, locale: english) == "1 min 00 s")

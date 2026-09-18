@@ -2,7 +2,7 @@ import Foundation
 
 /// The plain-text report `parola library stats` prints and `parola_library_stats` answers with.
 public enum LibraryStatsReport {
-    public static func text(_ stats: LibraryStatistics, locale: Locale = .autoupdatingCurrent) -> String {
+    public static func text(_ stats: LibraryStatistics, locale: Locale = TranscriptionSpeed.toolLocale) -> String {
         guard !stats.isEmpty else { return "The library is empty." }
         var lines = [
             "Transcripts: \(stats.totals.entries)",
@@ -24,7 +24,7 @@ public enum LibraryStatsReport {
             lines.append("By model")
             for row in stats.perModel {
                 var parts = [
-                    "\(row.runs) runs",
+                    row.runs == 1 ? "1 run" : "\(row.runs) runs",
                     "\(Timecode.format(row.audioSeconds)) audio",
                     "\(Timecode.format(row.transcriptionSeconds)) spent",
                 ]
