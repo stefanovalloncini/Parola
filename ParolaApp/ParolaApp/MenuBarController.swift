@@ -153,11 +153,8 @@ final class MenuBarController: NSObject {
 
     private func rebuildMenu(_ snapshot: MenuSnapshot) {
         guard let statusItem else { return }
-        let menu = NSMenu()
+        let menu = Self.menu(for: snapshot, target: self)
         menu.delegate = self
-        for item in Self.items(for: snapshot, target: self) {
-            menu.addItem(item)
-        }
         statusItem.menu = menu
     }
 
@@ -165,7 +162,17 @@ final class MenuBarController: NSObject {
 
     private static let microphoneItemIdentifier = NSUserInterfaceItemIdentifier("MenuBar.Microphone")
 
-    /// `target` is `nil` in tests, where only titles/state/order matter.
+    /// An autoenabling `NSMenu` would silently re-enable a disabled item (e.g. Live Captions) on display.
+    static func menu(for snapshot: MenuSnapshot, target: AnyObject?) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for item in items(for: snapshot, target: target) {
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    /// A nil target leaves every item unwired.
     static func items(for snapshot: MenuSnapshot, target: AnyObject?) -> [NSMenuItem] {
         if snapshot.mode == .dictationOnly {
             return [
@@ -225,6 +232,7 @@ final class MenuBarController: NSObject {
 
     private static func recordMeetingItem(for snapshot: MenuSnapshot, target: AnyObject?) -> NSMenuItem {
         let submenu = NSMenu()
+        submenu.autoenablesItems = false
         if snapshot.showsSystemAudio, let app = snapshot.detectedMeetingApp {
             submenu.addItem(menuItem(title: app, action: #selector(recordSystem), target: target))
         }
@@ -258,6 +266,7 @@ final class MenuBarController: NSObject {
 
     private static func microphoneSubmenu(devices: [AudioInputDevice], selectedUID: String, target: AnyObject?) -> NSMenu {
         let submenu = NSMenu()
+        submenu.autoenablesItems = false
         let systemDefault = menuItem(title: String(localized: "System Default"), action: #selector(selectInputDevice(_:)), target: target)
         systemDefault.representedObject = ""
         systemDefault.state = selectedUID.isEmpty ? .on : .off

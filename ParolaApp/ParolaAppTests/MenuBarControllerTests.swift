@@ -201,4 +201,18 @@ struct MenuBarItemsTests {
         let items = MenuBarController.items(for: snapshot, target: nil)
         #expect(titles(items) == ["Start Dictation", "—", "Open Parola", "Quit Parola"])
     }
+
+    @Test("a disabled item stays disabled after AppKit revalidates the menu")
+    func autoenablingIsOffEverywhere() {
+        let reason = "Parakeet can't stream Live Captions. Pick a Whisper model first."
+        let snapshot = fullSnapshot(detectedMeetingApp: "Zoom", captionsUnavailableReason: reason)
+        let menu = MenuBarController.menu(for: snapshot, target: nil)
+        #expect(menu.autoenablesItems == false)
+        #expect(menu.items.first { $0.title == "Record Meeting" }?.submenu?.autoenablesItems == false)
+        #expect(menu.items.first { $0.title == "Microphone" }?.submenu?.autoenablesItems == false)
+
+        menu.update()
+
+        #expect(menu.items.first { $0.title.contains("Live Captions") }?.isEnabled == false)
+    }
 }
