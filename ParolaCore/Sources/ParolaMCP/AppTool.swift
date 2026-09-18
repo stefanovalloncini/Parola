@@ -120,8 +120,8 @@ public enum AppTools {
         AppTool(
             name: "parola_app_set_route",
             bridgeCmd: "setRoute",
-            description: "Navigate the detail pane. Accepts 'transcript', 'batch', or 'queue'.",
-            properties: [.string("route", enum: ["transcript", "batch", "queue"])],
+            description: "Navigate the detail pane. Accepts 'transcript', 'batch', 'queue', 'statistics' or 'recentlyDeleted'.",
+            properties: [.string("route", enum: ["transcript", "batch", "queue", "statistics", "recentlyDeleted"])],
             required: ["route"]
         ),
         AppTool(

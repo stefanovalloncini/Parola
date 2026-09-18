@@ -7,6 +7,7 @@ public enum EngineTool: String, CaseIterable, Sendable {
     case listEngines      = "parola_list_engines"
     case searchLibrary    = "parola_search_library"
     case listRecent       = "parola_list_recent"
+    case libraryStats     = "parola_library_stats"
     case summarize        = "parola_summarize"
     case openApp          = "parola_open_app"
 
@@ -67,6 +68,12 @@ public enum EngineTool: String, CaseIterable, Sendable {
                         "limit": ["type": "integer", "default": 10],
                     ],
                 ] as [String: Any])
+            )
+        case .libraryStats:
+            return MCPTool(
+                name: rawValue,
+                description: "Report what Parola's library holds: how many transcripts, how much audio, how long transcribing took, and the speed each model ran at. Entries in Recently Deleted are left out.",
+                inputSchema: AnyEncodable(["type": "object", "properties": [String: Any]()] as [String: Any])
             )
         case .summarize:
             return MCPTool(

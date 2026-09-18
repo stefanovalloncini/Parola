@@ -128,6 +128,22 @@ enum TranscribeReport {
         """
     }
 
+    /// What the run cost, as a sentence and as the two keys a caller parses. Nil for a transcript
+    /// that never ran through a file transcription.
+    static func timingNote(for transcript: Transcript) -> String? {
+        guard let seconds = transcript.transcriptionSeconds else { return nil }
+        var lines = [
+            TranscriptionSpeed.runSummary(seconds: seconds, audioSeconds: transcript.durationSeconds),
+            "transcription_seconds: \(String(format: "%.2f", seconds))",
+        ]
+        if let factor = TranscriptionSpeed.factor(
+            audioSeconds: transcript.durationSeconds, transcriptionSeconds: seconds
+        ) {
+            lines.append("speed_factor: \(String(format: "%.2f", factor))")
+        }
+        return lines.joined(separator: "\n")
+    }
+
     static func preview(of rendered: String) -> String {
         let head = rendered.prefix(previewCharacters)
         return head.count < rendered.count ? head + "…" : String(head)

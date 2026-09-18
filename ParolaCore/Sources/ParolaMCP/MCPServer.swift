@@ -138,6 +138,7 @@ public actor MCPServer {
         case .listEngines:   return await listEngines()
         case .searchLibrary: return await searchLibrary(args: args)
         case .listRecent:    return await listRecent(args: args)
+        case .libraryStats:  return await libraryStats()
         case .summarize:     return try await summarize(args: args)
         case .openApp:       return try await openApp(args: args)
         }
@@ -156,6 +157,9 @@ public actor MCPServer {
         )
         let rendered = try request.format.render(transcript)
         var blocks = outputBlocks(for: transcript, rendered: rendered, request: request)
+        if let timing = TranscribeReport.timingNote(for: transcript) {
+            blocks.append(timing)
+        }
         if let existing = duplicate.entry {
             blocks.append(DuplicateNotice.text(for: existing, skipping: false))
         }
@@ -275,6 +279,11 @@ public actor MCPServer {
         let limit = max(0, args["limit"] as? Int ?? 10)
         let entries = await libraryStore.list().prefix(limit)
         return MCPToolCallResult(text: entries.map { "- \($0.title)" }.joined(separator: "\n"))
+    }
+
+    private func libraryStats() async -> MCPToolCallResult {
+        let stats = LibraryStatistics.compute(entries: await libraryStore.list())
+        return MCPToolCallResult(text: LibraryStatsReport.text(stats))
     }
 
     private func summarize(args: [String: Any]) async throws -> MCPToolCallResult {
