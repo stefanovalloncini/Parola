@@ -99,6 +99,8 @@ public actor TranscriptionSession {
             )
         }
         try Task.checkCancellation()
+        // The user's wait starts here, after any download: loading the model is part of it.
+        let engineStartedAt = ContinuousClock.now
         cancelIdleTimer()
         // Rearm on every exit: a throw below (incl. cancellation) would otherwise leave the
         // loaded model resident with no idle timer until the next successful run. An abandoned
@@ -202,6 +204,10 @@ public actor TranscriptionSession {
                 mergesSentences: engineID == .whisperKit
             )
         )
+        let engineElapsed = engineStartedAt.duration(to: .now)
+        transcript.transcriptionSeconds =
+            Double(engineElapsed.components.seconds)
+            + Double(engineElapsed.components.attoseconds) / 1e18
         ParolaLog.info(
             .models, "transcribe finished",
             [

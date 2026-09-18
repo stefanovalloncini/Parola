@@ -69,6 +69,10 @@ public struct Transcript: Codable, Hashable, Sendable {
     public var modelName: String
     public var sourceURL: URL?
     public var durationSeconds: Double?
+    /// Wall-clock seconds the engine run took, measured from the first engine call after any model
+    /// download to the finished transcript. Nil for anything that did not run through a file
+    /// transcription: imported subtitles, captions, dictation, live takes.
+    public var transcriptionSeconds: Double?
     public var summary: Summary?
     public var chatHistory: [ChatMessage]?
 
@@ -84,6 +88,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         modelName: String,
         sourceURL: URL? = nil,
         durationSeconds: Double? = nil,
+        transcriptionSeconds: Double? = nil,
         summary: Summary? = nil,
         chatHistory: [ChatMessage]? = nil,
         languageDetection: LanguageDetection? = nil
@@ -94,6 +99,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         self.modelName = modelName
         self.sourceURL = sourceURL
         self.durationSeconds = durationSeconds
+        self.transcriptionSeconds = transcriptionSeconds
         self.summary = summary
         self.chatHistory = chatHistory
         self.languageDetection = languageDetection
@@ -107,6 +113,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         modelName = try c.decode(String.self, forKey: .modelName)
         sourceURL = try c.decodeIfPresent(URL.self, forKey: .sourceURL)
         durationSeconds = try c.decodeIfPresent(Double.self, forKey: .durationSeconds)
+        transcriptionSeconds = try c.decodeIfPresent(Double.self, forKey: .transcriptionSeconds)
         summary = try c.decodeIfPresent(Summary.self, forKey: .summary)
         chatHistory = try c.decodeIfPresent([ChatMessage].self, forKey: .chatHistory)
         languageDetection = try c.decodeIfPresent(LanguageDetection.self, forKey: .languageDetection)
@@ -117,6 +124,11 @@ public struct Transcript: Codable, Hashable, Sendable {
             .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: " ")
+    }
+
+    /// Words of spoken text, counted the way the inspector and the library statistics count them.
+    public var wordCount: Int {
+        segments.reduce(0) { $0 + $1.text.split(whereSeparator: \.isWhitespace).count }
     }
 
     /// What the LLM features send. Diarized transcripts keep their speaker labels — prompts ask
