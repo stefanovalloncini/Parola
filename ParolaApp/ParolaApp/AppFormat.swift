@@ -42,6 +42,13 @@ enum AppFormat {
         fraction.formatted(.percent.precision(.fractionLength(fractionDigits)).locale(locale))
     }
 
+    /// A single run's wall time: whole seconds under a minute, minutes and seconds above it.
+    static func runDuration(seconds: Double, locale: Locale = AppFormat.locale) -> String {
+        let total = Int(max(0, seconds).rounded())
+        guard total >= 60 else { return "\(integer(total, locale: locale)) s" }
+        return "\(integer(total / 60, locale: locale)) min \(String(format: "%02d", total % 60)) s"
+    }
+
     /// A rounded span for a header line, not a timecode: the largest two units that carry meaning.
     static func duration(seconds: Double, locale: Locale = AppFormat.locale) -> String? {
         let total = Int(max(0, seconds).rounded())

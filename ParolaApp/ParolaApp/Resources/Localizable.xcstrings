@@ -78,6 +78,17 @@
         }
       }
     },
+    "%@ real time": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ tempo reale"
+          }
+        }
+      }
+    },
     "%@ rewrite preset": {
       "extractionState": "manual",
       "localizations": {
@@ -9613,6 +9624,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrivi più tardi"
+          }
+        }
+      }
+    },
+    "Transcribed in": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascritto in"
           }
         }
       }

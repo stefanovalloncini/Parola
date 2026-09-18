@@ -57,6 +57,14 @@ struct AppFormatTests {
         #expect(AppFormat.duration(seconds: 4_800, locale: english) == "1 hr, 20 min")
     }
 
+    @Test("a run's wall time is seconds alone until it passes a minute")
+    func runDurationSwitchesUnits() {
+        let english = Locale(identifier: "en_US")
+        #expect(AppFormat.runDuration(seconds: 37, locale: english) == "37 s")
+        #expect(AppFormat.runDuration(seconds: 125, locale: english) == "2 min 05 s")
+        #expect(AppFormat.runDuration(seconds: 12_500, locale: Locale(identifier: "it_IT")) == "208 min 20 s")
+    }
+
     @Test("sizes carry a unit and a separator, not raw bytes")
     func sizesCarryAUnit() {
         let label = AppFormat.byteSize(76_700_000, locale: Locale(identifier: "en_US"))

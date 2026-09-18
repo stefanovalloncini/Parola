@@ -38,6 +38,7 @@ struct InfoInspector: View {
                 InfoRow(icon: "text.word.spacing", label: "Words", value: AppFormat.integer(wordCount), numeric: true)
                 InfoRow(icon: "text.alignleft", label: "Sentences", value: AppFormat.integer(sentenceCount), numeric: true)
                 InfoRow(icon: "book", label: "Reading time", value: readingTimeLabel, numeric: true)
+                InfoRow(icon: "stopwatch", label: "Transcribed in", value: transcribedInLabel, numeric: true)
                 if speakerCount > 0 {
                     InfoRow(icon: "person.2", label: "Speakers", value: AppFormat.integer(speakerCount), numeric: true)
                 }
@@ -105,6 +106,15 @@ struct InfoInspector: View {
 
     private var durationLabel: String? {
         model.transcript?.durationSeconds.map { Timecode.format($0.rounded()) }
+    }
+
+    /// Nil for everything that never ran through a file transcription, and for entries made before it was measured.
+    private var transcribedInLabel: String? {
+        guard let seconds = model.transcript?.transcriptionSeconds ?? entry?.transcriptionSeconds else { return nil }
+        return StatisticsCopy.transcribedIn(
+            seconds: seconds,
+            audioSeconds: model.transcript?.durationSeconds ?? entry?.durationSeconds
+        )
     }
 
     private func dateLabel(_ date: Date?) -> String? {
