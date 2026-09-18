@@ -121,4 +121,25 @@ struct StatisticsViewTests {
         #expect(AppModel.Route.statistics.rawValue == "statistics")
         #expect(AppModel.Route(rawValue: "statistics") == .statistics)
     }
+
+    @Test("setRoute names the page among the routes it accepts")
+    func setRouteAcceptsThePage() throws {
+        try withIsolatedDefaults { defaults in
+            let model = makeModel(defaults, entries: [])
+            let server = try ParolaAutomationServer(model: model)
+            let command = try #require(server.settingsCommands().first { $0.name == "setRoute" })
+            withExtendedLifetime(server) {}
+
+            guard case .string(let options) = command.args.first(where: { $0.name == "route" })?.kind else {
+                Issue.record("setRoute should constrain its route argument to an enum")
+                return
+            }
+            #expect(options?.contains("statistics") == true)
+        }
+    }
+
+    @Test("a transcript opened from the page records no list to go back to")
+    func statisticsIsNotAList() {
+        #expect(LibraryOrigin.capture(sidebar: .statistics, homeOnScreen: false) == nil)
+    }
 }
