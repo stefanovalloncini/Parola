@@ -76,6 +76,7 @@ installed. App tools talk to a running Parola.app over a local bridge.
 | `parola_list_engines` | Registered engines and whether each supports `translate` and `prompt`. |
 | `parola_search_library` | Full-text search over stored transcripts. Returns entry ids with a score, the time of the first hit in the recording (absent for a title-only match) and a snippet. Args: `query`, `limit`. |
 | `parola_list_recent` | Titles of the most recent stored transcripts. Arg: `limit`. |
+| `parola_library_stats` | What the library adds up to: transcripts, audio, words, time spent transcribing, coverage, and a per-model table with each model's speed. Entries in Recently Deleted are left out. No arguments. |
 | `parola_summarize` | Transcribe a file, then summarise it with the on-device LLM. Arg: `path`. |
 | `parola_open_app` | Launch Parola.app and wait for its bridge. Args: `timeoutMs`, `bundleID`. |
 
@@ -164,6 +165,19 @@ its own and transcribes nothing.
 a copy of the source audio or video, so saving a 2 GB recording puts another
 2 GB in the library. A failed save is reported in that block rather than
 failing the call — the transcript itself is still returned.
+
+Every result also carries a block saying what the run cost:
+
+```
+Transcribed in 37 s (16× real time)
+transcription_seconds: 37.00
+speed_factor: 16.00
+```
+
+The two keys are always `%.2f` with a `.` decimal separator, whatever the
+machine's locale. The block is absent when the run did not go through a file
+transcription, and `speed_factor` is absent when the media duration is unknown,
+so a parser has to treat both as optional.
 
 ## Progress notifications
 
