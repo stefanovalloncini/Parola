@@ -212,7 +212,7 @@ struct RouteLayoutTests {
 
     @Test(
         "an empty route asks for no more height than the smallest window has",
-        arguments: [AppModel.Route.queue, .batch, .transcript]
+        arguments: [AppModel.Route.queue, .batch, .transcript, .statistics]
     )
     func emptyRoutesFitTheSmallestWindow(route: AppModel.Route) {
         withIsolatedDefaults { defaults in

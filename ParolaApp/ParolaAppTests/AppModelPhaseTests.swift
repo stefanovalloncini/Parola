@@ -57,9 +57,9 @@ struct AppModelPhaseTests {
         #expect(AppModel.RecordSource.systemAudio.label == "System audio")
     }
 
-    @Test("Route enum covers transcript, batch, queue and Recently Deleted")
+    @Test("Route enum covers transcript, batch, queue, Statistics and Recently Deleted")
     func routeAllCases() {
         let raws = AppModel.Route.allCases.map(\.rawValue).sorted()
-        #expect(raws == ["batch", "queue", "recentlyDeleted", "transcript"])
+        #expect(raws == ["batch", "queue", "recentlyDeleted", "statistics", "transcript"])
     }
 }

@@ -40,7 +40,7 @@ enum LibraryOrigin: Equatable {
         case .all: return .all
         case .category(let category): return .category(category)
         case .home: return homeOnScreen ? .home : nil
-        case .queue, .batch, .recentlyDeleted: return nil
+        case .queue, .batch, .statistics, .recentlyDeleted: return nil
         }
     }
 
@@ -479,6 +479,12 @@ extension AppModel {
             await self?.flushPendingTranscriptSave()
             self?.clearLoadedEntry()
         }
+    }
+
+    func openStatistics() {
+        libraryFilter = nil
+        libraryBrowsingAll = false
+        route = .statistics
     }
 
     func openRecentlyDeleted() {

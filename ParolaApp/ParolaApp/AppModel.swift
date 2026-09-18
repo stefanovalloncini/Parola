@@ -48,6 +48,7 @@ final class AppModel {
         case transcript
         case batch
         case queue
+        case statistics
         case recentlyDeleted
     }
 

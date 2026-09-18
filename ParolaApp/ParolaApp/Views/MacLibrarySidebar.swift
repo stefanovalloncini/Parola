@@ -164,6 +164,18 @@ struct MacLibrarySidebar: View {
     private var bottomPills: some View {
         VStack(spacing: 6) {
             SidebarRow(
+                title: "Statistics",
+                systemImage: "chart.bar",
+                isSelected: selectedRoute == .statistics,
+                height: 30,
+                bordered: true
+            ) {
+                model.openStatistics()
+            }
+            .accessibilityIdentifier("library.statistics")
+            .axLeaf("Sidebar.Button.Statistics")
+
+            SidebarRow(
                 title: "Recently Deleted",
                 systemImage: "trash",
                 isSelected: selectedRoute == .recentlyDeleted,
@@ -198,6 +210,7 @@ enum SidebarRoute: Hashable {
     case all
     case queue
     case batch
+    case statistics
     case recentlyDeleted
     case category(EntryCategory)
 
@@ -210,6 +223,7 @@ enum SidebarRoute: Hashable {
         switch route {
         case .queue: return .queue
         case .batch: return .batch
+        case .statistics: return .statistics
         case .recentlyDeleted: return .recentlyDeleted
         case .transcript:
             if searching { return .search }

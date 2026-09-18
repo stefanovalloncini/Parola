@@ -100,6 +100,39 @@
         }
       }
     },
+    "%@ transcripts": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ trascrizioni"
+          }
+        }
+      }
+    },
+    "%@ · %@ of audio": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · %@ di audio"
+          }
+        }
+      }
+    },
+    "%@ · %@ transcribed": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · %@ di audio"
+          }
+        }
+      }
+    },
     "%@%%": {
       "extractionState": "manual",
       "localizations": {
@@ -1307,6 +1340,17 @@
         }
       }
     },
+    "Audio": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio"
+          }
+        }
+      }
+    },
     "Audio duration": {
       "extractionState": "manual",
       "localizations": {
@@ -1314,6 +1358,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Durata audio"
+          }
+        }
+      }
+    },
+    "Audio transcribed": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio trascritto"
           }
         }
       }
@@ -1417,6 +1472,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Disponibili"
+          }
+        }
+      }
+    },
+    "Average speed": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velocità media"
           }
         }
       }
@@ -1710,6 +1776,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Incolla sottotitoli nel video…"
+          }
+        }
+      }
+    },
+    "By Kind": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Per tipo"
+          }
+        }
+      }
+    },
+    "By Model": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Per modello"
           }
         }
       }
@@ -4798,6 +4886,17 @@
         }
       }
     },
+    "Last 30 Days": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ultimi 30 giorni"
+          }
+        }
+      }
+    },
     "Last 30 days": {
       "extractionState": "manual",
       "localizations": {
@@ -5716,6 +5815,17 @@
         }
       }
     },
+    "No Statistics Yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna statistica"
+          }
+        }
+      }
+    },
     "No Transcript": {
       "extractionState": "manual",
       "localizations": {
@@ -5902,6 +6012,17 @@
         }
       }
     },
+    "No run has been timed yet — new transcriptions record how long they take.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun tempo registrato finora: le nuove trascrizioni misurano quanto impiegano."
+          }
+        }
+      }
+    },
     "No snippets match.": {
       "extractionState": "manual",
       "localizations": {
@@ -6062,6 +6183,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nessun elemento eliminato · gli elementi restano %lld giorni"
+          }
+        }
+      }
+    },
+    "Nothing transcribed in the last 30 days": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niente trascritto negli ultimi 30 giorni"
           }
         }
       }
@@ -7841,6 +7973,17 @@
         }
       }
     },
+    "Runs": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esecuzioni"
+          }
+        }
+      }
+    },
     "SOURCES": {
       "extractionState": "manual",
       "localizations": {
@@ -8667,6 +8810,17 @@
         }
       }
     },
+    "Speed": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velocità"
+          }
+        }
+      }
+    },
     "Split Segment": {
       "extractionState": "manual",
       "localizations": {
@@ -8841,6 +8995,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Avvio"
+          }
+        }
+      }
+    },
+    "Statistics": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Statistiche"
           }
         }
       }
@@ -9390,6 +9555,28 @@
         }
       }
     },
+    "Time": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempo"
+          }
+        }
+      }
+    },
+    "Time transcribing": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempo di trascrizione"
+          }
+        }
+      }
+    },
     "Timing": {
       "extractionState": "manual",
       "localizations": {
@@ -9397,6 +9584,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Timing"
+          }
+        }
+      }
+    },
+    "Timing recorded for every transcript.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempi registrati per ogni trascrizione."
+          }
+        }
+      }
+    },
+    "Timing recorded since %@ · %@ transcripts": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tempi registrati dal %@ · %@ trascrizioni"
           }
         }
       }
@@ -9579,6 +9788,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrivi ora"
+          }
+        }
+      }
+    },
+    "Transcribe a file and its timing appears here.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivi un file e qui comparirà il tempo impiegato."
           }
         }
       }
@@ -9786,6 +10006,17 @@
             "value": "Transcriptions"
           }
         },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizioni"
+          }
+        }
+      }
+    },
+    "Transcripts": {
+      "extractionState": "manual",
+      "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
