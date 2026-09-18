@@ -22,6 +22,26 @@ struct InfoRowTests {
         #expect(height("00:04") > 0)
     }
 
+    /// "2 min 05 s · 16× real time" does not fit the 300pt inspector column on one line.
+    @Test("a wrapping row takes a second line instead of truncating away half the value")
+    func wrappingRowsGrowInstead() {
+        func height(wraps: Bool) -> CGFloat {
+            let host = NSHostingView(
+                rootView: InfoRow(
+                    icon: "stopwatch",
+                    label: "Transcribed in",
+                    value: "2 min 05 s · 16× real time",
+                    numeric: true,
+                    wraps: wraps
+                )
+                .frame(width: 220)
+            )
+            host.layoutSubtreeIfNeeded()
+            return host.fittingSize.height
+        }
+        #expect(height(wraps: true) > height(wraps: false))
+    }
+
     @Test("a numeric value takes the mono tier and a name does not")
     func numericValuesAreMono() {
         let numeric = NSHostingView(

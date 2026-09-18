@@ -38,7 +38,7 @@ struct InfoInspector: View {
                 InfoRow(icon: "text.word.spacing", label: "Words", value: AppFormat.integer(wordCount), numeric: true)
                 InfoRow(icon: "text.alignleft", label: "Sentences", value: AppFormat.integer(sentenceCount), numeric: true)
                 InfoRow(icon: "book", label: "Reading time", value: readingTimeLabel, numeric: true)
-                InfoRow(icon: "stopwatch", label: "Transcribed in", value: transcribedInLabel, numeric: true)
+                InfoRow(icon: "stopwatch", label: "Transcribed in", value: transcribedInLabel, numeric: true, wraps: true)
                 if speakerCount > 0 {
                     InfoRow(icon: "person.2", label: "Speakers", value: AppFormat.integer(speakerCount), numeric: true)
                 }
@@ -146,6 +146,8 @@ struct InfoRow: View {
     let value: String?
     /// Counts, timecodes and sizes take the mono tier so the column of values lines up; names do not.
     var numeric: Bool = false
+    /// For the one value that carries two facts: the inspector column is too narrow to truncate it honestly.
+    var wraps: Bool = false
 
     var body: some View {
         // A fact the document does not carry is left out: an em dash reads as a placeholder nobody designed.
@@ -162,8 +164,10 @@ struct InfoRow: View {
                 Text(value)
                     .font(numeric ? DS.Font.mono : DS.Font.body)
                     .foregroundStyle(DS.Color.primaryText)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                    .lineLimit(wraps ? 2 : 1)
+                    .multilineTextAlignment(.trailing)
+                    .truncationMode(wraps ? .tail : .middle)
+                    .fixedSize(horizontal: false, vertical: wraps)
             }
         }
     }
