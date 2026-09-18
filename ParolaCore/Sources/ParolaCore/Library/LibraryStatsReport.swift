@@ -2,12 +2,14 @@ import Foundation
 
 /// The plain-text report `parola library stats` prints and `parola_library_stats` answers with.
 public enum LibraryStatsReport {
+    private typealias Totals = LibraryStatistics.Totals
+
     public static func text(_ stats: LibraryStatistics, locale: Locale = TranscriptionSpeed.toolLocale) -> String {
         guard !stats.isEmpty else { return "The library is empty." }
         var lines = [
             "Transcripts: \(stats.totals.entries)",
             "Audio: \(TranscriptionSpeed.duration(seconds: stats.totals.audioSeconds, locale: locale))",
-            "Words: \(stats.totals.words)",
+            "Words: \(words(stats.totals))",
             "Time transcribing: \(TranscriptionSpeed.duration(seconds: stats.totals.transcriptionSeconds, locale: locale))",
             "Timed: \(coverage(stats.timed))",
         ]
@@ -35,6 +37,12 @@ public enum LibraryStatsReport {
             }
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// The word count has the same pre-change gap timing has, so it says what it covers when it is short.
+    private static func words(_ totals: Totals) -> String {
+        guard totals.wordsCountedFor != totals.entries else { return "\(totals.words)" }
+        return "\(totals.words) (counted for \(totals.wordsCountedFor) of \(totals.entries))"
     }
 
     private static func plural(_ category: EntryCategory) -> String {

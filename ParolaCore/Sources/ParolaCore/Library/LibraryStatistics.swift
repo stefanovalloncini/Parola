@@ -10,13 +10,23 @@ public struct LibraryStatistics: Equatable, Sendable {
         /// Summed over the timed entries only; `coverage` says how many of the library those are.
         public let transcriptionSeconds: Double
         public let words: Int
+        /// How many of `entries` carry a word count at all; the rest were written before it was recorded.
+        public let wordsCountedFor: Int
 
-        public init(entries: Int, byCategory: [EntryCategory: Int], audioSeconds: Double, transcriptionSeconds: Double, words: Int) {
+        public init(
+            entries: Int,
+            byCategory: [EntryCategory: Int],
+            audioSeconds: Double,
+            transcriptionSeconds: Double,
+            words: Int,
+            wordsCountedFor: Int = 0
+        ) {
             self.entries = entries
             self.byCategory = byCategory
             self.audioSeconds = audioSeconds
             self.transcriptionSeconds = transcriptionSeconds
             self.words = words
+            self.wordsCountedFor = wordsCountedFor
         }
 
         public func count(_ category: EntryCategory) -> Int { byCategory[category] ?? 0 }
@@ -123,6 +133,7 @@ public struct LibraryStatistics: Equatable, Sendable {
         var byCategory: [EntryCategory: Int] = [:]
         var audioSeconds = 0.0
         var words = 0
+        var wordsCountedFor = 0
         var recentEntries = 0
         var recentAudio = 0.0
         var timedCount = 0
@@ -137,7 +148,10 @@ public struct LibraryStatistics: Equatable, Sendable {
             byCategory[entry.category, default: 0] += 1
             let entryAudio = max(0, entry.durationSeconds ?? 0)
             audioSeconds += entryAudio
-            words += max(0, entry.wordCount ?? 0)
+            if let counted = entry.wordCount {
+                words += max(0, counted)
+                wordsCountedFor += 1
+            }
             if entry.createdAt >= windowStart {
                 recentEntries += 1
                 recentAudio += entryAudio
@@ -173,7 +187,8 @@ public struct LibraryStatistics: Equatable, Sendable {
                 byCategory: byCategory,
                 audioSeconds: audioSeconds,
                 transcriptionSeconds: timedSeconds,
-                words: words
+                words: words,
+                wordsCountedFor: wordsCountedFor
             ),
             timed: Coverage(count: timedCount, total: active.count, since: since),
             perModel: perModel,

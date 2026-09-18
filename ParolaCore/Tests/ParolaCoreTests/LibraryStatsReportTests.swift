@@ -6,7 +6,7 @@ import Testing
 struct LibraryStatsReportTests {
     private let english = Locale(identifier: "en_US")
 
-    private func entry(_ id: String, model: String, audio: Double, timing: Double?, words: Int) -> LibraryEntry {
+    private func entry(_ id: String, model: String, audio: Double, timing: Double?, words: Int?) -> LibraryEntry {
         var manifest = ParolaDocument.Manifest(
             createdAt: Date(timeIntervalSince1970: 1_757_635_200),
             originalAudioName: "\(id).wav",
@@ -40,6 +40,7 @@ struct LibraryStatsReportTests {
         #expect(text.contains("Transcripts: 3"))
         #expect(text.contains("Audio: 30 min 00 s"))
         #expect(text.contains("Words: 2700"))
+        #expect(!text.contains("counted for"), "every entry carries a count here")
         #expect(text.contains("Time transcribing: 1 min 15 s"))
         #expect(text.contains("Timed: 2 of 3, since 2025-09-12"))
         #expect(text.contains("Average speed: 16× real time"))
@@ -47,6 +48,19 @@ struct LibraryStatsReportTests {
         #expect(text.contains("  whisper: 2 runs"))
         #expect(LibraryStatsReport.text(stats).contains("2 runs"), "the tool locale is the default")
         #expect(!text.contains("parakeet"), "a model with no measured run has nothing to compare")
+    }
+
+    @Test("the word total names its coverage when some entries predate the count")
+    func wordCoverageIsPrinted() {
+        let stats = LibraryStatistics.compute(
+            entries: [
+                entry("a", model: "whisper", audio: 600, timing: 30, words: 900),
+                entry("b", model: "whisper", audio: 600, timing: nil, words: nil),
+            ],
+            now: Date(timeIntervalSince1970: 1_757_635_200),
+            calendar: Calendar(identifier: .gregorian)
+        )
+        #expect(LibraryStatsReport.text(stats, locale: english).contains("Words: 900 (counted for 1 of 2)"))
     }
 
     @Test("a run reports its own wall time and speed in one line")

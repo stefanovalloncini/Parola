@@ -59,6 +59,21 @@ struct LibraryStatisticsTests {
         #expect(stats.perModel.first?.runs == 1)
     }
 
+    @Test("the word total says how many entries it was counted over")
+    func wordCoverageIsCounted() {
+        let stats = compute([
+            entry("counted", words: 400),
+            entry("also-counted", words: 500),
+            entry("pre-change", words: nil),
+        ])
+        #expect(stats.totals.words == 900)
+        #expect(stats.totals.wordsCountedFor == 2)
+        #expect(stats.totals.entries == 3)
+
+        let all = compute([entry("a", words: 10), entry("b", words: 0)])
+        #expect(all.totals.wordsCountedFor == all.totals.entries)
+    }
+
     @Test("an untimed entry counts as a transcript but not as a measured run")
     func untimedEntryStillCounts() {
         let stats = compute([
