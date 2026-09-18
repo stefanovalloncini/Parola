@@ -63,10 +63,7 @@ struct StatisticsView: View {
     }
 
     private var tiles: some View {
-        LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 150), spacing: DS.Spacing.regular)],
-            spacing: DS.Spacing.regular
-        ) {
+        LazyVGrid(columns: Self.tileColumns, spacing: DS.Spacing.regular) {
             StatTile(
                 label: "Transcripts",
                 value: AppFormat.integer(stats.totals.entries),
@@ -89,6 +86,12 @@ struct StatisticsView: View {
             )
         }
     }
+
+    /// Four across whatever the window gives them: an adaptive grid packs them left and leaves a gutter.
+    private static let tileColumns = Array(
+        repeating: GridItem(.flexible(minimum: 120), spacing: DS.Spacing.regular),
+        count: 4
+    )
 
     private var modelTable: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
@@ -174,7 +177,8 @@ private struct StatTile: View {
             Text(label)
                 .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.secondaryText)
-                .lineLimit(1)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             Text(value)
                 .font(DS.Font.title)
                 .monospacedDigit()
