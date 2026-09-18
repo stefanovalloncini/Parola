@@ -31,6 +31,13 @@ final class MenuBarController {
         var showsDictation: Bool
         var showsMicRecording: Bool
         var showsSystemAudio: Bool
+        var detectedMeetingApp: String? = nil
+        var captionsShown: Bool = false
+        var captionsActive: Bool = false
+        var captionsUnavailableReason: String? = nil
+        var inputDevices: [AudioInputDevice] = []
+        var selectedInputDeviceUID: String = ""
+        var showsUpdateCheck: Bool = false
         var pinned: [Item] = []
         var recents: [Item] = []
     }
@@ -52,6 +59,14 @@ final class MenuBarController {
             _ = model.dictationEnabled
             _ = model.dictationState
             _ = model.libraryEntries
+            _ = model.inputDeviceUID
+            if model.features.isEnabled(.meetings) {
+                _ = model.meetingDetector.detectedAppName
+            }
+            if model.features.isEnabled(.liveCaptions) {
+                _ = model.selectedModel
+                _ = model.liveCaptions?.isActive
+            }
         } onChange: { [weak self] in
             // Tracking is one-shot: re-arm before rebuilding so nothing that lands meanwhile is missed.
             Task { @MainActor in self?.observeAndRefresh() }
@@ -69,6 +84,13 @@ final class MenuBarController {
             showsSystemAudio: model.features.isEnabled(.meetings)
         )
         guard mode == .full else { return snapshot }
+        snapshot.detectedMeetingApp = model.meetingDetector.detectedAppName
+        snapshot.captionsShown = model.features.isEnabled(.liveCaptions)
+        snapshot.captionsActive = model.liveCaptions?.isActive ?? false
+        snapshot.captionsUnavailableReason = model.liveCaptionsUnavailableReason
+        snapshot.inputDevices = AudioDevices.inputDevices()
+        snapshot.selectedInputDeviceUID = model.inputDeviceUID
+        snapshot.showsUpdateCheck = SparkleUpdater.shared.feedURLConfigured
         let entries = model.libraryEntries
         snapshot.pinned = entries.lazy.filter(\.pinned).prefix(5).map(Self.item)
         snapshot.recents = RecentEntries.most(of: entries, limit: 8).map(Self.item)
@@ -130,25 +152,25 @@ final class MenuBarController {
         let menu = NSMenu()
 
         if snapshot.mode == .dictationOnly {
-            menu.addItem(menuItem(title: snapshot.dictateTitle, action: #selector(toggleDictation), target: self))
+            menu.addItem(Self.menuItem(title: snapshot.dictateTitle, action: #selector(toggleDictation), target: self))
             menu.addItem(.separator())
-            menu.addItem(menuItem(title: String(localized: "Open Parola"), action: #selector(openParola), target: self))
-            menu.addItem(menuItem(title: String(localized: "Quit Parola"), action: #selector(quitApp), target: self, key: "q"))
+            menu.addItem(Self.menuItem(title: String(localized: "Open Parola"), action: #selector(openParola), target: self))
+            menu.addItem(Self.menuItem(title: String(localized: "Quit Parola"), action: #selector(quitApp), target: self, key: "q"))
             statusItem.menu = menu
             return
         }
 
-        menu.addItem(menuItem(title: String(localized: "Open Parola"), action: #selector(openParola), target: self))
+        menu.addItem(Self.menuItem(title: String(localized: "Open Parola"), action: #selector(openParola), target: self))
         menu.addItem(.separator())
         if snapshot.showsMicRecording {
-            menu.addItem(menuItem(title: String(localized: "Record from Microphone"), action: #selector(recordMic), target: self))
+            menu.addItem(Self.menuItem(title: String(localized: "Record from Microphone"), action: #selector(recordMic), target: self))
         }
         if snapshot.showsSystemAudio {
-            menu.addItem(menuItem(title: String(localized: "Record System Audio"), action: #selector(recordSystem), target: self))
+            menu.addItem(Self.menuItem(title: String(localized: "Record System Audio"), action: #selector(recordSystem), target: self))
         }
-        menu.addItem(menuItem(title: String(localized: "Open Files…"), action: #selector(openFile), target: self))
+        menu.addItem(Self.menuItem(title: String(localized: "Open Files…"), action: #selector(openFile), target: self))
         if snapshot.showsDictation {
-            menu.addItem(menuItem(title: snapshot.dictateTitle, action: #selector(toggleDictation), target: self))
+            menu.addItem(Self.menuItem(title: snapshot.dictateTitle, action: #selector(toggleDictation), target: self))
         }
         menu.addItem(.separator())
 
@@ -157,7 +179,7 @@ final class MenuBarController {
             header.isEnabled = false
             menu.addItem(header)
             for entry in snapshot.pinned {
-                menu.addItem(entryItem(entry))
+                menu.addItem(Self.entryItem(entry, target: self))
             }
             menu.addItem(.separator())
         }
@@ -171,23 +193,133 @@ final class MenuBarController {
             header.isEnabled = false
             menu.addItem(header)
             for entry in snapshot.recents {
-                menu.addItem(entryItem(entry))
+                menu.addItem(Self.entryItem(entry, target: self))
             }
         }
         menu.addItem(.separator())
-        menu.addItem(menuItem(title: String(localized: "Quit Parola"), action: #selector(quitApp), target: self, key: "q"))
+        menu.addItem(Self.menuItem(title: String(localized: "Quit Parola"), action: #selector(quitApp), target: self, key: "q"))
 
         statusItem.menu = menu
     }
 
-    private func entryItem(_ entry: MenuSnapshot.Item) -> NSMenuItem {
+    // MARK: - Menu builder
+
+    private static let microphoneItemIdentifier = NSUserInterfaceItemIdentifier("MenuBar.Microphone")
+
+    /// `target` is `nil` in tests, where only titles/state/order matter.
+    static func items(for snapshot: MenuSnapshot, target: AnyObject?) -> [NSMenuItem] {
+        if snapshot.mode == .dictationOnly {
+            return [
+                menuItem(title: snapshot.dictateTitle, action: #selector(toggleDictation), target: target),
+                .separator(),
+                menuItem(title: String(localized: "Open Parola"), action: #selector(openParola), target: target),
+                menuItem(title: String(localized: "Quit Parola"), action: #selector(quitApp), target: target, key: "q"),
+            ]
+        }
+
+        var items: [NSMenuItem] = [
+            menuItem(title: String(localized: "Open Parola"), action: #selector(openParola), target: target),
+            .separator(),
+        ]
+
+        if snapshot.showsMicRecording || snapshot.showsSystemAudio {
+            items.append(recordMeetingItem(for: snapshot, target: target))
+        }
+        if snapshot.captionsShown {
+            items.append(liveCaptionsItem(for: snapshot, target: target))
+        }
+        if snapshot.showsDictation {
+            items.append(menuItem(title: snapshot.dictateTitle, action: #selector(toggleDictation), target: target))
+        }
+        items.append(menuItem(title: String(localized: "Open Files…"), action: #selector(openFile), target: target))
+        items.append(.separator())
+
+        items.append(microphoneItem(for: snapshot, target: target))
+        items.append(menuItem(title: String(localized: "Settings…"), action: #selector(openSettings), target: target, key: ","))
+        if snapshot.showsUpdateCheck {
+            items.append(menuItem(title: String(localized: "Check for Updates…"), action: #selector(checkForUpdates), target: target))
+        }
+        items.append(.separator())
+
+        if !snapshot.pinned.isEmpty {
+            let header = NSMenuItem(title: String(localized: "Pinned"), action: nil, keyEquivalent: "")
+            header.isEnabled = false
+            items.append(header)
+            items.append(contentsOf: snapshot.pinned.map { entryItem($0, target: target) })
+            items.append(.separator())
+        }
+
+        if snapshot.recents.isEmpty {
+            let noneItem = NSMenuItem(title: String(localized: "No transcripts yet"), action: nil, keyEquivalent: "")
+            noneItem.isEnabled = false
+            items.append(noneItem)
+        } else {
+            let header = NSMenuItem(title: String(localized: "Recent"), action: nil, keyEquivalent: "")
+            header.isEnabled = false
+            items.append(header)
+            items.append(contentsOf: snapshot.recents.map { entryItem($0, target: target) })
+        }
+        items.append(.separator())
+        items.append(menuItem(title: String(localized: "Quit Parola"), action: #selector(quitApp), target: target, key: "q"))
+        return items
+    }
+
+    private static func recordMeetingItem(for snapshot: MenuSnapshot, target: AnyObject?) -> NSMenuItem {
+        let submenu = NSMenu()
+        if snapshot.showsSystemAudio, let app = snapshot.detectedMeetingApp {
+            submenu.addItem(menuItem(title: app, action: #selector(recordSystem), target: target))
+        }
+        if snapshot.showsSystemAudio {
+            submenu.addItem(menuItem(title: String(localized: "System Audio"), action: #selector(recordSystem), target: target))
+        }
+        if snapshot.showsMicRecording {
+            submenu.addItem(menuItem(title: String(localized: "Microphone"), action: #selector(recordMic), target: target))
+        }
+        let item = NSMenuItem(title: String(localized: "Record Meeting"), action: nil, keyEquivalent: "")
+        item.submenu = submenu
+        return item
+    }
+
+    private static func liveCaptionsItem(for snapshot: MenuSnapshot, target: AnyObject?) -> NSMenuItem {
+        let title = snapshot.captionsActive ? String(localized: "Hide Live Captions") : String(localized: "Show Live Captions")
+        let item = menuItem(title: title, action: #selector(toggleLiveCaptions), target: target)
+        if let reason = snapshot.captionsUnavailableReason {
+            item.isEnabled = false
+            item.toolTip = reason
+        }
+        return item
+    }
+
+    private static func microphoneItem(for snapshot: MenuSnapshot, target: AnyObject?) -> NSMenuItem {
+        let item = NSMenuItem(title: String(localized: "Microphone"), action: nil, keyEquivalent: "")
+        item.identifier = microphoneItemIdentifier
+        item.submenu = microphoneSubmenu(devices: snapshot.inputDevices, selectedUID: snapshot.selectedInputDeviceUID, target: target)
+        return item
+    }
+
+    private static func microphoneSubmenu(devices: [AudioInputDevice], selectedUID: String, target: AnyObject?) -> NSMenu {
+        let submenu = NSMenu()
+        let systemDefault = menuItem(title: String(localized: "System Default"), action: #selector(selectInputDevice(_:)), target: target)
+        systemDefault.representedObject = ""
+        systemDefault.state = selectedUID.isEmpty ? .on : .off
+        submenu.addItem(systemDefault)
+        for device in devices {
+            let deviceItem = menuItem(title: device.name, action: #selector(selectInputDevice(_:)), target: target)
+            deviceItem.representedObject = device.uid
+            deviceItem.state = device.uid == selectedUID ? .on : .off
+            submenu.addItem(deviceItem)
+        }
+        return submenu
+    }
+
+    private static func entryItem(_ entry: MenuSnapshot.Item, target: AnyObject?) -> NSMenuItem {
         let item = NSMenuItem(title: entry.title, action: #selector(loadEntryAction(_:)), keyEquivalent: "")
-        item.target = self
+        item.target = target
         item.representedObject = entry.id
         return item
     }
 
-    private func menuItem(title: String, action: Selector, target: AnyObject, key: String = "") -> NSMenuItem {
+    private static func menuItem(title: String, action: Selector, target: AnyObject?, key: String = "") -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
         item.target = target
         return item
@@ -215,6 +347,24 @@ final class MenuBarController {
     @objc private func openFile() {
         NSApp.activate(ignoringOtherApps: true)
         model?.presentOpenPanel()
+    }
+
+    @objc private func openSettings() {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
+
+    @objc private func checkForUpdates() {
+        SparkleUpdater.shared.checkForUpdates()
+    }
+
+    @objc private func toggleLiveCaptions() {
+        model?.toggleLiveCaptions()
+    }
+
+    @objc private func selectInputDevice(_ sender: NSMenuItem) {
+        guard let uid = sender.representedObject as? String else { return }
+        model?.inputDeviceUID = uid
     }
 
     /// Keyed to the session, not the enabled flag: "Stop" on an enabled-but-idle
