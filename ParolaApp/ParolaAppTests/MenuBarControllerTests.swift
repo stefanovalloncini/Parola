@@ -215,4 +215,23 @@ struct MenuBarItemsTests {
 
         #expect(menu.items.first { $0.title.contains("Live Captions") }?.isEnabled == false)
     }
+
+    @Test("a hidden snapshot builds no items")
+    func hiddenModeReturnsNoItems() {
+        let snapshot = MenuBarController.MenuSnapshot(
+            mode: .hidden,
+            dictateTitle: "Start Dictation",
+            showsDictation: true,
+            showsMicRecording: true,
+            showsSystemAudio: true
+        )
+        #expect(MenuBarController.items(for: snapshot, target: nil).isEmpty)
+    }
+
+    @Test("Start/Stop Dictation is hidden when the dictation feature is off")
+    func dictationGating() {
+        let items = MenuBarController.items(for: fullSnapshot(showsDictation: false), target: nil)
+        #expect(!titles(items).contains("Start Dictation"))
+        #expect(!titles(items).contains("Stop Dictation"))
+    }
 }

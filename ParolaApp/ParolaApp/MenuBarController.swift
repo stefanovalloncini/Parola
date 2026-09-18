@@ -174,13 +174,18 @@ final class MenuBarController: NSObject {
 
     /// A nil target leaves every item unwired.
     static func items(for snapshot: MenuSnapshot, target: AnyObject?) -> [NSMenuItem] {
-        if snapshot.mode == .dictationOnly {
+        switch snapshot.mode {
+        case .hidden:
+            return []
+        case .dictationOnly:
             return [
                 menuItem(title: snapshot.dictateTitle, action: #selector(toggleDictation), target: target),
                 .separator(),
                 menuItem(title: String(localized: "Open Parola"), action: #selector(openParola), target: target),
                 menuItem(title: String(localized: "Quit Parola"), action: #selector(quitApp), target: target, key: "q"),
             ]
+        case .full:
+            break
         }
 
         var items: [NSMenuItem] = [
