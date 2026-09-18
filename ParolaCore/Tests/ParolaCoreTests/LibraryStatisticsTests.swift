@@ -200,7 +200,9 @@ struct TranscriptionSpeedTests {
     @Test("a decimal below ten, a whole number above it")
     func labelPrecision() {
         #expect(TranscriptionSpeed.label(1.24, locale: english) == "1.2×")
-        #expect(TranscriptionSpeed.label(9.96, locale: english) == "10.0×")
+        #expect(TranscriptionSpeed.label(9.94, locale: english) == "9.9×")
+        #expect(TranscriptionSpeed.label(9.96, locale: english) == "10×")
+        #expect(TranscriptionSpeed.label(10.04, locale: english) == "10×")
         #expect(TranscriptionSpeed.label(10, locale: english) == "10×")
         #expect(TranscriptionSpeed.label(16.4, locale: english) == "16×")
         #expect(TranscriptionSpeed.label(203.7, locale: english) == "204×")

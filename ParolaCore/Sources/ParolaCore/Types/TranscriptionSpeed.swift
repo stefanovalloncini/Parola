@@ -17,7 +17,8 @@ public enum TranscriptionSpeed {
 
     /// A tenth below ten, whole numbers above it: past 10× the first decimal is noise.
     public static func label(_ factor: Double, locale: Locale = TranscriptionSpeed.toolLocale) -> String {
-        let digits = factor < 10 ? 1 : 0
+        // Decided on the rounded value, or 9.96 takes the decimal branch and renders "10.0×".
+        let digits = ((factor * 10).rounded() / 10) < 10 ? 1 : 0
         let number = factor.formatted(.number.precision(.fractionLength(digits)).locale(locale))
         return "\(number)×"
     }
