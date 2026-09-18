@@ -1,4 +1,5 @@
 import Foundation
+import ParolaCore
 
 /// One locale for every number and date on screen; `ByteCountFormatter` has none of its own.
 enum AppFormat {
@@ -42,11 +43,9 @@ enum AppFormat {
         fraction.formatted(.percent.precision(.fractionLength(fractionDigits)).locale(locale))
     }
 
-    /// A single run's wall time: whole seconds under a minute, minutes and seconds above it.
+    /// A single run's wall time, in the form the CLI prints it in: seconds alone under a minute.
     static func runDuration(seconds: Double, locale: Locale = AppFormat.locale) -> String {
-        let total = Int(max(0, seconds).rounded())
-        guard total >= 60 else { return "\(integer(total, locale: locale)) s" }
-        return "\(integer(total / 60, locale: locale)) min \(String(format: "%02d", total % 60)) s"
+        TranscriptionSpeed.duration(seconds: seconds, locale: locale)
     }
 
     /// A rounded span for a header line, not a timecode: the largest two units that carry meaning.

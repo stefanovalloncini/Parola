@@ -196,7 +196,18 @@ struct Transcribe: AsyncParsableCommand {
             }
         }
         warnIfLanguageAssumed(transcript)
+        reportTiming(transcript)
         try emitTranscript(transcript, sourceURL: sourceURL, emitter: emitter)
+    }
+
+    /// Stderr, and never under --mcp: that mode's stderr carries NDJSON a sentence would break.
+    private func reportTiming(_ transcript: Transcript) {
+        guard !mcp, let seconds = transcript.transcriptionSeconds else { return }
+        stderr(TranscriptionSpeed.runSummary(
+            seconds: seconds,
+            audioSeconds: transcript.durationSeconds,
+            showsRealTimeFactor: verbose
+        ))
     }
 
     private func warnIfLanguageAssumed(_ transcript: Transcript) {
@@ -262,6 +273,7 @@ struct Transcribe: AsyncParsableCommand {
                 try rendered.write(to: target, options: .atomic)
                 stderr("✓ \(job.url.lastPathComponent) → \(target.path)")
                 warnIfLanguageAssumed(transcript)
+                reportTiming(transcript)
             case .failed(let id, let reason):
                 if let job = jobByID[id] { stderr("✘ \(job.url.lastPathComponent): \(reason)") }
             case .cancelled(let id):

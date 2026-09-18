@@ -47,7 +47,7 @@ enum StatisticsCopy {
             : String(localized: "\(AppFormat.integer(count, locale: locale)) transcripts", bundle: bundle)
     }
 
-    /// A span of media, which unlike a single run is never shown as bare seconds once it passes a minute.
+    /// A span of media in the header form, with a plain "0 s" standing in for a library with no audio yet.
     private static func audioLabel(_ seconds: Double, locale: Locale) -> String {
         AppFormat.duration(seconds: seconds, locale: locale) ?? AppFormat.runDuration(seconds: 0, locale: locale)
     }
