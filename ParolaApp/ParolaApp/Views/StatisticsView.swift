@@ -3,21 +3,29 @@ import ParolaCore
 
 struct StatisticsView: View {
     @Environment(AppModel.self) private var model
-    @State private var stats = LibraryStatistics.empty
+    @State private var stats: LibraryStatistics?
+
+    /// Seeded only by tests; in the app the `.task` fills it on the first pass.
+    init(stats: LibraryStatistics? = nil) {
+        _stats = State(initialValue: stats)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             header
             Divider()
-            if stats.isEmpty {
+            switch StatisticsPageState(libraryIsEmpty: model.libraryEntries.isEmpty, stats: stats) {
+            case .empty:
                 EmptyStateView(
                     systemImage: "chart.bar",
                     title: "No Statistics Yet",
                     message: "Transcribe a file and its timing appears here."
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                summary
+            case .summary(let stats):
+                summary(stats)
+            case .waiting:
+                Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -31,38 +39,36 @@ struct StatisticsView: View {
     private var header: some View {
         PageHeader(
             title: "Statistics",
-            subtitle: StatisticsCopy.subtitle(
-                entries: stats.totals.entries,
-                audioSeconds: stats.totals.audioSeconds
-            )
+            subtitle: stats.map {
+                StatisticsCopy.subtitle(entries: $0.totals.entries, audioSeconds: $0.totals.audioSeconds)
+            }
         ) {
             EmptyView()
         }
     }
 
-    private var summary: some View {
+    private func summary(_ stats: LibraryStatistics) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.large) {
-                tiles
-                // Under the tiles rather than in the subtitle: it is the caveat for the two timed
-                // tiles and the model table below it, not a fact about the page.
+                tiles(stats)
+                // The caveat for the timed tiles and the table below, not a fact about the page.
                 Text(StatisticsCopy.coverage(stats.timed))
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                     .axLeaf("Text.Coverage")
                 if !stats.perModel.isEmpty {
-                    modelTable
+                    modelTable(stats)
                 }
-                kinds
-                recent
+                kinds(stats)
+                recent(stats)
             }
             .padding(DS.Spacing.large)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private var tiles: some View {
+    private func tiles(_ stats: LibraryStatistics) -> some View {
         LazyVGrid(columns: Self.tileColumns, spacing: DS.Spacing.regular) {
             StatTile(
                 label: "Transcripts",
@@ -93,7 +99,7 @@ struct StatisticsView: View {
         count: 4
     )
 
-    private var modelTable: some View {
+    private func modelTable(_ stats: LibraryStatistics) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             SectionCaption("By Model")
             Grid(alignment: .leading, horizontalSpacing: DS.Spacing.regular, verticalSpacing: DS.Spacing.snug) {
@@ -109,24 +115,24 @@ struct StatisticsView: View {
                 .textCase(.uppercase)
                 .foregroundStyle(DS.Color.secondaryText)
                 ForEach(stats.perModel) { row in
-                    ModelTableRow(row: row, fastest: fastestSpeed)
+                    ModelTableRow(row: row, fastest: fastestSpeed(stats))
                 }
             }
         }
     }
 
-    private var kinds: some View {
+    private func kinds(_ stats: LibraryStatistics) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             SectionCaption("By Kind")
             HStack(spacing: DS.Spacing.regular) {
-                ForEach(visibleCategories, id: \.self) { category in
+                ForEach(visibleCategories(stats), id: \.self) { category in
                     KindCount(category: category, count: stats.totals.count(category))
                 }
             }
         }
     }
 
-    private var recent: some View {
+    private func recent(_ stats: LibraryStatistics) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             SectionCaption("Last 30 Days")
             Text(StatisticsCopy.last30Days(
@@ -139,7 +145,7 @@ struct StatisticsView: View {
         }
     }
 
-    private var visibleCategories: [EntryCategory] {
+    private func visibleCategories(_ stats: LibraryStatistics) -> [EntryCategory] {
         EntryCategory.allCases.filter { category in
             switch category {
             case .transcription: return true
@@ -149,12 +155,34 @@ struct StatisticsView: View {
         }
     }
 
-    private var fastestSpeed: Double? {
+    private func fastestSpeed(_ stats: LibraryStatistics) -> Double? {
         stats.perModel.compactMap(\.speed).max()
     }
 
+    /// "ESECUZIONI" is half again as wide as "RUNS" and would take the header row to two lines.
     private func columnHeading(_ title: LocalizedStringKey) -> some View {
-        Text(title).frame(width: ModelRowMetrics.numberWidth, alignment: .trailing)
+        Text(title)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .frame(width: ModelRowMetrics.numberWidth, alignment: .trailing)
+    }
+}
+
+/// What the page draws: the numbers, the empty state, or — for the pass before `compute` has run —
+/// nothing at all, since an empty state there would flash on every visit to a full library.
+enum StatisticsPageState: Equatable {
+    case empty
+    case waiting
+    case summary(LibraryStatistics)
+
+    init(libraryIsEmpty: Bool, stats: LibraryStatistics?) {
+        if libraryIsEmpty {
+            self = .empty
+        } else if let stats {
+            self = .summary(stats)
+        } else {
+            self = .waiting
+        }
     }
 }
 

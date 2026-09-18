@@ -9,6 +9,8 @@ import ParolaTestSupport
 @MainActor
 @Suite("Statistics page", .serialized)
 struct StatisticsViewTests {
+    private static let reference = Date(timeIntervalSince1970: 1_800_000_000)
+
     private func makeModel(_ defaults: UserDefaults, entries: [LibraryEntry]) -> AppModel {
         let model = AppModel(
             skipBootstrap: true,
@@ -20,8 +22,9 @@ struct StatisticsViewTests {
         return model
     }
 
-    private func entry(_ id: String, timing: Double?, audio: Double = 600, words: Int = 100) -> LibraryEntry {
+    private func entry(_ id: String, timing: Double?, audio: Double = 600, words: Int? = 100) -> LibraryEntry {
         var manifest = ParolaDocument.Manifest(
+            createdAt: Self.reference,
             originalAudioName: "\(id).wav",
             modelName: "openai_whisper-large-v3_turbo",
             language: "en",
@@ -59,21 +62,49 @@ struct StatisticsViewTests {
         return names
     }
 
-    @Test("the route reaches the page and the page fits the windows it is given", arguments: [
+    /// Seeded through the view's own init: the `.task` that fills `stats` in the app cannot run inside a
+    /// synchronous test body, so hosting the route would measure the empty state instead of the page.
+    private func populated() -> LibraryStatistics {
+        LibraryStatistics.compute(
+            entries: [
+                entry("a", timing: 37.5),
+                entry("b", timing: 1_205, audio: 12_500),
+                entry("c", timing: nil),
+            ],
+            now: Self.reference,
+            calendar: Calendar(identifier: .gregorian)
+        )
+    }
+
+    @Test("the populated page fits the detail column of every window it is given", arguments: [
         CGSize(width: 1180, height: 760), CGSize(width: MainWindowLayout.minimumWidth, height: MainWindowLayout.minimumHeight),
     ])
     func pageFitsTheWindow(size: CGSize) {
         withIsolatedDefaults { defaults in
-            let model = makeModel(defaults, entries: [
-                entry("a", timing: 37.5),
-                entry("b", timing: nil),
-            ])
-            let host = NSHostingView(rootView: ContentView().environment(model))
-            host.frame = NSRect(x: 0, y: 0, width: size.width, height: size.height)
+            let model = makeModel(defaults, entries: [])
+            // The narrowest the page can be in that window: the sidebar may take its widest.
+            let width = size.width - MainWindowLayout.sidebarMaxWidth
+            let host = NSHostingView(rootView: StatisticsView(stats: populated()).environment(model))
+            host.frame = NSRect(x: 0, y: 0, width: width, height: size.height)
             host.layoutSubtreeIfNeeded()
             let overflowing = viewsPastEdges(of: host, axis: .horizontal)
-            #expect(overflowing.isEmpty, "laid out past \(size): \(overflowing.joined(separator: ", "))")
+            #expect(overflowing.isEmpty, "laid out past \(width)pt: \(overflowing.joined(separator: ", "))")
         }
+    }
+
+    /// The seed used to be `.empty`, so the first frame of the route cross-fade was the empty state — on a
+    /// library of 400 entries as much as on an empty one.
+    @Test("a library with entries waits for its numbers instead of claiming there are none")
+    func populatedLibraryDoesNotFlashTheEmptyState() {
+        let stats = populated()
+        #expect(StatisticsPageState(libraryIsEmpty: false, stats: nil) == .waiting)
+        #expect(StatisticsPageState(libraryIsEmpty: true, stats: nil) == .empty)
+        #expect(StatisticsPageState(libraryIsEmpty: true, stats: stats) == .empty)
+        guard case .summary(let shown) = StatisticsPageState(libraryIsEmpty: false, stats: stats) else {
+            Issue.record("a library with entries and its numbers in hand shows the summary")
+            return
+        }
+        #expect(shown == stats)
     }
 
     @Test("an empty library renders the page without asking for more room than the smallest window")
