@@ -73,7 +73,9 @@ final class SparkleUpdater: NSObject {
         set { driver.channel = newValue }
     }
 
-    var feedURLConfigured: Bool {
+    var feedURLConfigured: Bool { Self.feedURLConfigured }
+
+    nonisolated static var feedURLConfigured: Bool {
         let bundle = Bundle.main
         guard let raw = bundle.infoDictionary?["SUFeedURL"] as? String else { return false }
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)

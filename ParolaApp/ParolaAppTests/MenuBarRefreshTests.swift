@@ -106,4 +106,32 @@ struct MenuBarRefreshTests {
         #expect(snapshot.recents.isEmpty)
         #expect(snapshot.pinned.isEmpty)
     }
+
+    @Test("the snapshot never scans hardware")
+    func snapshotNeverScansHardware() async {
+        let model = await makeModel()
+        model.showMenuBarExtra = true
+
+        let snapshot = MenuBarController.snapshot(for: model)
+
+        #expect(snapshot.mode == .full)
+        #expect(snapshot.inputDevices.isEmpty)
+    }
+
+    @Test("a deployment without meetings never touches the meeting detector")
+    func meetingsOffKeepsDetectedAppNil() async {
+        let model = AppModel(
+            skipBootstrap: true,
+            defaults: temporaryDefaults(),
+            libraryURL: makeTempLibraryURL("menubar-no-meetings"),
+            features: [.micRecording]
+        )
+        await model.libraryRefreshTask?.value
+        model.showMenuBarExtra = true
+
+        let snapshot = MenuBarController.snapshot(for: model)
+
+        #expect(snapshot.mode == .full)
+        #expect(snapshot.detectedMeetingApp == nil)
+    }
 }

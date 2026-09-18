@@ -84,13 +84,16 @@ final class MenuBarController: NSObject {
             showsSystemAudio: model.features.isEnabled(.meetings)
         )
         guard mode == .full else { return snapshot }
-        snapshot.detectedMeetingApp = model.meetingDetector.detectedAppName
-        snapshot.captionsShown = model.features.isEnabled(.liveCaptions)
-        snapshot.captionsActive = model.liveCaptions?.isActive ?? false
-        snapshot.captionsUnavailableReason = model.liveCaptionsUnavailableReason
-        snapshot.inputDevices = AudioDevices.inputDevices()
+        if model.features.isEnabled(.meetings) {
+            snapshot.detectedMeetingApp = model.meetingDetector.detectedAppName
+        }
+        if model.features.isEnabled(.liveCaptions) {
+            snapshot.captionsShown = true
+            snapshot.captionsActive = model.liveCaptions?.isActive ?? false
+            snapshot.captionsUnavailableReason = model.liveCaptionsUnavailableReason
+        }
         snapshot.selectedInputDeviceUID = model.inputDeviceUID
-        snapshot.showsUpdateCheck = SparkleUpdater.shared.feedURLConfigured
+        snapshot.showsUpdateCheck = SparkleUpdater.feedURLConfigured
         let entries = model.libraryEntries
         snapshot.pinned = entries.lazy.filter(\.pinned).prefix(5).map(Self.item)
         snapshot.recents = RecentEntries.most(of: entries, limit: 8).map(Self.item)
