@@ -243,4 +243,15 @@ struct MenuBarItemsTests {
         let topLevelMicrophoneEntries = items.filter { $0.title == "Microphone" }
         #expect(topLevelMicrophoneEntries.isEmpty == !showsMicrophonePicker)
     }
+
+    @Test("the detected app records as a meeting, not a plain system-audio capture")
+    func detectedAppUsesItsOwnAction() {
+        let snapshot = fullSnapshot(detectedMeetingApp: "Zoom")
+        let items = MenuBarController.items(for: snapshot, target: nil)
+        let recordMeeting = items.first { $0.title == "Record Meeting" }
+        let zoomItem = recordMeeting?.submenu?.items.first { $0.title == "Zoom" }
+        let systemAudioItem = recordMeeting?.submenu?.items.first { $0.title == "System Audio" }
+        #expect(zoomItem?.action != systemAudioItem?.action)
+        #expect(zoomItem?.representedObject as? String == "Zoom")
+    }
 }

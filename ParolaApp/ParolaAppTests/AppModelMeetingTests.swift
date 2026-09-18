@@ -104,6 +104,26 @@ struct AppModelMeetingTests {
         model.cancelCurrentWork()
     }
 
+    @Test("the app-name overload tags the category and clears the prompt for a different app")
+    func startMeetingRecordingWithAppNameSelectsCategoryAndBundleIDs() async {
+        let fixture = try? makeSilentMeetingWAV()
+        guard let fixture else { Issue.record("could not write fixture"); return }
+        defer { try? FileManager.default.removeItem(at: fixture) }
+        await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
+        defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+
+        let model = makeModel()
+        model.meetingCaptureAppOnly = true
+        model.meetingDetectedApp = "Zoom"
+
+        model.startMeetingRecording(appName: "Microsoft Teams")
+
+        #expect(model.pendingRecordingCategory == .meeting)
+        #expect(model.meetingDetectedApp == nil)
+        #expect(model.pendingCaptureBundleIDs == ["com.microsoft.teams", "com.microsoft.teams2"])
+        model.cancelCurrentWork()
+    }
+
     @Test("vendor display names map back to every known bundle ID")
     func bundleIDsForAppName() {
         #expect(MeetingDetector.bundleIDs(forAppName: "Zoom") == ["us.zoom.xos"])

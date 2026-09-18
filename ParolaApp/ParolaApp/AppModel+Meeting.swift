@@ -5,8 +5,18 @@ import ParolaCore
 extension AppModel {
 
     func startMeetingRecording() {
-        if meetingCaptureAppOnly, let app = meetingDetectedApp {
-            pendingCaptureBundleIDs = MeetingDetector.bundleIDs(forAppName: app)
+        guard let app = meetingDetectedApp else {
+            meetingDetectedApp = nil
+            pendingRecordingCategory = .meeting
+            startRecording(source: .systemAudio)
+            return
+        }
+        startMeetingRecording(appName: app)
+    }
+
+    func startMeetingRecording(appName: String) {
+        if meetingCaptureAppOnly {
+            pendingCaptureBundleIDs = MeetingDetector.bundleIDs(forAppName: appName)
         }
         meetingDetectedApp = nil
         pendingRecordingCategory = .meeting

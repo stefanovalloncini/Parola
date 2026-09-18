@@ -243,7 +243,9 @@ final class MenuBarController: NSObject {
         let submenu = NSMenu()
         submenu.autoenablesItems = false
         if snapshot.showsSystemAudio, let app = snapshot.detectedMeetingApp {
-            submenu.addItem(menuItem(title: app, action: #selector(recordSystem), target: target))
+            let detected = menuItem(title: app, action: #selector(recordDetectedMeeting(_:)), target: target)
+            detected.representedObject = app
+            submenu.addItem(detected)
         }
         if snapshot.showsSystemAudio {
             submenu.addItem(menuItem(title: String(localized: "System Audio"), action: #selector(recordSystem), target: target))
@@ -319,6 +321,12 @@ final class MenuBarController: NSObject {
     @objc private func recordSystem() {
         openParola()
         model?.startRecording(source: .systemAudio)
+    }
+
+    @objc private func recordDetectedMeeting(_ sender: NSMenuItem) {
+        guard let app = sender.representedObject as? String else { return }
+        openParola()
+        model?.startMeetingRecording(appName: app)
     }
 
     @objc private func openFile() {
