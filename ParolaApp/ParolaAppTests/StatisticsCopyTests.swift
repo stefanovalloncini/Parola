@@ -9,8 +9,8 @@ struct StatisticsCopyTests {
 
     @Test("a speed is always a multiple of real time, never a bare ratio")
     func speedReadsAsAMultiple() {
-        #expect(StatisticsCopy.speed(16, locale: english) == "16× real time")
-        #expect(StatisticsCopy.speed(1.24, locale: english) == "1.2× real time")
+        #expect(StatisticsCopy.speed(16, locale: english) == "16×\u{00A0}real time")
+        #expect(StatisticsCopy.speed(1.24, locale: english) == "1.2×\u{00A0}real time")
         #expect(StatisticsCopy.speed(nil, locale: english) == nil)
     }
 
@@ -18,11 +18,11 @@ struct StatisticsCopyTests {
     func transcribedInPairsTimeAndSpeed() {
         #expect(
             StatisticsCopy.transcribedIn(seconds: 37, audioSeconds: 592, locale: english)
-                == "37 sec · 16× real time"
+                == "37 sec · 16×\u{00A0}real time"
         )
         #expect(
             StatisticsCopy.transcribedIn(seconds: 125, audioSeconds: 600, locale: english)
-                == "2 min, 5 sec · 4.8× real time"
+                == "2 min, 5 sec · 4.8×\u{00A0}real time"
         )
     }
 

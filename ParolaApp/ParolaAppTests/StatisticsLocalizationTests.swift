@@ -17,10 +17,10 @@ struct StatisticsLocalizationTests {
         let bundle = try italianBundle()
 
         #expect(String(localized: "Transcribed in", bundle: bundle) == "Trascritto in")
-        #expect(StatisticsCopy.speed(16, bundle: bundle, locale: italian) == "16× tempo reale")
+        #expect(StatisticsCopy.speed(16, bundle: bundle, locale: italian) == "16×\u{00A0}tempo reale")
         #expect(
             StatisticsCopy.transcribedIn(seconds: 37, audioSeconds: 592, bundle: bundle, locale: italian)
-                == "\(AppFormat.duration(seconds: 37, locale: italian)) · 16× tempo reale"
+                == "\(AppFormat.duration(seconds: 37, locale: italian)) · 16×\u{00A0}tempo reale"
         )
     }
 
@@ -53,11 +53,11 @@ struct StatisticsLocalizationTests {
 
         #expect(
             StatisticsCopy.subtitle(entries: 12, audioSeconds: 4_800, bundle: bundle, locale: italian)
-                == "12 trascrizioni · \(audio) di audio"
+                == "12 trascrizioni · \(audio) trascritti"
         )
         #expect(
             StatisticsCopy.subtitle(entries: 1, audioSeconds: 4_800, bundle: bundle, locale: italian)
-                == "1 trascrizione · \(audio) di audio"
+                == "1 trascrizione · \(audio) trascritti"
         )
         #expect(
             StatisticsCopy.last30Days(entries: 4, audioSeconds: 4_800, bundle: bundle, locale: italian)

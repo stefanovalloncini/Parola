@@ -30,7 +30,7 @@ struct InfoRowTests {
                 rootView: InfoRow(
                     icon: "stopwatch",
                     label: "Transcribed in",
-                    value: "2 min, 5 sec · 16× real time",
+                    value: "2 min, 5 sec · 16×\u{00A0}real time",
                     numeric: true,
                     wraps: wraps
                 )

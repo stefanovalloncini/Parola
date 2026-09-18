@@ -78,17 +78,6 @@
         }
       }
     },
-    "%@ real time": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ tempo reale"
-          }
-        }
-      }
-    },
     "%@ rewrite preset": {
       "extractionState": "manual",
       "localizations": {
@@ -128,7 +117,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ · %@ di audio"
+            "value": "%@ · %@ trascritti"
           }
         }
       }
@@ -156,6 +145,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@: %@"
+          }
+        }
+      }
+    },
+    "%@ real time": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ tempo reale"
           }
         }
       }
