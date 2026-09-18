@@ -66,6 +66,7 @@ struct MenuBarItemsTests {
         inputDevices: [AudioInputDevice] = [],
         selectedInputDeviceUID: String = "",
         showsUpdateCheck: Bool = true,
+        showsMicrophonePicker: Bool = true,
         pinned: [MenuBarController.MenuSnapshot.Item] = [],
         recents: [MenuBarController.MenuSnapshot.Item] = []
     ) -> MenuBarController.MenuSnapshot {
@@ -82,6 +83,7 @@ struct MenuBarItemsTests {
             inputDevices: inputDevices,
             selectedInputDeviceUID: selectedInputDeviceUID,
             showsUpdateCheck: showsUpdateCheck,
+            showsMicrophonePicker: showsMicrophonePicker,
             pinned: pinned,
             recents: recents
         )
@@ -233,5 +235,12 @@ struct MenuBarItemsTests {
         let items = MenuBarController.items(for: fullSnapshot(showsDictation: false), target: nil)
         #expect(!titles(items).contains("Start Dictation"))
         #expect(!titles(items).contains("Stop Dictation"))
+    }
+
+    @Test("the Microphone picker follows showsMicrophonePicker", arguments: [true, false])
+    func microphonePickerGating(showsMicrophonePicker: Bool) {
+        let items = MenuBarController.items(for: fullSnapshot(showsMicrophonePicker: showsMicrophonePicker), target: nil)
+        let topLevelMicrophoneEntries = items.filter { $0.title == "Microphone" }
+        #expect(topLevelMicrophoneEntries.isEmpty == !showsMicrophonePicker)
     }
 }

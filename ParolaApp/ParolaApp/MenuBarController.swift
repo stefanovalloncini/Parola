@@ -38,6 +38,7 @@ final class MenuBarController: NSObject {
         var inputDevices: [AudioInputDevice] = []
         var selectedInputDeviceUID: String = ""
         var showsUpdateCheck: Bool = false
+        var showsMicrophonePicker: Bool = false
         var pinned: [Item] = []
         var recents: [Item] = []
     }
@@ -95,6 +96,7 @@ final class MenuBarController: NSObject {
         }
         snapshot.selectedInputDeviceUID = model.inputDeviceUID
         snapshot.showsUpdateCheck = SparkleUpdater.feedURLConfigured
+        snapshot.showsMicrophonePicker = SettingsRoute.microphone.isVisible(features: model.features)
         let entries = model.libraryEntries
         snapshot.pinned = entries.lazy.filter(\.pinned).prefix(5).map(Self.item)
         snapshot.recents = RecentEntries.most(of: entries, limit: 8).map(Self.item)
@@ -205,7 +207,9 @@ final class MenuBarController: NSObject {
         items.append(menuItem(title: String(localized: "Open Files…"), action: #selector(openFile), target: target))
         items.append(.separator())
 
-        items.append(microphoneItem(for: snapshot, target: target))
+        if snapshot.showsMicrophonePicker {
+            items.append(microphoneItem(for: snapshot, target: target))
+        }
         items.append(menuItem(title: String(localized: "Settings…"), action: #selector(openSettings), target: target, key: ","))
         if snapshot.showsUpdateCheck {
             items.append(menuItem(title: String(localized: "Check for Updates…"), action: #selector(checkForUpdates), target: target))
