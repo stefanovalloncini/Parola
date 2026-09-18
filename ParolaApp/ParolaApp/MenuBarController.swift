@@ -45,6 +45,7 @@ final class MenuBarController: NSObject {
     private weak var model: AppModel?
     private var statusItem: NSStatusItem?
     private(set) var lastSnapshot: MenuSnapshot?
+    private var lastInputDevices: [AudioInputDevice] = []
 
     func bind(_ model: AppModel) {
         self.model = model
@@ -355,15 +356,22 @@ final class MenuBarController: NSObject {
 }
 
 extension MenuBarController: NSMenuDelegate {
-    /// CoreAudio device attach/detach isn't Observation-tracked, so the picker re-scans on open.
+    /// CoreAudio device attach/detach isn't Observation-tracked, so the picker re-scans on open;
+    /// the cached list opens instantly, the fresh scan lands a moment later.
     func menuWillOpen(_ menu: NSMenu) {
         guard let model else { return }
+        installMicrophoneSubmenu(devices: lastInputDevices, into: menu, selectedUID: model.inputDeviceUID)
+        Task { @MainActor [weak self] in
+            guard let self, let model = self.model else { return }
+            let devices = AudioDevices.inputDevices()
+            self.lastInputDevices = devices
+            self.installMicrophoneSubmenu(devices: devices, into: menu, selectedUID: model.inputDeviceUID)
+        }
+    }
+
+    private func installMicrophoneSubmenu(devices: [AudioInputDevice], into menu: NSMenu, selectedUID: String) {
         for item in menu.items where item.identifier == Self.microphoneItemIdentifier {
-            item.submenu = Self.microphoneSubmenu(
-                devices: AudioDevices.inputDevices(),
-                selectedUID: model.inputDeviceUID,
-                target: self
-            )
+            item.submenu = Self.microphoneSubmenu(devices: devices, selectedUID: selectedUID, target: self)
         }
     }
 }
