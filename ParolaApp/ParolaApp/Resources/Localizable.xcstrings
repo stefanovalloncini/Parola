@@ -7485,17 +7485,6 @@
         }
       }
     },
-    "Record from Microphone": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registra dal microfono"
-          }
-        }
-      }
-    },
     "Record from the microphone or system audio.": {
       "extractionState": "manual",
       "localizations": {
@@ -9325,7 +9314,7 @@
       }
     },
     "System Default": {
-      "extractionState": "stale",
+      "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
