@@ -3,7 +3,7 @@ import ParolaCore
 import ParolaDictation
 
 @MainActor
-final class MenuBarController {
+final class MenuBarController: NSObject {
     enum Mode: Equatable {
         case hidden
         case full
@@ -150,55 +150,10 @@ final class MenuBarController {
     private func rebuildMenu(_ snapshot: MenuSnapshot) {
         guard let statusItem else { return }
         let menu = NSMenu()
-
-        if snapshot.mode == .dictationOnly {
-            menu.addItem(Self.menuItem(title: snapshot.dictateTitle, action: #selector(toggleDictation), target: self))
-            menu.addItem(.separator())
-            menu.addItem(Self.menuItem(title: String(localized: "Open Parola"), action: #selector(openParola), target: self))
-            menu.addItem(Self.menuItem(title: String(localized: "Quit Parola"), action: #selector(quitApp), target: self, key: "q"))
-            statusItem.menu = menu
-            return
-        }
-
-        menu.addItem(Self.menuItem(title: String(localized: "Open Parola"), action: #selector(openParola), target: self))
-        menu.addItem(.separator())
-        if snapshot.showsMicRecording {
-            menu.addItem(Self.menuItem(title: String(localized: "Record from Microphone"), action: #selector(recordMic), target: self))
-        }
-        if snapshot.showsSystemAudio {
-            menu.addItem(Self.menuItem(title: String(localized: "Record System Audio"), action: #selector(recordSystem), target: self))
-        }
-        menu.addItem(Self.menuItem(title: String(localized: "Open Files…"), action: #selector(openFile), target: self))
-        if snapshot.showsDictation {
-            menu.addItem(Self.menuItem(title: snapshot.dictateTitle, action: #selector(toggleDictation), target: self))
-        }
-        menu.addItem(.separator())
-
-        if !snapshot.pinned.isEmpty {
-            let header = NSMenuItem(title: String(localized: "Pinned"), action: nil, keyEquivalent: "")
-            header.isEnabled = false
-            menu.addItem(header)
-            for entry in snapshot.pinned {
-                menu.addItem(Self.entryItem(entry, target: self))
-            }
-            menu.addItem(.separator())
-        }
-
-        if snapshot.recents.isEmpty {
-            let item = NSMenuItem(title: String(localized: "No transcripts yet"), action: nil, keyEquivalent: "")
-            item.isEnabled = false
+        menu.delegate = self
+        for item in Self.items(for: snapshot, target: self) {
             menu.addItem(item)
-        } else {
-            let header = NSMenuItem(title: String(localized: "Recent"), action: nil, keyEquivalent: "")
-            header.isEnabled = false
-            menu.addItem(header)
-            for entry in snapshot.recents {
-                menu.addItem(Self.entryItem(entry, target: self))
-            }
         }
-        menu.addItem(.separator())
-        menu.addItem(Self.menuItem(title: String(localized: "Quit Parola"), action: #selector(quitApp), target: self, key: "q"))
-
         statusItem.menu = menu
     }
 
@@ -393,5 +348,19 @@ final class MenuBarController {
 
     @objc private func quitApp() {
         NSApp.terminate(nil)
+    }
+}
+
+extension MenuBarController: NSMenuDelegate {
+    /// CoreAudio device attach/detach isn't Observation-tracked, so the picker re-scans on open.
+    func menuWillOpen(_ menu: NSMenu) {
+        guard let model else { return }
+        for item in menu.items where item.identifier == Self.microphoneItemIdentifier {
+            item.submenu = Self.microphoneSubmenu(
+                devices: AudioDevices.inputDevices(),
+                selectedUID: model.inputDeviceUID,
+                target: self
+            )
+        }
     }
 }
