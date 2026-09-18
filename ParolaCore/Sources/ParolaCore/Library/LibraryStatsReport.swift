@@ -58,9 +58,11 @@ public enum LibraryStatsReport {
         return "\(timed.count) of \(timed.total), since \(day(since))"
     }
 
-    /// A fixed `yyyy-MM-dd`, not a locale date: this output is read by scripts as often as by people.
+    /// A fixed `yyyy-MM-dd` in UTC, so this line and `--json`'s ISO timestamp name the same day.
     private static func day(_ date: Date) -> String {
-        let parts = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day], from: date)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? calendar.timeZone
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 }

@@ -6,9 +6,16 @@ import Testing
 struct LibraryStatsReportTests {
     private let english = Locale(identifier: "en_US")
 
-    private func entry(_ id: String, model: String, audio: Double, timing: Double?, words: Int?) -> LibraryEntry {
+    private func entry(
+        _ id: String,
+        model: String,
+        audio: Double,
+        timing: Double?,
+        words: Int?,
+        at createdAt: Date = Date(timeIntervalSince1970: 1_757_635_200)
+    ) -> LibraryEntry {
         var manifest = ParolaDocument.Manifest(
-            createdAt: Date(timeIntervalSince1970: 1_757_635_200),
+            createdAt: createdAt,
             originalAudioName: "\(id).wav",
             modelName: model,
             language: "en",
@@ -48,6 +55,19 @@ struct LibraryStatsReportTests {
         #expect(text.contains("  whisper: 2 runs"))
         #expect(LibraryStatsReport.text(stats).contains("2 runs"), "the tool locale is the default")
         #expect(!text.contains("parakeet"), "a model with no measured run has nothing to compare")
+    }
+
+    /// The text line and `--json`'s ISO timestamp are read together; a local zone makes them disagree near midnight.
+    @Test("the coverage date is the UTC day, the one the JSON timestamp names")
+    func coverageDateIsUTC() {
+        // 2025-09-12T23:30:00Z: still the 12th in UTC, already the 13th in Rome.
+        let lateAtNight = Date(timeIntervalSince1970: 1_757_719_800)
+        let stats = LibraryStatistics.compute(
+            entries: [entry("a", model: "whisper", audio: 600, timing: 30, words: 10, at: lateAtNight)],
+            now: lateAtNight,
+            calendar: Calendar(identifier: .gregorian)
+        )
+        #expect(LibraryStatsReport.text(stats, locale: english).contains("since 2025-09-12"))
     }
 
     @Test("the word total names its coverage when some entries predate the count")
