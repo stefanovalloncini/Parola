@@ -83,11 +83,14 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `showIntroduction` | — | Restart the first-run introduction, the way Help ▸ Show Introduction does. Works in test mode too, even without `--show-introduction`. |
 | `introductionNext` | — | Move on to the next introduction scene; stops on the last one. On the engine scene it commits the chosen engine first, the way the Continue pill does. |
 | `introductionBack` | — | Move back a scene; stops on the first one. |
-| `introductionSkip` | — | Leave the introduction and mark it seen. |
+| `introductionSkip` | — | Leave the introduction and mark it seen. There is no separate finish command: this is also how the last scene ends. |
 | `introductionChooseEngine` | **id** | Pick one of the engine cards; the id comes from `engineChoices`. Nothing downloads until the introduction moves on. |
 
-The five introduction commands and `getState.introduction` all reply `{visible, step, steps, engine, engineChoices}`;
-`engine` is the picked model id, or null where the deployment offers no choice.
+The five introduction commands and `getState.introduction` all reply `{visible, step, steps, engine, engineChoices}`.
+`visible` says whether the introduction is on screen; `step` is the scene showing now and `steps` the order this
+deployment walks, drawn from `hello`, `transcribe`, `features`, `engine`, `ready` — `engine` is left out where the
+deployment offers no engine choice. `engine` is the picked model id, or null in that case, and `engineChoices` lists
+the ids the engine scene offers. `setSetting introductionComplete false` brings a finished introduction back.
 
 Rows named without the `parola_app_` prefix are raw bridge commands, called through `parola_app_dispatch`.
 
