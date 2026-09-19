@@ -76,7 +76,7 @@ struct ParolaApp: App {
         DiagnosticsInstaller.installIfWanted(sideEffects: bootstrap.sideEffects)
         DefaultsStore.current = bootstrap.defaults
         ManagedConfiguration.userSettingsStore = bootstrap.defaults
-        // Must precede AppModel, whose engine choices are the first touch of ModelStore.shared.
+        // Must precede AppModel: a managed launch resolves its engine choices against ModelStore.shared.
         ModelStore.sharedDirectoryOverride = bootstrap.models
         let m = AppModel(bootstrap: bootstrap)
         let lc = LiveCaptionsController()
