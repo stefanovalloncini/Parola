@@ -29,10 +29,10 @@ struct ReadyScene: View {
             Text("You're ready.")
                 .font(DS.Font.hero)
                 .foregroundStyle(DS.Color.primaryText)
-            Text("Grant a permission now, or the first time you use its feature.")
-                .font(DS.Font.title)
-                .foregroundStyle(DS.Color.secondaryText)
             if !rows.isEmpty {
+                Text("Grant a permission now, or the first time you use its feature.")
+                    .font(DS.Font.title)
+                    .foregroundStyle(DS.Color.secondaryText)
                 SettingsSection {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, kind in
                         permissionRow(kind, isFirst: index == 0)
