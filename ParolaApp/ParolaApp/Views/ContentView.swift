@@ -5,6 +5,20 @@ struct ContentView: View {
     @Environment(\.undoManager) private var windowUndoManager
 
     var body: some View {
+        Group {
+            if model.introduction.isPresented {
+                IntroductionView()
+                    .transition(.opacity)
+            } else {
+                home
+                    .transition(.opacity)
+            }
+        }
+        .animation(.smooth(duration: 0.35), value: model.introduction.isPresented)
+        .axBranch("App")
+    }
+
+    private var home: some View {
         NavigationSplitView {
             MacLibrarySidebar()
         } detail: {
@@ -32,7 +46,6 @@ struct ContentView: View {
         }
         .onAppear { model.undoManager = windowUndoManager }
         .onChange(of: windowUndoManager) { _, newValue in model.undoManager = newValue }
-        .axBranch("App")
     }
 }
 

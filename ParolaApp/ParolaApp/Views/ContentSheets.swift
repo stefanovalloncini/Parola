@@ -4,23 +4,10 @@ import ParolaCore
 struct ContentSheetsModifier: ViewModifier {
     @Environment(AppModel.self) private var model
     @State private var meetingAppSnapshot: String = ""
-    @State private var showingWelcome = false
-    @AppStorage("hasSeenWelcome", store: DefaultsStore.current) private var hasSeenWelcome = false
-
-    private var welcomeSuppressed: Bool {
-        model.mode != .normal
-            || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
-    }
 
     func body(content: Content) -> some View {
         @Bindable var model = model
         return content
-            .onAppear {
-                if !hasSeenWelcome && !welcomeSuppressed { showingWelcome = true }
-            }
-            .sheet(isPresented: $showingWelcome, onDismiss: { hasSeenWelcome = true }) {
-                WelcomeSheet()
-            }
             .sheet(isPresented: $model.youtubeSheetOpen) { YouTubeURLSheet() }
             .sheet(item: $model.duplicateImport) { pending in
                 DuplicateImportSheet(pending: pending)

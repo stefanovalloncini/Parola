@@ -22,6 +22,7 @@ private func applyAlwaysOnTop(_ on: Bool) {
 
 @MainActor
 func handleParolaOpen(_ url: URL, model: AppModel) {
+    model.introduction.defer()
     if url.isFileURL {
         model.collectOpenedFile(url)
         return
@@ -122,6 +123,8 @@ struct ParolaApp: App {
                 Button("About Parola") { aboutSheetOpen = true }
             }
             CommandGroup(replacing: .help) {
+                Button("Show Introduction") { model.introduction.restart() }
+                Divider()
                 Button("Keyboard Shortcuts…") { shortcutSheetOpen = true }
                     .keyboardShortcut("/", modifiers: [.command])
                 Button("Send Feedback") {
