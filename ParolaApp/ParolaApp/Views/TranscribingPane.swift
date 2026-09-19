@@ -22,7 +22,6 @@ struct TranscribingPane: View {
 
     private static let tailID = "transcribing.tail"
     private static let displayWindowChars = 2000
-    private static let caretBlinkPeriod: Double = 0.6
     private static let finishingProgressThreshold = 0.9
     private static let finishingStallSeconds: Double = 3
     private static let preparingGraceSeconds: Double = 2.5
@@ -80,7 +79,7 @@ struct TranscribingPane: View {
         .task(id: partial) {
             try? await Task.sleep(for: .milliseconds(900))
             let window = StreamingText.tail(of: partial, maxChars: Self.displayWindowChars)
-            withAnimation(.easeOut(duration: 0.4)) { bodyText = Self.attributed(settled: window, fresh: "") }
+            withAnimation(.easeOut(duration: 0.4)) { bodyText = StreamingReveal.attributed(settled: window, fresh: "") }
         }
         .task(id: progress) {
             guard let progress, progress >= Self.finishingProgressThreshold else { return }
@@ -153,23 +152,7 @@ struct TranscribingPane: View {
         let window = StreamingText.tail(of: latest, maxChars: Self.displayWindowChars)
         let parts = StreamingText.split(shown: shown, latest: window)
         shown = window
-        bodyText = Self.attributed(settled: parts.settled, fresh: parts.fresh)
-    }
-
-    private static func attributed(settled: String, fresh: String) -> AttributedString {
-        var text = AttributedString(settled)
-        text.foregroundColor = DS.Color.primaryText
-        if !fresh.isEmpty {
-            var tail = AttributedString(fresh)
-            tail.foregroundColor = DS.Color.primaryText.opacity(0.5)
-            text.append(tail)
-        }
-        return text
-    }
-
-    private func caret(visible: Bool) -> Text {
-        Text(verbatim: "\u{258F}")
-            .foregroundStyle(DS.Color.accentText.opacity(visible ? 1 : 0))
+        bodyText = StreamingReveal.attributed(settled: parts.settled, fresh: parts.fresh)
     }
 
     private var transcriptBox: some View {
@@ -177,9 +160,9 @@ struct TranscribingPane: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.Spacing.regular) {
                     if hasText {
-                        TimelineView(.periodic(from: startDate, by: Self.caretBlinkPeriod)) { context in
-                            let ticks = Int(context.date.timeIntervalSince(startDate) / Self.caretBlinkPeriod)
-                            Text("\(Text(bodyText))\(caret(visible: reduceMotion || ticks % 2 == 0))")
+                        TimelineView(.periodic(from: startDate, by: StreamingReveal.caretBlinkPeriod)) { context in
+                            let ticks = Int(context.date.timeIntervalSince(startDate) / StreamingReveal.caretBlinkPeriod)
+                            Text("\(Text(bodyText))\(StreamingReveal.caret(visible: reduceMotion || ticks % 2 == 0))")
                                 .font(DS.Font.transcript)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .textSelection(.enabled)
