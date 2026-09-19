@@ -224,7 +224,9 @@ if [ -z "$CLOSING_LINE" ]; then
 fi
 
 head -n $((CLOSING_LINE - 1)) "$TARGET" > "$TMP"
-printf '%s' "$BLOCK" >> "$TMP"
+# Command substitution ate the block's trailing newline; without it the closing ']' lands on the
+# same line as the new command and the next run can no longer find it.
+printf '%s\n' "$BLOCK" >> "$TMP"
 tail -n +"$CLOSING_LINE" "$TARGET" >> "$TMP"
 
 mv "$TMP" "$TARGET"
