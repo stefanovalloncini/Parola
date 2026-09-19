@@ -123,7 +123,7 @@ struct ParolaApp: App {
                 Button("About Parola") { aboutSheetOpen = true }
             }
             CommandGroup(replacing: .help) {
-                Button("Show Introduction") { model.introduction.restart() }
+                Button("Show Introduction") { model.restartIntroduction() }
                 Divider()
                 Button("Keyboard Shortcuts…") { shortcutSheetOpen = true }
                     .keyboardShortcut("/", modifiers: [.command])

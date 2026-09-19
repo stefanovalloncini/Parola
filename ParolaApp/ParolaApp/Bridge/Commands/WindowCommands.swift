@@ -192,7 +192,7 @@ extension ParolaAutomationServer {
                 summary: "Restarts the first-run introduction, the way Help ▸ Show Introduction does.",
                 kind: .mutating,
                 handler: { _, ctx in
-                    ctx.model.introduction.restart()
+                    ctx.model.restartIntroduction()
                     return ParolaAutomationServer.introductionState(ctx.model.introduction)
                 }
             ),

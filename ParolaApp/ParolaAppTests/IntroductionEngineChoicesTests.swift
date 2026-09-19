@@ -203,6 +203,26 @@ struct CommitIntroductionEngineTests {
         #expect(model.modelActionError == nil)
     }
 
+    @Test("restarting the introduction re-reads the model the app uses now")
+    func restartPresetsFromTheCurrentModel() throws {
+        let model = makeModel()
+        let choices = model.introduction.engineChoices
+        try #require(choices.count == 2)
+        model.introduction.chooseEngine(choices[1])
+        // The user changes their mind in Settings, then asks for the introduction again.
+        model.activateModel(choices[0])
+
+        model.restartIntroduction()
+
+        #expect(model.introduction.selectedEngineID == choices[0])
+        #expect(model.introduction.isPresented)
+
+        model.commitIntroductionEngine()
+
+        #expect(model.selectedModel == choices[0])
+        #expect(model.modelActionError == nil)
+    }
+
     @Test("moving on from the engine step commits the pick, other steps don't")
     func advanceCommitsOnTheEngineStep() {
         let model = makeModel()

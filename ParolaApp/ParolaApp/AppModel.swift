@@ -390,6 +390,11 @@ final class AppModel {
         introduction.advance()
     }
 
+    func restartIntroduction() {
+        introduction.presetEngine(selectedModel)
+        introduction.restart()
+    }
+
     var availableModels: [ModelInfo] = []
     var sourceFileURL: URL?
 

@@ -44,9 +44,6 @@ final class IntroductionController {
         self.defaults = defaults
         self.steps = IntroductionStep.sequence(hasEngineChoice: hasEngineChoice)
         self.engineChoices = engineChoices
-        self.selectedEngineID = engineChoices.contains(preferredEngineID ?? "")
-            ? preferredEngineID
-            : engineChoices.first
         self.isSuppressed = environment["XCTestConfigurationFilePath"] != nil
             || (mode == .test && !showsInTestMode)
 
@@ -68,6 +65,7 @@ final class IntroductionController {
         }
         #endif
         self.step = opening
+        presetEngine(preferredEngineID)
     }
 
     var isPresented: Bool { !isComplete && !isDeferred && !isSuppressed }
@@ -91,6 +89,12 @@ final class IntroductionController {
     func chooseEngine(_ id: String) {
         guard engineChoices.contains(id) else { return }
         selectedEngineID = id
+    }
+
+    /// Starts the pick from the model the app is using now: the introduction can be re-run long after
+    /// launch, and the engine it last preset may be nothing like the current selection.
+    func presetEngine(_ id: String?) {
+        selectedEngineID = engineChoices.contains(id ?? "") ? id : engineChoices.first
     }
 
     func skip() {
