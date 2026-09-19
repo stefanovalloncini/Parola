@@ -33,7 +33,7 @@ struct DSProgressBar: View {
             }
         }
         .frame(height: height)
-        .clipped()
+        .clipShape(Capsule(style: .continuous))
         .accessibilityElement()
         .accessibilityAddTraits(.updatesFrequently)
         .accessibilityLabel("Progress")
