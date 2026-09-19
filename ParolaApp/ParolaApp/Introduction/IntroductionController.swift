@@ -40,6 +40,8 @@ final class IntroductionController {
         if defaults.object(forKey: Self.completionKey) == nil, defaults.bool(forKey: Self.welcomeKey) {
             self.isComplete = true
             defaults.set(true, forKey: Self.completionKey)
+            // Retiring the old key is what lets Reset ▸ all bring the introduction back for an upgrader.
+            defaults.removeObject(forKey: Self.welcomeKey)
         } else {
             self.isComplete = defaults.bool(forKey: Self.completionKey)
         }

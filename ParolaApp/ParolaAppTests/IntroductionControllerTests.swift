@@ -110,7 +110,7 @@ struct IntroductionControllerTests {
         #expect(defaults.bool(forKey: "introductionComplete"))
     }
 
-    @Test("restart clears completion and shows the introduction again")
+    @Test("restart clears the persisted flag, so an abandoned introduction returns on the next launch")
     func restartClears() {
         let defaults = temporaryDefaults()
         let controller = makeController(defaults: defaults)
@@ -145,6 +145,18 @@ struct IntroductionControllerTests {
 
         #expect(controller.isComplete)
         #expect(defaults.bool(forKey: "introductionComplete"))
+        #expect(defaults.object(forKey: "hasSeenWelcome") == nil)
+    }
+
+    @Test("a full reset brings the introduction back for someone who had seen the old welcome sheet")
+    func resetAfterMigrationShowsItAgain() {
+        let defaults = temporaryDefaults()
+        defaults.set(true, forKey: "hasSeenWelcome")
+        #expect(makeController(defaults: defaults).isComplete)
+
+        defaults.removeObject(forKey: "introductionComplete")
+
+        #expect(makeController(defaults: defaults).isComplete == false)
     }
 
     @Test("a welcome sheet nobody saw leaves the introduction pending")
