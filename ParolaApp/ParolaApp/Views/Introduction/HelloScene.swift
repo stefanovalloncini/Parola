@@ -6,7 +6,7 @@ struct HelloScene: View {
 
     var body: some View {
         VStack(spacing: DS.Spacing.large) {
-            BrandWaveform(side: 168)
+            BrandWaveform(side: 200)
             VStack(spacing: DS.Spacing.small) {
                 Text(verbatim: "Parola")
                     .font(DS.Font.hero)

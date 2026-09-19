@@ -21,7 +21,7 @@ struct BrandWaveform: View {
                 }
             }
         }
-        .frame(width: usableWidth, height: side)
+        .frame(width: usableWidth, height: usableHeight)
         .onAppear { risen = true }
         .accessibilityHidden(true)
     }
@@ -31,7 +31,7 @@ struct BrandWaveform: View {
             ForEach(Array(Self.fractions.enumerated()), id: \.offset) { index, fraction in
                 Capsule(style: .continuous)
                     .fill(DS.Color.accent)
-                    .frame(width: barWidth, height: barHeight(fraction) * (risen ? 1 : 0.08))
+                    .frame(width: barWidth, height: barHeight(fraction) * (risen || reduceMotion ? 1 : 0.08))
                     .scaleEffect(y: breath(index: index, seconds: seconds), anchor: .center)
                     .animation(rise(index: index), value: risen)
             }
