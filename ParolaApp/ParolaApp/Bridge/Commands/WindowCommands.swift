@@ -200,10 +200,24 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "introductionNext",
                 area: .window,
-                summary: "Moves the introduction on to the next scene; stops on the last one.",
+                summary: "Moves the introduction on to the next scene; stops on the last one. On the engine scene it commits the chosen engine first, the way the Continue pill does.",
                 kind: .mutating,
                 handler: { _, ctx in
-                    ctx.model.introduction.advance()
+                    ctx.model.advanceIntroduction()
+                    return ParolaAutomationServer.introductionState(ctx.model.introduction)
+                }
+            ),
+
+            AutomationCommand(
+                name: "introductionChooseEngine",
+                area: .window,
+                summary: "Picks one of the engine cards in the introduction. Nothing downloads until the introduction moves on.",
+                kind: .mutating,
+                args: [
+                    .init(name: "id", kind: .string(), required: true, summary: "Model id from getState.introduction.engineChoices"),
+                ],
+                handler: { args, ctx in
+                    ctx.model.introduction.chooseEngine(try args.string("id"))
                     return ParolaAutomationServer.introductionState(ctx.model.introduction)
                 }
             ),

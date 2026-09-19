@@ -499,6 +499,8 @@ final class ParolaAutomationServer {
             "visible": .bool(introduction.isPresented),
             "step": .string(introduction.step.rawValue),
             "steps": .array(introduction.steps.map { .string($0.rawValue) }),
+            "engine": introduction.selectedEngineID.map { .string($0) } ?? .null,
+            "engineChoices": .array(introduction.engineChoices.map { .string($0) }),
         ])
     }
 

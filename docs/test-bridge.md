@@ -49,7 +49,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | Tool | Args | What it does |
 |---|---|---|
 | `parola_app_ping` | — | Returns `{pong: true}`. Use to confirm the bridge is up. |
-| `parola_app_state` | — | Full state snapshot: phase, route, selectedModel, language, libraryFilter, libraryOrigin, appTheme, availableModels, transcript presence, and `introduction` (`{visible, step, steps}`). While transcribing, `phaseDetail` also carries `progress`, `stage` and `hasPartialText`. |
+| `parola_app_state` | — | Full state snapshot: phase, route, selectedModel, language, libraryFilter, libraryOrigin, appTheme, availableModels, transcript presence, and `introduction` (`{visible, step, steps, engine, engineChoices}`). While transcribing, `phaseDetail` also carries `progress`, `stage` and `hasPartialText`. |
 | `parola_app_select_model` | **name** | Set selectedModel to a catalog id. |
 | `parola_app_set_language` | code | Two-letter language code, or empty string to auto-detect. |
 | `parola_app_set_theme` | **theme** | `light` / `dark` / `system`. |
@@ -81,11 +81,13 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `toggleInspector` | — | Toggle the transcript inspector, the same way ⌘⇧I does. Below ~1050 pt of window the pane folds the inspector away, and this is the only way to bring it back. |
 | `setWindowFrame` | x, y, w, h | Move and resize the main window; the reply carries the frame that landed after the window's minimum size clamped it. AX resize is refused on ad-hoc-signed builds, so layout checks go through here. |
 | `showIntroduction` | — | Restart the first-run introduction, the way Help ▸ Show Introduction does. Works in test mode too, even without `--show-introduction`. |
-| `introductionNext` | — | Move on to the next introduction scene; stops on the last one. |
+| `introductionNext` | — | Move on to the next introduction scene; stops on the last one. On the engine scene it commits the chosen engine first, the way the Continue pill does. |
 | `introductionBack` | — | Move back a scene; stops on the first one. |
 | `introductionSkip` | — | Leave the introduction and mark it seen. |
+| `introductionChooseEngine` | **id** | Pick one of the engine cards; the id comes from `engineChoices`. Nothing downloads until the introduction moves on. |
 
-The four introduction commands and `getState.introduction` all reply `{visible, step, steps}`.
+The five introduction commands and `getState.introduction` all reply `{visible, step, steps, engine, engineChoices}`;
+`engine` is the picked model id, or null where the deployment offers no choice.
 
 Rows named without the `parola_app_` prefix are raw bridge commands, called through `parola_app_dispatch`.
 
