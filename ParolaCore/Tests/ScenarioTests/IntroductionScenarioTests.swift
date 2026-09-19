@@ -61,10 +61,13 @@ extension ScenarioSuite {
             guard let choice = engineChoices.first(where: { $0 != Self.appleSpeechID }) else {
                 return
             }
+            let steps = state["steps"]?.arrayValue?.compactMap(\.stringValue) ?? []
 
-            while state["step"]?.stringValue != "engine" {
+            for _ in steps.indices {
+                if state["step"]?.stringValue == "engine" { break }
                 state = try await client.send("introductionNext")
             }
+            try #require(state["step"]?.stringValue == "engine", "never reached the engine step")
 
             let chosen = try await client.send("introductionChooseEngine", ["id": choice])
             #expect(chosen["engine"]?.stringValue == choice)
