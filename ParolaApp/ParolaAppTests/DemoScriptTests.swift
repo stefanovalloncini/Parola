@@ -75,13 +75,15 @@ struct DemoScriptTests {
 
     @Test("the player opens the bundled clip and the mute chip drives its volume")
     func playerMutes() throws {
-        let player = try DemoPlayer(url: try clip(["en-US"]).audioURL)
-        #expect(player.volume == 1)
-        #expect(!player.isPlaying)
-        #expect(!player.isFinished)
-        player.isMuted = true
-        #expect(player.volume == 0)
-        player.isMuted = false
-        #expect(player.volume == 1)
+        for languages in [["en-US"], ["it-IT"]] {
+            let player = try DemoPlayer(url: try clip(languages).audioURL)
+            #expect(player.volume == 1)
+            #expect(!player.isPlaying)
+            #expect(!player.isFinished)
+            player.isMuted = true
+            #expect(player.volume == 0)
+            player.isMuted = false
+            #expect(player.volume == 1)
+        }
     }
 }

@@ -33,7 +33,6 @@ private struct DemoTranscriptCard: View {
                 meter(at: time)
                 speakerLine
                 transcript(at: time)
-                Spacer(minLength: 0)
             }
         }
         .padding(DS.Spacing.large)
@@ -130,7 +129,7 @@ private struct DemoTranscriptCard: View {
     }
 
     private func showsCaret(at time: Double) -> Bool {
-        guard !isFinished else { return false }
+        guard player != nil, !isFinished else { return false }
         return reduceMotion || Int(time / StreamingReveal.caretBlinkPeriod) % 2 == 0
     }
 
