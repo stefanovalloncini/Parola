@@ -56,6 +56,17 @@
         }
       }
     },
+    "%@ keeps downloading in the background.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ continua a scaricarsi in background."
+          }
+        }
+      }
+    },
     "%@ left": {
       "extractionState": "manual",
       "localizations": {
@@ -800,6 +811,17 @@
         }
       }
     },
+    "Accessibility": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accessibilità"
+          }
+        }
+      }
+    },
     "Action Items": {
       "extractionState": "manual",
       "localizations": {
@@ -1182,6 +1204,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tutte le lingue"
+          }
+        }
+      }
+    },
+    "Allow…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consenti…"
           }
         }
       }
@@ -1738,6 +1771,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Integrato"
+          }
+        }
+      }
+    },
+    "Built into macOS. Ready now.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Integrato in macOS. Pronto subito."
           }
         }
       }
@@ -3230,6 +3274,17 @@
         }
       }
     },
+    "Dictate in any app": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detta in qualsiasi app"
+          }
+        }
+      }
+    },
     "Dictation": {
       "extractionState": "manual",
       "localizations": {
@@ -3424,6 +3479,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rilascia audio o video"
+          }
+        }
+      }
+    },
+    "Drop audio or video files.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascina file audio o video."
+          }
+        }
+      }
+    },
+    "Drop audio or video, or paste a YouTube link.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascina audio o video, oppure incolla un link YouTube."
           }
         }
       }
@@ -4311,6 +4388,17 @@
         }
       }
     },
+    "Grant a permission now, or the first time you use its feature.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Concedi un permesso adesso, oppure la prima volta che usi la sua funzione."
+          }
+        }
+      }
+    },
     "Grant each permission the first time you use its feature.": {
       "extractionState": "manual",
       "localizations": {
@@ -4428,6 +4516,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Evidenzia la parola pronunciata"
+          }
+        }
+      }
+    },
+    "Hold a key and speak. The words land where you type.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tieni premuto un tasto e parla. Le parole arrivano dove stai scrivendo."
           }
         }
       }
@@ -5166,6 +5265,17 @@
         }
       }
     },
+    "Live captions": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli in tempo reale"
+          }
+        }
+      }
+    },
     "Live preview": {
       "extractionState": "manual",
       "localizations": {
@@ -5617,6 +5727,17 @@
         }
       }
     },
+    "More models in Settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Altri modelli nelle Impostazioni"
+          }
+        }
+      }
+    },
     "Most Time Left": {
       "extractionState": "manual",
       "localizations": {
@@ -5624,6 +5745,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Più tempo rimasto"
+          }
+        }
+      }
+    },
+    "Most accurate. Downloads %@ once.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il più preciso. Scarica %@ una volta sola."
+          }
+        }
+      }
+    },
+    "Most accurate. Installed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il più preciso. Installato."
           }
         }
       }
@@ -7573,6 +7716,17 @@
         }
       }
     },
+    "Record meetings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra le riunioni"
+          }
+        }
+      }
+    },
     "Recording": {
       "extractionState": "manual",
       "localizations": {
@@ -7640,6 +7794,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registra le riunioni e qualsiasi audio riprodotto dal Mac."
+          }
+        }
+      }
+    },
+    "Records the call when a meeting starts.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra la chiamata quando inizia una riunione."
           }
         }
       }
@@ -9362,6 +9527,17 @@
         }
       }
     },
+    "Subtitles for anything playing on your Mac.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli per tutto ciò che il Mac riproduce."
+          }
+        }
+      }
+    },
     "Subtle": {
       "extractionState": "manual",
       "localizations": {
@@ -9419,6 +9595,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Audio di sistema"
+          }
+        }
+      }
+    },
+    "System Audio Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrazione audio di sistema"
           }
         }
       }
@@ -9965,6 +10152,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrivi ed esporta più file insieme. Aggiungi i file o trascinali sull'app."
+          }
+        }
+      }
+    },
+    "Transcribe files": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivi file"
+          }
+        }
+      }
+    },
+    "Transcribe files and links": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrivi file e link"
           }
         }
       }
@@ -10852,6 +11061,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ieri"
+          }
+        }
+      }
+    },
+    "You can change this any time in Settings.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puoi cambiarlo quando vuoi nelle Impostazioni."
           }
         }
       }
