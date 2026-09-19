@@ -190,6 +190,7 @@ struct ModelEngineIcon: View {
                 .foregroundStyle(Self.tint(for: engineID))
         }
         .frame(width: 34, height: 34)
+        .accessibilityHidden(true)
     }
 
     static func symbol(for engineID: EngineID) -> String {

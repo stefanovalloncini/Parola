@@ -84,6 +84,7 @@ struct FeatureRow: View {
                 .font(.system(size: glyphSize, weight: .regular))
                 .foregroundStyle(DS.Color.accent)
                 .frame(width: 44, height: 30, alignment: .leading)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: DS.Spacing.tight) {
                 Text(item.title)
                     .font(DS.Font.heading)
