@@ -26,8 +26,7 @@ let placeholders = [
         speaker: "Speaker 1",
         voice: "Samantha"
     ),
-    // The app name is capitalised again after the decode, which cannot tell it from the common
-    // noun, so the Italian placeholder never says "parola" in its other sense.
+    // The capitalisation step below capitalises every "parola" it finds, so a recording should avoid the common noun.
     "it": Placeholder(
         text: """
         Questa è Parola. Ascolta una registrazione e la scrive tutta, qui sul tuo Mac. \
