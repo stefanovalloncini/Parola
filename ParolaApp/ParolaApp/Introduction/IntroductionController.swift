@@ -10,6 +10,13 @@ final class IntroductionController {
 
     let steps: [IntroductionStep]
 
+    /// Model ids the engine scene offers, in the order it shows them.
+    let engineChoices: [String]
+
+    /// The card with the ring on it. Lives for this run only: the pick reaches the app when the
+    /// user moves on, through `AppModel.commitIntroductionEngine()`.
+    var selectedEngineID: String?
+
     /// A launch that must never show the introduction on its own: a unit-test process, or a
     /// test-mode instance that did not ask for it. An explicit `restart()` overrules it.
     private(set) var isSuppressed: Bool
@@ -30,10 +37,16 @@ final class IntroductionController {
         mode: AppBootstrap.Mode,
         showsInTestMode: Bool,
         hasEngineChoice: Bool = true,
+        engineChoices: [String] = [],
+        preferredEngineID: String? = nil,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) {
         self.defaults = defaults
         self.steps = IntroductionStep.sequence(hasEngineChoice: hasEngineChoice)
+        self.engineChoices = engineChoices
+        self.selectedEngineID = engineChoices.contains(preferredEngineID ?? "")
+            ? preferredEngineID
+            : engineChoices.first
         self.isSuppressed = environment["XCTestConfigurationFilePath"] != nil
             || (mode == .test && !showsInTestMode)
 
@@ -73,6 +86,11 @@ final class IntroductionController {
         guard canGoBack else { return }
         isMovingBack = true
         step = steps[stepIndex - 1]
+    }
+
+    func chooseEngine(_ id: String) {
+        guard engineChoices.contains(id) else { return }
+        selectedEngineID = id
     }
 
     func skip() {

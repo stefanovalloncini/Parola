@@ -375,6 +375,19 @@ final class AppModel {
         selectedModel = id
     }
 
+    /// Applies the introduction's engine pick. Called when the user moves on from the engine
+    /// scene, so clicking a card never starts a download.
+    func commitIntroductionEngine() {
+        guard let id = introduction.selectedEngineID else { return }
+        activateModel(id)
+        if !store.isInstalled(id) { downloadModel(id) }
+    }
+
+    func advanceIntroduction() {
+        if introduction.step == .engine { commitIntroductionEngine() }
+        introduction.advance()
+    }
+
     var availableModels: [ModelInfo] = []
     var sourceFileURL: URL?
 
@@ -1269,10 +1282,19 @@ final class AppModel {
         self.defaults = defaults
         self.features = bootstrap.enabledFeaturesOverride.map(FeatureSet.init(enabled:))
             ?? FeatureSet.resolve(managed: ManagedConfiguration(storage: defaults))
+        let engineChoices = IntroductionEngineChoices.compute(
+            catalog: ModelCatalog.all,
+            managed: ManagedConfiguration(storage: defaults),
+            isInstalled: { ModelStore.shared.isInstalled($0) }
+        )
         self.introduction = IntroductionController(
             defaults: defaults,
             mode: bootstrap.mode,
-            showsInTestMode: bootstrap.showsIntroduction
+            showsInTestMode: bootstrap.showsIntroduction,
+            hasEngineChoice: !engineChoices.isEmpty,
+            engineChoices: engineChoices.map(\.id),
+            // The persisted pick, read straight from defaults: readPersistedSettings() runs later.
+            preferredEngineID: defaults.string(forKey: "selectedModel")
         )
         self.filePicker = bootstrap.filePicker
         self.mode = bootstrap.mode

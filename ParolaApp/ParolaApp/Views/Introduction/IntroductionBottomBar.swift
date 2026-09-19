@@ -19,7 +19,7 @@ struct IntroductionBottomBar: View {
                     .axLeaf("Introduction.Button.Skip")
             }
             Button(primaryTitle(introduction.step)) {
-                if introduction.isLastStep { introduction.finish() } else { introduction.advance() }
+                if introduction.isLastStep { introduction.finish() } else { model.advanceIntroduction() }
             }
             .buttonStyle(DSPillButtonStyle(kind: .primary, size: .regular))
             .keyboardShortcut(.defaultAction)
