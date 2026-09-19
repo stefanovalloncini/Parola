@@ -4399,6 +4399,17 @@
         }
       }
     },
+    "Granted": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Concesso"
+          }
+        }
+      }
+    },
     "HTML (.html)": {
       "extractionState": "manual",
       "localizations": {
@@ -6359,6 +6370,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Non è un file di impostazioni valido."
+          }
+        }
+      }
+    },
+    "Not granted": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non concesso"
           }
         }
       }
