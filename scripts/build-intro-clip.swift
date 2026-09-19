@@ -104,8 +104,7 @@ func rounded(_ value: Double, places: Int) -> Double {
     return (value * scale).rounded() / scale
 }
 
-/// Whisper writes the app's name in lower case wherever it is also an ordinary word, so the
-/// transcript gets one pass: a word whose letters spell "parola" becomes "Parola", punctuation kept.
+/// Turns a word whose letters spell "parola" into "Parola" in Whisper's lower-cased transcript, punctuation kept.
 func capitalisingAppName(_ text: String) -> String {
     let letters = text.trimmingCharacters(in: CharacterSet.letters.inverted)
     guard letters.lowercased() == "parola" else { return text }

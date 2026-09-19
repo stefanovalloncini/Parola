@@ -88,8 +88,7 @@ extension ScenarioSuite {
             _ = try await client.send("resetTestState")
             _ = try await client.send("showIntroduction")
 
-            // introductionNext stops on the last step without finishing the flow (verified above);
-            // introductionSkip is the only bridge command that hides it, the way the last pill does there.
+            // introductionNext never finishes the flow (verified above); introductionSkip is the only bridge command that hides it.
             let skipped = try await client.send("introductionSkip")
             #expect(skipped["visible"]?.boolValue == false)
 
