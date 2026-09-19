@@ -18,7 +18,7 @@ struct EngineScene: View {
                     EngineCard(
                         variant: variant,
                         isSelected: model.introduction.selectedEngineID == variant.id,
-                        isInstalled: isInstalled(variant.id),
+                        isInstalled: model.isModelInstalled(variant.id),
                         downloadProgress: downloadProgress(for: variant.id),
                         choose: { model.introduction.chooseEngine(variant.id) }
                     )
@@ -47,10 +47,6 @@ struct EngineScene: View {
         }
         .buttonStyle(.plain)
         .axLeaf("Introduction.Button.MoreModels")
-    }
-
-    private func isInstalled(_ id: String) -> Bool {
-        model.availableModels.first(where: { $0.name == id })?.isInstalled ?? false
     }
 
     private func downloadProgress(for id: String) -> Double? {

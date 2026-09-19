@@ -381,7 +381,7 @@ final class AppModel {
         guard let id = introduction.selectedEngineID else { return }
         activateModel(id)
         // Back then Continue over a running download must not ask for it a second time.
-        guard downloadingModelName != id, !store.isInstalled(id) else { return }
+        guard downloadingModelName != id, !isModelInstalled(id) else { return }
         downloadModel(id)
     }
 
@@ -396,6 +396,11 @@ final class AppModel {
     }
 
     var availableModels: [ModelInfo] = []
+
+    /// The one answer to "is this model on disk?": the scan when it has landed, the store until then.
+    func isModelInstalled(_ id: String) -> Bool {
+        availableModels.first(where: { $0.name == id })?.isInstalled ?? store.isInstalled(id)
+    }
     var sourceFileURL: URL?
 
     var player: AVPlayer?

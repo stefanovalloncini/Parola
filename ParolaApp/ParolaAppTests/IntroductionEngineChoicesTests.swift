@@ -191,6 +191,24 @@ struct CommitIntroductionEngineTests {
         #expect(model.phase == .downloadingModel(name: id, progress: 0.2))
     }
 
+    @Test("the scan answers whether a model is installed, the store until it lands")
+    func installedStateHasOneSource() {
+        let model = makeModel()
+        #expect(model.isModelInstalled(installedEngine), "Apple Speech ships with macOS")
+        #expect(model.isModelInstalled("introduction-engine-not-on-disk") == false)
+
+        model.availableModels = [
+            ModelInfo(
+                name: "introduction-engine-not-on-disk",
+                label: "Pretend",
+                approximateSizeBytes: 0,
+                isMultilingual: true,
+                isInstalled: true
+            )
+        ]
+        #expect(model.isModelInstalled("introduction-engine-not-on-disk"))
+    }
+
     @Test("nothing is committed when no engine was ever picked")
     func noPickCommitsNothing() {
         let model = makeModel()
