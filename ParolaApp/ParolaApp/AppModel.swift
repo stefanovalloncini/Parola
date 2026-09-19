@@ -380,7 +380,9 @@ final class AppModel {
     func commitIntroductionEngine() {
         guard let id = introduction.selectedEngineID else { return }
         activateModel(id)
-        if !store.isInstalled(id) { downloadModel(id) }
+        // Back then Continue over a running download must not ask for it a second time.
+        guard downloadingModelName != id, !store.isInstalled(id) else { return }
+        downloadModel(id)
     }
 
     func advanceIntroduction() {

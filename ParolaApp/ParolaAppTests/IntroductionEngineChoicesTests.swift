@@ -177,6 +177,20 @@ struct CommitIntroductionEngineTests {
         #expect(model.modelActionError == model.downloadBlockedReason)
     }
 
+    @Test("a second commit during the download doesn't ask for it again")
+    func commitDuringDownloadIsQuiet() {
+        let model = makeModel()
+        let id = "introduction-engine-not-on-disk"
+        model.introduction.selectedEngineID = id
+        model.phase = .downloadingModel(name: id, progress: 0.2)
+
+        model.commitIntroductionEngine()
+
+        #expect(model.selectedModel == id)
+        #expect(model.modelActionError == nil)
+        #expect(model.phase == .downloadingModel(name: id, progress: 0.2))
+    }
+
     @Test("nothing is committed when no engine was ever picked")
     func noPickCommitsNothing() {
         let model = makeModel()
