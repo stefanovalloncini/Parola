@@ -11,7 +11,8 @@
 #
 # Any format afconvert reads works (wav, aiff, m4a, mp3). Record about twelve seconds in a quiet
 # room, one take, no music, and say the placeholder words — the transcript the introduction types
-# out is whatever the CLI hears, so a clean take is the whole trick.
+# out is whatever the CLI hears, so a clean take is the whole trick. The one edit the script makes
+# is the app's name: a word that spells "parola" is written "Parola", however the model heard it.
 #
 # Both files land in ParolaApp/ParolaApp/Resources/Introduction/ and are committed. Re-running
 # overwrites them.

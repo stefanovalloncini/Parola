@@ -26,9 +26,11 @@ let placeholders = [
         speaker: "Speaker 1",
         voice: "Samantha"
     ),
+    // The app name is capitalised again after the decode, which cannot tell it from the common
+    // noun, so the Italian placeholder never says "parola" in its other sense.
     "it": Placeholder(
         text: """
-        Questa è Parola. Ascolta una registrazione e scrive ogni parola, qui sul tuo Mac. \
+        Questa è Parola. Ascolta una registrazione e la scrive tutta, qui sul tuo Mac. \
         Niente esce da questo computer.
         """,
         speaker: "Voce 1",
@@ -101,6 +103,14 @@ func which(_ tool: String) -> String {
 func rounded(_ value: Double, places: Int) -> Double {
     let scale = pow(10.0, Double(places))
     return (value * scale).rounded() / scale
+}
+
+/// Whisper writes the app's name in lower case wherever it is also an ordinary word, so the
+/// transcript gets one pass: a word whose letters spell "parola" becomes "Parola", punctuation kept.
+func capitalisingAppName(_ text: String) -> String {
+    let letters = text.trimmingCharacters(in: CharacterSet.letters.inverted)
+    guard letters.lowercased() == "parola" else { return text }
+    return text.replacingOccurrences(of: letters, with: "Parola")
 }
 
 func voiceExists(_ name: String) -> Bool {
@@ -227,8 +237,9 @@ try? FileManager.default.removeItem(at: spokenURL)
 let measured = measure(clipURL)
 let model = installedModel()
 print("transcribing with \(model)…")
-let words = timings(model: model, clip: clipURL, language: language)
+var words = timings(model: model, clip: clipURL, language: language)
 guard !words.isEmpty else { fail("the transcript has no word timings") }
+words = words.map { DemoWord(text: capitalisingAppName($0.text), start: $0.start, end: $0.end) }
 
 let script = DemoScriptFile(
     text: words.map(\.text).joined(separator: " "),
