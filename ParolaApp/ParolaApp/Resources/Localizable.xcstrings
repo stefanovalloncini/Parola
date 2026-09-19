@@ -1284,6 +1284,17 @@
         }
       }
     },
+    "Apple Speech": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Speech"
+          }
+        }
+      }
+    },
     "Applied to SRT and VTT exports.": {
       "extractionState": "manual",
       "localizations": {

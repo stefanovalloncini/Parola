@@ -66,7 +66,7 @@ private struct EngineCard: View {
         Button(action: choose) {
             VStack(alignment: .leading, spacing: DS.Spacing.small) {
                 ModelEngineIcon(engineID: variant.engineID)
-                Text(variant.displayName)
+                Text(title)
                     .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.primaryText)
                 detail
@@ -91,6 +91,11 @@ private struct EngineCard: View {
         .animation(DS.Motion.rowState, value: isSelected)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .axLeaf("Introduction.Button.Engine.\(variant.id)")
+    }
+
+    /// The catalog's "(system)" earns its place next to nine Whispers, not next to one.
+    private var title: LocalizedStringKey {
+        variant.engineID == .appleSpeech ? "Apple Speech" : LocalizedStringKey(variant.displayName)
     }
 
     private var shape: RoundedRectangle {
