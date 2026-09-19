@@ -147,6 +147,7 @@ struct ParolaApp: App {
             CommandGroup(replacing: .newItem) {
                 Button("Open…") { model.presentOpenPanel() }
                     .keyboardShortcut("o")
+                    .disabled(model.introduction.isPresented)
                 Menu("Open Recent") {
                     let recents = model.recentFiles
                     if recents.isEmpty {
@@ -159,6 +160,7 @@ struct ParolaApp: App {
                         Button("Clear Menu") { model.clearRecentFiles() }
                     }
                 }
+                .disabled(model.introduction.isPresented)
                 Button("Save As Parola Document…") { model.saveProjectDocument() }
                     .keyboardShortcut("s")
                     .disabled(!model.hasTranscript)
@@ -206,6 +208,7 @@ struct ParolaApp: App {
                             scratchpad.toggle()
                         }
                         .keyboardShortcut("k", modifiers: [.command, .shift])
+                        .disabled(model.introduction.isPresented)
                     }
                     if model.features.isEnabled(.liveCaptions) {
                         Divider()
@@ -213,7 +216,10 @@ struct ParolaApp: App {
                             model.toggleLiveCaptions()
                         }
                         .keyboardShortcut("l", modifiers: [.command, .shift])
-                        .disabled(!liveCaptions.isActive && model.liveCaptionsUnavailableReason != nil)
+                        .disabled(
+                            model.introduction.isPresented
+                                || (!liveCaptions.isActive && model.liveCaptionsUnavailableReason != nil)
+                        )
                         Toggle("Translate to English", isOn: translateCaptionsBinding)
                         Divider()
                         Button(liveCaptions.isPresenterOpen ? "Exit Presenter" : "Enter Presenter Mode") {

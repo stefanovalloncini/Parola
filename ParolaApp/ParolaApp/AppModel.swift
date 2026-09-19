@@ -1756,6 +1756,7 @@ final class AppModel {
     }
 
     func transcribe(fileURL: URL, translateOverride: Bool? = nil) {
+        introduction.defer()
         guard fileURL.isFileURL else {
             transcribeYouTube(urlString: fileURL.absoluteString)
             return
@@ -2230,6 +2231,7 @@ final class AppModel {
     // MARK: - Recording
 
     func startRecording(source: RecordSource) {
+        introduction.defer()
         let needed: ParolaFeature = source == .microphone ? .micRecording : .meetings
         guard features.isEnabled(needed) else {
             phase = .failed(message: ParolaError.featureDisabled(needed).description)

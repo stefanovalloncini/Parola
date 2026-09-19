@@ -248,6 +248,49 @@ struct IntroductionControllerTests {
 }
 
 @MainActor
+@Suite("Introduction backstops")
+struct IntroductionBackstopTests {
+    private func makeModel() -> AppModel {
+        AppModel(
+            skipBootstrap: true,
+            defaults: temporaryDefaults(),
+            libraryURL: makeTempLibraryURL("introduction-backstop")
+        )
+    }
+
+    /// `.exporting` parks the arrival before any transcription starts, so the test only proves the defer.
+    @Test("a file arriving from the menu bar or an intent steps out of the introduction")
+    func transcribeDefers() {
+        let model = makeModel()
+        model.introduction.restart()
+        model.phase = .exporting(progress: 0)
+        #expect(model.introduction.isPresented)
+
+        model.transcribe(fileURL: URL(fileURLWithPath: "/tmp/parola-introduction-backstop.wav"))
+
+        #expect(model.introduction.isDeferred)
+        #expect(model.introduction.isPresented == false)
+    }
+
+    @Test("a recording started from outside the window steps out of the introduction")
+    func recordingDefers() {
+        let model = AppModel(
+            skipBootstrap: true,
+            defaults: temporaryDefaults(),
+            libraryURL: makeTempLibraryURL("introduction-backstop-record"),
+            features: []
+        )
+        model.introduction.restart()
+        #expect(model.introduction.isPresented)
+
+        model.startRecording(source: .microphone)
+
+        #expect(model.introduction.isDeferred)
+        #expect(model.introduction.isPresented == false)
+    }
+}
+
+@MainActor
 @Suite("Introduction persistence keys")
 struct IntroductionSettingsKeyTests {
 
