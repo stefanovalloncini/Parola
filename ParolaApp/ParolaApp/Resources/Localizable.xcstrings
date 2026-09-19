@@ -1373,6 +1373,17 @@
         }
       }
     },
+    "Audio, written down.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio, in parola."
+          }
+        }
+      }
+    },
     "Auto": {
       "localizations": {
         "it": {
@@ -1671,6 +1682,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Batch — %lld file"
+          }
+        }
+      }
+    },
+    "Begin": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inizia"
           }
         }
       }
@@ -2115,6 +2137,17 @@
         }
       }
     },
+    "Choose how it listens.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli come ascolta."
+          }
+        }
+      }
+    },
     "Choose which formats to write next to each transcribed file.": {
       "extractionState": "manual",
       "localizations": {
@@ -2429,6 +2462,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il contesto serve solo per nomi propri e termini tecnici — il modello non lo ripete né ci risponde. Tutti e tre sono disattivi di default."
+          }
+        }
+      }
+    },
+    "Continue": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continua"
           }
         }
       }
@@ -4704,6 +4748,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Integrazioni"
+          }
+        }
+      }
+    },
+    "It listens and writes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ascolta e scrive."
           }
         }
       }
@@ -8463,6 +8518,17 @@
         }
       }
     },
+    "Show Introduction": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra l'introduzione"
+          }
+        }
+      }
+    },
     "Show Live Captions": {
       "extractionState": "manual",
       "localizations": {
@@ -9050,6 +9116,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Stato"
+          }
+        }
+      }
+    },
+    "Step %lld of %lld": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Passo %lld di %lld"
           }
         }
       }
@@ -10528,6 +10605,17 @@
         }
       }
     },
+    "What it does.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cosa fa."
+          }
+        }
+      }
+    },
     "When on, the LLM answers your dictation instead of cleaning it up. Use this for voice Q&A.": {
       "extractionState": "manual",
       "localizations": {
@@ -10720,6 +10808,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ieri"
+          }
+        }
+      }
+    },
+    "You're ready.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutto pronto."
           }
         }
       }

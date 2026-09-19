@@ -15,6 +15,7 @@ struct TypeScaleTests {
     @Test("the tiers step down in the order the scale declares")
     func tiersDescend() {
         let ladder: [Font] = [
+            DS.Font.hero,
             DS.Font.display,
             DS.Font.title,
             DS.Font.heading,

@@ -34,9 +34,10 @@ enum DS {
         static let liveTranscriptMinHeight: CGFloat = 180
     }
 
-    /// Eleven fixed tiers, ours rather than the system text styles, so a tier means the same thing
+    /// Twelve fixed tiers, ours rather than the system text styles, so a tier means the same thing
     /// on every surface. Pick by role — page title, section heading, row title, meta line, caption.
     enum Font {
+        static let hero = SwiftUI.Font.system(size: 40, weight: .semibold)
         static let display = SwiftUI.Font.system(size: 28, weight: .semibold)
         static let title = SwiftUI.Font.system(size: 22, weight: .semibold)
         static let heading = SwiftUI.Font.system(size: 15, weight: .semibold)

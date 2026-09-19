@@ -21,6 +21,10 @@ enum AppIconArtwork {
         ("icon_512x512@2x.png", 1024),
     ]
 
+    /// Bar heights as fractions of the waveform's height, chosen to look symmetric and intentional.
+    /// `BrandWaveform` draws the same nine, so the Dock icon and the introduction can't drift apart.
+    static let barFractions: [CGFloat] = [0.32, 0.62, 0.84, 0.50, 0.92, 0.50, 0.84, 0.62, 0.32]
+
     static func draw(into context: CGContext, size: CGFloat, background: NSColor, foreground: NSColor) {
         // Apple's macOS icon grid insets the rounded square by 100/1024 of the canvas per side.
         let inset = size * 100 / 1024
@@ -35,8 +39,7 @@ enum AppIconArtwork {
         context.setFillColor(background.cgColor)
         context.fillPath()
 
-        // Bars representing a waveform. Heights chosen to look symmetric and intentional.
-        let bars: [CGFloat] = [0.32, 0.62, 0.84, 0.50, 0.92, 0.50, 0.84, 0.62, 0.32]
+        let bars = barFractions
         let barCount = CGFloat(bars.count)
         let usableWidth = artworkSide * 0.56
         let usableHeight = artworkSide * 0.72
