@@ -24,7 +24,12 @@ struct WaveformHistory: View {
     var idleHeight: CGFloat = 2
     var fill: Color = .white
 
+    /// A ready window of levels. When it is there the view draws it as-is instead of sampling `level`.
+    private let envelope: [Float]?
+
     @State private var history: LevelHistory
+    // `.now` re-read in the body restarts the schedule on every parent update, refilling the ring with one level.
+    @State private var clockStart = Date()
 
     init(
         level: Float,
@@ -42,7 +47,27 @@ struct WaveformHistory: View {
         self.maxHeight = maxHeight
         self.idleHeight = idleHeight
         self.fill = fill
+        self.envelope = nil
         _history = State(initialValue: LevelHistory(capacity: capacity))
+    }
+
+    init(
+        samples: [Float],
+        barWidth: CGFloat = 2,
+        spacing: CGFloat = 1.5,
+        maxHeight: CGFloat = 18,
+        idleHeight: CGFloat = 2,
+        fill: Color = .white
+    ) {
+        self.level = 0
+        self.capacity = samples.count
+        self.barWidth = barWidth
+        self.spacing = spacing
+        self.maxHeight = maxHeight
+        self.idleHeight = idleHeight
+        self.fill = fill
+        self.envelope = samples
+        _history = State(initialValue: LevelHistory(capacity: samples.count))
     }
 
     private var contentWidth: CGFloat {
@@ -50,26 +75,33 @@ struct WaveformHistory: View {
     }
 
     var body: some View {
-        // Audio levels arrive in irregular bursts; sampling the latest level on a steady ~30fps
-        // display clock makes the scroll cadence even (smooth) instead of stuttering with the input.
-        TimelineView(.periodic(from: .now, by: 1.0 / 30.0)) { timeline in
-            Canvas(opaque: false) { context, size in
-                let samples = history.samples
-                for (index, sample) in samples.enumerated() {
-                    let height = barHeight(sample)
-                    let x = CGFloat(index) * (barWidth + spacing)
-                    let rect = CGRect(x: x, y: (size.height - height) / 2, width: barWidth, height: height)
-                    context.fill(
-                        Path(roundedRect: rect, cornerRadius: barWidth / 2, style: .continuous),
-                        with: .color(fill)
-                    )
+        Group {
+            if let envelope {
+                bars(envelope)
+            } else {
+                // Audio levels arrive in irregular bursts; sampling the latest level on a steady ~30fps
+                // display clock makes the scroll cadence even (smooth) instead of stuttering with the input.
+                TimelineView(.periodic(from: clockStart, by: 1.0 / 30.0)) { timeline in
+                    bars(history.samples)
+                        .onChange(of: timeline.date) { _, _ in history.append(level) }
                 }
-            }
-            .onChange(of: timeline.date) { _, _ in
-                history.append(level)
             }
         }
         .frame(width: contentWidth, height: maxHeight)
+    }
+
+    private func bars(_ samples: [Float]) -> some View {
+        Canvas(opaque: false) { context, size in
+            for (index, sample) in samples.enumerated() {
+                let height = barHeight(sample)
+                let x = CGFloat(index) * (barWidth + spacing)
+                let rect = CGRect(x: x, y: (size.height - height) / 2, width: barWidth, height: height)
+                context.fill(
+                    Path(roundedRect: rect, cornerRadius: barWidth / 2, style: .continuous),
+                    with: .color(fill)
+                )
+            }
+        }
     }
 
     private func barHeight(_ value: Float) -> CGFloat {

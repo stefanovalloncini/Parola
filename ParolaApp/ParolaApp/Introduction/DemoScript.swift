@@ -1,8 +1,6 @@
 import Foundation
 
-/// The precomputed transcript of the introduction's demo clip: what the words are, when each one
-/// lands, and how loud the voice is along the way. Written by scripts/build-intro-clip.sh, so the
-/// introduction can show a transcription without running a model.
+/// Precomputed transcript of the introduction's demo clip, written by scripts/build-intro-clip.sh.
 struct DemoScript: Codable, Equatable {
     struct Word: Codable, Equatable {
         var text: String
@@ -25,6 +23,15 @@ struct DemoScript: Codable, Equatable {
         let index = Int(time * levelRate)
         guard levels.indices.contains(index) else { return 0 }
         return levels[index]
+    }
+
+    /// The last `window` levels up to `time`, padded with silence where the clip has nothing to give.
+    func levels(window: Int, endingAt time: Double) -> [Float] {
+        let last = Int(time * levelRate)
+        return (0..<max(0, window)).map { offset in
+            let index = last - window + 1 + offset
+            return levels.indices.contains(index) ? levels[index] : 0
+        }
     }
 
     /// Stands in when the bundled clip is missing, so the card still reads instead of going blank.
