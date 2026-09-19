@@ -490,6 +490,15 @@ final class ParolaAutomationServer {
             "dropHighlight": .string(model.dropHighlight?.rawValue ?? ""),
             "dropZones": .string(model.dropZonePlan.name),
             "meetingDetectedApp": model.meetingDetectedApp.map { .string($0) } ?? .null,
+            "introduction": Self.introductionState(model.introduction),
+        ])
+    }
+
+    static func introductionState(_ introduction: IntroductionController) -> AutomationValue {
+        .object([
+            "visible": .bool(introduction.isPresented),
+            "step": .string(introduction.step.rawValue),
+            "steps": .array(introduction.steps.map { .string($0.rawValue) }),
         ])
     }
 

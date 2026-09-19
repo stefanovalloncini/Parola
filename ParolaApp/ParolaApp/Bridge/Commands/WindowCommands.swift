@@ -185,6 +185,50 @@ extension ParolaAutomationServer {
                     return .object(["revealed": .bool(true)])
                 }
             ),
+
+            AutomationCommand(
+                name: "showIntroduction",
+                area: .window,
+                summary: "Restarts the first-run introduction, the way Help ▸ Show Introduction does.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    ctx.model.introduction.restart()
+                    return ParolaAutomationServer.introductionState(ctx.model.introduction)
+                }
+            ),
+
+            AutomationCommand(
+                name: "introductionNext",
+                area: .window,
+                summary: "Moves the introduction on to the next scene; stops on the last one.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    ctx.model.introduction.advance()
+                    return ParolaAutomationServer.introductionState(ctx.model.introduction)
+                }
+            ),
+
+            AutomationCommand(
+                name: "introductionBack",
+                area: .window,
+                summary: "Moves the introduction back a scene; stops on the first one.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    ctx.model.introduction.back()
+                    return ParolaAutomationServer.introductionState(ctx.model.introduction)
+                }
+            ),
+
+            AutomationCommand(
+                name: "introductionSkip",
+                area: .window,
+                summary: "Leaves the introduction and marks it seen, the way the Skip pill does.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    ctx.model.introduction.skip()
+                    return ParolaAutomationServer.introductionState(ctx.model.introduction)
+                }
+            ),
         ]
     }
 }
