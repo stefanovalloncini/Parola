@@ -67,7 +67,8 @@ struct WaveformHistory: View {
         self.idleHeight = idleHeight
         self.fill = fill
         self.envelope = samples
-        _history = State(initialValue: LevelHistory(capacity: samples.count))
+        // The envelope draws itself; the ring behind `level` is never sampled on this path.
+        _history = State(initialValue: LevelHistory(capacity: 1))
     }
 
     private var contentWidth: CGFloat {

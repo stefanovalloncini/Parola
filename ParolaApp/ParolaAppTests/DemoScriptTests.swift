@@ -60,6 +60,7 @@ struct DemoScriptTests {
     @Test("the waveform window scrolls with the clip and pads the head with silence")
     func levelWindowScrolls() throws {
         for script in try bothScripts() {
+            try #require(script.levels.count > 60)
             let opening = script.levels(window: 48, endingAt: 0)
             #expect(opening.count == 48)
             #expect(opening.dropLast().allSatisfy { $0 == 0 })
