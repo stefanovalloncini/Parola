@@ -12,7 +12,7 @@
 
 ## Install
 
-Download the latest DMG from [Releases](https://github.com/stefanovalloncini/Parola/releases), open it, and drag Parola to Applications. On first transcription the app downloads a speech model (about 75 MB for the default).
+Download the latest DMG from [Releases](https://github.com/stefanovalloncini/Parola/releases), open it, and drag Parola to Applications. The first launch opens a short introduction where you pick the speech engine (Apple Speech needs no download) and grant permissions.
 
 Everything runs locally: audio never leaves your Mac unless you connect a cloud AI provider yourself.
 
