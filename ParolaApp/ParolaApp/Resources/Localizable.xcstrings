@@ -1993,7 +1993,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Registra la tua voce per registrazioni e dettatura."
+            "value": "Cattura la tua voce per registrazioni e dettatura."
           }
         }
       }
@@ -4405,7 +4405,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Concedi un permesso adesso, oppure la prima volta che usi la sua funzione."
+            "value": "Concedi un permesso adesso, oppure la prima volta che ti serve."
           }
         }
       }
@@ -5727,6 +5727,28 @@
         }
       }
     },
+    "More accurate. Downloads %@ once.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Più preciso. Scarica %@ una volta sola."
+          }
+        }
+      }
+    },
+    "More accurate. Installed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Più preciso. Installato."
+          }
+        }
+      }
+    },
     "More actions": {
       "extractionState": "manual",
       "localizations": {
@@ -5756,28 +5778,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Più tempo rimasto"
-          }
-        }
-      }
-    },
-    "Most accurate. Downloads %@ once.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Il più preciso. Scarica %@ una volta sola."
-          }
-        }
-      }
-    },
-    "Most accurate. Installed.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Il più preciso. Installato."
           }
         }
       }
@@ -7253,17 +7253,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Player"
-          }
-        }
-      }
-    },
-    "Powers the dictation hotkey and inserts text where you type.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Attiva la scorciatoia di dettatura e inserisce il testo dove scrivi."
           }
         }
       }
@@ -10810,6 +10799,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cartelle monitorate"
+          }
+        }
+      }
+    },
+    "Watches for the dictation hotkey and inserts text where you type.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rileva la scorciatoia di dettatura e inserisce il testo dove scrivi."
           }
         }
       }

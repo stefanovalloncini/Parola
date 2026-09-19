@@ -88,7 +88,7 @@ struct ReadyScene: View {
         case .accessibility:
             PermissionRow(
                 title: String(localized: "Accessibility"),
-                detail: String(localized: "Powers the dictation hotkey and inserts text where you type."),
+                detail: String(localized: "Watches for the dictation hotkey and inserts text where you type."),
                 granted: model.dictationPermissions.accessibilityGranted,
                 isFirst: isFirst,
                 axID: "Introduction.Button.GrantAccessibility",

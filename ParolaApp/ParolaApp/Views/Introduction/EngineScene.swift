@@ -121,7 +121,7 @@ private struct EngineCard: View {
 
     private var line: LocalizedStringKey {
         if variant.engineID == .appleSpeech { return "Built into macOS. Ready now." }
-        if isInstalled { return "Most accurate. Installed." }
-        return "Most accurate. Downloads \(AppFormat.byteSize(variant.sizeBytes)) once."
+        if isInstalled { return "More accurate. Installed." }
+        return "More accurate. Downloads \(AppFormat.byteSize(variant.sizeBytes)) once."
     }
 }
