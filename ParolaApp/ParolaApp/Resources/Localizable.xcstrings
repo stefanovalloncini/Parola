@@ -3633,6 +3633,17 @@
         }
       }
     },
+    "Every word stays on this Mac.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ogni parola resta su questo Mac."
+          }
+        }
+      }
+    },
     "Everything on every Settings pane returns to defaults.": {
       "extractionState": "manual",
       "localizations": {
@@ -5646,6 +5657,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trascrizione multi-file"
+          }
+        }
+      }
+    },
+    "Mute": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silenzia"
           }
         }
       }
@@ -7783,6 +7805,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sostituisci tutto"
+          }
+        }
+      }
+    },
+    "Replay": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riascolta"
           }
         }
       }
@@ -10282,6 +10315,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sconosciuto"
+          }
+        }
+      }
+    },
+    "Unmute": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riattiva l'audio"
           }
         }
       }
