@@ -30,7 +30,7 @@ struct DemoScript: Codable, Equatable {
     /// Stands in when the bundled clip is missing, so the card still reads instead of going blank.
     static let placeholder = DemoScript(
         text: """
-        This is Parola. It listens to a recording and writes down every word, right here on your Mac. \
+        This is Parola. It listens to a recording and writes down every word. Right here on your Mac. \
         Nothing leaves this computer.
         """,
         speaker: "Speaker 1",

@@ -17,9 +17,10 @@ struct Placeholder {
 }
 
 let placeholders = [
+    // Samantha reads "Parola" as "Parala"; the hyphen fixes her pronunciation and never reaches the transcript.
     "en": Placeholder(
         text: """
-        This is Parola. It listens to a recording and writes down every word, right here on your Mac. \
+        This is Par-ola. It listens to a recording and writes down every word, right here on your Mac. \
         Nothing leaves this computer.
         """,
         speaker: "Speaker 1",
@@ -122,7 +123,24 @@ func installedModel() -> String {
     return model
 }
 
-/// RMS per 50 ms window over the mono mix, normalised so the 95th percentile reads full scale.
+func timings(model: String, clip: URL, language: String) -> [DemoWord] {
+    let printed = run(cliPath, [
+        "transcribe", "--word-timestamps", "--format", "json",
+        "--model", model, "--language", language, clip.path,
+    ])
+    guard let transcript = try? JSONDecoder().decode(CLITranscript.self, from: Data(printed.utf8)) else {
+        fail("could not read the transcript the CLI printed")
+    }
+    return transcript.segments.flatMap { $0.words ?? [] }.map {
+        DemoWord(
+            text: $0.word.trimmingCharacters(in: .whitespacesAndNewlines),
+            start: rounded($0.start, places: 3),
+            end: rounded($0.end, places: 3)
+        )
+    }
+}
+
+/// RMS per 50 ms window over the mono mix, normalised so the loudest window reads full scale.
 func measure(_ url: URL) -> (levels: [Double], duration: Double) {
     guard let file = try? AVAudioFile(forReading: url) else { fail("could not read \(url.path)") }
     let format = file.processingFormat
@@ -154,9 +172,8 @@ func measure(_ url: URL) -> (levels: [Double], duration: Double) {
         start = end
     }
 
-    let sorted = values.sorted()
-    let percentile = sorted[Int((Double(sorted.count - 1) * 0.95).rounded())]
-    let scale = percentile > 0 ? 1 / percentile : 1
+    let peak = values.max() ?? 0
+    let scale = peak > 0 ? 1 / peak : 1
     let levels = values.map { rounded(min(1, max(0, $0 * scale)), places: 3) }
     return (levels, Double(file.length) / format.sampleRate)
 }
@@ -210,20 +227,7 @@ try? FileManager.default.removeItem(at: spokenURL)
 let measured = measure(clipURL)
 let model = installedModel()
 print("transcribing with \(model)…")
-let transcribed = run(cliPath, [
-    "transcribe", "--word-timestamps", "--format", "json",
-    "--model", model, "--language", language, clipURL.path,
-])
-guard let transcript = try? JSONDecoder().decode(CLITranscript.self, from: Data(transcribed.utf8)) else {
-    fail("could not read the transcript the CLI printed")
-}
-let words = transcript.segments.flatMap { $0.words ?? [] }.map {
-    DemoWord(
-        text: $0.word.trimmingCharacters(in: .whitespacesAndNewlines),
-        start: rounded($0.start, places: 3),
-        end: rounded($0.end, places: 3)
-    )
-}
+let words = timings(model: model, clip: clipURL, language: language)
 guard !words.isEmpty else { fail("the transcript has no word timings") }
 
 let script = DemoScriptFile(
@@ -247,7 +251,9 @@ do {
 for word in words {
     print(String(format: "%7.2f %7.2f  %@", word.start, word.end, word.text))
 }
+let ordered = script.levels.sorted()
 print("""
 \nwrote \(clipURL.path) (\(String(format: "%.2f", script.duration)) s)
-wrote \(scriptURL.path) (\(words.count) words, \(script.levels.count) levels)
+wrote \(scriptURL.path) with \(model) (\(words.count) words, \(script.levels.count) levels; \
+min \(ordered.first ?? 0), median \(ordered[ordered.count / 2]), max \(ordered.last ?? 0))
 """)
