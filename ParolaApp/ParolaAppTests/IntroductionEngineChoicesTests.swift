@@ -191,6 +191,21 @@ struct CommitIntroductionEngineTests {
         #expect(model.phase == .downloadingModel(name: id, progress: 0.2))
     }
 
+    @Test("switching to the other card stops the download the first pick started")
+    func commitCancelsTheAbandonedDownload() throws {
+        let model = makeModel()
+        let choices = model.introduction.engineChoices
+        try #require(choices.count == 2)
+        model.phase = .downloadingModel(name: choices[1], progress: 0.2)
+        model.introduction.selectedEngineID = choices[0]
+
+        model.commitIntroductionEngine()
+
+        #expect(model.phase == .idle)
+        #expect(model.selectedModel == choices[0])
+        #expect(model.modelActionError == nil)
+    }
+
     @Test("the scan answers whether a model is installed, the store until it lands")
     func installedStateHasOneSource() {
         let model = makeModel()

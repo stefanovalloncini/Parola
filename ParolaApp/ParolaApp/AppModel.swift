@@ -379,6 +379,10 @@ final class AppModel {
     /// scene, so clicking a card never starts a download.
     func commitIntroductionEngine() {
         guard let id = introduction.selectedEngineID else { return }
+        if let downloading = downloadingModelName, downloading != id,
+           introduction.engineChoices.contains(downloading) {
+            cancelModelDownload()
+        }
         activateModel(id)
         // Back then Continue over a running download must not ask for it a second time.
         guard downloadingModelName != id, !isModelInstalled(id) else { return }
