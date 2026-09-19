@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct TranscribeScene: View {
+    let demo: DemoPlayback
+
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             Text("It listens and writes.")
@@ -9,7 +11,7 @@ struct TranscribeScene: View {
             Text("Every word stays on this Mac.")
                 .font(DS.Font.title)
                 .foregroundStyle(DS.Color.secondaryText)
-            DemoTranscriptCard(clip: DemoClip.bundled())
+            DemoTranscriptCard(demo: demo)
                 .padding(.top, DS.Spacing.small)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -18,17 +20,19 @@ struct TranscribeScene: View {
 
 /// The live-transcription box, replayed from a recording instead of run by a model.
 private struct DemoTranscriptCard: View {
-    let clip: DemoClip?
+    let demo: DemoPlayback
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var player: DemoPlayer?
 
-    private var script: DemoScript { clip?.script ?? .placeholder }
-    private var isFinished: Bool { player?.isFinished ?? false }
+    private static let barCount = 48
+
+    private var script: DemoScript { demo.script }
+    private var player: DemoPlayer? { demo.player }
+    private var isPlaying: Bool { player?.isPlaying ?? false }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !(player?.isPlaying ?? false))) { _ in
-            let time = isFinished ? script.duration : (player?.currentTime ?? 0)
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isPlaying)) { _ in
+            let time = demo.isSettled ? script.duration : (player?.currentTime ?? 0)
             VStack(alignment: .leading, spacing: DS.Spacing.regular) {
                 meter(at: time)
                 speakerLine
@@ -39,23 +43,21 @@ private struct DemoTranscriptCard: View {
         .frame(maxWidth: .infinity, minHeight: DS.Size.liveTranscriptMinHeight, alignment: .topLeading)
         .cardBackground(radius: DS.Radius.large)
         .overlay(alignment: .bottomTrailing) {
-            replayButton.animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: isFinished)
+            replayButton.animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: demo.isSettled)
         }
         .task {
-            guard let clip else { return }
-            if player == nil { player = try? DemoPlayer(url: clip.audioURL) }
+            guard demo.autoplays else { return }
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
-            player?.play()
+            demo.start()
         }
-        .onDisappear { player?.stop() }
+        .onDisappear { demo.stop() }
     }
 
     private func meter(at time: Double) -> some View {
         HStack(spacing: DS.Spacing.regular) {
             WaveformHistory(
-                level: script.level(at: time),
-                capacity: 48,
+                samples: envelope(at: time),
                 barWidth: 2,
                 spacing: 2,
                 maxHeight: 28,
@@ -99,14 +101,15 @@ private struct DemoTranscriptCard: View {
         }
         .buttonStyle(DSIconChipButtonStyle())
         .help(hint)
+        .accessibilityLabel(hint)
         .disabled(player == nil)
         .axLeaf("Introduction.Button.Mute")
     }
 
     @ViewBuilder
     private var replayButton: some View {
-        if isFinished {
-            Button("Replay") { player?.replay() }
+        if demo.isSettled {
+            Button("Replay") { demo.player?.replay() }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .axLeaf("Introduction.Button.Replay")
                 .padding(DS.Spacing.large)
@@ -114,8 +117,13 @@ private struct DemoTranscriptCard: View {
         }
     }
 
+    private func envelope(at time: Double) -> [Float] {
+        guard isPlaying else { return Array(repeating: 0, count: Self.barCount) }
+        return script.levels(window: Self.barCount, endingAt: time)
+    }
+
     private func reveal(at time: Double) -> AttributedString {
-        guard player != nil, !script.words.isEmpty, !isFinished else {
+        guard player != nil, !script.words.isEmpty, !demo.isSettled else {
             return StreamingReveal.attributed(settled: script.text, fresh: "")
         }
         let visible = script.words.prefix(script.visibleWordCount(at: time)).map(\.text)
@@ -129,7 +137,7 @@ private struct DemoTranscriptCard: View {
     }
 
     private func showsCaret(at time: Double) -> Bool {
-        guard player != nil, !isFinished else { return false }
+        guard player != nil, !demo.isSettled else { return false }
         return reduceMotion || Int(time / StreamingReveal.caretBlinkPeriod) % 2 == 0
     }
 

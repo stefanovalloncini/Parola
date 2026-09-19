@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// The live-transcription look: text that has settled in the primary colour, the words that just
-/// arrived dimmed behind it, and a caret blinking at the end.
+/// The live-transcription look: settled text, the words that just arrived dimmed, a caret at the end.
 enum StreamingReveal {
     static let caretBlinkPeriod: Double = 0.6
 

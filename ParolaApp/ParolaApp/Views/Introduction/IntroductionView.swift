@@ -11,6 +11,7 @@ enum IntroductionLayout {
 struct IntroductionView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var demo = DemoPlayback()
 
     var body: some View {
         let introduction = model.introduction
@@ -36,7 +37,7 @@ struct IntroductionView: View {
     private func scene(_ step: IntroductionStep) -> some View {
         switch step {
         case .hello: HelloScene()
-        case .transcribe: TranscribeScene()
+        case .transcribe: TranscribeScene(demo: demo)
         case .features: FeaturesScene()
         case .engine: EngineScene()
         case .ready: ReadyScene()

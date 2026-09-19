@@ -50,10 +50,48 @@ struct DemoScriptTests {
     @Test("the reveal starts empty, follows the words and ends whole")
     func visibleWordCountFollowsTheClock() throws {
         for script in try bothScripts() {
+            try #require(script.words.count > 3)
             #expect(script.visibleWordCount(at: -1) == 0)
             #expect(script.visibleWordCount(at: script.duration + 1) == script.words.count)
             #expect(script.visibleWordCount(at: script.words[3].start) == 4)
         }
+    }
+
+    @Test("the waveform window scrolls with the clip and pads the head with silence")
+    func levelWindowScrolls() throws {
+        for script in try bothScripts() {
+            let opening = script.levels(window: 48, endingAt: 0)
+            #expect(opening.count == 48)
+            #expect(opening.dropLast().allSatisfy { $0 == 0 })
+            #expect(opening.last == script.levels[0])
+
+            let later = script.levels(window: 48, endingAt: 3)
+            #expect(later.count == 48)
+            #expect(later == Array(script.levels[(60 - 47)...60]))
+
+            #expect(script.levels(window: 48, endingAt: -1).allSatisfy { $0 == 0 })
+            #expect(script.levels(window: 48, endingAt: script.duration + 5).allSatisfy { $0 == 0 })
+        }
+    }
+
+    @Test("the demo plays on the first visit only")
+    func autoplaysOnce() {
+        #expect(DemoPlayback.autoplays(hasPlayed: false, hasPlayer: true))
+        #expect(!DemoPlayback.autoplays(hasPlayed: true, hasPlayer: true))
+        #expect(!DemoPlayback.autoplays(hasPlayed: false, hasPlayer: false))
+        #expect(!DemoPlayback.autoplays(hasPlayed: true, hasPlayer: false))
+    }
+
+    @Test("a fresh stage has a silent, unsettled clip ready")
+    func freshPlayback() {
+        let demo = DemoPlayback()
+        #expect(demo.player != nil)
+        #expect(!demo.hasPlayed)
+        #expect(!demo.isSettled)
+        #expect(demo.autoplays)
+        #expect(demo.script.words.count > 5)
+        demo.stop()
+        #expect(!demo.isSettled)
     }
 
     @Test("a time outside the clip has no level")
