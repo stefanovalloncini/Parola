@@ -37,3 +37,61 @@ struct FeaturesSceneRowsTests {
         #expect(rows(.dictation).map(\.symbol) == ["text.alignleft", "text.cursor"])
     }
 }
+
+@MainActor
+@Suite("Introduction permission rows")
+struct ReadySceneRowsTests {
+    private func rows(_ features: ParolaFeature...) -> [ReadyScene.PermissionKind] {
+        ReadyScene.permissionRows(features: FeatureSet(enabled: Set(features)))
+    }
+
+    @Test("a full deployment asks for all three")
+    func allThree() {
+        #expect(ReadyScene.permissionRows(features: .all) == [.microphone, .systemAudio, .accessibility])
+    }
+
+    @Test("the microphone row stands for recording, dictation and captions alike")
+    func microphoneGating() {
+        #expect(rows(.micRecording) == [.microphone])
+        #expect(rows(.liveCaptions) == [.microphone])
+        #expect(rows(.dictation) == [.microphone, .accessibility])
+    }
+
+    @Test("system audio belongs to meetings")
+    func systemAudioGating() {
+        #expect(rows(.meetings) == [.systemAudio])
+        #expect(rows(.meetings, .micRecording) == [.microphone, .systemAudio])
+    }
+
+    @Test("a deployment that needs nothing gets no section")
+    func noRows() {
+        #expect(rows(.batch).isEmpty)
+        #expect(rows().isEmpty)
+    }
+}
+
+@Suite("The welcome sheet is gone")
+struct WelcomeSheetRetirementTests {
+    @Test("no source names the retired sheet or its accessibility ids")
+    func noWelcomeReferences() throws {
+        let sources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("ParolaApp")
+        let walker = try #require(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
+
+        var scanned = 0
+        var offenders: [String] = []
+        for case let url as URL in walker where url.pathExtension == "swift" {
+            scanned += 1
+            let lines = try String(contentsOf: url, encoding: .utf8).split(separator: "\n", omittingEmptySubsequences: false)
+            for (index, line) in lines.enumerated()
+            where line.contains("WelcomeSheet") || line.contains("Welcome.Button") {
+                offenders.append("\(url.lastPathComponent):\(index + 1)")
+            }
+        }
+
+        #expect(scanned > 0, "no sources found under \(sources.path)")
+        #expect(offenders.isEmpty, "the welcome sheet lives on at \(offenders.joined(separator: ", "))")
+    }
+}
