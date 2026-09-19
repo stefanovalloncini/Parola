@@ -1,0 +1,107 @@
+import Foundation
+
+/// Drives the first-run introduction: which scene is on screen, whether it is on screen at all, and
+/// the one flag that remembers it was finished.
+@MainActor
+@Observable
+final class IntroductionController {
+    static let completionKey = "introductionComplete"
+    private static let welcomeKey = "hasSeenWelcome"
+
+    let steps: [IntroductionStep]
+
+    /// A launch that must never show the introduction on its own: a unit-test process, or a
+    /// test-mode instance that did not ask for it. An explicit `restart()` overrules it.
+    private(set) var isSuppressed: Bool
+
+    private(set) var isComplete: Bool
+    private(set) var step: IntroductionStep
+
+    /// Which way the last move went, so the stage can mirror its scene transition.
+    private(set) var isMovingBack = false
+
+    /// Set for this launch only, when something else (an opened URL) needs the main window.
+    var isDeferred = false
+
+    @ObservationIgnored private let defaults: UserDefaults
+
+    init(
+        defaults: UserDefaults,
+        mode: AppBootstrap.Mode,
+        showsInTestMode: Bool,
+        hasEngineChoice: Bool = true,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) {
+        self.defaults = defaults
+        self.steps = IntroductionStep.sequence(hasEngineChoice: hasEngineChoice)
+        self.isSuppressed = environment["XCTestConfigurationFilePath"] != nil
+            || (mode == .test && !showsInTestMode)
+
+        if defaults.object(forKey: Self.completionKey) == nil, defaults.bool(forKey: Self.welcomeKey) {
+            self.isComplete = true
+            defaults.set(true, forKey: Self.completionKey)
+        } else {
+            self.isComplete = defaults.bool(forKey: Self.completionKey)
+        }
+
+        var opening = steps[0]
+        #if DEBUG
+        if let name = environment["PAROLA_INTRODUCTION_STEP"],
+           let wanted = IntroductionStep(rawValue: name),
+           steps.contains(wanted) {
+            opening = wanted
+        }
+        #endif
+        self.step = opening
+    }
+
+    var isPresented: Bool { !isComplete && !isDeferred && !isSuppressed }
+
+    var stepIndex: Int { steps.firstIndex(of: step) ?? 0 }
+    var canGoBack: Bool { stepIndex > 0 }
+    var isLastStep: Bool { stepIndex == steps.count - 1 }
+
+    func advance() {
+        guard stepIndex + 1 < steps.count else { return }
+        isMovingBack = false
+        step = steps[stepIndex + 1]
+    }
+
+    func back() {
+        guard canGoBack else { return }
+        isMovingBack = true
+        step = steps[stepIndex - 1]
+    }
+
+    func skip() {
+        finish()
+    }
+
+    func finish() {
+        setComplete(true)
+        isMovingBack = false
+        step = steps[0]
+    }
+
+    func restart() {
+        setComplete(false)
+        isDeferred = false
+        isSuppressed = false
+        isMovingBack = false
+        step = steps[0]
+    }
+
+    func `defer`() {
+        isDeferred = true
+    }
+
+    /// Follows a Reset or an Import that rewrote the flag underneath us. Reads, never writes.
+    func reloadFromDefaults() {
+        isComplete = defaults.bool(forKey: Self.completionKey)
+    }
+
+    private func setComplete(_ value: Bool) {
+        isComplete = value
+        defaults.set(value, forKey: Self.completionKey)
+    }
+}
