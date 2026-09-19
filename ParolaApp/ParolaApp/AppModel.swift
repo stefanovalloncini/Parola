@@ -571,6 +571,7 @@ final class AppModel {
     @ObservationIgnored private var isReloadingSettings = false
     @ObservationIgnored private(set) var activeSideEffects: Set<BootstrapSideEffect> = []
     @ObservationIgnored let features: FeatureSet
+    @ObservationIgnored let introduction: IntroductionController
 
     private func themeKeySnapshot() -> [String] {
         [appTheme, appAccentRaw, String(themeIsCustom), themeCustomPaletteJSON]
@@ -647,6 +648,7 @@ final class AppModel {
         self.sparkleChannelRaw = defaults.string(forKey: "sparkleChannel") ?? SparkleChannel.stable.rawValue
         self.sparkleAutomatic = readBool("sparkleAutomatic", default: true)
         self.liveCaptionsTranslate = defaults.bool(forKey: "liveCaptionsTranslate")
+        introduction.reloadFromDefaults()
     }
 
     func reloadSettings() {
@@ -1267,6 +1269,11 @@ final class AppModel {
         self.defaults = defaults
         self.features = bootstrap.enabledFeaturesOverride.map(FeatureSet.init(enabled:))
             ?? FeatureSet.resolve(managed: ManagedConfiguration(storage: defaults))
+        self.introduction = IntroductionController(
+            defaults: defaults,
+            mode: bootstrap.mode,
+            showsInTestMode: bootstrap.showsIntroduction
+        )
         self.filePicker = bootstrap.filePicker
         self.mode = bootstrap.mode
         self.clock = bootstrap.clock

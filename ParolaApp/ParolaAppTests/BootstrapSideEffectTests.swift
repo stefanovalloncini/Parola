@@ -71,6 +71,16 @@ struct BootstrapSideEffectTests {
         #expect(ModelStore(modelsDirectory: bootstrap.models).directory.path == "/tmp/bar")
     }
 
+    @Test("--show-introduction is a bare flag the sandbox can pass")
+    func showIntroductionFlag() throws {
+        let asked = try #require(AppBootstrap.test(from: ["Parola", "--test-mode", "--show-introduction"]))
+        #expect(asked.showsIntroduction)
+
+        let silent = try #require(AppBootstrap.test(from: ["Parola", "--test-mode"]))
+        #expect(silent.showsIntroduction == false)
+        #expect(AppBootstrap.normal.showsIntroduction == false)
+    }
+
     @Test("AppBootstrap.test ignores unknown flags")
     func testIgnoresUnknownFlags() throws {
         let args = [

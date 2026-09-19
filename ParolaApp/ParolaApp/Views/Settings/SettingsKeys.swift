@@ -205,6 +205,7 @@ enum UnscopedSettingsKeys {
         "transcriptCompact", "transcriptDisplayMode",
         "mainWindowAlwaysOnTop", "pinnedModel",
         "liveCaptions.fontSize", "liveCaptions.opacity", "presenter.fontSize",
+        "introductionComplete",
     ]
 }
 

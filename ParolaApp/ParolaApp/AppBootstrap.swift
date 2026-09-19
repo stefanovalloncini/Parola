@@ -14,6 +14,8 @@ struct AppBootstrap: @unchecked Sendable {
     let clock: any Clock<Duration>  // `any Clock<Duration>` isn't Sendable-marked, but the clocks we hand out (ContinuousClock, TestClock, ImmediateClock) are all immutable, safe-to-share instances.
     let enabledFeaturesOverride: Set<ParolaFeature>?
     let fileReadDeadline: Duration
+    /// Test mode hides the first-run introduction; this flag is how a sandbox asks for it back.
+    let showsIntroduction: Bool
 
     init(
         mode: Mode,
@@ -25,7 +27,8 @@ struct AppBootstrap: @unchecked Sendable {
         filePicker: FilePicker,
         clock: any Clock<Duration> = ContinuousClock(),
         enabledFeaturesOverride: Set<ParolaFeature>? = nil,
-        fileReadDeadline: Duration = FileReadDeadline.header
+        fileReadDeadline: Duration = FileReadDeadline.header,
+        showsIntroduction: Bool = false
     ) {
         self.mode = mode
         self.library = library
@@ -37,6 +40,7 @@ struct AppBootstrap: @unchecked Sendable {
         self.clock = clock
         self.enabledFeaturesOverride = enabledFeaturesOverride
         self.fileReadDeadline = fileReadDeadline
+        self.showsIntroduction = showsIntroduction
     }
 
     static let normal: AppBootstrap = AppBootstrap(
@@ -59,7 +63,8 @@ struct AppBootstrap: @unchecked Sendable {
             clock: ContinuousClock(),
             enabledFeaturesOverride: map["--enabled-features"].map { raw in
                 Set(raw.split(separator: ",").compactMap { ParolaFeature(rawValue: String($0)) })
-            }
+            },
+            showsIntroduction: args.contains("--show-introduction")
         )
     }
 

@@ -234,3 +234,18 @@ struct IntroductionControllerTests {
         #expect(controller.isPresented)
     }
 }
+
+@MainActor
+@Suite("Introduction persistence keys")
+struct IntroductionSettingsKeyTests {
+
+    @Test("a full reset or backup covers the introduction flag")
+    func unscopedKeysCarryIt() {
+        #expect(UnscopedSettingsKeys.all.contains("introductionComplete"))
+    }
+
+    @Test("the bridge can write the introduction flag")
+    func bridgeCanWriteIt() {
+        #expect(ParolaAutomationServer.writableSettingKeys.contains("introductionComplete"))
+    }
+}
