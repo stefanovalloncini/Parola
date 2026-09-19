@@ -1,12 +1,16 @@
 import SwiftUI
 
+enum IntroductionLayout {
+    /// The usable width every scene lays its content out in. The page margins sit outside it, so a
+    /// scene can run a headline or an image edge to edge across exactly this much.
+    static let columnWidth: CGFloat = 720
+}
+
 /// The whole window during the first run: one scene at a time over the canvas, with the step dots
 /// and the navigation pills pinned to the bottom.
 struct IntroductionView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private static let columnWidth: CGFloat = 720
 
     var body: some View {
         let introduction = model.introduction
@@ -18,11 +22,10 @@ struct IntroductionView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .id(introduction.step)
                     .transition(sceneTransition(back: introduction.isMovingBack))
-                    .clipped()
                 IntroductionBottomBar()
             }
+            .frame(maxWidth: IntroductionLayout.columnWidth)
             .padding(DS.Spacing.xlarge)
-            .frame(maxWidth: Self.columnWidth)
         }
         .animation(sceneAnimation, value: introduction.step)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
