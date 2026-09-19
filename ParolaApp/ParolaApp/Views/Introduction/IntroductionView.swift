@@ -11,7 +11,8 @@ enum IntroductionLayout {
 struct IntroductionView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var demo = DemoPlayback()
+    // Held as an optional and filled on appear: a default value would open an AVAudioPlayer on every init.
+    @State private var playback: DemoPlayback?
 
     var body: some View {
         let introduction = model.introduction
@@ -30,6 +31,7 @@ struct IntroductionView: View {
         }
         .animation(sceneAnimation, value: introduction.step)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task { if playback == nil { playback = DemoPlayback() } }
         .axBranch("Introduction")
     }
 
@@ -37,7 +39,8 @@ struct IntroductionView: View {
     private func scene(_ step: IntroductionStep) -> some View {
         switch step {
         case .hello: HelloScene()
-        case .transcribe: TranscribeScene(demo: demo)
+        case .transcribe:
+            if let playback { TranscribeScene(demo: playback) }
         case .features: FeaturesScene()
         case .engine: EngineScene()
         case .ready: ReadyScene()
