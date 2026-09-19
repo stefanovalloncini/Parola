@@ -63,14 +63,7 @@ struct ModelCardRow: View {
     }
 
     private var iconTile: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                .fill(iconTint.opacity(0.15))
-            Image(systemName: iconName)
-                .font(DS.Font.title3)
-                .foregroundStyle(iconTint)
-        }
-        .frame(width: 34, height: 34)
+        ModelEngineIcon(engineID: variant.engineID)
     }
 
     @ViewBuilder
@@ -168,22 +161,6 @@ struct ModelCardRow: View {
         return result
     }
 
-    private var iconName: String {
-        switch variant.engineID {
-        case .parakeet: return "bird"
-        case .whisperKit: return "waveform"
-        default: return "cpu"
-        }
-    }
-
-    private var iconTint: Color {
-        switch variant.engineID {
-        case .parakeet: return .green
-        case .whisperKit: return DS.Color.accent
-        default: return .secondary
-        }
-    }
-
     private var borderColor: Color {
         if case .active = kind { return DS.Color.accent.opacity(0.55) }
         return DS.Color.separator.opacity(0.6)
@@ -197,6 +174,38 @@ struct ModelCardRow: View {
     private func progressPercent(_ value: Double) -> String {
         let clamped = max(0, min(1, value))
         return AppFormat.percent(clamped)
+    }
+}
+
+/// The tile a model wears wherever it is shown: one glyph and one tint per engine.
+struct ModelEngineIcon: View {
+    let engineID: EngineID
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                .fill(Self.tint(for: engineID).opacity(0.15))
+            Image(systemName: Self.symbol(for: engineID))
+                .font(DS.Font.title3)
+                .foregroundStyle(Self.tint(for: engineID))
+        }
+        .frame(width: 34, height: 34)
+    }
+
+    static func symbol(for engineID: EngineID) -> String {
+        switch engineID {
+        case .parakeet: return "bird"
+        case .whisperKit: return "waveform"
+        default: return "cpu"
+        }
+    }
+
+    static func tint(for engineID: EngineID) -> Color {
+        switch engineID {
+        case .parakeet: return .green
+        case .whisperKit: return DS.Color.accent
+        default: return .secondary
+        }
     }
 }
 
