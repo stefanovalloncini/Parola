@@ -1666,9 +1666,7 @@ final class AppModel {
                 // and an empty registry silently swaps in the generic HuggingFace downloader.
                 await ParolaCoreBootstrap.registerBuiltInEngines()
                 _ = try await store.download(variant: name, progress: progress)
-                // A file run parked on this download resumes into the phase: idle would hide it.
-                if fileTranscribeTask == nil { phase = .idle }
-                refreshModelList()
+                finishModelDownload()
             } catch {
                 if !Task.isCancelled {
                     let message = Self.offlineMessage(for: error)
@@ -1681,6 +1679,12 @@ final class AppModel {
             if !Task.isCancelled { downloadTask = nil }
         }
         return true
+    }
+
+    /// Hands the phase back only while it is still the download's: a run, a take or a batch owns it too.
+    func finishModelDownload() {
+        if !transcribeTaskRunning, batchTask == nil, case .downloadingModel = phase { phase = .idle }
+        refreshModelList()
     }
 
     func cancelModelDownload() {

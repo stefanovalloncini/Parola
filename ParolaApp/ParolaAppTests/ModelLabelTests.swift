@@ -322,4 +322,41 @@ struct DownloadCompletionPhaseTests {
 
         #expect(await waitUntil { model.phase == .idle })
     }
+
+    // The phases below are taken over mid-download, which no instant download can stage, so these
+    // drive the completion step the task runs.
+    @Test("a take that took the phase over is left alone")
+    func recordingSurvivesTheDownload() {
+        let model = makeModel()
+        model.phase = .recording(source: .microphone)
+
+        model.finishModelDownload()
+
+        #expect(model.phase == .recording(source: .microphone))
+    }
+
+    @Test("a run that finished a beat before the download keeps its ready phase")
+    func readyPhaseSurvivesTheDownload() {
+        let model = makeModel()
+        model.phase = .ready
+
+        model.finishModelDownload()
+
+        #expect(model.phase == .ready)
+    }
+
+    @Test("a batch job holding the phase keeps it")
+    func batchRunKeepsThePhase() {
+        let model = makeModel()
+        model.phase = .downloadingModel(name: installed, progress: 1)
+        model.batchTask = Task { try? await Task.sleep(for: .seconds(60)) }
+        defer {
+            model.batchTask?.cancel()
+            model.batchTask = nil
+        }
+
+        model.finishModelDownload()
+
+        #expect(model.phase == .downloadingModel(name: installed, progress: 1))
+    }
 }
