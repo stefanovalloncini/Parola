@@ -53,7 +53,7 @@ struct DemoClip {
     let audioURL: URL
 
     static func bundled(
-        preferredLanguages: [String] = Locale.preferredLanguages,
+        preferredLanguages: [String] = Bundle.main.preferredLocalizations,
         bundle: Bundle = .main
     ) -> DemoClip? {
         let code = preferredLanguages.first.flatMap { Locale(identifier: $0).language.languageCode?.identifier }
