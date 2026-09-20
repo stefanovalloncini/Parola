@@ -34,7 +34,7 @@ struct BatchJobList: View {
                 } label: {
                     Label("Add Files…", systemImage: "plus")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .controlSize(.regular)
                 .axLeaf("Queue.Button.AddFiles")
 

@@ -255,9 +255,7 @@ private struct AutoExportFormatChips: View {
                 Button(format.fileExtension) {
                     if isOn { selected.remove(format) } else { selected.insert(format) }
                 }
-                .buttonStyle(.bordered)
-                .tint(isOn ? DS.Color.accent : .secondary)
-                .controlSize(.small)
+                .buttonStyle(DSPillButtonStyle(kind: isOn ? .primary : .secondary, size: .compact))
                 .axLeaf("AutoExport.Button.Format.\(format.fileExtension)")
             }
         }

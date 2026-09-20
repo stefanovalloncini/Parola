@@ -4,6 +4,7 @@ import ParolaCore
 struct LabelsSection: View {
     @Environment(AppModel.self) private var model
     @State private var draftLabel: String = ""
+    @FocusState private var composerFocused: Bool
 
     private var entry: LibraryEntry? {
         guard let id = model.selectedEntryID else { return nil }
@@ -59,8 +60,9 @@ struct LabelsSection: View {
     private var composer: some View {
         HStack(spacing: 6) {
             TextField("Add label", text: $draftLabel)
-                .textFieldStyle(.roundedBorder)
-                .controlSize(.small)
+                .textFieldStyle(.plain)
+                .focused($composerFocused)
+                .fieldChrome(focused: composerFocused)
                 .onSubmit(addDraft)
                 .axLeaf("Labels.TextField.AddLabel")
             if !model.allKnownLabels.isEmpty {

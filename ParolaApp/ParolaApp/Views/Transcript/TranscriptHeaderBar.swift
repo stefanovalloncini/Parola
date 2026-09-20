@@ -12,6 +12,7 @@ struct TranscriptHeaderBar: View {
     @State private var outlineOpen = false
     @State private var jumpOpen = false
     @State private var jumpDraft = ""
+    @FocusState private var jumpFocused: Bool
     // Cached so `transcript.text` (a full-segment join) isn't rebuilt on every header re-render;
     // only recomputed when the transcript actually changes or the title changes.
     @State private var shareItem: TranscriptShareFile?
@@ -195,7 +196,9 @@ struct TranscriptHeaderBar: View {
             Text("Jump to time").font(DS.Font.caption).foregroundStyle(DS.Color.secondaryText)
             HStack(spacing: 6) {
                 TextField("mm:ss", text: $jumpDraft)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
+                    .focused($jumpFocused)
+                    .fieldChrome(focused: jumpFocused)
                     .frame(width: 100)
                     .onSubmit { commitJump() }
                     .axLeaf("HeaderBar.TextField.JumpTime")

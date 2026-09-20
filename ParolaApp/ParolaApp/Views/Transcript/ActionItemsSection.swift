@@ -36,7 +36,7 @@ struct ActionItemsSection: View {
     private var emptyRow: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             Button("Find Action Items") { model.extractActionItems() }
-                .buttonStyle(.bordered)
+                .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .controlSize(.small)
                 .disabled(!model.isAIAvailable)
                 .accessibilityIdentifier("transcript.inspector.actionItems")

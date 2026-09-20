@@ -3,6 +3,7 @@ import SwiftUI
 struct FormatInspector: View {
     @Environment(AppModel.self) private var model
     @State private var newSpeaker: String = ""
+    @FocusState private var speakerFocused: Bool
 
     private var displayMode: TranscriptDisplayMode {
         model.transcriptDisplayMode
@@ -14,7 +15,9 @@ struct FormatInspector: View {
 
             InspectorSection(title: "People") {
                 TextField("Add a speaker…", text: $newSpeaker)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
+                    .focused($speakerFocused)
+                    .fieldChrome(focused: speakerFocused)
                     .onSubmit { commitSpeaker() }
                     .axLeaf("Inspector.TextField.AddSpeaker")
             }

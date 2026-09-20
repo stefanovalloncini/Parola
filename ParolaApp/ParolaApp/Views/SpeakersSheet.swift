@@ -100,8 +100,9 @@ struct SpeakersSheet: View {
                 .font(DS.Font.bodyStrong)
                 .foregroundStyle(DS.Color.secondaryText)
             TextField("Rename", text: renameBinding(for: speaker))
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
                 .focused($focusedSpeaker, equals: speaker)
+                .fieldChrome(focused: focusedSpeaker == speaker)
                 .axLeaf("Speakers.TextField.Rename")
         }
     }
@@ -144,7 +145,7 @@ private struct FlowChips: View {
         ) {
             ForEach(items, id: \.self) { item in
                 Button(item) { onTap(item) }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .controlSize(.small)
                     .axLeaf("Speakers.Button.Suggestion")
             }
