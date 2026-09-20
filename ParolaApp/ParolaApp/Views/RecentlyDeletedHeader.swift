@@ -156,7 +156,6 @@ struct RecentlyDeletedHeader: View {
         }
         .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
         .disabled(model.deletedEntries.isEmpty)
-        .opacity(model.deletedEntries.isEmpty ? 0.5 : 1)
         .help("Delete every item in Recently Deleted")
         .axLeaf("Toolbar.Button.EmptyTrash")
     }

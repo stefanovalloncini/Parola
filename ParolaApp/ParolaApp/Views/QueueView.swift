@@ -44,7 +44,6 @@ struct QueueView: View {
                 }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                 .disabled(!hasFinishedJobs)
-                .opacity(hasFinishedJobs ? 1 : 0.5)
                 .axLeaf("Toolbar.Button.ClearFinished")
             }
         )

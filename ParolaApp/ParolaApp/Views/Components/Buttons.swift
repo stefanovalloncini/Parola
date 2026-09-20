@@ -14,6 +14,8 @@ struct DSPillButtonStyle: ButtonStyle {
     let kind: Kind
     var size: Size = .regular
 
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(DS.Font.bodyStrong)
@@ -27,7 +29,7 @@ struct DSPillButtonStyle: ButtonStyle {
                     Capsule().strokeBorder(DS.Color.separator, lineWidth: 0.5)
                 }
             }
-            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1.0) : 0.4)
             .contentShape(Capsule())
     }
 
