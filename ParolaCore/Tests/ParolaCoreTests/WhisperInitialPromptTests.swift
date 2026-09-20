@@ -102,6 +102,19 @@ struct WhisperInitialPromptTests {
         #expect((own as? TextDecoder) !== shared)
     }
 
+    @Test("a run that transcribed nothing but the prompt back returns nothing")
+    func thePromptEchoIsDropped() {
+        let echo = [segment("  parola ")]
+        #expect(WhisperKitTranscriber.droppingPromptEcho(echo, prompt: "Parola").isEmpty)
+        #expect(WhisperKitTranscriber.droppingPromptEcho(echo, prompt: nil).count == 1)
+        #expect(WhisperKitTranscriber.droppingPromptEcho([segment("Parola is an app.")], prompt: "Parola").count == 1)
+        #expect(
+            WhisperKitTranscriber.droppingPromptEcho(
+                [segment("Parola"), segment("Parola")], prompt: "Parola"
+            ).count == 2
+        )
+    }
+
     @Test("the prefill a prompt-free run samples after is four tokens, or two without language and task")
     func prefillLengthFollowsTheModel() {
         #expect(unpromptedPrefillLength(isModelMultilingual: true) == 4)
@@ -109,6 +122,10 @@ struct WhisperInitialPromptTests {
     }
 
     // MARK: - Fixtures
+
+    private func segment(_ text: String) -> TranscriptSegment {
+        TranscriptSegment(id: 0, start: 0, end: 1, text: text)
+    }
 
     private var unpromptedPrefill: [Int] {
         let tokens = SpecialTokens.stub

@@ -186,9 +186,17 @@ actor WhisperKitTranscriber: Transcriber {
             }
         }
 
+        let kept = Self.droppingPromptEcho(segments, prompt: options.initialPrompt)
+        if kept.count != segments.count {
+            ParolaLog.info(
+                .engineWhisperKit, "dropped a transcript that was only the prompt read back",
+                [.model: .safe(ModelToken(modelName))]
+            )
+        }
+
         // durationSeconds comes from the source asset, not the engine: TranscriptionSession fills it in.
         return Transcript(
-            segments: segments.chronologicallyOrdered(),
+            segments: kept.chronologicallyOrdered(),
             language: detectedLanguage,
             modelName: modelName,
             sourceURL: url,
@@ -199,6 +207,13 @@ actor WhisperKitTranscriber: Transcriber {
                 canDetect: kit.textDecoder.isModelMultilingual
             )
         )
+    }
+
+    /// A prompted run over silence comes back with the prompt itself as its only segment, and
+    /// nothing downstream catches it: WhisperKit's no-speech probability is hard-coded to zero.
+    static func droppingPromptEcho(_ segments: [TranscriptSegment], prompt: String?) -> [TranscriptSegment] {
+        guard let prompt, segments.count == 1 else { return segments }
+        return IgnoredSegments.apply(rules: [IgnoredSegmentRule(pattern: prompt)], to: segments)
     }
 
     /// Leans on WhisperKit's own silence/fallback defaults rather than restating them here — see

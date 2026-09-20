@@ -94,9 +94,10 @@ struct EngineLoggingTests {
             #"ParolaLog.error( .engineWhisperKit, "engine returned no results", Self.emptyResultFields(model: modelName, url: url)"#,
             #"ParolaLog.error( .engineWhisperKit, "engine returned an empty result set", Self.emptyResultFields(model: modelName, url: url)"#,
             #"ParolaLog.info( .engineWhisperKit, "language probe inconclusive", [.count: .int(readings.count)]"#,
+            #"ParolaLog.info( .engineWhisperKit, "dropped a transcript that was only the prompt read back", [.model: .safe(ModelToken(modelName))]"#,
             #"fields[.audioSeconds] = .seconds(seconds)"#,
         ], in: source)
-        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 7)
+        #expect(source.components(separatedBy: "ParolaLog.").count - 1 == 8)
     }
 
     @Test("the parakeet engine logs load, rejection, transcribe and download failures")
