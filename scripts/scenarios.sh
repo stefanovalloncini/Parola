@@ -8,9 +8,10 @@
 #                     back through the BlackHole virtual device. Never a CI gate.
 #   --keep            Leave the run's sandbox directories behind and print where they are.
 #
-# Every run, --real included, gets its own library, defaults domain and home directory under /tmp
-# and never reads or writes the real ones — the scenarios wipe the library they are pointed at. The
-# app and the test process share the same fake home, which is how the tests find the sandboxed
+# Every run, --real included, gets its own library, defaults domain and home directory under /tmp —
+# the scenarios wipe the library they are pointed at. It never touches your library or your
+# settings; the run's own defaults suite lands next to your domains and is deleted on the way out.
+# The app and the test process share the same fake home, which is how the tests find the sandboxed
 # bridge. --mock also gets an empty models folder and downloads nothing; --real reads the models
 # folder you already use, so it needs openai_whisper-tiny installed and never writes there. On the
 # way out only the instance this script launched is killed, so a Parola running next to it is left
@@ -49,6 +50,12 @@ cleanup() {
   fi
   if [ -n "$APP_PID" ]; then
     kill "$APP_PID" 2>/dev/null || true
+    # cfprefsd flushes the dying instance's suite, so the plist removal below has to follow its exit.
+    wait "$APP_PID" 2>/dev/null || true
+    for _ in $(seq 1 40); do
+      if ! kill -0 "$APP_PID" 2>/dev/null; then break; fi
+      sleep 0.25
+    done
   else
     pgrep -f -- "--library=$SANDBOX/library" 2>/dev/null | while read -r pid; do
       kill "$pid" 2>/dev/null || true
@@ -157,9 +164,11 @@ fi
 
 echo "Running scenarios…"
 RUN_STATUS=0
-# The same fake home is how the test process finds the sandboxed bridge's port file.
+# The same fake home is how the test process finds the sandboxed bridge's port file; the cache path
+# is spelled out because that home would otherwise hide SwiftPM's own cache from every run.
 (cd ParolaCore && CFFIXED_USER_HOME="$FAKEHOME" PAROLA_RUN_SCENARIOS=1 \
-  PAROLA_SCENARIO_BACKEND="$BACKEND" swift test --filter ScenarioTests) || RUN_STATUS=$?
+  PAROLA_SCENARIO_BACKEND="$BACKEND" \
+  swift test --cache-path "$REAL_HOME/Library/Caches/org.swift.swiftpm" --filter ScenarioTests) || RUN_STATUS=$?
 
 # --real: grab a screenshot for the demo log (best-effort; never fails the run).
 if [ "$MODE" = "--real" ]; then
