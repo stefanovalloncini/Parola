@@ -209,8 +209,7 @@ struct LibraryListContentTests {
         #expect(await rowHeight(density: "comfortable", style: .list) == titleOnly)
     }
 
-    /// A labelled row is the row that says the most about itself; a chip taller than the title line would
-    /// pay for itself with the second line of the excerpt.
+    /// A chip taller than the title line would pay for itself with the excerpt's second line.
     @Test("label chips leave the excerpt the same room as a row without them")
     func labelChipsDoNotShortenTheExcerpt() async {
         let excerpt = String(repeating: "parola ", count: 60)

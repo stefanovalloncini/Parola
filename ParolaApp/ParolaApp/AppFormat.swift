@@ -42,8 +42,7 @@ enum AppFormat {
         fraction.formatted(.percent.precision(.fractionLength(fractionDigits)).locale(locale))
     }
 
-    /// Every span on screen, in one form: the largest two units that carry meaning, abbreviated the
-    /// way the locale abbreviates them. Rounds to whole seconds, so a shorter span reads "<1 sec".
+    /// Every span on screen: the largest two units that carry meaning, abbreviated the way the locale does.
     static func duration(seconds: Double, locale: Locale = AppFormat.locale) -> String {
         let total = Int(max(0, seconds).rounded())
         guard total > 0 else {

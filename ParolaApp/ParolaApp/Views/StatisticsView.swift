@@ -168,8 +168,7 @@ struct StatisticsView: View {
     }
 }
 
-/// What the page draws: the numbers, the empty state, or — for the pass before `compute` has run —
-/// nothing at all, since an empty state there would flash on every visit to a full library.
+/// What the page draws; nothing at all before `compute` has run, so the empty state can't flash on a full library.
 enum StatisticsPageState: Equatable {
     case empty
     case waiting

@@ -299,8 +299,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         }
     }
 
-    /// Sized to the text, not to `Chip.Size`: a 24 pt chip on a 16 pt title line takes its 8 pt out of the
-    /// excerpt below. On a selected row the accent fill is the backdrop, so the chip wears a veil of the foreground.
+    /// Sized to the text so it doesn't steal the excerpt's line, and veiled in the foreground so it reads on a selected row's accent fill.
     private func chip(_ label: Text) -> some View {
         label
             .font(DS.Font.caption)

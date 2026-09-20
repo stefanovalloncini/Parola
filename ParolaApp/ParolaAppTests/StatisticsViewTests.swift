@@ -62,8 +62,7 @@ struct StatisticsViewTests {
         return names
     }
 
-    /// Seeded through the view's own init: the `.task` that fills `stats` in the app cannot run inside a
-    /// synchronous test body, so hosting the route would measure the empty state instead of the page.
+    /// Seeded through the view's own init: the `.task` that fills `stats` can't run inside a synchronous test body.
     private func populated() -> LibraryStatistics {
         LibraryStatistics.compute(
             entries: [
@@ -92,8 +91,7 @@ struct StatisticsViewTests {
         }
     }
 
-    /// The seed used to be `.empty`, so the first frame of the route cross-fade was the empty state — on a
-    /// library of 400 entries as much as on an empty one.
+    /// The seed used to be `.empty`, so the route's first cross-fade frame was the empty state on a full library too.
     @Test("a library with entries waits for its numbers instead of claiming there are none")
     func populatedLibraryDoesNotFlashTheEmptyState() {
         let stats = populated()

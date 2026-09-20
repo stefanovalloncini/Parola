@@ -47,8 +47,7 @@ enum BatchJobStatus {
     }
 }
 
-/// What the ✕ on a row means, which is not the same on both pages: the Queue cancels the run, the Batch page
-/// cancels the one file.
+/// What a row's ✕ means: the Queue cancels the run, the Batch page cancels the one file.
 struct JobCancelAction {
     let help: LocalizedStringKey
     let axID: String

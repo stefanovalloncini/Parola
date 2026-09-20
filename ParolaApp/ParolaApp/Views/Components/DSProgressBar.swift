@@ -21,8 +21,7 @@ struct DSProgressBar: View {
                 Capsule(style: .continuous)
                     .fill(DS.Palette.subtleFill)
                 if let fraction {
-                    // The animation rides the fraction, not the bar's width: a layout change around a running
-                    // job (the export pane opening) would otherwise interpolate the geometry too.
+                    // The animation rides the fraction, not the bar's width, so a layout change can't interpolate the geometry too.
                     Capsule(style: .continuous)
                         .fill(resolvedFill)
                         .frame(width: geometry.size.width * fraction)

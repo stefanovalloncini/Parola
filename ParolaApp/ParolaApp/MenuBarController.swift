@@ -382,8 +382,7 @@ final class MenuBarController: NSObject {
 }
 
 extension MenuBarController: NSMenuDelegate {
-    /// CoreAudio device attach/detach isn't Observation-tracked, so the picker re-scans on open;
-    /// the cached list opens instantly, the fresh scan lands a moment later.
+    /// CoreAudio device attach/detach isn't Observation-tracked, so the picker re-scans on open.
     func menuWillOpen(_ menu: NSMenu) {
         guard let model else { return }
         installMicrophoneSubmenu(devices: lastInputDevices, into: menu, selectedUID: model.inputDeviceUID)
