@@ -8,11 +8,13 @@
 #                     back through the BlackHole virtual device. Never a CI gate.
 #   --keep            Leave the run's sandbox directories behind and print where they are.
 #
-# Every run, --real included, gets its own library, models folder, defaults domain and home
-# directory under /tmp and never reads or writes the real ones — the scenarios wipe the library
-# they are pointed at. The app and the test process share the same fake home, which is how the
-# tests find the sandboxed bridge. On the way out only the instance this script launched is
-# killed, so a Parola running next to it is left alone.
+# Every run, --real included, gets its own library, defaults domain and home directory under /tmp
+# and never reads or writes the real ones — the scenarios wipe the library they are pointed at. The
+# app and the test process share the same fake home, which is how the tests find the sandboxed
+# bridge. --mock also gets an empty models folder and downloads nothing; --real reads the models
+# folder you already use, so it needs openai_whisper-tiny installed and never writes there. On the
+# way out only the instance this script launched is killed, so a Parola running next to it is left
+# alone.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -29,6 +31,7 @@ done
 DD="/tmp/parola-scenario-dd"
 TAG="scenario-$$"
 SANDBOX="/tmp/parola-$TAG"
+REAL_HOME="$HOME"  # captured before anything is handed the fake one
 FAKEHOME="/tmp/parola-$TAG-home"
 PORT_FILE="$FAKEHOME/Library/Caches/Parola/bridge.port"
 APP_LOG="$SANDBOX/app.log"
@@ -101,13 +104,28 @@ BANNER
   fi
 fi
 
+mkdir -p "$SANDBOX" "$FAKEHOME/Library/Caches"
+
+MODELS="$SANDBOX/models"
+if [ "$MODE" = "--real" ]; then
+  # The live pipeline needs weights on disk, so it reads the ones you already have. Asked of the
+  # CLI rather than spelled out here, so the storage-override logic is the app's, not a guess.
+  if [ ! -x ParolaCore/.build/debug/parola ]; then
+    swift build --package-path ParolaCore --product parola >/dev/null
+  fi
+  MODELS="$(HOME="$REAL_HOME" ParolaCore/.build/debug/parola models path)"
+  [ -n "$MODELS" ] || { echo "could not resolve the models folder"; exit 1; }
+  echo "Models (read-only): $MODELS"
+else
+  mkdir -p "$MODELS"
+fi
+
 LAUNCH_ARGS+=(
   --library="$SANDBOX/library"
-  --models="$SANDBOX/models"
+  --models="$MODELS"
   --defaults-suite="$SUITE"
 )
 
-mkdir -p "$SANDBOX" "$SANDBOX/models" "$FAKEHOME/Library/Caches"
 echo "Sandbox: $SANDBOX (home $FAKEHOME)"
 # `open` cannot hand the app a fake home, and the pid is what the cleanup kills.
 CFFIXED_USER_HOME="$FAKEHOME" "$APP/Contents/MacOS/Parola" "${LAUNCH_ARGS[@]}" >"$APP_LOG" 2>&1 &
