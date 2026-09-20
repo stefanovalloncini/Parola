@@ -135,7 +135,7 @@ Rows named without the `parola_app_` prefix are raw bridge commands, called thro
 2. Claude Code picks up the server from `.mcp.json` on the next session. For ad-hoc testing, run `parola-mcp` directly over stdio.
 3. Call `parola_app_dispatch` with `{ "command": "ping" }` first. If it returns `pong`, the rest works.
 
-`scripts/scenarios.sh` drives the same bridge without a build of your own. It builds the app, launches it against a throwaway library, models folder, defaults domain and home directory under `/tmp`, runs `ScenarioTests` against that instance, and kills only the process it launched — a Parola you already have open is left alone, and the scenarios never see your real library. Add `--keep` after the mode to leave the sandbox behind; the script prints where it is. `--real` gets the same isolation.
+`scripts/scenarios.sh` drives the same bridge without a build of your own. It builds the app, launches it against a throwaway library, defaults domain and home directory under `/tmp`, runs `ScenarioTests` against that instance, and kills only the process it launched — a Parola you already have open is left alone, and the scenarios never see your real library. Add `--keep` after the mode to leave the sandbox behind; the script prints where it is. `--mock` also gets a throwaway models folder and downloads nothing. `--real` drives the live pipeline, so it reads the models folder you already use: nothing there is deleted, but a missing tiny model is downloaded into it. Its library, defaults suite and home are isolated like every other run's.
 
 End-to-end example. Transcribe a YouTube URL and read the result back:
 
