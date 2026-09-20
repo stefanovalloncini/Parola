@@ -13,7 +13,9 @@
 # room, one take, no music, and say the placeholder words — the transcript the introduction types
 # out is whatever the CLI hears, so a clean take is the whole trick. With --text each word the model
 # heard takes the casing and punctuation of the reference word it matches, and the count of matches
-# is printed; without it the only edit is the app's name, written "Parola" wherever it is heard.
+# is printed — write the reference the way it should read on screen, since that is what ships, and
+# never paste the placeholder's "Par-ola", which is only there for `say`. Without --text the only
+# edit is the app's name, written "Parola" wherever it is heard.
 #
 # Both files land in ParolaApp/ParolaApp/Resources/Introduction/ and are committed. Re-running
 # overwrites them.

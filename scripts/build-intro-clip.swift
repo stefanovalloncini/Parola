@@ -115,19 +115,35 @@ func comparable(_ word: String) -> String {
     String(String.UnicodeScalarView(word.lowercased().unicodeScalars.filter(CharacterSet.alphanumerics.contains)))
 }
 
+/// The app's name ships as one word, so `say`'s "Par-ola" never lands; the reference keeps its casing.
+func shippingSpelling(_ token: String) -> String {
+    guard comparable(token) == comparable("Parola") else { return token }
+    let head = String(token.prefix { !($0.isLetter || $0.isNumber) })
+    let tail = String(token.reversed().prefix { !($0.isLetter || $0.isNumber) }.reversed())
+    let letters = String(token.dropFirst(head.count).dropLast(tail.count).filter { $0.isLetter || $0.isNumber })
+    return head + letters + tail
+}
+
 /// Gives each word the casing and punctuation of the reference word it matches, with a look-ahead.
-func aligned(_ words: [DemoWord], to reference: String) -> (words: [DemoWord], matched: Int) {
-    let referenceWords = reference.split(whereSeparator: \.isWhitespace).map(String.init)
+func aligned(_ words: [DemoWord], to referenceWords: [String]) -> (words: [DemoWord], matched: Int) {
     var cursor = 0
     var matched = 0
     let rewritten = words.map { word -> DemoWord in
         let heard = comparable(word.text)
         guard !heard.isEmpty else { return word }
+        let rest = cursor..<referenceWords.count
         let window = cursor..<min(cursor + alignmentLookAhead, referenceWords.count)
-        guard let hit = window.first(where: { comparable(referenceWords[$0]) == heard }) else { return word }
+        var hit = window.first { comparable(referenceWords[$0]) == heard }
+        if hit == nil {
+            // A skipped clause is longer than the look-ahead: jump to the word only if it is the
+            // one candidate left, so a "the" further on cannot drag the rest of the clip with it.
+            let candidates = rest.filter { comparable(referenceWords[$0]) == heard }
+            hit = candidates.count == 1 ? candidates.first : nil
+        }
+        guard let hit else { return word }
         cursor = hit + 1
         matched += 1
-        return DemoWord(text: referenceWords[hit], start: word.start, end: word.end)
+        return DemoWord(text: shippingSpelling(referenceWords[hit]), start: word.start, end: word.end)
     }
     return (rewritten, matched)
 }
@@ -227,8 +243,10 @@ while let argument = arguments.first {
         Usage: scripts/build-intro-clip.sh <en|it> [recording] [--voice NAME] [--text "what the take says"]
 
         --text gives the words their casing and punctuation: each transcribed word takes the
-        reference word it matches, and anything unmatched keeps what the model heard. Without it
-        the only edit is the app's name, which is written "Parola" wherever it is heard.
+        reference word it matches, and anything unmatched keeps what the model heard. Write it the
+        way it should read on screen — the reference is what ships, so never paste the placeholder's
+        "Par-ola", which is only there for `say`. Without --text the only edit is the app's name,
+        which is written "Parola" wherever it is heard.
         """)
         exit(0)
     default:
@@ -279,12 +297,16 @@ words = words.map {
     )
 }
 words.sort { $0.start < $1.start }
-if let referenceText {
-    let alignment = aligned(words, to: referenceText)
+let referenceWords = (referenceText ?? "")
+    .split(whereSeparator: \.isWhitespace)
+    .map(String.init)
+    .filter { !comparable($0).isEmpty }
+if referenceWords.isEmpty {
+    words = words.map { DemoWord(text: capitalisingAppName($0.text), start: $0.start, end: $0.end) }
+} else {
+    let alignment = aligned(words, to: referenceWords)
     words = alignment.words
     print("aligned \(alignment.matched) of \(words.count) words to the reference text")
-} else {
-    words = words.map { DemoWord(text: capitalisingAppName($0.text), start: $0.start, end: $0.end) }
 }
 
 let script = DemoScriptFile(
