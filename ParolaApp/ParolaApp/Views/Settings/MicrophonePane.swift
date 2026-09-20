@@ -55,20 +55,18 @@ struct MicrophonePane: View {
                 }
                 SettingRow("Auto-stop after",
                            description: "Stops a microphone or system-audio recording and transcribes it once this many minutes pass.") {
-                    HStack(spacing: 6) {
-                        Picker("", selection: $model.recordingMaxMinutes) {
-                            Text("Never").tag(0)
-                            Text("5 min").tag(5)
-                            Text("15 min").tag(15)
-                            Text("30 min").tag(30)
-                            Text("60 min").tag(60)
-                            Text("120 min").tag(120)
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
-                        .frame(width: 120, alignment: .trailing)
-                        .axLeaf("Microphone.Picker.AutoStop")
+                    Picker("", selection: $model.recordingMaxMinutes) {
+                        Text("Never").tag(0)
+                        Text("5 min").tag(5)
+                        Text("15 min").tag(15)
+                        Text("30 min").tag(30)
+                        Text("60 min").tag(60)
+                        Text("120 min").tag(120)
                     }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 140, alignment: .trailing)
+                    .axLeaf("Microphone.Picker.AutoStop")
                 }
                 SettingRow("Count-in",
                            description: "Counts down in the main window before recording starts. Press Esc to cancel.") {

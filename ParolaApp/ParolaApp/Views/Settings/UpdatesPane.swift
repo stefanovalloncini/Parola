@@ -32,6 +32,7 @@ struct UpdatesPane: View {
                     Button("Check for Updates…") {
                         SparkleUpdater.shared.checkForUpdates()
                     }
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .disabled(!feedConfigured)
                     .axLeaf("Updates.Button.CheckNow")
                 }

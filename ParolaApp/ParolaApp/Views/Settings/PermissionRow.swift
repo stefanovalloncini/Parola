@@ -20,6 +20,7 @@ struct PermissionRow: View {
                     .foregroundStyle(DS.Color.secondaryText)
                 if !granted {
                     Button(actionLabel, action: action)
+                        .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                         .axLeaf(axID)
                 }
             }

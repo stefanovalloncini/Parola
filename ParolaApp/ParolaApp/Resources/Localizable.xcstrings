@@ -10912,17 +10912,6 @@
         }
       }
     },
-    "Whether captions are running right now.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Se i sottotitoli sono attivi in questo momento."
-          }
-        }
-      }
-    },
     "Which input Parola records from, and what happens while recording.": {
       "extractionState": "manual",
       "localizations": {

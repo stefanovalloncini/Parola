@@ -59,6 +59,7 @@ struct BatchExportSettingsPane: View {
                             break
                         }
                     }
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf("BatchExport.Button.OpenBatch")
                 }
             }
