@@ -54,6 +54,17 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
         self.deviceUID = deviceUID
     }
 
+    /// A decoder of our own over the borrowed model, so this session's logits filters never land on
+    /// the cached kit. Every other `TextDecoder` member is derived from `model`.
+    static func ownDecoder(borrowing shared: any TextDecoding, tokenizer: WhisperTokenizer) -> any TextDecoding {
+        guard let shared = shared as? TextDecoder else { return shared }
+        let own = TextDecoder()
+        own.model = shared.model
+        own.tokenizer = tokenizer
+        own.isModelMultilingual = shared.isModelMultilingual
+        return own
+    }
+
     static func resolveInputDeviceID(uid: String?) -> DeviceID? {
         #if os(macOS)
         guard let uid, !uid.isEmpty else { return nil }
@@ -114,11 +125,14 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             withoutTimestamps: false,
             wordTimestamps: options.wordTimestamps
         )
-        kit.textDecoder.logitsFilters = applyInitialPrompt(
+        // Decoding for this session only: logits filters are per-run state and the cached kit's
+        // decoder is shared with every other session borrowing the same model.
+        var textDecoder = Self.ownDecoder(borrowing: kit.textDecoder, tokenizer: tokenizer)
+        textDecoder.logitsFilters = applyInitialPrompt(
             options.initialPrompt,
             to: &decoding,
             tokenizer: tokenizer,
-            isModelMultilingual: kit.textDecoder.isModelMultilingual
+            isModelMultilingual: textDecoder.isModelMultilingual
         )
 
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(256))
@@ -136,7 +150,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             audioEncoder: kit.audioEncoder,
             featureExtractor: kit.featureExtractor,
             segmentSeeker: kit.segmentSeeker,
-            textDecoder: kit.textDecoder,
+            textDecoder: textDecoder,
             tokenizer: tokenizer
         )
         let persister = persistAudio ? StreamingAudioPersister(sampleRate: Double(WhisperKit.sampleRate)) : nil

@@ -86,6 +86,22 @@ struct WhisperInitialPromptTests {
         #expect(values[SpecialTokens.stub.whitespaceToken] == -.infinity)
     }
 
+    @Test("a streaming session installs its filters on a decoder of its own")
+    func theStreamingSessionLeavesTheCachedDecoderAlone() {
+        let shared = TextDecoder()
+        shared.isModelMultilingual = true
+        var own = StreamingTranscriptionSession.ownDecoder(borrowing: shared, tokenizer: StubTokenizer())
+        var decoding = DecodingOptions()
+        own.logitsFilters = applyInitialPrompt(
+            "Parola", to: &decoding, tokenizer: StubTokenizer(), isModelMultilingual: own.isModelMultilingual
+        )
+
+        #expect(own.logitsFilters?.count == 2)
+        #expect(shared.logitsFilters?.isEmpty == true)
+        #expect(own.isModelMultilingual)
+        #expect((own as? TextDecoder) !== shared)
+    }
+
     @Test("the prefill a prompt-free run samples after is four tokens, or two without language and task")
     func prefillLengthFollowsTheModel() {
         #expect(unpromptedPrefillLength(isModelMultilingual: true) == 4)

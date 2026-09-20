@@ -2,8 +2,10 @@ import Foundation
 import os
 @preconcurrency import WhisperKit
 
-// Safe because borrowers only read model components off the kit; concurrent reads match what
-// WhisperKit's own transcribe TaskGroup does when concurrentWorkerCount > 1.
+// Safe because borrowers only read model components off the kit — a session that needs per-run
+// decoder state builds its own TextDecoder over the borrowed model rather than writing to this
+// one; concurrent reads match what WhisperKit's own transcribe TaskGroup does when
+// concurrentWorkerCount > 1.
 struct SharedWhisperKit: @unchecked Sendable {
     let kit: WhisperKit
 }

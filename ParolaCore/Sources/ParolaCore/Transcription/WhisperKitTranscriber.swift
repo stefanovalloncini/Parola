@@ -95,6 +95,8 @@ actor WhisperKitTranscriber: Transcriber {
         try Task.checkCancellation()
         let pin = WhisperLanguagePin.resolve(requested: options.language, probed: probed)
         var decoding = Self.decodingOptions(for: options, pin: pin)
+        // This transcriber owns its kit, but a run abandoned after a cancel can still be decoding
+        // against the same decoder while the run that took its slot installs these.
         kit.textDecoder.logitsFilters = applyInitialPrompt(
             options.initialPrompt,
             to: &decoding,
