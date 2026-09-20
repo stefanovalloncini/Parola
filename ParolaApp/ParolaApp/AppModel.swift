@@ -3117,8 +3117,8 @@ final class AppModel {
             self.phase = .exporting(progress: 0)
             let startedAt = ContinuousClock.now
             do {
-                try await burn(transcript, videoURL, outputURL, style) { fraction in
-                    Task { @MainActor [weak self] in
+                try await burn(transcript, videoURL, outputURL, style) { [weak self] fraction in
+                    Task { @MainActor in
                         guard let self, case .exporting = self.phase else { return }
                         self.phase = .exporting(progress: fraction)
                     }

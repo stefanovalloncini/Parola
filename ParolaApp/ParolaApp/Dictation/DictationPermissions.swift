@@ -104,8 +104,8 @@ final class DictationPermissions {
     }
 
     func requestMicrophone() {
-        AVCaptureDevice.requestAccess(for: .audio) { _ in
-            Task { @MainActor [weak self] in self?.refresh() }
+        AVCaptureDevice.requestAccess(for: .audio) { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
         }
     }
 

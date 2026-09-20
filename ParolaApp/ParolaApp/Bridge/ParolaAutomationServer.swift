@@ -104,8 +104,8 @@ final class ParolaAutomationServer {
 
     func start(onPortReady: (@MainActor (UInt16) -> Void)? = nil) {
         self.onPortReady = onPortReady
-        listener.stateUpdateHandler = { state in
-            Task { @MainActor [weak self] in
+        listener.stateUpdateHandler = { [weak self] state in
+            Task { @MainActor in
                 guard let self else { return }
                 if case .ready = state, let port = self.listener.port {
                     let portString = "\(port.rawValue)"
@@ -130,8 +130,8 @@ final class ParolaAutomationServer {
                 }
             }
         }
-        listener.newConnectionHandler = { conn in
-            Task { @MainActor [weak self] in
+        listener.newConnectionHandler = { [weak self] conn in
+            Task { @MainActor in
                 self?.accept(conn)
             }
         }
@@ -154,10 +154,10 @@ final class ParolaAutomationServer {
     private func accept(_ conn: NWConnection) {
         let key = ObjectIdentifier(conn)
         connections[key] = conn
-        conn.stateUpdateHandler = { state in
+        conn.stateUpdateHandler = { [weak self] state in
             switch state {
             case .failed, .cancelled:
-                Task { @MainActor [weak self] in
+                Task { @MainActor in
                     self?.connectionTasks.removeValue(forKey: key)?.cancel()
                     self?.connections.removeValue(forKey: key)
                 }

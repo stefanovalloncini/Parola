@@ -48,6 +48,7 @@ struct EngineStreamsPartialsTests {
 }
 
 @Suite("Preparing label stage gate")
+@MainActor
 struct PreparingStageGateTests {
     private func makeIsolatedDefaults() -> UserDefaults {
         temporaryDefaults()
@@ -74,7 +75,7 @@ struct PreparingStageGateTests {
     }
 
     @Test("stage reports drive AppModel.fileTranscribeStage")
-    @MainActor func modelTracksStages() {
+    func modelTracksStages() {
         let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: makeTempLibraryURL("stage"))
         #expect(model.fileTranscribeStage == nil)
         model.fileTranscribeStage = .preparingAudio

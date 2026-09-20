@@ -63,10 +63,10 @@ final class MeetingDetector {
                 forName: name,
                 object: nil,
                 queue: .main
-            ) { note in
+            ) { [weak self] note in
                 let bundleID = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier
                 guard let bundleID, let display = MeetingDetector.knownMeetingApps[bundleID] else { return }
-                Task { @MainActor [weak self] in
+                Task { @MainActor in
                     if isLaunch { self?.snoozedApps.remove(display) }
                     self?.fire(appName: display)
                 }
