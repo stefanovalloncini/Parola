@@ -262,7 +262,7 @@ private struct VUMeter: View {
     private func color(for idx: Int, lit: Bool) -> Color {
         if !lit { return Color.primary.opacity(0.10) }
         let fraction = Float(idx) / Float(Self.segments - 1)
-        if fraction > 0.85 { return Color.red }
+        if fraction > 0.85 { return DS.Color.danger }
         if fraction > 0.65 { return DS.Palette.warning }
         return DS.Palette.success
     }

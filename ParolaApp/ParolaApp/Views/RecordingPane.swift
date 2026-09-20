@@ -131,7 +131,7 @@ struct RecordingCard: View {
                     .foregroundStyle(.white)
                     .frame(width: 120, height: 36)
                     .background(
-                        Capsule().fill(Color.red.opacity(0.9))
+                        Capsule().fill(DS.Color.danger.opacity(0.9))
                     )
             }
             .buttonStyle(.plain)

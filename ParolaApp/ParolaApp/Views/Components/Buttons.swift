@@ -78,7 +78,7 @@ struct DSIconChipButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(DS.Font.bodyStrong)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(DS.Color.secondaryText)
             .padding(.horizontal, fitsLabel ? DS.Spacing.snug : 0)
             .frame(width: fitsLabel ? nil : side, height: side)
             .background(

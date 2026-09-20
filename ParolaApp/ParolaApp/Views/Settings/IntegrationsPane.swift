@@ -38,7 +38,7 @@ private struct ToolStatusRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: available ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                        .foregroundStyle(available ? Color.green : Color.orange)
+                        .foregroundStyle(available ? DS.Palette.success : DS.Palette.warning)
                     Text(verbatim: name).font(DS.Font.bodyStrong)
                     Text(available ? "Installed" : "Not installed")
                         .font(DS.Font.secondary)

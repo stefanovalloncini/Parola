@@ -29,7 +29,7 @@ struct ContentToolbar: ToolbarContent {
                 } label: {
                     Label("Stop", systemImage: "stop.fill")
                 }
-                .tint(.red)
+                .tint(DS.Color.danger)
                 .help("Stop recording and transcribe.")
                 .accessibilityIdentifier("toolbar.stopRecording")
                 .axLeaf("Toolbar.Button.StopRecording")

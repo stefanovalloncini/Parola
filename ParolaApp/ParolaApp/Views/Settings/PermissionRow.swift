@@ -13,7 +13,7 @@ struct PermissionRow: View {
         SettingRow(titleVerbatim: title, descriptionVerbatim: detail, isFirst: isFirst) {
             HStack(spacing: 8) {
                 Circle()
-                    .fill(granted ? Color.green : Color.orange)
+                    .fill(granted ? DS.Palette.success : DS.Palette.warning)
                     .frame(width: 8, height: 8)
                 Text(granted ? String(localized: "Granted") : String(localized: "Not granted"))
                     .font(DS.Font.caption)

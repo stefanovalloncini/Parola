@@ -38,7 +38,7 @@ struct SearchPill: View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .font(DS.Font.secondary)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
             TextField(placeholder, text: $text, prompt: prompt.map(Text.init))
                 .textFieldStyle(.plain)
                 .font(DS.Font.secondary)
@@ -55,7 +55,7 @@ struct SearchPill: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(DS.Font.secondary)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

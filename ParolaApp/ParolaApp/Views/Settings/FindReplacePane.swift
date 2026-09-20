@@ -197,7 +197,7 @@ private struct FindReplaceRuleRow: View {
                         .textFieldStyle(.roundedBorder)
                         .overlay(
                             RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                                .strokeBorder(regexError == nil ? Color.clear : Color.red.opacity(0.8), lineWidth: 1)
+                                .strokeBorder(regexError == nil ? Color.clear : DS.Color.danger.opacity(0.8), lineWidth: 1)
                         )
                         .axLeaf("FindReplace.TextField.Find")
                     Text("→").foregroundStyle(DS.Color.secondaryText)

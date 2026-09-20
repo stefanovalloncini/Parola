@@ -42,7 +42,7 @@ struct ModelPickerView: View {
                             badgeText: Self.badge(for: pinned),
                             help: pinned.tagline,
                             leadingSystemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle",
-                            leadingTint: installed ? .green : .secondary,
+                            leadingTint: installed ? DS.Palette.success : .secondary,
                             action: { select(variant: pinned) }
                         )
                         .contextMenu {
@@ -60,7 +60,7 @@ struct ModelPickerView: View {
                                 badgeText: Self.badge(for: variant),
                                 help: variant.tagline,
                                 leadingSystemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle",
-                                leadingTint: installed ? .green : .secondary,
+                                leadingTint: installed ? DS.Palette.success : .secondary,
                                 action: { select(variant: variant) }
                             )
                             .contextMenu {

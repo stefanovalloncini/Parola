@@ -91,7 +91,7 @@ struct ChatPane: View {
             BarPill {
                 Image(systemName: "magnifyingglass")
                     .font(DS.Font.secondary)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
                 TextField("Filter messages", text: $searchQuery)
                     .textFieldStyle(.plain)
                     .focused($searchFocused)
@@ -102,7 +102,7 @@ struct ChatPane: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(DS.Font.secondary)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.Color.secondaryText)
                     }
                     .buttonStyle(.plain)
                     .help("Clear")
@@ -114,7 +114,7 @@ struct ChatPane: View {
             Button(action: toggleSearch) {
                 Image(systemName: "xmark.circle.fill")
                     .font(DS.Font.heading)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

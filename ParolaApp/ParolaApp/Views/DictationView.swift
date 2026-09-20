@@ -205,7 +205,7 @@ struct DictationView: View {
             if isDownloadingModel {
                 SpinningRing().frame(width: 14, height: 14)
             } else {
-                Circle().fill(Color.gray.opacity(0.6)).frame(width: 14, height: 14)
+                Circle().fill(Color.white.opacity(0.45)).frame(width: 14, height: 14)
             }
         case .listening:
             LiveWaveformBars(levelSubject: controller.audioLevel)
@@ -214,7 +214,7 @@ struct DictationView: View {
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(DS.Font.heading)
-                .foregroundStyle(.orange)
+                .foregroundStyle(DS.Palette.warning)
         }
     }
 

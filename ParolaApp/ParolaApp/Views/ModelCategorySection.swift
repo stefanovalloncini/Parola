@@ -29,7 +29,7 @@ struct ModelsCategory: Identifiable {
             title: "Parakeet",
             description: "NVIDIA Parakeet via FluidAudio. Fast, English only.",
             symbol: "bird",
-            tint: .green
+            tint: DS.Palette.success
         )
     ]
 }

@@ -119,7 +119,7 @@ private struct MiniPlayerTimeLabel: View {
             total: model.transcript?.durationSeconds ?? 0
         ))
         .font(DS.Font.mono)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(DS.Color.secondaryText)
     }
 }
 

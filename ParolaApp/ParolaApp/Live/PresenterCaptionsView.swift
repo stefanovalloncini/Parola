@@ -37,7 +37,7 @@ struct PresenterCaptionsView: View {
         if let error = controller.state.error {
             Text(error)
                 .font(.system(size: fontSize / 2, weight: .semibold))
-                .foregroundStyle(.red.opacity(0.85))
+                .foregroundStyle(DS.Color.dangerOnDark)
                 .multilineTextAlignment(.center)
         } else if caption.isEmpty {
             VStack(spacing: 24) {

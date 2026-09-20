@@ -82,7 +82,7 @@ struct ShortcutCheatSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(section.title.uppercased())
                 .font(DS.Font.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(DS.Color.secondaryText)
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(section.entries) { entry in
                     HStack {

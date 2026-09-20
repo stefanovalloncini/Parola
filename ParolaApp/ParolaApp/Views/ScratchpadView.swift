@@ -11,7 +11,7 @@ struct ScratchpadView: View {
                     .foregroundStyle(DS.Color.accent)
                 Text("Focus the text below, then trigger dictation to capture here.")
                     .font(DS.Font.secondary)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 12)

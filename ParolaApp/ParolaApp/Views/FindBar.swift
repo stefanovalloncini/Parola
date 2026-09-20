@@ -30,7 +30,7 @@ struct FindBar: View {
             BarPill {
                 Image(systemName: "magnifyingglass")
                     .font(DS.Font.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
                 TextField("Find", text: $model.findQuery)
                     .textFieldStyle(.plain)
                     .focused($queryFocused)
@@ -40,7 +40,7 @@ struct FindBar: View {
                 if !model.findQuery.isEmpty {
                     Text(matchSummary)
                         .font(DS.Font.mono)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                         .padding(.trailing, 2)
                 }
             }
@@ -86,7 +86,7 @@ struct FindBar: View {
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(DS.Font.heading)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -104,7 +104,7 @@ struct FindBar: View {
             BarPill {
                 Image(systemName: "arrow.2.squarepath")
                     .font(DS.Font.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.Color.secondaryText)
                 TextField("Replace", text: $model.findReplacement)
                     .textFieldStyle(.plain)
                     .focused($replaceFocused)
