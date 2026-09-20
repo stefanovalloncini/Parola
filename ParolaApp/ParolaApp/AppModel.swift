@@ -1666,7 +1666,8 @@ final class AppModel {
                 // and an empty registry silently swaps in the generic HuggingFace downloader.
                 await ParolaCoreBootstrap.registerBuiltInEngines()
                 _ = try await store.download(variant: name, progress: progress)
-                phase = .idle
+                // A file run parked on this download resumes into the phase: idle would hide it.
+                if fileTranscribeTask == nil { phase = .idle }
                 refreshModelList()
             } catch {
                 if !Task.isCancelled {

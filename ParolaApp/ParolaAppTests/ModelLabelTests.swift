@@ -275,3 +275,51 @@ struct ModelDeletionTests {
         #expect(throws: (any Error).self) { try AppModel.removeModelCopies(Self.variant, using: store) }
     }
 }
+
+@MainActor
+@Suite("A finished download hands the phase back only when nothing is waiting on it")
+struct DownloadCompletionPhaseTests {
+    // Apple Speech is installed by definition, so the task reaches its completion path without a network call.
+    private let installed = "apple-speech-analyzer"
+
+    private func makeModel() -> AppModel {
+        AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("download-completion"))
+    }
+
+    private func waitUntil(timeoutMs: Int = 2_000, _ condition: @MainActor () -> Bool) async -> Bool {
+        var elapsed = 0
+        while elapsed < timeoutMs {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(15))
+            elapsed += 15
+        }
+        return condition()
+    }
+
+    @Test("a file run parked on the download keeps the phase the download was showing")
+    func waitingFileRunKeepsThePhase() async {
+        let model = makeModel()
+        model.phase = .downloadingModel(name: installed, progress: 0)
+        model.fileTranscribeTask = Task { try? await Task.sleep(for: .seconds(60)) }
+        defer {
+            model.fileTranscribeTask?.cancel()
+            model.fileTranscribeTask = nil
+        }
+
+        #expect(model.downloadModel(installed))
+        let wentIdle = await waitUntil(timeoutMs: 1_000) { model.phase == .idle }
+
+        #expect(!wentIdle)
+        #expect(model.phase == .downloadingModel(name: installed, progress: 1))
+    }
+
+    @Test("with nothing waiting on it the finished download hands the phase back")
+    func lonelyDownloadReturnsToIdle() async {
+        let model = makeModel()
+        model.phase = .downloadingModel(name: installed, progress: 0)
+
+        #expect(model.downloadModel(installed))
+
+        #expect(await waitUntil { model.phase == .idle })
+    }
+}
