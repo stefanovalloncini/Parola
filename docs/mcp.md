@@ -107,7 +107,7 @@ answers. The wire protocol and the bridge's own gating live in
 | `language` | string | Two-letter code (`en`, `it`, …). Omit to auto-detect. |
 | `format` | string | `txt` (default), `md`, `srt`, `vtt`, `json`. |
 | `translate` | bool | Translate the speech to English instead of writing down what was said. Only engines whose `parola_list_engines` row reads `translate=true` accept it. |
-| `initial_prompt` | string | Words or proper nouns to bias decoding toward. Whisper truncates it internally to about 224 tokens, so keep it short. |
+| `initial_prompt` | string | Words or proper nouns to bias decoding toward. Whisper truncates it internally to about 111 tokens, so keep it short. |
 | `output_path` | string | Absolute path to write the transcript to. Missing parent directories are created, and an existing file there is overwritten. A path nothing can be written to is refused before the audio is touched. |
 | `save` | bool | Also store the transcript in Parola's library. The entry keeps a copy of the source file. |
 | `skip_duplicates` | bool | Return the existing entry's details instead of transcribing when the library already holds this exact file. Off by default. |

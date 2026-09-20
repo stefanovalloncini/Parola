@@ -18,7 +18,7 @@ struct TranscribeRequestTests {
 
         let prompt = try #require(props["initial_prompt"] as? [String: Any])
         #expect(prompt["type"] as? String == "string")
-        #expect((prompt["description"] as? String)?.contains("224") == true)
+        #expect((prompt["description"] as? String)?.contains("111") == true)
 
         let outputPath = try #require(props["output_path"] as? [String: Any])
         #expect(outputPath["type"] as? String == "string")

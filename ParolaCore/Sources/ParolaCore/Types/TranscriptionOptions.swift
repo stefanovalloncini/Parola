@@ -15,7 +15,7 @@ public struct TranscriptionOptions: Sendable {
     public var verbose: Bool
 
     /// Free-form text that biases the decoder toward specific words (proper nouns, jargon).
-    /// Whisper truncates internally to ~224 tokens, so keep this short.
+    /// Whisper truncates internally to ~111 tokens, so keep this short.
     public var initialPrompt: String?
 
     /// When true, run speaker diarization after transcription and tag each segment with a speaker.

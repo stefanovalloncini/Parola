@@ -1,6 +1,6 @@
 import CoreML
 import Foundation
-@preconcurrency import WhisperKit
+import WhisperKit
 
 /// Tokenizes a user-supplied prompt into the format WhisperKit's decoder expects.
 /// Returns nil when there's no prompt to tokenize or when the tokenizer isn't ready.
@@ -53,13 +53,8 @@ func unpromptedPrefillLength(isModelMultilingual: Bool) -> Int {
     isModelMultilingual ? 4 : 2
 }
 
-/// WhisperKit's own filters read the prefill from the front of the token array: the timestamp
-/// rules look for the task token in the first three tokens (`TextDecoder.swift:891` →
-/// `LogitsFilter.swift:131`) and the blank filter compares the whole array's length against a
-/// prefill index that is always zero (`TextDecoder.swift:447`). A prompt prefix puts both out of
-/// reach, so the decoder stops being steered towards timestamps — windows collapse into a single
-/// segment, and large-v3-turbo ends the window on its first sampled token. Hands the filter the
-/// run starting at `<|startoftranscript|>`, which is the shape it was written for.
+/// WhisperKit's own filters read the prefill from the front of the token array, so a prompt prefix
+/// puts them out of reach; hands them the run from `<|startoftranscript|>` instead.
 struct PromptStrippedFilter: LogitsFiltering {
     let inner: any LogitsFiltering
     let startOfTranscriptToken: Int

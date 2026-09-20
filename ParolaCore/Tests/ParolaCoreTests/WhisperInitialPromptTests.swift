@@ -54,7 +54,10 @@ struct WhisperInitialPromptTests {
         _ = timestampRules().filterLogits(logits, withTokens: promptedPrefill)
         _ = SuppressBlankFilter(specialTokens: .stub, sampleBegin: 0)
             .filterLogits(logits, withTokens: promptedPrefill)
-        #expect(readValues(logits) == untouched)
+        #expect(
+            readValues(logits) == untouched,
+            "WhisperKit's filters now react to a prompt-prefixed array — the bug is fixed upstream, drop PromptStrippedFilter."
+        )
     }
 
     @Test("the wrapper masks what a prompt-free run masks")
@@ -127,6 +130,8 @@ struct WhisperInitialPromptTests {
         TranscriptSegment(id: 0, start: 0, end: 1, text: text)
     }
 
+    /// Mirrors `TextDecoder.prefillDecoderInputs`: start token, language and task for a
+    /// multilingual model, then one timestamp token.
     private var unpromptedPrefill: [Int] {
         let tokens = SpecialTokens.stub
         return [tokens.startOfTranscriptToken, tokens.englishToken, tokens.transcribeToken, tokens.timeTokenBegin]
