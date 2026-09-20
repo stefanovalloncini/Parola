@@ -32,7 +32,7 @@ let placeholders = [
         Questa è Parola. Ascolta una registrazione e la scrive tutta, qui sul tuo Mac. \
         Niente esce da questo computer.
         """,
-        speaker: "Voce 1",
+        speaker: "Speaker 1",
         voice: "Alice"
     ),
 ]
