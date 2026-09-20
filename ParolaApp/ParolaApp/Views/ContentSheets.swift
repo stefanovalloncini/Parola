@@ -55,17 +55,6 @@ struct ContentSheetsModifier: ViewModifier {
                     Text("Parola quit while transcribing \(checkpoint.sourceURL?.lastPathComponent ?? "this file").")
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .parolaOpenEntry)) { note in
-                if let id = note.userInfo?["id"] as? String {
-                    model.selectedEntryID = id
-                }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .parolaStartRecording)) { _ in
-                model.startRecording(source: .microphone)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .parolaSummarizeLast)) { _ in
-                model.summarizeLatestEntry()
-            }
     }
 
     private var meetingPromptBinding: Binding<Bool> {

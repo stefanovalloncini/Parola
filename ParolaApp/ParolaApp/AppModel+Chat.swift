@@ -14,6 +14,7 @@ extension AppModel {
     }
 
     func summarizeLatestEntry() {
+        introduction.defer()
         guard features.isEnabled(.ai) else { return }
         Task { [weak self, library] in
             guard let self else { return }
