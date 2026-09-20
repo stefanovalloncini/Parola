@@ -1,18 +1,19 @@
 #!/bin/bash
 # Builds one demo clip for the first-run introduction. Run from anywhere:
 #
-#   scripts/build-intro-clip.sh <en|it> [recording] [--voice NAME]
+#   scripts/build-intro-clip.sh <en|it> [recording] [--voice NAME] [--text "what the take says"]
 #
 # Without a recording it speaks the placeholder text with `say`. To ship a real voice instead, hand
 # it the take:
 #
 #   scripts/build-intro-clip.sh en ~/Desktop/intro-en.wav
-#   scripts/build-intro-clip.sh it ~/Desktop/intro-it.wav
+#   scripts/build-intro-clip.sh it ~/Desktop/intro-it.wav --text "Questa è Parola. Ascolta una parola alla volta."
 #
 # Any format afconvert reads works (wav, aiff, m4a, mp3). Record about twelve seconds in a quiet
 # room, one take, no music, and say the placeholder words — the transcript the introduction types
-# out is whatever the CLI hears, so a clean take is the whole trick. The one edit the script makes
-# is the app's name: a word that spells "parola" is written "Parola", however the model heard it.
+# out is whatever the CLI hears, so a clean take is the whole trick. With --text each word the model
+# heard takes the casing and punctuation of the reference word it matches, and the count of matches
+# is printed; without it the only edit is the app's name, written "Parola" wherever it is heard.
 #
 # Both files land in ParolaApp/ParolaApp/Resources/Introduction/ and are committed. Re-running
 # overwrites them.

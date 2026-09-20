@@ -5,6 +5,7 @@ import Foundation
 // Builds one demo clip for the first-run introduction. Run it through scripts/build-intro-clip.sh, which resolves the repo root and the CLI for it.
 
 let levelRate = 20.0
+let alignmentLookAhead = 4
 let outputDirectory = URL(fileURLWithPath: "ParolaApp/ParolaApp/Resources/Introduction", isDirectory: true)
 let cliPath = "ParolaCore/.build/debug/parola"
 let preferredModels = ["openai_whisper-large-v3_turbo", "openai_whisper-tiny"]
@@ -25,7 +26,7 @@ let placeholders = [
         speaker: "Speaker 1",
         voice: "Samantha"
     ),
-    // The capitalisation step below capitalises every "parola" it finds, so a recording should avoid the common noun.
+    // Without --text every "parola" is capitalised, so a take that says the common noun needs the reference sentence.
     "it": Placeholder(
         text: """
         Questa è Parola. Ascolta una registrazione e la scrive tutta, qui sul tuo Mac. \
@@ -110,6 +111,27 @@ func capitalisingAppName(_ text: String) -> String {
     return text.replacingOccurrences(of: letters, with: "Parola")
 }
 
+func comparable(_ word: String) -> String {
+    String(String.UnicodeScalarView(word.lowercased().unicodeScalars.filter(CharacterSet.alphanumerics.contains)))
+}
+
+/// Gives each word the casing and punctuation of the reference word it matches, with a look-ahead.
+func aligned(_ words: [DemoWord], to reference: String) -> (words: [DemoWord], matched: Int) {
+    let referenceWords = reference.split(whereSeparator: \.isWhitespace).map(String.init)
+    var cursor = 0
+    var matched = 0
+    let rewritten = words.map { word -> DemoWord in
+        let heard = comparable(word.text)
+        guard !heard.isEmpty else { return word }
+        let window = cursor..<min(cursor + alignmentLookAhead, referenceWords.count)
+        guard let hit = window.first(where: { comparable(referenceWords[$0]) == heard }) else { return word }
+        cursor = hit + 1
+        matched += 1
+        return DemoWord(text: referenceWords[hit], start: word.start, end: word.end)
+    }
+    return (rewritten, matched)
+}
+
 func voiceExists(_ name: String) -> Bool {
     let listing = run(which("say"), ["-v", "?"])
     return listing.split(separator: "\n").contains { line in
@@ -187,6 +209,7 @@ func measure(_ url: URL) -> (levels: [Double], duration: Double) {
 
 var positional: [String] = []
 var voiceOverride: String?
+var referenceText: String?
 var arguments = Array(CommandLine.arguments.dropFirst())
 while let argument = arguments.first {
     arguments.removeFirst()
@@ -195,8 +218,18 @@ while let argument = arguments.first {
         guard let name = arguments.first else { fail("--voice needs a voice name") }
         voiceOverride = name
         arguments.removeFirst()
+    case "--text":
+        guard let sentence = arguments.first else { fail("--text needs the sentence the take says") }
+        referenceText = sentence
+        arguments.removeFirst()
     case "-h", "--help":
-        print("Usage: scripts/build-intro-clip.sh <en|it> [recording] [--voice NAME]")
+        print("""
+        Usage: scripts/build-intro-clip.sh <en|it> [recording] [--voice NAME] [--text "what the take says"]
+
+        --text gives the words their casing and punctuation: each transcribed word takes the
+        reference word it matches, and anything unmatched keeps what the model heard. Without it
+        the only edit is the app's name, which is written "Parola" wherever it is heard.
+        """)
         exit(0)
     default:
         positional.append(argument)
@@ -232,23 +265,32 @@ run(which("afconvert"), ["-f", "m4af", "-d", "aac@44100", "-b", "96000", sourceU
 try? FileManager.default.removeItem(at: spokenURL)
 
 let measured = measure(clipURL)
+// The JSON stores the rounded duration and the app asserts every word ends inside it, so clamp to that.
+let duration = rounded(measured.duration, places: 3)
 let model = installedModel()
 print("transcribing with \(model)…")
 var words = timings(model: model, clip: clipURL, language: language)
 guard !words.isEmpty else { fail("the transcript has no word timings") }
 words = words.map {
     DemoWord(
-        text: capitalisingAppName($0.text),
-        start: min(max($0.start, 0), measured.duration),
-        end: min(max($0.end, 0), measured.duration)
+        text: $0.text,
+        start: min(max($0.start, 0), duration),
+        end: min(max($0.end, 0), duration)
     )
 }
 words.sort { $0.start < $1.start }
+if let referenceText {
+    let alignment = aligned(words, to: referenceText)
+    words = alignment.words
+    print("aligned \(alignment.matched) of \(words.count) words to the reference text")
+} else {
+    words = words.map { DemoWord(text: capitalisingAppName($0.text), start: $0.start, end: $0.end) }
+}
 
 let script = DemoScriptFile(
     text: words.map(\.text).joined(separator: " "),
     speaker: placeholder.speaker,
-    duration: rounded(measured.duration, places: 3),
+    duration: duration,
     levelRate: levelRate,
     levels: measured.levels,
     words: words
