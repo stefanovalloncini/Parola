@@ -6506,6 +6506,17 @@
         }
       }
     },
+    "Offers to record when a meeting app opens.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Propone di registrare quando apri un'app per riunioni."
+          }
+        }
+      }
+    },
     "Older": {
       "extractionState": "manual",
       "localizations": {
@@ -7805,17 +7816,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registra le riunioni e qualsiasi audio riprodotto dal Mac."
-          }
-        }
-      }
-    },
-    "Records the call when a meeting starts.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Registra la chiamata quando inizia una riunione."
           }
         }
       }
@@ -9538,17 +9538,6 @@
         }
       }
     },
-    "Subtitles for anything playing on your Mac.": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sottotitoli per tutto ciò che il Mac riproduce."
-          }
-        }
-      }
-    },
     "Subtle": {
       "extractionState": "manual",
       "localizations": {
@@ -11165,6 +11154,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Qui compaiono le tue trascrizioni."
+          }
+        }
+      }
+    },
+    "Your words as subtitles, in a panel that stays on top.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le tue parole come sottotitoli, in un pannello sempre in primo piano."
           }
         }
       }

@@ -20,7 +20,7 @@ struct FeaturesScene: View {
             items.append(FeatureRow.Item(
                 symbol: DS.categorySymbol(for: .meeting),
                 title: "Record meetings",
-                line: "Records the call when a meeting starts."
+                line: "Offers to record when a meeting app opens."
             ))
         }
         if features.isEnabled(.dictation) {
@@ -34,7 +34,7 @@ struct FeaturesScene: View {
             items.append(FeatureRow.Item(
                 symbol: "captions.bubble.fill",
                 title: "Live captions",
-                line: "Subtitles for anything playing on your Mac."
+                line: "Your words as subtitles, in a panel that stays on top."
             ))
         }
         return items
