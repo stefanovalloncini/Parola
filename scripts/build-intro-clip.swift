@@ -237,7 +237,14 @@ let model = installedModel()
 print("transcribing with \(model)…")
 var words = timings(model: model, clip: clipURL, language: language)
 guard !words.isEmpty else { fail("the transcript has no word timings") }
-words = words.map { DemoWord(text: capitalisingAppName($0.text), start: $0.start, end: $0.end) }
+words = words.map {
+    DemoWord(
+        text: capitalisingAppName($0.text),
+        start: min(max($0.start, 0), measured.duration),
+        end: min(max($0.end, 0), measured.duration)
+    )
+}
+words.sort { $0.start < $1.start }
 
 let script = DemoScriptFile(
     text: words.map(\.text).joined(separator: " "),

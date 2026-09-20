@@ -32,7 +32,7 @@ struct DemoScriptTests {
             for word in script.words {
                 #expect(word.start >= previous)
                 #expect(word.start <= word.end)
-                #expect(word.end <= script.duration + 0.25)
+                #expect(word.end <= script.duration)
                 previous = word.start
             }
         }
@@ -53,7 +53,8 @@ struct DemoScriptTests {
             try #require(script.words.count > 3)
             #expect(script.visibleWordCount(at: -1) == 0)
             #expect(script.visibleWordCount(at: script.duration + 1) == script.words.count)
-            #expect(script.visibleWordCount(at: script.words[3].start) == 4)
+            let t = script.words[3].start
+            #expect(script.visibleWordCount(at: t) == script.words.filter { $0.start <= t }.count)
         }
     }
 
