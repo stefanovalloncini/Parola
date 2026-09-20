@@ -22,7 +22,7 @@ struct PromptsPane: View {
                         Text("No prompts match.").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
                         Spacer()
                     }
-                    .padding(16)
+                    .padding(DS.Spacing.medium)
                 } else {
                     ForEach(Array(visible.enumerated()), id: \.element.id) { idx, prompt in
                         PromptRow(
@@ -100,7 +100,7 @@ struct PromptsPane: View {
             }
             Spacer()
         }
-        .padding(10)
+        .padding(DS.Spacing.small)
         .background(DS.Palette.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
         .axLeaf("Prompts.Text.SaveError")
     }
@@ -275,7 +275,7 @@ private struct PromptEditor: View {
                 TextEditor(text: $draft.instructions)
                     .font(DS.Font.body)
                     .frame(minHeight: 160)
-                    .padding(4)
+                    .padding(DS.Spacing.tight)
                     .overlay(
                         RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                             .strokeBorder(Color.secondary.opacity(0.3))
@@ -310,7 +310,7 @@ private struct PromptEditor: View {
                     .axLeaf("PromptEditor.Button.Save")
             }
         }
-        .padding(20)
+        .padding(DS.Spacing.medium)
         .frame(width: 480)
         .tint(DS.Color.accent)
     }

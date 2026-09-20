@@ -66,8 +66,8 @@ struct RecordingPane: View {
                 .foregroundStyle(.white)
             Spacer()
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.small)
         .background(
             Capsule().fill(DS.Palette.warning.opacity(0.85))
         )
@@ -87,6 +87,8 @@ struct RecordingCard: View {
     var showsWaveform: Bool = false
     let onStop: () -> Void
     @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 64
+
+    private static let cardRadius: CGFloat = 16
 
     var body: some View {
         VStack(spacing: DS.Spacing.large) {
@@ -118,7 +120,7 @@ struct RecordingCard: View {
                 if showsWaveform, let levelSubject {
                     LiveRecordingWaveform(levelSubject: levelSubject)
                         .frame(width: 220, height: 30)
-                        .padding(.top, 2)
+                        .padding(.top, DS.Spacing.hair)
                 }
                 Text(source.label)
                     .font(DS.Font.secondary)
@@ -138,14 +140,14 @@ struct RecordingCard: View {
             .keyboardShortcut(.return)
             .axLeaf("Recording.Button.Stop")
         }
-        .padding(32)
+        .padding(DS.Spacing.xlarge)
         .frame(width: 360)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
                 .fill(DS.Color.surfaceElevated)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: Self.cardRadius, style: .continuous)
                 .stroke(DS.Color.separator.opacity(0.6), lineWidth: 1)
         )
     }

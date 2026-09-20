@@ -26,7 +26,7 @@ struct AutoExportPane: View {
                         Text("No matches").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
                         Spacer()
                     }
-                    .padding(16)
+                    .padding(DS.Spacing.medium)
                 } else {
                     ForEach(Array(displayedRules.enumerated()), id: \.element.id) { position, rule in
                         if let binding = binding(for: rule.id) {
@@ -196,7 +196,7 @@ private struct AutoExportRuleRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isFirst { Divider().padding(.leading, 16) }
+            if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Toggle("", isOn: $rule.enabled).labelsHidden()
@@ -227,8 +227,8 @@ private struct AutoExportRuleRow: View {
                     AutoExportFormatChips(selected: $rule.outputFormats)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, DS.Spacing.medium)
+            .padding(.vertical, DS.Spacing.small)
         }
         .onAppear {
             extensionsText = rule.sourceExtensions.sorted().joined(separator: ", ")

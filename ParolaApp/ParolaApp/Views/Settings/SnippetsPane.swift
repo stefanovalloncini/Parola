@@ -19,7 +19,7 @@ struct SnippetsPane: View {
                         Text("No snippets match.").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
                         Spacer()
                     }
-                    .padding(16)
+                    .padding(DS.Spacing.medium)
                 } else {
                     ForEach(Array(visible.enumerated()), id: \.element.id) { idx, snippet in
                         if let binding = binding(for: snippet.id) {
@@ -59,7 +59,7 @@ struct SnippetsPane: View {
             Text("These placeholders expand in the replacement text: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}")
                 .font(DS.Font.mono)
                 .foregroundStyle(DS.Color.secondaryText)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, DS.Spacing.tight)
             ResetPaneButton(scope: .snippets)
         }
     }
@@ -104,7 +104,7 @@ private struct SnippetRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isFirst { Divider().padding(.leading, 16) }
+            if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Toggle("", isOn: enabledBinding)
@@ -126,8 +126,8 @@ private struct SnippetRow: View {
                     .axLeaf("Snippets.Button.Delete")
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, DS.Spacing.medium)
+            .padding(.vertical, DS.Spacing.small)
         }
     }
 }

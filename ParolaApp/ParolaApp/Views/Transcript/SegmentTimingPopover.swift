@@ -34,7 +34,7 @@ struct SegmentTimingPopover: View {
                 model.nudgeSegmentEnd(id: segment.id, frames: delta)
             }
         }
-        .padding(14)
+        .padding(DS.Spacing.regular)
         .frame(width: 260)
     }
 
@@ -58,7 +58,7 @@ struct SegmentTimingPopover: View {
                 .font(DS.Font.bodyStrong)
                 .frame(width: 26, height: 22)
                 .background(
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: DS.Radius.small)
                         .fill(Color.primary.opacity(0.08))
                 )
                 .contentShape(Rectangle())

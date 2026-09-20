@@ -174,7 +174,7 @@ struct ModelsSettingsPane: View {
         if sections.isEmpty {
             ContentUnavailableView.search(text: searchText)
                 .frame(maxWidth: .infinity)
-                .padding(.top, 40)
+                .padding(.top, DS.Spacing.xlarge)
         } else {
             VStack(alignment: .leading, spacing: 28) {
                 if !sections.installed.isEmpty || installFilter == .installed {
@@ -277,7 +277,7 @@ struct ModelsSettingsPane: View {
                 .controlSize(.small)
                 .axLeaf("Models.Button.DismissError")
         }
-        .padding(10)
+        .padding(DS.Spacing.small)
         .background(DS.Palette.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
     }
 

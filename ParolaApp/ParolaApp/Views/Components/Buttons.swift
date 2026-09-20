@@ -19,7 +19,7 @@ struct DSPillButtonStyle: ButtonStyle {
             .font(DS.Font.bodyStrong)
             .foregroundStyle(foreground)
             .frame(minWidth: size == .regular ? 104 : nil, minHeight: size == .regular ? 36 : 28)
-            .padding(.horizontal, size == .regular ? DS.Spacing.medium : 14)
+            .padding(.horizontal, size == .regular ? DS.Spacing.medium : DS.Spacing.regular)
             .background(background(pressed: configuration.isPressed))
             .clipShape(Capsule())
             .overlay {

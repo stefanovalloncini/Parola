@@ -28,7 +28,7 @@ struct SpeakerFilterRow: View {
                     }
                 }
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, DS.Spacing.hair)
         }
     }
 }

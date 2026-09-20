@@ -52,7 +52,7 @@ struct SidebarRowLabel: View {
                 Text("\(badge)")
                     .font(DS.Font.caption)
                     .foregroundStyle(isSelected ? DS.Color.onAccent.opacity(0.9) : .secondary)
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, DS.Spacing.snug)
                     .padding(.vertical, 1)
                     .background(
                         Capsule().fill(
@@ -64,7 +64,7 @@ struct SidebarRowLabel: View {
             }
         }
         .foregroundStyle(isSelected ? DS.Color.onAccent : .primary)
-        .padding(.horizontal, 10)
+        .padding(.horizontal, DS.Spacing.small)
         .frame(height: height)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(rowBackground)

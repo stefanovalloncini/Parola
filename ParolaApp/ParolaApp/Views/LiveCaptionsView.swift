@@ -7,15 +7,20 @@ struct LiveCaptionsView: View {
     // Fixed pt by design: the caption overlay has its own user size control (context menu → Caption size).
     @AppStorage("liveCaptions.fontSize", store: DefaultsStore.current) private var fontSize: Double = 22
 
+    private static let horizontalInset: CGFloat = 22
+    private static let verticalInset: CGFloat = 18
+    private static let chipTopInset: CGFloat = 10
+    private static let chipInset: CGFloat = 9
+
     var body: some View {
         content
-            .padding(.horizontal, 22)
-            .padding(.vertical, 18)
+            .padding(.horizontal, Self.horizontalInset)
+            .padding(.vertical, Self.verticalInset)
             .frame(minWidth: 560, maxWidth: .infinity, alignment: .center)
             .background(background)
             .overlay(border)
             .overlay(alignment: .topTrailing) {
-                modeChip.padding(.top, 10).padding(.trailing, 12)
+                modeChip.padding(.top, Self.chipTopInset).padding(.trailing, DS.Spacing.regular)
             }
             .opacity(opacity)
             .contextMenu { settingsMenu }
@@ -76,7 +81,7 @@ struct LiveCaptionsView: View {
                 .textCase(.uppercase)
         }
         .foregroundStyle(translating ? Color.white : Color.white.opacity(0.7))
-        .padding(.horizontal, 9)
+        .padding(.horizontal, Self.chipInset)
         .frame(height: 20)
         .background(Capsule().fill(chipFill(translating: translating)))
     }

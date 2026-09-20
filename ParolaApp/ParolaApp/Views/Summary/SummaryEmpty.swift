@@ -40,7 +40,7 @@ struct SummaryEmpty: View {
                         .font(DS.Font.heading)
                         .foregroundStyle(.white)
                         .padding(.horizontal, DS.Spacing.large)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, DS.Spacing.small)
                         .background(
                             Capsule(style: .continuous)
                                 .fill(DS.Color.accent)

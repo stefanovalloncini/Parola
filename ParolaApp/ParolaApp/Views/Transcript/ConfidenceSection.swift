@@ -19,7 +19,7 @@ struct ConfidenceSection: View {
                                 lowRow(seg)
                             }
                         }
-                        .padding(.top, 4)
+                        .padding(.top, DS.Spacing.tight)
                     } label: {
                         Group {
                             if lows.count == 1 {

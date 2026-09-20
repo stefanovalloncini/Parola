@@ -24,7 +24,7 @@ struct ChatBubble: View {
                 Spacer(minLength: 40)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DS.Spacing.hair)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(message.role == .user ? "You" : "Assistant"): \(Self.displayText(message.text).isEmpty ? "No response" : message.text)")
     }
@@ -43,8 +43,8 @@ struct ChatBubble: View {
         }
         .multilineTextAlignment(.leading)
         .fixedSize(horizontal: false, vertical: true)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.small)
         .frame(maxWidth: 480, alignment: .leading)
     }
 

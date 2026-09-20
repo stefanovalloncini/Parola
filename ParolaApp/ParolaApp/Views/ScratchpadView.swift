@@ -14,19 +14,19 @@ struct ScratchpadView: View {
                     .foregroundStyle(DS.Color.secondaryText)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
+            .padding(.horizontal, DS.Spacing.regular)
+            .padding(.top, DS.Spacing.small)
 
             TextEditor(text: $controller.text)
                 .font(DS.Font.body)
                 .writingToolsBehavior(.complete)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
+                .padding(.horizontal, DS.Spacing.small)
+                .padding(.vertical, DS.Spacing.snug)
                 .background(
                     RoundedRectangle(cornerRadius: DS.Radius.small)
                         .fill(Color.primary.opacity(0.04))
                 )
-                .padding(.horizontal, 12)
+                .padding(.horizontal, DS.Spacing.regular)
                 .focused($editorFocused)
                 .onAppear { editorFocused = true }
 
@@ -41,8 +41,8 @@ struct ScratchpadView: View {
                 .disabled(controller.text.isEmpty)
                 .axLeaf("Scratchpad.Button.Clear")
             }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 10)
+            .padding(.horizontal, DS.Spacing.regular)
+            .padding(.bottom, DS.Spacing.small)
         }
         .frame(minWidth: 320, minHeight: 220)
         .axBranch("Scratchpad")

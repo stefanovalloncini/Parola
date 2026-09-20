@@ -137,8 +137,8 @@ struct BatchFormatChip: View {
         Text(".\(`extension`)")
             .font(DS.Font.mono)
             .foregroundStyle(DS.Color.secondaryText)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
+            .padding(.horizontal, DS.Spacing.snug)
+            .padding(.vertical, DS.Spacing.hair)
             .background(
                 Capsule().fill(DS.Color.separator.opacity(0.4))
             )

@@ -31,8 +31,8 @@ struct TranscriptHeaderBar: View {
                 Text(label)
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.accentText)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
+                    .padding(.horizontal, DS.Spacing.snug)
+                    .padding(.vertical, DS.Spacing.hair)
                     .background(Capsule().fill(DS.Color.accentWash))
                     .modifier(LanguagePillHelpModifier(isAssumed: model.assumedLanguageNotice != nil))
             }
@@ -150,7 +150,7 @@ struct TranscriptHeaderBar: View {
     private var groupDivider: some View {
         Divider()
             .frame(height: 14)
-            .padding(.horizontal, 2)
+            .padding(.horizontal, DS.Spacing.hair)
     }
 
     private func rebuildShareItem() {
@@ -205,7 +205,7 @@ struct TranscriptHeaderBar: View {
                     .axLeaf("HeaderBar.Button.JumpGo")
             }
         }
-        .padding(12)
+        .padding(DS.Spacing.regular)
     }
 
     private func commitJump() {

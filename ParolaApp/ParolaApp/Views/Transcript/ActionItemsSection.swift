@@ -107,7 +107,7 @@ private struct ActionItemRow: View {
                 Text("by \(due)")
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
-                    .padding(.leading, 18)
+                    .padding(.leading, DS.Spacing.medium)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

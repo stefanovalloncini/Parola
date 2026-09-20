@@ -52,21 +52,21 @@ struct TranscriptionDefaultsPane: View {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.warningText)
-                    .padding(.top, 2)
+                    .padding(.top, DS.Spacing.hair)
                     .axLeaf("TranscriptionDefaults.Label.LanguageWarning")
             }
             if let notice = model.englishOnlyAutoNotice {
                 Label(notice, systemImage: "exclamationmark.triangle.fill")
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.warningText)
-                    .padding(.top, 2)
+                    .padding(.top, DS.Spacing.hair)
                     .axLeaf("TranscriptionDefaults.Label.EnglishOnlyAutoNotice")
             }
             if let warning = model.diarizeMismatchWarning {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.warningText)
-                    .padding(.top, 2)
+                    .padding(.top, DS.Spacing.hair)
                     .axLeaf("TranscriptionDefaults.Label.DiarizeWarning")
             }
             SettingHelper(text: "The main-window toolbar shows these same settings; a change in either place persists.")

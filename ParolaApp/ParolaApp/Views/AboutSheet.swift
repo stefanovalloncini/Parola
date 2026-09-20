@@ -46,7 +46,7 @@ struct AboutInfoView: View {
                         if let channel = AboutInfo.channelLabel {
                             Text(channel)
                                 .font(DS.Font.caption)
-                                .padding(.horizontal, 6)
+                                .padding(.horizontal, DS.Spacing.snug)
                                 .padding(.vertical, 1)
                                 .background(Capsule().fill(DS.Color.accentWash))
                                 .foregroundStyle(DS.Color.accentText)
@@ -96,7 +96,7 @@ struct AboutSheet: View {
     var body: some View {
         SheetFrame(icon: "waveform", title: "About Parola", onClose: { dismiss() }) {
             AboutInfoView()
-                .padding(20)
+                .padding(DS.Spacing.medium)
         }
         .sheetSize(width: 380, minHeight: 340, maxHeight: 420)
         .closeLeaf("About.Button.Close")

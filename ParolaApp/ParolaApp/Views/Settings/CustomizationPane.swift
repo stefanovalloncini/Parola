@@ -107,7 +107,7 @@ private struct ThemePresetGallery: View {
                                 .frame(width: 26, height: 26)
                         }
                     }
-                    .padding(2)
+                    .padding(DS.Spacing.hair)
                 }
                 .buttonStyle(.plain)
                 .help(preset.label)

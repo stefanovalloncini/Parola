@@ -73,8 +73,8 @@ struct DictationPane: View {
                     Label(warning, systemImage: "exclamationmark.triangle.fill")
                         .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.warningText)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, DS.Spacing.regular)
+                        .padding(.vertical, DS.Spacing.tight)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .axLeaf("Dictation.Label.ModelWarning")
                 }

@@ -175,16 +175,16 @@ private struct SettingsSidebar: View {
     var body: some View {
         VStack(spacing: 0) {
             SearchPill(text: $search, placeholder: "Search Settings…")
-                .padding(.horizontal, 12)
-                .padding(.top, 14)
-                .padding(.bottom, 10)
+                .padding(.horizontal, DS.Spacing.regular)
+                .padding(.top, DS.Spacing.regular)
+                .padding(.bottom, DS.Spacing.small)
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     ForEach(filteredGroups) { group in
                         if let title = group.title {
                             SectionCaption(title)
-                                .padding(.horizontal, 16)
-                                .padding(.top, 4)
+                                .padding(.horizontal, DS.Spacing.medium)
+                                .padding(.top, DS.Spacing.tight)
                         }
                         VStack(spacing: 2) {
                             ForEach(group.routes) { r in
@@ -198,12 +198,12 @@ private struct SettingsSidebar: View {
                                 }
                                 .axLeaf("Sidebar.Button.\(r.rawValue)")
                                 .accessibilityLabel(r.label)
-                                .padding(.horizontal, 8)
+                                .padding(.horizontal, DS.Spacing.small)
                             }
                         }
                     }
                 }
-                .padding(.bottom, 16)
+                .padding(.bottom, DS.Spacing.medium)
             }
         }
         .background(DS.Palette.canvas)
@@ -231,11 +231,11 @@ private struct SettingsDetail: View {
                         .foregroundStyle(DS.Color.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.top, 20)
+                .padding(.top, DS.Spacing.medium)
                 content
                 Spacer(minLength: 24)
             }
-            .padding(.horizontal, 28)
+            .padding(.horizontal, DS.Spacing.large)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(DS.Palette.surface)
@@ -289,7 +289,7 @@ struct SettingsSection<Content: View>: View {
             if let title {
                 Text(title)
                     .font(DS.Font.heading)
-                    .padding(.bottom, 2)
+                    .padding(.bottom, DS.Spacing.hair)
             }
             VStack(spacing: 0) {
                 content
@@ -339,7 +339,7 @@ struct SettingRow<Trailing: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             if !isFirst {
-                Divider().padding(.leading, 16)
+                Divider().padding(.leading, DS.Spacing.medium)
             }
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -356,8 +356,8 @@ struct SettingRow<Trailing: View>: View {
                 trailing
                     .toggleStyle(DSSwitchToggleStyle())
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, DS.Spacing.medium)
+            .padding(.vertical, DS.Spacing.small)
         }
     }
 }
@@ -368,6 +368,6 @@ struct SettingHelper: View {
         Text(text)
             .font(DS.Font.secondary)
             .foregroundStyle(DS.Color.secondaryText)
-            .padding(.horizontal, 4)
+            .padding(.horizontal, DS.Spacing.tight)
     }
 }

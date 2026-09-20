@@ -48,8 +48,8 @@ struct SegmentCard: View {
         .overlay(alignment: .bottomTrailing) {
             if hovering && !isEditing {
                 actionStrip
-                    .padding(.bottom, 6)
-                    .padding(.trailing, 6)
+                    .padding(.bottom, DS.Spacing.snug)
+                    .padding(.trailing, DS.Spacing.snug)
                     .transition(.opacity)
             }
         }
@@ -62,7 +62,7 @@ struct SegmentCard: View {
                 Rectangle()
                     .fill(confidenceColor(bucket))
                     .frame(width: 3)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, DS.Spacing.tight)
                     .accessibilityHidden(true)
             }
         }
@@ -160,8 +160,8 @@ struct SegmentCard: View {
                 .lineLimit(2)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, DS.Spacing.small)
+        .padding(.vertical, DS.Spacing.tight)
         .background(
             RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                 .fill(DS.Color.accent.opacity(0.08))
@@ -278,8 +278,8 @@ struct SegmentCard: View {
             .axLeaf("Card.Button.Copy")
             moreMenu
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
+        .padding(.horizontal, DS.Spacing.snug)
+        .padding(.vertical, DS.Spacing.tight)
         .background(
             RoundedRectangle(cornerRadius: DS.Radius.regular)
                 .fill(DS.Color.surface)

@@ -23,7 +23,7 @@ struct OutlinePopover: View {
                             OutlineRow(entry: entry) { onJump(entry.start) }
                         }
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, DS.Spacing.tight)
                 }
                 .frame(maxHeight: 360)
             }
@@ -45,8 +45,8 @@ struct OutlinePopover: View {
                     .axLeaf("Outline.Button.GenerateChapters")
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.small)
     }
 
     private var emptyState: some View {
@@ -59,7 +59,7 @@ struct OutlinePopover: View {
                 .foregroundStyle(DS.Color.secondaryText)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
+        .padding(.vertical, DS.Spacing.large)
     }
 }
 
@@ -94,8 +94,8 @@ private struct OutlineRow: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, DS.Spacing.regular)
+            .padding(.vertical, DS.Spacing.snug)
             .background(hovering ? DS.Palette.surfaceHover : Color.clear)
             .contentShape(Rectangle())
         }

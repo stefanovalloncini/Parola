@@ -14,14 +14,14 @@ struct ChatThinkingIndicator: View {
                         .opacity(dotOpacity(time: t, index: i))
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.horizontal, DS.Spacing.regular)
+            .padding(.vertical, DS.Spacing.small)
             .background(
                 RoundedRectangle(cornerRadius: DS.Radius.large, style: .continuous)
                     .fill(DS.Color.surfaceElevated)
             )
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 2)
+            .padding(.vertical, DS.Spacing.hair)
         }
     }
 

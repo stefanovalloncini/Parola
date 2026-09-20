@@ -5,13 +5,22 @@ struct DictationHUDPreview: View {
     let style: DictationIndicatorStyle
     let modeName: String?
 
+    private static let stageRadius: CGFloat = 10
+    private static let fieldRadius: CGFloat = 4
+    private static let hudRadius: CGFloat = 10
+    private static let notchRadius: CGFloat = 12
+    private static let hudInset: CGFloat = 10
+    private static let hudVerticalInset: CGFloat = 5
+    private static let badgeInset: CGFloat = 5
+    private static let badgeVerticalInset: CGFloat = 1
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Preview")
                 .font(DS.Font.bodyStrong)
                 .foregroundStyle(DS.Color.secondaryText)
             ZStack {
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: Self.stageRadius)
                     .fill(Color.primary.opacity(0.04))
                     .frame(height: 92)
                 hudMock
@@ -31,14 +40,14 @@ struct DictationHUDPreview: View {
 
     private var nearFieldMock: some View {
         VStack(alignment: .leading, spacing: 6) {
-            RoundedRectangle(cornerRadius: 4)
+            RoundedRectangle(cornerRadius: Self.fieldRadius)
                 .stroke(Color.primary.opacity(0.25), lineWidth: 1)
                 .frame(width: 180, height: 22)
                 .overlay(alignment: .leading) {
                     Text("Type here…")
                         .font(DS.Font.caption)
                         .foregroundStyle(.tertiary)
-                        .padding(.leading, 6)
+                        .padding(.leading, DS.Spacing.snug)
                 }
             HStack(spacing: 6) {
                 bars
@@ -46,9 +55,9 @@ struct DictationHUDPreview: View {
                     .font(DS.Font.caption)
                     .foregroundStyle(.white)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.black.opacity(0.88)))
+            .padding(.horizontal, Self.hudInset)
+            .padding(.vertical, Self.hudVerticalInset)
+            .background(RoundedRectangle(cornerRadius: Self.hudRadius, style: .continuous).fill(.black.opacity(0.88)))
         }
     }
 
@@ -62,8 +71,8 @@ struct DictationHUDPreview: View {
                 Text(modeName)
                     .font(DS.Font.caption)
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
+                    .padding(.horizontal, Self.badgeInset)
+                    .padding(.vertical, Self.badgeVerticalInset)
                     .background(Capsule().fill(.white.opacity(0.18)))
             }
             Spacer(minLength: 0)
@@ -71,8 +80,8 @@ struct DictationHUDPreview: View {
                 .font(DS.Font.mono)
                 .foregroundStyle(.white.opacity(0.7))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.small)
         .background(Capsule().fill(.black.opacity(0.85)))
         .frame(width: 220)
     }
@@ -88,9 +97,9 @@ struct DictationHUDPreview: View {
                 .font(DS.Font.mono)
                 .foregroundStyle(.white.opacity(0.6))
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.black.opacity(0.9)))
+        .padding(.horizontal, Self.hudInset)
+        .padding(.vertical, DS.Spacing.tight)
+        .background(RoundedRectangle(cornerRadius: Self.notchRadius, style: .continuous).fill(.black.opacity(0.9)))
         .frame(width: 170, height: 24)
     }
 

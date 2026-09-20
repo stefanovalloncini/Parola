@@ -11,7 +11,7 @@ struct AboutPane: View {
     var body: some View {
         VStack(spacing: 16) {
             AboutInfoView()
-                .padding(.top, 8)
+                .padding(.top, DS.Spacing.small)
 
             HStack(spacing: 10) {
                 Button("Open Repository") {
@@ -75,7 +75,7 @@ struct AboutPane: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(16)
+                .padding(DS.Spacing.medium)
             }
             .task {
                 hasDiagnostics = await model.diagnosticsRecordsExist()
@@ -87,7 +87,7 @@ struct AboutPane: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 24)
+        .padding(.horizontal, DS.Spacing.large)
     }
 
     private func exportDiagnostics() {

@@ -82,7 +82,7 @@ struct WorkflowRow: View {
             .axLeaf("Workflow.Button.CancelURLRule")
             Spacer()
         }
-        .padding(.leading, 6)
+        .padding(.leading, DS.Spacing.snug)
     }
 
     private func commitDraftRule() {

@@ -12,7 +12,7 @@ struct FindBar: View {
             searchRow
             if showReplace { replaceRow }
         }
-        .padding(8)
+        .padding(DS.Spacing.small)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
@@ -41,7 +41,7 @@ struct FindBar: View {
                     Text(matchSummary)
                         .font(DS.Font.mono)
                         .foregroundStyle(DS.Color.secondaryText)
-                        .padding(.trailing, 2)
+                        .padding(.trailing, DS.Spacing.hair)
                 }
             }
 
@@ -127,7 +127,7 @@ struct FindBar: View {
                 .accessibilityIdentifier("find.replaceAll")
                 .axLeaf("FindBar.Button.ReplaceAll")
         }
-        .padding(.leading, 2)
+        .padding(.leading, DS.Spacing.hair)
     }
 
     private var matchSummary: String {

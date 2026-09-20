@@ -21,7 +21,7 @@ struct DictationView: View {
             case .minimal: minimalBody
             }
         }
-        .padding(4)
+        .padding(DS.Spacing.tight)
         .opacity(max(0.4, min(1.0, model.dictationHudOpacity)))
         .onChange(of: state) { _, newValue in
             if case .listening = newValue { startedAt = Date() }
@@ -54,8 +54,8 @@ struct DictationView: View {
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
+                        .padding(.horizontal, DS.Spacing.snug)
+                        .padding(.vertical, DS.Spacing.hair)
                         .background(Capsule().fill(.white.opacity(0.18)))
                 }
                 Spacer(minLength: 0)
@@ -74,11 +74,11 @@ struct DictationView: View {
         .padding(.vertical, DS.Spacing.regular)
         .frame(width: hasPartial ? 344 : (isListening || isDownloadingModel ? 324 : 256), alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: Self.overlayRadius, style: .continuous)
                 .fill(Color.black.opacity(0.85))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: Self.overlayRadius, style: .continuous)
                 .stroke(.white.opacity(0.08), lineWidth: 1)
         )
     }
@@ -104,6 +104,10 @@ struct DictationView: View {
 
     private let transcriptTailAnchor = "dictation.transcript.tail"
 
+    private static let overlayRadius: CGFloat = 22
+    private static let barRadius: CGFloat = 14
+    private static let notchInset: CGFloat = 14
+
     private var notchBody: some View {
         HStack(spacing: 10) {
             indicator
@@ -118,15 +122,15 @@ struct DictationView: View {
                 .foregroundStyle(.white.opacity(0.65))
             stopButton
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
+        .padding(.horizontal, Self.notchInset)
+        .padding(.vertical, DS.Spacing.snug)
         .frame(width: hasPartial ? 360 : 240, height: 28, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: Self.barRadius, style: .continuous)
                 .fill(Color.black.opacity(0.9))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: Self.barRadius, style: .continuous)
                 .stroke(.white.opacity(0.05), lineWidth: 1)
         )
     }
@@ -177,15 +181,15 @@ struct DictationView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.small)
         .frame(width: hasPartial || hasFailureMessage ? 352 : 192, height: hasPartial || hasFailureMessage ? 88 : 36, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: Self.barRadius, style: .continuous)
                 .fill(Color.black.opacity(0.88))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: Self.barRadius, style: .continuous)
                 .stroke(.white.opacity(0.08), lineWidth: 1)
         )
     }

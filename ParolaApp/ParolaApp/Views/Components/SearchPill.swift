@@ -64,8 +64,8 @@ struct SearchPill: View {
                 .accessibilityIdentifier(clearButtonIdentifier)
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.horizontal, DS.Spacing.small)
+        .padding(.vertical, DS.Spacing.snug)
         .background(
             RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                 .fill(DS.Palette.subtleFill)

@@ -15,21 +15,21 @@ struct ModelPickerView: View {
             VStack(spacing: 0) {
                 searchField
                     .onAppear { model.prewarmSelectedModel() }
-                    .padding(.horizontal, 10)
-                    .padding(.top, 4)
-                    .padding(.bottom, 6)
+                    .padding(.horizontal, DS.Spacing.small)
+                    .padding(.top, DS.Spacing.tight)
+                    .padding(.bottom, DS.Spacing.snug)
 
                 installedOnlyToggle
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 4)
+                    .padding(.horizontal, DS.Spacing.regular)
+                    .padding(.bottom, DS.Spacing.tight)
 
                 let filtered = filteredGroups
                 if filtered.isEmpty {
                     Text("No models match")
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.Color.secondaryText)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
+                        .padding(.horizontal, DS.Spacing.regular)
+                        .padding(.vertical, DS.Spacing.small)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     if let pinned = pinnedVariant {
@@ -74,14 +74,14 @@ struct ModelPickerView: View {
                     }
                 }
 
-                Divider().padding(.vertical, 4)
+                Divider().padding(.vertical, DS.Spacing.tight)
                 PillPopoverRow(
                     title: "Refresh",
                     leadingSystemImage: "arrow.clockwise",
                     action: { model.refreshModelList() }
                 )
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, DS.Spacing.snug)
         }
         .help("Active model. Models are downloaded on demand.")
     }

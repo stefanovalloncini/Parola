@@ -34,7 +34,7 @@ private struct ToolStatusRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isFirst { Divider().padding(.leading, 16) }
+            if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: available ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
@@ -71,8 +71,8 @@ private struct ToolStatusRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, DS.Spacing.medium)
+            .padding(.vertical, DS.Spacing.small)
         }
     }
 }

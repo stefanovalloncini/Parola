@@ -62,8 +62,8 @@ struct MediaBar: View {
             Image(systemName: model.skipSilences ? "forward.end.fill" : "forward.end")
                 .font(DS.Font.bodyStrong)
                 .foregroundStyle(model.skipSilences ? DS.Color.accent : .secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
+                .padding(.horizontal, DS.Spacing.small)
+                .padding(.vertical, DS.Spacing.tight)
                 .background(
                     Capsule().fill(model.skipSilences ? DS.Color.accent.opacity(0.14) : Color.clear)
                 )
@@ -149,8 +149,8 @@ private struct SpeedPillStyle: ButtonStyle {
         configuration.label
             .font(DS.Font.mono.weight(.semibold))
             .foregroundStyle(DS.Color.accentText)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.horizontal, DS.Spacing.small)
+            .padding(.vertical, DS.Spacing.tight)
             .background(Capsule().fill(DS.Color.accentWash))
             .overlay(Capsule().strokeBorder(DS.Color.accent.opacity(0.35), lineWidth: 1))
             .opacity(configuration.isPressed ? 0.85 : 1)

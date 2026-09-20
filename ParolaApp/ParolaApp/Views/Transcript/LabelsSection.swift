@@ -48,8 +48,8 @@ struct LabelsSection: View {
             .axLeaf("Labels.Button.RemoveChip")
         }
         .foregroundStyle(DS.Color.accentText)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
+        .padding(.horizontal, DS.Spacing.small)
+        .padding(.vertical, DS.Spacing.hair)
         // The measured fill: a 12% accent over the inspector's material is a pair nothing measures.
         .background(
             Capsule().fill(DS.Color.accentWash)

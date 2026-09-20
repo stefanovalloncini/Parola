@@ -67,7 +67,7 @@ struct URLRuleRow: View {
             .foregroundStyle(DS.Color.secondaryText)
             .axLeaf("URLRule.Button.Remove")
         }
-        .padding(.leading, 6)
+        .padding(.leading, DS.Spacing.snug)
     }
 
     // Commits on submit or focus loss. An empty pattern reverts to the stored value —

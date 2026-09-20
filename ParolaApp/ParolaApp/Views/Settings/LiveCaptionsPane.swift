@@ -24,7 +24,7 @@ struct LiveCaptionsPane: View {
                     Label(warning, systemImage: "exclamationmark.triangle.fill")
                         .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.warningText)
-                        .padding(.top, 2)
+                        .padding(.top, DS.Spacing.hair)
                         .axLeaf("LiveCaptions.Label.TranslateWarning")
                 }
                 SettingRow("Status",

@@ -30,7 +30,7 @@ struct DownloadedEmpty: View {
                 .foregroundStyle(DS.Color.secondaryText)
             Spacer()
         }
-        .padding(14)
+        .padding(DS.Spacing.regular)
         .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
     }
 }

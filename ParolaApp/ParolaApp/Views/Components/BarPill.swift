@@ -5,7 +5,7 @@ struct BarPill<Content: View>: View {
 
     var body: some View {
         HStack(spacing: 8) { content }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, DS.Spacing.small)
             .frame(height: 28)
             .frame(maxWidth: .infinity)
             .background(

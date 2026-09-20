@@ -21,7 +21,7 @@ struct LanguagePickerView: View {
                     )
                 }
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, DS.Spacing.snug)
         }
     }
 

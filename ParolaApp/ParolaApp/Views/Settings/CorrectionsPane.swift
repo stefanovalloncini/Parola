@@ -19,7 +19,7 @@ struct CorrectionsPane: View {
                         Text("No corrections match.").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
                         Spacer()
                     }
-                    .padding(16)
+                    .padding(DS.Spacing.medium)
                 } else {
                     ForEach(Array(visible.enumerated()), id: \.element.id) { idx, rule in
                         if let binding = binding(for: rule.id) {
@@ -84,7 +84,7 @@ private struct CorrectionRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isFirst { Divider().padding(.leading, 16) }
+            if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             HStack(spacing: 8) {
                 Toggle("", isOn: enabledBinding)
                     .labelsHidden()
@@ -109,8 +109,8 @@ private struct CorrectionRow: View {
                 .buttonStyle(.borderless)
                 .axLeaf("Corrections.Button.Delete")
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, DS.Spacing.medium)
+            .padding(.vertical, DS.Spacing.small)
         }
     }
 }

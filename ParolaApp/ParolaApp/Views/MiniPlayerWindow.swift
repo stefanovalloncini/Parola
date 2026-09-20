@@ -11,8 +11,8 @@ struct MiniPlayerWindow: View {
             currentSegmentText
             controls
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, DS.Spacing.regular)
+        .padding(.vertical, DS.Spacing.small)
         .frame(minWidth: 320, idealWidth: 360, maxWidth: 520)
         .background(MiniPlayerWindowConfigurator())
         .axBranch("MiniPlayer")

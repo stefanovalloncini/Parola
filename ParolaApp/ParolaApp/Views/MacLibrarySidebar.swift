@@ -35,9 +35,9 @@ struct MacLibrarySidebar: View {
     var body: some View {
         VStack(spacing: 0) {
             SearchPill(text: searchBinding, placeholder: "Search history…", clearsOnEscape: true)
-                .padding(.horizontal, 12)
-                .padding(.top, 12)
-                .padding(.bottom, 10)
+                .padding(.horizontal, DS.Spacing.regular)
+                .padding(.top, DS.Spacing.regular)
+                .padding(.bottom, DS.Spacing.small)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
@@ -52,7 +52,7 @@ struct MacLibrarySidebar: View {
                     .axLeaf("Sidebar.Button.Home")
 
                     librarySectionHeader
-                        .padding(.top, 14)
+                        .padding(.top, DS.Spacing.regular)
 
                     SidebarRow(
                         title: "All",
@@ -78,7 +78,7 @@ struct MacLibrarySidebar: View {
 
                     if model.features.isEnabled(.batch) {
                         SectionLabel("Activity")
-                            .padding(.top, 14)
+                            .padding(.top, DS.Spacing.regular)
 
                         SidebarRow(
                             title: "Queue",
@@ -106,15 +106,15 @@ struct MacLibrarySidebar: View {
                         .axLeaf("Sidebar.Button.Batch")
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.bottom, 8)
+                .padding(.horizontal, DS.Spacing.small)
+                .padding(.bottom, DS.Spacing.small)
             }
 
             Spacer(minLength: 0)
 
             bottomPills
-                .padding(.horizontal, 8)
-                .padding(.vertical, 10)
+                .padding(.horizontal, DS.Spacing.small)
+                .padding(.vertical, DS.Spacing.small)
         }
         .navigationSplitViewColumnWidth(
             min: MainWindowLayout.sidebarMinWidth,
@@ -139,7 +139,7 @@ struct MacLibrarySidebar: View {
             Spacer(minLength: 0)
             sortMenu
         }
-        .padding(.trailing, 4)
+        .padding(.trailing, DS.Spacing.tight)
     }
 
     private var sortMenu: some View {
@@ -238,7 +238,7 @@ private struct SectionLabel: View {
     init(_ text: LocalizedStringKey) { self.text = text }
     var body: some View {
         SectionCaption(text)
-            .padding(.horizontal, 10)
-            .padding(.bottom, 4)
+            .padding(.horizontal, DS.Spacing.small)
+            .padding(.bottom, DS.Spacing.tight)
     }
 }

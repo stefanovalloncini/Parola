@@ -83,7 +83,7 @@ struct SheetFrame<Content: View, Footer: View>: View {
                 Divider()
                 footer
                     .padding(.horizontal, DS.Spacing.regular)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, DS.Spacing.regular)
             }
         }
         .frame(width: width)
@@ -128,7 +128,7 @@ struct SheetFrame<Content: View, Footer: View>: View {
             }
         }
         .padding(.horizontal, DS.Spacing.regular)
-        .padding(.vertical, 12)
+        .padding(.vertical, DS.Spacing.regular)
     }
 }
 

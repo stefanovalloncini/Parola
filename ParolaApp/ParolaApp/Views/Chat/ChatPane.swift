@@ -153,7 +153,7 @@ struct ChatPane: View {
                 .focused($composerFocused)
                 .axLeaf("Composer.TextField.Input")
                 .padding(.horizontal, DS.Spacing.regular)
-                .padding(.vertical, 8)
+                .padding(.vertical, DS.Spacing.small)
                 .background(
                     Capsule(style: .continuous)
                         .fill(DS.Color.surfaceElevated)

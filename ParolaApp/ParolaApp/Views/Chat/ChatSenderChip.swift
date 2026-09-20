@@ -40,7 +40,7 @@ private struct SenderChipButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .padding(.horizontal, 10)
+            .padding(.horizontal, DS.Spacing.small)
             .frame(height: 28)
             .foregroundStyle(isFiltered ? DS.Color.onAccent : Color.primary.opacity(0.85))
             .background(

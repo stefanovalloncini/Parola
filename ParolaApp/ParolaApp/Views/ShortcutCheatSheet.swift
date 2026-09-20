@@ -72,7 +72,7 @@ struct ShortcutCheatSheet: View {
                         sectionView(section)
                     }
                 }
-                .padding(20)
+                .padding(DS.Spacing.medium)
             }
         }
         .sheetSize(width: 420, minHeight: 480, maxHeight: 560)
@@ -91,8 +91,8 @@ struct ShortcutCheatSheet: View {
                         Spacer()
                         Text(entry.keys)
                             .font(DS.Font.mono)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
+                            .padding(.horizontal, DS.Spacing.small)
+                            .padding(.vertical, DS.Spacing.hair)
                             .background(
                                 RoundedRectangle(cornerRadius: DS.Radius.small)
                                     .fill(DS.Palette.subtleFill)

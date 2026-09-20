@@ -39,7 +39,7 @@ private struct WatchedFoldersPaneBody: View {
                         .controlSize(.small)
                         .axLeaf("WatchedFolders.Button.DismissError")
                 }
-                .padding(12)
+                .padding(DS.Spacing.regular)
                 .background(
                     RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                         .fill(DS.Palette.warning.opacity(0.10))

@@ -46,7 +46,7 @@ struct SpeakersSheet: View {
                     speakerRow(speaker)
                 }
                 if Self.offersSuggestions(hasSpeakers: !transcript.uniqueSpeakers.isEmpty, hasSuggestions: !filteredSuggestions.isEmpty) {
-                    Divider().padding(.vertical, 2)
+                    Divider().padding(.vertical, DS.Spacing.hair)
                     Text("Recent")
                         .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)

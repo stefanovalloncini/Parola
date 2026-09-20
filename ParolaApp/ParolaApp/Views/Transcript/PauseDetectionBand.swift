@@ -18,14 +18,14 @@ struct LongPauseDivider: View {
                     .font(DS.Font.mono)
             }
             .foregroundStyle(DS.Color.secondaryText)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
+            .padding(.horizontal, DS.Spacing.small)
+            .padding(.vertical, DS.Spacing.hair)
             .background(
                 Capsule().fill(DS.Color.surfaceElevated)
             )
             line
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, DS.Spacing.hair)
     }
 
     private var line: some View {

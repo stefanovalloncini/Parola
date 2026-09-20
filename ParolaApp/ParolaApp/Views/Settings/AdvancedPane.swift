@@ -18,7 +18,7 @@ struct AdvancedPane: View {
                     Button("Reveal in Finder") { model.revealCacheDirectory() }
                         .axLeaf("Advanced.Button.RevealCache")
                 }
-                .padding(16)
+                .padding(DS.Spacing.medium)
             }
 
             SettingsSection("Backup & restore") {
@@ -49,7 +49,7 @@ struct AdvancedPane: View {
                         Text(failure.message)
                     }
                 }
-                .padding(16)
+                .padding(DS.Spacing.medium)
             }
 
             SettingsSection("Reset") {
@@ -64,7 +64,7 @@ struct AdvancedPane: View {
                     }
                     .axLeaf("Advanced.Button.ResetAll")
                 }
-                .padding(16)
+                .padding(DS.Spacing.medium)
             }
         }
         .confirmationDialog(

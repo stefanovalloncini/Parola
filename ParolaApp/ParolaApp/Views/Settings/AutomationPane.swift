@@ -78,7 +78,7 @@ struct AutomationPane: View {
                             .foregroundStyle(DS.Color.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(16)
+                    .padding(DS.Spacing.medium)
                 }
 
                 SettingsSection("parola-mcp binary") {
@@ -113,7 +113,7 @@ struct AutomationPane: View {
                             #endif
                         }
                     }
-                    .padding(16)
+                    .padding(DS.Spacing.medium)
                 }
 
                 if let snippet = Self.mcpJSONSnippet {
@@ -127,7 +127,7 @@ struct AutomationPane: View {
                                     .font(DS.Font.mono)
                                     .textSelection(.enabled)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(10)
+                                    .padding(DS.Spacing.small)
                             }
                             .frame(maxHeight: 160)
                             .background(
@@ -137,7 +137,7 @@ struct AutomationPane: View {
                             Button("Copy Snippet") { copy(snippet, label: String(localized: "Snippet copied")) }
                                 .axLeaf("Automation.Button.CopySnippet")
                         }
-                        .padding(16)
+                        .padding(DS.Spacing.medium)
                     }
                 }
 
@@ -154,7 +154,7 @@ struct AutomationPane: View {
 
                 ResetPaneButton(scope: .automation)
             }
-            .padding(20)
+            .padding(DS.Spacing.medium)
         }
     }
 

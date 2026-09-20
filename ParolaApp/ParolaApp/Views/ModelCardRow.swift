@@ -33,13 +33,13 @@ struct ModelCardRow: View {
                             ModelTagChip(label: chip.label, fill: chip.fill, text: chip.text)
                         }
                     }
-                    .padding(.top, 2)
+                    .padding(.top, DS.Spacing.hair)
                 }
             }
             Spacer(minLength: 12)
             trailing
         }
-        .padding(14)
+        .padding(DS.Spacing.regular)
         .background(DS.Color.surfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
@@ -232,8 +232,8 @@ struct ModelTagChip: View {
         Text(label)
             .font(DS.Font.caption)
             .foregroundStyle(text)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
+            .padding(.horizontal, DS.Spacing.small)
+            .padding(.vertical, DS.Spacing.hair)
             .background(fill, in: Capsule())
     }
 }

@@ -26,7 +26,7 @@ struct IgnoredSegmentsPane: View {
                         Text("No matches").foregroundStyle(DS.Color.secondaryText).font(DS.Font.body)
                         Spacer()
                     }
-                    .padding(16)
+                    .padding(DS.Spacing.medium)
                 } else {
                     ForEach(Array(displayedRules.enumerated()), id: \.element.id) { position, rule in
                         if let binding = binding(for: rule.id) {
@@ -160,7 +160,7 @@ private struct IgnoredRuleRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !isFirst { Divider().padding(.leading, 16) }
+            if !isFirst { Divider().padding(.leading, DS.Spacing.medium) }
             HStack(spacing: 10) {
                 Toggle("", isOn: enabledBinding)
                     .labelsHidden()
@@ -175,8 +175,8 @@ private struct IgnoredRuleRow: View {
                 .buttonStyle(.borderless)
                 .axLeaf("IgnoredSegments.Button.Delete")
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, DS.Spacing.medium)
+            .padding(.vertical, DS.Spacing.small)
         }
     }
 }

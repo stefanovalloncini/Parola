@@ -27,8 +27,8 @@ struct PillPickerButton<MenuContent: View>: View {
                     .font(DS.Font.caption)
                     .foregroundStyle(.tertiary)
             }
-            .padding(.horizontal, 11)
-            .padding(.vertical, 5)
+            .padding(.horizontal, DS.Spacing.regular)
+            .padding(.vertical, DS.Spacing.tight)
             .frame(height: 28)
             .background(
                 Capsule(style: .continuous)
@@ -46,7 +46,7 @@ struct PillPickerButton<MenuContent: View>: View {
         .accessibilityLabel("\(caption): \(value)")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             menuContent()
-                .padding(.vertical, 6)
+                .padding(.vertical, DS.Spacing.snug)
                 .frame(minWidth: 240)
         }
         .axLeaf("Pill.Button.\(caption)")
@@ -73,8 +73,8 @@ struct PillToggleButton: View {
                     .lineLimit(1)
             }
             .foregroundStyle(isOn ? DS.Color.onAccent : Color.primary)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 5)
+            .padding(.horizontal, DS.Spacing.regular)
+            .padding(.vertical, DS.Spacing.tight)
             .frame(height: 28)
             .background(
                 Capsule(style: .continuous)
@@ -151,7 +151,7 @@ struct PillPopoverRow: View {
                     Text(verbatim: badgeText)
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.Color.secondaryText)
-                        .padding(.horizontal, 5)
+                        .padding(.horizontal, DS.Spacing.tight)
                         .padding(.vertical, 1)
                         .background(Capsule(style: .continuous).fill(Color.primary.opacity(0.08)))
                 }
@@ -166,14 +166,14 @@ struct PillPopoverRow: View {
                     .foregroundStyle(DS.Color.accent)
                     .opacity(isSelected ? 1 : 0)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.horizontal, DS.Spacing.small)
+            .padding(.vertical, DS.Spacing.tight)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                     .fill(hovering ? Color.secondary.opacity(0.18) : Color.clear)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
@@ -188,9 +188,9 @@ struct PillPopoverSectionHeader: View {
         Text(title.uppercased())
             .font(DS.Font.caption)
             .foregroundStyle(DS.Color.secondaryText)
-            .padding(.horizontal, 14)
-            .padding(.top, 8)
-            .padding(.bottom, 2)
+            .padding(.horizontal, DS.Spacing.regular)
+            .padding(.top, DS.Spacing.small)
+            .padding(.bottom, DS.Spacing.hair)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

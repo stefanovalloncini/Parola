@@ -277,7 +277,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
                 .font(DS.Font.caption)
         }
         .foregroundStyle(DS.Color.accentText)
-        .padding(.horizontal, 5)
+        .padding(.horizontal, DS.Spacing.tight)
         .padding(.vertical, 1)
         .background(Capsule().fill(DS.Color.accentWash))
     }

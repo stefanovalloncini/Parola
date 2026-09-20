@@ -15,7 +15,7 @@ struct ContentToolbar: ToolbarContent {
                         .modifier(LanguageNoticeHelpModifier(notice: languageControlNotice))
                 }
                 // Without this the pills' own capsules run flush into the toolbar's rounded ends.
-                .padding(.horizontal, 5)
+                .padding(.horizontal, DS.Spacing.tight)
             }
             ToolbarItem(placement: .navigation) {
                 optionsButton

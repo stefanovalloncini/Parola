@@ -163,7 +163,7 @@ struct MicrophonePane: View {
                 .controlSize(.small)
                 .axLeaf("Microphone.Button.OpenAccessSettings")
         }
-        .padding(12)
+        .padding(DS.Spacing.regular)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
@@ -231,7 +231,7 @@ private struct MicErrorBanner: View {
                 .axLeaf("Microphone.Button.OpenSystemSettings")
             }
         }
-        .padding(12)
+        .padding(DS.Spacing.regular)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
