@@ -32,7 +32,7 @@ extension ScenarioSuite {
             _ = try await client.send("resetTestState")
             let opened = try await client.send("showIntroduction")
             let steps = opened["steps"]?.arrayValue?.compactMap(\.stringValue) ?? []
-            #expect(!steps.isEmpty, "precondition: the introduction should offer at least one step")
+            try #require(steps.count >= 2, "precondition: the introduction should offer at least two steps")
 
             for expected in steps.dropFirst() {
                 let advanced = try await client.send("introductionNext")
@@ -49,18 +49,21 @@ extension ScenarioSuite {
             #expect(skipped["visible"]?.boolValue == false)
         }
 
-        @Test("choosing a non-Apple engine and continuing commits it into selectedModel")
+        @Test("choosing the installed engine and continuing commits it into selectedModel, nothing downloads")
         func choosesEngineAndCommits() async throws {
             let client = try ScenarioBridgeClient()
             try await client.connect()
             defer { Task { await client.close() } }
 
             _ = try await client.send("resetTestState")
-            var state = try await client.send("showIntroduction")
-            let engineChoices = state["engineChoices"]?.arrayValue?.compactMap(\.stringValue) ?? []
-            guard let choice = engineChoices.first(where: { $0 != Self.appleSpeechID }) else {
+            let initial = try await client.send("getState")
+            let engineChoices = initial["introduction"]?["engineChoices"]?.arrayValue?.compactMap(\.stringValue) ?? []
+            guard let whisperChoice = engineChoices.first(where: { $0 != Self.appleSpeechID }) else {
                 return
             }
+            _ = try await client.send("selectModel", ["name": whisperChoice])
+
+            var state = try await client.send("showIntroduction")
             let steps = state["steps"]?.arrayValue?.compactMap(\.stringValue) ?? []
 
             for _ in steps.indices {
@@ -69,14 +72,15 @@ extension ScenarioSuite {
             }
             try #require(state["step"]?.stringValue == "engine", "never reached the engine step")
 
-            let chosen = try await client.send("introductionChooseEngine", ["id": choice])
-            #expect(chosen["engine"]?.stringValue == choice)
+            let chosen = try await client.send("introductionChooseEngine", ["id": Self.appleSpeechID])
+            #expect(chosen["engine"]?.stringValue == Self.appleSpeechID)
 
             let advanced = try await client.send("introductionNext")
             #expect(advanced["step"]?.stringValue == "ready")
 
             let appState = try await client.send("getState")
-            #expect(appState["selectedModel"]?.stringValue == choice)
+            #expect(appState["selectedModel"]?.stringValue == Self.appleSpeechID)
+            #expect(appState["phase"]?.stringValue == "idle")
         }
 
         @Test("introductionSkip persists, and clearing introductionComplete brings it back")
@@ -97,6 +101,9 @@ extension ScenarioSuite {
             let state = try await client.send("getState")
             #expect(state["introduction"]?["visible"]?.boolValue == true)
             #expect(state["introduction"]?["step"]?.stringValue == "hello")
+
+            let reskipped = try await client.send("introductionSkip")
+            #expect(reskipped["visible"]?.boolValue == false)
         }
     }
 }
