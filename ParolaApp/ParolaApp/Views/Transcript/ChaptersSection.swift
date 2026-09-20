@@ -37,7 +37,6 @@ struct ChaptersSection: View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             Button("Generate Chapters") { model.extractSmartChapters() }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                .controlSize(.small)
                 .disabled(!model.isAIAvailable)
                 .accessibilityIdentifier("transcript.inspector.chapters")
                 .axLeaf("Chapters.Button.Generate")

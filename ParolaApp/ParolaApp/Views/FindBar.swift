@@ -114,7 +114,6 @@ struct FindBar: View {
 
             Button("Replace") { model.replaceCurrentMatch() }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                .controlSize(.small)
                 .keyboardShortcut("=", modifiers: [.command])
                 .disabled(model.matches.isEmpty)
                 .accessibilityIdentifier("find.replace")

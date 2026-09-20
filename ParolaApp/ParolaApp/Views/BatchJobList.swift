@@ -35,7 +35,6 @@ struct BatchJobList: View {
                     Label("Add Files…", systemImage: "plus")
                 }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                .controlSize(.regular)
                 .axLeaf("Queue.Button.AddFiles")
 
                 if model.canResumeBatch {

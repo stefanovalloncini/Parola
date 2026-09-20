@@ -146,7 +146,6 @@ private struct FlowChips: View {
             ForEach(items, id: \.self) { item in
                 Button(item) { onTap(item) }
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                    .controlSize(.small)
                     .axLeaf("Speakers.Button.Suggestion")
             }
         }
