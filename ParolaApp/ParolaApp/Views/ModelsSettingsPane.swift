@@ -365,10 +365,10 @@ struct ModelsSettingsPane: View {
     private func sectionHeader(_ title: LocalizedStringKey, count: Int?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(title)
-                .font(DS.Font.title3)
+                .font(DS.Font.heading)
             if let count, count > 0 {
                 Text(verbatim: AppFormat.integer(count))
-                    .font(DS.Font.calloutMedium)
+                    .font(DS.Font.mono)
                     .foregroundStyle(DS.Color.secondaryText)
             }
             Spacer()

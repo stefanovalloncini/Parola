@@ -49,46 +49,6 @@ enum DS {
         static let transcript = SwiftUI.Font.system(size: 15)
         static let transcriptCompact = SwiftUI.Font.system(size: 13)
         static let timer = SwiftUI.Font.system(size: 22, weight: .light, design: .monospaced)
-
-        // MARK: - Legacy names, mapped onto the tiers above
-
-        static let largeTitle = display
-        static let largeTitleRounded = SwiftUI.Font.system(size: 28, weight: .semibold, design: .rounded)
-        static let titleRegular = SwiftUI.Font.system(size: 22)
-        static let titleRounded = SwiftUI.Font.system(size: 22, weight: .semibold, design: .rounded)
-
-        static let title3 = heading
-        static let title3Regular = SwiftUI.Font.system(size: 15)
-        static let title3Medium = SwiftUI.Font.system(size: 15, weight: .medium)
-        static let title3Bold = SwiftUI.Font.system(size: 15, weight: .bold)
-
-        static let bodyEmphasized = bodyStrong
-        static let bodyMedium = bodyStrong
-        static let bodyMono = mono
-
-        static let callout = secondary
-        static let calloutEmphasized = bodyStrong
-        static let calloutMedium = bodyStrong
-        static let calloutMono = mono
-        static let calloutMonoEmphasized = SwiftUI.Font.system(size: 12, weight: .semibold, design: .monospaced).monospacedDigit()
-
-        static let subheadline = secondary
-        static let subheadlineEmphasized = bodyStrong
-        static let subheadlineMedium = bodyStrong
-        static let subheadlineBold = SwiftUI.Font.system(size: 13, weight: .bold)
-        static let subheadlineMono = mono
-
-        static let captionEmphasized = SwiftUI.Font.system(size: 11, weight: .semibold)
-        static let captionMedium = caption
-        static let captionMono = mono
-        static let captionMonoEmphasized = calloutMonoEmphasized
-
-        static let caption2 = caption
-        static let caption2Emphasized = captionEmphasized
-        static let caption2Medium = caption
-        static let caption2Bold = SwiftUI.Font.system(size: 11, weight: .bold)
-        static let caption2Mono = mono
-        static let caption2MonoEmphasized = calloutMonoEmphasized
     }
 
     /// The active palette every element color funnels through. AppModel.applyTheme() sets it on the main actor.
@@ -281,7 +241,7 @@ extension View {
 
     /// A live readout that must hold the accent on video — `onAccent` fill lands under AA on five of seven presets.
     func accentPill() -> some View {
-        font(DS.Font.captionMono)
+        font(DS.Font.mono)
             .foregroundStyle(DS.Color.accentText)
             .padding(.horizontal, DS.Spacing.small)
             .padding(.vertical, DS.Spacing.hair)

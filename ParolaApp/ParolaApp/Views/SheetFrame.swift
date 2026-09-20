@@ -95,14 +95,14 @@ struct SheetFrame<Content: View, Footer: View>: View {
     private var header: some View {
         HStack(spacing: DS.Spacing.regular) {
             Image(systemName: icon)
-                .font(DS.Font.bodyEmphasized)
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(iconTint)
                 .frame(width: 28, height: 28)
                 .background(iconTint.opacity(0.16))
                 .clipShape(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
 
             titleText
-                .font(DS.Font.title3)
+                .font(DS.Font.heading)
                 .lineLimit(1)
 
             Spacer(minLength: DS.Spacing.small)
@@ -114,7 +114,7 @@ struct SheetFrame<Content: View, Footer: View>: View {
             if showsClose {
                 Button(action: onClose) {
                     Image(systemName: "xmark")
-                        .font(DS.Font.subheadlineBold)
+                        .font(DS.Font.bodyStrong)
                         .foregroundStyle(DS.Color.secondaryText)
                         .frame(width: 22, height: 22)
                         .background(DS.Color.surfaceElevated)

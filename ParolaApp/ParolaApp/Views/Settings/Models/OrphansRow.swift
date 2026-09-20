@@ -14,7 +14,7 @@ struct OrphansRow: View {
                 .frame(width: 24, height: 24)
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
-                    .font(DS.Font.subheadline)
+                    .font(DS.Font.bodyStrong)
                 if let bytes = displaySize {
                     Text(AppFormat.byteSize(bytes))
                         .font(DS.Font.secondary)

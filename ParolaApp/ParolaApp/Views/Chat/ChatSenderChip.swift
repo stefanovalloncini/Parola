@@ -19,11 +19,11 @@ struct ChatSenderChip: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "person.crop.circle")
-                    .font(DS.Font.captionEmphasized)
+                    .font(DS.Font.caption)
                 Text(selection.label)
                     .font(DS.Font.secondary)
                 Image(systemName: "chevron.down")
-                    .font(DS.Font.caption2Emphasized)
+                    .font(DS.Font.caption)
             }
         }
         .menuStyle(.button)

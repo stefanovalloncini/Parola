@@ -34,7 +34,7 @@ struct OutlinePopover: View {
     private var header: some View {
         HStack {
             Text("Outline")
-                .font(DS.Font.calloutEmphasized)
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(DS.Color.secondaryText)
             Spacer()
             if model.smartChapters.isEmpty {
@@ -52,10 +52,10 @@ struct OutlinePopover: View {
     private var emptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: "list.bullet.rectangle.portrait")
-                .font(DS.Font.titleRegular)
+                .font(DS.Font.title)
                 .foregroundStyle(DS.Color.secondaryText)
             Text("No outline available")
-                .font(DS.Font.callout)
+                .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.secondaryText)
         }
         .frame(maxWidth: .infinity)
@@ -73,12 +73,12 @@ private struct OutlineRow: View {
         Button(action: onJump) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(Timecode.format(entry.start))
-                    .font(DS.Font.subheadlineMedium.monospacedDigit())
+                    .font(DS.Font.mono)
                     .foregroundStyle(DS.Color.accentText)
                     .frame(width: 50, alignment: .leading)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(entry.title)
-                        .font(DS.Font.callout)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.primaryText)
                         .multilineTextAlignment(.leading)
                     if let rawSpeaker = entry.speaker, let speaker = SegmentCard.speakerLabel(for: rawSpeaker) {
@@ -87,7 +87,7 @@ private struct OutlineRow: View {
                                 .fill(DS.speakerColor(for: rawSpeaker))
                                 .frame(width: 5, height: 5)
                             Text(speaker)
-                                .font(DS.Font.caption2)
+                                .font(DS.Font.caption)
                                 .foregroundStyle(DS.Color.secondaryText)
                         }
                     }

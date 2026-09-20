@@ -17,7 +17,7 @@ struct TranslationPane: View {
             }
             if let warning = model.translateMismatchWarning {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
-                    .font(DS.Font.callout)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.warningText)
                     .axLeaf("Translation.Label.TranslateWarning")
             }

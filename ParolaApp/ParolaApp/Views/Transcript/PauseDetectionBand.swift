@@ -13,9 +13,9 @@ struct LongPauseDivider: View {
             line
             HStack(spacing: 4) {
                 Image(systemName: "moon.zzz")
-                    .font(DS.Font.caption2Emphasized)
+                    .font(DS.Font.caption)
                 Text(label)
-                    .font(DS.Font.captionMono)
+                    .font(DS.Font.mono)
             }
             .foregroundStyle(DS.Color.secondaryText)
             .padding(.horizontal, 8)

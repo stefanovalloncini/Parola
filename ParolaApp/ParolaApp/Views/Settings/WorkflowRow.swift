@@ -45,7 +45,7 @@ struct WorkflowRow: View {
                                 isAddingRule = true
                             } label: {
                                 Label("Add URL Rule", systemImage: "plus.circle")
-                                    .font(DS.Font.subheadline)
+                                    .font(DS.Font.secondary)
                             }
                             .buttonStyle(.borderless)
                             .foregroundStyle(DS.Color.secondaryText)

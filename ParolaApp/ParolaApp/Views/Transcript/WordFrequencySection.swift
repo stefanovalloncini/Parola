@@ -61,7 +61,7 @@ private struct WordFrequencyBar: View {
                 }
                 .frame(height: 8)
                 Text("\(count)")
-                    .font(DS.Font.captionMono)
+                    .font(DS.Font.mono)
                     .foregroundStyle(DS.Color.secondaryText)
                     .frame(width: 24, alignment: .trailing)
             }

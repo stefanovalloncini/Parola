@@ -51,7 +51,7 @@ struct BatchFormatCard: View {
             } label: {
                 HStack(spacing: DS.Spacing.small) {
                     Image(systemName: "chevron.right")
-                        .font(DS.Font.subheadlineBold)
+                        .font(DS.Font.bodyStrong)
                         .foregroundStyle(DS.Color.secondaryText)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     Text(LocalizedStringKey(formatLabel))
@@ -63,7 +63,7 @@ struct BatchFormatCard: View {
                         model.removeBatchExportFormat(format)
                     } label: {
                         Image(systemName: "xmark")
-                            .font(DS.Font.caption2Emphasized)
+                            .font(DS.Font.caption)
                             .foregroundStyle(DS.Color.secondaryText)
                             .frame(width: 20, height: 20)
                     }

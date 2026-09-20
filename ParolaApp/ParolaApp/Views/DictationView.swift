@@ -50,7 +50,7 @@ struct DictationView: View {
                     .foregroundStyle(.white)
                 if let modeName = currentModeName {
                     Text(modeName)
-                        .font(DS.Font.caption2Emphasized)
+                        .font(DS.Font.caption)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(.white)
@@ -109,12 +109,12 @@ struct DictationView: View {
             indicator
                 .frame(width: 22, height: 16)
             Text(notchLabel)
-                .font(DS.Font.subheadlineMedium)
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(.white.opacity(0.9))
                 .lineLimit(1)
             Spacer(minLength: 0)
             timer
-                .font(DS.Font.subheadlineMono)
+                .font(DS.Font.mono)
                 .foregroundStyle(.white.opacity(0.65))
             stopButton
         }
@@ -162,7 +162,7 @@ struct DictationView: View {
                 indicator
                     .frame(width: 24, height: 16)
                 Text(nearFieldLabel)
-                    .font(DS.Font.caption2Medium)
+                    .font(DS.Font.caption)
                     .foregroundStyle(.white.opacity(0.9))
                     .lineLimit(hasFailureMessage ? 2 : 1)
                 Spacer(minLength: 0)
@@ -170,7 +170,7 @@ struct DictationView: View {
             }
             if hasPartial {
                 Text(controller.recentDictation)
-                    .font(DS.Font.caption2Medium)
+                    .font(DS.Font.caption)
                     .foregroundStyle(.white.opacity(0.85))
                     .lineLimit(2)
                     .truncationMode(.head)
@@ -213,7 +213,7 @@ struct DictationView: View {
             SpinningRing().frame(width: 14, height: 14)
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(DS.Font.title3Regular)
+                .font(DS.Font.heading)
                 .foregroundStyle(.orange)
         }
     }
@@ -246,7 +246,7 @@ struct DictationView: View {
                 ZStack {
                     Circle().fill(Color.white.opacity(0.14))
                     Image(systemName: "stop.fill")
-                        .font(DS.Font.caption2Bold)
+                        .font(DS.Font.caption)
                         .foregroundStyle(.white)
                 }
                 .frame(width: 22, height: 22)

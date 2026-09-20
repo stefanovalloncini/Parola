@@ -225,9 +225,9 @@ private struct SettingsDetail: View {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(route.localizedLabelKey)
-                        .font(DS.Font.title3)
+                        .font(DS.Font.heading)
                     Text(route.localizedSummaryKey)
-                        .font(DS.Font.callout)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }

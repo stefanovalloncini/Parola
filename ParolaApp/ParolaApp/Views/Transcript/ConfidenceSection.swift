@@ -56,7 +56,7 @@ struct ConfidenceSection: View {
         } label: {
             HStack(spacing: DS.Spacing.tight) {
                 Text(Timecode.format(seg.start))
-                    .font(DS.Font.captionMono)
+                    .font(DS.Font.mono)
                     .foregroundStyle(DS.Color.accentText)
                     .frame(width: 50, alignment: .leading)
                 Text(seg.text)

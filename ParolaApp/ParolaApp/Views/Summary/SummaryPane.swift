@@ -36,7 +36,7 @@ struct SummaryPane: View {
                         .frame(width: 18, height: 18)
                 } else {
                     Image(systemName: "arrow.clockwise")
-                        .font(DS.Font.bodyMedium)
+                        .font(DS.Font.bodyStrong)
                 }
             }
             .buttonStyle(.plain)
@@ -69,13 +69,13 @@ struct SummaryPane: View {
 
     private var dot: some View {
         Text(verbatim: "·")
-            .font(DS.Font.captionMono)
+            .font(DS.Font.mono)
             .foregroundStyle(DS.Color.secondaryText.opacity(0.5))
     }
 
     private func metaLabel(_ text: Text) -> some View {
         text
-            .font(DS.Font.captionMono)
+            .font(DS.Font.mono)
             .foregroundStyle(DS.Color.secondaryText)
     }
 

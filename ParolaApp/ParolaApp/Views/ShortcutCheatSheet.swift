@@ -81,7 +81,7 @@ struct ShortcutCheatSheet: View {
     private func sectionView(_ section: ShortcutCatalog.Section) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(section.title.uppercased())
-                .font(DS.Font.captionEmphasized)
+                .font(DS.Font.caption)
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(section.entries) { entry in
@@ -90,7 +90,7 @@ struct ShortcutCheatSheet: View {
                             .font(DS.Font.body)
                         Spacer()
                         Text(entry.keys)
-                            .font(DS.Font.bodyMono)
+                            .font(DS.Font.mono)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
                             .background(

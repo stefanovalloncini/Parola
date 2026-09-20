@@ -29,7 +29,7 @@ struct TranscriptHeaderBar: View {
 
             if let label = languageLabel {
                 Text(label)
-                    .font(DS.Font.caption2Emphasized)
+                    .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.accentText)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)

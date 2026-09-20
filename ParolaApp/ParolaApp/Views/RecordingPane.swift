@@ -62,7 +62,7 @@ struct RecordingPane: View {
             Image(systemName: icon)
                 .foregroundStyle(.white)
             Text(message)
-                .font(DS.Font.calloutMedium)
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(.white)
             Spacer()
         }
@@ -191,7 +191,7 @@ struct LiveTranscriptView: View {
                 .symbolEffect(.variableColor.iterative, isActive: !reduceMotion)
                 .accessibilityHidden(true)
             Text("Your transcript appears here as you speak")
-                .font(DS.Font.callout)
+                .font(DS.Font.secondary)
                 .multilineTextAlignment(.center)
         }
         .foregroundStyle(DS.Color.secondaryText.opacity(0.6))

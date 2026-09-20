@@ -16,7 +16,7 @@ struct DSPillButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(size == .regular ? DS.Font.bodyMedium : DS.Font.calloutEmphasized)
+            .font(DS.Font.bodyStrong)
             .foregroundStyle(foreground)
             .frame(minWidth: size == .regular ? 104 : nil, minHeight: size == .regular ? 36 : 28)
             .padding(.horizontal, size == .regular ? DS.Spacing.medium : 14)
@@ -77,7 +77,7 @@ struct DSIconChipButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(DS.Font.subheadlineEmphasized)
+            .font(DS.Font.bodyStrong)
             .foregroundStyle(.secondary)
             .padding(.horizontal, fitsLabel ? DS.Spacing.snug : 0)
             .frame(width: fitsLabel ? nil : side, height: side)

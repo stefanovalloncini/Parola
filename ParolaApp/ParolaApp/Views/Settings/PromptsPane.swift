@@ -92,7 +92,7 @@ struct PromptsPane: View {
                 .foregroundStyle(DS.Palette.warning)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Couldn't save your prompts")
-                    .font(DS.Font.calloutMedium)
+                    .font(DS.Font.bodyStrong)
                 Text("The change is only in this session. Check that Parola can write to its Application Support folder.")
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
@@ -258,9 +258,9 @@ private struct PromptEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if draft.isExisting {
-                Text("Edit Prompt").font(DS.Font.title3)
+                Text("Edit Prompt").font(DS.Font.heading)
             } else {
-                Text("New Prompt").font(DS.Font.title3)
+                Text("New Prompt").font(DS.Font.heading)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -273,7 +273,7 @@ private struct PromptEditor: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Instructions").font(DS.Font.secondary).foregroundStyle(DS.Color.secondaryText)
                 TextEditor(text: $draft.instructions)
-                    .font(DS.Font.subheadline)
+                    .font(DS.Font.body)
                     .frame(minHeight: 160)
                     .padding(4)
                     .overlay(

@@ -66,7 +66,7 @@ struct ContentToolbar: ToolbarContent {
         return VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             if let notice = model.englishOnlyAutoNotice {
                 Label(notice, systemImage: "exclamationmark.triangle.fill")
-                    .font(DS.Font.callout)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.warningText)
                     .axLeaf("Toolbar.Label.EnglishOnlyAutoNotice")
             }

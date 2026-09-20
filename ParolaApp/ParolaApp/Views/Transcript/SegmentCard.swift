@@ -152,7 +152,7 @@ struct SegmentCard: View {
     private func noteRow(text: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "note.text")
-                .font(DS.Font.caption2)
+                .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.accent)
             Text(text)
                 .font(DS.Font.secondary)
@@ -303,7 +303,7 @@ struct SegmentCard: View {
                 .axLeaf("Card.Button.Delete")
         } label: {
             Image(systemName: "ellipsis")
-                .font(DS.Font.subheadlineEmphasized)
+                .font(DS.Font.bodyStrong)
                 .frame(width: 22, height: 22)
                 .contentShape(Rectangle())
         }
@@ -324,7 +324,7 @@ struct SegmentCard: View {
     private func cardButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(DS.Font.subheadlineEmphasized)
+                .font(DS.Font.bodyStrong)
                 .frame(width: 22, height: 22)
                 .contentShape(Rectangle())
         }

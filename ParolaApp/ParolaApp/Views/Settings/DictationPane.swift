@@ -65,13 +65,13 @@ struct DictationPane: View {
                 SettingRow("Model",
                            description: "Dictation uses the model picked in the main toolbar.") {
                     Text(AppModel.modelLabel(model.selectedModel))
-                        .font(DS.Font.callout)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
                         .axLeaf("Dictation.Label.Model")
                 }
                 ForEach(model.dictationModelWarnings, id: \.self) { warning in
                     Label(warning, systemImage: "exclamationmark.triangle.fill")
-                        .font(DS.Font.callout)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.warningText)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 4)
@@ -134,7 +134,7 @@ struct DictationPane: View {
                             .frame(width: 160)
                             .axLeaf("Dictation.Slider.PasteDelay")
                         Text("\(model.dictationPasteDelayMs) ms")
-                            .font(DS.Font.subheadlineMono)
+                            .font(DS.Font.mono)
                             .foregroundStyle(DS.Color.secondaryText)
                             .frame(width: 56, alignment: .trailing)
                     }

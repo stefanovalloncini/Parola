@@ -9,7 +9,7 @@ struct LiveCaptionsPane: View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 12) {
             Text("Live captions transcribe the microphone as you speak and show the words in a floating panel that stays above other windows.")
-                .font(DS.Font.callout)
+                .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             SettingsSection {
@@ -22,7 +22,7 @@ struct LiveCaptionsPane: View {
                 }
                 if let warning = model.translateMismatchWarning {
                     Label(warning, systemImage: "exclamationmark.triangle.fill")
-                        .font(DS.Font.callout)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.warningText)
                         .padding(.top, 2)
                         .axLeaf("LiveCaptions.Label.TranslateWarning")

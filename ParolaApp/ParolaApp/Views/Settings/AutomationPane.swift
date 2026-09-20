@@ -165,14 +165,14 @@ struct AutomationPane: View {
                 .frame(width: 10, height: 10)
             if model.automationBridgeRunning, let port = model.automationBridgePort {
                 Text("Listening on 127.0.0.1:\(String(port))")
-                    .font(DS.Font.subheadline)
+                    .font(DS.Font.secondary)
             } else if model.automationBridgeRunning {
                 Text("Starting…")
-                    .font(DS.Font.subheadline)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
             } else {
                 Text("Bridge disabled")
-                    .font(DS.Font.subheadline)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
             }
             Spacer()

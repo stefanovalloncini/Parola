@@ -12,7 +12,7 @@ struct SummaryChapterRow: View {
         } label: {
             HStack(spacing: DS.Spacing.regular) {
                 Text(Timecode.format(chapter.start))
-                    .font(DS.Font.captionMono)
+                    .font(DS.Font.mono)
                     .foregroundStyle(DS.Color.secondaryText)
                     .frame(width: 64, alignment: .leading)
                 Text(chapter.title)
@@ -20,7 +20,7 @@ struct SummaryChapterRow: View {
                     .foregroundStyle(DS.Color.primaryText)
                 Spacer()
                 Image(systemName: "play.fill")
-                    .font(DS.Font.caption2)
+                    .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.accent)
                     .opacity(hovering ? 1 : 0)
             }

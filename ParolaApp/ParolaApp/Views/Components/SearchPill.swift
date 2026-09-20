@@ -37,11 +37,11 @@ struct SearchPill: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(DS.Font.subheadline)
+                .font(DS.Font.secondary)
                 .foregroundStyle(.secondary)
             TextField(placeholder, text: $text, prompt: prompt.map(Text.init))
                 .textFieldStyle(.plain)
-                .font(DS.Font.subheadline)
+                .font(DS.Font.secondary)
                 .accessibilityIdentifier(identifier)
                 .onKeyPress(.escape) {
                     guard Self.escapeOutcome(clearsOnEscape: clearsOnEscape, isEmpty: text.isEmpty) == .clear
@@ -54,7 +54,7 @@ struct SearchPill: View {
                     text = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(DS.Font.subheadline)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(.secondary)
                         .contentShape(Rectangle())
                 }

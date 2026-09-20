@@ -41,11 +41,11 @@ struct AboutInfoView: View {
                         .font(DS.Font.title)
                     HStack(spacing: 6) {
                         Text("Version \(AboutInfo.versionString)")
-                            .font(DS.Font.callout)
+                            .font(DS.Font.secondary)
                             .foregroundStyle(DS.Color.secondaryText)
                         if let channel = AboutInfo.channelLabel {
                             Text(channel)
-                                .font(DS.Font.caption2Emphasized)
+                                .font(DS.Font.caption)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 1)
                                 .background(Capsule().fill(DS.Color.accentWash))
@@ -80,11 +80,11 @@ struct AboutInfoView: View {
     private func creditRow(title: LocalizedStringKey, value: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(title)
-                .font(DS.Font.subheadlineEmphasized)
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(DS.Color.secondaryText)
                 .frame(width: 90, alignment: .leading)
             Text(verbatim: value)
-                .font(DS.Font.callout)
+                .font(DS.Font.body)
                 .foregroundStyle(.primary)
         }
     }

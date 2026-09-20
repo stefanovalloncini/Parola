@@ -153,7 +153,7 @@ struct MicrophonePane: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Microphone access is off")
-                    .font(DS.Font.calloutMedium)
+                    .font(DS.Font.bodyStrong)
                 Text("Parola needs the microphone to record and dictate.")
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
@@ -216,7 +216,7 @@ private struct MicErrorBanner: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(DS.Palette.warning)
                 Text("Couldn't open microphone")
-                    .font(DS.Font.calloutMedium)
+                    .font(DS.Font.bodyStrong)
             }
             Text(message)
                 .font(DS.Font.secondary)

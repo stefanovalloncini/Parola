@@ -186,7 +186,7 @@ struct ModelEngineIcon: View {
             RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                 .fill(Self.tint(for: engineID).opacity(0.15))
             Image(systemName: Self.symbol(for: engineID))
-                .font(DS.Font.title3)
+                .font(DS.Font.heading)
                 .foregroundStyle(Self.tint(for: engineID))
         }
         .frame(width: 34, height: 34)

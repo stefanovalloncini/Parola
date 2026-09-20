@@ -70,7 +70,7 @@ struct LiveCaptionsView: View {
         let translating = controller.translateToEnglish
         HStack(spacing: 6) {
             Image(systemName: translating ? "character.bubble" : "mic.fill")
-                .font(DS.Font.caption2Bold)
+                .font(DS.Font.caption)
             Text(translating ? "Translate" : "Mic")
                 .font(DS.Font.mono.weight(.semibold))
                 .textCase(.uppercase)

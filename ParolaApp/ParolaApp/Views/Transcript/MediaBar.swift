@@ -32,7 +32,7 @@ struct MediaBar: View {
         HStack(spacing: DS.Spacing.regular) {
             Button { model.skip(by: -15) } label: {
                 Image(systemName: "gobackward.15")
-                    .font(DS.Font.title3Medium)
+                    .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.primaryText)
                     .frame(width: 30, height: 30)
             }
@@ -44,7 +44,7 @@ struct MediaBar: View {
 
             Button(action: togglePlayPause) {
                 Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
-                    .font(DS.Font.bodyEmphasized)
+                    .font(DS.Font.bodyStrong)
                     .foregroundStyle(DS.Color.onAccent)
                     .frame(width: 36, height: 36)
                     .background(Circle().fill(DS.Color.accent))
@@ -60,7 +60,7 @@ struct MediaBar: View {
     private var skipSilencesButton: some View {
         Button { model.skipSilences.toggle() } label: {
             Image(systemName: model.skipSilences ? "forward.end.fill" : "forward.end")
-                .font(DS.Font.subheadlineEmphasized)
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(model.skipSilences ? DS.Color.accent : .secondary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
@@ -101,7 +101,7 @@ struct MediaBar: View {
                 Text(speedLabel(playbackRate))
                     .monospacedDigit()
                 Image(systemName: "chevron.down")
-                    .font(DS.Font.caption2Bold)
+                    .font(DS.Font.caption)
             }
         }
         .menuStyle(.button)
@@ -147,7 +147,7 @@ struct MediaBar: View {
 private struct SpeedPillStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(DS.Font.calloutMonoEmphasized)
+            .font(DS.Font.mono.weight(.semibold))
             .foregroundStyle(DS.Color.accentText)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -199,8 +199,7 @@ struct PlaybackTimeLabel: View {
             current: scrubbingTo ?? model.currentTimeSeconds,
             total: model.transcript?.durationSeconds ?? 0
         ))
-        .font(DS.Font.calloutMono)
-        .monospacedDigit()
+        .font(DS.Font.mono)
         .foregroundStyle(.secondary)
     }
 }

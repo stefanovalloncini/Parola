@@ -8,7 +8,7 @@ struct DictationHUDPreview: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Preview")
-                .font(DS.Font.subheadlineEmphasized)
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(DS.Color.secondaryText)
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
@@ -36,14 +36,14 @@ struct DictationHUDPreview: View {
                 .frame(width: 180, height: 22)
                 .overlay(alignment: .leading) {
                     Text("Type here…")
-                        .font(DS.Font.caption2Medium)
+                        .font(DS.Font.caption)
                         .foregroundStyle(.tertiary)
                         .padding(.leading, 6)
                 }
             HStack(spacing: 6) {
                 bars
                 Text("Listening")
-                    .font(DS.Font.caption2Medium)
+                    .font(DS.Font.caption)
                     .foregroundStyle(.white)
             }
             .padding(.horizontal, 10)
@@ -56,11 +56,11 @@ struct DictationHUDPreview: View {
         HStack(spacing: 10) {
             bars
             Text("Listening")
-                .font(DS.Font.calloutEmphasized)
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(.white)
             if let modeName {
                 Text(modeName)
-                    .font(DS.Font.caption2Emphasized)
+                    .font(DS.Font.caption)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
@@ -68,7 +68,7 @@ struct DictationHUDPreview: View {
             }
             Spacer(minLength: 0)
             Text("00:03")
-                .font(DS.Font.caption2Mono)
+                .font(DS.Font.mono)
                 .foregroundStyle(.white.opacity(0.7))
         }
         .padding(.horizontal, 12)
@@ -81,11 +81,11 @@ struct DictationHUDPreview: View {
         HStack(spacing: 6) {
             bars
             Text("Listening")
-                .font(DS.Font.caption2Medium)
+                .font(DS.Font.caption)
                 .foregroundStyle(.white)
             Spacer(minLength: 0)
             Text("00:03")
-                .font(DS.Font.caption2Mono)
+                .font(DS.Font.mono)
                 .foregroundStyle(.white.opacity(0.6))
         }
         .padding(.horizontal, 10)

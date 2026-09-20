@@ -16,15 +16,15 @@ struct PillPickerButton<MenuContent: View>: View {
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(DS.Font.subheadlineEmphasized)
+                    .font(DS.Font.bodyStrong)
                     .foregroundStyle(DS.Color.accent)
                     .frame(width: 14)
                 Text(value)
-                    .font(DS.Font.calloutMedium)
+                    .font(DS.Font.bodyStrong)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                 Image(systemName: "chevron.down")
-                    .font(DS.Font.caption2Bold)
+                    .font(DS.Font.caption)
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 11)
@@ -66,10 +66,10 @@ struct PillToggleButton: View {
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(DS.Font.subheadlineEmphasized)
+                    .font(DS.Font.bodyStrong)
                     .frame(width: 14)
                 Text(label)
-                    .font(DS.Font.calloutMedium)
+                    .font(DS.Font.bodyStrong)
                     .lineLimit(1)
             }
             .foregroundStyle(isOn ? DS.Color.onAccent : Color.primary)
@@ -162,7 +162,7 @@ struct PillPopoverRow: View {
                         .foregroundStyle(.secondary)
                 }
                 Image(systemName: "checkmark")
-                    .font(DS.Font.subheadlineEmphasized)
+                    .font(DS.Font.bodyStrong)
                     .foregroundStyle(DS.Color.accent)
                     .opacity(isSelected ? 1 : 0)
             }

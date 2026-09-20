@@ -39,7 +39,7 @@ struct FindBar: View {
                     .axLeaf("FindBar.TextField.Query")
                 if !model.findQuery.isEmpty {
                     Text(matchSummary)
-                        .font(DS.Font.captionMono)
+                        .font(DS.Font.mono)
                         .foregroundStyle(.secondary)
                         .padding(.trailing, 2)
                 }
@@ -85,7 +85,7 @@ struct FindBar: View {
                 model.toggleFind()
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(DS.Font.title3Regular)
+                    .font(DS.Font.heading)
                     .foregroundStyle(.secondary)
                     .contentShape(Rectangle())
             }
@@ -147,7 +147,7 @@ private struct FindIconButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(DS.Font.calloutEmphasized)
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(disabled ? Color.secondary.opacity(0.4) : Color.primary.opacity(0.85))
                 .frame(width: 22, height: 22)
                 .background(
@@ -174,7 +174,7 @@ private struct FindToggleButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(DS.Font.calloutEmphasized)
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(isOn ? Color.white : Color.primary.opacity(0.85))
                 .frame(width: 22, height: 22)
                 .background(

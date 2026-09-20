@@ -239,9 +239,9 @@ private struct ViewAllButton: View {
                 Text("View all (\(count))")
                     .underline(isHovering)
                 Image(systemName: "chevron.right")
-                    .font(DS.Font.caption2Emphasized)
+                    .font(DS.Font.caption)
             }
-            .font(DS.Font.subheadlineMedium)
+            .font(DS.Font.bodyStrong)
             .foregroundStyle(DS.Color.accentText)
             .contentShape(Rectangle())
         }
@@ -270,13 +270,13 @@ private struct IntakeDropWell: View {
                         .font(DS.Font.heading)
                         .foregroundStyle(DS.Color.primaryText)
                     Text("or click to choose files")
-                        .font(DS.Font.subheadline)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
                 }
                 Spacer(minLength: DS.Spacing.regular)
                 // A shape, not just the accent: under the Mono accent the dashed well alone reads as disabled.
                 Label("Open Files…", systemImage: "folder")
-                    .font(DS.Font.subheadlineMedium)
+                    .font(DS.Font.bodyStrong)
                     .foregroundStyle(DS.Color.primaryText)
                     .chipChrome(
                         isSelected: false,
@@ -351,7 +351,7 @@ private struct ModeButton: View {
                 Image(systemName: systemImage)
                     .foregroundStyle(DS.Color.accent)
                 Text(title)
-                    .font(DS.Font.subheadlineMedium)
+                    .font(DS.Font.bodyStrong)
                     .foregroundStyle(DS.Color.primaryText)
             }
             .pillStyle()

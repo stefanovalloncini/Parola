@@ -119,7 +119,7 @@ private struct SplitDropOverlay: View {
     private var header: some View {
         if let countLabel {
             Text(countLabel)
-                .font(DS.Font.subheadlineMedium)
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(DS.Color.secondaryText)
                 .frame(maxWidth: .infinity)
         }

@@ -10,7 +10,7 @@ struct ScratchpadView: View {
                 Image(systemName: "note.text")
                     .foregroundStyle(DS.Color.accent)
                 Text("Focus the text below, then trigger dictation to capture here.")
-                    .font(DS.Font.subheadline)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             }

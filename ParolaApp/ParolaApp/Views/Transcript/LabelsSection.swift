@@ -38,10 +38,10 @@ struct LabelsSection: View {
     private func chip(_ label: String) -> some View {
         HStack(spacing: 4) {
             Text(label)
-                .font(DS.Font.subheadlineMedium)
+                .font(DS.Font.bodyStrong)
             Button { remove(label) } label: {
                 Image(systemName: "xmark")
-                    .font(DS.Font.caption2Bold)
+                    .font(DS.Font.caption)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Remove label \(label)")

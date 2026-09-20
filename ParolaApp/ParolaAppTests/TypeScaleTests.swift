@@ -36,32 +36,11 @@ struct TypeScaleTests {
         NSHostingView(rootView: Text(verbatim: "Hxg 019").font(font)).fittingSize
     }
 
-    @Test("every legacy name renders as the tier it aliases")
-    func legacyNamesRenderAsTheirTier() {
-        // The measurement has to be able to fail: weight and design both move it.
+    @Test("tiers that share a line height still differ on screen")
+    func tiersSharingAHeightDiffer() {
         #expect(measured(DS.Font.body) != measured(DS.Font.bodyStrong))
         #expect(measured(DS.Font.secondary) != measured(DS.Font.mono))
-
-        let aliases: [(Comment, Font, Font)] = [
-            ("largeTitle", DS.Font.largeTitle, DS.Font.display),
-            ("title3", DS.Font.title3, DS.Font.heading),
-            ("callout", DS.Font.callout, DS.Font.secondary),
-            ("subheadline", DS.Font.subheadline, DS.Font.secondary),
-            ("caption2", DS.Font.caption2, DS.Font.caption),
-            ("captionMedium", DS.Font.captionMedium, DS.Font.caption),
-            ("bodyEmphasized", DS.Font.bodyEmphasized, DS.Font.bodyStrong),
-            ("bodyMedium", DS.Font.bodyMedium, DS.Font.bodyStrong),
-            ("calloutMedium", DS.Font.calloutMedium, DS.Font.bodyStrong),
-            ("subheadlineEmphasized", DS.Font.subheadlineEmphasized, DS.Font.bodyStrong),
-            ("bodyMono", DS.Font.bodyMono, DS.Font.mono),
-            ("calloutMono", DS.Font.calloutMono, DS.Font.mono),
-            ("subheadlineMono", DS.Font.subheadlineMono, DS.Font.mono),
-            ("captionMono", DS.Font.captionMono, DS.Font.mono),
-            ("caption2Mono", DS.Font.caption2Mono, DS.Font.mono),
-        ]
-        for (name, alias, tier) in aliases {
-            #expect(measured(alias) == measured(tier), name)
-        }
+        #expect(measured(DS.Font.transcript) != measured(DS.Font.heading))
     }
 
     @Test("a section caption is the caption tier, not a one-off")

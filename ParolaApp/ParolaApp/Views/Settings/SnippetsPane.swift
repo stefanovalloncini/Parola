@@ -57,7 +57,7 @@ struct SnippetsPane: View {
 
             SettingHelper(text: "Triggers fire on dictated text only; matching is case-insensitive and word-bounded.")
             Text("These placeholders expand in the replacement text: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}")
-                .font(DS.Font.subheadlineMono)
+                .font(DS.Font.mono)
                 .foregroundStyle(DS.Color.secondaryText)
                 .padding(.horizontal, 4)
             ResetPaneButton(scope: .snippets)

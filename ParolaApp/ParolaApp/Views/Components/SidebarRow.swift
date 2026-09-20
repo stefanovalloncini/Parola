@@ -41,16 +41,16 @@ struct SidebarRowLabel: View {
     var body: some View {
         HStack(spacing: DS.Spacing.small) {
             Image(systemName: systemImage)
-                .font(DS.Font.bodyMedium)
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(isSelected ? DS.Color.onAccent : .secondary)
                 .frame(width: 18, alignment: .center)
             Text(title)
-                .font(DS.Font.subheadline)
+                .font(DS.Font.secondary)
                 .lineLimit(1)
             Spacer(minLength: 0)
             if let badge {
                 Text("\(badge)")
-                    .font(DS.Font.captionMedium)
+                    .font(DS.Font.caption)
                     .foregroundStyle(isSelected ? DS.Color.onAccent.opacity(0.9) : .secondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 1)

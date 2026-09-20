@@ -56,7 +56,7 @@ struct MiniPlayerWindow: View {
 
             Button(action: togglePlayPause) {
                 Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
-                    .font(DS.Font.title3Bold)
+                    .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.onAccent)
                     .frame(width: 32, height: 32)
                     .background(Circle().fill(DS.Color.accent))
@@ -118,8 +118,7 @@ private struct MiniPlayerTimeLabel: View {
             current: model.currentTimeSeconds,
             total: model.transcript?.durationSeconds ?? 0
         ))
-        .font(DS.Font.subheadlineMono)
-        .monospacedDigit()
+        .font(DS.Font.mono)
         .foregroundStyle(.secondary)
     }
 }

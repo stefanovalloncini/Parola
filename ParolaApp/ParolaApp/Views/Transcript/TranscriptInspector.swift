@@ -104,7 +104,7 @@ struct InspectorDisclosureRow<Content: View>: View {
                     Text(title)
                     Spacer()
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(DS.Font.subheadline)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(DS.Color.secondaryText)
                 }
             }

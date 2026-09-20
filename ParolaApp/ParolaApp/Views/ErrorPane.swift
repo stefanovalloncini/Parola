@@ -18,14 +18,14 @@ struct ErrorBanner: View {
     var body: some View {
         HStack(alignment: .top, spacing: DS.Spacing.regular) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(DS.Font.title3)
+                .font(DS.Font.heading)
                 .foregroundStyle(DS.Color.danger)
             VStack(alignment: .leading, spacing: DS.Spacing.tight) {
                 Text(title)
                     .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.primaryText)
                 Text(AppModel.errorDetail(from: message))
-                    .font(DS.Font.callout)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: DS.Spacing.small) {
