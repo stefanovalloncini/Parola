@@ -93,7 +93,7 @@ only when `engineChoices` is non-empty; otherwise it is left out of `steps` and 
 `null`. `engine` is the ringed card: an explicit `introductionChooseEngine`, or the app's current model when
 that is one of `engineChoices` and nothing has been clicked yet — never a fallback to the first choice, since
 Continue only ever commits an explicit pick. `engineChoices` lists the ids the engine scene offers.
-`setSetting introductionComplete false` brings a finished introduction back.
+`setSetting introductionComplete false` brings a finished introduction back once `showIntroduction` has run at least once this session (it lifts the test-mode suppression for the rest of the process); before that, the flag changes but nothing appears.
 
 Rows named without the `parola_app_` prefix are raw bridge commands, called through `parola_app_dispatch`.
 
