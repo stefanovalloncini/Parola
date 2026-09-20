@@ -218,8 +218,8 @@ struct ParolaApp: App {
                         }
                         .keyboardShortcut("l", modifiers: [.command, .shift])
                         .disabled(
-                            model.introduction.isPresented
-                                || (!liveCaptions.isActive && model.liveCaptionsUnavailableReason != nil)
+                            !liveCaptions.isActive
+                                && (model.introduction.isPresented || model.liveCaptionsUnavailableReason != nil)
                         )
                         Toggle("Translate to English", isOn: translateCaptionsBinding)
                         Divider()
