@@ -88,7 +88,6 @@ struct ModelsSettingsPane: View {
         VStack(spacing: 0) {
             StorageRow()
             modelsUsageRow
-            Divider()
             libraryUsageRow
         }
         .background(
@@ -110,13 +109,17 @@ struct ModelsSettingsPane: View {
         }
     }
 
+    @ViewBuilder
     private var libraryUsageRow: some View {
         let totalBytes = model.libraryBundleSizes.values.reduce(Int64(0), +)
-        return UsageRow(
-            icon: "tray.full",
-            label: "Library:",
-            value: "\(model.libraryEntries.count) entries · \(AppFormat.byteSize(totalBytes))"
-        )
+        if !model.libraryEntries.isEmpty {
+            Divider()
+            UsageRow(
+                icon: "tray.full",
+                label: "Library:",
+                value: "\(model.libraryEntries.count) entries · \(AppFormat.byteSize(totalBytes))"
+            )
+        }
     }
 
     // MARK: - Controls
