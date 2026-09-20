@@ -95,10 +95,12 @@ actor WhisperKitTranscriber: Transcriber {
         try Task.checkCancellation()
         let pin = WhisperLanguagePin.resolve(requested: options.language, probed: probed)
         var decoding = Self.decodingOptions(for: options, pin: pin)
-        if let tokens = promptTokens(options.initialPrompt, tokenizer: kit.tokenizer) {
-            decoding.promptTokens = tokens
-            decoding.usePrefillPrompt = true
-        }
+        kit.textDecoder.logitsFilters = applyInitialPrompt(
+            options.initialPrompt,
+            to: &decoding,
+            tokenizer: kit.tokenizer,
+            isModelMultilingual: kit.textDecoder.isModelMultilingual
+        )
 
         struct DiscoveryState {
             var builder = StreamingPartialBuilder()
@@ -373,15 +375,4 @@ enum WhisperLanguagePin {
         }
         return probed ?? .assumed(language)
     }
-}
-
-/// Tokenizes a user-supplied prompt into the format WhisperKit's decoder expects.
-/// Returns nil when there's no prompt to tokenize or when the tokenizer isn't ready.
-func promptTokens(_ prompt: String?, tokenizer: WhisperTokenizer?) -> [Int]? {
-    guard let prompt, let tokenizer else { return nil }
-    let trimmed = prompt.trimmingCharacters(in: .whitespaces)
-    guard !trimmed.isEmpty else { return nil }
-    let tokens = tokenizer.encode(text: " " + trimmed)
-        .filter { $0 < tokenizer.specialTokens.specialTokenBegin }
-    return tokens.isEmpty ? nil : tokens
 }

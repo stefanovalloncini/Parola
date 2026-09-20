@@ -114,10 +114,12 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
             withoutTimestamps: false,
             wordTimestamps: options.wordTimestamps
         )
-        if let tokens = promptTokens(options.initialPrompt, tokenizer: kit.tokenizer) {
-            decoding.promptTokens = tokens
-            decoding.usePrefillPrompt = true
-        }
+        kit.textDecoder.logitsFilters = applyInitialPrompt(
+            options.initialPrompt,
+            to: &decoding,
+            tokenizer: tokenizer,
+            isModelMultilingual: kit.textDecoder.isModelMultilingual
+        )
 
         let (stream, cont) = AsyncStream<StreamingEvent>.makeStream(bufferingPolicy: .bufferingNewest(256))
         let (segStream, segCont) = AsyncStream<ConfirmedAudioBatch>.makeStream(bufferingPolicy: .bufferingNewest(64))
