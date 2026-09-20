@@ -5,9 +5,6 @@ import ScenarioKit
 extension ScenarioSuite {
     @Suite("Introduction scenarios", .enabled(if: ScenarioSuite.backend == "mock"))
     struct Introduction {
-        /// AppleSpeechTranscriber's synthetic model id — the one engine choice every deployment offers.
-        private static let appleSpeechID = "apple-speech-analyzer"
-
         @Test("showIntroduction opens on hello with the full step sequence")
         func opensOnHello() async throws {
             let client = try ScenarioBridgeClient()
@@ -58,7 +55,7 @@ extension ScenarioSuite {
             _ = try await client.send("resetTestState")
             let initial = try await client.send("getState")
             let engineChoices = initial["introduction"]?["engineChoices"]?.arrayValue?.compactMap(\.stringValue) ?? []
-            guard let whisperChoice = engineChoices.first(where: { $0 != Self.appleSpeechID }) else {
+            guard let whisperChoice = engineChoices.first(where: { $0 != ScenarioSuite.installedModelID }) else {
                 return
             }
             _ = try await client.send("selectModel", ["name": whisperChoice])
@@ -72,14 +69,14 @@ extension ScenarioSuite {
             }
             try #require(state["step"]?.stringValue == "engine", "never reached the engine step")
 
-            let chosen = try await client.send("introductionChooseEngine", ["id": Self.appleSpeechID])
-            #expect(chosen["engine"]?.stringValue == Self.appleSpeechID)
+            let chosen = try await client.send("introductionChooseEngine", ["id": ScenarioSuite.installedModelID])
+            #expect(chosen["engine"]?.stringValue == ScenarioSuite.installedModelID)
 
             let advanced = try await client.send("introductionNext")
             #expect(advanced["step"]?.stringValue == "ready")
 
             let appState = try await client.send("getState")
-            #expect(appState["selectedModel"]?.stringValue == Self.appleSpeechID)
+            #expect(appState["selectedModel"]?.stringValue == ScenarioSuite.installedModelID)
             #expect(appState["phase"]?.stringValue == "idle")
         }
 
