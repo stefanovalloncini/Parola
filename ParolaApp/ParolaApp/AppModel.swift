@@ -375,8 +375,7 @@ final class AppModel {
         selectedModel = id
     }
 
-    /// Applies the introduction's engine pick. Called when the user moves on from the engine
-    /// scene, so clicking a card never starts a download.
+    /// Applies the introduction's engine pick, called when the user moves on so clicking a card never starts a download.
     func commitIntroductionEngine() {
         guard let id = introduction.selectedEngineID else { return }
         if let downloading = downloadingModelName, downloading != id,

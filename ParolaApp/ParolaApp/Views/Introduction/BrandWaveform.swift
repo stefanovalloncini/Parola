@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// The app icon's waveform, drawn at any size and tinted with the accent: the same nine bars, the
-/// same proportions, no rounded square behind them.
+/// The app icon's waveform at any size, tinted with the accent: the same nine bars and proportions, no rounded square behind them.
 struct BrandWaveform: View {
     let side: CGFloat
 

@@ -1,7 +1,6 @@
 import Foundation
 
-/// Drives the first-run introduction: which scene is on screen, whether it is on screen at all, and
-/// the one flag that remembers it was finished.
+/// Drives the first-run introduction: which scene is on screen, whether it's on screen at all, and the flag that remembers it finished.
 @MainActor
 @Observable
 final class IntroductionController {
@@ -16,8 +15,7 @@ final class IntroductionController {
     /// An explicit click on an engine card, nil until one happens; reaches the app on Continue, through `AppModel.commitIntroductionEngine()`.
     var selectedEngineID: String?
 
-    /// A launch that must never show the introduction on its own: a unit-test process, or a
-    /// test-mode instance that did not ask for it. An explicit `restart()` overrules it.
+    /// A launch that must never show the introduction on its own — a unit-test process, or a test-mode instance that didn't ask for it — until an explicit `restart()`.
     private(set) var isSuppressed: Bool
 
     private(set) var isComplete: Bool
@@ -27,7 +25,7 @@ final class IntroductionController {
     private(set) var isMovingBack = false
 
     /// Set for this launch only, when something else (an opened URL) needs the main window.
-    var isDeferred = false
+    private(set) var isDeferred = false
 
     @ObservationIgnored private let defaults: UserDefaults
 
@@ -113,6 +111,7 @@ final class IntroductionController {
     }
 
     func `defer`() {
+        guard !isDeferred else { return }
         isDeferred = true
     }
 

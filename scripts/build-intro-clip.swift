@@ -2,8 +2,7 @@
 import AVFoundation
 import Foundation
 
-// Builds one demo clip for the first-run introduction. Run it through scripts/build-intro-clip.sh,
-// which resolves the repo root and the CLI for it.
+// Builds one demo clip for the first-run introduction. Run it through scripts/build-intro-clip.sh, which resolves the repo root and the CLI for it.
 
 let levelRate = 20.0
 let outputDirectory = URL(fileURLWithPath: "ParolaApp/ParolaApp/Resources/Introduction", isDirectory: true)

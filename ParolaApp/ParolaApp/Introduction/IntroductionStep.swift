@@ -1,7 +1,6 @@
 import Foundation
 
-/// The scenes of the first-run introduction, in the order they are shown. The one place the order
-/// is decided: everything else asks `IntroductionController` for `steps`.
+/// The scenes of the first-run introduction, in order — the one place that order is decided; everything else asks `IntroductionController` for `steps`.
 enum IntroductionStep: String, CaseIterable, Sendable {
     case hello
     case transcribe

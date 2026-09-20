@@ -21,8 +21,7 @@ enum AppIconArtwork {
         ("icon_512x512@2x.png", 1024),
     ]
 
-    /// Bar heights as fractions of the waveform's height, chosen to look symmetric and intentional.
-    /// `BrandWaveform` draws the same nine, so the Dock icon and the introduction can't drift apart.
+    /// Bar heights as fractions of the waveform's height; `BrandWaveform` draws the same nine, so the Dock icon and the introduction can't drift apart.
     static let barFractions: [CGFloat] = [0.32, 0.62, 0.84, 0.50, 0.92, 0.50, 0.84, 0.62, 0.32]
 
     static func draw(into context: CGContext, size: CGFloat, background: NSColor, foreground: NSColor) {

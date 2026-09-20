@@ -1,8 +1,7 @@
 import Foundation
 import ParolaCore
 
-/// The at most two engines the introduction offers: the one built into macOS, and the Whisper the
-/// catalog recommends. A deployment that bars downloads only keeps the Whisper it already has.
+/// The at most two engines the introduction offers: Apple's built-in one and the catalog's recommended Whisper, minus an uninstalled Whisper when downloads are barred.
 enum IntroductionEngineChoices {
     static func compute(
         catalog: [ModelVariant],
