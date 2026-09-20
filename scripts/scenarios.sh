@@ -51,7 +51,6 @@ cleanup() {
   if [ -n "$APP_PID" ]; then
     kill "$APP_PID" 2>/dev/null || true
     # cfprefsd flushes the dying instance's suite, so the plist removal below has to follow its exit.
-    wait "$APP_PID" 2>/dev/null || true
     for _ in $(seq 1 40); do
       if ! kill -0 "$APP_PID" 2>/dev/null; then break; fi
       sleep 0.25
