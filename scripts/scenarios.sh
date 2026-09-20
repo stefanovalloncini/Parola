@@ -127,9 +127,22 @@ LAUNCH_ARGS+=(
 )
 
 echo "Sandbox: $SANDBOX (home $FAKEHOME)"
-# `open` cannot hand the app a fake home, and the pid is what the cleanup kills.
-CFFIXED_USER_HOME="$FAKEHOME" "$APP/Contents/MacOS/Parola" "${LAUNCH_ARGS[@]}" >"$APP_LOG" 2>&1 &
-APP_PID=$!
+if [ "$MODE" = "--real" ]; then
+  # A directly exec'd app answers the bridge but asks for the microphone as the terminal and never
+  # comes to the front for the screenshot, so the run that needs both goes through LaunchServices.
+  open -n --env CFFIXED_USER_HOME="$FAKEHOME" --stdout "$APP_LOG" --stderr "$APP_LOG" \
+    "$APP" --args "${LAUNCH_ARGS[@]}"
+  for _ in $(seq 1 40); do
+    APP_PID="$(pgrep -n -f -- "--library=$SANDBOX/library" || true)"
+    if [ -n "$APP_PID" ]; then break; fi
+    sleep 0.25
+  done
+  [ -n "$APP_PID" ] || { echo "the launched app never appeared"; exit 1; }
+else
+  # `open` cannot hand a headless run its fake home as cheaply, and the pid is what cleanup kills.
+  CFFIXED_USER_HOME="$FAKEHOME" "$APP/Contents/MacOS/Parola" "${LAUNCH_ARGS[@]}" >"$APP_LOG" 2>&1 &
+  APP_PID=$!
+fi
 
 echo "Waiting for bridge…"
 for _ in $(seq 1 60); do [ -f "$PORT_FILE" ] && break; sleep 0.5; done
