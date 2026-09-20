@@ -6,23 +6,59 @@
 #   --real            LOCAL pre-demo smoke. Runs the streaming + dictation scenarios
 #                     through the real WhisperKit pipeline, fed real mic audio looped
 #                     back through the BlackHole virtual device. Never a CI gate.
+#   --keep            Leave the run's sandbox directories behind and print where they are.
+#
+# Every run, --real included, gets its own library, models folder, defaults domain and home
+# directory under /tmp and never reads or writes the real ones — the scenarios wipe the library
+# they are pointed at. The app and the test process share the same fake home, which is how the
+# tests find the sandboxed bridge. On the way out only the instance this script launched is
+# killed, so a Parola running next to it is left alone.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-MODE="${1:---mock}"
+MODE="--mock"
+KEEP=""
+for argument in "$@"; do
+  case "$argument" in
+    --mock|--real) MODE="$argument" ;;
+    --keep) KEEP=1 ;;
+    *) echo "usage: scripts/scenarios.sh [--mock|--real] [--keep]"; exit 2 ;;
+  esac
+done
+
 DD="/tmp/parola-scenario-dd"
-PORT_FILE="$HOME/Library/Caches/Parola/bridge.port"
+TAG="scenario-$$"
+SANDBOX="/tmp/parola-$TAG"
+FAKEHOME="/tmp/parola-$TAG-home"
+PORT_FILE="$FAKEHOME/Library/Caches/Parola/bridge.port"
+APP_LOG="$SANDBOX/app.log"
+SUITE="com.parola.Parola.$TAG"
 
 # Spoken fixture for --real, shared with smoke.sh so the keyword asserts match.
 SPEECH="Hello, my name is Parola. I transcribe audio using the Whisper model on Apple Silicon."
 
+APP_PID=""
 PLAYER_PID=""
 cleanup() {
   if [ -n "$PLAYER_PID" ]; then
     kill "$PLAYER_PID" 2>/dev/null || true
     pkill -f parola-scenario-fixture 2>/dev/null || true
   fi
-  pkill -f 'Parola.app/Contents/MacOS/Parola' 2>/dev/null || true
+  if [ -n "$APP_PID" ]; then
+    kill "$APP_PID" 2>/dev/null || true
+  else
+    pgrep -f -- "--library=$SANDBOX/library" 2>/dev/null | while read -r pid; do
+      kill "$pid" 2>/dev/null || true
+    done
+  fi
+  if [ -n "$KEEP" ]; then
+    echo "Kept the sandbox: $SANDBOX (app log: $APP_LOG) and $FAKEHOME (defaults suite $SUITE)"
+  else
+    rm -rf "$SANDBOX" "$FAKEHOME"
+    # cfprefsd writes the suite next to the user's own domains whatever the fake home says.
+    defaults delete "$SUITE" 2>/dev/null || true
+    rm -f "$HOME/Library/Preferences/$SUITE.plist"
+  fi
 }
 trap cleanup EXIT
 
@@ -65,14 +101,21 @@ BANNER
   fi
 fi
 
-rm -f "$PORT_FILE" "$HOME/Library/Caches/Parola/bridge.token"
-pkill -f 'Parola.app/Contents/MacOS/Parola' 2>/dev/null || true
-sleep 1
-open "$APP" --args "${LAUNCH_ARGS[@]}"
+LAUNCH_ARGS+=(
+  --library="$SANDBOX/library"
+  --models="$SANDBOX/models"
+  --defaults-suite="$SUITE"
+)
+
+mkdir -p "$SANDBOX" "$SANDBOX/models" "$FAKEHOME/Library/Caches"
+echo "Sandbox: $SANDBOX (home $FAKEHOME)"
+# `open` cannot hand the app a fake home, and the pid is what the cleanup kills.
+CFFIXED_USER_HOME="$FAKEHOME" "$APP/Contents/MacOS/Parola" "${LAUNCH_ARGS[@]}" >"$APP_LOG" 2>&1 &
+APP_PID=$!
 
 echo "Waiting for bridge…"
 for _ in $(seq 1 60); do [ -f "$PORT_FILE" ] && break; sleep 0.5; done
-[ -f "$PORT_FILE" ] || { echo "bridge never came up"; exit 1; }
+[ -f "$PORT_FILE" ] || { echo "bridge never came up; app log tail:"; tail -30 "$APP_LOG"; exit 1; }
 
 # --real: loop the fixture into the (BlackHole) mic for the duration of the run.
 if [ "$MODE" = "--real" ]; then
@@ -83,7 +126,9 @@ fi
 
 echo "Running scenarios…"
 RUN_STATUS=0
-(cd ParolaCore && PAROLA_RUN_SCENARIOS=1 PAROLA_SCENARIO_BACKEND="$BACKEND" swift test --filter ScenarioTests) || RUN_STATUS=$?
+# The same fake home is how the test process finds the sandboxed bridge's port file.
+(cd ParolaCore && CFFIXED_USER_HOME="$FAKEHOME" PAROLA_RUN_SCENARIOS=1 \
+  PAROLA_SCENARIO_BACKEND="$BACKEND" swift test --filter ScenarioTests) || RUN_STATUS=$?
 
 # --real: grab a screenshot for the demo log (best-effort; never fails the run).
 if [ "$MODE" = "--real" ]; then
