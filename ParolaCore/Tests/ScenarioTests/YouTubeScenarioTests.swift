@@ -15,7 +15,7 @@ extension ScenarioSuite {
             defer { try? FileManager.default.removeItem(at: audioURL) }
 
             _ = try await client.send("resetTestState")
-            _ = try await client.send("selectModel", ["name": "openai_whisper-tiny"])
+            _ = try await client.send("selectModel", ["name": ScenarioSuite.installedModelID])
             _ = try await client.send("installMockTranscriber", ["engineID": "all", "response": [
                 "segments": [
                     ["start": 0.0, "end": 2.0, "text": "mock youtube transcript"],

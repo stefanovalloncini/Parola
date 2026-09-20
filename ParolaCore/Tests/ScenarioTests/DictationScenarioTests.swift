@@ -121,8 +121,9 @@ extension ScenarioSuite {
             defer { Task { await client.close() } }
 
             _ = try await client.send("resetTestState")
-            _ = try await client.send("selectModel", ["name": "openai_whisper-tiny"])
+            // A setSetting reloads the settings and corrects a pick that isn't installed, so style first.
             _ = try await client.send("setSetting", ["key": "dictationIndicatorStyleRaw", "value": "nearField"])
+            _ = try await client.send("selectModel", ["name": "openai_whisper-tiny"])
             _ = try await client.send("installMockStreamingTranscriber", ["response": [
                 "partials": ["hello", "hello from"],
                 "segments": [["start": 0, "end": 1, "text": "hello from the field"]],

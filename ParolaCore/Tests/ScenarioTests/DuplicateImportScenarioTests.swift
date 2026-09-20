@@ -12,7 +12,7 @@ extension ScenarioSuite {
             defer { Task { await client.close() } }
 
             _ = try await client.send("resetTestState")
-            _ = try await client.send("selectModel", ["name": "openai_whisper-tiny"])
+            _ = try await client.send("selectModel", ["name": ScenarioSuite.installedModelID])
             _ = try await client.send("installMockTranscriber", ["engineID": "all", "response": [
                 "segments": [["start": 0.0, "end": 1.5, "text": "Same recording, twice."]],
                 "language": "en",
