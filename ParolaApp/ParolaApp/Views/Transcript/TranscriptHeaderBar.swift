@@ -192,7 +192,7 @@ struct TranscriptHeaderBar: View {
 
     private var jumpPopover: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Jump to time").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Text("Jump to time").font(DS.Font.caption).foregroundStyle(.secondary)
             HStack(spacing: 6) {
                 TextField("mm:ss", text: $jumpDraft)
                     .textFieldStyle(.roundedBorder)

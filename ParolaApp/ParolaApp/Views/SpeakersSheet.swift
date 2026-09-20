@@ -97,7 +97,7 @@ struct SpeakersSheet: View {
     private func speakerRow(_ speaker: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(speaker)
-                .font(.body.weight(.medium))
+                .font(DS.Font.bodyStrong)
                 .foregroundStyle(DS.Color.secondaryText)
             TextField("Rename", text: renameBinding(for: speaker))
                 .textFieldStyle(.roundedBorder)

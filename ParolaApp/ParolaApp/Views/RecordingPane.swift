@@ -127,7 +127,7 @@ struct RecordingCard: View {
 
             Button(action: onStop) {
                 Text(stopTitle)
-                    .font(.system(.body, design: .default).weight(.semibold))
+                    .font(DS.Font.bodyStrong)
                     .foregroundStyle(.white)
                     .frame(width: 120, height: 36)
                     .background(
@@ -184,10 +184,12 @@ struct LiveTranscriptView: View {
         }
     }
 
+    private static let placeholderGlyphSize: CGFloat = 30
+
     private var placeholder: some View {
         VStack(spacing: DS.Spacing.small) {
             Image(systemName: "waveform")
-                .font(.system(size: 30, weight: .regular))
+                .font(.system(size: Self.placeholderGlyphSize))
                 .symbolEffect(.variableColor.iterative, isActive: !reduceMotion)
                 .accessibilityHidden(true)
             Text("Your transcript appears here as you speak")

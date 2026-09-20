@@ -5,6 +5,7 @@ struct PresenterCaptionsView: View {
     let onClose: () -> Void
 
     @AppStorage("presenter.fontSize", store: DefaultsStore.current) private var fontSize: Double = 96
+    private static let closeGlyphSize: CGFloat = 28
     @State private var hovering = false
 
     private var caption: String {
@@ -61,7 +62,7 @@ struct PresenterCaptionsView: View {
     private var closeButton: some View {
         Button(action: onClose) {
             Image(systemName: "xmark.circle.fill")
-                .font(.system(size: 28))
+                .font(.system(size: Self.closeGlyphSize))
                 .foregroundStyle(.white.opacity(0.8))
                 .padding(8)
                 .background(Circle().fill(.black.opacity(0.4)))

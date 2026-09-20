@@ -26,7 +26,7 @@ struct LiveCaptionsView: View {
     private var content: some View {
         if let error = controller.state.error {
             Text(error)
-                .font(.callout)
+                .font(DS.Font.secondary)
                 // This overlay paints its own dark scrim, so surface-derived colours read too dark here.
                 .foregroundStyle(DS.Color.dangerOnDark.opacity(0.9))
                 .multilineTextAlignment(.center)

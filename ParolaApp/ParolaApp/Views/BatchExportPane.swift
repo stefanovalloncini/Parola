@@ -135,7 +135,7 @@ struct BatchFormatChip: View {
 
     var body: some View {
         Text(".\(`extension`)")
-            .font(.system(.caption, design: .monospaced).weight(.medium))
+            .font(DS.Font.mono)
             .foregroundStyle(DS.Color.secondaryText)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)

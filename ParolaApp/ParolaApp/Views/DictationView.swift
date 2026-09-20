@@ -234,7 +234,7 @@ struct DictationView: View {
     @ViewBuilder
     private var statusLabel: some View {
         Text(label)
-            .font(.subheadline.weight(.semibold))
+            .font(DS.Font.bodyStrong)
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
     }
@@ -265,13 +265,11 @@ struct DictationView: View {
             TimelineView(.periodic(from: startedAt, by: 1)) { context in
                 let elapsed = Int(context.date.timeIntervalSince(startedAt))
                 Text(String(format: "%02d:%02d", elapsed / 60, elapsed % 60))
-                    .font(.system(.subheadline, design: .monospaced))
-                    .monospacedDigit()
+                    .font(DS.Font.mono)
             }
         default:
             Text("00:00")
-                .font(.system(.subheadline, design: .monospaced))
-                .monospacedDigit()
+                .font(DS.Font.mono)
                 .opacity(0)
         }
     }

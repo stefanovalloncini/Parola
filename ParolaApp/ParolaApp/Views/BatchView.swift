@@ -66,7 +66,7 @@ struct BatchView: View {
                     exportPaneVisible.toggle()
                 } label: {
                     Image(systemName: "sidebar.right")
-                        .font(.body.weight(.semibold))
+                        .font(DS.Font.bodyStrong)
                         .foregroundStyle(exportPaneVisible ? DS.Color.accent : DS.Color.secondaryText)
                         .frame(width: 24, height: 24)
                 }

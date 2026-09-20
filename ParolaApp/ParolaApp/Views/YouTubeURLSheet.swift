@@ -114,7 +114,7 @@ private struct YtDlpBanner: View {
             HStack(alignment: .top, spacing: DS.Spacing.small) {
                 Image(systemName: "info.circle.fill")
                     .foregroundStyle(.tint)
-                    .font(.title3)
+                    .font(DS.Font.heading)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("yt-dlp isn't installed")
                         .font(DS.Font.heading)

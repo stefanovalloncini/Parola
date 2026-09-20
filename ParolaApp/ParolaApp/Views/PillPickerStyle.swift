@@ -149,7 +149,7 @@ struct PillPopoverRow: View {
                     .foregroundStyle(.primary)
                 if let badgeText {
                     Text(verbatim: badgeText)
-                        .font(.caption2.weight(.semibold))
+                        .font(DS.Font.caption)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
@@ -158,7 +158,7 @@ struct PillPopoverRow: View {
                 Spacer()
                 if let trailingText {
                     Text(trailingText)
-                        .font(.caption)
+                        .font(DS.Font.secondary)
                         .foregroundStyle(.secondary)
                 }
                 Image(systemName: "checkmark")
@@ -186,7 +186,7 @@ struct PillPopoverSectionHeader: View {
     let title: String
     var body: some View {
         Text(title.uppercased())
-            .font(.caption2.weight(.semibold))
+            .font(DS.Font.caption)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 14)
             .padding(.top, 8)

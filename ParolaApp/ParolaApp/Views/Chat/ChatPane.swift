@@ -62,7 +62,7 @@ struct ChatPane: View {
             Spacer()
             Button(action: toggleSearch) {
                 Image(systemName: "magnifyingglass")
-                    .font(.body.weight(.medium))
+                    .font(DS.Font.bodyStrong)
                     .foregroundStyle(isSearching ? DS.Color.accent : DS.Color.secondaryText)
             }
             .buttonStyle(.plain)
@@ -73,7 +73,7 @@ struct ChatPane: View {
 
             Button(role: .destructive, action: resetConversation) {
                 Image(systemName: "arrow.counterclockwise")
-                    .font(.body.weight(.medium))
+                    .font(DS.Font.bodyStrong)
             }
             .buttonStyle(.plain)
             .foregroundStyle(DS.Color.secondaryText)
@@ -90,7 +90,7 @@ struct ChatPane: View {
         HStack(spacing: DS.Spacing.small) {
             BarPill {
                 Image(systemName: "magnifyingglass")
-                    .font(.subheadline)
+                    .font(DS.Font.secondary)
                     .foregroundStyle(.secondary)
                 TextField("Filter messages", text: $searchQuery)
                     .textFieldStyle(.plain)
@@ -101,7 +101,7 @@ struct ChatPane: View {
                         searchQuery = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.subheadline)
+                            .font(DS.Font.secondary)
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
@@ -113,7 +113,7 @@ struct ChatPane: View {
 
             Button(action: toggleSearch) {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.title3)
+                    .font(DS.Font.heading)
                     .foregroundStyle(.secondary)
                     .contentShape(Rectangle())
             }
@@ -172,7 +172,7 @@ struct ChatPane: View {
 
             Button(action: send) {
                 Image(systemName: "paperplane.fill")
-                    .font(.callout.weight(.semibold))
+                    .font(DS.Font.bodyStrong)
                     .foregroundStyle(.white)
                     .frame(width: 32, height: 32)
                     .background(
