@@ -99,28 +99,42 @@ struct IntroductionEngineChoicesTests {
 @Suite("Introduction engine pick")
 struct IntroductionEnginePickTests {
     private func controller(
-        choices: [String] = ["apple-speech-analyzer", "openai_whisper-large-v3_turbo"],
-        preferred: String? = nil
+        choices: [String] = ["apple-speech-analyzer", "openai_whisper-large-v3_turbo"]
     ) -> IntroductionController {
         IntroductionController(
             defaults: temporaryDefaults(),
             mode: .normal,
             showsInTestMode: false,
             engineChoices: choices,
-            preferredEngineID: preferred,
             environment: [:]
         )
     }
 
-    @Test("the pick starts on the model the app already uses")
-    func presetsToSelectedModel() {
-        #expect(controller(preferred: "openai_whisper-large-v3_turbo").selectedEngineID == "openai_whisper-large-v3_turbo")
+    @Test("nothing is picked until a card is clicked")
+    func startsWithNoPick() {
+        #expect(controller().selectedEngineID == nil)
     }
 
-    @Test("a model outside the choices presets to the first one")
-    func presetsToFirstChoice() {
-        #expect(controller(preferred: "nvidia_parakeet-tdt-0.6b-v2").selectedEngineID == "apple-speech-analyzer")
-        #expect(controller(preferred: nil).selectedEngineID == "apple-speech-analyzer")
+    @Test("the ring follows the model the app is using now")
+    func ringFollowsSelectedModel() {
+        let introduction = controller()
+        #expect(introduction.ringedEngineID(current: "openai_whisper-large-v3_turbo") == "openai_whisper-large-v3_turbo")
+        #expect(introduction.ringedEngineID(current: "nvidia_parakeet-tdt-0.6b-v2") == nil)
+    }
+
+    @Test("a click wins over the model the app is using now")
+    func clickWinsOverRing() {
+        let introduction = controller()
+        introduction.chooseEngine("openai_whisper-large-v3_turbo")
+        #expect(introduction.ringedEngineID(current: "apple-speech-analyzer") == "openai_whisper-large-v3_turbo")
+    }
+
+    @Test("restart clears the click")
+    func restartClearsClick() {
+        let introduction = controller()
+        introduction.chooseEngine("openai_whisper-large-v3_turbo")
+        introduction.restart()
+        #expect(introduction.selectedEngineID == nil)
     }
 
     @Test("choosing an offered engine takes")
@@ -134,7 +148,7 @@ struct IntroductionEnginePickTests {
     func ignoresUnknownEngine() {
         let introduction = controller()
         introduction.chooseEngine("openai_whisper-tiny")
-        #expect(introduction.selectedEngineID == "apple-speech-analyzer")
+        #expect(introduction.selectedEngineID == nil)
     }
 }
 
@@ -236,8 +250,19 @@ struct CommitIntroductionEngineTests {
         #expect(model.modelActionError == nil)
     }
 
-    @Test("restarting the introduction re-reads the model the app uses now")
-    func restartPresetsFromTheCurrentModel() throws {
+    @Test("continuing without a click leaves a Parakeet pick alone")
+    func noClickLeavesParakeetAlone() {
+        let model = makeModel()
+        model.activateModel("nvidia_parakeet-tdt-0.6b-v2")
+
+        model.commitIntroductionEngine()
+
+        #expect(model.selectedModel == "nvidia_parakeet-tdt-0.6b-v2")
+        #expect(model.modelActionError == nil)
+    }
+
+    @Test("restarting the introduction clears the pick and leaves the current model alone")
+    func restartClearsPickAndLeavesModelAlone() throws {
         let model = makeModel()
         let choices = model.introduction.engineChoices
         try #require(choices.count == 2)
@@ -247,7 +272,7 @@ struct CommitIntroductionEngineTests {
 
         model.restartIntroduction()
 
-        #expect(model.introduction.selectedEngineID == choices[0])
+        #expect(model.introduction.selectedEngineID == nil)
         #expect(model.introduction.isPresented)
 
         model.commitIntroductionEngine()

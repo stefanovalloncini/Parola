@@ -17,7 +17,7 @@ struct EngineScene: View {
                 ForEach(choices) { variant in
                     EngineCard(
                         variant: variant,
-                        isSelected: model.introduction.selectedEngineID == variant.id,
+                        isSelected: model.introduction.ringedEngineID(current: model.selectedModel) == variant.id,
                         isInstalled: model.isModelInstalled(variant.id),
                         downloadProgress: downloadProgress(for: variant.id),
                         choose: { model.introduction.chooseEngine(variant.id) }

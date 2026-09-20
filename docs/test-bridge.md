@@ -88,9 +88,11 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 
 The five introduction commands and `getState.introduction` all reply `{visible, step, steps, engine, engineChoices}`.
 `visible` says whether the introduction is on screen; `step` is the scene showing now and `steps` the order this
-deployment walks, drawn from `hello`, `transcribe`, `features`, `engine`, `ready`. The `engine` step (and the
-reply's `engine` field, the picked model id) are present only when `engineChoices` is non-empty; otherwise `engine`
-is left out of `steps` and the reply field is `null`. `engineChoices` lists the ids the engine scene offers.
+deployment walks, drawn from `hello`, `transcribe`, `features`, `engine`, `ready`. The `engine` step is present
+only when `engineChoices` is non-empty; otherwise it is left out of `steps` and the reply's `engine` field is
+`null`. `engine` is the ringed card: an explicit `introductionChooseEngine`, or the app's current model when
+that is one of `engineChoices` and nothing has been clicked yet — never a fallback to the first choice, since
+Continue only ever commits an explicit pick. `engineChoices` lists the ids the engine scene offers.
 `setSetting introductionComplete false` brings a finished introduction back.
 
 Rows named without the `parola_app_` prefix are raw bridge commands, called through `parola_app_dispatch`.

@@ -13,8 +13,7 @@ final class IntroductionController {
     /// Model ids the engine scene offers, in the order it shows them.
     let engineChoices: [String]
 
-    /// The card with the ring on it. Lives for this run only: the pick reaches the app when the
-    /// user moves on, through `AppModel.commitIntroductionEngine()`.
+    /// An explicit click on an engine card, nil until one happens; reaches the app on Continue, through `AppModel.commitIntroductionEngine()`.
     var selectedEngineID: String?
 
     /// A launch that must never show the introduction on its own: a unit-test process, or a
@@ -38,7 +37,6 @@ final class IntroductionController {
         showsInTestMode: Bool,
         hasEngineChoice: Bool = true,
         engineChoices: [String] = [],
-        preferredEngineID: String? = nil,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) {
         self.defaults = defaults
@@ -65,7 +63,6 @@ final class IntroductionController {
         }
         #endif
         self.step = opening
-        presetEngine(preferredEngineID)
     }
 
     var isPresented: Bool { !isComplete && !isDeferred && !isSuppressed }
@@ -91,10 +88,9 @@ final class IntroductionController {
         selectedEngineID = id
     }
 
-    /// Starts the pick from the model the app is using now: the introduction can be re-run long after
-    /// launch, and the engine it last preset may be nothing like the current selection.
-    func presetEngine(_ id: String?) {
-        selectedEngineID = engineChoices.contains(id ?? "") ? id : engineChoices.first
+    /// The card to ring: an explicit click, or the current model when it's one of the choices — never a fallback to the first card.
+    func ringedEngineID(current: String) -> String? {
+        selectedEngineID ?? (engineChoices.contains(current) ? current : nil)
     }
 
     func skip() {
@@ -113,6 +109,7 @@ final class IntroductionController {
         isSuppressed = false
         isMovingBack = false
         step = steps[0]
+        selectedEngineID = nil
     }
 
     func `defer`() {
@@ -122,6 +119,7 @@ final class IntroductionController {
     /// Follows a Reset or an Import that rewrote the flag underneath us. Reads, never writes.
     func reloadFromDefaults() {
         isComplete = defaults.bool(forKey: Self.completionKey)
+        selectedEngineID = nil
     }
 
     private func setComplete(_ value: Bool) {

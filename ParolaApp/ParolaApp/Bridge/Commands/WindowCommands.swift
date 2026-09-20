@@ -193,7 +193,7 @@ extension ParolaAutomationServer {
                 kind: .mutating,
                 handler: { _, ctx in
                     ctx.model.restartIntroduction()
-                    return ParolaAutomationServer.introductionState(ctx.model.introduction)
+                    return ParolaAutomationServer.introductionState(ctx.model.introduction, currentModel: ctx.model.selectedModel)
                 }
             ),
 
@@ -204,7 +204,7 @@ extension ParolaAutomationServer {
                 kind: .mutating,
                 handler: { _, ctx in
                     ctx.model.advanceIntroduction()
-                    return ParolaAutomationServer.introductionState(ctx.model.introduction)
+                    return ParolaAutomationServer.introductionState(ctx.model.introduction, currentModel: ctx.model.selectedModel)
                 }
             ),
 
@@ -218,7 +218,7 @@ extension ParolaAutomationServer {
                 ],
                 handler: { args, ctx in
                     ctx.model.introduction.chooseEngine(try args.string("id"))
-                    return ParolaAutomationServer.introductionState(ctx.model.introduction)
+                    return ParolaAutomationServer.introductionState(ctx.model.introduction, currentModel: ctx.model.selectedModel)
                 }
             ),
 
@@ -229,7 +229,7 @@ extension ParolaAutomationServer {
                 kind: .mutating,
                 handler: { _, ctx in
                     ctx.model.introduction.back()
-                    return ParolaAutomationServer.introductionState(ctx.model.introduction)
+                    return ParolaAutomationServer.introductionState(ctx.model.introduction, currentModel: ctx.model.selectedModel)
                 }
             ),
 
@@ -240,7 +240,7 @@ extension ParolaAutomationServer {
                 kind: .mutating,
                 handler: { _, ctx in
                     ctx.model.introduction.skip()
-                    return ParolaAutomationServer.introductionState(ctx.model.introduction)
+                    return ParolaAutomationServer.introductionState(ctx.model.introduction, currentModel: ctx.model.selectedModel)
                 }
             ),
         ]

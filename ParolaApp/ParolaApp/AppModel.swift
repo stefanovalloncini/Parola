@@ -395,7 +395,6 @@ final class AppModel {
     }
 
     func restartIntroduction() {
-        introduction.presetEngine(selectedModel)
         introduction.restart()
     }
 
@@ -1308,9 +1307,7 @@ final class AppModel {
             mode: bootstrap.mode,
             showsInTestMode: bootstrap.showsIntroduction,
             hasEngineChoice: !engineChoices.isEmpty,
-            engineChoices: engineChoices.map(\.id),
-            // The persisted pick, read straight from defaults: readPersistedSettings() runs later.
-            preferredEngineID: defaults.string(forKey: "selectedModel")
+            engineChoices: engineChoices.map(\.id)
         )
         self.filePicker = bootstrap.filePicker
         self.mode = bootstrap.mode
