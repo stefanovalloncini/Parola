@@ -124,6 +124,7 @@ struct ParolaApp: App {
             }
             CommandGroup(replacing: .help) {
                 Button("Show Introduction") { model.restartIntroduction() }
+                    .disabled(model.introduction.isPresented || model.downloadBlockedReason != nil)
                 Divider()
                 Button("Keyboard Shortcuts…") { shortcutSheetOpen = true }
                     .keyboardShortcut("/", modifiers: [.command])
