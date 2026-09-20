@@ -1967,7 +1967,7 @@ final class AppModel {
         }
     }
 
-    private func makeDownloadProgressHandler(for modelName: String) -> @Sendable (Double) -> Void {
+    func makeDownloadProgressHandler(for modelName: String) -> @Sendable (Double) -> Void {
         let throttle = DownloadProgressThrottle()
         return { [weak self] frac in
             // Dedupe on the URLSession callback thread: spawning a main-actor task per received
@@ -1979,7 +1979,10 @@ final class AppModel {
             guard throttle.shouldEmit(percent) else { return }
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.phase = .downloadingModel(name: modelName, progress: clamped)
+                // Only the download's own phase is the bar's to paint; a take or a run owns it outright.
+                if case .downloadingModel = self.phase {
+                    self.phase = .downloadingModel(name: modelName, progress: clamped)
+                }
                 if percent >= 100 { self.refreshModelList() }
             }
         }

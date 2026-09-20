@@ -345,6 +345,33 @@ struct DownloadCompletionPhaseTests {
         #expect(model.phase == .ready)
     }
 
+    @Test("a progress tick arriving while a take owns the phase is dropped")
+    func progressTickLeavesARecordingAlone() async {
+        let model = makeModel()
+        let tick = model.makeDownloadProgressHandler(for: installed)
+        model.phase = .recording(source: .microphone)
+
+        tick(0.5)
+        let moved = await waitUntil(timeoutMs: 300) { model.phase != .recording(source: .microphone) }
+        #expect(!moved)
+
+        model.phase = .downloadingModel(name: installed, progress: 0)
+        tick(0.75)
+
+        #expect(await waitUntil { model.phase == .downloadingModel(name: installed, progress: 0.75) })
+    }
+
+    @Test("a progress tick while the download owns the phase moves the bar")
+    func progressTickUpdatesTheDownload() async {
+        let model = makeModel()
+        let tick = model.makeDownloadProgressHandler(for: installed)
+        model.phase = .downloadingModel(name: installed, progress: 0)
+
+        tick(0.5)
+
+        #expect(await waitUntil { model.phase == .downloadingModel(name: installed, progress: 0.5) })
+    }
+
     @Test("a batch job holding the phase keeps it")
     func batchRunKeepsThePhase() {
         let model = makeModel()
