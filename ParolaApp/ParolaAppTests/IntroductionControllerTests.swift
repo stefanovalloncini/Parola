@@ -12,6 +12,7 @@ struct IntroductionControllerTests {
         mode: AppBootstrap.Mode = .normal,
         showsInTestMode: Bool = false,
         hasEngineChoice: Bool = true,
+        engineChoices: [String] = [],
         environment: [String: String] = [:]
     ) -> IntroductionController {
         IntroductionController(
@@ -19,6 +20,7 @@ struct IntroductionControllerTests {
             mode: mode,
             showsInTestMode: showsInTestMode,
             hasEngineChoice: hasEngineChoice,
+            engineChoices: engineChoices,
             environment: environment
         )
     }
@@ -244,6 +246,43 @@ struct IntroductionControllerTests {
 
         #expect(controller.isComplete == false)
         #expect(controller.isPresented)
+    }
+
+    @Test("a settings reload mid-introduction keeps the engine pick")
+    func reloadKeepsTheEnginePick() {
+        let controller = makeController(defaults: temporaryDefaults(), engineChoices: ["apple-speech-analyzer", "turbo"])
+        #expect(controller.isPresented)
+        controller.chooseEngine("turbo")
+
+        controller.reloadFromDefaults()
+
+        #expect(controller.selectedEngineID == "turbo")
+        #expect(controller.isPresented)
+    }
+
+    @Test("an import that says the introduction is done never dismisses a live one")
+    func reloadNeverDismissesALiveIntroduction() {
+        let defaults = temporaryDefaults()
+        let controller = makeController(defaults: defaults)
+        #expect(controller.isPresented)
+
+        defaults.set(true, forKey: "introductionComplete")
+        controller.reloadFromDefaults()
+
+        #expect(controller.isComplete == false)
+        #expect(controller.isPresented)
+    }
+
+    @Test("a reload with no introduction on screen still re-reads the flag")
+    func reloadOutsideTheIntroductionReadsTheFlag() {
+        let defaults = temporaryDefaults()
+        let controller = makeController(defaults: defaults, mode: .test, showsInTestMode: false)
+        #expect(controller.isPresented == false)
+
+        defaults.set(true, forKey: "introductionComplete")
+        controller.reloadFromDefaults()
+
+        #expect(controller.isComplete)
     }
 }
 

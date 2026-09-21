@@ -80,6 +80,25 @@ extension ScenarioSuite {
             #expect(appState["phase"]?.stringValue == "idle")
         }
 
+        @Test("a settings change while the introduction is up leaves it on screen, on the same step")
+        func settingsReloadLeavesTheIntroductionAlone() async throws {
+            let client = try ScenarioBridgeClient()
+            try await client.connect()
+            defer { Task { await client.close() } }
+
+            _ = try await client.send("resetTestState")
+            _ = try await client.send("showIntroduction")
+            let advanced = try await client.send("introductionNext")
+            let step = advanced["step"]?.stringValue
+            try #require(step != nil)
+
+            _ = try await client.send("setSetting", ["key": "appAccentColor", "value": "yellow"])
+
+            let state = try await client.send("getState")
+            #expect(state["introduction"]?["visible"]?.boolValue == true)
+            #expect(state["introduction"]?["step"]?.stringValue == step)
+        }
+
         @Test("introductionSkip persists, and clearing introductionComplete brings it back")
         func finishAndReopenViaSetting() async throws {
             let client = try ScenarioBridgeClient()

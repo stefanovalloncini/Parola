@@ -124,6 +124,8 @@ final class IntroductionController {
 
     /// Follows a Reset or an Import that rewrote the flag underneath us. Reads, never writes.
     func reloadFromDefaults() {
+        // A reload landing mid-introduction would drop the engine pick and pull the scene out from under the user.
+        guard !isPresented else { return }
         isComplete = defaults.bool(forKey: Self.completionKey)
         selectedEngineID = nil
     }
