@@ -295,7 +295,12 @@ extension AppModel {
         if let language,
            let caps = ModelCatalog.staticCapabilities(forID: model),
            !caps.supportedLanguages.allows(language) {
-            warnings.append(String(localized: "\(label) is English-only. Dictation in other languages won't work."))
+            if caps.supportedLanguages.isEnglishOnly {
+                warnings.append(String(localized: "\(label) is English-only. Dictation in other languages won't work."))
+            } else {
+                let languageName = LanguageDisplay.name(for: language) ?? language
+                warnings.append(String(localized: "\(label) doesn't support \(languageName). Dictation in that language won't work."))
+            }
         }
         // Ids missing from the catalog are legacy WhisperKit directories, so they stream.
         if let variant, variant.engineID != .whisperKit {

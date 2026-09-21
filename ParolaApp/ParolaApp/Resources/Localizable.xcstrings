@@ -34,6 +34,17 @@
         }
       }
     },
+    "%@ can't transcribe %@. Pick a multilingual model (like Whisper) to transcribe other languages.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ non trascrive %@. Scegli un modello multilingue (come Whisper) per trascrivere altre lingue."
+          }
+        }
+      }
+    },
     "%@ dictation mode": {
       "extractionState": "manual",
       "localizations": {
@@ -41,6 +52,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Modalità dettatura %@"
+          }
+        }
+      }
+    },
+    "%@ doesn't support %@. Dictation in that language won't work.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ non supporta %@. La dettatura in quella lingua non funzionerà."
           }
         }
       }

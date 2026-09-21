@@ -43,6 +43,24 @@ struct LanguageMismatchTests {
         model.selectedLanguage = "it"
         #expect(model.languageMismatchWarning == nil)
     }
+
+    @Test("Parakeet v3 with Italian does not warn")
+    func parakeetV3ItalianNoWarning() {
+        let model = makeModel()
+        model.selectedModel = "nvidia_parakeet-tdt-0.6b-v3"
+        model.selectedLanguage = "it"
+        #expect(model.languageMismatchWarning == nil)
+    }
+
+    @Test("Parakeet v3 with a language outside its 25 names it instead of claiming English-only")
+    func parakeetV3JapaneseWarnsByName() {
+        let model = makeModel()
+        model.selectedModel = "nvidia_parakeet-tdt-0.6b-v3"
+        model.selectedLanguage = "ja"
+        #expect(model.languageMismatchWarning != nil)
+        #expect(model.languageMismatchWarning?.contains("Japanese") == true)
+        #expect(model.languageMismatchWarning?.contains("English-only") == false)
+    }
 }
 
 @MainActor

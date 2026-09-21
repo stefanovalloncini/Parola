@@ -60,6 +60,15 @@ struct AppModelDictationTests {
         let unknown = AppModel.dictationModelWarnings(
             model: "custom-model", useStreaming: true, language: "it", isInstalled: false)
         #expect(unknown.isEmpty, "ids outside the catalog are legacy WhisperKit dirs: they stream, and no capability or size claims apply")
+
+        let parakeetV3Japanese = AppModel.dictationModelWarnings(
+            model: "nvidia_parakeet-tdt-0.6b-v3", useStreaming: true, language: "ja", isInstalled: true)
+        #expect(parakeetV3Japanese.contains { $0.contains("Japanese") })
+        #expect(!parakeetV3Japanese.contains { $0.contains("English-only") })
+
+        let parakeetV3Italian = AppModel.dictationModelWarnings(
+            model: "nvidia_parakeet-tdt-0.6b-v3", useStreaming: true, language: "it", isInstalled: true)
+        #expect(!parakeetV3Italian.contains { $0.contains("support") })
     }
 
     @Test("dictationWorkflows decodes from the per-app overrides JSON")

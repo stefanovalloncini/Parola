@@ -345,7 +345,12 @@ final class AppModel {
     var languageMismatchWarning: String? {
         guard let language = selectedLanguage,
               !selectedModelCapabilities.supportedLanguages.allows(language) else { return nil }
-        return "\(AppModel.modelLabel(selectedModel)) is English-only. Pick a multilingual model (like Whisper) to transcribe other languages."
+        let label = AppModel.modelLabel(selectedModel)
+        if selectedModelCapabilities.supportedLanguages.isEnglishOnly {
+            return String(localized: "\(label) is English-only. Pick a multilingual model (like Whisper) to transcribe other languages.")
+        }
+        let languageName = LanguageDisplay.name(for: language) ?? language
+        return String(localized: "\(label) can't transcribe \(languageName). Pick a multilingual model (like Whisper) to transcribe other languages.")
     }
 
     /// English-only model on Auto: TranscriptionSession pins the run to English regardless, so this
