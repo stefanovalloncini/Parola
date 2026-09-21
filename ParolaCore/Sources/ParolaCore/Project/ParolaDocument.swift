@@ -20,6 +20,7 @@ public struct ParolaDocument: Sendable {
         public var audioFilename: String?
         public var labels: [String]
         public var segmentNotes: [String: String]
+        public var favoriteSegments: [Int]
         public var pinned: Bool
         /// Media length in seconds. Absent on bundles written before it was recorded.
         public var durationSeconds: Double?
@@ -52,6 +53,7 @@ public struct ParolaDocument: Sendable {
             audioFilename: String? = nil,
             labels: [String] = [],
             segmentNotes: [String: String] = [:],
+            favoriteSegments: [Int] = [],
             pinned: Bool = false,
             durationSeconds: Double? = nil,
             sourceDigest: String? = nil,
@@ -74,6 +76,7 @@ public struct ParolaDocument: Sendable {
             self.audioFilename = audioFilename
             self.labels = labels
             self.segmentNotes = segmentNotes
+            self.favoriteSegments = favoriteSegments
             self.pinned = pinned
             self.durationSeconds = durationSeconds
             self.sourceDigest = sourceDigest
@@ -103,6 +106,7 @@ public struct ParolaDocument: Sendable {
             case audioFilename
             case labels
             case segmentNotes
+            case favoriteSegments
             case pinned
             case durationSeconds
             case sourceDigest
@@ -128,6 +132,7 @@ public struct ParolaDocument: Sendable {
             audioFilename = try c.decodeIfPresent(String.self, forKey: .audioFilename)
             labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
             segmentNotes = try c.decodeIfPresent([String: String].self, forKey: .segmentNotes) ?? [:]
+            favoriteSegments = Array(Set(try c.decodeIfPresent([Int].self, forKey: .favoriteSegments) ?? [])).sorted()
             pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
             durationSeconds = try c.decodeIfPresent(Double.self, forKey: .durationSeconds)
             sourceDigest = try c.decodeIfPresent(String.self, forKey: .sourceDigest)
@@ -157,6 +162,9 @@ public struct ParolaDocument: Sendable {
             }
             if !segmentNotes.isEmpty {
                 try c.encode(segmentNotes, forKey: .segmentNotes)
+            }
+            if !favoriteSegments.isEmpty {
+                try c.encode(Array(Set(favoriteSegments)).sorted(), forKey: .favoriteSegments)
             }
             if pinned {
                 try c.encode(pinned, forKey: .pinned)

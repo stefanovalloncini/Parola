@@ -54,6 +54,19 @@ struct LibraryStoreTests {
         #expect(await store.list().first { $0.id == entry.id }?.aiTitle == nil)
     }
 
+    @Test("favorites toggle per segment and can be replaced wholesale")
+    func favoritesPersist() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: makeFakeAudio(), category: .transcription)
+        try await store.setSegmentFavorite(true, segmentID: 2, for: entry.id)
+        try await store.setSegmentFavorite(true, segmentID: 0, for: entry.id)
+        #expect(await store.list().first { $0.id == entry.id }?.favoriteSegments == [0, 2])
+        try await store.setSegmentFavorite(false, segmentID: 2, for: entry.id)
+        #expect(await store.list().first { $0.id == entry.id }?.favoriteSegments == [0])
+        try await store.setFavoriteSegments([5, 1], for: entry.id)
+        #expect(await store.list().first { $0.id == entry.id }?.favoriteSegments == [1, 5])
+    }
+
     private struct HangingIndexer: LibraryIndexer {
         func index(id: String, title: String, text: String, createdAt: Date) async {
             try? await Task.sleep(for: .seconds(3600))

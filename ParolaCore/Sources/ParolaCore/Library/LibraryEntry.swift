@@ -25,6 +25,7 @@ public struct LibraryEntry: Identifiable, Hashable, Sendable {
     public var lastOpenedAt: Date? { manifest.lastOpenedAt }
     public var labels: [String] { manifest.labels }
     public var segmentNotes: [String: String] { manifest.segmentNotes }
+    public var favoriteSegments: Set<Int> { Set(manifest.favoriteSegments) }
     public var pinned: Bool { manifest.pinned }
     public var durationSeconds: Double? { manifest.durationSeconds }
     public var language: String { manifest.language }
@@ -37,6 +38,10 @@ public struct LibraryEntry: Identifiable, Hashable, Sendable {
 
     public func note(forSegment id: Int) -> String? {
         manifest.segmentNotes[String(id)]
+    }
+
+    public func isFavorite(segment id: Int) -> Bool {
+        manifest.favoriteSegments.contains(id)
     }
 
     public static func == (lhs: LibraryEntry, rhs: LibraryEntry) -> Bool { lhs.id == rhs.id }

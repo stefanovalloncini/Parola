@@ -693,6 +693,29 @@ public actor LibraryStore {
         }
     }
 
+    public func setSegmentFavorite(_ isFavorite: Bool, segmentID: Int, for id: LibraryEntry.ID) throws {
+        try updateFavorites(for: id) { favorites in
+            if isFavorite { favorites.insert(segmentID) } else { favorites.remove(segmentID) }
+        }
+    }
+
+    public func setFavoriteSegments(_ ids: Set<Int>, for id: LibraryEntry.ID) throws {
+        try updateFavorites(for: id) { $0 = ids }
+    }
+
+    private func updateFavorites(for id: LibraryEntry.ID, _ mutate: (inout Set<Int>) -> Void) throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            var favorites = Set(manifest.favoriteSegments)
+            mutate(&favorites)
+            manifest.favoriteSegments = favorites.sorted()
+        }
+        try recacheEntry(at: bundleURL)
+    }
+
     /// A manifest edit leaves transcript.json alone, so an open document is still current; fall back
     /// to disk — off the actor, word timings and all — only when it isn't cached.
     private func transcriptForReindex(_ id: LibraryEntry.ID, at bundleURL: URL) async -> Transcript? {
