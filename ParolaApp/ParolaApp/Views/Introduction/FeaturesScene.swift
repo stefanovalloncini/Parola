@@ -66,7 +66,7 @@ struct FeaturesScene: View {
             modifiers: model.dictationModifierFlags
         )
         return VStack(alignment: .leading, spacing: DS.Spacing.medium) {
-            ForEach(Self.arrangement(count: items.count), id: \.first) { indices in
+            ForEach(Self.arrangement(count: items.count), id: \.self) { indices in
                 HStack(alignment: .top, spacing: DS.Spacing.medium) {
                     ForEach(indices, id: \.self) { index in
                         FeatureCard(item: items[index], hotkeyName: hotkeyName)
@@ -76,7 +76,9 @@ struct FeaturesScene: View {
                             .animation(entrance(card: index), value: hasAppeared)
                     }
                     if indices.count == 1 {
-                        Color.clear.frame(maxWidth: .infinity, maxHeight: 0)
+                        Color.clear
+                            .frame(maxWidth: .infinity, maxHeight: 0)
+                            .allowsHitTesting(false)
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true)
