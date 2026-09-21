@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// One permission the introduction asks for: what it is for, whether macOS has granted it, and the way to grant it.
+/// One of the permissions the introduction asks for.
 struct PermissionCard: View {
     struct Status: Equatable {
         let label: LocalizedStringKey
