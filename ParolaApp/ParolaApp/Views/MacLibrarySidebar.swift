@@ -67,8 +67,10 @@ struct MacLibrarySidebar: View {
                         .axLeaf("Sidebar.Button.Filter\(item.id.capitalized)")
                     }
 
+                    PeopleSidebarSection()
+
                     if model.features.isEnabled(.batch) {
-                        SectionLabel("Activity")
+                        SidebarSectionLabel("Activity")
                             .padding(.top, DS.Spacing.regular)
 
                         SidebarRow(
@@ -123,7 +125,7 @@ struct MacLibrarySidebar: View {
 
     private var librarySectionHeader: some View {
         HStack(spacing: 0) {
-            SectionLabel("Library")
+            SidebarSectionLabel("Library")
             Spacer(minLength: 0)
             sortMenu
         }
@@ -221,7 +223,7 @@ enum SidebarRoute: Hashable {
     }
 }
 
-private struct SectionLabel: View {
+struct SidebarSectionLabel: View {
     let text: LocalizedStringKey
     init(_ text: LocalizedStringKey) { self.text = text }
     var body: some View {

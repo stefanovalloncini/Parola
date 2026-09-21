@@ -40,7 +40,7 @@ struct PeopleDirectoryList: View {
     @State private var renameDraft: String = ""
     @State private var deleting: Person?
 
-    private var people: [Person] { model.mostUsedPeople(limit: 200) }
+    private var people: [Person] { model.peopleByUse }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {

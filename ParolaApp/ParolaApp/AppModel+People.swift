@@ -17,12 +17,15 @@ extension AppModel {
         people.first { $0.id == id }
     }
 
-    /// The people to offer first: most assigned, then most recently used.
-    func mostUsedPeople(limit: Int) -> [Person] {
-        let sorted = people.sorted {
+    /// The directory in the order every list shows it: most assigned, then most recently used.
+    var peopleByUse: [Person] {
+        people.sorted {
             $0.usageCount == $1.usageCount ? $0.lastUsedAt > $1.lastUsedAt : $0.usageCount > $1.usageCount
         }
-        return Array(sorted.prefix(limit))
+    }
+
+    func mostUsedPeople(limit: Int) -> [Person] {
+        Array(peopleByUse.prefix(limit))
     }
 
     /// The open entry's speaker map. A transcript that isn't in the library carries none.

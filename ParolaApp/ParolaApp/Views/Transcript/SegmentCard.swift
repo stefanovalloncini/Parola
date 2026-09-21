@@ -186,7 +186,7 @@ struct SegmentCard: View {
                 .foregroundStyle(DS.speakerColor(for: raw, colorIndex: person?.colorIndex))
         }
         .buttonStyle(.plain)
-        .help(person == nil ? Text("Unknown speaker, click to assign") : Text(verbatim: person?.name ?? ""))
+        .help(person == nil ? String(localized: "Unknown speaker, click to assign") : "")
         .onHover { hovering in
             hoveredSpeaker.wrappedValue = hovering ? raw : nil
         }

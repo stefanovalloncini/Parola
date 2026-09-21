@@ -1,4 +1,5 @@
 import SwiftUI
+import ParolaCore
 
 enum LibraryDateRangeFilter: String, CaseIterable, Identifiable {
     case all, today, week, month, year
@@ -28,8 +29,10 @@ struct LibraryFilterBar: View {
     @Binding var labelFilter: String?
     @Binding var languageFilter: String?
     @Binding var dateRangeFilter: LibraryDateRangeFilter
+    @Binding var personFilter: UUID?
     let labelOptions: [String]
     let languageOptions: [String]
+    let peopleOptions: [Person]
 
     var body: some View {
         Group {
@@ -50,6 +53,27 @@ struct LibraryFilterBar: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .axLeaf("Filter.Menu.Label")
+            }
+            if !peopleOptions.isEmpty {
+                Menu {
+                    Button("All People") { personFilter = nil }
+                        .axLeaf("Filter.MenuItem.AllPeople")
+                    Divider()
+                    ForEach(peopleOptions) { person in
+                        Button(person.name) { personFilter = person.id }
+                            .axLeaf("Filter.MenuItem.Person.\(person.name)")
+                    }
+                } label: {
+                    FilterPillLabel(
+                        systemImage: "person",
+                        label: selectedPerson.map { Text(verbatim: $0.name) } ?? Text("All People")
+                    )
+                }
+                .menuStyle(.button)
+                .buttonStyle(ChipButtonStyle(isSelected: personFilter != nil))
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .axLeaf("Filter.Menu.Person")
             }
             if languageOptions.count >= 2 {
                 Menu {
@@ -86,6 +110,10 @@ struct LibraryFilterBar: View {
             .fixedSize()
             .axLeaf("Filter.Menu.Date")
         }
+    }
+
+    private var selectedPerson: Person? {
+        personFilter.flatMap { id in peopleOptions.first { $0.id == id } }
     }
 
     private func languageName(_ code: String) -> String {

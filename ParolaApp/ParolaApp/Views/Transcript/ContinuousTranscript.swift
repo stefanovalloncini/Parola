@@ -74,6 +74,10 @@ struct ContinuousChunks: View {
         }
         .tint(.primary)
         .environment(\.openURL, OpenURLAction { url in
+            if url.scheme == "parola-assign", let chunk = url.host.flatMap(Int.init) {
+                assigningChunkID = chunk
+                return .handled
+            }
             guard url.scheme == "parola-seek", let id = url.host.flatMap(Int.init) else { return .systemAction }
             model.seekToSegment(id: id)
             return .handled
@@ -344,6 +348,10 @@ struct ContinuousChunks: View {
                 var heading = AttributedString(label + "\n")
                 heading.foregroundColor = speakerTint
                 heading.font = DS.Font.bodyStrong
+                // A link, not a gesture: a selectable Text answers a right-click with the system
+                // editing menu, so the heading has to carry the assign affordance itself.
+                heading.link = URL(string: "parola-assign://\(chunks.count)")
+                heading.underlineStyle = nil
                 offset += heading.characters.count
                 text.append(heading)
                 translatedPrefix = heading
@@ -445,7 +453,7 @@ private struct ChunkSpeakerAssignment: ViewModifier {
                     Button("Assign \(label)…") { isPresented = true }
                         .axLeaf("Chunk.MenuItem.AssignSpeaker")
                 }
-                .popover(isPresented: $isPresented, arrowEdge: .leading) {
+                .popover(isPresented: $isPresented, arrowEdge: .bottom) {
                     AssignSpeakerPopover(label: speaker) { onRenameLabel(label) }
                         .environment(model)
                 }

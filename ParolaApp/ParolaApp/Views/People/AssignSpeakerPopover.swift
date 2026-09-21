@@ -14,7 +14,7 @@ struct AssignSpeakerPopover: View {
 
     private var assigned: Person? { model.person(forSpeaker: label) }
 
-    private var people: [Person] { model.mostUsedPeople(limit: 20) }
+    private var people: [Person] { model.peopleByUse }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

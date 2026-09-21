@@ -389,13 +389,16 @@ struct ContinuousChunksTests {
         #expect(chunks[1].runs[1]?.baseColor == DS.Color.primaryText)
     }
 
-    @Test("heading runs carry no seek link")
-    func headingRunsCarryNoLink() {
+    @Test("a heading links to its own assign popover, never to a seek")
+    func headingRunsCarryTheAssignLink() {
         let segments = [segment(0, "Hi.", speaker: "Alice"), segment(1, "Yo.", speaker: "Bob")]
         let chunks = build(segments, useSpeakerColor: true)
+        #expect(chunks.map(\.speaker) == ["Alice", "Bob"])
+        #expect(chunks[0].text.runs.first?.link?.absoluteString == "parola-assign://0")
+        #expect(chunks[1].text.runs.first?.link?.absoluteString == "parola-assign://1")
         for chunk in chunks {
-            #expect(chunk.text.runs.first?.link == nil)
-            #expect(chunk.text.runs.compactMap(\.link).count == chunk.runs.count)
+            let seeks = chunk.text.runs.compactMap(\.link?.absoluteString).filter { $0.hasPrefix("parola-seek://") }
+            #expect(seeks.count == chunk.runs.count)
         }
     }
 

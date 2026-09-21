@@ -45,7 +45,8 @@ struct LibraryListContentTests {
             category: nil,
             labelFilter: nil,
             languageFilter: nil,
-            dateRange: .all
+            dateRange: .all,
+            personFilter: nil
         )
     }
 
@@ -154,22 +155,22 @@ struct LibraryListContentTests {
         ]
 
         let byCategory = LibraryListContent.rows(
-            from: entries, category: .meeting, labelFilter: nil, languageFilter: nil, dateRange: .all
+            from: entries, category: .meeting, labelFilter: nil, languageFilter: nil, dateRange: .all, personFilter: nil
         )
         #expect(byCategory.map(\.id) == ["b"])
 
         let byLabel = LibraryListContent.rows(
-            from: entries, category: nil, labelFilter: "work", languageFilter: nil, dateRange: .all
+            from: entries, category: nil, labelFilter: "work", languageFilter: nil, dateRange: .all, personFilter: nil
         )
         #expect(byLabel.map(\.id) == ["a", "b"])
 
         let byLanguage = LibraryListContent.rows(
-            from: entries, category: nil, labelFilter: nil, languageFilter: "IT", dateRange: .all
+            from: entries, category: nil, labelFilter: nil, languageFilter: "IT", dateRange: .all, personFilter: nil
         )
         #expect(byLanguage.map(\.id) == ["c"])
 
         let byDate = LibraryListContent.rows(
-            from: entries, category: nil, labelFilter: nil, languageFilter: nil, dateRange: .today
+            from: entries, category: nil, labelFilter: nil, languageFilter: nil, dateRange: .today, personFilter: nil
         )
         #expect(byDate.isEmpty)
     }
@@ -192,7 +193,7 @@ struct LibraryListContentTests {
         ]
         func ids(_ category: EntryCategory?) -> Set<LibraryEntry.ID> {
             Set(LibraryListContent.rows(
-                from: entries, category: category, labelFilter: nil, languageFilter: nil, dateRange: .all
+                from: entries, category: category, labelFilter: nil, languageFilter: nil, dateRange: .all, personFilter: nil
             ).map(\.id))
         }
 
@@ -453,7 +454,7 @@ struct LibraryListContentTests {
         ]
         func subtitle(_ category: EntryCategory?) -> String? {
             let shown = LibraryListContent.rows(
-                from: entries, category: category, labelFilter: nil, languageFilter: nil, dateRange: .all
+                from: entries, category: category, labelFilter: nil, languageFilter: nil, dateRange: .all, personFilter: nil
             )
             return LibraryListContent.listSubtitle(
                 count: shown.count,

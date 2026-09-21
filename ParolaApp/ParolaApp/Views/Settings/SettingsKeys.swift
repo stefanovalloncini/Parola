@@ -12,6 +12,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     case snippets
     case corrections
     case translation
+    case people
     case transcriptionDefaults
     case ignoredSegments
     case findReplace
@@ -41,6 +42,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .snippets: return "Snippets"
         case .corrections: return "Corrections"
         case .translation: return "Translation"
+        case .people: return "People"
         case .transcriptionDefaults: return "Transcription Defaults"
         case .ignoredSegments: return "Ignored Segments"
         case .findReplace: return "Find & Replace"
@@ -70,6 +72,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .snippets: return String(localized: "Snippets")
         case .corrections: return String(localized: "Corrections")
         case .translation: return String(localized: "Translation")
+        case .people: return String(localized: "People")
         case .transcriptionDefaults: return String(localized: "Transcription Defaults")
         case .ignoredSegments: return String(localized: "Ignored Segments")
         case .findReplace: return String(localized: "Find & Replace")
@@ -100,6 +103,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .snippets: return ["snippet", "expand", "abbreviation", "trigger", "placeholder", "date", "time"]
         case .corrections: return ["correction", "fix", "replace", "dictation", "vocabulary"]
         case .translation: return ["translate", "english", "side by side", "language"]
+        case .people: return ["people", "person", "speaker", "diarize", "identify speakers", "name", "colour", "color", "merge"]
         case .transcriptionDefaults: return ["default", "model", "language", "engine", "whisper", "privacy", "cloud", "llm", "speakers", "diarize", "word timestamps", "apple speech", "playback"]
         case .ignoredSegments: return ["filler", "uh", "um", "ignore", "skip"]
         case .findReplace: return ["regex", "replace", "term pack", "substitution", "rule"]
@@ -171,6 +175,10 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
             return ["correctionRules"]
         case .translation:
             return ["translate", "translationSideBySide"]
+        case .people:
+            // diarize is shared with the .general and .transcriptionDefaults scopes: all three
+            // show the toggle, and each pane's reset must cover what it shows.
+            return ["showMostUsedPeople", "diarize"]
         case .transcriptionDefaults:
             // wordTimestamps and diarize are shared with the .general scope: both panes
             // show the toggles, and each pane's reset must cover what it shows.

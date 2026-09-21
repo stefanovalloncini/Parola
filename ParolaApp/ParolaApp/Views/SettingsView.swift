@@ -34,7 +34,7 @@ struct SettingsView: View {
 enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     case general, customization, watchedFolders, recordMeetings, shortcuts
     case microphone, liveCaptions, dictation, snippets, corrections
-    case localModels, transcriptionDefaults, translation, ignoredSegments, findReplace
+    case localModels, transcriptionDefaults, translation, people, ignoredSegments, findReplace
     case exportFormats, batchExport, autoExport, sendTo, integrations
     case aiServices, prompts
     case automation
@@ -111,6 +111,7 @@ private struct SettingsRouteMeta {
         .localModels: SettingsRouteMeta(titleKey: "Local Models", summaryKey: "Speech models on this Mac, and the space they take up.", symbol: "cpu", scope: nil),
         .transcriptionDefaults: SettingsRouteMeta(titleKey: "Transcription Defaults", summaryKey: "The model and language new transcriptions start with.", symbol: "slider.horizontal.3", scope: .transcriptionDefaults),
         .translation: SettingsRouteMeta(titleKey: "Translation", summaryKey: "How Parola translates a transcript, and how it shows the result.", symbol: "character.book.closed", scope: .translation),
+        .people: SettingsRouteMeta(titleKey: "People", summaryKey: "The speakers you name, the colour each one wears, and where they show up.", symbol: "person.2", scope: .people),
         .ignoredSegments: SettingsRouteMeta(titleKey: "Ignored Segments", summaryKey: "Segments dropped from a transcript when the text matches a pattern.", symbol: "line.3.horizontal.decrease.circle", scope: .ignoredSegments),
         .findReplace: SettingsRouteMeta(titleKey: "Find & Replace", summaryKey: "Substitutions applied to every transcript before it's saved.", symbol: "arrow.triangle.2.circlepath", scope: .findReplace),
         .exportFormats: SettingsRouteMeta(titleKey: "Export Formats", summaryKey: "The named exports Parola can write, and what each one puts in the file.", symbol: "square.and.arrow.up", scope: .exportFormats),
@@ -140,7 +141,7 @@ enum SettingsSidebarCatalog {
             SidebarGroup(id: "capture", title: "CAPTURE", routes: [.microphone, .recordMeetings, .liveCaptions]),
             SidebarGroup(id: "dictation", title: "DICTATION", routes: [.dictation, .snippets, .corrections]),
             SidebarGroup(id: "sources", title: "SOURCES", routes: [.watchedFolders, .integrations]),
-            SidebarGroup(id: "transcription", title: "TRANSCRIPTION", routes: [.localModels, .transcriptionDefaults, .translation, .ignoredSegments, .findReplace]),
+            SidebarGroup(id: "transcription", title: "TRANSCRIPTION", routes: [.localModels, .transcriptionDefaults, .translation, .people, .ignoredSegments, .findReplace]),
             SidebarGroup(id: "export", title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport, .sendTo]),
             SidebarGroup(id: "ai", title: "AI", routes: [.aiServices, .prompts]),
             SidebarGroup(id: "automation", title: "AUTOMATION", routes: [.automation]),
@@ -262,6 +263,7 @@ private struct SettingsDetail: View {
             ModelsSettingsPane()
         case .transcriptionDefaults: TranscriptionDefaultsPane()
         case .translation: TranslationPane()
+        case .people: PeoplePane()
         case .ignoredSegments: IgnoredSegmentsPane()
         case .findReplace: FindReplacePane()
         case .exportFormats: ExportFormatsPane()

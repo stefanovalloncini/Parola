@@ -48,8 +48,9 @@ enum LibraryListContent {
         var label: String? = nil
         var language: String? = nil
         var dateRange: LibraryDateRangeFilter = .all
+        var person: UUID? = nil
 
-        var isEmpty: Bool { label == nil && language == nil && dateRange == .all }
+        var isEmpty: Bool { label == nil && language == nil && dateRange == .all && person == nil }
     }
 
     /// Filters survive a category switch, but one the new category has no row for is dropped, not carried over empty.
@@ -58,14 +59,23 @@ enum LibraryListContent {
         survivingIn category: EntryCategory?,
         entries: [LibraryEntry]
     ) -> ActiveFilters {
-        func matchesSomething(label: String? = nil, language: String? = nil, dateRange: LibraryDateRangeFilter = .all) -> Bool {
-            anyRow(in: entries, category: category, labelFilter: label, languageFilter: language, dateRange: dateRange)
+        func matchesSomething(
+            label: String? = nil,
+            language: String? = nil,
+            dateRange: LibraryDateRangeFilter = .all,
+            person: UUID? = nil
+        ) -> Bool {
+            anyRow(
+                in: entries, category: category, labelFilter: label, languageFilter: language,
+                dateRange: dateRange, personFilter: person
+            )
         }
         var kept = active
         if kept.label != nil, !matchesSomething(label: kept.label) { kept.label = nil }
         if kept.language != nil, !matchesSomething(language: kept.language) { kept.language = nil }
+        if kept.person != nil, !matchesSomething(person: kept.person) { kept.person = nil }
         if kept.dateRange != .all,
-           !matchesSomething(label: kept.label, language: kept.language, dateRange: kept.dateRange) {
+           !matchesSomething(label: kept.label, language: kept.language, dateRange: kept.dateRange, person: kept.person) {
             kept.dateRange = .all
         }
         return kept
@@ -83,10 +93,14 @@ enum LibraryListContent {
             category: category,
             labelFilter: active.label,
             languageFilter: active.language,
-            dateRange: active.dateRange
+            dateRange: active.dateRange,
+            personFilter: active.person
         )
         guard !anyMatch else { return false }
-        return anyRow(in: entries, category: category, labelFilter: nil, languageFilter: nil, dateRange: .all)
+        return anyRow(
+            in: entries, category: category, labelFilter: nil, languageFilter: nil,
+            dateRange: .all, personFilter: nil
+        )
     }
 
     /// The same test `rows` applies, without building the array a caller only measures for emptiness.
@@ -95,11 +109,15 @@ enum LibraryListContent {
         category: EntryCategory?,
         labelFilter: String?,
         languageFilter: String?,
-        dateRange: LibraryDateRangeFilter
+        dateRange: LibraryDateRangeFilter,
+        personFilter: UUID?
     ) -> Bool {
         let cutoff = dateRange.cutoff
         return entries.contains {
-            matches($0, category: category, labelFilter: labelFilter, languageFilter: languageFilter, cutoff: cutoff)
+            matches(
+                $0, category: category, labelFilter: labelFilter, languageFilter: languageFilter,
+                cutoff: cutoff, personFilter: personFilter
+            )
         }
     }
 
@@ -108,9 +126,11 @@ enum LibraryListContent {
         category: EntryCategory?,
         labelFilter: String?,
         languageFilter: String?,
-        cutoff: Date?
+        cutoff: Date?,
+        personFilter: UUID?
     ) -> Bool {
         if let category, entry.category != category { return false }
+        if let personFilter, !entry.personIDs.contains(personFilter) { return false }
         if let labelFilter,
            !entry.labels.contains(where: { $0.localizedCaseInsensitiveCompare(labelFilter) == .orderedSame }) {
             return false
@@ -186,11 +206,15 @@ enum LibraryListContent {
         category: EntryCategory?,
         labelFilter: String?,
         languageFilter: String?,
-        dateRange: LibraryDateRangeFilter
+        dateRange: LibraryDateRangeFilter,
+        personFilter: UUID?
     ) -> [LibraryEntry] {
         let cutoff = dateRange.cutoff
         let filtered = entries.filter {
-            matches($0, category: category, labelFilter: labelFilter, languageFilter: languageFilter, cutoff: cutoff)
+            matches(
+                $0, category: category, labelFilter: labelFilter, languageFilter: languageFilter,
+                cutoff: cutoff, personFilter: personFilter
+            )
         }
         // The entries arrive in the order the sidebar's sort menu picked; only pinning is layered on top.
         return filtered.filter(\.pinned) + filtered.filter { !$0.pinned }
@@ -228,7 +252,14 @@ struct LibraryListView: View {
     @State private var animatesRows = false
 
     private var activeFilters: LibraryListContent.ActiveFilters {
-        LibraryListContent.ActiveFilters(label: labelFilter, language: languageFilter, dateRange: dateRangeFilter)
+        LibraryListContent.ActiveFilters(
+            label: labelFilter, language: languageFilter, dateRange: dateRangeFilter, person: model.personFilter
+        )
+    }
+
+    /// The filter lives on the model: the sidebar rows and the bridge set it too.
+    private var personFilterBinding: Binding<UUID?> {
+        Binding(get: { model.personFilter }, set: { model.setPersonFilter($0) })
     }
 
     @discardableResult
@@ -248,7 +279,8 @@ struct LibraryListView: View {
                 category: category,
                 labelFilter: filters.label,
                 languageFilter: filters.language,
-                dateRange: filters.dateRange
+                dateRange: filters.dateRange,
+                personFilter: filters.person
             )
         }
         let sizes = model.libraryBundleSizes
@@ -322,6 +354,7 @@ struct LibraryListView: View {
         .onChange(of: labelFilter) { _, _ in recomputeEntries() }
         .onChange(of: languageFilter) { _, _ in recomputeEntries() }
         .onChange(of: dateRangeFilter) { _, _ in recomputeEntries() }
+        .onChange(of: model.personFilter) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryBundleSizesVersion) { _, _ in recomputeEntries() }
         .onChange(of: model.libraryExcerptsVersion) { _, _ in recomputeEntries() }
         .onChange(of: searchResults) { _, _ in
@@ -337,6 +370,7 @@ struct LibraryListView: View {
             labelFilter = kept.label
             languageFilter = kept.language
             dateRangeFilter = kept.dateRange
+            model.setPersonFilter(kept.person)
             let newEntries = recomputeEntries(with: kept)
             selection = selection.intersection(Set(newEntries.map(\.id)))
         }
@@ -482,8 +516,10 @@ struct LibraryListView: View {
                         labelFilter: $labelFilter,
                         languageFilter: $languageFilter,
                         dateRangeFilter: $dateRangeFilter,
+                        personFilter: personFilterBinding,
                         labelOptions: model.knownLabels(in: category),
-                        languageOptions: model.knownLanguages(in: category)
+                        languageOptions: model.knownLanguages(in: category),
+                        peopleOptions: model.peopleByUse
                     )
                 }
             },

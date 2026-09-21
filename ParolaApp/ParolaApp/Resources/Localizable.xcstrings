@@ -67,6 +67,17 @@
         }
       }
     },
+    "%@ is forgotten and the transcripts stop pointing at them. The names already written into them stay, and that can't be undone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola dimentica %@ e le trascrizioni smettono di puntarci. I nomi già scritti al loro interno restano, e questo non si può annullare."
+          }
+        }
+      }
+    },
     "%@ is running": {
       "extractionState": "manual",
       "localizations": {
@@ -244,6 +255,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld già nella tua libreria"
+          }
+        }
+      }
+    },
+    "%lld assignments": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld assegnazioni"
           }
         }
       }
@@ -602,6 +624,17 @@
         }
       }
     },
+    "1 assignment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 assegnazione"
+          }
+        }
+      }
+    },
     "1 day left": {
       "extractionState": "manual",
       "localizations": {
@@ -888,6 +921,17 @@
         }
       }
     },
+    "A person carries a colour and a name across every transcript they speak in. Renaming or merging rewrites the name in the transcripts that point at them.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una persona porta un colore e un nome in tutte le trascrizioni in cui parla. Rinominarla o unirla riscrive il nome nelle trascrizioni che la indicano."
+          }
+        }
+      }
+    },
     "A sample Parola writes to check a destination.": {
       "extractionState": "manual",
       "localizations": {
@@ -1169,6 +1213,17 @@
         }
       }
     },
+    "Add": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi"
+          }
+        }
+      }
+    },
     "Add App…": {
       "extractionState": "manual",
       "localizations": {
@@ -1257,6 +1312,17 @@
         }
       }
     },
+    "Add People…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi persone…"
+          }
+        }
+      }
+    },
     "Add Preset": {
       "extractionState": "manual",
       "localizations": {
@@ -1308,6 +1374,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aggiungi regola URL"
+          }
+        }
+      }
+    },
+    "Add a person…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi una persona…"
           }
         }
       }
@@ -1495,6 +1572,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tutte le lingue"
+          }
+        }
+      }
+    },
+    "All People": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tutte le persone"
           }
         }
       }
@@ -1704,6 +1792,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Chiede a Whisper i timestamp parola per parola. Karaoke più preciso ma più lento."
+          }
+        }
+      }
+    },
+    "Assign %@…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assegna %@…"
+          }
+        }
+      }
+    },
+    "Assign Selection to": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assegna la selezione a"
+          }
+        }
+      }
+    },
+    "Assign Speaker": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assegna speaker"
           }
         }
       }
@@ -2737,6 +2858,17 @@
         }
       }
     },
+    "Clear Speaker": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Togli lo speaker"
+          }
+        }
+      }
+    },
     "Clear batch": {
       "extractionState": "manual",
       "localizations": {
@@ -2766,6 +2898,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cancella ricerca"
+          }
+        }
+      }
+    },
+    "Clear speaker": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Togli lo speaker"
           }
         }
       }
@@ -3640,6 +3783,17 @@
         }
       }
     },
+    "Delete person": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina persona"
+          }
+        }
+      }
+    },
     "Delete prompt": {
       "extractionState": "manual",
       "localizations": {
@@ -3770,6 +3924,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cancellazione…"
+          }
+        }
+      }
+    },
+    "Detect speakers by default": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identifica gli speaker per impostazione predefinita"
           }
         }
       }
@@ -6481,6 +6646,28 @@
         }
       }
     },
+    "Manage People": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestisci le persone"
+          }
+        }
+      }
+    },
+    "Manage People…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestisci le persone…"
+          }
+        }
+      }
+    },
     "Manage models…": {
       "extractionState": "manual",
       "localizations": {
@@ -6614,6 +6801,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Le voci di menu sono fisse. Le scorciatoie globali richiedono il permesso di Monitoraggio Input. L'elenco completo è in Aiuto > Scorciatoie da tastiera."
+          }
+        }
+      }
+    },
+    "Merge Into": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unisci a"
           }
         }
       }
@@ -7075,6 +7273,28 @@
         }
       }
     },
+    "New person…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuova persona…"
+          }
+        }
+      }
+    },
+    "New transcriptions split the audio by speaker, so each one can be named.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le nuove trascrizioni dividono l'audio per speaker, così puoi dare un nome a ciascuno."
+          }
+        }
+      }
+    },
     "Newest first": {
       "extractionState": "manual",
       "localizations": {
@@ -7423,6 +7643,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ancora nessun pattern"
+          }
+        }
+      }
+    },
+    "No people yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna persona"
+          }
+        }
+      }
+    },
+    "No people yet — type a name below.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna persona: scrivi un nome qui sotto."
           }
         }
       }
@@ -8957,6 +9199,17 @@
         }
       }
     },
+    "Puts the five people you assign most under Library, each one a filter.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mette sotto Libreria le cinque persone che assegni più spesso, ognuna come filtro."
+          }
+        }
+      }
+    },
     "Queue": {
       "comment": "A title for a screen that shows the user's queue of batch jobs.",
       "isCommentAutoGenerated": true,
@@ -9547,6 +9800,17 @@
         }
       }
     },
+    "Rename Person": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rinomina persona"
+          }
+        }
+      }
+    },
     "Rename entry": {
       "extractionState": "manual",
       "localizations": {
@@ -9554,6 +9818,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rinomina voce"
+          }
+        }
+      }
+    },
+    "Rename label…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rinomina l'etichetta…"
+          }
+        }
+      }
+    },
+    "Rename person": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rinomina persona"
           }
         }
       }
@@ -10725,6 +11011,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostra l'icona nella barra dei menu"
+          }
+        }
+      }
+    },
+    "Show most used people in the sidebar": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra nella barra laterale le persone più usate"
           }
         }
       }
@@ -11942,6 +12239,17 @@
         }
       }
     },
+    "The new name replaces the old one in every transcript. That rewrite can't be undone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il nuovo nome sostituisce il vecchio in ogni trascrizione. La riscrittura non si può annullare."
+          }
+        }
+      }
+    },
     "The preset keeps this style, format and options.": {
       "extractionState": "manual",
       "localizations": {
@@ -11960,6 +12268,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La libreria di prompt dietro la pulizia della dettatura e il menu Trascrizione."
+          }
+        }
+      }
+    },
+    "The speakers you name, the colour each one wears, and where they show up.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gli speaker a cui dai un nome, il colore di ciascuno e dove compaiono."
           }
         }
       }
@@ -12893,6 +13212,17 @@
         }
       }
     },
+    "Unassigned": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non assegnato"
+          }
+        }
+      }
+    },
     "Unfavorite": {
       "extractionState": "manual",
       "localizations": {
@@ -12911,6 +13241,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sconosciuto"
+          }
+        }
+      }
+    },
+    "Unknown speaker, click to assign": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speaker sconosciuto: fai clic per assegnarlo"
           }
         }
       }
