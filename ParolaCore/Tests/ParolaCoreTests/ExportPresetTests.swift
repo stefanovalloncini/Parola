@@ -89,12 +89,18 @@ struct ExportPresetTests {
         }
     }
 
-    @Test("changing the format moves the spec to that format's style and keeps the options")
-    func changingFormatKeepsOptions() {
-        let spec = ExportSpec(style: .transcript, format: .txt, options: ExportOptions(timestamps: true))
+    @Test("changing the format moves the spec to that format's style and keeps what it reads")
+    func changingFormatMovesTheStyle() {
+        let spec = ExportSpec(
+            style: .transcript,
+            format: .txt,
+            options: ExportOptions(timestamps: true, speakers: false, grouping: .speakerParagraphs)
+        )
         let moved = spec.changing(format: .vtt)
         #expect(moved.style == .subtitles)
-        #expect(moved.options == spec.options)
+        #expect(moved.options.speakers == false)
+        #expect(moved.options.grouping == .speakerParagraphs)
+        #expect(moved.options.timestamps == false)
     }
 
     @Test("changing the style picks that style's first format unless the current one fits")
@@ -102,6 +108,58 @@ struct ExportPresetTests {
         let spec = ExportSpec(style: .transcript, format: .md)
         #expect(spec.changing(style: .segments).format == .json)
         #expect(spec.changing(style: .transcript).format == .md)
+    }
+
+    @Test("every format has a stable preset id and a preset that names it")
+    func formatPresetsCoverEveryFormat() {
+        #expect(Set(ExportFormat.allCases.map(ExportPreset.defaultID(for:))).count == ExportFormat.allCases.count)
+        for preset in ExportPreset.builtIns {
+            #expect(ExportPreset.defaultID(for: preset.spec.format) == preset.id)
+        }
+        #expect(ExportPreset.formatPreset(for: .csv).name == "CSV")
+        #expect(ExportPreset.formatPreset(for: .csv).isBuiltIn == false)
+        #expect(ExportPreset.formatPreset(for: .txt) == ExportPreset.builtIn(for: .txt))
+        #expect(ExportPreset.formatPresets.count == ExportFormat.allCases.count)
+        #expect(ExportPreset.formatPreset(id: ExportPreset.defaultID(for: .lrc))?.name == "LRC Lyrics")
+        #expect(ExportPreset.formatPreset(id: UUID()) == nil)
+    }
+
+    @Test("changing the format drops the options the new format ignores")
+    func changingFormatMasksOptions() {
+        var spec = ExportSpec.standard(for: .txt)
+        spec.options.timestamps = true
+        spec.options.endTimestamps = true
+        spec.options.milliseconds = true
+        spec.options.speakers = false
+        spec.options.grouping = .speakerParagraphs
+
+        let word = spec.changing(format: .docx)
+        #expect(word.options.timestamps == false)
+        #expect(word.options.endTimestamps == false)
+        #expect(word.options.milliseconds == false)
+        #expect(word.options.speakers == false)
+        #expect(word.options.grouping == .speakerParagraphs)
+
+        let html = spec.changing(format: .html)
+        #expect(html.options.timestamps)
+        #expect(html.options.htmlTheme == .light)
+    }
+
+    @Test("masking keeps the content choice the exporters do not read yet")
+    func maskingKeepsContent() {
+        var options = ExportOptions()
+        options.content = .both
+        #expect(options.masked(to: .srt).content == .both)
+    }
+
+    @Test("a binary format previews as plain text with the same options")
+    func textRenderingOfBinaryFormats() {
+        var spec = ExportSpec.standard(for: .docx)
+        spec.options.speakers = false
+        #expect(spec.textRendering.format == .txt)
+        #expect(spec.textRendering.options.speakers == false)
+        #expect(spec.textRendering.options.timestamps == false)
+        #expect(ExportSpec.standard(for: .srt).textRendering == ExportSpec.standard(for: .srt))
     }
 
     @Test("timestamp labels follow the end and millisecond options")

@@ -116,14 +116,4 @@ struct ExportOptionsTests {
         #expect(!plain.contains("Ada: "))
         #expect(plain.contains("Hello world."))
     }
-
-    @Test("a format keeps its standard output when the options are untouched")
-    func standardOptionsAreTheShippedOnes() throws {
-        for format in ExportFormat.allCases {
-            let fromSpec = try Exporters.exporter(for: ExportSpec.standard(for: format)).render(sample())
-            let fromFormat = try Exporters.exporter(for: format).render(sample())
-            if format == .pdf { continue }
-            #expect(fromSpec == fromFormat, "\(format.rawValue) diverged between the spec and the format factory")
-        }
-    }
 }

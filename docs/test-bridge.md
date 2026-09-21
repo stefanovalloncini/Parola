@@ -74,6 +74,10 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_download_model` | **name** | Trigger a download from inside the app. Progress shows in the UI. |
 | `parola_app_delete_model` | **name** | Delete a downloaded model. |
 | `parola_app_export_transcript` | **format** | txt / md / html / docx / pdf / csv / srt / vtt / json. The app's save panel handles the destination. |
+| `openExportSheet` | — | Open the Export sheet on the loaded transcript. Replies `{open, spec}`; `PRECONDITION` when nothing is loaded. |
+| `setExportSpec` | **spec** | Merge fields over the sheet's spec (`options` merges field by field, so `{"options":{"timestamps":true}}` keeps the rest). Naming `format` moves the spec to that format's style; naming `style` alone picks that style's first format. Replies `{spec}`. |
+| `exportWithSpec` | **spec**, **path** | Write the loaded transcript straight to `path` with that spec — no save panel. Replies `{path, format}`. |
+| `setExportPresets` | **presets** | Replace the saved export presets with an array of `ExportPreset` objects. Built-ins are kept and re-stamped. Replies `{exportPresets}`. |
 | `exportDiagnostics` | — | Render the diagnostics report and write it to the save destination. Returns `{path}`. In test mode, queue the destination with `queueSaveDestination` first. A dismissed panel is `PRECONDITION`; a failed write is `INTERNAL`. |
 | `parola_app_dismiss_error` | — | Clear a failed phase (equivalent to clicking "Try again"). |
 | `parola_app_screenshot` | path | Capture the main window to PNG via ScreenCaptureKit (needs Screen Recording permission). `path` is a bare filename stored under `Caches/Parola/Screenshots`. |
@@ -87,6 +91,9 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `introductionChooseEngine` | **id** | Pick one of the engine cards; the id comes from `engineChoices`. Nothing downloads until the introduction moves on. |
 
 The five introduction commands and `getState.introduction` all reply `{visible, step, steps, engine, engineChoices}`.
+
+`getState.exportPresets` carries the whole preset library (`{id, name, spec, isBuiltIn}` each) and
+`getState.exportSpec` the sheet's current spec, or `null` while the sheet is shut.
 `visible` says whether the introduction is on screen; `step` is the scene showing now and `steps` the order this
 deployment walks, drawn from `hello`, `transcribe`, `features`, `engine`, `ready`. The `engine` step is present
 only when `engineChoices` is non-empty; otherwise it is left out of `steps` and the reply's `engine` field is
@@ -101,7 +108,7 @@ Rows named without the `parola_app_` prefix are raw bridge commands, called thro
 
 | Tool | Args | What it does |
 |---|---|---|
-| `parola_app_get_settings` | — | All UserDefaults-backed settings: theme, model, language, streaming, diarize, wordTimestamps, dictation, sidebar density, batch export prefs, meeting detector. |
+| `parola_app_get_settings` | — | All UserDefaults-backed settings: theme, model, language, streaming, diarize, wordTimestamps, dictation, sidebar density, meeting detector. |
 | `parola_app_set_setting` | **key**, value | Generic UserDefaults setter. Bypasses `@AppStorage`'s outside-of-View flakiness by writing directly + nudging `objectWillChange`. |
 | `parola_app_open_settings` | — | Open the Settings window via the standard `showSettingsWindow:` selector. |
 | `parola_app_close_settings` | — | Close any open Settings window. |

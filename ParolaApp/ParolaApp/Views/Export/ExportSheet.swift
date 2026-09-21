@@ -62,7 +62,7 @@ struct ExportSheet: View {
     private var styleSection: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             sectionTitle("Style")
-            HStack(spacing: DS.Spacing.tight) {
+            LeadingFlow(spacing: DS.Spacing.tight) {
                 ForEach(ExportStyle.allCases) { style in
                     Button(LocalizedStringKey(style.displayName)) {
                         model.setExportSpec(spec.changing(style: style))
@@ -77,7 +77,7 @@ struct ExportSheet: View {
     private var formatSection: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             sectionTitle("Format")
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), alignment: .leading)], alignment: .leading, spacing: 4) {
+            LeadingFlow(spacing: DS.Spacing.tight) {
                 ForEach(spec.style.formats, id: \.self) { format in
                     Button(LocalizedStringKey(format.displayName)) {
                         model.setExportSpec(spec.changing(format: format))

@@ -6,7 +6,7 @@ struct ExportPresetChecks: View {
     let presets: [ExportPreset]
     let leafPrefix: String
     let isOn: (UUID) -> Bool
-    let toggle: (UUID) -> Void
+    let setOn: (UUID, Bool) -> Void
 
     var body: some View {
         let grid = [GridItem(.adaptive(minimum: 160), alignment: .leading)]
@@ -22,7 +22,7 @@ struct ExportPresetChecks: View {
     }
 
     private func binding(for id: UUID) -> Binding<Bool> {
-        Binding(get: { isOn(id) }, set: { _ in toggle(id) })
+        Binding(get: { isOn(id) }, set: { setOn(id, $0) })
     }
 
     static func slug(_ preset: ExportPreset) -> String {

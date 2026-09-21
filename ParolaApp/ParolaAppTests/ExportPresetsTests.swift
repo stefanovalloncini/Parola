@@ -158,14 +158,74 @@ struct ExportPresetsTests {
         #expect(model.exportPresets.contains { $0.id == selected.first?.id })
     }
 
-    @Test("a legacy format without a built-in preset migrates to nothing")
-    func batchMigrationSkipsFormatsWithoutAPreset() {
+    @Test("a legacy format without a built-in preset keeps its own preset")
+    func batchMigrationMaterializesFormatPresets() {
         let defaults = temporaryDefaults()
-        defaults.set("csv,txt", forKey: "batchExportFormats")
+        defaults.set("txt,lrc", forKey: "batchExportFormats")
 
         let model = makeModel(defaults: defaults)
 
-        #expect(model.batchExportPresetIDs == [txtPreset.id])
+        #expect(model.batchExportPresetIDs == [txtPreset.id, ExportPreset.defaultID(for: .lrc)])
+        #expect(model.batchExportPresets.map(\.name) == ["Transcript (.txt)", "LRC Lyrics"])
+        #expect(model.exportPreset(id: ExportPreset.defaultID(for: .lrc))?.isBuiltIn == false)
+    }
+
+    @Test("a legacy rule naming formats without a built-in materializes their presets")
+    func ruleMigrationMaterializesFormatPresets() {
+        let defaults = temporaryDefaults()
+        let legacy = """
+        [{"id":"44444444-4444-4444-4444-444444444444","sourceExtensions":["mp4"],"outputFormats":["html","csv"],"enabled":true}]
+        """
+        defaults.set(Data(legacy.utf8), forKey: "autoExportRules")
+
+        let model = makeModel(defaults: defaults)
+
+        #expect(model.autoExportRules.first?.presetIDs == [
+            ExportPreset.defaultID(for: .html),
+            ExportPreset.defaultID(for: .csv),
+        ])
+        let materialized = model.exportPresets.filter { !$0.isBuiltIn }.map(\.name)
+        #expect(materialized == ["HTML", "CSV"])
+
+        let planned = AutoExportEngine.plannedPresets(
+            rules: model.autoExportRules,
+            sourceExtension: "mp4",
+            presets: model.exportPresets
+        )
+        #expect(planned.map(\.spec.format) == [.html, .csv])
+    }
+
+    @Test("deleting a materialized format preset prunes the rule that named it")
+    func deletingAMaterializedPresetPrunesReferences() {
+        let defaults = temporaryDefaults()
+        let legacy = """
+        [{"id":"55555555-5555-5555-5555-555555555555","sourceExtensions":["mp4"],"outputFormats":["csv"],"enabled":true}]
+        """
+        defaults.set(Data(legacy.utf8), forKey: "autoExportRules")
+        let model = makeModel(defaults: defaults)
+        let csv = ExportPreset.defaultID(for: .csv)
+        #expect(model.exportPreset(id: csv) != nil)
+
+        model.deleteExportPreset(id: csv)
+
+        #expect(model.exportPreset(id: csv) == nil)
+        #expect(model.autoExportRules.first?.presetIDs.isEmpty == true)
+    }
+
+    @Test("selecting a batch preset honours the value it is given")
+    func setBatchPresetHonoursTheValue() {
+        let model = makeModel()
+        model.batchExportPresetIDs = []
+
+        model.setBatchExportPreset(srtPreset.id, selected: false)
+        #expect(model.batchExportPresetIDs.isEmpty)
+
+        model.setBatchExportPreset(srtPreset.id, selected: true)
+        model.setBatchExportPreset(srtPreset.id, selected: true)
+        #expect(model.batchExportPresetIDs == [srtPreset.id])
+
+        model.setBatchExportPreset(srtPreset.id, selected: false)
+        #expect(model.batchExportPresetIDs.isEmpty)
     }
 
     @Test("a rule saved with output formats loads onto the built-in presets")

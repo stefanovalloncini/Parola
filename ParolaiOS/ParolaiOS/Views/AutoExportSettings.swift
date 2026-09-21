@@ -53,7 +53,7 @@ struct AutoExportSettings: View {
     }
 
     static func presetNames(for rule: AutoExportRule) -> [String] {
-        rule.presetIDs.compactMap { id in ExportPreset.builtIns.first { $0.id == id }?.name }
+        rule.presetIDs.compactMap { id in ExportPreset.formatPreset(id: id)?.name }
     }
 
     private var filteredRuleIDs: Set<AutoExportRule.ID> {
@@ -108,7 +108,7 @@ private struct AutoExportRuleEditor: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Also write").font(.caption).foregroundStyle(.secondary)
                 FlowGrid {
-                    ForEach(ExportPreset.builtIns) { preset in
+                    ForEach(ExportPreset.formatPresets) { preset in
                         let isOn = rule.presetIDs.contains(preset.id)
                         Button(preset.name) {
                             if isOn {

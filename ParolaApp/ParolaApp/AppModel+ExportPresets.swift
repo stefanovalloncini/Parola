@@ -11,9 +11,7 @@ private struct LegacyBatchFormatOptions: Codable {
 extension AppModel {
 
     func loadExportPresets() {
-        exportPresets = AppModel.normalizedExportPresets(
-            readJSON([ExportPreset].self, forKey: "exportPresets") ?? ExportPreset.builtIns
-        )
+        setExportPresets(readJSON([ExportPreset].self, forKey: "exportPresets") ?? ExportPreset.builtIns)
     }
 
     func saveExportPresets() {
@@ -22,11 +20,20 @@ extension AppModel {
 
     /// The one way the preset library changes: every add, rename, delete and move lands here.
     func setExportPresets(_ presets: [ExportPreset]) {
-        exportPresets = AppModel.normalizedExportPresets(presets)
+        exportPresets = AppModel.normalizedExportPresets(presets, referencedIDs: referencedExportPresetIDs)
     }
 
-    /// Drops duplicates, re-stamps the built-in flag and puts back any built-in that went missing.
-    nonisolated static func normalizedExportPresets(_ presets: [ExportPreset]) -> [ExportPreset] {
+    /// Ids a rule or the batch selection still points at, so normalization can put those presets back.
+    private var referencedExportPresetIDs: [UUID] {
+        batchExportPresetIDs + autoExportRules.flatMap(\.presetIDs)
+    }
+
+    /// Drops duplicates, re-stamps the built-in flag, puts back any built-in that went missing and
+    /// materializes the format preset behind an id a saved rule or batch selection still names.
+    nonisolated static func normalizedExportPresets(
+        _ presets: [ExportPreset],
+        referencedIDs: [UUID] = []
+    ) -> [ExportPreset] {
         let builtInsByID = Dictionary(uniqueKeysWithValues: ExportPreset.builtIns.map { ($0.id, $0) })
         var seen = Set<UUID>()
         var out: [ExportPreset] = []
@@ -41,7 +48,13 @@ extension AppModel {
             out.append(copy)
         }
         for builtIn in ExportPreset.builtIns where !seen.contains(builtIn.id) {
+            seen.insert(builtIn.id)
             out.append(builtIn)
+        }
+        for id in referencedIDs where !seen.contains(id) {
+            guard let preset = ExportPreset.formatPreset(id: id) else { continue }
+            seen.insert(id)
+            out.append(preset)
         }
         return out
     }
@@ -66,12 +79,12 @@ extension AppModel {
 
     func deleteExportPreset(id: UUID) {
         guard let preset = exportPreset(id: id), !preset.isBuiltIn else { return }
-        setExportPresets(exportPresets.filter { $0.id != id })
-        // A rule or a batch selection pointing at a deleted preset would silently export nothing.
+        // Prune first: normalization puts a format preset straight back while a rule still names it.
         batchExportPresetIDs = batchExportPresetIDs.filter { $0 != id }
-        for index in autoExportRules.indices {
+        for index in autoExportRules.indices where autoExportRules[index].presetIDs.contains(id) {
             autoExportRules[index].presetIDs.removeAll { $0 == id }
         }
+        setExportPresets(exportPresets.filter { $0.id != id })
     }
 
     func moveExportPreset(id: UUID, by offset: Int) {
@@ -90,29 +103,37 @@ extension AppModel {
     }
 
     func toggleBatchExportPreset(_ id: UUID) {
-        if batchExportPresetIDs.contains(id) {
+        setBatchExportPreset(id, selected: !batchExportPresetIDs.contains(id))
+    }
+
+    /// The one way the batch selection changes: a preset the library does not hold cannot be selected.
+    func setBatchExportPreset(_ id: UUID, selected: Bool) {
+        guard selected else {
             batchExportPresetIDs = batchExportPresetIDs.filter { $0 != id }
-        } else if exportPreset(id: id) != nil {
-            batchExportPresetIDs = batchExportPresetIDs + [id]
+            return
         }
+        guard exportPreset(id: id) != nil, !batchExportPresetIDs.contains(id) else { return }
+        batchExportPresetIDs = batchExportPresetIDs + [id]
     }
 
     func loadBatchExportSelection() {
         if let stored = readJSON([UUID].self, forKey: "batchExportPresets") {
             batchExportPresetIDs = stored
-            return
+        } else {
+            let migrated = AppModel.migratedBatchSelection(
+                formats: (defaults.string(forKey: "batchExportFormats") ?? "txt,srt")
+                    .split(separator: ",")
+                    .compactMap { ExportFormat(rawValue: String($0)) },
+                legacyOptionsJSON: defaults.string(forKey: "batchExportFormatOptions") ?? "{}",
+                fallbackWriteToSourceFolder: (defaults.object(forKey: "batchExportToSourceFolder") as? Bool) ?? true,
+                fallbackIncludeTimestamps: defaults.bool(forKey: "batchExportIncludeTimestamps"),
+                presets: exportPresets
+            )
+            batchExportPresetIDs = migrated.ids
+            exportPresets = migrated.presets
         }
-        let migrated = AppModel.migratedBatchSelection(
-            formats: (defaults.string(forKey: "batchExportFormats") ?? "txt,srt")
-                .split(separator: ",")
-                .compactMap { ExportFormat(rawValue: String($0)) },
-            legacyOptionsJSON: defaults.string(forKey: "batchExportFormatOptions") ?? "{}",
-            fallbackWriteToSourceFolder: (defaults.object(forKey: "batchExportToSourceFolder") as? Bool) ?? true,
-            fallbackIncludeTimestamps: defaults.bool(forKey: "batchExportIncludeTimestamps"),
-            presets: exportPresets
-        )
-        setExportPresets(migrated.presets)
-        batchExportPresetIDs = migrated.ids
+        // The selection is known only now, so re-normalize: a format preset a migrated id names appears here.
+        setExportPresets(exportPresets)
     }
 
     /// Turns the pre-preset batch selection into preset ids, adding a preset where the old
@@ -135,7 +156,8 @@ extension AppModel {
                 writeToSourceFolder: fallbackWriteToSourceFolder,
                 includeTimestamps: fallbackIncludeTimestamps
             )
-            guard options.writeToSourceFolder, let builtIn = ExportPreset.builtIn(for: format) else { continue }
+            guard options.writeToSourceFolder else { continue }
+            let builtIn = ExportPreset.formatPreset(for: format)
             guard options.includeTimestamps, !builtIn.spec.options.timestamps else {
                 ids.append(builtIn.id)
                 continue

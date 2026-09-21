@@ -8780,6 +8780,17 @@
         }
       }
     },
+    "Rendering…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rendering in corso…"
+          }
+        }
+      }
+    },
     "Replace": {
       "extractionState": "manual",
       "localizations": {

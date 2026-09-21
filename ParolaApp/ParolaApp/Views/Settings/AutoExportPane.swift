@@ -238,11 +238,12 @@ private struct AutoExportRuleRow: View {
                         presets: presets,
                         leafPrefix: "AutoExport",
                         isOn: { rule.presetIDs.contains($0) },
-                        toggle: { id in
-                            if rule.presetIDs.contains(id) {
-                                rule.presetIDs.removeAll { $0 == id }
-                            } else {
+                        setOn: { id, isOn in
+                            if isOn {
+                                guard !rule.presetIDs.contains(id) else { return }
                                 rule.presetIDs.append(id)
+                            } else {
+                                rule.presetIDs.removeAll { $0 == id }
                             }
                         }
                     )

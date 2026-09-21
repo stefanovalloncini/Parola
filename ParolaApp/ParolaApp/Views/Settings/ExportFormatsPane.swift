@@ -135,7 +135,7 @@ struct BatchExportSettingsPane: View {
                         presets: model.exportPresets,
                         leafPrefix: "BatchExport",
                         isOn: { model.batchExportPresetIDs.contains($0) },
-                        toggle: { model.toggleBatchExportPreset($0) }
+                        setOn: { id, isOn in model.setBatchExportPreset(id, selected: isOn) }
                     )
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

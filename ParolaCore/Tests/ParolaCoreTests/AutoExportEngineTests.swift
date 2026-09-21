@@ -39,6 +39,12 @@ struct AutoExportEngineTests {
         #expect(AutoExportEngine.plannedPresets(rules: [rule], sourceExtension: "wav", presets: library).map(\.id) == [txt])
     }
 
+    @Test("disabled rule with no extensions still contributes nothing")
+    func emptyExtensionsDisabled() {
+        let rule = AutoExportRule(sourceExtensions: [], presetIDs: [txt], enabled: false)
+        #expect(AutoExportEngine.plannedPresets(rules: [rule], sourceExtension: "mp4", presets: library).isEmpty)
+    }
+
     @Test("multiple rules dedupe overlapping presets")
     func dedupe() {
         let first = AutoExportRule(sourceExtensions: ["mp4"], presetIDs: [srt])
@@ -88,12 +94,14 @@ struct AutoExportEngineTests {
         #expect(decoded.first?.sourceExtensions == ["mp4"])
     }
 
-    @Test("a legacy format without a built-in preset migrates to nothing")
-    func migratesUnknownLegacyFormat() throws {
+    @Test("a legacy format without a built-in preset keeps its own stable preset id")
+    func migratesFormatWithoutABuiltIn() throws {
         let legacy = """
-        [{"id":"11111111-1111-1111-1111-111111111111","sourceExtensions":["mp4"],"outputFormats":["csv"],"enabled":true}]
+        [{"id":"11111111-1111-1111-1111-111111111111","sourceExtensions":["mp4"],"outputFormats":["html","csv"],"enabled":true}]
         """
         let decoded = try JSONDecoder().decode([AutoExportRule].self, from: Data(legacy.utf8))
-        #expect(decoded.first?.presetIDs.isEmpty == true)
+        #expect(decoded.first?.presetIDs == [ExportPreset.defaultID(for: .html), ExportPreset.defaultID(for: .csv)])
+        #expect(ExportPreset.formatPreset(id: ExportPreset.defaultID(for: .csv))?.name == "CSV")
+        #expect(ExportPreset.formatPreset(id: ExportPreset.defaultID(for: .html))?.name == "HTML")
     }
 }

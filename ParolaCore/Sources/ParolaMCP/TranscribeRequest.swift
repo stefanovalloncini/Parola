@@ -9,12 +9,18 @@ enum TranscribeFormat: String, CaseIterable, Sendable {
     case json
 
     func render(_ transcript: Transcript) throws -> String {
+        // txt is the one shape that is not an export: the tool contract promises the joined plain text.
+        guard self != .txt else { return transcript.text }
+        return try Exporters.exporter(for: exportFormat).renderText(transcript)
+    }
+
+    var exportFormat: ExportFormat {
         switch self {
-        case .txt:  return transcript.text
-        case .md:   return try MarkdownExporter().renderText(transcript)
-        case .srt:  return try SrtExporter().renderText(transcript)
-        case .vtt:  return try VttExporter().renderText(transcript)
-        case .json: return try JsonExporter().renderText(transcript)
+        case .txt:  return .txt
+        case .md:   return .md
+        case .srt:  return .srt
+        case .vtt:  return .vtt
+        case .json: return .json
         }
     }
 }

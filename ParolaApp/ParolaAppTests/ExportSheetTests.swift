@@ -109,6 +109,53 @@ struct ExportSheetTests {
         #expect(text == "Ada: Hello world.\nGrace: Goodbye.\n")
     }
 
+    @Test("copying a Word export puts its text on the pasteboard")
+    func copyOfABinaryFormatCopiesItsText() async throws {
+        let model = makeModel()
+        model.transcript = Self.transcript()
+        model.openExportSheet()
+        model.setExportSpec(model.exportSheetSpec.changing(format: .docx))
+
+        NSPasteboard.general.clearContents()
+        model.copyExportToPasteboard()
+
+        var text: String?
+        for _ in 0..<200 {
+            text = NSPasteboard.general.string(forType: .string)
+            if text == "Ada: Hello world.\nGrace: Goodbye.\n" { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(text == "Ada: Hello world.\nGrace: Goodbye.\n")
+        #expect(model.phase != .failed(message: ""))
+    }
+
+    @Test("the sheet reopens on the spec it was left on")
+    func sheetRemembersTheSessionSpec() {
+        let model = makeModel()
+        model.transcript = Self.transcript()
+
+        model.openExportSheet()
+        model.setExportSpec(model.exportSheetSpec.changing(format: .srt))
+        model.closeExportSheet()
+
+        model.openExportSheet()
+
+        #expect(model.exportSheetSpec.format == .srt)
+        #expect(model.exportSheetSpec.style == .subtitles)
+    }
+
+    @Test("the quick export shortcut still writes the first preset")
+    func firstPresetIsTheQuickExport() throws {
+        let model = makeModel()
+        model.transcript = Self.transcript()
+        let first = try #require(model.exportPresets.first)
+
+        model.exportWithPreset(first.id)
+
+        #expect(first.spec.format == .txt)
+        #expect(model.pendingExport == first.spec)
+    }
+
     @Test("saving the sheet's spec adds a preset with that spec")
     func saveAsPresetKeepsTheSpec() {
         let model = makeModel()
@@ -151,34 +198,53 @@ struct ExportSheetTests {
     }
 
     @Test("the preview follows the spec")
-    func previewFollowsTheSpec() async {
+    func previewFollowsTheSpec() async throws {
         var spec = ExportSpec.standard(for: .txt)
-        let plain = await ExportPreview.render(transcript: Self.transcript(), spec: spec)
+        let plain = try await ExportPreview.render(transcript: Self.transcript(), spec: spec)
         #expect(plain == "Ada: Hello world.\nGrace: Goodbye.\n")
 
         spec.options.timestamps = true
-        let timed = await ExportPreview.render(transcript: Self.transcript(), spec: spec)
+        let timed = try await ExportPreview.render(transcript: Self.transcript(), spec: spec)
         #expect(timed.hasPrefix("[00:00:00] Ada: Hello world."))
     }
 
     @Test("the preview of a binary format shows the text rendering")
-    func previewFallsBackForBinaryFormats() async {
+    func previewFallsBackForBinaryFormats() async throws {
         for format in [ExportFormat.docx, .pdf] {
-            #expect(ExportPreview.previewSpec(for: .standard(for: format)).format == .txt)
-            let text = await ExportPreview.render(transcript: Self.transcript(), spec: .standard(for: format))
+            #expect(ExportSpec.standard(for: format).textRendering.format == .txt)
+            let text = try await ExportPreview.render(transcript: Self.transcript(), spec: .standard(for: format))
             #expect(text.contains("Hello world."))
         }
-        #expect(ExportPreview.previewSpec(for: .standard(for: .srt)).format == .srt)
+        #expect(ExportSpec.standard(for: .srt).textRendering.format == .srt)
+    }
+
+    @Test("switching to a binary format drops the options it cannot honour")
+    func binaryFormatPreviewMatchesTheFile() async throws {
+        let model = makeModel()
+        model.transcript = Self.transcript()
+        model.openExportSheet()
+
+        var timestamped = model.exportSheetSpec
+        timestamped.options.timestamps = true
+        model.setExportSpec(timestamped)
+        #expect(model.exportSheetSpec.options.timestamps)
+
+        model.setExportSpec(model.exportSheetSpec.changing(format: .docx))
+
+        #expect(model.exportSheetSpec.options.timestamps == false)
+        let preview = try await ExportPreview.render(transcript: Self.transcript(), spec: model.exportSheetSpec)
+        #expect(preview.hasPrefix("Ada: Hello world."))
+        #expect(!preview.contains("[00:00:00]"))
     }
 
     @Test("the preview stops at the character cap")
-    func previewIsCapped() async {
+    func previewIsCapped() async throws {
         let segments = (0..<4000).map {
             TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "A long enough line of speech.")
         }
         let transcript = Transcript(segments: segments, language: "en", modelName: "stub")
 
-        let text = await ExportPreview.render(transcript: transcript, spec: .standard(for: .txt))
+        let text = try await ExportPreview.render(transcript: transcript, spec: .standard(for: .txt))
 
         #expect(text.count <= ExportPreview.characterCap + 2)
     }

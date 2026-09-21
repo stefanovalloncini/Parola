@@ -54,6 +54,20 @@ struct SpeakerParagraphGroupingTests {
         #expect(merged[0].words?.map(\.word) == ["Hello", "again"])
     }
 
+    @Test("a run where only one segment has word timings loses them")
+    func partialWordTimingsAreDropped() {
+        let segments = [
+            TranscriptSegment(id: 0, start: 0, end: 1, text: "Hello", speaker: "Ada"),
+            TranscriptSegment(
+                id: 1, start: 1, end: 2, text: "again", speaker: "Ada",
+                words: [WordTiming(id: "1-0", word: "again", start: 1, end: 2, probability: 1)]
+            ),
+        ]
+        let merged = ExportGrouping.speakerParagraphs.apply(to: segments)
+        #expect(merged.count == 1)
+        #expect(merged[0].words == nil)
+    }
+
     @Test("segments without a speaker merge with each other")
     func unlabelledSegmentsMerge() {
         let segments = [

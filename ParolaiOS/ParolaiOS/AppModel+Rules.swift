@@ -44,7 +44,7 @@ extension AppModel {
         let presets = AutoExportEngine.plannedPresets(
             rules: autoExportRules,
             sourceExtension: ext,
-            presets: ExportPreset.builtIns
+            presets: ExportPreset.formatPresets
         )
         guard !presets.isEmpty else { return }
         Task { [weak self] in

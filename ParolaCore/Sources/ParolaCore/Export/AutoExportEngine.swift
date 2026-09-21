@@ -35,7 +35,7 @@ public struct AutoExportRule: Codable, Sendable, Identifiable, Hashable {
             let legacy = try c.decodeIfPresent(Set<ExportFormat>.self, forKey: .outputFormats) ?? []
             presetIDs = ExportFormat.allCases
                 .filter(legacy.contains)
-                .compactMap { ExportPreset.builtIn(for: $0)?.id }
+                .map(ExportPreset.defaultID(for:))
         }
     }
 

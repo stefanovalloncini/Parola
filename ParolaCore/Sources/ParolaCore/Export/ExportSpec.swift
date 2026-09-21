@@ -58,8 +58,11 @@ public enum ExportGrouping: String, Sendable, Codable, Hashable, CaseIterable, I
             let tail = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
             previous.text = [head, tail].filter { !$0.isEmpty }.joined(separator: " ")
             previous.end = max(previous.end, segment.end)
-            if previous.words != nil || segment.words != nil {
-                previous.words = (previous.words ?? []) + (segment.words ?? [])
+            // Half a run's word timings would read as the whole merged segment's; keep them only when every member has them.
+            if let head = previous.words, let tail = segment.words {
+                previous.words = head + tail
+            } else {
+                previous.words = nil
             }
             merged[merged.count - 1] = previous
         }
@@ -150,6 +153,25 @@ public struct ExportOptions: Sendable, Codable, Hashable {
         content = try c.decodeIfPresent(ExportContent.self, forKey: .content) ?? .original
     }
 
+    /// The same options with everything this format ignores reset to that format's standard, so a
+    /// spec never carries a field the export cannot honour.
+    func masked(to format: ExportFormat) -> ExportOptions {
+        var out = ExportSpec.standard(for: format).options
+        out.content = content
+        for field in format.optionFields {
+            switch field {
+            case .timestamps: out.timestamps = timestamps
+            case .endTimestamps: out.endTimestamps = endTimestamps
+            case .milliseconds: out.milliseconds = milliseconds
+            case .speakers: out.speakers = speakers
+            case .captionLength: out.captionLength = captionLength
+            case .htmlTheme: out.htmlTheme = htmlTheme
+            case .grouping: out.grouping = grouping
+            }
+        }
+        return out
+    }
+
     /// The stamp a text format puts in front of a segment, or nil when timestamps are off.
     public func timestampLabel(start: Double, end: Double) -> String? {
         guard timestamps else { return nil }
@@ -192,17 +214,27 @@ public struct ExportSpec: Sendable, Codable, Hashable {
         return ExportSpec(style: ExportStyle.style(for: format), format: format, options: options)
     }
 
-    /// The same export in another format, moved to that format's style when it belongs to a different one.
+    /// The same export in another format: it moves to that format's style and drops the options that format ignores.
     public func changing(format newFormat: ExportFormat) -> ExportSpec {
-        ExportSpec(style: ExportStyle.style(for: newFormat), format: newFormat, options: options)
+        ExportSpec(
+            style: ExportStyle.style(for: newFormat),
+            format: newFormat,
+            options: options.masked(to: newFormat)
+        )
     }
 
     /// The same options rendered by the first format of another style.
     public func changing(style newStyle: ExportStyle) -> ExportSpec {
         guard !newStyle.formats.contains(format), let first = newStyle.formats.first else {
-            return ExportSpec(style: newStyle, format: format, options: options)
+            return changing(format: format)
         }
-        return ExportSpec(style: newStyle, format: first, options: options)
+        return changing(format: first)
+    }
+
+    /// The spec to render when this one produces bytes no reader can show: docx and pdf preview as text.
+    public var textRendering: ExportSpec {
+        guard format == .docx || format == .pdf else { return self }
+        return changing(format: .txt)
     }
 }
 
@@ -232,43 +264,43 @@ public struct ExportPreset: Sendable, Codable, Hashable, Identifiable {
 public extension ExportPreset {
     static let builtIns: [ExportPreset] = [
         ExportPreset(
-            id: UUID(uuidString: "E0000000-0000-0000-0000-000000000001")!,
+            id: defaultID(for: .txt),
             name: "Transcript (.txt)",
             spec: .standard(for: .txt),
             isBuiltIn: true
         ),
         ExportPreset(
-            id: UUID(uuidString: "E0000000-0000-0000-0000-000000000002")!,
+            id: defaultID(for: .md),
             name: "Transcript (.md)",
             spec: .standard(for: .md),
             isBuiltIn: true
         ),
         ExportPreset(
-            id: UUID(uuidString: "E0000000-0000-0000-0000-000000000003")!,
+            id: defaultID(for: .srt),
             name: "Subtitles (.srt)",
             spec: .standard(for: .srt),
             isBuiltIn: true
         ),
         ExportPreset(
-            id: UUID(uuidString: "E0000000-0000-0000-0000-000000000004")!,
+            id: defaultID(for: .vtt),
             name: "Subtitles (.vtt)",
             spec: .standard(for: .vtt),
             isBuiltIn: true
         ),
         ExportPreset(
-            id: UUID(uuidString: "E0000000-0000-0000-0000-000000000005")!,
+            id: defaultID(for: .json),
             name: "Segments (.json)",
             spec: .standard(for: .json),
             isBuiltIn: true
         ),
         ExportPreset(
-            id: UUID(uuidString: "E0000000-0000-0000-0000-000000000006")!,
+            id: defaultID(for: .docx),
             name: "Word (.docx)",
             spec: .standard(for: .docx),
             isBuiltIn: true
         ),
         ExportPreset(
-            id: UUID(uuidString: "E0000000-0000-0000-0000-000000000007")!,
+            id: defaultID(for: .pdf),
             name: "PDF",
             spec: .standard(for: .pdf),
             isBuiltIn: true
@@ -278,5 +310,48 @@ public extension ExportPreset {
     /// The built-in preset that renders this format, if one does.
     static func builtIn(for format: ExportFormat) -> ExportPreset? {
         builtIns.first { $0.spec.format == format }
+    }
+
+    /// The fixed id every format's preset keeps across versions, so a saved rule survives an upgrade.
+    static func defaultID(for format: ExportFormat) -> UUID {
+        switch format {
+        case .txt:    return uuid(1)
+        case .md:     return uuid(2)
+        case .srt:    return uuid(3)
+        case .vtt:    return uuid(4)
+        case .json:   return uuid(5)
+        case .docx:   return uuid(6)
+        case .pdf:    return uuid(7)
+        case .html:   return uuid(8)
+        case .csv:    return uuid(9)
+        case .tsv:    return uuid(10)
+        case .jsonl:  return uuid(11)
+        case .fcpxml: return uuid(12)
+        case .lrc:    return uuid(13)
+        }
+    }
+
+    /// The preset a format exports with: the built-in where there is one, else a plain preset the user can delete.
+    static func formatPreset(for format: ExportFormat) -> ExportPreset {
+        if let builtIn = builtIn(for: format) { return builtIn }
+        return ExportPreset(
+            id: defaultID(for: format),
+            name: format.displayName,
+            spec: .standard(for: format),
+            isBuiltIn: false
+        )
+    }
+
+    /// The format preset with this id, for putting back a preset a saved rule still points at.
+    static func formatPreset(id: UUID) -> ExportPreset? {
+        guard let format = ExportFormat.allCases.first(where: { defaultID(for: $0) == id }) else { return nil }
+        return formatPreset(for: format)
+    }
+
+    /// One preset per export format, the seven built-ins included.
+    static var formatPresets: [ExportPreset] { ExportFormat.allCases.map { formatPreset(for: $0) } }
+
+    private static func uuid(_ index: Int) -> UUID {
+        UUID(uuidString: String(format: "E0000000-0000-0000-0000-%012d", index))!
     }
 }

@@ -109,6 +109,50 @@ struct TranscribeRequestTests {
         #expect(rendered.contains("00:00:00,000 --> "))
     }
 
+    @Test("every MCP format keeps the bytes the tool contract promises")
+    func renderedFormatsKeepTheirBytes() throws {
+        let transcript = speakerFixture()
+
+        #expect(try TranscribeFormat.txt.render(transcript) == "sprint review shipping \"on\" friday & later")
+
+        #expect(try TranscribeFormat.md.render(transcript) == """
+        # Transcript
+
+        **Ada:** sprint review
+
+        **Grace:** shipping "on" friday & later
+
+        """)
+
+        #expect(try TranscribeFormat.srt.render(transcript) == """
+        1
+        00:00:00,000 --> 00:00:02,000
+        sprint review
+
+        2
+        00:00:02,000 --> 00:00:04,500
+        shipping "on" friday & later
+
+
+        """)
+
+        #expect(try TranscribeFormat.vtt.render(transcript) == """
+        WEBVTT
+
+        00:00:00.000 --> 00:00:02.000
+        sprint review
+
+        00:00:02.000 --> 00:00:04.500
+        shipping "on" friday &amp; later
+
+
+        """)
+
+        let json = try TranscribeFormat.json.render(transcript)
+        #expect(json.hasPrefix("{\n  \"durationSeconds\" : 4.5,"))
+        #expect(json.contains("\"speaker\" : \"Grace\""))
+    }
+
     @Test("a call without output_path writes no file")
     func noOutputPathWritesNothing() throws {
         let request = try TranscribeRequest(args: ["path": "/tmp/talk.wav"])
@@ -272,6 +316,18 @@ struct TranscribeRequestTests {
         let schema = try #require(parsed["inputSchema"] as? [String: Any])
         #expect(schema["required"] as? [String] == ["path"])
         return try #require(schema["properties"] as? [String: Any])
+    }
+
+    private func speakerFixture() -> Transcript {
+        Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 2, text: "sprint review", speaker: "Ada"),
+                TranscriptSegment(id: 1, start: 2, end: 4.5, text: "shipping \"on\" friday & later", speaker: "Grace"),
+            ],
+            language: "en",
+            modelName: "tiny",
+            durationSeconds: 4.5
+        )
     }
 
     private func fixture() -> Transcript {

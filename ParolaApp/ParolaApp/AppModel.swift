@@ -448,6 +448,7 @@ final class AppModel {
     var pendingExport: ExportSpec?
     var exportSheetOpen: Bool = false
     private(set) var exportSheetSpec: ExportSpec = .standard(for: .txt)
+    @ObservationIgnored private var hasChosenExportSpec = false
 
     // MARK: - Post-process rules
 
@@ -3361,7 +3362,10 @@ final class AppModel {
 
     func openExportSheet() {
         guard transcript != nil else { return }
-        setExportSpec(exportPresets.first?.spec ?? .standard(for: .txt))
+        // The sheet reopens where it was left this session; the first opening starts from the top preset.
+        if !hasChosenExportSpec {
+            setExportSpec(exportPresets.first?.spec ?? .standard(for: .txt))
+        }
         exportSheetOpen = true
     }
 
@@ -3369,13 +3373,11 @@ final class AppModel {
         exportSheetOpen = false
     }
 
-    /// The one way the sheet's spec changes: a spec whose format belongs to another style is repaired.
+    /// The one way the sheet's spec changes: the style follows the format and the options the format
+    /// cannot honour are dropped, so the preview and the file never disagree.
     func setExportSpec(_ spec: ExportSpec) {
-        exportSheetSpec = ExportSpec(
-            style: ExportStyle.style(for: spec.format),
-            format: spec.format,
-            options: spec.options
-        )
+        exportSheetSpec = spec.changing(format: spec.format)
+        hasChosenExportSpec = true
     }
 
     func exportFromSheet() {
@@ -3396,14 +3398,18 @@ final class AppModel {
 
     func copyExportToPasteboard() {
         guard let transcript else { return }
-        let spec = exportSheetSpec
-        Task {
-            guard let data = try? await AppModel.offMainIO({ try Exporters.exporter(for: spec).render(transcript) }),
-                  let text = String(data: data, encoding: .utf8) else {
-                return
+        // docx and pdf have no text to paste; the clipboard gets what the preview shows.
+        let spec = exportSheetSpec.textRendering
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let text = try await AppModel.offMainIO { try Exporters.exporter(for: spec).renderText(transcript) }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(text, forType: .string)
+            } catch {
+                ParolaLog.error(.export, "copy failed as \(spec.format)", [.error: .error(error)])
+                self.phase = .failed(message: Self.exportFailureMessage(for: error))
             }
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
         }
     }
 

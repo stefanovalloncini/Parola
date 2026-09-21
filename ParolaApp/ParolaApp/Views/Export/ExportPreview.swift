@@ -7,7 +7,13 @@ struct ExportPreview: View {
     let spec: ExportSpec
     let transcript: Transcript
 
-    @State private var text: String = ""
+    @State private var state: State = .rendering
+
+    private enum State: Equatable {
+        case rendering
+        case text(String)
+        case failed(String)
+    }
 
     static let characterCap = 20_000
     private static let debounce = Duration.milliseconds(150)
@@ -15,9 +21,8 @@ struct ExportPreview: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             ScrollView {
-                Text(text)
+                body(for: state)
                     .font(DS.Font.mono)
-                    .foregroundStyle(DS.Color.primaryText)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(DS.Spacing.small)
@@ -29,34 +34,45 @@ struct ExportPreview: View {
             )
             .axLeaf("Export.Text.Preview")
 
-            if Self.previewSpec(for: spec).format != spec.format {
+            if spec.textRendering != spec {
                 Text("Layout preview not available for this format")
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
             }
         }
         .task(id: spec) {
+            state = .rendering
             try? await Task.sleep(for: Self.debounce)
             guard !Task.isCancelled else { return }
-            let rendered = await Self.render(transcript: transcript, spec: spec)
-            guard !Task.isCancelled else { return }
-            text = rendered
+            do {
+                let rendered = try await Self.render(transcript: transcript, spec: spec)
+                guard !Task.isCancelled else { return }
+                state = .text(rendered)
+            } catch {
+                guard !Task.isCancelled else { return }
+                state = .failed(AppModel.exportFailureMessage(for: error))
+            }
         }
     }
 
-    /// A binary format has no text to show, so the preview renders the same options as plain text.
-    static func previewSpec(for spec: ExportSpec) -> ExportSpec {
-        guard spec.format == .docx || spec.format == .pdf else { return spec }
-        return ExportSpec(style: spec.style, format: .txt, options: spec.options)
+    @ViewBuilder
+    private func body(for state: State) -> some View {
+        switch state {
+        case .rendering:
+            Text("Rendering…").foregroundStyle(DS.Color.secondaryText)
+        case .text(let text):
+            Text(text).foregroundStyle(DS.Color.primaryText)
+        case .failed(let message):
+            Text(message).foregroundStyle(DS.Color.dangerText)
+        }
     }
 
-    static func render(transcript: Transcript, spec: ExportSpec) async -> String {
-        let target = previewSpec(for: spec)
-        let rendered = try? await AppModel.offMainIO {
+    static func render(transcript: Transcript, spec: ExportSpec) async throws -> String {
+        let target = spec.textRendering
+        return try await AppModel.offMainIO {
             let text = try Exporters.exporter(for: target).renderText(transcript)
             guard text.count > characterCap else { return text }
             return String(text.prefix(characterCap)) + "\n…"
         }
-        return rendered ?? ""
     }
 }
