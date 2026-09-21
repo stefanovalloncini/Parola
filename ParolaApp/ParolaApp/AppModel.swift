@@ -1967,12 +1967,56 @@ final class AppModel {
         )
     }
 
-    func makeFilePartialHandler(runToken: Int) -> @Sendable (String) -> Void {
-        return { [weak self] text in
-            Task { @MainActor in
-                guard let self, self.fileRunGeneration == runToken, self.filePartialText != text else { return }
-                self.filePartialText = text
+    /// Keep-newest, single flight: a burst of engine callbacks costs one main-actor hop, not one each.
+    final class MainActorCoalescer<Value: Sendable>: Sendable {
+        private struct Slot {
+            var pending: Value?
+            var hopScheduled = false
+            var hops = 0
+        }
+
+        private let slot = OSAllocatedUnfairLock(initialState: Slot())
+        private let deliver: @MainActor @Sendable (Value) -> Void
+
+        init(deliver: @escaping @MainActor @Sendable (Value) -> Void) {
+            self.deliver = deliver
+        }
+
+        var hopCount: Int { slot.withLock { $0.hops } }
+
+        func send(_ value: Value) {
+            let schedule = slot.withLock { state -> Bool in
+                state.pending = value
+                guard !state.hopScheduled else { return false }
+                state.hopScheduled = true
+                return true
             }
+            guard schedule else { return }
+            Task { @MainActor in self.drain() }
+        }
+
+        @MainActor private func drain() {
+            let value = slot.withLock { state -> Value? in
+                state.hops += 1
+                state.hopScheduled = false
+                let pending = state.pending
+                state.pending = nil
+                return pending
+            }
+            guard let value else { return }
+            deliver(value)
+        }
+    }
+
+    func makeFilePartialHandler(runToken: Int) -> @Sendable (String) -> Void {
+        let coalescer = makeFilePartialCoalescer(runToken: runToken)
+        return { coalescer.send($0) }
+    }
+
+    func makeFilePartialCoalescer(runToken: Int) -> MainActorCoalescer<String> {
+        MainActorCoalescer { [weak self] text in
+            guard let self, self.fileRunGeneration == runToken, self.filePartialText != text else { return }
+            self.filePartialText = text
         }
     }
 
@@ -2059,18 +2103,21 @@ final class AppModel {
     }
 
     func makeFileProgressHandler(runToken: Int) -> @Sendable (Double) -> Void {
+        let coalescer = makeFileProgressCoalescer(runToken: runToken)
+        return { coalescer.send($0) }
+    }
+
+    func makeFileProgressCoalescer(runToken: Int) -> MainActorCoalescer<Double> {
         let throttle = FileProgressThrottle()
-        return { [weak self] seconds in
-            Task { @MainActor [weak self] in
-                guard let self, self.fileRunGeneration == runToken,
-                      let duration = self.mediaDurationSeconds, duration > 0 else { return }
-                let fraction = min(1, max(throttle.lastFraction, seconds / duration))
-                let percent = Int(fraction * 100)
-                guard percent != throttle.lastPercent else { return }
-                throttle.lastPercent = percent
-                throttle.lastFraction = fraction
-                self.fileTranscribeFraction = fraction
-            }
+        return MainActorCoalescer { [weak self] seconds in
+            guard let self, self.fileRunGeneration == runToken,
+                  let duration = self.mediaDurationSeconds, duration > 0 else { return }
+            let fraction = min(1, max(throttle.lastFraction, seconds / duration))
+            let percent = Int(fraction * 100)
+            guard percent != throttle.lastPercent else { return }
+            throttle.lastPercent = percent
+            throttle.lastFraction = fraction
+            self.fileTranscribeFraction = fraction
         }
     }
 
