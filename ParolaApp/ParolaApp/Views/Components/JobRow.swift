@@ -85,7 +85,7 @@ struct JobRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: DS.Spacing.regular) {
-            EntryBadge(kind: EntrySourceKind(url: job.url), isSelected: onAccent)
+            EntryBadge(kind: EntrySourceKind(url: job.url), onAccent: onAccent)
             VStack(alignment: .leading, spacing: DS.Spacing.hair) {
                 Text(job.url.lastPathComponent)
                     .font(DS.Font.bodyStrong)

@@ -78,17 +78,18 @@ enum EntryRowMetrics {
 /// The tinted square a row or a job leads with.
 struct EntryBadge: View {
     let kind: EntrySourceKind
-    var isSelected: Bool = false
+    /// True only where the badge really sits on the accent fill; a grey selection keeps the tint.
+    var onAccent: Bool = false
     var side: CGFloat = EntryRowMetrics.badgeSide
 
     var body: some View {
         RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-            .fill(isSelected ? DS.Color.onAccent.opacity(0.18) : kind.tint.opacity(0.14))
+            .fill(onAccent ? DS.Color.onAccent.opacity(0.18) : kind.tint.opacity(0.14))
             .frame(width: side, height: side)
             .overlay {
                 Image(systemName: kind.symbol)
                     .font(DS.Font.bodyStrong)
-                    .foregroundStyle(isSelected ? DS.Color.onAccent : kind.tint)
+                    .foregroundStyle(onAccent ? DS.Color.onAccent : kind.tint)
             }
             .accessibilityHidden(true)
     }
@@ -124,6 +125,7 @@ struct EntryRow<Accessory: View, Actions: View>: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.backgroundProminence) private var backgroundProminence
     @State private var isHovering = false
 
     init(
@@ -173,9 +175,13 @@ struct EntryRow<Accessory: View, Actions: View>: View {
         isSelected ? .secondary : DS.Color.secondaryText
     }
 
+    private var onAccent: Bool {
+        DS.onAccent(isSelected: isSelected, prominence: backgroundProminence)
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: DS.Spacing.regular) {
-            EntryBadge(kind: display.sourceKind, isSelected: isSelected)
+            EntryBadge(kind: display.sourceKind, onAccent: onAccent)
             VStack(alignment: .leading, spacing: DS.Spacing.hair) {
                 titleLine
                 detailLine
@@ -308,12 +314,12 @@ struct EntryRow<Accessory: View, Actions: View>: View {
             .padding(.horizontal, DS.Spacing.snug)
             .background(
                 Capsule(style: .continuous)
-                    .fill(isSelected ? DS.Color.onAccent.opacity(0.18) : DS.Color.surfaceElevated)
+                    .fill(onAccent ? DS.Color.onAccent.opacity(0.18) : DS.Color.surfaceElevated)
             )
             .overlay(
                 Capsule(style: .continuous)
                     .strokeBorder(
-                        isSelected ? DS.Color.onAccent.opacity(0.35) : DS.Color.separator.opacity(0.4),
+                        onAccent ? DS.Color.onAccent.opacity(0.35) : DS.Color.separator.opacity(0.4),
                         lineWidth: 0.5
                     )
             )

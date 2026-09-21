@@ -185,6 +185,6 @@ extension RecentlyDeletedCopy.ExpiryBucket {
     }
 
     static func emphasized(_ isSelected: Bool, _ prominence: BackgroundProminence) -> Bool {
-        isSelected && prominence == .increased
+        DS.onAccent(isSelected: isSelected, prominence: prominence)
     }
 }

@@ -189,6 +189,11 @@ enum DS {
 
     static let speakerPalette: [SwiftUI.Color] = speakerTints.map(\.color)
 
+    /// A `List` fills a selected row with the accent only while it holds focus; anywhere else the selection is a grey wash.
+    static func onAccent(isSelected: Bool, prominence: BackgroundProminence) -> Bool {
+        isSelected && prominence == .increased
+    }
+
     /// The one symbol table for entry categories: sidebar, library empty states and Recently Deleted.
     static func categorySymbol(for category: EntryCategory) -> String {
         switch category {

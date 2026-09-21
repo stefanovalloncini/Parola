@@ -182,6 +182,14 @@ struct SurfaceContrastTests {
         #expect(later.barFill(isSelected: true, prominence: .increased) == DS.Color.onAccent)
     }
 
+    /// The badge and the label chips of a selected row read the same rule the countdown and the bar do.
+    @Test("a row's badge keeps its tint until the accent is what it sits on")
+    func entryRowBadgeFollowsProminence() {
+        #expect(!DS.onAccent(isSelected: false, prominence: .increased))
+        #expect(!DS.onAccent(isSelected: true, prominence: .standard))
+        #expect(DS.onAccent(isSelected: true, prominence: .increased))
+    }
+
     @Test("accent text leaves an accent that already clears AA alone")
     func accentTextKeepsLegibleAccents() {
         let dark = RGBA(0.1, 0.1, 0.1)
