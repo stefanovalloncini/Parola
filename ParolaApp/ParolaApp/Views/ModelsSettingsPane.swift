@@ -310,7 +310,7 @@ struct ModelsSettingsPane: View {
     /// doesn't rebuild the installed-id set and re-sort the catalog once per section.
     private var sections: Sections {
         let installedIDs = Set(model.availableModels.filter(\.isInstalled).map(\.name))
-        let allowed = ManagedConfiguration.shared.filterAllowed(ModelCatalog.all)
+        let allowed = ModelCatalog.listedVariants(isInstalled: { installedIDs.contains($0) })
         var sections = Sections()
 
         if installFilter != .available {

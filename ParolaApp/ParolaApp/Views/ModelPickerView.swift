@@ -7,8 +7,10 @@ struct ModelPickerView: View {
     @State private var searchText = ""
     @State private var installedOnly = false
 
-    /// Frozen at first use: ModelStore re-applies the managed allowlist on every scan, so a stale row here cannot reach a blocked model.
-    private static let groups: [(ModelCategory, [ModelVariant])] = ModelCatalog.groupedForPicker()
+    private var groups: [(ModelCategory, [ModelVariant])] {
+        let installed = Set(model.availableModels.filter(\.isInstalled).map(\.name))
+        return ModelCatalog.groupedForPicker(isInstalled: { installed.contains($0) })
+    }
 
     var body: some View {
         PillPickerButton(icon: "cpu", caption: "Model", value: currentLabel) {
@@ -114,7 +116,7 @@ struct ModelPickerView: View {
 
     private var filteredGroups: [(ModelCategory, [ModelVariant])] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return Self.groups.compactMap { category, variants in
+        return groups.compactMap { category, variants in
             let matches = variants.filter { variant in
                 if installedOnly && !isInstalled(variant) { return false }
                 if query.isEmpty { return true }
