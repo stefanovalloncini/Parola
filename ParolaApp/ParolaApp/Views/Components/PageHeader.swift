@@ -48,9 +48,12 @@ struct PageHeader<Leading: View, Trailing: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.hair) {
             HStack(spacing: DS.Spacing.regular) {
+                // A locale that runs long truncates the title rather than growing the header to two lines.
                 title
                     .font(DS.Font.title)
                     .foregroundStyle(DS.Color.primaryText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 leading
                 Spacer()
                 trailing
