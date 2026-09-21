@@ -295,7 +295,11 @@ extension AppModel {
 
     func toggleSegmentFavorite(_ id: Int) {
         guard let entryID = selectedEntryID else { return }
-        let makeFavorite = !isSegmentFavorite(id)
+        let current = favoriteSegmentIDs
+        let makeFavorite = !current.contains(id)
+        if !makeFavorite, favoritesOnly, current.subtracting([id]).isEmpty {
+            favoritesOnly = false
+        }
         Task { [weak self] in
             guard let self else { return }
             do {
@@ -321,9 +325,14 @@ extension AppModel {
 
     func replaceFavorites(_ ids: Set<Int>) {
         guard let entryID = selectedEntryID else { return }
+        if ids.isEmpty, favoritesOnly { favoritesOnly = false }
         Task { [weak self] in
             guard let self else { return }
-            try? await library.setFavoriteSegments(ids, for: entryID)
+            do {
+                try await library.setFavoriteSegments(ids, for: entryID)
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
             refreshLibrary()
         }
     }
@@ -448,6 +457,7 @@ extension AppModel {
                 closeFind()
                 sourceFileURL = loaded.document.audioURL
                 selectedEntryID = id
+                favoritesOnly = false
                 if let audioURL = loaded.document.audioURL {
                     installPlayer(for: audioURL)
                     adoptLoadedMediaDuration()

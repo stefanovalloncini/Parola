@@ -53,7 +53,7 @@ struct FormatInspector: View {
             Toggle(isOn: $model.favoritesOnly) {
                 Text(String(localized: "Favorites only (\(model.favoriteSegmentIDs.count))"))
             }
-            .disabled(model.favoriteSegmentIDs.isEmpty)
+            .disabled(!model.favoritesOnly && model.favoriteSegmentIDs.isEmpty)
             .axLeaf("Format.Toggle.FavoritesOnly")
         }
     }
