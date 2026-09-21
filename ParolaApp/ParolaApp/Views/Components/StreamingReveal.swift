@@ -4,12 +4,15 @@ import SwiftUI
 enum StreamingReveal {
     static let caretBlinkPeriod: Double = 0.6
 
+    /// How far the words that have just arrived are held back, in the demo card as well as the live pane.
+    static let freshOpacity: Double = 0.5
+
     static func attributed(settled: String, fresh: String) -> AttributedString {
         var text = AttributedString(settled)
         text.foregroundColor = DS.Color.primaryText
         if !fresh.isEmpty {
             var tail = AttributedString(fresh)
-            tail.foregroundColor = DS.Color.primaryText.opacity(0.5)
+            tail.foregroundColor = DS.Color.primaryText.opacity(freshOpacity)
             text.append(tail)
         }
         return text

@@ -90,7 +90,7 @@ struct DemoTranscriptCard: View {
                 Text(verbatim: word)
                     .font(DS.Font.transcript)
                     .foregroundStyle(DS.Color.primaryText)
-                    .opacity(index >= freshFrom && !demo.isSettled ? 0.5 : 1)
+                    .opacity(index >= freshFrom && !demo.isSettled ? StreamingReveal.freshOpacity : 1)
                     .transition(wordTransition)
             }
             if showsCaret {
