@@ -1,7 +1,7 @@
 import Testing
 @testable import ParolaCore
 
-@Suite("Streaming transcriber factory")
+@Suite("Streaming transcriber factory", .serialized)
 struct StreamingTranscriberFactoryTests {
     @Test("returns mock when one is installed, real session otherwise")
     func selectsBackend() {
