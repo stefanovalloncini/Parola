@@ -28,17 +28,8 @@ struct MacLibrarySidebar: View {
         }
     }
 
-    private var searchBinding: Binding<String> {
-        Binding(get: { model.searchQuery }, set: { model.search($0) })
-    }
-
     var body: some View {
         VStack(spacing: 0) {
-            SearchPill(text: searchBinding, placeholder: "Search history…", clearsOnEscape: true, leaf: "Sidebar.TextField.Search")
-                .padding(.horizontal, DS.Spacing.regular)
-                .padding(.top, DS.Spacing.regular)
-                .padding(.bottom, DS.Spacing.small)
-
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
                     SidebarRow(
@@ -103,6 +94,7 @@ struct MacLibrarySidebar: View {
                     }
                 }
                 .padding(.horizontal, DS.Spacing.small)
+                .padding(.top, DS.Spacing.regular)
                 .padding(.bottom, DS.Spacing.small)
             }
 

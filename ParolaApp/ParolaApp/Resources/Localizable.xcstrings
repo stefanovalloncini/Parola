@@ -8446,17 +8446,6 @@
         }
       }
     },
-    "Search history…": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cerca nella cronologia…"
-          }
-        }
-      }
-    },
     "Search looks in titles and transcript text": {
       "extractionState": "manual",
       "localizations": {
