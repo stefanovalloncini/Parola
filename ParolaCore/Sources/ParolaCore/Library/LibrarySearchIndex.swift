@@ -710,8 +710,7 @@ public actor LibrarySearchIndex {
         return Int(exactly: (seconds * 100).rounded()) ?? 0
     }
 
-    /// `hit` is the offset the search already found in the inverted index, so the body is walked to
-    /// the window and no further; nil means the entry matched on its title or auxiliary text alone.
+    /// `hit` comes from the inverted index, so the body is walked to the window and never searched.
     private static func makeSnippet(
         text: String,
         tokens: [String],
@@ -869,8 +868,7 @@ public actor LibrarySearchIndex {
         }
     }
 
-    /// Entry files first, then the files of entries the manifest no longer lists, then the manifest
-    /// itself: a snapshot interrupted anywhere in that order reads as stale rather than as complete.
+    /// The manifest lands last, so a write interrupted anywhere before it reads as stale, never as complete.
     private static func performWrite(
         _ write: SnapshotWrite,
         in directory: URL,
