@@ -24,7 +24,10 @@ struct Models: AsyncParsableCommand {
         func run() async throws {
             CLIDiagnostics.installIfWanted(alwaysOn: false)
             let store = ModelStore.shared
-            let entries = store.catalog()
+            let catalogEntries = store.catalog()
+            let installedNames = Set(catalogEntries.filter(\.isInstalled).map(\.name))
+            let listedIDs = Set(ModelCatalog.listedVariants(isInstalled: installedNames.contains).map(\.id))
+            let entries = catalogEntries.filter { listedIDs.contains($0.name) }
 
             if json {
                 let data = try JSONEncoder.pretty.encode(entries)
@@ -37,7 +40,7 @@ struct Models: AsyncParsableCommand {
                 return
             }
 
-            let grouped = ModelCatalog.groupedForPicker()
+            let grouped = ModelCatalog.groupedForPicker(isInstalled: installedNames.contains)
             let nameWidth = (entries.map { $0.name.count }.max() ?? 0) + 2
 
             for (index, group) in grouped.enumerated() {

@@ -69,7 +69,7 @@ struct ModelCatalogTests {
 
     @Test("groupedForPicker pins Recommended first, then Fastest, then accuracy etc.")
     func groupingOrder() {
-        let groups = ModelCatalog.groupedForPicker()
+        let groups = ModelCatalog.groupedForPicker(isInstalled: { _ in false })
         #expect(groups.first?.0 == .recommended)
         let categoriesInOrder = groups.map(\.0)
         #expect(categoriesInOrder == categoriesInOrder.sorted { $0.sortOrder < $1.sortOrder })
@@ -77,7 +77,7 @@ struct ModelCatalogTests {
 
     @Test("groupedForPicker's Recommended group lists Turbo before Apple Speech, matching defaultModelID's catalogue order")
     func recommendedGroupOrderMatchesDefault() throws {
-        let groups = ModelCatalog.groupedForPicker()
+        let groups = ModelCatalog.groupedForPicker(isInstalled: { _ in false })
         let recommended = try #require(groups.first(where: { $0.0 == .recommended })?.1)
         #expect(recommended.map(\.id) == ["openai_whisper-large-v3_turbo", "apple-speech-analyzer"])
     }

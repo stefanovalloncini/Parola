@@ -271,6 +271,19 @@ struct MCPServerTests {
         #expect(text.contains("openai_whisper-tiny"), "list_models output should include known model ids")
     }
 
+    @Test("parola_list_models hides Parakeet v2 unless installed")
+    func listModelsHidesUninstalledV2() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-mcp-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        let server = MCPServer(modelStore: ModelStore(modelsDirectory: tmp), libraryStore: scratchLibraryStore(), bridge: NullBridge())
+        let response = try await server.handle(toolCall(name: "parola_list_models", id: 102))
+        let json = try encode(response)
+        let text = try textBlock(from: json)
+        #expect(!text.contains("nvidia_parakeet-tdt-0.6b-v2"), "v2 should not be listed when not installed")
+        #expect(text.contains("nvidia_parakeet-tdt-0.6b-v3"), "v3 should be listed")
+    }
+
     @Test("parola_list_engines lists every registered engine after bootstrap")
     func listEnginesAfterBootstrap() async throws {
         let server = makeServer()
