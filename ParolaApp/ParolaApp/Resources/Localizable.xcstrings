@@ -4182,7 +4182,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Preferisci"
+            "value": "Aggiungi ai preferiti"
           }
         }
       }
@@ -4193,7 +4193,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Preferisci il segmento"
+            "value": "Aggiungi segmento ai preferiti"
           }
         }
       }
