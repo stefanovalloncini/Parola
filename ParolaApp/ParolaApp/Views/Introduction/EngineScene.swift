@@ -111,7 +111,7 @@ private struct EngineCard: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: DS.Spacing.small) {
+        HStack(alignment: .center, spacing: DS.Spacing.small) {
             ModelEngineIcon(engineID: variant.engineID)
             Spacer(minLength: DS.Spacing.small)
             if isRecommended {
