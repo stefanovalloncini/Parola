@@ -251,6 +251,8 @@ struct ParolaApp: App {
                     .disabled(!model.hasTranscript)
                 Button("Copy as SRT") { model.copyTranscriptAsFormat(.srt) }
                     .disabled(!model.hasTranscript)
+                Button("Copy Favorites") { model.copyTranscriptToPasteboard(withTimestamps: true, favoritesOnly: true) }
+                    .disabled(model.favoriteSegmentIDs.isEmpty)
                 Button("Send via Mail…") { model.shareTranscriptViaMail() }
                     .keyboardShortcut("m", modifiers: [.command, .shift])
                     .disabled(!model.hasTranscript)
@@ -261,12 +263,11 @@ struct ParolaApp: App {
                     .keyboardShortcut("j", modifiers: [.command, .shift])
                     .disabled(!model.hasTranscript)
                 Button("Favorite Segment") {
-                    if let id = model.focusedSegmentIDForCommands { model.toggleSegmentFavorite(id) }
+                    guard let id = model.focusedSegmentIDForCommands else { return }
+                    model.toggleSegmentFavorite(id)
                 }
                 .keyboardShortcut("d", modifiers: [.command])
-                .disabled(model.focusedSegmentIDForCommands == nil)
-                Button("Copy Favorites") { model.copyTranscriptToPasteboard(withTimestamps: true, favoritesOnly: true) }
-                    .disabled(model.favoriteSegmentIDs.isEmpty)
+                .disabled(!model.hasTranscript)
                 Button("Copy as Markdown") { model.copyTranscriptAsFormat(.md) }
                     .disabled(!model.hasTranscript)
                 Button("Export Segment Notes…") { model.exportSegmentNotesAsMarkdown() }
