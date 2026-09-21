@@ -167,6 +167,8 @@ public enum DestinationConfig: Codable, Sendable, Hashable {
 /// A stored destination: the kind it was written as, and its settings.
 public enum AnyDestination: Codable, Sendable, Identifiable {
     case obsidianFolder(ObsidianVaultFolderDestination)
+    /// Test mode only: a destination that records what it was handed and writes nothing.
+    case mock(MockDestination)
     /// A kind this build cannot run. Kept verbatim so it is still there after a round trip.
     case unsupported(kind: String, config: DestinationConfig)
 
@@ -193,13 +195,14 @@ public enum AnyDestination: Codable, Sendable, Identifiable {
     public var destination: (any DeliveryDestination)? {
         switch self {
         case .obsidianFolder(let destination): return destination
+        case .mock(let destination): return destination
         case .unsupported: return nil
         }
     }
 
     public var kind: DestinationKind? {
         switch self {
-        case .obsidianFolder: return .obsidianFolder
+        case .obsidianFolder, .mock: return .obsidianFolder
         case .unsupported(let raw, _): return DestinationKind(rawValue: raw)
         }
     }
@@ -254,6 +257,8 @@ public enum DestinationRegistry {
         switch destination {
         case .obsidianFolder(let value):
             return (DestinationKind.obsidianFolder.rawValue, encodeConfig(value))
+        case .mock(let value):
+            return (DestinationKind.obsidianFolder.rawValue, encodeConfig(value.asObsidianDestination))
         case .unsupported(let kind, let config):
             return (kind, config)
         }

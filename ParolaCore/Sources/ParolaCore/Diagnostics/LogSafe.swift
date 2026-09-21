@@ -47,6 +47,10 @@ extension EntryCategory: LogSafe {
     public var logToken: String { rawValue }
 }
 
+extension DeliveryLogEntry.Event: LogSafe {
+    public var logToken: String { rawValue }
+}
+
 extension BatchJob.Status: LogSafe {
     public var logToken: String { rawValue }
 }
