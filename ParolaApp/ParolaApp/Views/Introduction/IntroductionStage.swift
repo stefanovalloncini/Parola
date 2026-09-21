@@ -5,9 +5,9 @@ import SwiftUI
 struct IntroductionStage: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private static let rest = SIMD2<Float>(0.32, 0.28)
-    private static let amplitude = SIMD2<Float>(0.06, 0.05)
-    private static let periods = SIMD2<Double>(31, 27)
+    nonisolated private static let rest = SIMD2<Float>(0.32, 0.28)
+    nonisolated private static let amplitude = SIMD2<Float>(0.06, 0.05)
+    nonisolated private static let periods = SIMD2<Double>(31, 27)
 
     var body: some View {
         let colors = Self.colors()
