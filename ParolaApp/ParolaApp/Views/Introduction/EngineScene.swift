@@ -5,19 +5,27 @@ import ParolaCore
 struct EngineScene: View {
     @Environment(AppModel.self) private var model
 
+    /// Apple Speech is `.recommended` too — for its own engine — so the chip follows the rule that picked the Whisper card.
+    static func isRecommended(_ variant: ModelVariant) -> Bool {
+        variant.category == .recommended && variant.engineID != .appleSpeech
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.regular) {
             Text("Choose how it listens.")
                 .font(DS.Font.hero)
                 .foregroundStyle(DS.Color.primaryText)
+                .sceneEntrance(order: 0)
             Text("You can change this any time in Settings.")
                 .font(DS.Font.title)
                 .foregroundStyle(DS.Color.secondaryText)
+                .sceneEntrance(order: 1)
             HStack(alignment: .top, spacing: DS.Spacing.medium) {
                 ForEach(choices) { variant in
                     EngineCard(
                         variant: variant,
                         isSelected: model.introduction.ringedEngineID(current: model.selectedModel) == variant.id,
+                        isRecommended: Self.isRecommended(variant),
                         isInstalled: model.isModelInstalled(variant.id),
                         downloadProgress: downloadProgress(for: variant.id),
                         choose: { model.introduction.chooseEngine(variant.id) }
@@ -26,7 +34,9 @@ struct EngineScene: View {
             }
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, DS.Spacing.small)
+            .sceneEntrance(order: 2)
             moreModelsLink
+                .sceneEntrance(order: 3)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -58,6 +68,7 @@ struct EngineScene: View {
 private struct EngineCard: View {
     let variant: ModelVariant
     let isSelected: Bool
+    let isRecommended: Bool
     let isInstalled: Bool
     let downloadProgress: Double?
     let choose: () -> Void
@@ -65,7 +76,7 @@ private struct EngineCard: View {
     var body: some View {
         Button(action: choose) {
             VStack(alignment: .leading, spacing: DS.Spacing.small) {
-                ModelEngineIcon(engineID: variant.engineID)
+                header
                 Text(title)
                     .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.primaryText)
@@ -73,7 +84,10 @@ private struct EngineCard: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(DS.Spacing.medium)
-            .background(DS.Color.surfaceElevated, in: shape)
+            .background {
+                shape.fill(DS.Color.surfaceElevated)
+                shape.fill(isSelected ? DS.Color.accent.opacity(0.10) : .clear)
+            }
             .overlay(
                 shape.strokeBorder(
                     isSelected ? DS.Color.accent : DS.Color.separator,
@@ -91,6 +105,16 @@ private struct EngineCard: View {
         .animation(DS.Motion.rowState, value: isSelected)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .axLeaf("Introduction.Button.Engine.\(variant.id)")
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: DS.Spacing.small) {
+            ModelEngineIcon(engineID: variant.engineID)
+            Spacer(minLength: DS.Spacing.small)
+            if isRecommended {
+                Text("Recommended").accentPill(font: DS.Font.caption)
+            }
+        }
     }
 
     /// The catalog's "(system)" earns its place next to nine Whispers, not next to one.

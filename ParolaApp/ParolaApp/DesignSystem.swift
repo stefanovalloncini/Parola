@@ -268,8 +268,8 @@ extension View {
     }
 
     /// A live readout that must hold the accent on video — `onAccent` fill lands under AA on five of seven presets.
-    func accentPill() -> some View {
-        font(DS.Font.mono)
+    func accentPill(font: SwiftUI.Font = DS.Font.mono) -> some View {
+        self.font(font)
             .foregroundStyle(DS.Color.accentText)
             .padding(.horizontal, DS.Spacing.small)
             .padding(.vertical, DS.Spacing.hair)
