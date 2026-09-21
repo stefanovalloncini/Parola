@@ -13,6 +13,101 @@ struct AnyDestinationCodableTests {
         try JSONDecoder().decode([AnyDestination].self, from: data)
     }
 
+    func obsidian() -> ObsidianVaultFolderDestination {
+        ObsidianVaultFolderDestination(
+            id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
+            name: "Vault",
+            isEnabled: true,
+            autoSend: true,
+            categories: [.meeting, .transcription],
+            titleFormat: .dateAndTitle,
+            vaultBookmark: Data([0x01, 0x02, 0x03]),
+            vaultPath: "/tmp/vault",
+            subfolder: "Transcripts",
+            filenameTemplate: "{date} {title}",
+            collision: .overwrite,
+            frontmatter: ObsidianFrontmatterOptions(duration: false),
+            body: ObsidianBodyOptions(timestamps: true),
+            wikilinks: true
+        )
+    }
+
+    @Test("an Obsidian destination round-trips through the envelope")
+    func obsidianRoundTrips() throws {
+        let original = obsidian()
+        let restored = try decoded(try encoded([.obsidianFolder(original)]))
+        #expect(restored.count == 1)
+        guard case .obsidianFolder(let back) = restored[0] else {
+            Issue.record("expected an obsidianFolder destination, got \(restored[0])")
+            return
+        }
+        #expect(back == original)
+    }
+
+    @Test("the envelope carries the kind next to the config")
+    func envelopeShape() throws {
+        let data = try encoded([.obsidianFolder(obsidian())])
+        let json = try #require(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+        #expect(json.first?["kind"] as? String == "obsidianFolder")
+        let config = try #require(json.first?["config"] as? [String: Any])
+        #expect(config["subfolder"] as? String == "Transcripts")
+        #expect(config["categories"] as? [String] == ["meeting", "transcription"])
+    }
+
+    @Test("the envelope exposes what the list rows read")
+    func envelopeAccessors() {
+        let destination = AnyDestination.obsidianFolder(obsidian())
+        #expect(destination.name == "Vault")
+        #expect(destination.isEnabled)
+        #expect(destination.autoSend)
+        #expect(destination.categories == [.meeting, .transcription])
+        #expect(destination.titleFormat == .dateAndTitle)
+        #expect(destination.kind == .obsidianFolder)
+        #expect(destination.id == UUID(uuidString: "11111111-2222-3333-4444-555555555555"))
+    }
+
+    @Test("a config from a newer build keeps its known fields and defaults the rest")
+    func configForwardCompat() throws {
+        let raw = """
+        [{"kind":"obsidianFolder","config":{
+          "id":"6C9C1E1E-0000-0000-0000-000000000004",
+          "name":"Newer",
+          "isEnabled":true,
+          "autoSend":false,
+          "categories":["dictation"],
+          "titleFormat":"aiTitle",
+          "vaultBookmark":"AQID",
+          "vaultPath":"/tmp/vault",
+          "subfolder":"",
+          "filenameTemplate":"{title}",
+          "collision":"appendCounter",
+          "somethingFromTheFuture":{"deeply":["nested", 2]}
+        }}]
+        """
+        let restored = try decoded(Data(raw.utf8))
+        guard case .obsidianFolder(let back) = restored[0] else {
+            Issue.record("expected an obsidianFolder destination, got \(restored[0])")
+            return
+        }
+        #expect(back.name == "Newer")
+        #expect(back.categories == [.dictation])
+        #expect(back.titleFormat == .aiTitle)
+        #expect(back.wikilinks == false)
+        #expect(back.frontmatter == ObsidianFrontmatterOptions())
+        #expect(back.body == ObsidianBodyOptions())
+    }
+
+    @Test("a config the kind cannot decode is kept as unsupported instead of throwing")
+    func brokenConfigIsKept() throws {
+        let raw = #"[{"kind":"obsidianFolder","config":{"name":42}}]"#
+        let restored = try decoded(Data(raw.utf8))
+        guard case .unsupported(let kind, _) = restored[0] else {
+            Issue.record("expected unsupported, got \(restored[0])")
+            return
+        }
+        #expect(kind == "obsidianFolder")
+    }
+
     @Test("a kind this build does not implement decodes as unsupported and re-encodes unchanged")
     func unknownKindSurvives() throws {
         let raw = """

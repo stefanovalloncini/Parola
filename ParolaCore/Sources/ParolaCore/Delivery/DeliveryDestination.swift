@@ -94,6 +94,22 @@ public extension DeliveryDestination {
     }
 }
 
+/// Why a delivery could not be made.
+public enum DeliveryError: Error, LocalizedError, Equatable {
+    case vaultUnavailable(String, String)
+    case writeFailed(String, String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .vaultUnavailable(let name, let path):
+            let where_ = path.isEmpty ? name : path
+            return "Parola couldn't reach \(where_). Pick the folder again in Send To settings."
+        case .writeFailed(let path, let reason):
+            return "Parola couldn't write to \(path). \(reason)"
+        }
+    }
+}
+
 /// A destination's stored settings, held as plain JSON so a kind this build does not implement
 /// re-encodes exactly as it was read.
 public enum DestinationConfig: Codable, Sendable, Hashable {
@@ -150,6 +166,7 @@ public enum DestinationConfig: Codable, Sendable, Hashable {
 
 /// A stored destination: the kind it was written as, and its settings.
 public enum AnyDestination: Codable, Sendable, Identifiable {
+    case obsidianFolder(ObsidianVaultFolderDestination)
     /// A kind this build cannot run. Kept verbatim so it is still there after a round trip.
     case unsupported(kind: String, config: DestinationConfig)
 
@@ -175,12 +192,14 @@ public enum AnyDestination: Codable, Sendable, Identifiable {
     /// The destination this build can run, or nil for a kind it cannot.
     public var destination: (any DeliveryDestination)? {
         switch self {
+        case .obsidianFolder(let destination): return destination
         case .unsupported: return nil
         }
     }
 
     public var kind: DestinationKind? {
         switch self {
+        case .obsidianFolder: return .obsidianFolder
         case .unsupported(let raw, _): return DestinationKind(rawValue: raw)
         }
     }
@@ -224,11 +243,17 @@ public enum AnyDestination: Codable, Sendable, Identifiable {
 /// rather than failing the whole list.
 public enum DestinationRegistry {
     public static func decode(kind: String, config: DestinationConfig) -> AnyDestination {
-        .unsupported(kind: kind, config: config)
+        guard DestinationKind(rawValue: kind) == .obsidianFolder,
+              let destination: ObsidianVaultFolderDestination = try? decodeConfig(config) else {
+            return .unsupported(kind: kind, config: config)
+        }
+        return .obsidianFolder(destination)
     }
 
     public static func encode(_ destination: AnyDestination) -> (kind: String, config: DestinationConfig) {
         switch destination {
+        case .obsidianFolder(let value):
+            return (DestinationKind.obsidianFolder.rawValue, encodeConfig(value))
         case .unsupported(let kind, let config):
             return (kind, config)
         }
