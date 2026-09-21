@@ -138,6 +138,11 @@ public actor LibrarySearchIndex {
         let entries: [String: String]
     }
 
+    private struct PreparedEntry: Sendable {
+        let id: String
+        let entry: IndexedEntry
+    }
+
     private struct LoadedState: Sendable {
         let entries: [String: IndexedEntry]
         let inverted: [String: Set<String>]
@@ -400,19 +405,14 @@ public actor LibrarySearchIndex {
 
     func rebuild(entries rebuilt: [RebuildEntry]) async {
         await ensureLoaded()
+        // Tokenized before the old index is dropped, so a search during the pass still answers from it.
+        let prepared = await Self.tokenizeOffActor(rebuilt)
         entries.removeAll()
         inverted.removeAll()
         dirtyEntryIDs.removeAll()
         sortedTokens = nil
-        for entry in rebuilt {
-            addToIndex(
-                id: entry.id,
-                title: entry.title,
-                text: entry.text,
-                auxiliaryText: entry.auxiliaryText,
-                boundaries: entry.boundaries,
-                fingerprint: entry.fingerprint
-            )
+        for entry in prepared {
+            install(entry.entry, for: entry.id)
         }
         rebuildNeed = .none
         // A library with nothing to index still needs its empty snapshot on disk, or every launch rescans.
@@ -530,6 +530,38 @@ public actor LibrarySearchIndex {
             ),
             for: id
         )
+    }
+
+    private static func tokenizeOffActor(_ rebuilt: [RebuildEntry]) async -> [PreparedEntry] {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                continuation.resume(returning: tokenizeInParallel(rebuilt))
+            }
+        }
+    }
+
+    /// One `NLTokenizer` per entry, never shared: the tokenizer is not thread-safe.
+    private static func tokenizeInParallel(_ rebuilt: [RebuildEntry]) -> [PreparedEntry] {
+        guard !rebuilt.isEmpty else { return [] }
+        var prepared = [PreparedEntry?](repeating: nil, count: rebuilt.count)
+        prepared.withUnsafeMutableBufferPointer { buffer in
+            // Each iteration owns its slot, so the shared buffer never races.
+            nonisolated(unsafe) let slots = buffer
+            DispatchQueue.concurrentPerform(iterations: rebuilt.count) { position in
+                let source = rebuilt[position]
+                slots[position] = PreparedEntry(
+                    id: source.id,
+                    entry: makeIndexedEntry(
+                        title: source.title,
+                        text: source.text,
+                        auxiliaryText: source.auxiliaryText,
+                        boundaries: source.boundaries,
+                        fingerprint: source.fingerprint
+                    )
+                )
+            }
+        }
+        return prepared.compactMap { $0 }
     }
 
     private static func makeIndexedEntry(

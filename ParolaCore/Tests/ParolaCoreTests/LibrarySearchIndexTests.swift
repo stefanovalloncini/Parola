@@ -671,6 +671,42 @@ struct LibrarySearchIndexTests {
         #expect(await index.search("kanban").contains(where: { $0.entryID == "e1" }))
     }
 
+    @Test("a rebuild of many entries indexes each one exactly as indexing it would")
+    func rebuildMatchesEntryByEntryIndexing() async throws {
+        let words = ["sprint", "retro", "lancio", "kanban", "riunione", "alpha", "primavera", "domande"]
+        let entries = (0..<60).map { position -> LibrarySearchIndex.RebuildEntry in
+            let body = (0..<12).map { words[($0 &* 7 &+ position) % words.count] }.joined(separator: " ")
+            return .init(
+                id: "e\(position)",
+                title: "Entry \(position) \(words[position % words.count])",
+                text: "\(body) marker\(position)",
+                auxiliaryText: words[(position &+ 3) % words.count],
+                boundaries: [.init(textOffset: 0, seconds: Double(position))],
+                fingerprint: "f\(position)"
+            )
+        }
+
+        let (rebuilt, _) = makeTempIndex()
+        await rebuilt.rebuild(entries: entries)
+
+        let (incremental, _) = makeTempIndex()
+        for entry in entries {
+            await incremental.index(
+                id: entry.id, title: entry.title, text: entry.text, auxiliaryText: entry.auxiliaryText,
+                boundaries: entry.boundaries, fingerprint: entry.fingerprint, createdAt: Date()
+            )
+        }
+
+        for query in words + ["marker7", "marker59", "entry"] {
+            let a = await keyed(rebuilt.search(query))
+            let b = await keyed(incremental.search(query))
+            #expect(a == b, "query \(query)")
+        }
+        #expect(await rebuilt.needsRebuild(matching: Dictionary(
+            uniqueKeysWithValues: entries.map { ($0.id, $0.fingerprint) }
+        )) == false)
+    }
+
     @Test("a version-2 snapshot is discarded as stale")
     func v2SnapshotDiscarded() async throws {
         let url = makeTempDirectory()
