@@ -364,6 +364,29 @@ extension TranscriberMockSuites {
             #expect(entries.first?.title.hasSuffix("(recovered)") == true)
         }
 
+        /// The probe is the same await window loadEntry has, and a page opened inside it is the user's last word.
+        @Test("a page opened while a recovered take is probed keeps the window")
+        func acceptRestoreLeavesAPageOpenedDuringTheProbe() async throws {
+            let lib = makeTempLibraryURL("recovery-route")
+            let segments = Self.makeSegments()
+            let missing = FileManager.default.temporaryDirectory
+                .appendingPathComponent("parola-recovery-missing-\(UUID().uuidString).wav")
+            try writeCheckpoint(
+                RecoveryCheckpoint(
+                    kind: .recording, startedAt: Date(), modelName: "m", language: "it",
+                    segments: segments, audioURL: missing
+                ),
+                libraryURL: lib
+            )
+            let model = makeModel(libraryURL: lib)
+
+            model.acceptPendingRecovery()
+            model.openStatistics()
+
+            #expect(await waitUntil { model.transcript?.segments == segments })
+            #expect(model.route == .statistics)
+        }
+
         @Test("accepting a file recovery re-runs the transcription")
         func acceptRerunsFileTranscription() async throws {
             await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(

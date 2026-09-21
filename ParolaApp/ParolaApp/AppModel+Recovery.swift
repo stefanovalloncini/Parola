@@ -215,19 +215,20 @@ extension AppModel {
     }
 
     private func restoreRecoveredRecording(_ checkpoint: RecoveryCheckpoint) {
+        let pageAtStart = route
         guard let candidate = checkpoint.audioURL else {
-            finishRecordingRestore(checkpoint, audioURL: nil)
+            finishRecordingRestore(checkpoint, audioURL: nil, pageAtStart: pageAtStart)
             return
         }
         // A crash can leave the in-flight WAV with a stale header; attach it only
         // when it still opens, and probe off-main (AVAudioFile can block).
         Task { [weak self] in
             let audioURL = (try? await AppModel.offMainIO({ Self.readableRecordingURL(candidate) })) ?? nil
-            self?.finishRecordingRestore(checkpoint, audioURL: audioURL)
+            self?.finishRecordingRestore(checkpoint, audioURL: audioURL, pageAtStart: pageAtStart)
         }
     }
 
-    private func finishRecordingRestore(_ checkpoint: RecoveryCheckpoint, audioURL: URL?) {
+    private func finishRecordingRestore(_ checkpoint: RecoveryCheckpoint, audioURL: URL?, pageAtStart: Route) {
         guard !checkpoint.segments.isEmpty || audioURL != nil else { return }
         let restored = Transcript(
             segments: checkpoint.segments,
@@ -248,7 +249,8 @@ extension AppModel {
         transcript = restored
         if audioURL != nil { adoptLoadedMediaDuration() }
         phase = .ready
-        route = .transcript
+        // A page opened while the take was probed is the later word, as in loadEntry.
+        if route == pageAtStart { route = .transcript }
         persistToLibrary(
             restored,
             audioSource: audioURL,
