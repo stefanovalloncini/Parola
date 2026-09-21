@@ -32,9 +32,10 @@ enum QueueCount {
         jobs.count { $0.status == .pending || $0.status == .transcribing }
     }
 
+    /// A settled queue still says how much it holds; the page loses its subtitle only when it is empty.
     static func label(for jobs: [BatchJob], locale: Locale = AppFormat.locale) -> String? {
         let n = count(for: jobs)
-        guard n > 0 else { return nil }
+        guard n > 0 else { return BatchProgress.headerLabel(for: jobs, locale: locale)?.text }
         return String(localized: "\(n) in queue", locale: locale)
     }
 }

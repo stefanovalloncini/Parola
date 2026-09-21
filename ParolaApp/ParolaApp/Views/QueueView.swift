@@ -96,7 +96,15 @@ struct QueueView: View {
             systemImage: "list.bullet.indent",
             title: "No Jobs Yet",
             message: "Queued transcriptions appear here. They stay until you clear them."
-        )
+        ) {
+            Button {
+                model.presentBatchOpenPanel()
+            } label: {
+                Text("Add Files…")
+            }
+            .buttonStyle(DSPillButtonStyle(kind: .primary))
+            .axLeaf("Empty.Button.AddFiles")
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 

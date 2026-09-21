@@ -16,10 +16,15 @@ struct QueueCountTests {
         AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("queue-count"))
     }
 
-    @Test("hides once nothing is active")
-    func hidesWhenIdle() {
+    @Test("hides only when the queue is empty")
+    func hidesWhenEmpty() {
+        let english = Locale(identifier: "en_US")
         #expect(QueueCount.label(for: []) == nil)
-        #expect(QueueCount.label(for: [Self.makeJob("a", .done)]) == nil)
+        #expect(QueueCount.label(for: [Self.makeJob("a", .done)], locale: english) == "1 file")
+        #expect(
+            QueueCount.label(for: [Self.makeJob("a", .done), Self.makeJob("b", .failed)], locale: english)
+                == "2 files"
+        )
     }
 
     @Test("counts pending and transcribing jobs against the English wording")
