@@ -129,8 +129,8 @@ public actor LibraryStore {
             self.extraIndexerJobs = nil
         }
         try? FileManager.default.createDirectory(at: libraryURL, withIntermediateDirectories: true)
-        let indexURL = libraryURL.appendingPathComponent(".search-index.json")
-        self.searchIndex = LibrarySearchIndex(indexURL: indexURL)
+        let indexDirectory = libraryURL.appendingPathComponent(".search-index", isDirectory: true)
+        self.searchIndex = LibrarySearchIndex(indexDirectory: indexDirectory)
         Task { await self.ensureSearchIndexReady() }
     }
 

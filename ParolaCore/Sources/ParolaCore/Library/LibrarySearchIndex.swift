@@ -132,14 +132,10 @@ public actor LibrarySearchIndex {
         let fingerprint: String
     }
 
-    private struct Snapshot: Decodable {
+    /// The authority on what the snapshot holds: an entry file with no row here is ignored and pruned.
+    private struct Manifest: Codable, Sendable {
         let version: Int
-        let entries: [SnapshotEntry]
-    }
-
-    private enum SnapshotPiece: Sendable {
-        case encoded(Data)
-        case pending(SnapshotEntry)
+        let entries: [String: String]
     }
 
     private struct LoadedState: Sendable {
@@ -153,10 +149,22 @@ public actor LibrarySearchIndex {
         case missing
     }
 
+    private struct LoadResult: Sendable {
+        let outcome: LoadOutcome
+        let legacySnapshotPresent: Bool
+    }
+
     private enum RebuildNeed: Sendable {
         case none
         case staleSnapshot
         case absentSnapshot
+    }
+
+    private struct SnapshotWrite: Sendable {
+        let entries: [SnapshotEntry]
+        let manifest: Manifest
+        let generation: Int
+        let removesLegacySnapshot: Bool
     }
 
     private enum WriteOutcome: Sendable {
@@ -165,27 +173,31 @@ public actor LibrarySearchIndex {
         case failed(any Error)
     }
 
-    // v10: auxiliary text carries the card title and summary; older snapshots are discarded and rebuilt.
-    private static let snapshotVersion = 10
+    private struct WriteResult: Sendable {
+        let encoded: Int
+        let outcome: WriteOutcome
+    }
+
+    // v11: one file per entry under `entries/`, listed by `manifest.json`; older snapshots are discarded and rebuilt.
+    private static let snapshotVersion = 11
     private static let noOffset = -1
-    private static let snapshotPrefix = Data(#"{"version":\#(snapshotVersion),"entries":["#.utf8)
-    private static let snapshotSeparator = Data(",".utf8)
-    private static let snapshotSuffix = Data("]}".utf8)
 
     private var entries: [String: IndexedEntry] = [:]
-    private var encodedEntries: [String: Data] = [:]
     private var inverted: [String: Set<String>] = [:]
+    private var dirtyEntryIDs: Set<String> = []
     private var sortedTokens: [String]?
     private var isLoaded = false
     private var isDirty = false
+    private var legacySnapshotPresent = false
     private var rebuildNeed: RebuildNeed = .none
     private var snapshotWriteFailing = false
-    private let loadTask: Task<LoadOutcome, Never>
-    private let indexURL: URL
+    private let loadTask: Task<LoadResult, Never>
+    private let indexDirectory: URL
     private let saveDebounce: Duration
     private let clock: any Clock<Duration>
     private var pendingSaveTask: Task<Void, Never>?
     private let writeSnapshotData: @Sendable (Data, URL) throws -> Void
+    private let removeSnapshotFile: @Sendable (URL) throws -> Void
     // .default, not .utility: the quit path blocks the main thread on a plain semaphore, which donates no priority.
     private let writeQueue = DispatchQueue(label: "com.parola.search-index-write", qos: .default)
     private let latestGeneration = OSAllocatedUnfairLock(initialState: 0)
@@ -193,28 +205,35 @@ public actor LibrarySearchIndex {
     private(set) var entriesEncoded = 0
     private(set) var vocabularySorts = 0
 
+    /// `indexDirectory` holds the snapshot: a `manifest.json` and one file per entry under `entries/`.
     public init(
-        indexURL: URL,
+        indexDirectory: URL,
         saveDebounce: Duration = .milliseconds(250),
         clock: any Clock<Duration> = ContinuousClock()
     ) {
-        self.init(indexURL: indexURL, saveDebounce: saveDebounce, clock: clock) { data, url in
-            try data.write(to: url, options: .atomic)
-        }
+        self.init(
+            indexDirectory: indexDirectory,
+            saveDebounce: saveDebounce,
+            clock: clock,
+            writeSnapshotData: { data, url in try data.write(to: url, options: .atomic) },
+            removeSnapshotFile: { url in try FileManager.default.removeItem(at: url) }
+        )
     }
 
     init(
-        indexURL: URL,
+        indexDirectory: URL,
         saveDebounce: Duration,
         clock: any Clock<Duration>,
-        writeSnapshotData: @escaping @Sendable (Data, URL) throws -> Void
+        writeSnapshotData: @escaping @Sendable (Data, URL) throws -> Void,
+        removeSnapshotFile: @escaping @Sendable (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) }
     ) {
-        self.indexURL = indexURL
+        self.indexDirectory = indexDirectory
         self.saveDebounce = saveDebounce
         self.clock = clock
         self.writeSnapshotData = writeSnapshotData
+        self.removeSnapshotFile = removeSnapshotFile
         self.loadTask = Task.detached(priority: .utility) {
-            Self.loadSnapshot(at: indexURL)
+            Self.loadSnapshot(at: indexDirectory)
         }
     }
 
@@ -374,8 +393,7 @@ public actor LibrarySearchIndex {
             fingerprint: fingerprint
         )
         entries[id] = updated
-        encodedEntries[id] = try? JSONEncoder().encode(Self.snapshotEntry(id: id, entry: updated))
-        entriesEncoded &+= 1
+        dirtyEntryIDs.insert(id)
         isDirty = true
         scheduleSave()
     }
@@ -383,8 +401,9 @@ public actor LibrarySearchIndex {
     func rebuild(entries rebuilt: [RebuildEntry]) async {
         await ensureLoaded()
         entries.removeAll()
-        encodedEntries.removeAll()
         inverted.removeAll()
+        dirtyEntryIDs.removeAll()
+        sortedTokens = nil
         for entry in rebuilt {
             addToIndex(
                 id: entry.id,
@@ -405,10 +424,11 @@ public actor LibrarySearchIndex {
 
     private func ensureLoaded() async {
         guard !isLoaded else { return }
-        let outcome = await loadTask.value
+        let result = await loadTask.value
         guard !isLoaded else { return }
         isLoaded = true
-        switch outcome {
+        legacySnapshotPresent = result.legacySnapshotPresent
+        switch result.outcome {
         case .loaded(let state):
             entries = state.entries
             inverted = state.inverted
@@ -421,16 +441,39 @@ public actor LibrarySearchIndex {
         }
     }
 
-    private static func loadSnapshot(at url: URL) -> LoadOutcome {
-        guard let data = try? Data(contentsOf: url) else { return .missing }
-        guard let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data),
-              snapshot.version == snapshotVersion else {
-            return .staleDiscarded
+    private static func manifestURL(in directory: URL) -> URL {
+        directory.appendingPathComponent("manifest.json")
+    }
+
+    private static func entriesDirectory(in directory: URL) -> URL {
+        directory.appendingPathComponent("entries", isDirectory: true)
+    }
+
+    private static func entryURL(_ id: String, in entriesDirectory: URL) -> URL {
+        entriesDirectory.appendingPathComponent("\(id).json")
+    }
+
+    /// The single file v10 and earlier wrote, beside the directory that replaced it.
+    private static func legacySnapshotURL(for directory: URL) -> URL {
+        directory.appendingPathExtension("json")
+    }
+
+    private static func loadSnapshot(at directory: URL) -> LoadResult {
+        let legacy = FileManager.default.fileExists(atPath: legacySnapshotURL(for: directory).path)
+        guard let data = try? Data(contentsOf: manifestURL(in: directory)) else {
+            return LoadResult(outcome: legacy ? .staleDiscarded : .missing, legacySnapshotPresent: legacy)
+        }
+        guard let manifest = try? JSONDecoder().decode(Manifest.self, from: data),
+              manifest.version == snapshotVersion else {
+            return LoadResult(outcome: .staleDiscarded, legacySnapshotPresent: legacy)
+        }
+        guard let decoded = decodeEntries(manifest.entries.keys.sorted(), in: entriesDirectory(in: directory)) else {
+            return LoadResult(outcome: .staleDiscarded, legacySnapshotPresent: legacy)
         }
         var entries: [String: IndexedEntry] = [:]
         var inverted: [String: Set<String>] = [:]
-        entries.reserveCapacity(snapshot.entries.count)
-        for entry in snapshot.entries {
+        entries.reserveCapacity(decoded.count)
+        for entry in decoded {
             entries[entry.id] = IndexedEntry(
                 title: entry.title,
                 text: entry.text,
@@ -445,7 +488,31 @@ public actor LibrarySearchIndex {
                 inverted[token, default: []].insert(entry.id)
             }
         }
-        return .loaded(LoadedState(entries: entries, inverted: inverted))
+        return LoadResult(
+            outcome: .loaded(LoadedState(entries: entries, inverted: inverted)),
+            legacySnapshotPresent: legacy
+        )
+    }
+
+    /// nil when a row the manifest lists is missing or will not decode: the snapshot is then stale as a whole.
+    private static func decodeEntries(_ ids: [String], in entriesDirectory: URL) -> [SnapshotEntry]? {
+        guard !ids.isEmpty else { return [] }
+        var decoded = [SnapshotEntry?](repeating: nil, count: ids.count)
+        decoded.withUnsafeMutableBufferPointer { buffer in
+            // Each iteration owns its slot, so the shared buffer never races.
+            nonisolated(unsafe) let slots = buffer
+            DispatchQueue.concurrentPerform(iterations: ids.count) { position in
+                guard let data = try? Data(contentsOf: entryURL(ids[position], in: entriesDirectory)) else { return }
+                slots[position] = try? JSONDecoder().decode(SnapshotEntry.self, from: data)
+            }
+        }
+        var entries: [SnapshotEntry] = []
+        entries.reserveCapacity(ids.count)
+        for entry in decoded {
+            guard let entry else { return nil }
+            entries.append(entry)
+        }
+        return entries
     }
 
     private func addToIndex(
@@ -456,26 +523,44 @@ public actor LibrarySearchIndex {
         boundaries: [SegmentBoundary],
         fingerprint: String
     ) {
+        install(
+            Self.makeIndexedEntry(
+                title: title, text: text, auxiliaryText: auxiliaryText,
+                boundaries: boundaries, fingerprint: fingerprint
+            ),
+            for: id
+        )
+    }
+
+    private static func makeIndexedEntry(
+        title: String,
+        text: String,
+        auxiliaryText: String,
+        boundaries: [SegmentBoundary],
+        fingerprint: String
+    ) -> IndexedEntry {
         var tallies: [String: Tally] = [:]
-        Self.enumerateTokens(in: title) { token, _ in tallies[token, default: Tally()].count += 1 }
-        Self.enumerateTokens(in: text) { token, offset in tallies[token, default: Tally()].add(at: offset) }
-        Self.enumerateTokens(in: auxiliaryText) { token, _ in tallies[token, default: Tally()].count += 1 }
+        enumerateTokens(in: title) { token, _ in tallies[token, default: Tally()].count += 1 }
+        enumerateTokens(in: text) { token, offset in tallies[token, default: Tally()].add(at: offset) }
+        enumerateTokens(in: auxiliaryText) { token, _ in tallies[token, default: Tally()].count += 1 }
         let tokens = tallies.keys.sorted()
-        let entry = IndexedEntry(
+        return IndexedEntry(
             title: title,
             text: text,
             tokens: tokens,
             counts: tokens.map { tallies[$0]?.count ?? 0 },
-            offsets: tokens.map { tallies[$0]?.offset ?? Self.noOffset },
+            offsets: tokens.map { tallies[$0]?.offset ?? noOffset },
             boundaryOffsets: boundaries.map(\.textOffset),
-            boundaryCentiseconds: boundaries.map { Self.centiseconds($0.seconds) },
+            boundaryCentiseconds: boundaries.map { centiseconds($0.seconds) },
             fingerprint: fingerprint
         )
+    }
+
+    private func install(_ entry: IndexedEntry, for id: String) {
         entries[id] = entry
-        encodedEntries[id] = try? JSONEncoder().encode(Self.snapshotEntry(id: id, entry: entry))
-        entriesEncoded &+= 1
+        dirtyEntryIDs.insert(id)
         var vocabularyGrew = false
-        for token in tokens {
+        for token in entry.tokens {
             if inverted[token] == nil { vocabularyGrew = true }
             inverted[token, default: []].insert(id)
         }
@@ -485,7 +570,7 @@ public actor LibrarySearchIndex {
 
     private func removeFromIndex(_ id: String) {
         guard let entry = entries.removeValue(forKey: id) else { return }
-        encodedEntries.removeValue(forKey: id)
+        dirtyEntryIDs.remove(id)
         var vocabularyShrank = false
         for token in entry.tokens {
             guard var ids = inverted[token] else { continue }
@@ -702,77 +787,96 @@ public actor LibrarySearchIndex {
     private func saveSnapshot() async {
         guard canPersistSnapshot, isDirty else { return }
         isDirty = false
+        let pending = dirtyEntryIDs
+        dirtyEntryIDs.removeAll()
         snapshotGeneration &+= 1
         let generation = snapshotGeneration
         latestGeneration.withLock { $0 = generation }
-        var pieces: [SnapshotPiece] = []
-        pieces.reserveCapacity(entries.count)
-        for (id, entry) in entries {
-            if let encoded = encodedEntries[id] {
-                pieces.append(.encoded(encoded))
-            } else {
-                pieces.append(.pending(Self.snapshotEntry(id: id, entry: entry)))
+        let write = SnapshotWrite(
+            entries: pending.compactMap { id in entries[id].map { Self.snapshotEntry(id: id, entry: $0) } },
+            manifest: Manifest(version: Self.snapshotVersion, entries: entries.mapValues(\.fingerprint)),
+            generation: generation,
+            removesLegacySnapshot: legacySnapshotPresent
+        )
+        let result = await writeSnapshot(write)
+        entriesEncoded &+= result.encoded
+        switch result.outcome {
+        case .written:
+            snapshotWriteFailing = false
+            legacySnapshotPresent = false
+        case .superseded:
+            // The entry files landed; the newer generation writes the manifest that lists them.
+            break
+        case .failed(let error):
+            // The retry runs on the debounce until the write lands, so only the first of a run is logged.
+            if !snapshotWriteFailing {
+                snapshotWriteFailing = true
+                ParolaLog.error(
+                    .libraryIndex, "search index snapshot write failed",
+                    [.count: .int(entries.count), .error: .error(error)]
+                )
             }
+            dirtyEntryIDs.formUnion(pending)
+            isDirty = true
+            scheduleSave()
         }
-        let (encoded, outcome) = await assembleAndWrite(pieces: pieces, generation: generation)
-        entriesEncoded &+= encoded.count
-        // Anything mutated during the write already carries a fresh blob, so only fill the gaps.
-        for (id, blob) in encoded where entries[id] != nil && encodedEntries[id] == nil {
-            encodedEntries[id] = blob
-        }
-        if case .written = outcome { snapshotWriteFailing = false }
-        // A superseded write is the newer generation's problem; a failed one dropped state nothing else holds.
-        guard case .failed(let error) = outcome else { return }
-        // The retry runs on the debounce until the write lands, so only the first of a run is logged.
-        if !snapshotWriteFailing {
-            snapshotWriteFailing = true
-            ParolaLog.error(
-                .libraryIndex, "search index snapshot write failed",
-                [.count: .int(entries.count), .error: .error(error)]
-            )
-        }
-        isDirty = true
-        scheduleSave()
     }
 
-    private func assembleAndWrite(
-        pieces: [SnapshotPiece],
-        generation: Int
-    ) async -> (encoded: [String: Data], outcome: WriteOutcome) {
-        let url = indexURL
-        let write = writeSnapshotData
+    private func writeSnapshot(_ write: SnapshotWrite) async -> WriteResult {
+        let directory = indexDirectory
+        let writeData = writeSnapshotData
+        let removeFile = removeSnapshotFile
         let latestGeneration = latestGeneration
         return await withCheckedContinuation { continuation in
             writeQueue.async {
-                var encoded: [String: Data] = [:]
-                var body = Self.snapshotPrefix
-                var isFirst = true
-                for piece in pieces {
-                    let blob: Data
-                    switch piece {
-                    case .encoded(let data):
-                        blob = data
-                    case .pending(let entry):
-                        guard let data = try? JSONEncoder().encode(entry) else { continue }
-                        encoded[entry.id] = data
-                        blob = data
-                    }
-                    if !isFirst { body.append(Self.snapshotSeparator) }
-                    body.append(blob)
-                    isFirst = false
-                }
-                body.append(Self.snapshotSuffix)
-                // A snapshot that lost the race must not land on top of the newer one it queued behind.
-                guard latestGeneration.withLock({ $0 }) == generation else {
-                    return continuation.resume(returning: (encoded, .superseded))
-                }
-                do {
-                    try write(body, url)
-                    continuation.resume(returning: (encoded, .written))
-                } catch {
-                    continuation.resume(returning: (encoded, .failed(error)))
-                }
+                continuation.resume(returning: Self.performWrite(
+                    write, in: directory, writeData: writeData,
+                    removeFile: removeFile, latestGeneration: latestGeneration
+                ))
             }
+        }
+    }
+
+    /// Entry files first, then the files of entries the manifest no longer lists, then the manifest
+    /// itself: a snapshot interrupted anywhere in that order reads as stale rather than as complete.
+    private static func performWrite(
+        _ write: SnapshotWrite,
+        in directory: URL,
+        writeData: @Sendable (Data, URL) throws -> Void,
+        removeFile: @Sendable (URL) throws -> Void,
+        latestGeneration: OSAllocatedUnfairLock<Int>
+    ) -> WriteResult {
+        let entriesDirectory = entriesDirectory(in: directory)
+        var encoded = 0
+        do {
+            try FileManager.default.createDirectory(at: entriesDirectory, withIntermediateDirectories: true)
+            let encoder = JSONEncoder()
+            for entry in write.entries {
+                let data = try encoder.encode(entry)
+                encoded += 1
+                try writeData(data, entryURL(entry.id, in: entriesDirectory))
+            }
+            for url in unlistedEntryFiles(in: entriesDirectory, keeping: Set(write.manifest.entries.keys)) {
+                try? removeFile(url)
+            }
+            // A snapshot that lost the race must not list an older set than the newer one it queued behind.
+            guard latestGeneration.withLock({ $0 }) == write.generation else {
+                return WriteResult(encoded: encoded, outcome: .superseded)
+            }
+            try writeData(try encoder.encode(write.manifest), manifestURL(in: directory))
+            if write.removesLegacySnapshot { try? removeFile(legacySnapshotURL(for: directory)) }
+            return WriteResult(encoded: encoded, outcome: .written)
+        } catch {
+            return WriteResult(encoded: encoded, outcome: .failed(error))
+        }
+    }
+
+    private static func unlistedEntryFiles(in entriesDirectory: URL, keeping ids: Set<String>) -> [URL] {
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: entriesDirectory, includingPropertiesForKeys: nil
+        )) ?? []
+        return contents.filter {
+            $0.pathExtension == "json" && !ids.contains($0.deletingPathExtension().lastPathComponent)
         }
     }
 

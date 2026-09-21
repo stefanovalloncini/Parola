@@ -88,7 +88,7 @@ struct LibraryLoggingTests {
         _ = try await seed.add(transcript: makeTranscript("second"), audioSource: audio)
         await seed.flush()
         try Data("not json".utf8).write(to: broken.bundleURL.appendingPathComponent("transcript.json"))
-        try FileManager.default.removeItem(at: libraryURL.appendingPathComponent(".search-index.json"))
+        try FileManager.default.removeItem(at: libraryURL.appendingPathComponent(".search-index", isDirectory: true))
 
         await ParolaLog.withSink(sink) {
             let store = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
@@ -222,18 +222,21 @@ struct LibraryLoggingTests {
         try await withSink { sink in
             let libraryURL = try makeLibraryURL()
             defer { try? FileManager.default.removeItem(at: libraryURL) }
-            let indexURL = libraryURL.appendingPathComponent("index.json")
+            let indexDirectory = libraryURL.appendingPathComponent("snapshot-store", isDirectory: true)
             let attempts = OSAllocatedUnfairLock(initialState: 0)
             let index = LibrarySearchIndex(
-                indexURL: indexURL, saveDebounce: .seconds(60), clock: ContinuousClock()
-            ) { data, target in
-                let attempt = attempts.withLock { count -> Int in
-                    count += 1
-                    return count
+                indexDirectory: indexDirectory,
+                saveDebounce: .seconds(60),
+                clock: ContinuousClock(),
+                writeSnapshotData: { data, target in
+                    let attempt = attempts.withLock { count -> Int in
+                        count += 1
+                        return count
+                    }
+                    guard attempt > 2 else { throw CocoaError(.fileWriteNoPermission) }
+                    try data.write(to: target, options: .atomic)
                 }
-                guard attempt > 2 else { throw CocoaError(.fileWriteNoPermission) }
-                try data.write(to: target, options: .atomic)
-            }
+            )
 
             await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
             await index.flush()
@@ -247,7 +250,7 @@ struct LibraryLoggingTests {
             #expect(record.level == .error)
             #expect(record.fields[.error]?.text == "NSCocoaErrorDomain.513")
             #expect(record.fields[.count]?.text == "1")
-            #expect(record.formattedLine.contains("index.json") == false)
+            #expect(record.formattedLine.contains("snapshot-store") == false)
 
             await index.index(id: "e3", title: "Three", text: "alpha review", createdAt: Date())
             await index.flush()
@@ -260,9 +263,9 @@ struct LibraryLoggingTests {
         try await withSink { sink in
             let libraryURL = try makeLibraryURL()
             defer { try? FileManager.default.removeItem(at: libraryURL) }
-            let indexURL = libraryURL.appendingPathComponent("index.json")
-            try Data(#"{"version":1,"entries":[]}"#.utf8).write(to: indexURL)
-            let index = LibrarySearchIndex(indexURL: indexURL)
+            let indexDirectory = libraryURL.appendingPathComponent("snapshot-store", isDirectory: true)
+            try Data(#"{"version":1,"entries":[]}"#.utf8).write(to: indexDirectory.appendingPathExtension("json"))
+            let index = LibrarySearchIndex(indexDirectory: indexDirectory)
 
             #expect(await index.needsRebuild(matching: [:]))
 
@@ -270,7 +273,7 @@ struct LibraryLoggingTests {
                 records(sink, .libraryIndex, message: "search index snapshot discarded, rebuilding").first
             )
             #expect(record.level == .notice)
-            #expect(record.formattedLine.contains("index.json") == false)
+            #expect(record.formattedLine.contains("snapshot-store") == false)
         }
     }
 }

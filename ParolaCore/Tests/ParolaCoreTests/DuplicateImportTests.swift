@@ -156,7 +156,7 @@ struct DuplicateImportTests {
         defer { try? FileManager.default.removeItem(at: audio) }
         let entry = try await seed.add(transcript: makeTranscript(), audioSource: audio)
         try ParolaDocument.updateManifest(at: entry.bundleURL) { $0.sourceDigest = nil }
-        try? FileManager.default.removeItem(at: library.appendingPathComponent(".search-index.json"))
+        try? FileManager.default.removeItem(at: library.appendingPathComponent(".search-index", isDirectory: true))
 
         let store = LibraryStore(libraryURL: library, extraIndexer: nil)
         _ = await store.search("hi")

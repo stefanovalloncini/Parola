@@ -693,8 +693,26 @@ struct LibraryStoreTests {
     /// Read through FileManager, not URL.resourceValues: URL caches the first answer, so a second
     /// read of the same URL would report the file as untouched however often it was rewritten.
     private func snapshotWrittenAt(_ dir: URL) throws -> Date? {
-        let url = dir.appendingPathComponent(".search-index.json")
+        let url = indexManifestURL(in: dir)
         return try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date
+    }
+
+    private func indexDirectoryURL(in libraryURL: URL) -> URL {
+        libraryURL.appendingPathComponent(".search-index", isDirectory: true)
+    }
+
+    private func indexManifestURL(in libraryURL: URL) -> URL {
+        indexDirectoryURL(in: libraryURL).appendingPathComponent("manifest.json")
+    }
+
+    private func indexEntryURL(_ id: String, in libraryURL: URL) -> URL {
+        indexDirectoryURL(in: libraryURL)
+            .appendingPathComponent("entries", isDirectory: true)
+            .appendingPathComponent("\(id).json")
+    }
+
+    private func legacyIndexURL(in libraryURL: URL) -> URL {
+        indexDirectoryURL(in: libraryURL).appendingPathExtension("json")
     }
 
     private func makeTempLibraryDirectory() throws -> URL {
@@ -785,7 +803,7 @@ struct LibraryStoreTests {
         )
         await store.flush()
         try Data("not json".utf8).write(to: broken.bundleURL.appendingPathComponent("transcript.json"))
-        try FileManager.default.removeItem(at: dir.appendingPathComponent(".search-index.json"))
+        try FileManager.default.removeItem(at: dir.appendingPathComponent(".search-index", isDirectory: true))
 
         let first = LibraryStore(libraryURL: dir, extraIndexer: nil)
         #expect(await first.search("brokenmarker").count == 1, "the title stays searchable")
@@ -809,7 +827,7 @@ struct LibraryStoreTests {
         try await store.setSegmentNote("notemarker", segmentID: 0, for: broken.id)
         await store.flush()
         try Data("not json".utf8).write(to: broken.bundleURL.appendingPathComponent("transcript.json"))
-        try FileManager.default.removeItem(at: dir.appendingPathComponent(".search-index.json"))
+        try FileManager.default.removeItem(at: dir.appendingPathComponent(".search-index", isDirectory: true))
 
         let degraded = LibraryStore(libraryURL: dir, extraIndexer: nil)
 
@@ -827,7 +845,7 @@ struct LibraryStoreTests {
         let transcriptURL = broken.bundleURL.appendingPathComponent("transcript.json")
         let good = try Data(contentsOf: transcriptURL)
         try Data("not json".utf8).write(to: transcriptURL)
-        try FileManager.default.removeItem(at: dir.appendingPathComponent(".search-index.json"))
+        try FileManager.default.removeItem(at: dir.appendingPathComponent(".search-index", isDirectory: true))
 
         let degraded = LibraryStore(libraryURL: dir, extraIndexer: nil)
         #expect(await degraded.search("hi").isEmpty)
@@ -922,10 +940,10 @@ struct LibraryStoreTests {
     /// The silent segment never reaches the app, so the hit after it is index 1, not 2.
     @Test("a hit past a silent segment resolves to its place in the cleaned transcript")
     func hitPastASilentSegmentResolvesToTheCleanedIndex() async throws {
-        let indexURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("parola-boundary-\(UUID().uuidString).json")
-        defer { try? FileManager.default.removeItem(at: indexURL) }
-        let index = LibrarySearchIndex(indexURL: indexURL)
+        let indexDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-boundary-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: indexDirectory) }
+        let index = LibrarySearchIndex(indexDirectory: indexDirectory)
         let transcript = Transcript(
             segments: [
                 TranscriptSegment(id: 0, start: 0, end: 3, text: "Buongiorno a tutti"),
@@ -966,7 +984,7 @@ struct LibraryStoreTests {
         let entry = try await store1.add(transcript: transcript, audioSource: nil)
         await store1.flush()
 
-        try FileManager.default.removeItem(at: libraryURL.appendingPathComponent(".search-index.json"))
+        try FileManager.default.removeItem(at: libraryURL.appendingPathComponent(".search-index", isDirectory: true))
         let store2 = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
         let hit = try #require(await store2.search("lancio").first(where: { $0.entryID == entry.id })?.firstHit)
         let loaded = try await store2.load(entry.id).document.transcript.segments
@@ -995,7 +1013,7 @@ struct LibraryStoreTests {
         #expect(added.seconds == 12.4)
         await store1.flush()
 
-        try FileManager.default.removeItem(at: libraryURL.appendingPathComponent(".search-index.json"))
+        try FileManager.default.removeItem(at: libraryURL.appendingPathComponent(".search-index", isDirectory: true))
         let store2 = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
         let rebuilt = try #require(await store2.search("lancio").first(where: { $0.entryID == entry.id })?.firstHit)
         #expect(rebuilt == added)
@@ -1082,11 +1100,11 @@ struct LibraryStoreTests {
         try await store1.setSegmentNote("check the kanban board", segmentID: 0, for: entry.id)
         await store1.flush()
 
-        let indexURL = libraryURL.appendingPathComponent(".search-index.json")
         let v2 = """
         {"version":2,"entries":{"\(entry.id)":{"title":"Old","excerpt":"kryptonite meeting notes","tokens":["kryptonite","meeting","notes"]}}}
         """
-        try Data(v2.utf8).write(to: indexURL)
+        try FileManager.default.removeItem(at: indexDirectoryURL(in: libraryURL))
+        try Data(v2.utf8).write(to: legacyIndexURL(in: libraryURL))
 
         let store2 = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
         #expect(await store2.search("renewal").contains(where: { $0.entryID == entry.id }))
@@ -1105,11 +1123,11 @@ struct LibraryStoreTests {
         let entry = try await store1.add(transcript: transcript, audioSource: nil)
         await store1.flush()
 
-        let indexURL = libraryURL.appendingPathComponent(".search-index.json")
         let oldFormat = """
         {"entries":{"ghost":{"id":"ghost","title":"Ghost","text":"phantom words"}},"inverted":{"phantom":["ghost"],"words":["ghost"]}}
         """
-        try Data(oldFormat.utf8).write(to: indexURL)
+        try FileManager.default.removeItem(at: indexDirectoryURL(in: libraryURL))
+        try Data(oldFormat.utf8).write(to: legacyIndexURL(in: libraryURL))
 
         let store2 = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
         let matches = await store2.search("kryptonite")
@@ -1129,11 +1147,11 @@ struct LibraryStoreTests {
         let entry = try await store1.add(transcript: transcript, audioSource: nil)
         await store1.flush()
 
-        let indexURL = libraryURL.appendingPathComponent(".search-index.json")
         let v3 = """
         {"version":3,"entries":{"\(entry.id)":{"title":"Old","excerpt":"phantom","tokens":["phantom"]}}}
         """
-        try Data(v3.utf8).write(to: indexURL)
+        try FileManager.default.removeItem(at: indexDirectoryURL(in: libraryURL))
+        try Data(v3.utf8).write(to: legacyIndexURL(in: libraryURL))
 
         let store2 = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
         #expect(await store2.search("kryptonite").contains(where: { $0.entryID == entry.id }))
@@ -1151,13 +1169,15 @@ struct LibraryStoreTests {
         let entry = try await store1.add(transcript: transcript, audioSource: nil)
         await store1.flush()
 
-        let indexURL = libraryURL.appendingPathComponent(".search-index.json")
-        try FileManager.default.removeItem(at: indexURL)
+        try FileManager.default.removeItem(at: indexDirectoryURL(in: libraryURL))
 
         let store2 = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
         #expect(await store2.search("kryptonite").contains(where: { $0.entryID == entry.id }))
+        await store2.flush()
 
-        let raw = try #require(String(data: Data(contentsOf: indexURL), encoding: .utf8))
+        let raw = try #require(
+            String(data: Data(contentsOf: indexEntryURL(entry.id, in: libraryURL)), encoding: .utf8)
+        )
         #expect(raw.contains("kryptonite"))
 
         let store3 = LibraryStore(libraryURL: libraryURL, extraIndexer: nil)
@@ -1168,8 +1188,7 @@ struct LibraryStoreTests {
     func missingIndexSnapshotEmptyLibrary() async throws {
         let (store, libraryURL) = try makeTempLibrary()
         #expect(await store.search("kryptonite").isEmpty)
-        let indexURL = libraryURL.appendingPathComponent(".search-index.json")
-        #expect(FileManager.default.fileExists(atPath: indexURL.path))
+        #expect(FileManager.default.fileExists(atPath: indexManifestURL(in: libraryURL).path))
     }
 
     @Test("a library directory that will not list writes no empty snapshot")
@@ -1186,8 +1205,7 @@ struct LibraryStoreTests {
 
         let store = LibraryStore(libraryURL: tmp, extraIndexer: nil)
         #expect(await store.search("kryptonite").isEmpty)
-        let indexURL = tmp.appendingPathComponent(".search-index.json")
-        #expect(FileManager.default.fileExists(atPath: indexURL.path) == false)
+        #expect(FileManager.default.fileExists(atPath: indexDirectoryURL(in: tmp).path) == false)
     }
 
     @Test("search on a fresh store instance finds previously indexed entries")
@@ -1279,7 +1297,9 @@ struct LibraryStoreTests {
         let bundle = libraryURL.appendingPathComponent("entry.parola", isDirectory: true)
         try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
         try Data(repeating: 0x61, count: 2_000).write(to: bundle.appendingPathComponent("audio.wav"))
-        try Data(repeating: 0x62, count: 400_000).write(to: libraryURL.appendingPathComponent(".search-index.json"))
+        let indexEntries = indexDirectoryURL(in: libraryURL).appendingPathComponent("entries", isDirectory: true)
+        try FileManager.default.createDirectory(at: indexEntries, withIntermediateDirectories: true)
+        try Data(repeating: 0x62, count: 400_000).write(to: indexEntries.appendingPathComponent("e1.json"))
 
         let bytes = try #require(await store.sizeOnDisk())
         #expect(bytes >= 2_000)
