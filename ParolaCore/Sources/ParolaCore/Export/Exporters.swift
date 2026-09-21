@@ -48,11 +48,20 @@ public protocol TranscriptExporter: Sendable {
 public extension TranscriptExporter {
     var options: ExportOptions { spec.options }
 
-    /// Renders the transcript as the spec describes it, grouping segments before the format sees them.
+    /// Renders the transcript as the spec describes it: segments grouped, and the content mode
+    /// settled, before the format sees them.
     func render(_ transcript: Transcript) throws -> Data {
-        var prepared = transcript
-        prepared.segments = spec.options.grouping.apply(to: transcript.segments)
-        return try encode(prepared)
+        try encode(spec.prepared(transcript))
+    }
+
+    /// The translation a format writes next to a segment's own text, or nil when this export
+    /// writes one language.
+    func translation(for segment: TranscriptSegment, in transcript: Transcript) -> String? {
+        guard spec.resolvedContent == .both else { return nil }
+        let text = transcript.translation?.segments[segment.id]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let text, !text.isEmpty else { return nil }
+        return text
     }
 
     func renderText(_ transcript: Transcript) throws -> String {

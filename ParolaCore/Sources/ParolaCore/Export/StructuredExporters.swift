@@ -30,10 +30,26 @@ struct JsonLinesExporter: TranscriptExporter {
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         var data = Data()
         for segment in transcript.segments.droppingBlankText() {
-            data.append(try encoder.encode(segment))
+            let line = TranslatedSegment(segment: segment, translation: translation(for: segment, in: transcript))
+            data.append(try encoder.encode(line))
             data.append(0x0A)
         }
         return data
+    }
+}
+
+/// A segment plus the translation of its text, as one flat JSON object.
+private struct TranslatedSegment: Encodable {
+    enum ExtraKey: String, CodingKey { case translation }
+
+    let segment: TranscriptSegment
+    let translation: String?
+
+    func encode(to encoder: any Encoder) throws {
+        try segment.encode(to: encoder)
+        guard let translation else { return }
+        var container = encoder.container(keyedBy: ExtraKey.self)
+        try container.encode(translation, forKey: .translation)
     }
 }
 
@@ -99,16 +115,22 @@ public struct HtmlExporter: TranscriptExporter {
             if options.speakers, let speaker = Format.presentationSpeakerLabel(seg.speaker) {
                 paragraph += "<span class=\"s\">\(Format.escapeHTML(speaker))</span>: "
             }
-            paragraph += "\(text)</p>\n"
+            paragraph += text
+            if let translated = translation(for: seg, in: transcript) {
+                paragraph += "<br><span class=\"x\">\(Format.escapeHTML(translated))</span>"
+            }
+            paragraph += "</p>\n"
             body += paragraph
         }
         let theme = options.htmlTheme
         let title = Format.escapeHTML(Format.documentTitle(for: transcript))
         let css = "body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.5;background:\(theme.background);color:\(theme.foreground)}.t{color:\(theme.timestamp);font-family:ui-monospace,monospace;font-size:.85em;text-decoration:none;margin-right:.4em}.s{font-weight:600}p{margin:0 0 1em}"
+        // Only for a two-language export, so a single-language one keeps its exact bytes.
+        let translationCSS = spec.resolvedContent == .both ? ".x{color:\(theme.timestamp)}" : ""
         let doc = """
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"><title>\(title)</title>
-        <style>\(css)</style>
+        <style>\(css)\(translationCSS)</style>
         </head><body>
         \(body)</body></html>
         """
@@ -125,12 +147,18 @@ struct CsvExporter: TranscriptExporter {
     }
 
     func encode(_ transcript: Transcript) throws -> Data {
-        var out = "start_seconds,end_seconds,speaker,text\n"
+        let writesTranslation = spec.resolvedContent == .both
+        var out = "start_seconds,end_seconds,speaker,text"
+        out += writesTranslation ? ",translation\n" : "\n"
         for seg in transcript.segments {
             let text = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { continue }
             let speaker = Format.presentationSpeakerLabel(seg.speaker) ?? ""
-            out += "\(Format.decimalSeconds(seg.start)),\(Format.decimalSeconds(seg.end)),\(Self.quote(speaker)),\(Self.quote(text))\n"
+            out += "\(Format.decimalSeconds(seg.start)),\(Format.decimalSeconds(seg.end)),\(Self.quote(speaker)),\(Self.quote(text))"
+            if writesTranslation {
+                out += ",\(Self.quote(translation(for: seg, in: transcript) ?? ""))"
+            }
+            out += "\n"
         }
         return utf8(out)
     }
@@ -167,11 +195,14 @@ struct DocxExporter: TranscriptExporter {
             let trimmed = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { continue }
             let text = Format.escapeXML(trimmed)
+            let tail = translation(for: seg, in: transcript).map {
+                "<w:r><w:br/><w:t xml:space=\"preserve\">\(Format.escapeXML($0))</w:t></w:r>"
+            } ?? ""
             if options.speakers, let speaker = Format.presentationSpeakerLabel(seg.speaker) {
                 let escapedSpeaker = Format.escapeXML(speaker)
-                body += "<w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space=\"preserve\">\(escapedSpeaker): </w:t></w:r><w:r><w:t xml:space=\"preserve\">\(text)</w:t></w:r></w:p>"
+                body += "<w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space=\"preserve\">\(escapedSpeaker): </w:t></w:r><w:r><w:t xml:space=\"preserve\">\(text)</w:t></w:r>\(tail)</w:p>"
             } else {
-                body += "<w:p><w:r><w:t xml:space=\"preserve\">\(text)</w:t></w:r></w:p>"
+                body += "<w:p><w:r><w:t xml:space=\"preserve\">\(text)</w:t></w:r>\(tail)</w:p>"
             }
         }
         return """

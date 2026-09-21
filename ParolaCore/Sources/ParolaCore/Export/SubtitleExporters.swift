@@ -17,10 +17,12 @@ public struct SrtExporter: TranscriptExporter {
             let end = max(seg.end, seg.start + Format.minCaptionSeconds)
             out += "\(cueNumber)\n"
             out += "\(Self.srtTimestamp(seg.start)) --> \(Self.srtTimestamp(end))\n"
+            let tail = translation(for: seg, in: transcript)
+                .map { "\n" + CaptionWrapper.wrap($0, length: options.captionLength) } ?? ""
             if options.speakers, let speaker = Format.presentationSpeakerLabel(seg.speaker) {
-                out += "\(speaker): \(body)\n\n"
+                out += "\(speaker): \(body)\(tail)\n\n"
             } else {
-                out += body + "\n\n"
+                out += body + tail + "\n\n"
             }
             cueNumber += 1
         }
@@ -47,10 +49,12 @@ public struct VttExporter: TranscriptExporter {
             guard !body.isEmpty else { continue }
             let end = max(seg.end, seg.start + Format.minCaptionSeconds)
             out += "\(Self.vttTimestamp(seg.start)) --> \(Self.vttTimestamp(end))\n"
+            let tail = translation(for: seg, in: transcript)
+                .map { "\n" + Format.escapeWebVTT(CaptionWrapper.wrap($0, length: options.captionLength)) } ?? ""
             if options.speakers, let speaker = Format.presentationSpeakerLabel(seg.speaker) {
-                out += "<v \(Format.escapeWebVTT(speaker))>\(body)</v>\n\n"
+                out += "<v \(Format.escapeWebVTT(speaker))>\(body)\(tail)</v>\n\n"
             } else {
-                out += body + "\n\n"
+                out += body + tail + "\n\n"
             }
         }
         return utf8(out)

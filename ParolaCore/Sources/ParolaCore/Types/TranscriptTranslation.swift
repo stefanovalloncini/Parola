@@ -30,15 +30,22 @@ public struct TranscriptTranslation: Codable, Hashable, Sendable {
     /// segment joins its source texts.
     public func afterMerge(of id: Int, with nextID: Int) -> TranscriptTranslation {
         var out = self
+        out.segments = Self.merging(segments, of: id, with: nextID)
+        return out
+    }
+
+    /// The same join the merged segment's own text gets, applied to a bare id-to-text map.
+    static func merging(_ segments: [Int: String], of id: Int, with nextID: Int) -> [Int: String] {
+        var out = segments
         let joined = [segments[id], segments[nextID]]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: " ")
-        out.segments.removeValue(forKey: nextID)
+        out.removeValue(forKey: nextID)
         if joined.isEmpty {
-            out.segments.removeValue(forKey: id)
+            out.removeValue(forKey: id)
         } else {
-            out.segments[id] = joined
+            out[id] = joined
         }
         return out
     }

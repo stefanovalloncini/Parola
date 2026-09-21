@@ -18,6 +18,11 @@ public struct LrcExporter: TranscriptExporter {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard !body.isEmpty else { continue }
             out += "[\(Self.lrcTimestamp(seg.start))]\(body)\n"
+            // A second line under the same time tag: how a bilingual LRC carries a translation.
+            if let translated = translation(for: seg, in: transcript) {
+                let line = translated.split(whereSeparator: \.isNewline).joined(separator: " ")
+                out += "[\(Self.lrcTimestamp(seg.start))]\(line)\n"
+            }
         }
         return utf8(out)
     }

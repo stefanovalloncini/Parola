@@ -45,8 +45,17 @@ public enum ExportGrouping: String, Sendable, Codable, Hashable, CaseIterable, I
 
     /// Merges runs of segments that share a speaker into one segment, keeping the first start and the last end.
     public func apply(to segments: [TranscriptSegment]) -> [TranscriptSegment] {
-        guard self == .speakerParagraphs else { return segments }
+        apply(to: segments, translation: [:]).segments
+    }
+
+    /// The same merge, carrying a translation along: a merged run's translations join with a space,
+    /// exactly as its texts do.
+    public func apply(
+        to segments: [TranscriptSegment], translation: [Int: String]
+    ) -> (segments: [TranscriptSegment], translation: [Int: String]) {
+        guard self == .speakerParagraphs else { return (segments, translation) }
         var merged: [TranscriptSegment] = []
+        var mergedTranslation = translation
         for segment in segments {
             guard var previous = merged.last,
                   Format.presentationSpeakerLabel(previous.speaker) == Format.presentationSpeakerLabel(segment.speaker)
@@ -54,6 +63,7 @@ public enum ExportGrouping: String, Sendable, Codable, Hashable, CaseIterable, I
                 merged.append(segment)
                 continue
             }
+            mergedTranslation = TranscriptTranslation.merging(mergedTranslation, of: previous.id, with: segment.id)
             let head = previous.text.trimmingCharacters(in: .whitespacesAndNewlines)
             let tail = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
             previous.text = [head, tail].filter { !$0.isEmpty }.joined(separator: " ")
@@ -66,7 +76,7 @@ public enum ExportGrouping: String, Sendable, Codable, Hashable, CaseIterable, I
             }
             merged[merged.count - 1] = previous
         }
-        return merged
+        return (merged, mergedTranslation)
     }
 }
 
@@ -77,6 +87,14 @@ public enum ExportContent: String, Sendable, Codable, Hashable, CaseIterable, Id
     case both
 
     public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .original: return "Original"
+        case .translation: return "Translation"
+        case .both: return "Original and translation"
+        }
+    }
 }
 
 /// One field of ``ExportOptions``. A format lists the ones it reads so the Export sheet
@@ -229,6 +247,42 @@ public struct ExportSpec: Sendable, Codable, Hashable {
             return changing(format: format)
         }
         return changing(format: first)
+    }
+
+    /// The transcript as this spec's format sees it: segments grouped, and the text swapped for the
+    /// translation when that is what the export writes.
+    func prepared(_ transcript: Transcript) -> Transcript {
+        var out = transcript
+        let grouped = options.grouping.apply(
+            to: transcript.segments, translation: transcript.translation?.segments ?? [:]
+        )
+        out.segments = grouped.segments
+        switch resolvedContent {
+        case .original:
+            out.translation = nil
+        case .translation:
+            out.segments = out.segments.map { segment in
+                guard let translated = grouped.translation[segment.id] else { return segment }
+                var segment = segment
+                segment.text = translated
+                // The word timings belong to the original wording; they would mislabel the translation.
+                segment.words = nil
+                return segment
+            }
+            out.translation = nil
+        case .both:
+            out.translation = transcript.translation.map {
+                var translation = $0
+                translation.segments = grouped.translation
+                return translation
+            }
+        }
+        return out
+    }
+
+    /// A caption carries one text, so Final Cut reads "both" as the translation.
+    var resolvedContent: ExportContent {
+        format == .fcpxml && options.content == .both ? .translation : options.content
     }
 
     /// The spec to render when this one produces bytes no reader can show: docx and pdf preview as text.

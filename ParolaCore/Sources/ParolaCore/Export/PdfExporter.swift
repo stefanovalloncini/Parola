@@ -38,7 +38,8 @@ struct PdfExporter: TranscriptExporter {
             transcript: transcript,
             fonts: fonts,
             chunkSize: Self.segmentsPerChunk,
-            speakers: options.speakers
+            speakers: options.speakers,
+            translations: spec.resolvedContent == .both ? (transcript.translation?.segments ?? [:]) : [:]
         )
         while let chunk = iterator.next() {
             guard chunk.length > 0 else { continue }
@@ -113,14 +114,16 @@ struct PdfExporter: TranscriptExporter {
         let fonts: Fonts
         let chunkSize: Int
         let speakers: Bool
+        let translations: [Int: String]
         private var cursor: Int = 0
         private var emittedTitle: Bool = false
 
-        init(transcript: Transcript, fonts: Fonts, chunkSize: Int, speakers: Bool) {
+        init(transcript: Transcript, fonts: Fonts, chunkSize: Int, speakers: Bool, translations: [Int: String]) {
             self.transcript = transcript
             self.fonts = fonts
             self.chunkSize = max(1, chunkSize)
             self.speakers = speakers
+            self.translations = translations
         }
 
         mutating func next() -> NSAttributedString? {
@@ -139,7 +142,13 @@ struct PdfExporter: TranscriptExporter {
                 if speakers, let speaker = Format.presentationSpeakerLabel(seg.speaker) {
                     chunk.append(NSAttributedString(string: "\(speaker): ", attributes: [fontKey: fonts.speaker]))
                 }
-                chunk.append(NSAttributedString(string: "\(text)\n\n", attributes: [fontKey: fonts.body]))
+                let translated = translations[seg.id]?.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let translated, !translated.isEmpty {
+                    chunk.append(NSAttributedString(string: "\(text)\n", attributes: [fontKey: fonts.body]))
+                    chunk.append(NSAttributedString(string: "\(translated)\n\n", attributes: [fontKey: fonts.body]))
+                } else {
+                    chunk.append(NSAttributedString(string: "\(text)\n\n", attributes: [fontKey: fonts.body]))
+                }
             }
             cursor = end
             return chunk

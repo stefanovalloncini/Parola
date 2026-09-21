@@ -92,8 +92,20 @@ struct ExportSheet: View {
     private var optionsSection: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             sectionTitle("Options")
+            if model.hasTranslation { contentRow }
             ForEach(spec.format.optionFields) { field in
                 optionRow(field)
+            }
+        }
+    }
+
+    /// Only worth a row when the transcript has a translation to choose from.
+    private var contentRow: some View {
+        pickerRow("Language", detail: "Write the original, the translation, or both.", leaf: "Content") {
+            Picker("", selection: contentBinding) {
+                ForEach(ExportContent.allCases) { content in
+                    Text(LocalizedStringKey(content.displayName)).tag(content)
+                }
             }
         }
     }
@@ -250,6 +262,10 @@ struct ExportSheet: View {
 
     private var htmlThemeBinding: Binding<HtmlExportTheme> {
         optionBinding(\.htmlTheme)
+    }
+
+    private var contentBinding: Binding<ExportContent> {
+        optionBinding(\.content)
     }
 
     private var groupingBinding: Binding<ExportGrouping> {

@@ -7528,6 +7528,28 @@
         }
       }
     },
+    "Original": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Originale"
+          }
+        }
+      }
+    },
+    "Original and translation": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Originale e traduzione"
+          }
+        }
+      }
+    },
     "Original order": {
       "extractionState": "manual",
       "localizations": {
@@ -12494,6 +12516,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Spezza i segmenti lunghi in battute più corte."
+          }
+        }
+      }
+    },
+    "Write the original, the translation, or both.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrivi l'originale, la traduzione o entrambi."
           }
         }
       }

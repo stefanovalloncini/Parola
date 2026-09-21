@@ -19,8 +19,10 @@ public struct TxtExporter: TranscriptExporter {
                 } else {
                     line = body
                 }
-                guard let stamp = options.timestampLabel(start: seg.start, end: seg.end) else { return line }
-                return "[\(stamp)] \(line)"
+                let stamped = options.timestampLabel(start: seg.start, end: seg.end)
+                    .map { "[\($0)] \(line)" } ?? line
+                guard let translated = translation(for: seg, in: transcript) else { return stamped }
+                return "\(stamped)\n\(translated)"
             }
         guard !lines.isEmpty else { return Data() }
         return utf8(lines.joined(separator: "\n") + "\n")
@@ -41,15 +43,17 @@ public struct MarkdownExporter: TranscriptExporter {
             let body = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !body.isEmpty else { continue }
             let label = options.speakers ? Format.presentationSpeakerLabel(seg.speaker) : nil
+            // Two trailing spaces: the markdown line break that keeps both languages in one paragraph.
+            let tail = translation(for: seg, in: transcript).map { "  \n\($0)" } ?? ""
             switch (label, options.timestampLabel(start: seg.start, end: seg.end)) {
             case (let speaker?, let stamp?):
-                out += "**\(speaker)** *[\(stamp)]*: \(body)\n\n"
+                out += "**\(speaker)** *[\(stamp)]*: \(body)\(tail)\n\n"
             case (let speaker?, nil):
-                out += "**\(speaker):** \(body)\n\n"
+                out += "**\(speaker):** \(body)\(tail)\n\n"
             case (nil, let stamp?):
-                out += "*[\(stamp)]* \(body)\n\n"
+                out += "*[\(stamp)]* \(body)\(tail)\n\n"
             case (nil, nil):
-                out += "\(body)\n\n"
+                out += "\(body)\(tail)\n\n"
             }
         }
         return utf8(String(out.dropLast()))
@@ -65,13 +69,19 @@ struct TsvExporter: TranscriptExporter {
     }
 
     func encode(_ transcript: Transcript) throws -> Data {
-        var out = "start_seconds\tend_seconds\tspeaker\ttext\n"
+        let writesTranslation = spec.resolvedContent == .both
+        var out = "start_seconds\tend_seconds\tspeaker\ttext"
+        out += writesTranslation ? "\ttranslation\n" : "\n"
         for seg in transcript.segments {
             let trimmed = seg.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { continue }
             let speaker = Self.escape(Format.presentationSpeakerLabel(seg.speaker) ?? "")
             let text = Self.escape(trimmed)
-            out += "\(Format.decimalSeconds(seg.start))\t\(Format.decimalSeconds(seg.end))\t\(speaker)\t\(text)\n"
+            out += "\(Format.decimalSeconds(seg.start))\t\(Format.decimalSeconds(seg.end))\t\(speaker)\t\(text)"
+            if writesTranslation {
+                out += "\t\(Self.escape(translation(for: seg, in: transcript) ?? ""))"
+            }
+            out += "\n"
         }
         return utf8(out)
     }
