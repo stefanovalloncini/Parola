@@ -28,6 +28,10 @@ struct SummaryBody: View {
                     if !summary.chapters.isEmpty {
                         chaptersSection
                     }
+
+                    if !summary.actionItems.isEmpty {
+                        actionItemsSection
+                    }
                 }
                 .frame(maxWidth: 720, alignment: .leading)
                 .frame(maxWidth: .infinity)
@@ -57,6 +61,29 @@ struct SummaryBody: View {
                     }
                 }
             }
+            .background(DS.Color.surfaceElevated)
+            .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
+        }
+    }
+
+    private var actionItemsSection: some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.regular) {
+            SectionCaption("Action Items")
+
+            VStack(alignment: .leading, spacing: DS.Spacing.small) {
+                ForEach(Array(summary.actionItems.enumerated()), id: \.offset) { _, item in
+                    HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
+                        Text(verbatim: "•")
+                            .foregroundStyle(DS.Color.secondaryText)
+                        Text(item)
+                            .font(DS.Font.body)
+                            .foregroundStyle(DS.Color.primaryText)
+                    }
+                }
+            }
+            .padding(.horizontal, DS.Spacing.regular)
+            .padding(.vertical, DS.Spacing.small)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(DS.Color.surfaceElevated)
             .clipShape(RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous))
         }

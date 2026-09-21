@@ -297,6 +297,29 @@ extension ParolaAutomationServer {
                     return .object(["started": .bool(true)])
                 }
             ),
+
+            AutomationCommand(
+                name: "setTranscriptPaneMode",
+                area: .library,
+                summary: "Switches the transcript column between Transcript, Summary and Chat.",
+                kind: .mutating,
+                args: [
+                    .init(
+                        name: "mode",
+                        kind: .string(enum: AppModel.TranscriptPaneMode.allCases.map(\.rawValue)),
+                        required: true,
+                        summary: "transcript, summary, or chat"
+                    ),
+                ],
+                handler: { args, ctx in
+                    let raw = try args.string("mode")
+                    guard let mode = AppModel.TranscriptPaneMode(rawValue: raw) else {
+                        throw AutomationError.invalidArgs(field: "mode", reason: "unknown mode: \(raw)")
+                    }
+                    ctx.model.setTranscriptPaneMode(mode)
+                    return .object(["mode": .string(ctx.model.transcriptPaneMode.rawValue)])
+                }
+            ),
         ]
     }
 }

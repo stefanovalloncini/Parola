@@ -64,8 +64,6 @@ struct TranscriptPane: View {
     @Environment(AppModel.self) private var model
     @AppStorage(InspectorVisibility.preferenceKey, store: DefaultsStore.current) private var inspectorVisible: Bool = true
     @AppStorage(InspectorVisibility.modeKey, store: DefaultsStore.current) private var inspectorModeRaw: String = InspectorMode.format.rawValue
-    @State private var summarySheetOpen = false
-    @State private var chatSheetOpen = false
     // Persisted: the pane is rebuilt on every phase and route change, and the ask has to outlive that.
     @AppStorage(InspectorVisibility.forcedAtNarrowWidthKey, store: DefaultsStore.current)
     private var inspectorForcedAtNarrowWidth = false
@@ -79,9 +77,7 @@ struct TranscriptPane: View {
         VStack(spacing: 0) {
             TranscriptHeaderBar(
                 title: headerTitle,
-                onAdvance: advanceToNext,
-                onOpenSummary: { summarySheetOpen = true },
-                onOpenChat: { chatSheetOpen = true }
+                onAdvance: advanceToNext
             )
             Divider()
 
@@ -109,12 +105,6 @@ struct TranscriptPane: View {
             } action: { width in
                 applyPaneWidth(width)
             }
-        }
-        .sheet(isPresented: $summarySheetOpen) {
-            SummarySheet().environment(model)
-        }
-        .sheet(isPresented: $chatSheetOpen) {
-            ChatSheet().environment(model)
         }
         .task { model.refreshAIAvailability() }
         .axBranch("Transcript")
@@ -165,14 +155,21 @@ struct TranscriptPane: View {
 
     @ViewBuilder
     private var transcriptBody: some View {
-        if model.transcriptIsEmpty {
-            EmptyTranscriptPane()
-        } else {
-            switch displayMode {
-            case .segments:
-                SegmentsScroll()
-            case .transcript:
-                ContinuousTranscriptView()
+        switch model.transcriptPaneMode {
+        case .summary:
+            SummaryPane()
+        case .chat:
+            ChatPane()
+        case .transcript:
+            if model.transcriptIsEmpty {
+                EmptyTranscriptPane()
+            } else {
+                switch displayMode {
+                case .segments:
+                    SegmentsScroll()
+                case .transcript:
+                    ContinuousTranscriptView()
+                }
             }
         }
     }

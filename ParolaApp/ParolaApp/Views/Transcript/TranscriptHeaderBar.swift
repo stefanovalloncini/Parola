@@ -6,8 +6,6 @@ struct TranscriptHeaderBar: View {
     @State private var speaker = TranscriptSpeaker()
     let title: String
     let onAdvance: () -> Void
-    let onOpenSummary: () -> Void
-    let onOpenChat: () -> Void
 
     @State private var outlineOpen = false
     @State private var jumpOpen = false
@@ -74,6 +72,7 @@ struct TranscriptHeaderBar: View {
 
             if model.features.isEnabled(.ai) {
                 groupDivider
+                paneModePicker
                 aiMenu
             }
 
@@ -135,12 +134,41 @@ struct TranscriptHeaderBar: View {
         .onChange(of: title) { _, _ in rebuildShareItem() }
     }
 
+    private var paneModePicker: some View {
+        Picker(selection: paneModeBinding) {
+            ForEach(AppModel.TranscriptPaneMode.allCases, id: \.self) { mode in
+                Text(Self.paneModeLabel(mode)).tag(mode)
+            }
+        } label: {
+            Text(Self.paneModeLabel(model.transcriptPaneMode))
+        }
+        .pickerStyle(.menu)
+        .fixedSize()
+        .help("Switch between Transcript, Summary and Chat")
+        .axLeaf("HeaderBar.Picker.PaneMode")
+    }
+
+    private var paneModeBinding: Binding<AppModel.TranscriptPaneMode> {
+        Binding(
+            get: { model.transcriptPaneMode },
+            set: { model.setTranscriptPaneMode($0) }
+        )
+    }
+
+    static func paneModeLabel(_ mode: AppModel.TranscriptPaneMode) -> String {
+        switch mode {
+        case .transcript: return String(localized: "Transcript")
+        case .summary: return String(localized: "Summary")
+        case .chat: return String(localized: "Chat")
+        }
+    }
+
     private var aiMenu: some View {
         Menu {
-            Button("Summary", action: onOpenSummary)
+            Button("Summary") { model.setTranscriptPaneMode(.summary) }
                 .accessibilityIdentifier("ai.summary")
                 .axLeaf("HeaderBar.Button.OpenSummary")
-            Button("Chat", action: onOpenChat)
+            Button("Chat") { model.setTranscriptPaneMode(.chat) }
                 .accessibilityIdentifier("ai.chat")
                 .axLeaf("HeaderBar.Button.OpenChat")
             Divider()

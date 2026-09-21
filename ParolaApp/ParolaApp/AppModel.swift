@@ -3212,6 +3212,17 @@ final class AppModel {
         }
     }
 
+    func clearSummary() {
+        guard transcript?.summary != nil else { return }
+        transcript?.summary = nil
+        summaryError = nil
+        if let entryID = selectedEntryID, let updated = transcript {
+            Task { [library] in
+                try? await library.updateTranscript(updated, for: entryID, reindex: false)
+            }
+        }
+    }
+
     // MARK: - Transcript pane mode
 
     enum TranscriptPaneMode: String, CaseIterable, Sendable {
