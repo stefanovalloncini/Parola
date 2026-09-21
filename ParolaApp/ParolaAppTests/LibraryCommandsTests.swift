@@ -101,6 +101,60 @@ struct LibraryCommandsTests {
         #expect(first["displayTitle"] == .string(LibraryEntryDisplay.title(raw: "audio", createdAt: created)))
     }
 
+    @Test("listEntries carries the AI title and summary, null when absent")
+    func listEntriesCarriesCardMetadata() async throws {
+        let (model, server, context, commands) = try makeRig()
+        var withMetadata = ParolaDocument.Manifest(originalAudioName: "talk.m4a", modelName: "stub", language: "it")
+        withMetadata.aiTitle = "Quarterly sync"
+        withMetadata.shortSummary = "Budget review."
+        model.libraryEntries = [
+            LibraryEntry(id: "a", bundleURL: URL(fileURLWithPath: "/tmp/a.parola"), manifest: withMetadata),
+            entry(id: "b", title: "Beta"),
+        ]
+        let command = try #require(commands["listEntries"])
+
+        let result = try await command.handler(try command.validate(AutomationArgs()), context)
+        withExtendedLifetime(server) {}
+
+        guard case .array(let items) = result, case .object(let first) = items[0],
+              case .object(let second) = items[1] else {
+            Issue.record("listEntries should return an array of objects")
+            return
+        }
+        #expect(first["aiTitle"] == .string("Quarterly sync"))
+        #expect(first["shortSummary"] == .string("Budget review."))
+        #expect(second["aiTitle"] == .null)
+        #expect(second["shortSummary"] == .null)
+    }
+
+    @Test("generateCardMetadata writes the AI title and summary using the mock model")
+    func generateCardMetadataWritesFields() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let entry = try await model.library.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 9, text: String(repeating: "vendite per canale ", count: 6))],
+                language: "it", modelName: "m"
+            ),
+            audioSource: nil, category: .transcription
+        )
+        await MockLanguageModelStore.shared.install(
+            provider: .foundation,
+            response: MockLanguageModelResponse(text: "Piano vendite\nRiepilogo delle quote per canale.")
+        )
+        defer { Task { await MockLanguageModelStore.shared.clear() } }
+        let command = try #require(commands["generateCardMetadata"])
+
+        let result = try await command.handler(try command.validate(AutomationArgs(["id": .string(entry.id)])), context)
+        withExtendedLifetime(server) {}
+
+        guard case .object(let fields) = result else {
+            Issue.record("generateCardMetadata should return an object")
+            return
+        }
+        #expect(fields["aiTitle"] == .string("Piano vendite"))
+        #expect(fields["shortSummary"] == .string("Riepilogo delle quote per canale."))
+    }
+
     @Test("listDeletedEntries clamps a negative limit to empty instead of trapping")
     func listDeletedEntriesNegativeLimit() async throws {
         let (model, server, context, commands) = try makeRig()

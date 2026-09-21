@@ -7,7 +7,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "listEntries",
                 area: .library,
-                summary: "Lists library entries, optionally filtered by category. Each entry carries id, title (as stored), displayTitle (as the rows show it), category, createdAt, durationSeconds, language and modelName.",
+                summary: "Lists library entries, optionally filtered by category. Each entry carries id, title (as stored), displayTitle (as the rows show it), category, createdAt, durationSeconds, language, modelName, aiTitle and shortSummary.",
                 kind: .sync,
                 args: [
                     .init(name: "limit", kind: .integer, required: false, summary: "Maximum entries to return", defaultValue: .int(50)),
@@ -30,8 +30,30 @@ extension ParolaAutomationServer {
                             "durationSeconds": entry.durationSeconds.map { .double($0) } ?? .null,
                             "language": .string(entry.language),
                             "modelName": .string(entry.modelName),
+                            "aiTitle": entry.aiTitle.map { .string($0) } ?? .null,
+                            "shortSummary": entry.shortSummary.map { .string($0) } ?? .null,
                         ])
                     })
+                }
+            ),
+
+            AutomationCommand(
+                name: "generateCardMetadata",
+                area: .library,
+                summary: "Writes the on-device title and one-line summary for an entry. Needs the AI feature; use installMockLanguageModel in tests.",
+                kind: .mutating,
+                args: [
+                    .init(name: "id", kind: .string(), required: true, summary: "Library entry ID"),
+                ],
+                handler: { args, ctx in
+                    let id = try args.string("id")
+                    let loaded = try await ctx.model.library.load(id)
+                    await ctx.model.generateCardMetadata(for: id, transcript: loaded.document.transcript)
+                    let reloaded = try await ctx.model.library.load(id)
+                    return .object([
+                        "aiTitle": reloaded.entry.aiTitle.map { .string($0) } ?? .null,
+                        "shortSummary": reloaded.entry.shortSummary.map { .string($0) } ?? .null,
+                    ])
                 }
             ),
 
