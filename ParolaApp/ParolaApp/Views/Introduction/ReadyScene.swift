@@ -41,6 +41,7 @@ struct ReadyScene: View {
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true)
+                .animation(DS.Motion.rowState, value: granted)
                 .padding(.top, DS.Spacing.small)
                 .sceneEntrance(order: 2)
             }
@@ -53,6 +54,19 @@ struct ReadyScene: View {
         }
     }
 
+    /// The cards re-equalise height when a grant flips, so the row animates on the set rather than on one card.
+    private var granted: Set<PermissionKind> {
+        Set(Self.permissionRows(features: model.features).filter(isGranted))
+    }
+
+    private func isGranted(_ kind: PermissionKind) -> Bool {
+        switch kind {
+        case .microphone: model.dictationPermissions.microphoneAuthorized
+        case .systemAudio: model.capturePermissions.systemAudioGranted
+        case .accessibility: model.dictationPermissions.accessibilityGranted
+        }
+    }
+
     @ViewBuilder
     private func permissionCard(_ kind: PermissionKind) -> some View {
         switch kind {
@@ -60,7 +74,7 @@ struct ReadyScene: View {
             PermissionCard(
                 title: String(localized: "Microphone"),
                 detail: String(localized: "Captures your voice for recordings and dictation."),
-                granted: model.dictationPermissions.microphoneAuthorized,
+                granted: isGranted(.microphone),
                 axID: "Introduction.Button.GrantMicrophone",
                 action: {
                     if model.dictationPermissions.microphoneUndetermined {
@@ -75,7 +89,7 @@ struct ReadyScene: View {
             PermissionCard(
                 title: String(localized: "System Audio Recording"),
                 detail: String(localized: "Records meetings and anything else your Mac plays."),
-                granted: model.capturePermissions.systemAudioGranted,
+                granted: isGranted(.systemAudio),
                 axID: "Introduction.Button.GrantSystemAudio",
                 action: { model.capturePermissions.requestSystemAudio() },
                 actionLabel: String(localized: "Allow…")
@@ -84,7 +98,7 @@ struct ReadyScene: View {
             PermissionCard(
                 title: String(localized: "Accessibility"),
                 detail: String(localized: "Watches for the dictation hotkey and inserts text where you type."),
-                granted: model.dictationPermissions.accessibilityGranted,
+                granted: isGranted(.accessibility),
                 axID: "Introduction.Button.GrantAccessibility",
                 action: { model.dictationPermissions.openAccessibilitySettings() },
                 actionLabel: String(localized: "Open System Settings…")
