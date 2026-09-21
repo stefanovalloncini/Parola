@@ -4465,17 +4465,6 @@
         }
       }
     },
-    "Hide Live Captions": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nascondi sottotitoli live"
-          }
-        }
-      }
-    },
     "Hide Scratchpad": {
       "extractionState": "manual",
       "localizations": {
@@ -8750,17 +8739,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostra l'introduzione"
-          }
-        }
-      }
-    },
-    "Show Live Captions": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mostra sottotitoli live"
           }
         }
       }

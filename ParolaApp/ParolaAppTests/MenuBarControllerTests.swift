@@ -104,7 +104,7 @@ struct MenuBarItemsTests {
 
         #expect(titles(items) == [
             "Open Parola", "—",
-            "Record Meeting", "Show Live Captions", "Start Dictation", "Open Files…", "—",
+            "Record Meeting", "Start Live Captions", "Start Dictation", "Open Files…", "—",
             "Microphone", "Settings…", "Check for Updates…", "—",
             "Pinned", "Pinned One", "—",
             "Recent", "Recent One", "—",
@@ -154,17 +154,17 @@ struct MenuBarItemsTests {
     func liveCaptionsHiddenWhenFeatureOff() {
         let snapshot = fullSnapshot(captionsShown: false)
         let items = MenuBarController.items(for: snapshot, target: nil)
-        #expect(!titles(items).contains("Show Live Captions"))
-        #expect(!titles(items).contains("Hide Live Captions"))
+        #expect(!titles(items).contains("Start Live Captions"))
+        #expect(!titles(items).contains("Stop Live Captions"))
     }
 
     @Test("Live Captions title follows the active state")
     func captionsTitleByState() {
         let inactive = MenuBarController.items(for: fullSnapshot(captionsActive: false), target: nil)
-        #expect(inactive.first { $0.title.contains("Live Captions") }?.title == "Show Live Captions")
+        #expect(inactive.first { $0.title.contains("Live Captions") }?.title == "Start Live Captions")
 
         let active = MenuBarController.items(for: fullSnapshot(captionsActive: true), target: nil)
-        #expect(active.first { $0.title.contains("Live Captions") }?.title == "Hide Live Captions")
+        #expect(active.first { $0.title.contains("Live Captions") }?.title == "Stop Live Captions")
     }
 
     @Test("Live Captions is disabled with the unavailable reason as its tooltip")

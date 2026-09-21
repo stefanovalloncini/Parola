@@ -262,7 +262,9 @@ final class MenuBarController: NSObject {
     }
 
     private static func liveCaptionsItem(for snapshot: MenuSnapshot, target: AnyObject?) -> NSMenuItem {
-        let title = snapshot.captionsActive ? String(localized: "Hide Live Captions") : String(localized: "Show Live Captions")
+        let title = snapshot.captionsActive
+            ? String(localized: "Stop Live Captions")
+            : String(localized: "Start Live Captions")
         let item = menuItem(title: title, action: #selector(toggleLiveCaptions), target: target)
         if let reason = snapshot.captionsUnavailableReason {
             item.isEnabled = false
@@ -387,11 +389,12 @@ final class MenuBarController: NSObject {
 extension MenuBarController: NSMenuDelegate {
     /// CoreAudio device attach/detach isn't Observation-tracked, so the picker re-scans on open.
     func menuWillOpen(_ menu: NSMenu) {
-        guard let model else { return }
+        guard let model, lastSnapshot?.showsMicrophonePicker == true else { return }
         installMicrophoneSubmenu(devices: lastInputDevices, into: menu, selectedUID: model.inputDeviceUID)
         Task { @MainActor [weak self] in
             guard let self, let model = self.model else { return }
             let devices = AudioDevices.inputDevices()
+            guard devices != self.lastInputDevices else { return }
             self.lastInputDevices = devices
             self.installMicrophoneSubmenu(devices: devices, into: menu, selectedUID: model.inputDeviceUID)
         }
