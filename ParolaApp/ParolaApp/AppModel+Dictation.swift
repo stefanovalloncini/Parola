@@ -376,7 +376,8 @@ extension AppModel {
             triggerPrompts: cachedDictationTriggerPrompts,
             contextProvider: contextProvider,
             contextConfig: contextConfig,
-            language: selectedLanguage
+            language: selectedLanguage,
+            cleanupRunner: dictationCleanupRunner()
         )
         var chain: [any TextPostProcessor] = []
         if dictationStripSelfCorrections {

@@ -309,10 +309,9 @@ struct ChatPane: View {
         displayedHistory = []
         guard let transcript = model.transcript else { return }
         do {
-            let s = try TranscriptChat.makeSession(
+            let s = try await model.makeChatSession(
                 transcript: transcript,
-                history: transcript.chatHistory ?? [],
-                features: model.features
+                history: transcript.chatHistory ?? []
             )
             session = s
             displayedHistory = await s.history

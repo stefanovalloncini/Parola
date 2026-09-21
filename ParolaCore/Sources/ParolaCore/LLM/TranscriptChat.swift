@@ -80,15 +80,42 @@ public enum TranscriptChat {
         }
     }
 
+    /// Chat against a model the caller already built for its own provider choice. The caller owns
+    /// the model's instructions, so a transcript over `budgetTokens` is refused here instead of
+    /// being condensed behind its back.
     public static func makeSession(
         transcript: Transcript,
         history: [ChatMessage] = [],
+        budgetTokens: Int? = nil,
+        features: FeatureSet = .resolve(),
         model: any LanguageModel
-    ) -> TranscriptChatSession {
-        TranscriptChatSession(transcript: transcript, history: history, model: model)
+    ) throws -> TranscriptChatSession {
+        try features.require(.ai)
+        let budget = budgetTokens ?? defaultBudgetTokens
+        guard !usesCondensedContext(for: transcript, budgetTokens: budget) else {
+            throw TranscriptChatSession.FailureReason.notAvailable(
+                "This transcript is too long for the chosen model."
+            )
+        }
+        return TranscriptChatSession(transcript: transcript, history: history, model: model)
     }
 
-    static func systemInstructions(for transcript: Transcript) -> String {
+    /// The prompt ceiling a chat on `choice` can take, so a caller can size the session it asks for.
+    /// Ollama and custom endpoints are sized from the context window Parola asks Ollama for.
+    public static func budgetTokens(for choice: LanguageModelProviderChoice) -> Int {
+        switch choice {
+        case .onDevice:
+            return defaultBudgetTokens
+        case .cloud(let provider, _):
+            return cloudBudgetTokens(for: provider)
+        case .ollama, .custom:
+            return max(defaultBudgetTokens, OllamaLanguageModel.defaultContextTokens - 4096)
+        }
+    }
+
+    /// The system prompt a chat session runs with: the instructions plus the whole transcript,
+    /// one timestamped line per segment. A caller that builds its own model needs these.
+    public static func systemInstructions(for transcript: Transcript) -> String {
         var out = """
         You answer questions about a transcript. Be concise — one or two sentences unless the user asks for more. When you reference a moment from the audio, include its timestamp in MM:SS or HH:MM:SS form.
 

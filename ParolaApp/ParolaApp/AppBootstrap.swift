@@ -16,6 +16,9 @@ struct AppBootstrap: @unchecked Sendable {
     let fileReadDeadline: Duration
     /// Test mode hides the first-run introduction; this flag is how a sandbox asks for it back.
     let showsIntroduction: Bool
+    /// Where API keys are read and written. Left nil, a test-mode launch keeps them in memory and
+    /// a normal launch uses the keychain, so a sandbox never writes into the real one.
+    let apiKeyStore: (any APIKeyStore)?
 
     init(
         mode: Mode,
@@ -28,7 +31,8 @@ struct AppBootstrap: @unchecked Sendable {
         clock: any Clock<Duration> = ContinuousClock(),
         enabledFeaturesOverride: Set<ParolaFeature>? = nil,
         fileReadDeadline: Duration = FileReadDeadline.header,
-        showsIntroduction: Bool = false
+        showsIntroduction: Bool = false,
+        apiKeyStore: (any APIKeyStore)? = nil
     ) {
         self.mode = mode
         self.library = library
@@ -41,6 +45,7 @@ struct AppBootstrap: @unchecked Sendable {
         self.enabledFeaturesOverride = enabledFeaturesOverride
         self.fileReadDeadline = fileReadDeadline
         self.showsIntroduction = showsIntroduction
+        self.apiKeyStore = apiKeyStore
     }
 
     static let normal: AppBootstrap = AppBootstrap(

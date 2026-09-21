@@ -4,6 +4,43 @@ import Testing
 
 @Suite("Summary parser")
 struct SummaryServiceTests {
+    @Test("the injected model maker answers instead of the on-device model")
+    func injectedModelMaker() async throws {
+        let model = MockLanguageModel(scriptedResponses: ["SUMMARY:\nA short recap.\n\nCHAPTERS:\n00:00  Opening lines\n"])
+        let service = SummaryService(makeModel: { _ in model })
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 4, text: "We ship the patch on Friday.")],
+            language: "en",
+            modelName: "stub"
+        )
+
+        let summary = try await service.summarise(transcript)
+
+        #expect(summary.text == "A short recap.")
+        #expect(summary.chapters.map(\.title) == ["Opening lines"])
+        let histories = await model.receivedHistories
+        #expect(histories.count == 1)
+    }
+
+    @Test("the model maker is handed the summary instructions for the options it runs with")
+    func injectedMakerGetsInstructions() async throws {
+        let recorder = InstructionRecorder()
+        let model = MockLanguageModel(scriptedResponses: ["SUMMARY:\nRecap.\n"])
+        let service = SummaryService(makeModel: { instructions in
+            await recorder.record(instructions)
+            return model
+        })
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 4, text: "We ship the patch on Friday.")],
+            language: "en",
+            modelName: "stub"
+        )
+
+        _ = try await service.summarise(transcript, options: SummaryOptions(actionItems: true))
+
+        #expect(await recorder.last?.contains("ACTION ITEMS:") == true)
+    }
+
     @Test("clock parsing handles MM:SS and H:MM:SS")
     func clock() {
         #expect(SummaryService.parseClock("01:30") == 90)
@@ -286,4 +323,9 @@ struct SummaryServiceTests {
         #expect(decoded.summary?.text == "Greeting.")
         #expect(decoded.summary?.chapters.first?.title == "Hello")
     }
+}
+
+private actor InstructionRecorder {
+    private(set) var last: String?
+    func record(_ instructions: String?) { last = instructions }
 }

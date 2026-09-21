@@ -12,6 +12,45 @@ struct TranscriptChatTests {
         )
     }
 
+    @Test("a session built on a given model asks that model")
+    func sessionOnGivenModel() async throws {
+        let model = MockLanguageModel(scriptedResponses: ["From the chosen model"])
+        let chat = try TranscriptChat.makeSession(
+            transcript: makeTranscript(),
+            history: [],
+            budgetTokens: 3500,
+            features: .all,
+            model: model
+        )
+        let assistant = try await chat.ask("Who are you?")
+        #expect(assistant.text == "From the chosen model")
+    }
+
+    @Test("a transcript over the given budget is refused instead of sent whole")
+    func sessionRefusesOverBudget() async {
+        let long = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: String(repeating: "parola ", count: 4000))],
+            language: "it",
+            modelName: "tiny"
+        )
+        #expect(throws: TranscriptChatSession.FailureReason.self) {
+            _ = try TranscriptChat.makeSession(
+                transcript: long,
+                history: [],
+                budgetTokens: 3500,
+                features: .all,
+                model: MockLanguageModel(scriptedResponses: ["never asked"])
+            )
+        }
+    }
+
+    @Test("the budget for a choice follows the model behind it")
+    func budgetPerChoice() {
+        #expect(TranscriptChat.budgetTokens(for: .onDevice) == TranscriptChat.defaultBudgetTokens)
+        #expect(TranscriptChat.budgetTokens(for: .cloud(provider: .openAI, model: "gpt-4o-mini")) > 100_000)
+        #expect(TranscriptChat.budgetTokens(for: .ollama(endpoint: URL(string: "http://127.0.0.1:11434")!, model: "llama3.2:3b")) >= TranscriptChat.defaultBudgetTokens)
+    }
+
     @Test("first ask records user and assistant messages")
     func firstAsk() async throws {
         let model = MockLanguageModel(scriptedResponses: ["Hi there!"])

@@ -515,6 +515,13 @@ final class AppModel {
         didSet { saveAutoExportRules() }
     }
 
+    // MARK: - AI services
+
+    /// Written only through `setAIServices(_:)`.
+    var aiServices: [AIServiceConfig] = []
+    /// Written only through `setLanguageModelSelection(_:)`.
+    var languageModelSelection: LanguageModelSelection = .onDevice
+
     // MARK: - Send To
 
     /// Written only through `setDestinations(_:)`.
@@ -731,6 +738,7 @@ final class AppModel {
         isReloadingSettings = true
         readPersistedSettings()
         loadAutoExportRules()
+        loadAIServices()
         loadDestinations()
         loadExportPresets()
         loadBatchExportSelection()
@@ -1349,17 +1357,24 @@ final class AppModel {
     @ObservationIgnored let filePicker: FilePicker
     @ObservationIgnored let mode: AppBootstrap.Mode
     @ObservationIgnored let clock: any Clock<Duration>
+    @ObservationIgnored let managedConfiguration: ManagedConfiguration
+    @ObservationIgnored let apiKeyStore: any APIKeyStore
 
     // MARK: - Bootstrap
 
     init(bootstrap: AppBootstrap) {
         let defaults = bootstrap.defaults
         self.defaults = defaults
+        let managed = ManagedConfiguration(storage: defaults)
+        self.managedConfiguration = managed
+        // A sandbox or a test must never reach the real keychain, so test mode keeps keys in memory.
+        self.apiKeyStore = bootstrap.apiKeyStore
+            ?? (bootstrap.mode == .test ? InMemoryAPIKeyStore() : KeychainAPIKeyStore.shared)
         self.features = bootstrap.enabledFeaturesOverride.map(FeatureSet.init(enabled:))
-            ?? FeatureSet.resolve(managed: ManagedConfiguration(storage: defaults))
+            ?? FeatureSet.resolve(managed: managed)
         let engineChoices = IntroductionEngineChoices.compute(
             catalog: ModelCatalog.all,
-            managed: ManagedConfiguration(storage: defaults),
+            managed: managed,
             isInstalled: { ModelStore.shared.isInstalled($0) }
         )
         self.introduction = IntroductionController(
@@ -1393,6 +1408,7 @@ final class AppModel {
         isReloadingSettings = false
         applyTheme()
         loadAutoExportRules()
+        loadAIServices()
         loadDestinations()
         // Built here, not on first send: its init reloads the queue from disk and re-arms the
         // timers, so a delivery queued by an earlier launch does not wait for an unrelated send.
@@ -1475,7 +1491,8 @@ final class AppModel {
         defaults: UserDefaults = .standard,
         filePicker: FilePicker = SystemFilePicker(),
         libraryURL: URL? = nil,
-        features: Set<ParolaFeature>? = nil
+        features: Set<ParolaFeature>? = nil,
+        apiKeyStore: (any APIKeyStore)? = nil
     ) {
         let sideEffects: Set<BootstrapSideEffect> = skipBootstrap ? [] : BootstrapSideEffect.all
         let bootstrap = AppBootstrap(
@@ -1484,7 +1501,9 @@ final class AppModel {
             defaultsOverride: defaults,
             sideEffects: sideEffects,
             filePicker: filePicker,
-            enabledFeaturesOverride: features
+            enabledFeaturesOverride: features,
+            // A test that skips bootstrap must not reach the real keychain either.
+            apiKeyStore: apiKeyStore ?? (skipBootstrap ? InMemoryAPIKeyStore() : nil)
         )
         self.init(bootstrap: bootstrap)
     }
@@ -3266,7 +3285,14 @@ final class AppModel {
         let snapshot = transcript
         let entryID = selectedEntryID
         let artifacts = derivedArtifactsGeneration
-        let summarise = summariseOperation ?? { [features] in try await SummaryService(features: features).summarise($0, options: $1) }
+        let makeModel = summaryModelMaker()
+        let summarise = summariseOperation ?? { [features] transcript, options in
+            guard let makeModel else {
+                return try await SummaryService(features: features).summarise(transcript, options: options)
+            }
+            return try await SummaryService(features: features, makeModel: makeModel)
+                .summarise(transcript, options: options)
+        }
         Task { [weak self] in
             do {
                 let summary = try await summarise(snapshot, resolvedOptions)

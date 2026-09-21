@@ -23,12 +23,27 @@ public actor SummaryService {
 
     private let budgetTokens: Int
     private let features: FeatureSet
+    /// nil means Apple's on-device model, the only path that can answer in Generable form.
+    private let makeModel: (@Sendable (String?) async throws -> any LanguageModel)?
 
     /// The budget is the prompt-token ceiling (bytes/4 estimate); transcripts over it are
     /// summarised per time-window and reduced. The default fits Apple's 4096-token context.
     public init(budgetTokens: Int = SummaryService.defaultBudgetTokens, features: FeatureSet = .resolve()) {
         self.budgetTokens = budgetTokens
         self.features = features
+        self.makeModel = nil
+    }
+
+    /// Summarises through the model `makeModel` builds for the instructions it is handed, instead
+    /// of Apple's on-device model.
+    public init(
+        budgetTokens: Int = SummaryService.defaultBudgetTokens,
+        features: FeatureSet = .resolve(),
+        makeModel: @escaping @Sendable (String?) async throws -> any LanguageModel
+    ) {
+        self.budgetTokens = budgetTokens
+        self.features = features
+        self.makeModel = makeModel
     }
 
     public func summarise(_ transcript: Transcript) async throws -> Summary {
@@ -40,7 +55,8 @@ public actor SummaryService {
         #if canImport(FoundationModels)
         // The structured path talks to FoundationModels directly, so it can't see an installed
         // mock — route mocked runs through the text path, which resolves models via the factory.
-        if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
+        if makeModel == nil,
+           #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
            await MockLanguageModelStore.shared.resolve(for: .foundation) == nil {
             return try await summariseStructured(transcript, options: options)
         }
@@ -88,7 +104,13 @@ public actor SummaryService {
     }
 
     private func summariseText(_ transcript: Transcript, options: SummaryOptions) async throws -> Summary {
-        let model = try await LanguageModelFactory.makeOnDevice(instructions: SummaryService.textInstructions(for: options))
+        let instructions = SummaryService.textInstructions(for: options)
+        let model: any LanguageModel
+        if let makeModel {
+            model = try await makeModel(instructions)
+        } else {
+            model = try await LanguageModelFactory.makeOnDevice(instructions: instructions)
+        }
         return try await summarise(transcript, model: model, options: options)
     }
 
