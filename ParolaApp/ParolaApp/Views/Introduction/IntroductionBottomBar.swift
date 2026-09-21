@@ -29,12 +29,12 @@ struct IntroductionBottomBar: View {
             if let secondary = Self.secondaryAction(for: introduction.step) {
                 secondaryButton(secondary)
             }
-            Button(primaryTitle(introduction.step)) {
+            Button(Self.primaryTitle(introduction.step)) {
                 if introduction.isLastStep { introduction.finish() } else { model.advanceIntroduction() }
             }
             .buttonStyle(DSPillButtonStyle(kind: .primary, size: .regular))
             .keyboardShortcut(.defaultAction)
-            .axLeaf("Introduction.Button.\(primaryRole(introduction.step))")
+            .axLeaf("Introduction.Button.\(Self.primaryRole(introduction.step))")
         }
         .frame(maxWidth: .infinity)
     }
@@ -52,7 +52,7 @@ struct IntroductionBottomBar: View {
         }
     }
 
-    private func primaryTitle(_ step: IntroductionStep) -> LocalizedStringKey {
+    nonisolated static func primaryTitle(_ step: IntroductionStep) -> LocalizedStringKey {
         switch step {
         case .hello: "Begin"
         case .ready: "Open Parola"
@@ -60,7 +60,8 @@ struct IntroductionBottomBar: View {
         }
     }
 
-    private func primaryRole(_ step: IntroductionStep) -> String {
+    /// The tail of the primary button's ax leaf; `Introduction.Button.Finish` has no other source.
+    nonisolated static func primaryRole(_ step: IntroductionStep) -> String {
         switch step {
         case .hello: "Begin"
         case .ready: "Finish"
