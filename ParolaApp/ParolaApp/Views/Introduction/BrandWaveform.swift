@@ -21,6 +21,12 @@ struct BrandWaveform: View {
     /// Settling back to the icon is a beat of its own, slower than tracking the next sample.
     private static let settleEase: Double = 0.25
 
+    /// How many levels a drive has to carry, taken from the icon so the mark and the meter cannot disagree.
+    nonisolated static let barCount = AppIconArtwork.barFractions.count
+
+    /// How far behind the middle each bar out from it runs, so the mark ripples outward from the centre.
+    nonisolated static let levelLagPerBar: Double = 0.05
+
     /// A level's share of a bar's full height, with a floor so a silent mark is still the app's mark.
     nonisolated static func scale(level: Float) -> CGFloat {
         let value = Double(level)
