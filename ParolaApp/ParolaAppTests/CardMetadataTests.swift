@@ -7,8 +7,8 @@ import ParolaTestSupport
 @MainActor
 @Suite("Card metadata generation", .serialized)
 struct CardMetadataTests {
-    private func makeModel(_ defaults: UserDefaults? = nil) -> AppModel {
-        AppModel(skipBootstrap: true, defaults: defaults ?? temporaryDefaults(), libraryURL: makeTempLibraryURL("cardmetadata"))
+    private func makeModel(_ defaults: UserDefaults) -> AppModel {
+        AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("cardmetadata"))
     }
 
     @Test("defaults: generation and both display toggles are on")
@@ -22,24 +22,48 @@ struct CardMetadataTests {
     @Test("a finished transcript gets an AI title and summary from the mock model")
     func generatesOnCompletion() async throws {
         await MockLanguageModelStore.shared.install(provider: .foundation, response: MockLanguageModelResponse(text: "Piano vendite\nRiepilogo delle quote per canale."))
-        defer { Task { await MockLanguageModelStore.shared.clear() } }
         let model = makeModel(temporaryDefaults())
         let entry = try await model.library.add(transcript: longTranscript(), audioSource: nil, category: .transcription, source: .file)
         await model.generateCardMetadata(for: entry.id, transcript: longTranscript())
         let reloaded = try #require(model.libraryEntry(id: entry.id))
         #expect(reloaded.aiTitle == "Piano vendite")
         #expect(reloaded.shortSummary == "Riepilogo delle quote per canale.")
+        await MockLanguageModelStore.shared.clear()
     }
 
     @Test("generation is skipped when the toggle is off")
     func skippedWhenOff() async throws {
         await MockLanguageModelStore.shared.install(provider: .foundation, response: MockLanguageModelResponse(text: "T\nS"))
-        defer { Task { await MockLanguageModelStore.shared.clear() } }
         let model = makeModel(temporaryDefaults())
         model.generatesCardMetadata = false
         let entry = try await model.library.add(transcript: longTranscript(), audioSource: nil, category: .transcription, source: .file)
         await model.generateCardMetadata(for: entry.id, transcript: longTranscript())
-        #expect(model.libraryEntry(id: entry.id)?.aiTitle == nil)
+        let stored = try await model.library.load(entry.id)
+        #expect(stored.entry.aiTitle == nil)
+        #expect(stored.entry.shortSummary == nil)
+        await MockLanguageModelStore.shared.clear()
+    }
+
+    @Test("regenerateCardMetadata bypasses the generation toggle")
+    func regenerateBypassesToggle() async throws {
+        await MockLanguageModelStore.shared.install(provider: .foundation, response: MockLanguageModelResponse(text: "Piano vendite\nRiepilogo delle quote per canale."))
+        let model = makeModel(temporaryDefaults())
+        model.generatesCardMetadata = false
+        let entry = try await model.library.add(transcript: longTranscript(), audioSource: nil, category: .transcription, source: .file)
+        model.selectedEntryID = entry.id
+        model.transcript = longTranscript()
+
+        model.regenerateCardMetadata()
+        var written = false
+        for _ in 0..<200 {
+            if try await model.library.load(entry.id).entry.aiTitle != nil { written = true; break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(written)
+        let reloaded = try await model.library.load(entry.id).entry
+        #expect(reloaded.aiTitle == "Piano vendite")
+        #expect(reloaded.shortSummary == "Riepilogo delle quote per canale.")
+        await MockLanguageModelStore.shared.clear()
     }
 
     @Test("toggling AI titles bumps the library version so rows redraw")
@@ -48,6 +72,13 @@ struct CardMetadataTests {
         let before = model.libraryVersion
         model.showAITitles = false
         #expect(model.libraryVersion == before + 1)
+    }
+
+    @Test("blank custom prompts trim to nil so the built-in instructions are used")
+    func resolvedPromptTrimsBlankToNil() {
+        #expect(AppModel.resolvedPrompt("") == nil)
+        #expect(AppModel.resolvedPrompt("   \n\t ") == nil)
+        #expect(AppModel.resolvedPrompt("  Mention the client's name.  ") == "  Mention the client's name.  ")
     }
 
     private func longTranscript() -> Transcript {

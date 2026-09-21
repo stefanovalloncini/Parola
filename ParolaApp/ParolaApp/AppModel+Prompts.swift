@@ -168,30 +168,43 @@ extension AppModel {
         persistChapters([])
     }
 
-    /// Writes the card title and one-line summary for a saved entry. Best-effort: failures only log.
-    func generateCardMetadata(for id: LibraryEntry.ID, transcript: Transcript) async {
-        guard generatesCardMetadata, features.isEnabled(.ai) else { return }
+    /// Writes the card title and one-line summary for a saved entry, honoring the generation toggle.
+    /// Best-effort: failures only log. Returns the written metadata, or nil when skipped or failed.
+    @discardableResult
+    func generateCardMetadata(for id: LibraryEntry.ID, transcript: Transcript) async -> CardMetadata? {
+        guard generatesCardMetadata else { return nil }
+        return await writeCardMetadata(for: id, transcript: transcript)
+    }
+
+    /// An explicit user request from the Info inspector: bypasses the generation toggle, still needs the AI feature.
+    func regenerateCardMetadata() {
+        guard let id = selectedEntryID, let transcript else { return }
+        Task { [weak self] in await self?.writeCardMetadata(for: id, transcript: transcript) }
+    }
+
+    /// Blank custom prompts fall back to the built-in instructions instead of being sent as empty text.
+    static func resolvedPrompt(_ raw: String) -> String? {
+        raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : raw
+    }
+
+    @discardableResult
+    private func writeCardMetadata(for id: LibraryEntry.ID, transcript: Transcript) async -> CardMetadata? {
+        guard features.isEnabled(.ai) else { return nil }
         let prompts = CardMetadataPrompts(
-            title: customTitlePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : customTitlePrompt,
-            summary: customSummaryPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : customSummaryPrompt
+            title: Self.resolvedPrompt(customTitlePrompt),
+            summary: Self.resolvedPrompt(customSummaryPrompt)
         )
         do {
             let meta = try await CardMetadataService.generate(for: transcript, prompts: prompts, features: features)
             try await library.setCardMetadata(aiTitle: meta.title, shortSummary: meta.summary, for: id)
-            // refreshLibrary() is fire-and-forget elsewhere; awaited here so the card the caller
-            // just wrote is visible in libraryEntries before generateCardMetadata returns.
-            refreshLibrary()
-            await libraryRefreshTask?.value
+            await refreshLibraryAndWait()
+            return meta
         } catch CardMetadataService.Failure.tooShort {
-            return
+            return nil
         } catch {
             ParolaLog.notice(.ai, "card metadata skipped", [.error: .error(error)])
+            return nil
         }
-    }
-
-    func regenerateCardMetadata() {
-        guard let id = selectedEntryID, let transcript else { return }
-        Task { [weak self] in await self?.generateCardMetadata(for: id, transcript: transcript) }
     }
 
     func generateYouTubeChapters() {

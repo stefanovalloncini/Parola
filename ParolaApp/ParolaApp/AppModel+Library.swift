@@ -81,6 +81,12 @@ extension AppModel {
         }
     }
 
+    /// `refreshLibrary()` is fire-and-forget; this awaits the scan so a caller sees `libraryEntries` updated before it returns.
+    func refreshLibraryAndWait() async {
+        refreshLibrary()
+        await libraryRefreshTask?.value
+    }
+
     /// Rows quote a transcript's first lines; the index is the only place that text is already in memory.
     func refreshLibraryExcerpts() {
         libraryExcerptsTask?.cancel()
