@@ -3,8 +3,6 @@ import ParolaCore
 
 struct FeaturesScene: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var hasAppeared = false
 
     static func rows(features: FeatureSet) -> [FeatureRow.Item] {
         var items = [
@@ -56,7 +54,6 @@ struct FeaturesScene: View {
             grid
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .onAppear { hasAppeared = true }
     }
 
     private var grid: some View {
@@ -71,9 +68,7 @@ struct FeaturesScene: View {
                     ForEach(indices, id: \.self) { index in
                         FeatureCard(item: items[index], hotkeyName: hotkeyName)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .opacity(isShown ? 1 : 0)
-                            .offset(x: isShown ? 0 : -32)
-                            .animation(entrance(card: index), value: hasAppeared)
+                            .sceneEntrance(order: 2 + index)
                     }
                     if indices.count == 1 {
                         Color.clear
@@ -84,13 +79,6 @@ struct FeaturesScene: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
-    }
-
-    private var isShown: Bool { hasAppeared || reduceMotion }
-
-    private func entrance(card: Int) -> Animation? {
-        guard !reduceMotion else { return nil }
-        return .spring(response: 0.5, dampingFraction: 0.85).delay(Double(card) * 0.08)
     }
 }
 
