@@ -215,7 +215,10 @@ struct CaptionsFrame: Equatable {
         let arrived = phase < FeatureVignettePhase.resetSpan
             ? 1
             : FeatureVignettePhase.ease(FeatureVignettePhase.ramp(phase, from: Self.captionFrom, span: Self.arrival))
-        caption = phase < FeatureVignettePhase.resetSpan ? FeatureVignettePhase.clearing(phase) : arrived
+        // The real panel swaps its two states instantly, so the opacity takes the short fade and only the rise is eased.
+        caption = phase < FeatureVignettePhase.resetSpan
+            ? FeatureVignettePhase.clearing(phase)
+            : FeatureVignettePhase.ramp(phase, from: Self.captionFrom, span: Self.fade)
         captionOffset = 3 * (1 - arrived)
     }
 }

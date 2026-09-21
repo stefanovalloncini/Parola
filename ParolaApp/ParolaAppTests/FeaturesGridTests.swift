@@ -108,6 +108,16 @@ struct FeaturesGridTests {
         #expect(CaptionsFrame(phase: 0.25).caption == 0)
     }
 
+    @Test("the captions panel is never blank for more than a frame")
+    func captionsPanelStaysLegible() {
+        let frames = Int((FeatureVignettePhase.period / FeatureVignettePhase.frameInterval).rounded())
+        let blank = (0..<frames)
+            .map { CaptionsFrame(phase: Double($0) / Double(frames)) }
+            .filter { max($0.listening, $0.caption) < 0.1 }
+        // One handover each way, each allowed a single frame at the zero crossing the no-overlap rule forces.
+        #expect(blank.count <= 2)
+    }
+
     @Test("the dictated phrase lands by the end of the hold, whatever its word count")
     func wordStrideFollowsTheWordCount() {
         for count in 1...6 {
