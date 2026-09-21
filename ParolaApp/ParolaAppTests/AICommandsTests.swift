@@ -8,14 +8,17 @@ import ParolaTestSupport
 @Suite("Bridge AI commands", .serialized)
 struct AICommandsTests {
 
-    private func makeRig() throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
+    private func makeRig(
+        mode: AppBootstrap.Mode = .test,
+        features: Set<ParolaFeature> = Set(ParolaFeature.allCases)
+    ) throws -> (AppModel, ParolaAutomationServer, AutomationContext, [String: AutomationCommand]) {
         let bootstrap = AppBootstrap(
-            mode: .test,
+            mode: mode,
             library: makeTempLibraryURL("aicommands"),
             defaultsOverride: temporaryDefaults(),
             sideEffects: [],
             filePicker: SystemFilePicker(),
-            enabledFeaturesOverride: Set(ParolaFeature.allCases),
+            enabledFeaturesOverride: features,
             apiKeyStore: InMemoryAPIKeyStore()
         )
         let model = AppModel(bootstrap: bootstrap)
@@ -98,26 +101,91 @@ struct AICommandsTests {
         withExtendedLifetime(server) {}
     }
 
+    /// Installs the mocks, runs the body, and clears them whether the body returns or throws.
+    private func withMocks<T>(
+        _ responses: [MockLanguageModelStore.Provider: String],
+        _ body: () async throws -> T
+    ) async throws -> T {
+        await MockLanguageModelStore.shared.clear()
+        for (provider, text) in responses {
+            await MockLanguageModelStore.shared.install(
+                provider: provider,
+                response: MockLanguageModelResponse(text: text)
+            )
+        }
+        do {
+            let value = try await body()
+            await MockLanguageModelStore.shared.clear()
+            return value
+        } catch {
+            await MockLanguageModelStore.shared.clear()
+            throw error
+        }
+    }
+
     @Test("testAIService reports the mocked reply and how long it took")
     func testService() async throws {
-        await MockLanguageModelStore.shared.clear()
-        await MockLanguageModelStore.shared.install(
-            provider: .openAI,
-            response: MockLanguageModelResponse(text: "OK")
-        )
-        let (_, server, context, commands) = try makeRig()
-        let id = UUID()
-        _ = try await run(commands, "setAIServices", ["services": .array([service(id: id)])], context)
+        try await withMocks([.openAI: "OK"]) {
+            let (_, server, context, commands) = try makeRig()
+            let id = UUID()
+            _ = try await run(commands, "setAIServices", ["services": .array([service(id: id)])], context)
 
-        let reply = try await run(commands, "testAIService", ["id": .string(id.uuidString)], context)
+            let reply = try await run(commands, "testAIService", ["id": .string(id.uuidString)], context)
 
-        #expect(try field(reply, "ok") == .bool(true))
-        #expect(try field(reply, "message") == .string("OK"))
-        guard case .int = try field(reply, "ms") else {
-            Issue.record("expected a round-trip time")
-            return
+            #expect(try field(reply, "ok") == .bool(true))
+            #expect(try field(reply, "message") == .string("OK"))
+            guard case .int = try field(reply, "ms") else {
+                Issue.record("expected a round-trip time")
+                return
+            }
+            withExtendedLifetime(server) {}
         }
-        await MockLanguageModelStore.shared.clear()
+    }
+
+    @Test("a key handed over outside test mode is refused, not quietly dropped")
+    func apiKeyOutsideTestModeIsRefused() async throws {
+        let (model, server, context, commands) = try makeRig(mode: .normal)
+
+        await #expect(throws: AutomationError.self) {
+            _ = try await run(commands, "setAIServices", ["services": .array([service(apiKey: "sk-secret-value")])], context)
+        }
+        #expect(model.aiServices.isEmpty)
+        withExtendedLifetime(server) {}
+    }
+
+    @Test("a custom service with no endpoint is refused")
+    func customWithoutEndpointIsRefused() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let row = AutomationValue.object([
+            "id": .string(UUID().uuidString),
+            "kind": .string("custom"),
+            "name": .string("My server"),
+            "model": .string("m"),
+        ])
+
+        await #expect(throws: AutomationError.self) {
+            _ = try await run(commands, "setAIServices", ["services": .array([row])], context)
+        }
+        #expect(model.aiServices.isEmpty)
+        withExtendedLifetime(server) {}
+    }
+
+    @Test("with the AI feature off the setters fail loudly instead of doing nothing")
+    func featureOffIsRefused() async throws {
+        let (model, server, context, commands) = try makeRig(features: [])
+
+        await #expect(throws: AutomationError.self) {
+            _ = try await run(commands, "setAIServices", ["services": .array([service()])], context)
+        }
+        await #expect(throws: AutomationError.self) {
+            _ = try await run(
+                commands,
+                "setLanguageModelSelection",
+                ["selection": .object(["choices": .object([:])])],
+                context
+            )
+        }
+        #expect(model.aiServices.isEmpty)
         withExtendedLifetime(server) {}
     }
 

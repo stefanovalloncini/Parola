@@ -13,6 +13,7 @@ extension ParolaAutomationServer {
                     .init(name: "services", kind: .any, required: true, summary: "Array of AI service rows"),
                 ],
                 handler: { args, ctx in
+                    try ctx.require(.ai)
                     guard case .array(let raw)? = args.rawValue("services") else {
                         throw AutomationError.invalidArgs(field: "services", reason: "must be an array of services")
                     }
@@ -21,8 +22,17 @@ extension ParolaAutomationServer {
                           let decoded = try? JSONDecoder().decode([AIServiceConfig].self, from: data) else {
                         throw AutomationError.invalidArgs(field: "services", reason: "could not decode the given services")
                     }
+                    if ctx.model.mode != .test, raw.contains(where: { Self.carriesAPIKey($0) }) {
+                        throw AutomationError.invalidArgs(field: "services", reason: "apiKey is test-mode only")
+                    }
+                    if let broken = decoded.first(where: { $0.kind == .custom && $0.endpoint == nil }) {
+                        throw AutomationError.invalidArgs(
+                            field: "services",
+                            reason: "a custom service needs an endpoint (\(broken.name))"
+                        )
+                    }
                     ctx.model.setAIServices(decoded)
-                    try await Self.storeTestKeys(from: raw, services: decoded, model: ctx.model)
+                    await Self.storeTestKeys(from: raw, services: decoded, model: ctx.model)
                     return .object(["aiServices": ParolaAutomationServer.aiServicesState(ctx.model)])
                 }
             ),
@@ -36,6 +46,7 @@ extension ParolaAutomationServer {
                     .init(name: "selection", kind: .object, required: true, summary: "LanguageModelSelection JSON"),
                 ],
                 handler: { args, ctx in
+                    try ctx.require(.ai)
                     guard let raw = args.rawValue("selection") else {
                         throw AutomationError.invalidArgs(field: "selection", reason: "must be a selection object")
                     }
@@ -59,6 +70,7 @@ extension ParolaAutomationServer {
                     .init(name: "id", kind: .string(), required: true, summary: "Service id from getState.aiServices"),
                 ],
                 handler: { args, ctx in
+                    try ctx.require(.ai)
                     let raw = try args.string("id")
                     guard let id = UUID(uuidString: raw) else {
                         throw AutomationError.invalidArgs(field: "id", reason: "must be a UUID")
@@ -76,13 +88,18 @@ extension ParolaAutomationServer {
         ]
     }
 
+    static func carriesAPIKey(_ value: AutomationValue) -> Bool {
+        guard case .object(let fields) = value, case .string(let key)? = fields["apiKey"] else { return false }
+        return !key.isEmpty
+    }
+
     /// Test mode lets a script hand over a key with the row so a cloud service can be exercised
     /// without the keychain; the key goes to the in-memory store and is never echoed back.
     private static func storeTestKeys(
         from raw: [AutomationValue],
         services: [AIServiceConfig],
         model: AppModel
-    ) async throws {
+    ) async {
         guard model.mode == .test else { return }
         var written: Set<UUID> = []
         for (value, service) in zip(raw, services) {
