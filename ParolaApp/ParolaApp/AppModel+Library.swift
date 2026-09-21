@@ -439,12 +439,16 @@ extension AppModel {
         showList()
     }
 
-    /// Results outrank every list, so a row that picks one has to retire the query that would mask it.
-    private func showList() {
+    /// Results outrank every list, so anything that leaves one has to retire the query that would mask it.
+    func leaveList(keepingTranscript: Bool) {
         clearSearch()
         forgetLibraryOrigin()
+        if !keepingTranscript { closeTranscript() }
+    }
+
+    private func showList() {
+        leaveList(keepingTranscript: false)
         route = .transcript
-        closeTranscript()
     }
 
     func forgetLibraryOrigin() {
@@ -496,15 +500,27 @@ extension AppModel {
     }
 
     func openStatistics() {
-        libraryFilter = nil
-        libraryBrowsingAll = false
-        route = .statistics
+        openPage(.statistics, keepingTranscript: false)
     }
 
     func openRecentlyDeleted() {
+        openPage(.recentlyDeleted, keepingTranscript: false)
+    }
+
+    /// A batch writes `route` itself while one is running, so stepping in from the sidebar leaves what is loaded alone.
+    func openQueue() {
+        openPage(.queue, keepingTranscript: true)
+    }
+
+    func openBatch() {
+        openPage(.batch, keepingTranscript: true)
+    }
+
+    private func openPage(_ page: Route, keepingTranscript: Bool) {
+        leaveList(keepingTranscript: keepingTranscript)
         libraryFilter = nil
         libraryBrowsingAll = false
-        route = .recentlyDeleted
+        route = page
     }
 
     /// Home is the stand-in destination until routes remember where they were opened from.

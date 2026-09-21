@@ -86,9 +86,7 @@ struct MacLibrarySidebar: View {
                             isSelected: selectedRoute == .queue,
                             badge: activeQueueBadge
                         ) {
-                            model.libraryFilter = nil
-                            model.libraryBrowsingAll = false
-                            model.route = .queue
+                            model.openQueue()
                         }
                         .accessibilityIdentifier("library.queue")
                         .axLeaf("Sidebar.Button.Queue")
@@ -98,9 +96,7 @@ struct MacLibrarySidebar: View {
                             systemImage: "square.stack.3d.up",
                             isSelected: selectedRoute == .batch
                         ) {
-                            model.libraryFilter = nil
-                            model.libraryBrowsingAll = false
-                            model.route = .batch
+                            model.openBatch()
                         }
                         .accessibilityIdentifier("library.batch")
                         .axLeaf("Sidebar.Button.Batch")

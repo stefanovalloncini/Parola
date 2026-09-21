@@ -541,6 +541,33 @@ struct AppModelLibraryTests {
         #expect(model.searchResults == nil)
     }
 
+    /// A page takes the whole content area, so a query left live behind it is a result set nobody can see.
+    @Test("every sidebar destination retires the query behind it")
+    func destinationsRetireTheQuery() {
+        let destinations: [(String, AppModel.Route, (AppModel) -> Void)] = [
+            ("Home", .transcript, { $0.goHome() }),
+            ("All", .transcript, { $0.browseAll() }),
+            ("a category", .transcript, { $0.browseCategory(.meeting) }),
+            ("Queue", .queue, { $0.openQueue() }),
+            ("Batch", .batch, { $0.openBatch() }),
+            ("Statistics", .statistics, { $0.openStatistics() }),
+            ("Recently Deleted", .recentlyDeleted, { $0.openRecentlyDeleted() }),
+        ]
+        for (name, route, open) in destinations {
+            let model = makeModel()
+            model.searchQuery = "bianchi"
+            model.searchResults = [Self.entry(id: "a", title: "A", createdAt: Self.baseDate)]
+            model.libraryOrigin = .search
+
+            open(model)
+
+            #expect(model.route == route, "\(name)")
+            #expect(model.searchQuery.isEmpty, "\(name)")
+            #expect(model.searchResults == nil, "\(name)")
+            #expect(model.libraryOrigin == nil, "\(name)")
+        }
+    }
+
     @Test("LibrarySortOrder exposes a label for every case")
     func sortOrderLabels() {
         for order in LibrarySortOrder.allCases {
