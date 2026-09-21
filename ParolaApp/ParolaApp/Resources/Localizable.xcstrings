@@ -5947,6 +5947,17 @@
         }
       }
     },
+    "Newest first": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dal più recente"
+          }
+        }
+      }
+    },
     "Next match": {
       "extractionState": "manual",
       "localizations": {
@@ -6546,6 +6557,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Meno recenti"
+          }
+        }
+      }
+    },
+    "Oldest first": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dal meno recente"
           }
         }
       }

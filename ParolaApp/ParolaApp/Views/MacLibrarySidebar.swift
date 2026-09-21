@@ -147,7 +147,7 @@ struct MacLibrarySidebar: View {
         return Menu {
             Picker("Sort", selection: $model.librarySortOrder) {
                 ForEach(LibrarySortOrder.allCases) { order in
-                    Text(order.label).tag(order)
+                    Text(LocalizedStringKey(order.label)).tag(order)
                 }
             }
         } label: {

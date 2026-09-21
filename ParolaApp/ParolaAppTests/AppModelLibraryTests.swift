@@ -549,6 +549,25 @@ struct AppModelLibraryTests {
         }
     }
 
+    /// The menu renders the label through `LocalizedStringKey`, so a label missing from the catalog ships in English.
+    @Test("every library sort label resolves to Italian")
+    func sortOrderLabelsItalian() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let italian = try #require(Bundle(path: path))
+        let expected: [LibrarySortOrder: String] = [
+            .newest: "Dal più recente",
+            .oldest: "Dal meno recente",
+            .titleAZ: "Titolo A→Z",
+            .titleZA: "Titolo Z→A",
+            .longest: "Dal più grande",
+            .shortest: "Dal più piccolo",
+            .lastOpened: "Ultima apertura",
+        ]
+        for order in LibrarySortOrder.allCases {
+            #expect(italian.localizedString(forKey: order.label, value: "MISSING", table: nil) == expected[order])
+        }
+    }
+
     @Test("LibrarySortOrder cases are all distinct")
     func sortOrderRawsUnique() {
         let raws = LibrarySortOrder.allCases.map(\.rawValue)
