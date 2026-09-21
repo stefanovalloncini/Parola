@@ -134,6 +134,17 @@ extension AppModel {
         libraryEntries = sortedLibraryEntries(libraryEntries)
     }
 
+    /// Keyed once per entry: the displayed title runs a regex, and a comparator would run it per comparison.
+    private func entriesSortedByTitle(_ entries: [LibraryEntry], ascending: Bool) -> [LibraryEntry] {
+        entries
+            .map { (title: LibraryEntryDisplay.title(for: $0), entry: $0) }
+            .sorted {
+                let order = $0.title.localizedCaseInsensitiveCompare($1.title)
+                return ascending ? order == .orderedAscending : order == .orderedDescending
+            }
+            .map(\.entry)
+    }
+
     func sortedLibraryEntries(_ entries: [LibraryEntry]) -> [LibraryEntry] {
         switch librarySortOrder {
         case .newest:
@@ -141,9 +152,9 @@ extension AppModel {
         case .oldest:
             return entries.sorted { $0.createdAt < $1.createdAt }
         case .titleAZ:
-            return entries.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+            return entriesSortedByTitle(entries, ascending: true)
         case .titleZA:
-            return entries.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
+            return entriesSortedByTitle(entries, ascending: false)
         case .longest:
             return entries.sorted { (libraryBundleSizes[$0.id] ?? 0) > (libraryBundleSizes[$1.id] ?? 0) }
         case .shortest:
@@ -336,7 +347,7 @@ extension AppModel {
                 do {
                     let loaded = try await library.load(entry.id)
                     let transcript = loaded.document.transcript
-                    let safe = entry.title.replacingOccurrences(of: "/", with: "-")
+                    let safe = TranscriptShareFile.safeName(for: LibraryEntryDisplay.title(for: entry))
                     var name = safe
                     var suffix = 2
                     while usedNames.contains(name) {

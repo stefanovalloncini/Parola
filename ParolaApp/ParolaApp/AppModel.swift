@@ -3177,7 +3177,7 @@ final class AppModel {
             return
         }
         let notes = entry.segmentNotes
-        let title = entry.title
+        let title = TranscriptShareFile.safeName(for: LibraryEntryDisplay.title(for: entry))
         Task { [weak self] in
             guard let self else { return }
             guard let url = await self.filePicker.chooseSaveDestination(

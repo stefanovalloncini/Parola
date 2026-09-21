@@ -185,7 +185,7 @@ struct MacRecentlyDeletedView: View {
         return rows.filter { row in
             guard categoryFilter.matches(row.entry.category) else { return false }
             guard !q.isEmpty else { return true }
-            if row.entry.title.lowercased().contains(q) { return true }
+            if row.title.lowercased().contains(q) { return true }
             return previews[row.id]?.lowercased().contains(q) ?? false
         }
     }
@@ -201,9 +201,9 @@ struct MacRecentlyDeletedView: View {
                 (lhs.entry.deletedAt ?? .distantFuture) < (rhs.entry.deletedAt ?? .distantFuture)
             }
         case .titleAZ:
-            return filtered.sorted { $0.entry.title.localizedCaseInsensitiveCompare($1.entry.title) == .orderedAscending }
+            return filtered.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
         case .titleZA:
-            return filtered.sorted { $0.entry.title.localizedCaseInsensitiveCompare($1.entry.title) == .orderedDescending }
+            return filtered.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedDescending }
         }
     }
 

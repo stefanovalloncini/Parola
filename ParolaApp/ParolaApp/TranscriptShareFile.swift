@@ -22,10 +22,15 @@ struct TranscriptShareFile: Transferable {
     }
 
     static func fileName(for title: String) -> String {
+        safeName(for: title) + ".txt"
+    }
+
+    /// A title carries the two characters the file system reads as separators, so every export name strips them.
+    static func safeName(for title: String) -> String {
         let cleaned = title
             .replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: ":", with: "-")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        return (cleaned.isEmpty ? "Transcript" : cleaned) + ".txt"
+        return cleaned.isEmpty ? "Transcript" : cleaned
     }
 }

@@ -326,6 +326,19 @@ struct AppModelLibraryTests {
         #expect(sorted == ["b", "a", "c"])
     }
 
+    @Test("title sort keys off the title the row shows, not the stored one")
+    func sortTitleUsesTheDisplayedTitle() {
+        let model = makeModel()
+        model.librarySortOrder = .titleAZ
+
+        let generic = Self.entry(id: "generic", title: "audio", createdAt: Self.baseDate)
+        let sorted = model.sortedLibraryEntries(Self.fixture() + [generic]).map(\.id)
+
+        // "audio" displays as "Recording — …", so it sorts under R, not under a.
+        #expect(sorted.firstIndex(of: "generic") ?? 0 > sorted.firstIndex(of: "b") ?? 0)
+        #expect(LibraryEntryDisplay.title(for: generic) != "audio")
+    }
+
     @Test("titleZA sort is reverse of A→Z")
     func sortTitleZA() {
         let model = makeModel()

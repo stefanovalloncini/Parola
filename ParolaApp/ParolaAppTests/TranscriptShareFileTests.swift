@@ -15,6 +15,13 @@ struct TranscriptShareFileTests {
         #expect(TranscriptShareFile.fileName(for: "a/b: c") == "a-b- c.txt")
     }
 
+    @Test("safeName is the same cleaning without an extension, so other exports can share it")
+    func safeNameStripsTheSameCharacters() {
+        #expect(TranscriptShareFile.safeName(for: "Recording — 21 Sep 2026 at 2:40") == "Recording — 21 Sep 2026 at 2-40")
+        #expect(TranscriptShareFile.safeName(for: "a/b: c") == "a-b- c")
+        #expect(TranscriptShareFile.safeName(for: "   ") == "Transcript")
+    }
+
     @Test("an empty title falls back to Transcript")
     func emptyTitleFallsBack() {
         #expect(TranscriptShareFile.fileName(for: "   ") == "Transcript.txt")
