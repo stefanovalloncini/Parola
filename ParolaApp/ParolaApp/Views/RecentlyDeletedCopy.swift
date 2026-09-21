@@ -30,6 +30,14 @@ enum RecentlyDeletedCopy {
         }
     }
 
+    /// What the page's own search reaches: the title always, and the transcript only where a row has decoded one.
+    static func matches(query: String, title: String, preview: String?) -> Bool {
+        let needle = query.lowercased()
+        guard !needle.isEmpty else { return true }
+        if title.lowercased().contains(needle) { return true }
+        return preview?.lowercased().contains(needle) ?? false
+    }
+
     static func bulkPurgeTitle(_ count: Int, bundle: Bundle = .main) -> String {
         count == 1
             ? String(localized: "Delete 1 item permanently?", bundle: bundle)

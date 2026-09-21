@@ -221,3 +221,28 @@ struct RecentlyDeletedCopyTests {
         RecentlyDeletedCopy.timeLeftLabel(deletedAt: deletedAt, now: now, retentionDays: 30, bundle: bundle)
     }
 }
+
+@Suite("Recently Deleted search")
+struct RecentlyDeletedSearchTests {
+    @Test("a row whose preview never decoded is still reachable by its title")
+    func titleMatchesWithoutAPreview() {
+        #expect(RecentlyDeletedCopy.matches(query: "board", title: "Board meeting", preview: nil))
+        #expect(!RecentlyDeletedCopy.matches(query: "budget", title: "Board meeting", preview: nil))
+    }
+
+    @Test("a decoded preview answers for what the title does not say")
+    func previewMatchesTheTranscript() {
+        #expect(RecentlyDeletedCopy.matches(query: "budget", title: "Board meeting", preview: "we went over the budget"))
+    }
+
+    @Test("the match ignores case on both sides")
+    func matchIgnoresCase() {
+        #expect(RecentlyDeletedCopy.matches(query: "BOARD", title: "Board meeting", preview: nil))
+        #expect(RecentlyDeletedCopy.matches(query: "Budget", title: "Board meeting", preview: "the BUDGET again"))
+    }
+
+    @Test("an empty query keeps every row")
+    func emptyQueryKeepsEverything() {
+        #expect(RecentlyDeletedCopy.matches(query: "", title: "Board meeting", preview: nil))
+    }
+}

@@ -48,6 +48,7 @@ struct MacRecentlyDeletedView: View {
         }
         // One rebuild for the previews that arrived together, not one per row.
         .onChange(of: previews) { recomputeRows() }
+        .task(id: searchText.isEmpty) { await loadPreviewsForSearch() }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)
         .tint(DS.Color.accent)
@@ -182,12 +183,9 @@ struct MacRecentlyDeletedView: View {
     }
 
     private var filtered: [LibraryRowDisplay] {
-        let q = searchText.lowercased()
-        return rows.filter { row in
-            guard categoryFilter.matches(row.entry.category) else { return false }
-            guard !q.isEmpty else { return true }
-            if row.title.lowercased().contains(q) { return true }
-            return previews[row.id]?.lowercased().contains(q) ?? false
+        rows.filter { row in
+            categoryFilter.matches(row.entry.category)
+                && RecentlyDeletedCopy.matches(query: searchText, title: row.title, preview: previews[row.id])
         }
     }
 
@@ -248,11 +246,28 @@ struct MacRecentlyDeletedView: View {
 
     private func loadPreview(for entry: LibraryEntry) async {
         if previews[entry.id] != nil { return }
-        let text = await readTranscriptText(at: entry.bundleURL)
+        previews[entry.id] = Self.preview(of: await readTranscriptText(at: entry.bundleURL))
+    }
+
+    /// Only the rows a filter keeps carry a preview task, so a search has to decode the rows it would otherwise never reach.
+    private func loadPreviewsForSearch() async {
+        guard !searchText.isEmpty else { return }
+        let pending = model.deletedEntries.filter { previews[$0.id] == nil }
+        guard !pending.isEmpty else { return }
+        var decoded: [LibraryEntry.ID: String] = [:]
+        for entry in pending {
+            guard !Task.isCancelled else { return }
+            decoded[entry.id] = Self.preview(of: await readTranscriptText(at: entry.bundleURL))
+        }
+        guard !Task.isCancelled else { return }
+        previews.merge(decoded) { loaded, _ in loaded }
+    }
+
+    private static func preview(of text: String) -> String {
         let trimmed = text
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        previews[entry.id] = trimmed.isEmpty ? "" : String(trimmed.prefix(280))
+        return trimmed.isEmpty ? "" : String(trimmed.prefix(280))
     }
 
     private func recomputeRows() {
