@@ -53,6 +53,16 @@ enum FeatureVignetteKind: CaseIterable {
         default: return nil
         }
     }
+
+    /// Seconds into the loop each kind starts, so the four sketches never clear at the same moment.
+    var phaseOffset: Double {
+        switch self {
+        case .transcribe: return 0
+        case .meetings: return 1.1
+        case .dictation: return 2.2
+        case .captions: return 3.1
+        }
+    }
 }
 
 /// A looping sketch of one feature, sized to sit beside a feature card's text.
@@ -79,7 +89,7 @@ struct FeatureVignette: View {
             still(phase: 1)
         } else {
             TimelineView(.animation(minimumInterval: FeatureVignettePhase.frameInterval, paused: !isOnScreen)) { context in
-                still(phase: FeatureVignettePhase.phase(at: context.date.timeIntervalSinceReferenceDate))
+                still(phase: FeatureVignettePhase.phase(at: context.date.timeIntervalSinceReferenceDate + kind.phaseOffset))
             }
         }
     }

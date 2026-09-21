@@ -116,6 +116,18 @@ struct FeaturesGridTests {
         }
     }
 
+    @Test("no two vignettes reach the same point of the loop together")
+    func loopsAreOffsetFromEachOther() {
+        let offsets = FeatureVignetteKind.allCases.map(\.phaseOffset)
+        #expect(offsets.allSatisfy { $0 >= 0 && $0 < FeatureVignettePhase.period })
+        for (index, offset) in offsets.enumerated() {
+            for other in offsets[(index + 1)...] {
+                let gap = abs(offset - other)
+                #expect(min(gap, FeatureVignettePhase.period - gap) >= 0.8)
+            }
+        }
+    }
+
     @Test("every feature row has a vignette")
     func everyRowHasAVignette() {
         for item in FeaturesScene.rows(features: .all) {
