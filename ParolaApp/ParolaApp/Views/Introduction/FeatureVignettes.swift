@@ -270,7 +270,8 @@ private struct TranscribeVignette: View {
 private struct MeetingVignette: View {
     let frame: MeetingFrame
 
-    private static let detected = String(localized: "Zoom is running")
+    /// The alert's own key with the first known meeting app in it, so the sketch and the alert can never diverge.
+    private static let detected = String(localized: "\("Zoom") is running")
     private static let record = String(localized: "Record")
 
     var body: some View {

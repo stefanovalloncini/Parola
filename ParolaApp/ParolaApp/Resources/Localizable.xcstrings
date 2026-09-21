@@ -11545,17 +11545,6 @@
         }
       }
     },
-    "Zoom is running": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zoom è in esecuzione"
-          }
-        }
-      }
-    },
     "any": {
       "extractionState": "manual",
       "localizations": {
