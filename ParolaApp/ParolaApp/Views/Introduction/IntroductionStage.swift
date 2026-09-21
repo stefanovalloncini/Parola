@@ -17,7 +17,7 @@ struct IntroductionStage: View {
                 // Both sines cross their rest position at zero.
                 mesh(points: Self.points(seconds: 0), colors: colors)
             } else {
-                TimelineView(.animation(minimumInterval: 1.0 / 10.0)) { context in
+                TimelineView(.animation(minimumInterval: 1.0 / 5.0)) { context in
                     mesh(
                         points: Self.points(seconds: context.date.timeIntervalSinceReferenceDate),
                         colors: colors
