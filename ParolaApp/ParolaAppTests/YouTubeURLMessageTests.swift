@@ -18,22 +18,24 @@ struct YouTubeURLMessageTests {
     }
 }
 
-@MainActor
-@Suite("YouTube task lifecycle")
-struct YouTubeTaskLifecycleTests {
-    private func makeModel() -> AppModel {
-        AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("yt"))
-    }
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("YouTube task lifecycle")
+    struct YouTubeTaskLifecycleTests {
+        private func makeModel() -> AppModel {
+            AppModel(skipBootstrap: true, defaults: temporaryDefaults(), libraryURL: makeTempLibraryURL("yt"))
+        }
 
-    @Test("cancelled task leaves the replacement's handle intact")
-    func restartKeepsHandle() async {
-        MockMediaFetcherRegistry.shared.install(URL(fileURLWithPath: "/tmp/missing-\(UUID()).wav"))
-        defer { MockMediaFetcherRegistry.shared.clear() }
-        let model = makeModel()
-        model.transcribeYouTube(urlString: "https://www.youtube.com/watch?v=aaaaaaaaaaa")
-        model.cancelCurrentWork()
-        model.transcribeYouTube(urlString: "https://www.youtube.com/watch?v=bbbbbbbbbbb")
-        for _ in 0..<8 { await Task.yield() }
-        #expect(model.canCancel)
+        @Test("cancelled task leaves the replacement's handle intact")
+        func restartKeepsHandle() async {
+            MockMediaFetcherRegistry.shared.install(URL(fileURLWithPath: "/tmp/missing-\(UUID()).wav"))
+            defer { MockMediaFetcherRegistry.shared.clear() }
+            let model = makeModel()
+            model.transcribeYouTube(urlString: "https://www.youtube.com/watch?v=aaaaaaaaaaa")
+            model.cancelCurrentWork()
+            model.transcribeYouTube(urlString: "https://www.youtube.com/watch?v=bbbbbbbbbbb")
+            for _ in 0..<8 { await Task.yield() }
+            #expect(model.canCancel)
+        }
     }
 }
