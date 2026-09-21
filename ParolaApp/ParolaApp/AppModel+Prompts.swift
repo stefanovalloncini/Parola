@@ -191,12 +191,7 @@ extension AppModel {
         }
     }
 
-    static func sanitizedTitle(_ raw: String) -> String {
-        var title = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let newline = title.firstIndex(of: "\n") { title = String(title[..<newline]) }
-        title = title.trimmingCharacters(in: CharacterSet(charactersIn: "\"'“”.,;: "))
-        return String(title.prefix(80))
-    }
+    static func sanitizedTitle(_ raw: String) -> String { CardMetadata.sanitizedTitle(raw) }
 
     func generateYouTubeChapters() {
         guard features.isEnabled(.ai) else { return }
