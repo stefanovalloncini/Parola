@@ -1026,6 +1026,11 @@ final class AppModel {
     var selectedEntryID: LibraryEntry.ID? {
         didSet { if oldValue != selectedEntryID { transcriptPaneMode = .transcript } }
     }
+
+    // MARK: - Transcript windows
+
+    @ObservationIgnored let entryWindows = EntryWindowRegistry()
+    @ObservationIgnored var openEntryWindowAction: ((LibraryEntry.ID) -> Void)?
     @ObservationIgnored private var libraryEntriesByID: [String: LibraryEntry] = [:]
 
     private func rebuildLibraryIndex() {

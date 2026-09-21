@@ -96,6 +96,7 @@ struct ParolaApp: App {
                 .environment(liveCaptions)
                 .frame(minWidth: MainWindowLayout.minimumWidth, minHeight: MainWindowLayout.minimumHeight)
                 .preferredColorScheme(model.preferredColorScheme)
+                .bindsEntryWindowOpening(to: model)
                 .onAppear {
                     model.liveCaptions = liveCaptions
                     appDelegate.bind(model: model)
@@ -334,6 +335,15 @@ struct ParolaApp: App {
                 .frame(minWidth: 880, idealWidth: 900, maxWidth: .infinity, minHeight: 600, idealHeight: 640, maxHeight: .infinity)
                 .preferredColorScheme(model.preferredColorScheme)
         }
+
+        WindowGroup("Transcript", id: EntryWindowScene.id, for: LibraryEntry.ID.self) { $entryID in
+            EntryWindowView(entryID: entryID)
+                .id(model.themeRevision)
+                .tint(DS.Color.accent)
+                .environment(model)
+                .preferredColorScheme(model.preferredColorScheme)
+        }
+        .defaultSize(width: 900, height: 640)
 
         Window("Mini Player", id: "mini-player") {
             MiniPlayerWindow()
