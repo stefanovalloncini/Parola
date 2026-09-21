@@ -483,6 +483,12 @@ final class AppModel {
 
     @ObservationIgnored let peopleStore: PeopleStore
     var showingSpeakersSheet: Bool = false
+    var showingPeopleSheet: Bool = false
+    /// The people directory, mirrored from the store so views read it without awaiting the actor.
+    var people: [Person] = []
+    /// Which person the library list is filtered to, set from the sidebar, the filter bar or the bridge.
+    var personFilter: UUID?
+    var showMostUsedPeople: Bool = true { didSet { defaults.set(showMostUsedPeople, forKey: "showMostUsedPeople") } }
 
     // MARK: - Prompt library
 
@@ -732,6 +738,7 @@ final class AppModel {
         self.sparkleAutomatic = readBool("sparkleAutomatic", default: true)
         self.liveCaptionsTranslate = defaults.bool(forKey: "liveCaptionsTranslate")
         self.remoteAIAcknowledged = defaults.bool(forKey: "remoteAIAcknowledged")
+        self.showMostUsedPeople = readBool("showMostUsedPeople", default: true)
         introduction.reloadFromDefaults()
     }
 
@@ -752,6 +759,7 @@ final class AppModel {
         isReloadingSettings = false
 
         refreshModelList()
+        Task { await refreshPeople() }
         if themeKeySnapshot() != themeBefore {
             applyTheme()
             themeRevision &+= 1
@@ -1425,6 +1433,7 @@ final class AppModel {
         loadSnippets()
         loadCorrectionRules()
         refreshModelList()
+        Task { await refreshPeople() }
         refreshLibrary()
         restoreBatchQueue()
         loadPendingRecovery()
@@ -3063,7 +3072,11 @@ final class AppModel {
         }
         applyTranscriptEdit(t, actionName: String(localized: "Assign Speaker"), textChanged: false)
         if let speaker, speaker != previous {
-            Task { [peopleStore] in _ = await peopleStore.recordUsage(name: speaker) }
+            Task { [peopleStore] in
+                let person = await peopleStore.recordUsage(name: speaker)
+                await recordSpeakerAssignment(label: speaker, person: person)
+                await refreshPeople()
+            }
         }
     }
 

@@ -20,6 +20,7 @@ struct ContentSheetsModifier: ViewModifier {
                     SpeakersSheet(transcript: transcript)
                 }
             }
+            .sheet(isPresented: $model.showingPeopleSheet) { ManagePeopleSheet() }
             .sheet(isPresented: $model.exportSheetOpen) { ExportSheet() }
             .sheet(isPresented: $model.burnSheetOpen) { BurnStyleSheet() }
             .onChange(of: model.meetingDetectedApp, initial: true) { _, name in

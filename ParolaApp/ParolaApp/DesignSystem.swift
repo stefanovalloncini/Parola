@@ -242,6 +242,14 @@ enum DS {
         }
     }
 
+    /// A label assigned to a person wears that person's colour; an unassigned one keeps its hash.
+    static func speakerColor(for label: String, colorIndex: Int?) -> SwiftUI.Color {
+        guard let colorIndex, speakerPalette.indices.contains(colorIndex) else {
+            return speakerColor(for: label)
+        }
+        return speakerPalette[colorIndex]
+    }
+
     static func speakerColor(for label: String) -> SwiftUI.Color {
         let key = label.trimmingCharacters(in: .whitespacesAndNewlines)
         var hash: UInt64 = 0xcbf29ce484222325

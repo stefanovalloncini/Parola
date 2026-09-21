@@ -16,6 +16,7 @@ struct SegmentCard: View {
     @State private var renamingSpeaker: Bool = false
     @State private var draftSpeakerName: String = ""
     @State private var assigningSpeaker: Bool = false
+    @State private var assigningPerson: Bool = false
     @State private var draftAssignSpeakerName: String = ""
     @State private var editingNote: Bool = false
     @State private var draftNote: String = ""
@@ -69,14 +70,19 @@ struct SegmentCard: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: radius))
         .contentShape(Rectangle())
+        .contextMenu { assignSelectionMenu }
         .draggable(draggablePayload)
         .onHover { hover in
             withAnimation(.easeOut(duration: 0.12)) { hovering = hover }
         }
         // simultaneousGesture: .textSelection consumes plain taps, so a card-level .onTapGesture never fires on text.
         // Skipped while word karaoke shows: its per-word links own the click, and a simultaneous segment seek would race the word seek.
+        // hoveredSpeaker is nil unless the pointer sits on the chip, which is the one place in the
+        // card that opens the popover instead of seeking.
         .simultaneousGesture(TapGesture().onEnded {
-            if !isEditing, !showsWordKaraoke, model.player != nil { model.seek(to: segment) }
+            if !isEditing, !showsWordKaraoke, hoveredSpeaker.wrappedValue == nil, model.player != nil {
+                model.seek(to: segment)
+            }
         })
         .alert("Rename speaker", isPresented: $renamingSpeaker, presenting: segment.speaker) { current in
             TextField("Name", text: $draftSpeakerName)
@@ -145,19 +151,7 @@ struct SegmentCard: View {
     private var speakerLine: some View {
         HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
             if let rawSpeaker = segment.speaker, let speaker = Self.speakerLabel(for: rawSpeaker) {
-                Text(speaker)
-                    .font(DS.Font.bodyStrong)
-                    .foregroundStyle(DS.speakerColor(for: rawSpeaker))
-                    .onHover { hovering in
-                        hoveredSpeaker.wrappedValue = hovering ? rawSpeaker : nil
-                    }
-                    .contextMenu {
-                        Button("Rename \(speaker)…") {
-                            draftSpeakerName = speaker
-                            renamingSpeaker = true
-                        }
-                        assignSpeakerMenu
-                    }
+                speakerChip(raw: rawSpeaker, label: speaker)
             }
             Spacer(minLength: DS.Spacing.small)
             if isFavorite {
@@ -180,6 +174,37 @@ struct SegmentCard: View {
             // A speakerless segment renders no chip, so the timestamp carries the assign menu too.
             .contextMenu { assignSpeakerMenu }
         }
+    }
+
+    private func speakerChip(raw: String, label: String) -> some View {
+        let person = model.person(forSpeaker: raw)
+        return Button {
+            assigningPerson = true
+        } label: {
+            Text(label)
+                .font(DS.Font.bodyStrong)
+                .foregroundStyle(DS.speakerColor(for: raw, colorIndex: person?.colorIndex))
+        }
+        .buttonStyle(.plain)
+        .help(person == nil ? Text("Unknown speaker, click to assign") : Text(verbatim: person?.name ?? ""))
+        .onHover { hovering in
+            hoveredSpeaker.wrappedValue = hovering ? raw : nil
+        }
+        .popover(isPresented: $assigningPerson, arrowEdge: .bottom) {
+            AssignSpeakerPopover(label: raw) {
+                draftSpeakerName = label
+                renamingSpeaker = true
+            }
+            .environment(model)
+        }
+        .contextMenu {
+            Button("Rename \(label)…") {
+                draftSpeakerName = label
+                renamingSpeaker = true
+            }
+            assignSpeakerMenu
+        }
+        .axLeaf("Segment.Button.Speaker")
     }
 
     private func beginEditingNote() {
@@ -387,6 +412,22 @@ struct SegmentCard: View {
 
     private var isLastSegment: Bool {
         model.transcript?.segments.last?.id == segment.id
+    }
+
+    /// The card the menu was opened on is the selection; the people it offers are the directory's.
+    private var assignSelectionMenu: some View {
+        Menu("Assign Selection to") {
+            ForEach(model.mostUsedPeople(limit: 10)) { person in
+                Button(person.name) { model.assignSpeaker(person.name, toSegmentID: segment.id) }
+                    .axLeaf("Card.MenuItem.AssignPerson.\(person.name)")
+            }
+            if !model.people.isEmpty { Divider() }
+            Button("New person…") {
+                draftAssignSpeakerName = ""
+                assigningSpeaker = true
+            }
+            .axLeaf("Card.MenuItem.AssignNewPerson")
+        }
     }
 
     private var assignSpeakerMenu: some View {

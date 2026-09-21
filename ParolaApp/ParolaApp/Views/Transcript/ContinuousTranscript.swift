@@ -29,6 +29,8 @@ struct ContinuousChunks: View {
         var text: AttributedString
         var translation: AttributedString?
         let runs: [TranscriptSegment.ID: SegmentRun]
+        /// The speaker this run belongs to, so the chunk can offer to assign it.
+        var speaker: String?
     }
 
     /// Holds the signature of the chunks currently on screen. A build that never lands must not claim one.
@@ -59,6 +61,9 @@ struct ContinuousChunks: View {
     @State private var highlightedSegmentID: TranscriptSegment.ID?
     @State private var gate = BuildGate()
     @State private var buildTask: Task<Void, Never>?
+    @State private var assigningChunkID: Chunk.ID?
+    @State private var renamingSpeaker: String?
+    @State private var draftSpeakerName: String = ""
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: DS.Spacing.regular) {
@@ -82,23 +87,54 @@ struct ContinuousChunks: View {
             followCurrentSegment()
         }
         .task(id: model.pendingRevealSegmentID) { await revealPendingSegment() }
+        .alert("Rename speaker", isPresented: isRenamingSpeaker, presenting: renamingSpeaker) { current in
+            TextField("Name", text: $draftSpeakerName)
+            Button("Cancel", role: .cancel) { renamingSpeaker = nil }
+            Button("Rename") {
+                let trimmed = draftSpeakerName.trimmingCharacters(in: .whitespacesAndNewlines)
+                renamingSpeaker = nil
+                guard !trimmed.isEmpty, trimmed != current else { return }
+                model.applySpeakerRenames([current: trimmed])
+            }
+        }
+    }
+
+    private var isRenamingSpeaker: Binding<Bool> {
+        Binding(get: { renamingSpeaker != nil }, set: { if !$0 { renamingSpeaker = nil } })
+    }
+
+    private func assigningBinding(for chunk: Chunk) -> Binding<Bool> {
+        Binding(
+            get: { assigningChunkID == chunk.id },
+            set: { assigningChunkID = $0 ? chunk.id : nil }
+        )
     }
 
     @ViewBuilder
     private func chunkRow(_ chunk: Chunk) -> some View {
-        if let translation = chunk.translation, model.translationSideBySide {
-            HStack(alignment: .top, spacing: DS.Spacing.regular) {
-                chunkText(chunk.text)
-                chunkText(translation)
-            }
-        } else {
-            VStack(alignment: .leading, spacing: DS.Spacing.small) {
-                chunkText(chunk.text)
-                if let translation = chunk.translation {
+        Group {
+            if let translation = chunk.translation, model.translationSideBySide {
+                HStack(alignment: .top, spacing: DS.Spacing.regular) {
+                    chunkText(chunk.text)
                     chunkText(translation)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: DS.Spacing.small) {
+                    chunkText(chunk.text)
+                    if let translation = chunk.translation {
+                        chunkText(translation)
+                    }
                 }
             }
         }
+        .modifier(ChunkSpeakerAssignment(
+            speaker: chunk.speaker,
+            isPresented: assigningBinding(for: chunk),
+            onRenameLabel: { label in
+                draftSpeakerName = label
+                renamingSpeaker = label
+            }
+        ))
     }
 
     private func chunkText(_ text: AttributedString) -> some View {
@@ -284,7 +320,8 @@ struct ContinuousChunks: View {
                 id: chunks.count,
                 text: text,
                 translation: translatedSegments == 0 ? nil : translated,
-                runs: runs
+                runs: runs,
+                speaker: shownSpeaker
             ))
             text = AttributedString()
             translated = AttributedString()
@@ -390,5 +427,30 @@ struct ContinuousChunks: View {
     nonisolated private static func endsSentence(_ body: String) -> Bool {
         guard let terminal = body.last(where: { !"\"')]»”’".contains($0) }) else { return false }
         return ".!?…。！？".contains(terminal)
+    }
+}
+
+/// A speaker run's assign affordance: the context menu that opens the popover, and the popover.
+private struct ChunkSpeakerAssignment: ViewModifier {
+    let speaker: String?
+    @Binding var isPresented: Bool
+    let onRenameLabel: (String) -> Void
+
+    @Environment(AppModel.self) private var model
+
+    func body(content: Content) -> some View {
+        if let speaker, let label = SegmentCard.speakerLabel(for: speaker) {
+            content
+                .contextMenu {
+                    Button("Assign \(label)…") { isPresented = true }
+                        .axLeaf("Chunk.MenuItem.AssignSpeaker")
+                }
+                .popover(isPresented: $isPresented, arrowEdge: .leading) {
+                    AssignSpeakerPopover(label: speaker) { onRenameLabel(label) }
+                        .environment(model)
+                }
+        } else {
+            content
+        }
     }
 }

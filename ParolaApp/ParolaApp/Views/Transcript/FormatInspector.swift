@@ -1,4 +1,5 @@
 import SwiftUI
+import ParolaCore
 
 struct FormatInspector: View {
     @Environment(AppModel.self) private var model
@@ -16,12 +17,18 @@ struct FormatInspector: View {
             TranslationSection()
 
             InspectorSection(title: "People") {
+                ForEach(model.speakerSegmentCounts, id: \.label) { row in
+                    SpeakerPersonRow(label: row.label, segmentCount: row.count)
+                }
                 TextField("Add a speaker…", text: $newSpeaker)
                     .textFieldStyle(.plain)
                     .focused($speakerFocused)
                     .fieldChrome(focused: speakerFocused)
                     .onSubmit { commitSpeaker() }
                     .axLeaf("Inspector.TextField.AddSpeaker")
+                Button("Manage People…") { model.showingPeopleSheet = true }
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .axLeaf("Inspector.Button.ManagePeople")
             }
         }
     }
@@ -63,10 +70,55 @@ struct FormatInspector: View {
     private func commitSpeaker() {
         let trimmed = newSpeaker.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        Task { [peopleStore = model.peopleStore] in
-            _ = await peopleStore.recordUsage(name: trimmed)
-        }
+        Task { await model.addPerson(named: trimmed) }
         newSpeaker = ""
+    }
+}
+
+/// One speaker in this transcript: what it is called, how much of it there is, and who it is.
+private struct SpeakerPersonRow: View {
+    let label: String
+    let segmentCount: Int
+
+    @Environment(AppModel.self) private var model
+
+    private var person: Person? { model.person(forSpeaker: label) }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(verbatim: label)
+                    .font(DS.Font.secondary)
+                    .foregroundStyle(DS.speakerColor(for: label, colorIndex: person?.colorIndex))
+                    .lineLimit(1)
+                Text(verbatim: SegmentCount.label(segmentCount))
+                    .font(DS.Font.caption)
+                    .foregroundStyle(DS.Color.secondaryText)
+            }
+            Spacer(minLength: DS.Spacing.small)
+            Menu {
+                ForEach(model.mostUsedPeople(limit: 10)) { candidate in
+                    Button(candidate.name) { Task { await model.assignSpeaker(label: label, to: candidate) } }
+                        .axLeaf("Inspector.MenuItem.AssignPerson.\(candidate.name)")
+                }
+                if !model.people.isEmpty { Divider() }
+                Button("Manage People…") { model.showingPeopleSheet = true }
+                    .axLeaf("Inspector.MenuItem.ManagePeople")
+                if person != nil {
+                    Button("Clear speaker") { Task { await model.clearSpeaker(label: label) } }
+                        .axLeaf("Inspector.MenuItem.ClearSpeaker")
+                }
+            } label: {
+                (person.map { Text(verbatim: $0.name) } ?? Text("Unassigned"))
+                    .font(DS.Font.caption)
+            }
+            .menuStyle(.button)
+            .buttonStyle(ChipButtonStyle(isSelected: person != nil))
+            .menuIndicator(.hidden)
+            .fixedSize()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .axLeaf("Inspector.People.Row.\(label)")
     }
 }
 

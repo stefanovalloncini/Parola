@@ -275,6 +275,7 @@ struct ParolaApp: App {
                 Button("Jump to Next Speaker") { model.jumpToNextSpeaker() }
                     .keyboardShortcut("j", modifiers: [.command, .shift])
                     .disabled(!model.hasTranscript)
+                Button("Manage People…") { model.showingPeopleSheet = true }
                 Button("Favorite Segment") {
                     guard let id = model.focusedSegmentIDForCommands else { return }
                     model.toggleSegmentFavorite(id)
