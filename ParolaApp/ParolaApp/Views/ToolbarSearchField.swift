@@ -13,11 +13,11 @@ enum ToolbarSearchMetrics {
     /// Below this a field is a sliver: the chip expands to at least this much or stays a chip.
     static let minimumFieldWidth: CGFloat = 132
 
-    /// Measured on the live toolbar at 1180: the window inset, the traffic lights, the sidebar toggle,
-    /// the New menu and the gaps around them — 250 pt to the capsule, 50.5 pt back from the right edge, 24 pt of gaps.
-    static let chromeBesideSearch: CGFloat = 324
+    /// Measured on the live toolbar at 1180: 251.5 pt of lights and sidebar toggle before the capsule,
+    /// 8 pt of gap after it, and 62.5 pt of New menu and window inset after the field.
+    static let chromeBesideSearch: CGFloat = 322
     /// The fused intake capsule at its widest stock labels ("Apple Speech (system)" + "Auto-detect"), measured the same way.
-    static let intakeCapsuleWidth: CGFloat = 370
+    static let intakeCapsuleWidth: CGFloat = 386
 
     static func isShown(introductionPresented: Bool) -> Bool {
         !introductionPresented
