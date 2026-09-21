@@ -40,30 +40,55 @@ struct FeaturesScene: View {
         return items
     }
 
+    /// Two cards to a row, in order; an odd last card sits alone in the last row.
+    static func arrangement(count: Int) -> [[Int]] {
+        stride(from: 0, to: max(0, count), by: 2).map { start in
+            Array(start..<min(start + 2, count))
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.large) {
             Text("What it does.")
                 .font(DS.Font.hero)
                 .foregroundStyle(DS.Color.primaryText)
                 .sceneEntrance(order: 0)
-            VStack(alignment: .leading, spacing: DS.Spacing.medium) {
-                ForEach(Array(Self.rows(features: model.features).enumerated()), id: \.element.id) { index, item in
-                    FeatureRow(item: item)
-                        .opacity(isShown ? 1 : 0)
-                        .offset(x: isShown ? 0 : -32)
-                        .animation(entrance(row: index), value: hasAppeared)
-                }
-            }
+            grid
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear { hasAppeared = true }
     }
 
+    private var grid: some View {
+        let items = Self.rows(features: model.features)
+        let hotkeyName = HotkeyDisplay.description(
+            keyCode: model.dictationKeyCode,
+            modifiers: model.dictationModifierFlags
+        )
+        return VStack(alignment: .leading, spacing: DS.Spacing.medium) {
+            ForEach(Self.arrangement(count: items.count), id: \.first) { indices in
+                HStack(alignment: .top, spacing: DS.Spacing.medium) {
+                    ForEach(indices, id: \.self) { index in
+                        FeatureCard(item: items[index], hotkeyName: hotkeyName)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .opacity(isShown ? 1 : 0)
+                            .offset(x: isShown ? 0 : -32)
+                            .animation(entrance(card: index), value: hasAppeared)
+                    }
+                    if indices.count == 1 {
+                        Color.clear.frame(maxWidth: .infinity, maxHeight: 0)
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     private var isShown: Bool { hasAppeared || reduceMotion }
 
-    private func entrance(row: Int) -> Animation? {
+    private func entrance(card: Int) -> Animation? {
         guard !reduceMotion else { return nil }
-        return .spring(response: 0.5, dampingFraction: 0.85).delay(Double(row) * 0.08)
+        return .spring(response: 0.5, dampingFraction: 0.85).delay(Double(card) * 0.08)
     }
 }
 
