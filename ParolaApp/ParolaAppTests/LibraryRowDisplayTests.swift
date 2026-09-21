@@ -29,4 +29,20 @@ struct LibraryRowDisplayTests {
         #expect(off.title == "New Recording 160")
         #expect(off.excerpt == "sensori fattivi…")
     }
+
+    @Test("the cache reuses a display for a matching raw excerpt and recomputes for a changed one")
+    func cacheReusesOnMatchingRawExcerpt() {
+        var cache = LibraryRowDisplayCache()
+        let original = entry(aiTitle: "Riunione fornitori", summary: "Ordini al magazzino.")
+        let first = cache.display(for: original, excerpt: "sensori fattivi…", showsAITitle: true, showsAISummary: true)
+        #expect(first.title == "Riunione fornitori")
+
+        // Same id, same raw excerpt, different AI metadata: a cache hit returns the stale display instead of recomputing.
+        let changed = entry(aiTitle: "Titolo diverso", summary: "Riassunto diverso.")
+        let second = cache.display(for: changed, excerpt: "sensori fattivi…", showsAITitle: true, showsAISummary: true)
+        #expect(second.title == "Riunione fornitori")
+
+        let third = cache.display(for: changed, excerpt: "testo differente", showsAITitle: true, showsAISummary: true)
+        #expect(third.title == "Titolo diverso")
+    }
 }
