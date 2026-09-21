@@ -5,7 +5,7 @@ enum IntroductionLayout {
     static let columnWidth: CGFloat = 720
 }
 
-/// The whole window during the first run: one scene at a time over the canvas, with the step dots and navigation pills pinned to the bottom.
+/// The whole window during the first run: one scene at a time over the stage, with the step dots and navigation pills pinned to the bottom.
 struct IntroductionView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -15,8 +15,7 @@ struct IntroductionView: View {
     var body: some View {
         let introduction = model.introduction
         return ZStack {
-            DS.Palette.canvas.ignoresSafeArea()
-            IntroductionGlow().ignoresSafeArea()
+            IntroductionStage()
             VStack(spacing: DS.Spacing.large) {
                 scene(introduction.step)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -55,38 +54,5 @@ struct IntroductionView: View {
             insertion: .move(edge: back ? .leading : .trailing).combined(with: .opacity),
             removal: .move(edge: back ? .trailing : .leading).combined(with: .opacity)
         )
-    }
-}
-
-/// A wash of accent light in the top-leading corner, drifting slowly so the canvas isn't dead flat.
-private struct IntroductionGlow: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        GeometryReader { proxy in
-            let radius = min(proxy.size.width, proxy.size.height) * 0.55
-            if reduceMotion {
-                glow(radius: radius, drift: .zero)
-            } else {
-                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
-                    let seconds = context.date.timeIntervalSinceReferenceDate
-                    glow(
-                        radius: radius,
-                        drift: CGSize(width: sin(seconds * 0.21) * 14, height: cos(seconds * 0.17) * 10)
-                    )
-                }
-            }
-        }
-        .allowsHitTesting(false)
-    }
-
-    private func glow(radius: CGFloat, drift: CGSize) -> some View {
-        RadialGradient(
-            colors: [DS.Color.accentWash, DS.Color.accentWash.opacity(0)],
-            center: .topLeading,
-            startRadius: 0,
-            endRadius: radius
-        )
-        .offset(x: drift.width, y: drift.height)
     }
 }
