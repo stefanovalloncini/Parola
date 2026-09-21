@@ -57,6 +57,7 @@ final class ParolaAutomationServer {
             server.coreCommands(),
             server.modelCommands(),
             server.transcriptCommands(),
+            server.exportCommands(),
             server.libraryCommands(),
             server.batchCommands(),
             server.recordingCommands(),
@@ -496,6 +497,8 @@ final class ParolaAutomationServer {
             "transcriptPaneMode": .string(model.transcriptPaneMode.rawValue),
             "summaryOptions": Self.encode(model.summaryOptions),
             "autostartSummary": .bool(model.autostartSummary),
+            "exportPresets": Self.encode(model.exportPresets),
+            "exportSpec": model.exportSheetOpen ? Self.encode(model.exportSheetSpec) : .null,
         ])
     }
 

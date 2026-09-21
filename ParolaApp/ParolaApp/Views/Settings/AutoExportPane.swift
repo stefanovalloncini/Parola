@@ -95,6 +95,8 @@ struct AutoExportPane: View {
                 }
             }
 
+            SettingHelper(text: "These apply to the Transcript menu's copy commands, the library's bulk export and the subtitle warnings. Auto-export writes what each preset says.")
+
             ResetPaneButton(scope: .autoExport)
         }
     }

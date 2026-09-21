@@ -102,7 +102,7 @@ extension ParolaAutomationServer {
                         throw AutomationError.invalidArgs(field: "format", reason: "invalid format: \(raw)")
                     }
                     let includeTimestamps = try args.optionalBool("includeTimestamps")
-                    ctx.model.performExport(format, includeTimestamps: includeTimestamps)
+                    ctx.model.performExport(ctx.model.exportSpec(for: format, includeTimestamps: includeTimestamps))
                     return .object(["queued": .bool(true), "format": .string(raw)])
                 }
             ),

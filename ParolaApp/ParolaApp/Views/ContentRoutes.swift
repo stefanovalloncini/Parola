@@ -7,9 +7,9 @@ struct ContentRoutes: View {
 
     var body: some View {
         routedContent
-            .onChange(of: model.pendingExport) { _, format in
-                if let format {
-                    model.performExport(format)
+            .onChange(of: model.pendingExport) { _, spec in
+                if let spec {
+                    model.performExport(spec)
                     model.pendingExport = nil
                 }
             }

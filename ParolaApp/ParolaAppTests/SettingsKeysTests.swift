@@ -75,6 +75,11 @@ struct SettingsPaneScopeTests {
         }
     }
 
+    @Test("the export presets pane resets its own library")
+    func exportFormatsResetsThePresets() {
+        #expect(SettingsPaneScope.exportFormats.defaultsKeys == ["exportPresets"])
+    }
+
     @Test("the models storage path stays out of every scope")
     func modelsPathStaysExcluded() {
         let scoped = Set(SettingsPaneScope.allCases.flatMap(\.defaultsKeys))
@@ -83,7 +88,6 @@ struct SettingsPaneScopeTests {
 
     @Test("panes with no persisted state expose no reset keys")
     func panesWithoutDefaults() {
-        #expect(SettingsPaneScope.exportFormats.defaultsKeys.isEmpty)
         #expect(SettingsPaneScope.integrations.defaultsKeys.isEmpty)
         #expect(SettingsPaneScope.prompts.defaultsKeys.isEmpty)
         #expect(SettingsPaneScope.advanced.defaultsKeys.isEmpty)

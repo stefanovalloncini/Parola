@@ -445,8 +445,9 @@ final class AppModel {
     /// True only while the loaded transcript describes that media; a length measured for any other file must never reach it.
     @ObservationIgnored var transcriptMatchesLoadedMedia = false
 
-    var pendingExport: ExportFormat?
-    var exportOptionsFormat: ExportFormat?
+    var pendingExport: ExportSpec?
+    var exportSheetOpen: Bool = false
+    private(set) var exportSheetSpec: ExportSpec = .standard(for: .txt)
 
     // MARK: - Post-process rules
 
@@ -3358,20 +3359,60 @@ final class AppModel {
 
     // MARK: - Export
 
-    /// True when the format has exporter options worth a sheet; option-free formats go straight to the save panel.
-    nonisolated static func exportHasOptions(_ format: ExportFormat) -> Bool {
-        switch format {
-        case .txt, .md, .html, .srt, .vtt: return true
-        case .json, .jsonl, .csv, .tsv, .docx, .pdf, .fcpxml, .lrc: return false
+    func openExportSheet() {
+        guard transcript != nil else { return }
+        setExportSpec(exportPresets.first?.spec ?? .standard(for: .txt))
+        exportSheetOpen = true
+    }
+
+    func closeExportSheet() {
+        exportSheetOpen = false
+    }
+
+    /// The one way the sheet's spec changes: a spec whose format belongs to another style is repaired.
+    func setExportSpec(_ spec: ExportSpec) {
+        exportSheetSpec = ExportSpec(
+            style: ExportStyle.style(for: spec.format),
+            format: spec.format,
+            options: spec.options
+        )
+    }
+
+    func exportFromSheet() {
+        exportSheetOpen = false
+        pendingExport = exportSheetSpec
+    }
+
+    func exportWithPreset(_ id: UUID) {
+        guard transcript != nil, let preset = exportPreset(id: id) else { return }
+        pendingExport = preset.spec
+    }
+
+    func saveExportSheetSpecAsPreset(name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        addExportPreset(name: trimmed, spec: exportSheetSpec)
+    }
+
+    func copyExportToPasteboard() {
+        guard let transcript else { return }
+        let spec = exportSheetSpec
+        Task {
+            guard let data = try? await AppModel.offMainIO({ try Exporters.exporter(for: spec).render(transcript) }),
+                  let text = String(data: data, encoding: .utf8) else {
+                return
+            }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
         }
     }
 
-    func exportRequest(_ format: ExportFormat) {
-        guard transcript != nil else { return }
-        if Self.exportHasOptions(format) {
-            exportOptionsFormat = format
-        } else {
-            pendingExport = format
+    /// Writes the transcript to `url` as the spec describes it. The bridge and the save panel share this.
+    func exportTranscript(spec: ExportSpec, to url: URL) async throws {
+        guard let transcript else { throw ParolaError.ioError("No transcript to export.") }
+        try await AppModel.offMainIO {
+            let data = try Exporters.exporter(for: spec).render(transcript)
+            try data.write(to: url, options: .atomic)
         }
     }
 
@@ -3526,24 +3567,20 @@ final class AppModel {
         return result
     }
 
-    func performExport(_ format: ExportFormat, includeTimestamps: Bool? = nil) {
-        guard let transcript else { return }
+    func performExport(_ spec: ExportSpec) {
+        guard transcript != nil else { return }
         Task { [weak self] in
             guard let self else { return }
             guard let url = await self.filePicker.chooseSaveDestination(
-                suggestedName: "transcript.\(format.fileExtension)",
+                suggestedName: "transcript.\(spec.format.fileExtension)",
                 // Unconstrained: most export formats (docx, pdf, csv, srt, ...) don't conform to
                 // .plainText, and a constrained panel rewrites their extension to .txt.
                 allowedTypes: []
             ) else { return }
-            let exporter = self.makeExporter(for: format, includeTimestamps: includeTimestamps)
             do {
-                try await AppModel.offMainIO {
-                    let data = try exporter.render(transcript)
-                    try data.write(to: url, options: .atomic)
-                }
+                try await self.exportTranscript(spec: spec, to: url)
             } catch {
-                ParolaLog.error(.export, "export failed as \(format)", [.error: .error(error)])
+                ParolaLog.error(.export, "export failed as \(spec.format)", [.error: .error(error)])
                 self.phase = .failed(message: Self.exportFailureMessage(for: error))
             }
         }

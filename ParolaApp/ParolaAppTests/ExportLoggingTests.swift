@@ -64,7 +64,7 @@ struct ExportLoggingTests {
             let destination = unwritableDestination("secret-notes.txt")
             await picker.queueSaveResponse(destination)
 
-            model.performExport(.txt)
+            model.performExport(.standard(for: .txt))
 
             let record = try #require(await waitForRecord(sink, message: "export failed as txt"))
             #expect(record.level == .error)

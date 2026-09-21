@@ -283,21 +283,13 @@ struct ParolaApp: App {
                 Button("Export Segment Notes…") { model.exportSegmentNotesAsMarkdown() }
                     .disabled(!model.hasTranscript)
                 Divider()
+                Button("Export…") { model.openExportSheet() }
+                    .keyboardShortcut("e", modifiers: [.command, .shift])
+                    .disabled(!model.hasTranscript)
                 Menu("Export As") {
-                    Button("TXT…") { model.exportRequest(.txt) }
-                        .keyboardShortcut("e", modifiers: [.command])
-                    Button("Markdown…") { model.exportRequest(.md) }
-                    Button("HTML…") { model.exportRequest(.html) }
-                    Button("Word (.docx)…") { model.exportRequest(.docx) }
-                    Button("PDF…") { model.exportRequest(.pdf) }
-                    Button("CSV…") { model.exportRequest(.csv) }
-                    Button("SRT…") { model.exportRequest(.srt) }
-                    Button("VTT…") { model.exportRequest(.vtt) }
-                    Button("JSON…") { model.exportRequest(.json) }
-                    Button("JSON Lines…") { model.exportRequest(.jsonl) }
-                    Button("TSV…") { model.exportRequest(.tsv) }
-                    Button("Final Cut Pro XML…") { model.exportRequest(.fcpxml) }
-                    Button("LRC…") { model.exportRequest(.lrc) }
+                    ForEach(model.exportPresets) { preset in
+                        Button(LocalizedStringKey(preset.name)) { model.exportWithPreset(preset.id) }
+                    }
                 }
                 .disabled(!model.hasTranscript)
                 Divider()

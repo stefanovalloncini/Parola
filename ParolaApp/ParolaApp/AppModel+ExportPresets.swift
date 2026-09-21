@@ -148,4 +148,28 @@ extension AppModel {
         }
         return (library, ids)
     }
+
+    /// Merges bridge-supplied fields over the sheet's spec: `options` merges field by field,
+    /// so `{"options":{"timestamps":true}}` keeps the rest of the spec.
+    func mergedExportSpec(overriding raw: [String: AutomationValue]) throws -> ExportSpec {
+        guard var merged = try? JSONSerialization.jsonObject(with: JSONEncoder().encode(exportSheetSpec)) as? [String: Any] else {
+            throw AutomationError.invalidArgs(field: "spec", reason: "could not encode the current export spec")
+        }
+        for (key, value) in raw {
+            if key == "options", case .object(let fields) = value {
+                var options = merged["options"] as? [String: Any] ?? [:]
+                for (field, fieldValue) in fields { options[field] = fieldValue.jsonObject }
+                merged["options"] = options
+            } else {
+                merged[key] = value.jsonObject
+            }
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: merged),
+              let decoded = try? JSONDecoder().decode(ExportSpec.self, from: data) else {
+            throw AutomationError.invalidArgs(field: "spec", reason: "could not decode an ExportSpec from the given fields")
+        }
+        if raw["format"] != nil { return decoded.changing(format: decoded.format) }
+        if raw["style"] != nil { return decoded.changing(style: decoded.style) }
+        return decoded
+    }
 }

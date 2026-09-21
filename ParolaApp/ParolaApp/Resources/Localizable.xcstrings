@@ -1479,6 +1479,17 @@
         }
       }
     },
+    "As-is": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Come sono"
+          }
+        }
+      }
+    },
     "Ask about this transcript…": {
       "extractionState": "manual",
       "localizations": {
@@ -2074,6 +2085,17 @@
         }
       }
     },
+    "CSV": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CSV"
+          }
+        }
+      }
+    },
     "CSV (.csv)": {
       "extractionState": "manual",
       "localizations": {
@@ -2125,6 +2147,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dimensione sottotitoli"
+          }
+        }
+      }
+    },
+    "Caption length": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lunghezza dei sottotitoli"
           }
         }
       }
@@ -2619,6 +2652,17 @@
         }
       }
     },
+    "Color scheme of the exported page.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Combinazione di colori della pagina esportata."
+          }
+        }
+      }
+    },
     "Color scheme used by the HTML export.": {
       "extractionState": "manual",
       "localizations": {
@@ -2854,6 +2898,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Copia come SRT"
+          }
+        }
+      }
+    },
+    "Copy to Clipboard": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copia negli appunti"
           }
         }
       }
@@ -3905,6 +3960,17 @@
         }
       }
     },
+    "End times": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ora di fine"
+          }
+        }
+      }
+    },
     "Engine": {
       "extractionState": "manual",
       "localizations": {
@@ -4415,6 +4481,17 @@
         }
       }
     },
+    "Final Cut Pro XML": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "XML di Final Cut Pro"
+          }
+        }
+      }
+    },
     "Find": {
       "extractionState": "manual",
       "localizations": {
@@ -4766,6 +4843,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Concesso"
+          }
+        }
+      }
+    },
+    "Grouping": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raggruppamento"
+          }
+        }
+      }
+    },
+    "HTML": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HTML"
           }
         }
       }
@@ -5246,6 +5345,17 @@
         }
       }
     },
+    "JSON": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JSON"
+          }
+        }
+      }
+    },
     "JSON (.json)": {
       "extractionState": "manual",
       "localizations": {
@@ -5253,6 +5363,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "JSON (.json)"
+          }
+        }
+      }
+    },
+    "JSON Lines": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JSON Lines"
           }
         }
       }
@@ -5374,6 +5495,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Battute tasti"
+          }
+        }
+      }
+    },
+    "LRC Lyrics": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testi LRC"
+          }
+        }
+      }
+    },
+    "Label each line with who is speaking.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indica su ogni riga chi sta parlando."
           }
         }
       }
@@ -5506,6 +5649,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Avvia Parola in background quando accedi al Mac."
+          }
+        }
+      }
+    },
+    "Layout preview not available for this format": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anteprima dell'impaginazione non disponibile per questo formato"
           }
         }
       }
@@ -5758,6 +5912,17 @@
         }
       }
     },
+    "Long (movie)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lunghi (film)"
+          }
+        }
+      }
+    },
     "Looks for a new version straight away.": {
       "extractionState": "manual",
       "localizations": {
@@ -5889,6 +6054,17 @@
         }
       }
     },
+    "Medium (TV)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Medi (TV)"
+          }
+        }
+      }
+    },
     "Meeting": {
       "extractionState": "manual",
       "localizations": {
@@ -5935,6 +6111,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Le voci di menu sono fisse. Le scorciatoie globali richiedono il permesso di Monitoraggio Input. L'elenco completo è in Aiuto > Scorciatoie da tastiera."
+          }
+        }
+      }
+    },
+    "Merge a speaker's consecutive segments into one.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unisci in uno i segmenti consecutivi di chi parla."
           }
         }
       }
@@ -5990,6 +6177,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "L'accesso al microfono è disattivato. Attivalo in Impostazioni di Sistema → Privacy e sicurezza → Microfono, poi avvia di nuovo la registrazione."
+          }
+        }
+      }
+    },
+    "Milliseconds": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Millisecondi"
           }
         }
       }
@@ -6769,6 +6967,17 @@
         }
       }
     },
+    "No transcript loaded": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna trascrizione caricata"
+          }
+        }
+      }
+    },
     "No transcript text.": {
       "extractionState": "manual",
       "localizations": {
@@ -7253,6 +7462,17 @@
         }
       }
     },
+    "Options": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opzioni"
+          }
+        }
+      }
+    },
     "Organize into sections": {
       "extractionState": "manual",
       "localizations": {
@@ -7348,6 +7568,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tavolozza"
+          }
+        }
+      }
+    },
+    "Paragraph per speaker": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un paragrafo per interlocutore"
           }
         }
       }
@@ -7784,6 +8015,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Antepone a ogni paragrafo Markdown il suo tempo di inizio."
+          }
+        }
+      }
+    },
+    "Prefix each line with its start time.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anteponi a ogni riga l'ora di inizio."
+          }
+        }
+      }
+    },
+    "Preset name": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nome del preset"
           }
         }
       }
@@ -8939,6 +9192,28 @@
         }
       }
     },
+    "Save as Preset": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva come preset"
+          }
+        }
+      }
+    },
+    "Save as Preset…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva come preset…"
+          }
+        }
+      }
+    },
     "Save next to the audio file": {
       "extractionState": "manual",
       "localizations": {
@@ -9181,6 +9456,17 @@
         }
       }
     },
+    "Segment per line": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un segmento per riga"
+          }
+        }
+      }
+    },
     "Segment text": {
       "extractionState": "manual",
       "localizations": {
@@ -9324,6 +9610,17 @@
         }
       }
     },
+    "Sepia": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seppia"
+          }
+        }
+      }
+    },
     "Set Up Meeting Recording": {
       "extractionState": "manual",
       "localizations": {
@@ -9364,6 +9661,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Impostazioni…"
+          }
+        }
+      }
+    },
+    "Short (reels)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corti (reel)"
           }
         }
       }
@@ -9540,6 +9848,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostra il titolo AI al posto del nome del file"
+          }
+        }
+      }
+    },
+    "Show the end of each segment too.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra anche la fine di ogni segmento."
           }
         }
       }
@@ -10438,6 +10757,17 @@
         }
       }
     },
+    "TSV": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TSV"
+          }
+        }
+      }
+    },
     "Tags each segment with Speaker 1, Speaker 2, etc. Loads a second model on first use.": {
       "extractionState": "manual",
       "localizations": {
@@ -10559,6 +10889,28 @@
         }
       }
     },
+    "The named exports Parola can write, and what each one puts in the file.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le esportazioni con nome che Parola può scrivere, e cosa mette ciascuna nel file."
+          }
+        }
+      }
+    },
+    "The preset keeps this style, format and options.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il preset conserva questo stile, formato e opzioni."
+          }
+        }
+      }
+    },
     "The prompt library behind dictation cleanup and the Transcript menu.": {
       "extractionState": "manual",
       "localizations": {
@@ -10566,6 +10918,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "La libreria di prompt dietro la pulizia della dettatura e il menu Trascrizione."
+          }
+        }
+      }
+    },
+    "Theme": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tema"
           }
         }
       }
@@ -10588,6 +10951,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "I colori del tema e quanto è compatta l'interfaccia."
+          }
+        }
+      }
+    },
+    "These apply to the Transcript menu's copy commands, the library's bulk export and the subtitle warnings. Auto-export writes what each preset says.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valgono per i comandi di copia del menu Trascrizione, per l'esportazione in blocco della libreria e per gli avvisi sui sottotitoli. L'esportazione automatica scrive quello che dice ogni preset."
           }
         }
       }
@@ -10709,6 +11083,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tempo di trascrizione"
+          }
+        }
+      }
+    },
+    "Timestamps": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timestamp"
           }
         }
       }
@@ -11911,6 +12296,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parole che attivano questo prompt per una sola dettatura. Separale con la virgola."
+          }
+        }
+      }
+    },
+    "Wraps long segments into shorter cues.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spezza i segmenti lunghi in battute più corte."
+          }
+        }
+      }
+    },
+    "Write times down to the millisecond.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrivi gli orari al millisecondo."
           }
         }
       }

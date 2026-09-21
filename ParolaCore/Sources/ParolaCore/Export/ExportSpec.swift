@@ -76,6 +76,37 @@ public enum ExportContent: String, Sendable, Codable, Hashable, CaseIterable, Id
     public var id: String { rawValue }
 }
 
+/// One field of ``ExportOptions``. A format lists the ones it reads so the Export sheet
+/// only offers what changes the output.
+public enum ExportOptionField: String, Sendable, Hashable, CaseIterable, Identifiable {
+    case timestamps
+    case endTimestamps
+    case milliseconds
+    case speakers
+    case captionLength
+    case htmlTheme
+    case grouping
+
+    public var id: String { rawValue }
+}
+
+public extension ExportFormat {
+    var optionFields: [ExportOptionField] {
+        switch self {
+        case .txt, .md:
+            return [.timestamps, .endTimestamps, .milliseconds, .speakers, .grouping]
+        case .html:
+            return [.timestamps, .endTimestamps, .milliseconds, .speakers, .htmlTheme, .grouping]
+        case .docx, .pdf:
+            return [.speakers, .grouping]
+        case .srt, .vtt:
+            return [.speakers, .captionLength, .grouping]
+        case .json, .jsonl, .csv, .tsv, .fcpxml, .lrc:
+            return [.grouping]
+        }
+    }
+}
+
 /// Everything the formats can be told about an export. Each format reads the fields that apply to it.
 public struct ExportOptions: Sendable, Codable, Hashable {
     public var timestamps: Bool

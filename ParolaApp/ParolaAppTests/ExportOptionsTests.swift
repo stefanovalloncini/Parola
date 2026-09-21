@@ -28,48 +28,38 @@ struct ExportOptionsTests {
         )
     }
 
-    @Test("formats with real exporter options ask for the sheet, the rest skip it")
-    func formatsWithOptions() {
-        let withSheet: [ExportFormat] = [.txt, .md, .html, .srt, .vtt]
-        let without: [ExportFormat] = [.json, .jsonl, .csv, .tsv, .docx, .pdf, .fcpxml, .lrc]
-        for format in withSheet {
-            #expect(AppModel.exportHasOptions(format), "\(format.rawValue) should offer options")
-        }
-        for format in without {
-            #expect(!AppModel.exportHasOptions(format), "\(format.rawValue) has no options to offer")
-        }
-    }
-
-    @Test("exportRequest for an options format opens the sheet instead of queueing the export")
-    func exportRequestOpensSheet() {
+    @Test("the Export sheet opens on the first preset and queues its spec")
+    func sheetOpensOnTheFirstPreset() {
         let model = makeModel()
         model.transcript = Self.makeTranscript()
 
-        model.exportRequest(.md)
+        model.openExportSheet()
 
-        #expect(model.exportOptionsFormat == .md)
+        #expect(model.exportSheetOpen)
+        #expect(model.exportSheetSpec == model.exportPresets.first?.spec)
         #expect(model.pendingExport == nil)
     }
 
-    @Test("exportRequest for an option-free format queues the export straight away")
-    func exportRequestSkipsSheet() {
+    @Test("Export As queues a preset without opening the sheet")
+    func exportAsSkipsTheSheet() {
         let model = makeModel()
         model.transcript = Self.makeTranscript()
+        let pdf = ExportPreset.builtIn(for: .pdf)!
 
-        model.exportRequest(.pdf)
+        model.exportWithPreset(pdf.id)
 
-        #expect(model.pendingExport == .pdf)
-        #expect(model.exportOptionsFormat == nil)
+        #expect(model.pendingExport == pdf.spec)
+        #expect(model.exportSheetOpen == false)
     }
 
-    @Test("exportRequest without a transcript does nothing")
-    func exportRequestNeedsTranscript() {
+    @Test("neither route does anything without a transcript")
+    func exportNeedsTranscript() {
         let model = makeModel()
 
-        model.exportRequest(.md)
-        model.exportRequest(.pdf)
+        model.openExportSheet()
+        model.exportWithPreset(ExportPreset.builtIn(for: .pdf)!.id)
 
-        #expect(model.exportOptionsFormat == nil)
+        #expect(model.exportSheetOpen == false)
         #expect(model.pendingExport == nil)
     }
 
