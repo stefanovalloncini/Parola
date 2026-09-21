@@ -107,6 +107,12 @@ struct FeatureVignette: View {
 
 /// One frame of the transcribe loop: a file glyph drops onto a card, then three lines of text fill in.
 struct TranscribeFrame: Equatable {
+    static let glyphFrom = 0.08
+    static let glyphTravel = 0.14
+    static let lineFrom = 0.24
+    static let lineStep = 0.15
+    static let lineSpan = 0.12
+
     let glyphOpacity: Double
     let glyphOffset: Double
     let lineOpacity: Double
@@ -118,7 +124,7 @@ struct TranscribeFrame: Equatable {
         let clearing = FeatureVignettePhase.clearing(phase)
         let drop = phase < FeatureVignettePhase.resetSpan
             ? 1
-            : FeatureVignettePhase.ramp(phase, from: 0.08, span: 0.14)
+            : FeatureVignettePhase.ramp(phase, from: Self.glyphFrom, span: Self.glyphTravel)
         glyphOpacity = clearing * drop
         glyphOffset = -12 * (1 - FeatureVignettePhase.ease(drop))
         lineOpacity = clearing
@@ -138,21 +144,27 @@ struct TranscribeFrame: Equatable {
     static func line(_ index: Int, at phase: Double) -> Double {
         guard phase >= FeatureVignettePhase.resetSpan else { return 1 }
         return FeatureVignettePhase.ease(
-            FeatureVignettePhase.ramp(phase, from: 0.24 + Double(index) * 0.15, span: 0.12)
+            FeatureVignettePhase.ramp(phase, from: lineFrom + Double(index) * lineStep, span: lineSpan)
         )
     }
 }
 
 /// One frame of the meetings loop: the detection pill, a Record pill that beats once, a recording dot that arrives late.
 struct MeetingFrame: Equatable {
+    static let beatFrom = 0.38
+    static let beatSpan = 0.24
+    static let beatHeight = 0.06
+    static let dotFrom = 0.67
+    static let dotSpan = 0.13
+
     let pillScale: Double
     let dot: Double
 
     init(phase: Double) {
-        pillScale = 1 + 0.06 * FeatureVignettePhase.pulse(phase, from: 0.38, span: 0.24)
+        pillScale = 1 + Self.beatHeight * FeatureVignettePhase.pulse(phase, from: Self.beatFrom, span: Self.beatSpan)
         dot = phase < FeatureVignettePhase.resetSpan
             ? FeatureVignettePhase.clearing(phase)
-            : FeatureVignettePhase.ramp(phase, from: 0.67, span: 0.13)
+            : FeatureVignettePhase.ramp(phase, from: Self.dotFrom, span: Self.dotSpan)
     }
 }
 
@@ -162,6 +174,8 @@ struct DictationFrame: Equatable {
     static let lastWord = 0.7
     static let wordSpan = 0.12
     static let pressTravel = 0.08
+    /// Whole half-blinks in one loop, rounded down to an even number so the wrap doesn't stretch the last one.
+    static let caretCycles = max(2, Int(FeatureVignettePhase.period / StreamingReveal.caretBlinkPeriod) / 2 * 2)
 
     let press: Double
     let isHeld: Bool
@@ -174,15 +188,15 @@ struct DictationFrame: Equatable {
             1 - FeatureVignettePhase.ease(FeatureVignettePhase.ramp(phase, from: Self.lastWord, span: Self.pressTravel))
         )
         isHeld = press > 0.5
-        caretVisible = Int(phase * FeatureVignettePhase.period / StreamingReveal.caretBlinkPeriod) % 2 == 0
+        caretVisible = Int(phase * Double(Self.caretCycles)) % 2 == 0
     }
 
     /// The stride comes from the word count, so a translation of any length still finishes by `lastWord`.
     static func landing(_ index: Int, of count: Int, at phase: Double) -> Double {
         guard phase >= FeatureVignettePhase.resetSpan else { return 1 }
-        let stride = count > 1 ? (lastWord - wordSpan - firstWord) / Double(count - 1) : 0
+        let step = count > 1 ? (lastWord - wordSpan - firstWord) / Double(count - 1) : 0
         return FeatureVignettePhase.ease(
-            FeatureVignettePhase.ramp(phase, from: firstWord + Double(index) * stride, span: wordSpan)
+            FeatureVignettePhase.ramp(phase, from: firstWord + Double(index) * step, span: wordSpan)
         )
     }
 

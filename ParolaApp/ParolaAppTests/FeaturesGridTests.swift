@@ -118,6 +118,17 @@ struct FeaturesGridTests {
         #expect(blank.count <= 2)
     }
 
+    @Test("the caret blinks evenly across the wrap")
+    func caretBlinksEvenly() {
+        #expect(DictationFrame.caretCycles % 2 == 0)
+        #expect(DictationFrame(phase: 0).caretVisible)
+        #expect(DictationFrame(phase: 1).caretVisible)
+        let steps = (0..<DictationFrame.caretCycles).map {
+            DictationFrame(phase: (Double($0) + 0.5) / Double(DictationFrame.caretCycles)).caretVisible
+        }
+        #expect(steps == (0..<DictationFrame.caretCycles).map { $0 % 2 == 0 })
+    }
+
     @Test("the dictated phrase lands by the end of the hold, whatever its word count")
     func wordStrideFollowsTheWordCount() {
         for count in 1...6 {
