@@ -95,11 +95,10 @@ struct EntryBadge: View {
     }
 }
 
-/// Who paints a row: a `List` paints its own selection, Home paints its own hover, anything else paints both.
+/// Who paints a row: a `List` paints its own selection, Home paints its own hover.
 enum EntryRowStyle {
     case list
     case home
-    case plain
 }
 
 /// The line under a row's title: what the entry says, or where a search hit it.
@@ -190,7 +189,6 @@ struct EntryRow<Accessory: View, Actions: View>: View {
             trailingActions
         }
         .padding(.vertical, compact ? DS.Spacing.tight : DS.Spacing.small)
-        .padding(.horizontal, style == .plain ? DS.Spacing.small : 0)
         .frame(height: rowHeight, alignment: .top)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(rowBackground)
@@ -260,18 +258,6 @@ struct EntryRow<Accessory: View, Actions: View>: View {
             }
         case .home:
             EmptyView()
-        case .plain:
-            if isSelected {
-                RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                    .fill(DS.Color.accent.opacity(0.12))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                            .strokeBorder(DS.Color.accent.opacity(0.35), lineWidth: 1)
-                    )
-            } else if isHovering {
-                RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-                    .fill(DS.Palette.surfaceHover)
-            }
         }
     }
 

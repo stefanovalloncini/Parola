@@ -6,12 +6,6 @@ struct MetaLine: View {
     private let tint: Color?
     private let timecode: String?
 
-    init(_ parts: [String?], tint: Color? = nil) {
-        self.parts = Self.present(parts)
-        self.tint = tint
-        timecode = nil
-    }
-
     /// A row's fact cluster: the length leads it as a timecode, the facts after it read as text.
     init(timecode: String?, _ parts: [String?], tint: Color? = nil) {
         self.parts = Self.present(parts)
@@ -21,10 +15,6 @@ struct MetaLine: View {
 
     nonisolated static func present(_ parts: [String?]) -> [String] {
         parts.compactMap { $0 }.filter { !$0.isEmpty }
-    }
-
-    nonisolated static func joined(_ parts: [String?]) -> String {
-        present(parts).joined(separator: " · ")
     }
 
     /// The middots sit back so the facts read as facts, not as a line of punctuation.
