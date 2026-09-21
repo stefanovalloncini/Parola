@@ -68,7 +68,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_wait_for_phase` | **phase**, timeoutMs | Poll until phase matches or timeout fires. Returns `{matched, state}`. |
 | `parola_app_get_transcript` | — | Text + language + modelName + segment count + duration. Null if none loaded. |
 | `parola_app_clear_transcript` | — | Drop the in-memory transcript. |
-| `parola_app_list_entries` | category, limit | Library entries with id, title, category, createdAt, durationSeconds, language. |
+| `parola_app_list_entries` | category, limit | Library entries with id, title (as stored), displayTitle (what the rows show), category, createdAt, durationSeconds, language. |
 | `parola_app_load_entry` | **id** | Open a library entry by id. |
 | `parola_app_delete_entry` | **id** | Move an entry to Recently Deleted. |
 | `parola_app_download_model` | **name** | Trigger a download from inside the app. Progress shows in the UI. |

@@ -401,7 +401,7 @@ struct LibraryListView: View {
                 }
                 .accessibilityIdentifier("library.row.\(entry.id).revealInFinder")
                 Button("Rename…") {
-                    renameDraft = entry.title
+                    renameDraft = LibraryEntryDisplay.title(for: entry)
                     renamingEntry = entry
                 }
                 .accessibilityIdentifier("library.row.\(entry.id).rename")

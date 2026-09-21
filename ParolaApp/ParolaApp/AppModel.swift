@@ -3182,11 +3182,13 @@ final class AppModel {
             return
         }
         let notes = entry.segmentNotes
-        let title = TranscriptShareFile.safeName(for: LibraryEntryDisplay.title(for: entry))
+        // The heading is read, the file name is written: only the latter has characters to lose.
+        let title = LibraryEntryDisplay.title(for: entry)
+        let fileName = TranscriptShareFile.safeName(for: title)
         Task { [weak self] in
             guard let self else { return }
             guard let url = await self.filePicker.chooseSaveDestination(
-                suggestedName: "\(title)-notes.md",
+                suggestedName: "\(fileName)-notes.md",
                 allowedTypes: [.plainText]
             ) else { return }
             let body = NotesMarkdownRenderer.render(transcript: transcript, notes: notes, title: title)

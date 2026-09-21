@@ -7,7 +7,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "listEntries",
                 area: .library,
-                summary: "Lists library entries, optionally filtered by category. Each entry carries id, title, category, createdAt, durationSeconds, language and modelName.",
+                summary: "Lists library entries, optionally filtered by category. Each entry carries id, title (as stored), displayTitle (as the rows show it), category, createdAt, durationSeconds, language and modelName.",
                 kind: .sync,
                 args: [
                     .init(name: "limit", kind: .integer, required: false, summary: "Maximum entries to return", defaultValue: .int(50)),
@@ -24,6 +24,7 @@ extension ParolaAutomationServer {
                         .object([
                             "id": .string(entry.id),
                             "title": .string(entry.title),
+                            "displayTitle": .string(LibraryEntryDisplay.title(for: entry)),
                             "category": .string(entry.category.rawValue),
                             "createdAt": .double(entry.createdAt.timeIntervalSince1970),
                             "durationSeconds": entry.durationSeconds.map { .double($0) } ?? .null,

@@ -3937,6 +3937,17 @@
         }
       }
     },
+    "Export of %@ failed: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esportazione di %@ non riuscita: %@"
+          }
+        }
+      }
+    },
     "Export options": {
       "extractionState": "manual",
       "localizations": {

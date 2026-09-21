@@ -367,7 +367,11 @@ extension AppModel {
                     }
                     ParolaLog.error(.export, "library export failed as \(format)", fields)
                     await MainActor.run { [weak self] in
-                        self?.phase = .failed(message: "Export of \(entry.title) failed: \(error.localizedDescription)")
+                        let name = LibraryEntryDisplay.title(for: entry)
+                        let reason = error.localizedDescription
+                        self?.phase = .failed(
+                            message: String(localized: "Export of \(name) failed: \(reason)")
+                        )
                     }
                     return
                 }

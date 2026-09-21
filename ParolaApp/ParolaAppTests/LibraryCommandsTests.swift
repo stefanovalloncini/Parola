@@ -74,6 +74,33 @@ struct LibraryCommandsTests {
         #expect(second["modelName"] == .string("stub"))
     }
 
+    /// A scenario asserting on a row reads `displayTitle`; `title` stays the stored value.
+    @Test("listEntries reports both the stored title and the shown one")
+    func listEntriesCarriesTheDisplayTitle() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let created = Date(timeIntervalSince1970: 1_700_000_000)
+        let manifest = ParolaDocument.Manifest(
+            createdAt: created,
+            originalAudioName: "audio.m4a",
+            modelName: "stub",
+            language: "en"
+        )
+        model.libraryEntries = [
+            LibraryEntry(id: "a", bundleURL: URL(fileURLWithPath: "/tmp/a.parola"), manifest: manifest),
+        ]
+        let command = try #require(commands["listEntries"])
+
+        let result = try await command.handler(try command.validate(AutomationArgs()), context)
+        withExtendedLifetime(server) {}
+
+        guard case .array(let items) = result, case .object(let first) = items[0] else {
+            Issue.record("listEntries should return an array of objects")
+            return
+        }
+        #expect(first["title"] == .string("audio"))
+        #expect(first["displayTitle"] == .string(LibraryEntryDisplay.title(raw: "audio", createdAt: created)))
+    }
+
     @Test("listDeletedEntries clamps a negative limit to empty instead of trapping")
     func listDeletedEntriesNegativeLimit() async throws {
         let (model, server, context, commands) = try makeRig()
