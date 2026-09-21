@@ -75,9 +75,17 @@ struct RecentlyDeletedCopyTests {
         #expect(RecentlyDeletedCopy.subtitle(count: 8, retentionDays: 14) == "8 items · removed after 14 days")
     }
 
-    @Test("an empty trash says so instead of counting to zero")
+    /// The two captions stack on the same page, so they have to read as a pair.
+    @Test("the expiry captions are parallel in Italian")
+    func bucketCaptionsItalian() throws {
+        let it = try italianBundle()
+        #expect(it.localizedString(forKey: RecentlyDeletedCopy.ExpiryBucket.soon.caption, value: "MISSING", table: nil) == "In scadenza")
+        #expect(it.localizedString(forKey: RecentlyDeletedCopy.ExpiryBucket.later.caption, value: "MISSING", table: nil) == "In scadenza più avanti")
+    }
+
+    @Test("an empty trash leaves the retention window to the empty state")
     func subtitleEmpty() {
-        #expect(RecentlyDeletedCopy.subtitle(count: 0, retentionDays: 30) == "Nothing deleted · items are kept 30 days")
+        #expect(RecentlyDeletedCopy.subtitle(count: 0, retentionDays: 30) == nil, "the empty state already states the window")
     }
 
     @Test("the subtitle is localized to Italian on both sides of zero")
@@ -85,7 +93,7 @@ struct RecentlyDeletedCopyTests {
         let it = try italianBundle()
         #expect(RecentlyDeletedCopy.subtitle(count: 1, retentionDays: 30, bundle: it) == "1 elemento · rimosso dopo 30 giorni")
         #expect(RecentlyDeletedCopy.subtitle(count: 3, retentionDays: 30, bundle: it) == "3 elementi · rimossi dopo 30 giorni")
-        #expect(RecentlyDeletedCopy.subtitle(count: 0, retentionDays: 30, bundle: it) == "Nessun elemento eliminato · gli elementi restano 30 giorni")
+        #expect(RecentlyDeletedCopy.subtitle(count: 0, retentionDays: 30, bundle: it) == nil)
     }
 
     @Test("an entry without a deletion date has no days left")

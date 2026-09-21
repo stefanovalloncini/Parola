@@ -51,9 +51,10 @@ enum RecentlyDeletedCopy {
     }
 
     /// The line under the page title: how much is in the trash, and how long the trash keeps it.
-    static func subtitle(count: Int, retentionDays: Int, bundle: Bundle = .main) -> String {
+    /// An empty page leaves the window to the empty state, which is already stating it.
+    static func subtitle(count: Int, retentionDays: Int, bundle: Bundle = .main) -> String? {
         switch count {
-        case 0: return String(localized: "Nothing deleted · items are kept \(retentionDays) days", bundle: bundle)
+        case 0: return nil
         case 1: return String(localized: "1 item · removed after \(retentionDays) days", bundle: bundle)
         default: return String(localized: "\(count) items · removed after \(retentionDays) days", bundle: bundle)
         }

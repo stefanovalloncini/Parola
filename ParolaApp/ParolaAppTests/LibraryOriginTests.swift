@@ -429,6 +429,7 @@ struct LibraryOriginTests {
         #expect(TranscriptBackCopy.help(for: .category(.meeting), bundle: italian) == "Torna alle riunioni")
         #expect(TranscriptBackCopy.help(for: .home, bundle: italian) == "Torna alla Home")
         #expect(TranscriptBackCopy.help(for: .search, bundle: italian) == "Torna ai risultati")
+        #expect(TranscriptBackCopy.help(for: .all, bundle: italian) == "Torna a tutti gli elementi")
     }
 
     // MARK: - Bridge

@@ -1592,7 +1592,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Torna a Tutti"
+            "value": "Torna a tutti gli elementi"
           }
         }
       }
@@ -3793,7 +3793,7 @@
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scade più avanti"
+            "value": "In scadenza più avanti"
           }
         }
       }
@@ -6447,17 +6447,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nota"
-          }
-        }
-      }
-    },
-    "Nothing deleted · items are kept %lld days": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nessun elemento eliminato · gli elementi restano %lld giorni"
           }
         }
       }

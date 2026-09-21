@@ -97,7 +97,7 @@ struct RecentlyDeletedRow: View {
             .buttonStyle(DSIconChipButtonStyle())
             .help("Restore")
             .accessibilityLabel("Restore")
-            .axLeaf("Row.Button.arrowuturnbackward")
+            .axLeaf("Row.Button.Restore")
             Button(action: onPurge) {
                 Image(systemName: "trash")
                     .foregroundStyle(DS.Color.dangerText)
@@ -105,7 +105,7 @@ struct RecentlyDeletedRow: View {
             .buttonStyle(DSIconChipButtonStyle())
             .help("Delete Now")
             .accessibilityLabel("Delete Now")
-            .axLeaf("Row.Button.trash")
+            .axLeaf("Row.Button.Purge")
         }
         .opacity(revealed ? 1 : 0)
         .allowsHitTesting(revealed)
