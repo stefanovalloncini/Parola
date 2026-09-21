@@ -18,17 +18,19 @@ enum IntakeSettings {
 struct ContentToolbar: ToolbarContent {
     @Environment(AppModel.self) private var model
     @State private var optionsOpen = false
+    @State private var measuredIntakeWidth: CGFloat = 0
 
     var body: some ToolbarContent {
         if showsIntakeSettings {
             ToolbarItem(placement: .navigation) {
                 intakeCapsule
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { measuredIntakeWidth = $0 }
             }
         }
         ToolbarSpacer(.flexible, placement: .navigation)
         ToolbarItemGroup(placement: .primaryAction) {
             if showsSearch {
-                ToolbarSearchField(intakeShown: showsIntakeSettings)
+                ToolbarSearchField(intakeWidth: intakeWidth)
             }
             if isRecording {
                 Button {
@@ -164,6 +166,12 @@ struct ContentToolbar: ToolbarContent {
         .help("Start a new transcription.")
         .accessibilityIdentifier("toolbar.new")
         .axLeaf("Toolbar.Menu.New")
+    }
+
+    /// The capsule's own width once it has reported one, so the search field's budget is the toolbar's, not a guess.
+    private var intakeWidth: CGFloat {
+        guard showsIntakeSettings else { return 0 }
+        return measuredIntakeWidth > 0 ? measuredIntakeWidth : ToolbarSearchMetrics.defaultIntakeWidth
     }
 
     private var showsSearch: Bool {

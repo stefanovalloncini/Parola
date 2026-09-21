@@ -43,6 +43,9 @@ struct PillPickerButton<MenuContent: View>: View {
                     .font(DS.Font.bodyStrong)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
+                    .truncationMode(.tail)
+                    // An uncurated model id would otherwise widen the capsule past the search field's budget.
+                    .frame(maxWidth: 150, alignment: .leading)
                 Image(systemName: "chevron.down")
                     .font(DS.Font.caption)
                     .foregroundStyle(.tertiary)

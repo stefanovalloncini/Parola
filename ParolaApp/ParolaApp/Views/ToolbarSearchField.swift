@@ -14,30 +14,30 @@ enum ToolbarSearchMetrics {
     /// Below this a field is a sliver: the chip expands to at least this much or stays a chip.
     static let minimumFieldWidth: CGFloat = 132
 
-    /// Measured on the live toolbar at 1180: 251.5 pt of lights and sidebar toggle before the capsule,
-    /// 8 pt of gap after it, and 62.5 pt of New menu and window inset after the field.
-    static let chromeBesideSearch: CGFloat = 322
-    /// The fused intake capsule at its widest stock labels ("Apple Speech (system)" + "Auto-detect"), measured the same way.
-    static let intakeCapsuleWidth: CGFloat = 386
+    /// Measured on the built toolbar at 1180: 248 pt of lights and sidebar toggle, the 9 pt and 7 pt gaps
+    /// around the field, and 50.5 pt of New menu and window inset.
+    static let chromeBesideSearch: CGFloat = 314.5
+    /// What the capsule is worth before it has reported its own width: the widest stock pair, measured the same way.
+    static let defaultIntakeWidth: CGFloat = 393
 
     static func isShown(introductionPresented: Bool) -> Bool {
         !introductionPresented
     }
 
-    static func roomForSearch(windowWidth: CGFloat, intakeShown: Bool) -> CGFloat {
-        windowWidth - chromeBesideSearch - (intakeShown ? intakeCapsuleWidth : 0)
+    static func roomForSearch(windowWidth: CGFloat, intakeWidth: CGFloat) -> CGFloat {
+        windowWidth - chromeBesideSearch - intakeWidth
     }
 
     /// An unmeasured window proposes nothing, so it keeps the full field rather than flashing the chip.
-    static func collapses(windowWidth: CGFloat, intakeShown: Bool) -> Bool {
-        windowWidth > 0 && roomForSearch(windowWidth: windowWidth, intakeShown: intakeShown) < focusedWidth
+    static func collapses(windowWidth: CGFloat, intakeWidth: CGFloat) -> Bool {
+        windowWidth > 0 && roomForSearch(windowWidth: windowWidth, intakeWidth: intakeWidth) < focusedWidth
     }
 
     /// A chip opened on a narrow toolbar takes the room that is left rather than pushing the New menu off the edge.
-    static func fieldWidth(windowWidth: CGFloat, intakeShown: Bool, focused: Bool) -> CGFloat {
+    static func fieldWidth(windowWidth: CGFloat, intakeWidth: CGFloat, focused: Bool) -> CGFloat {
         let wanted = focused ? focusedWidth : restingWidth
-        guard collapses(windowWidth: windowWidth, intakeShown: intakeShown) else { return wanted }
-        return max(minimumFieldWidth, min(wanted, roomForSearch(windowWidth: windowWidth, intakeShown: intakeShown)))
+        guard collapses(windowWidth: windowWidth, intakeWidth: intakeWidth) else { return wanted }
+        return max(minimumFieldWidth, min(wanted, roomForSearch(windowWidth: windowWidth, intakeWidth: intakeWidth)))
     }
 
     enum EscapeOutcome: Equatable {
@@ -102,7 +102,8 @@ enum ToolbarSearchFocus {
 }
 
 struct ToolbarSearchField: View {
-    let intakeShown: Bool
+    /// The capsule's measured width, or 0 on a page that does not show it.
+    let intakeWidth: CGFloat
 
     @Environment(AppModel.self) private var model
     @Environment(\.mainWindowWidth) private var windowWidth
@@ -135,7 +136,7 @@ struct ToolbarSearchField: View {
     }
 
     private var collapsed: Bool {
-        !expanded && ToolbarSearchMetrics.collapses(windowWidth: windowWidth, intakeShown: intakeShown)
+        !expanded && ToolbarSearchMetrics.collapses(windowWidth: windowWidth, intakeWidth: intakeWidth)
     }
 
     private var query: Binding<String> {
@@ -160,7 +161,7 @@ struct ToolbarSearchField: View {
         .frame(
             width: ToolbarSearchMetrics.fieldWidth(
                 windowWidth: windowWidth,
-                intakeShown: intakeShown,
+                intakeWidth: intakeWidth,
                 focused: editing
             )
         )
