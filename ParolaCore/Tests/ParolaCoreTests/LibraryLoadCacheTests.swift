@@ -132,6 +132,9 @@ struct LibraryLoadCacheTests {
 
         private let state = OSAllocatedUnfairLock<Arming?>(initialState: nil)
 
+        /// Once reported, later waits are skipped: a broken gate then costs 30 s, not 30 s per iteration.
+        private let reported = OSAllocatedUnfairLock(initialState: false)
+
         var hook: @Sendable () -> Void {
             { [state] in
                 let arrival: (DispatchSemaphore, AsyncStream<Void>.Continuation?)? = state.withLock { current in
@@ -150,21 +153,24 @@ struct LibraryLoadCacheTests {
         /// Runs `body` once `count` decodes are parked, then lets them all answer.
         func holding(_ count: Int, _ body: () async throws -> Void) async rethrows {
             let release = DispatchSemaphore(value: 0)
-            let (parked, signal) = AsyncStream<Void>.makeStream()
+            let (parked, signal) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
             state.withLock { $0 = Arming(release: release, allParked: signal, remaining: count, parked: 0) }
             defer {
                 state.withLock { $0 = nil }
                 signal.finish()
                 for _ in 0..<count { release.signal() }
             }
-            let reached = await signalled(parked)
-            if !reached, state.withLock({ $0?.parked ?? count }) < count {
-                Issue.record("the decodes never reached the gate")
+            if !reported.withLock({ $0 }) {
+                let reached = await signalled(parked)
+                if !reached, state.withLock({ $0?.parked ?? count }) < count {
+                    reported.withLock { $0 = true }
+                    Issue.record("the decodes never reached the gate")
+                }
             }
             try await body()
         }
 
-        /// The last decode to park signals; nothing polls, so a starved pool delays the answer instead of faking a timeout.
+        /// The last decode to park signals, so a starved pool delays the answer instead of faking a timeout.
         private func signalled(_ parked: AsyncStream<Void>) async -> Bool {
             await withTaskGroup(of: Bool.self) { group in
                 group.addTask {
