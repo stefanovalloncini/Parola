@@ -164,8 +164,10 @@ actor AppleSpeechTranscriber: Transcriber {
                 assembler.addFinal(text)
                 if let tail = partials.offer(assembler.tail()) { handlers.onPartial?(tail) }
             }
-            if let reported = progress.flush() { handlers.onProgress?(reported) }
-            if let tail = partials.flush() { handlers.onPartial?(tail) }
+            if !Task.isCancelled {
+                if let reported = progress.flush() { handlers.onProgress?(reported) }
+                if let tail = partials.flush() { handlers.onPartial?(tail) }
+            }
             return (segments, meter.value)
         }
 
