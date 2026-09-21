@@ -5,6 +5,9 @@ enum FeatureVignettePhase {
     static let period: Double = 4
     static let frameInterval: Double = 1.0 / 15.0
 
+    /// Every loop opens on its settled frame and clears it over this much of the period, so phase 0 and phase 1 draw the same thing.
+    static let resetSpan: Double = 0.1
+
     static func phase(at time: Double, period: Double = FeatureVignettePhase.period) -> Double {
         guard period > 0 else { return 0 }
         let wrapped = time.truncatingRemainder(dividingBy: period)
@@ -22,16 +25,20 @@ enum FeatureVignettePhase {
         return clamped * clamped * (3 - 2 * clamped)
     }
 
-    /// One rise and fall over the window, peaking in the middle.
+    /// One rise and fall over the window, peaking in the middle and at rest on both sides.
     static func pulse(_ phase: Double, from start: Double, span: Double) -> Double {
-        sin(.pi * ramp(phase, from: start, span: span))
+        let progress = ramp(phase, from: start, span: span)
+        guard progress > 0, progress < 1 else { return 0 }
+        return sin(.pi * progress)
     }
 
-    /// The loop opens on the settled frame and clears it, so phase 0 and phase 1 draw the same thing.
-    static let resetSpan: Double = 0.1
+    /// How much of the settled frame is still on screen while the loop clears it.
+    static func clearing(_ phase: Double) -> Double {
+        phase < resetSpan ? 1 - phase / resetSpan : 1
+    }
 }
 
-enum FeatureVignetteKind {
+enum FeatureVignetteKind: CaseIterable {
     case transcribe
     case meetings
     case dictation
@@ -80,16 +87,113 @@ struct FeatureVignette: View {
     @ViewBuilder
     private func still(phase: Double) -> some View {
         switch kind {
-        case .transcribe: TranscribeVignette(phase: phase)
-        case .meetings: MeetingVignette(phase: phase)
-        case .dictation: DictationVignette(phase: phase, keyName: hotkeyName)
-        case .captions: CaptionsVignette(phase: phase)
+        case .transcribe: TranscribeVignette(frame: TranscribeFrame(phase: phase))
+        case .meetings: MeetingVignette(frame: MeetingFrame(phase: phase))
+        case .dictation: DictationVignette(frame: DictationFrame(phase: phase), phase: phase, keyName: hotkeyName)
+        case .captions: CaptionsVignette(frame: CaptionsFrame(phase: phase))
+        }
+    }
+}
+
+/// One frame of the transcribe loop: a file glyph drops onto a card, then three lines of text fill in.
+struct TranscribeFrame: Equatable {
+    let glyphOpacity: Double
+    let glyphOffset: Double
+    let lineOpacity: Double
+    let firstLine: Double
+    let secondLine: Double
+    let thirdLine: Double
+
+    init(phase: Double) {
+        let clearing = FeatureVignettePhase.clearing(phase)
+        let drop = phase < FeatureVignettePhase.resetSpan
+            ? 1
+            : FeatureVignettePhase.ramp(phase, from: 0.08, span: 0.14)
+        glyphOpacity = clearing * drop
+        glyphOffset = -12 * (1 - FeatureVignettePhase.ease(drop))
+        lineOpacity = clearing
+        firstLine = Self.line(0, at: phase)
+        secondLine = Self.line(1, at: phase)
+        thirdLine = Self.line(2, at: phase)
+    }
+
+    func line(_ index: Int) -> Double {
+        switch index {
+        case 0: return firstLine
+        case 1: return secondLine
+        default: return thirdLine
+        }
+    }
+
+    static func line(_ index: Int, at phase: Double) -> Double {
+        guard phase >= FeatureVignettePhase.resetSpan else { return 1 }
+        return FeatureVignettePhase.ease(
+            FeatureVignettePhase.ramp(phase, from: 0.24 + Double(index) * 0.15, span: 0.12)
+        )
+    }
+}
+
+/// One frame of the meetings loop: the detection pill, a Record pill that beats once, a recording dot that arrives late.
+struct MeetingFrame: Equatable {
+    let pillScale: Double
+    let dot: Double
+
+    init(phase: Double) {
+        pillScale = 1 + 0.06 * FeatureVignettePhase.pulse(phase, from: 0.38, span: 0.24)
+        dot = phase < FeatureVignettePhase.resetSpan
+            ? FeatureVignettePhase.clearing(phase)
+            : FeatureVignettePhase.ramp(phase, from: 0.67, span: 0.13)
+    }
+}
+
+/// One frame of the dictation loop: the key goes down, the words land one by one behind a blinking caret.
+struct DictationFrame: Equatable {
+    static let firstWord = 0.24
+    static let lastWord = 0.7
+    static let wordSpan = 0.12
+
+    let press: Double
+    let caretVisible: Bool
+
+    init(phase: Double) {
+        press = FeatureVignettePhase.pulse(phase, from: 0.06, span: 0.2)
+        caretVisible = Int(phase * FeatureVignettePhase.period / StreamingReveal.caretBlinkPeriod) % 2 == 0
+    }
+
+    /// The stride comes from the word count, so a translation of any length still finishes by `lastWord`.
+    static func landing(_ index: Int, of count: Int, at phase: Double) -> Double {
+        guard phase >= FeatureVignettePhase.resetSpan else { return 1 }
+        let stride = count > 1 ? (lastWord - wordSpan - firstWord) / Double(count - 1) : 0
+        return FeatureVignettePhase.ease(
+            FeatureVignettePhase.ramp(phase, from: firstWord + Double(index) * stride, span: wordSpan)
+        )
+    }
+
+    static func word(_ index: Int, of count: Int, at phase: Double) -> Double {
+        guard phase >= FeatureVignettePhase.resetSpan else { return FeatureVignettePhase.clearing(phase) }
+        return landing(index, of: count, at: phase)
+    }
+}
+
+/// One frame of the captions loop.
+struct CaptionsFrame: Equatable {
+    static let crossfade = 0.22 / FeatureVignettePhase.period
+
+    let first: Double
+
+    var second: Double { 1 - first }
+
+    init(phase: Double) {
+        if phase < 0.42 + Self.crossfade {
+            first = 1 - FeatureVignettePhase.ramp(phase, from: 0.42, span: Self.crossfade)
+        } else {
+            first = FeatureVignettePhase.ramp(phase, from: 1 - Self.crossfade, span: Self.crossfade)
         }
     }
 }
 
 private struct TranscribeVignette: View {
-    let phase: Double
+    let frame: TranscribeFrame
 
     private static let lineWidths: [CGFloat] = [56, 42, 48]
 
@@ -98,15 +202,15 @@ private struct TranscribeVignette: View {
             Image(systemName: "arrow.down.doc")
                 .font(.system(size: 18))
                 .foregroundStyle(DS.Color.accent)
-                .offset(y: -12 * (1 - FeatureVignettePhase.ease(drop)))
-                .opacity(clearing * drop)
+                .offset(y: frame.glyphOffset)
+                .opacity(frame.glyphOpacity)
             VStack(alignment: .leading, spacing: DS.Spacing.snug) {
                 ForEach(0..<Self.lineWidths.count, id: \.self) { index in
                     Capsule(style: .continuous)
                         .fill(DS.Color.secondaryText.opacity(0.4))
-                        .frame(width: Self.lineWidths[index] * fill(index), height: 4)
+                        .frame(width: Self.lineWidths[index] * frame.line(index), height: 4)
                         .frame(width: Self.lineWidths[index], alignment: .leading)
-                        .opacity(clearing)
+                        .opacity(frame.lineOpacity)
                 }
             }
         }
@@ -114,26 +218,10 @@ private struct TranscribeVignette: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .cardBackground(radius: DS.Radius.small)
     }
-
-    private var clearing: Double {
-        phase < FeatureVignettePhase.resetSpan ? 1 - phase / FeatureVignettePhase.resetSpan : 1
-    }
-
-    private var drop: Double {
-        guard phase >= FeatureVignettePhase.resetSpan else { return 1 }
-        return FeatureVignettePhase.ramp(phase, from: 0.08, span: 0.14)
-    }
-
-    private func fill(_ index: Int) -> Double {
-        guard phase >= FeatureVignettePhase.resetSpan else { return 1 }
-        return FeatureVignettePhase.ease(
-            FeatureVignettePhase.ramp(phase, from: 0.24 + Double(index) * 0.15, span: 0.12)
-        )
-    }
 }
 
 private struct MeetingVignette: View {
-    let phase: Double
+    let frame: MeetingFrame
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
@@ -153,25 +241,20 @@ private struct MeetingVignette: View {
                     .padding(.horizontal, DS.Spacing.small)
                     .padding(.vertical, 3)
                     .background(Capsule(style: .continuous).fill(DS.Color.accent))
-                    .scaleEffect(1 + 0.06 * FeatureVignettePhase.pulse(phase, from: 0.38, span: 0.24))
+                    .scaleEffect(frame.pillScale)
                 Circle()
                     .fill(DS.Color.danger)
                     .frame(width: 6, height: 6)
-                    .opacity(dot)
+                    .opacity(frame.dot)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
-
-    private var dot: Double {
-        guard phase >= FeatureVignettePhase.resetSpan else {
-            return 1 - phase / FeatureVignettePhase.resetSpan
-        }
-        return FeatureVignettePhase.ramp(phase, from: 0.67, span: 0.13)
-    }
 }
 
 private struct DictationVignette: View {
+    let frame: DictationFrame
+    // The words' own progress depends on how many the phrase has, which only this view knows, so it keeps the phase too.
     let phase: Double
     let keyName: String
 
@@ -191,23 +274,24 @@ private struct DictationVignette: View {
                 .frame(minWidth: 22)
                 .background(
                     RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                        .fill(press > 0.4 ? DS.Palette.pillFillHover : DS.Palette.pillFill)
+                        .fill(frame.press > 0.4 ? DS.Palette.pillFillHover : DS.Palette.pillFill)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                         .strokeBorder(DS.Palette.divider, lineWidth: 1)
                 )
-                .scaleEffect(1 - 0.08 * press)
+                .scaleEffect(1 - 0.08 * frame.press)
             HStack(spacing: DS.Spacing.tight) {
                 ForEach(0..<Self.words.count, id: \.self) { index in
                     // Dropped rather than hidden while it waits, so the caret sits against the last word that landed.
-                    if word(index) > 0 {
+                    let opacity = DictationFrame.word(index, of: Self.words.count, at: phase)
+                    if opacity > 0 {
                         Text(verbatim: Self.words[index])
-                            .offset(y: 3 * (1 - landing(index)))
-                            .opacity(word(index))
+                            .offset(y: 3 * (1 - DictationFrame.landing(index, of: Self.words.count, at: phase)))
+                            .opacity(opacity)
                     }
                 }
-                StreamingReveal.caret(visible: Int(phase * 6) % 2 == 0)
+                StreamingReveal.caret(visible: frame.caretVisible)
             }
             .font(DS.Font.caption)
             .foregroundStyle(DS.Color.primaryText)
@@ -215,28 +299,10 @@ private struct DictationVignette: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
-
-    private var press: Double {
-        FeatureVignettePhase.pulse(phase, from: 0.06, span: 0.2)
-    }
-
-    private func landing(_ index: Int) -> Double {
-        guard phase >= FeatureVignettePhase.resetSpan else { return 1 }
-        return FeatureVignettePhase.ease(
-            FeatureVignettePhase.ramp(phase, from: 0.24 + Double(index) * 0.15, span: 0.12)
-        )
-    }
-
-    private func word(_ index: Int) -> Double {
-        guard phase >= FeatureVignettePhase.resetSpan else {
-            return 1 - phase / FeatureVignettePhase.resetSpan
-        }
-        return landing(index)
-    }
 }
 
 private struct CaptionsVignette: View {
-    let phase: Double
+    let frame: CaptionsFrame
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.tight) {
@@ -245,8 +311,8 @@ private struct CaptionsVignette: View {
                 // The real captions panel paints its own dark scrim, so surface-derived colours read too dark here.
                 .foregroundStyle(Color.white.opacity(0.55))
             ZStack(alignment: .topLeading) {
-                caption("Words as they are spoken").opacity(first)
-                caption("In a panel that stays on top").opacity(1 - first)
+                caption("Words as they are spoken").opacity(frame.first)
+                caption("In a panel that stays on top").opacity(frame.second)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
@@ -270,15 +336,5 @@ private struct CaptionsVignette: View {
             .lineLimit(2)
             .minimumScaleFactor(0.75)
             .fixedSize(horizontal: false, vertical: true)
-    }
-
-    // The real panel crossfades a new caption in over 0.22 s; matched here, as a fraction of the loop.
-    private static let crossfade = 0.22 / FeatureVignettePhase.period
-
-    private var first: Double {
-        if phase < 0.42 { return 1 }
-        if phase < 0.42 + Self.crossfade { return 1 - (phase - 0.42) / Self.crossfade }
-        if phase < 1 - Self.crossfade { return 0 }
-        return (phase - (1 - Self.crossfade)) / Self.crossfade
     }
 }
