@@ -90,6 +90,7 @@ struct ParolaApp: App {
         WindowGroup {
             ContentView()
                 .id(model.themeRevision)
+                .demoPlayback()
                 .tint(DS.Color.accent)
                 .environment(model)
                 .environment(liveCaptions)

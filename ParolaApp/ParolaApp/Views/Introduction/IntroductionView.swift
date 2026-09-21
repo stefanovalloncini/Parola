@@ -40,9 +40,8 @@ struct IntroductionView: View {
 
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(DemoPlayback.self) private var playback: DemoPlayback?
     @Namespace private var brand
-    // Held as an optional and filled on appear: a default value would open an AVAudioPlayer on every init.
-    @State private var playback: DemoPlayback?
 
     var body: some View {
         let introduction = model.introduction
@@ -62,7 +61,6 @@ struct IntroductionView: View {
         }
         .animation(sceneAnimation(kind: kind), value: introduction.step)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task { if playback == nil { playback = DemoPlayback() } }
         .axBranch("Introduction")
     }
 
@@ -105,5 +103,27 @@ struct IntroductionView: View {
         guard !reduceMotion else { return .opacity }
         let arriving: AnyTransition = kind == .fade ? .opacity : .move(edge: Self.moveEdge(back: back))
         return .asymmetric(insertion: arriving, removal: .opacity)
+    }
+}
+
+extension View {
+    /// Holds the demo clip above `ContentView`'s theme identity, so changing the accent mid-introduction doesn't rebuild the player and replay the audio.
+    func demoPlayback() -> some View {
+        modifier(DemoPlaybackOwner())
+    }
+}
+
+private struct DemoPlaybackOwner: ViewModifier {
+    @Environment(AppModel.self) private var model
+    // Built when the introduction opens rather than up front: a player at launch would decode the clip for everyone.
+    @State private var playback: DemoPlayback?
+
+    func body(content: Content) -> some View {
+        content
+            .environment(playback)
+            .task(id: model.introduction.isPresented) {
+                guard model.introduction.isPresented else { return }
+                playback = DemoPlayback()
+            }
     }
 }
