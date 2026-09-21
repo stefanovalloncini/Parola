@@ -1,6 +1,20 @@
 import SwiftUI
 import ParolaCore
 
+/// The model, language and options apply to the next run, so only the pages that can start one show them.
+enum IntakeSettings {
+    static func areShown(
+        route: AppModel.Route,
+        isBrowsingLibrary: Bool,
+        settingsPreview: Bool = false,
+        introductionPresented: Bool = false
+    ) -> Bool {
+        guard !settingsPreview, !introductionPresented else { return false }
+        guard route == .transcript else { return false }
+        return !isBrowsingLibrary
+    }
+}
+
 struct ContentToolbar: ToolbarContent {
     @Environment(AppModel.self) private var model
     @State private var optionsOpen = false
@@ -139,9 +153,13 @@ struct ContentToolbar: ToolbarContent {
         .axLeaf("Toolbar.Menu.New")
     }
 
-    /// The model, language and options apply to the next run, so the library's own lists hide them.
     private var showsIntakeSettings: Bool {
-        !model.isBrowsingLibrary
+        IntakeSettings.areShown(
+            route: model.route,
+            isBrowsingLibrary: model.isBrowsingLibrary,
+            settingsPreview: model.mode == .test && model.settingsRoutePreview,
+            introductionPresented: model.introduction.isPresented
+        )
     }
 
     private var selectedModelIsEnglishOnly: Bool {
