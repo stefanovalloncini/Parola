@@ -121,6 +121,24 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "openEntryInNewWindow",
+                area: .window,
+                summary: "Opens a library entry in its own read-only transcript window, the way ⇧⌘N and the row's context menu do. The window is titled after the entry; getState.openEntryWindows lists what is open.",
+                kind: .mutating,
+                args: [
+                    .init(name: "entryID", kind: .string(), required: true, summary: "Library entry ID"),
+                ],
+                handler: { args, ctx in
+                    let id = try args.string("entryID")
+                    ctx.model.openEntryWindow(id)
+                    return .object([
+                        "opened": .bool(ctx.model.openEntryWindowIDs.contains(id)),
+                        "openEntryWindows": .array(ctx.model.openEntryWindowIDs.map { .string($0) }),
+                    ])
+                }
+            ),
+
+            AutomationCommand(
                 name: "openRecentlyDeleted",
                 area: .window,
                 summary: "Routes the main window to the Recently Deleted page.",

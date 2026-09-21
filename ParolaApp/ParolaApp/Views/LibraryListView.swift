@@ -338,7 +338,7 @@ struct LibraryListView: View {
                 .animation(animatesRows && !reduceMotion ? DS.Motion.listRows : nil, value: entries.map(\.id))
                 .onKeyPress(.return) {
                     guard selection.count == 1, let id = selection.first else { return .ignored }
-                    model.loadEntry(id)
+                    model.openEntryFromLibrary(id, inNewWindow: false)
                     return .handled
                 }
             }
@@ -433,13 +433,21 @@ struct LibraryListView: View {
             .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] + SearchResultRow.separatorInset }
             .contentShape(Rectangle())
             .draggable(entry.bundleURL)
+            // SwiftUI's tap gesture doesn't carry the event's modifiers, so Option is read as the tap lands.
             .onTapGesture(count: 2) {
-                model.loadEntry(entry.id)
+                model.openEntryFromLibrary(
+                    entry.id,
+                    inNewWindow: NSEvent.modifierFlags.contains(.option)
+                )
             }
             .contextMenu {
                 Button("Open") {
-                    model.loadEntry(entry.id)
+                    model.openEntryFromLibrary(entry.id, inNewWindow: false)
                 }
+                Button("Open in New Window") {
+                    model.openEntryWindow(entry.id)
+                }
+                .accessibilityIdentifier("library.row.\(entry.id).openInNewWindow")
                 Button(entry.pinned ? "Unpin" : "Pin") {
                     model.togglePinned(for: entry.id)
                 }

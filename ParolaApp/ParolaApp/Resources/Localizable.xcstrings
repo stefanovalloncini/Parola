@@ -1641,6 +1641,17 @@
         }
       }
     },
+    "Always open transcripts in a new window": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri sempre le trascrizioni in una nuova finestra"
+          }
+        }
+      }
+    },
     "An appcast URL hasn't been configured yet, so checks won't run.": {
       "extractionState": "manual",
       "localizations": {
@@ -4177,6 +4188,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fine"
+          }
+        }
+      }
+    },
+    "Double-clicking a library row opens its own window instead of taking over the main one. Hold Option to open a window either way.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un doppio clic su una riga della libreria apre una finestra dedicata invece di occupare quella principale. Tieni premuto Opzione per aprire comunque una finestra."
           }
         }
       }
@@ -10439,6 +10461,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salva il nome"
+          }
+        }
+      }
+    },
+    "Save the transcript to the library first": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva prima la trascrizione nella libreria"
           }
         }
       }

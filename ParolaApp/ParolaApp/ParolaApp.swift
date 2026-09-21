@@ -172,13 +172,13 @@ struct ParolaApp: App {
                 @Bindable var model = model
                 Button("Show Transcript") { model.setTranscriptPaneMode(.transcript) }
                     .keyboardShortcut("1", modifiers: [.command])
-                    .disabled(!model.canShow(.transcript))
+                    .disabled(!model.canShow(.transcript) || model.keyWindowIsViewer)
                 Button("Show Summary") { model.setTranscriptPaneMode(.summary) }
                     .keyboardShortcut("2", modifiers: [.command])
-                    .disabled(!model.canShow(.summary))
+                    .disabled(!model.canShow(.summary) || model.keyWindowIsViewer)
                 Button("Show Chat") { model.setTranscriptPaneMode(.chat) }
                     .keyboardShortcut("3", modifiers: [.command])
-                    .disabled(!model.canShow(.chat))
+                    .disabled(!model.canShow(.chat) || model.keyWindowIsViewer)
                 Toggle("Show Translations Side by Side", isOn: $model.translationSideBySide)
                     .disabled(!model.hasTranslation)
                     .axLeaf("Menu.View.TranslationSideBySide")
@@ -187,23 +187,23 @@ struct ParolaApp: App {
                     InspectorVisibility.toggle(in: DefaultsStore.current, isNarrow: model.transcriptPaneIsNarrow)
                 }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
-                .disabled(!model.hasTranscript)
+                .disabled(!model.mainTranscriptCommandsEnabled)
                 Toggle("Always on Top", isOn: $model.mainWindowAlwaysOnTop)
                 MiniPlayerCommand()
             }
             CommandGroup(after: .textEditing) {
-                Button("Find…") { model.toggleFind() }
+                Button("Find…") { model.beginFind() }
                     .keyboardShortcut("f", modifiers: [.command])
-                    .disabled(!model.hasTranscript)
-                Button("Find Next") { model.goToNextMatch() }
+                    .disabled(!model.findCommandEnabled)
+                Button("Find Next") { model.goToNextMatchInKeyWindow() }
                     .keyboardShortcut("g", modifiers: [.command])
-                    .disabled(!model.findIsOpen || !model.hasMatches)
-                Button("Find Previous") { model.goToPreviousMatch() }
+                    .disabled(!model.keyWindowFindIsOpen || !model.keyWindowHasMatches)
+                Button("Find Previous") { model.goToPreviousMatchInKeyWindow() }
                     .keyboardShortcut("g", modifiers: [.command, .shift])
-                    .disabled(!model.findIsOpen || !model.hasMatches)
+                    .disabled(!model.keyWindowFindIsOpen || !model.keyWindowHasMatches)
                 Button("Replace All") { model.replaceAllMatches() }
                     .keyboardShortcut("e", modifiers: [.command, .option])
-                    .disabled(!model.findIsOpen || !model.hasMatches)
+                    .disabled(!model.findIsOpen || !model.hasMatches || model.keyWindowIsViewer)
                 Divider()
                 Button("Search Library") { model.focusLibrarySearch() }
                     .keyboardShortcut("f", modifiers: [.command, .option])
@@ -215,12 +215,12 @@ struct ParolaApp: App {
                 FocusChatComposerCommand()
             }
             CommandMenu("Playback") {
-                Button(model.isPlaying ? "Pause" : "Play") { model.togglePlayPause() }
-                    .disabled(model.player == nil)
-                Button("Skip Back 5 Seconds") { model.skip(by: -5) }
-                    .disabled(model.player == nil)
-                Button("Skip Forward 5 Seconds") { model.skip(by: 5) }
-                    .disabled(model.player == nil)
+                Button(model.keyWindowIsPlaying ? "Pause" : "Play") { model.togglePlayPauseInKeyWindow() }
+                    .disabled(!model.keyWindowHasPlayer)
+                Button("Skip Back 5 Seconds") { model.skipInKeyWindow(by: -5) }
+                    .disabled(!model.keyWindowHasPlayer)
+                Button("Skip Forward 5 Seconds") { model.skipInKeyWindow(by: 5) }
+                    .disabled(!model.keyWindowHasPlayer)
             }
             if model.features.isEnabled(.dictation) || model.features.isEnabled(.liveCaptions) {
                 CommandMenu("Captions") {
@@ -259,38 +259,38 @@ struct ParolaApp: App {
                 Divider()
                 Button("Copy Plain Text") { model.copyTranscriptToPasteboard(withTimestamps: false) }
                     .keyboardShortcut("c", modifiers: [.command, .shift])
-                    .disabled(!model.hasTranscript)
+                    .disabled(!model.mainTranscriptCommandsEnabled)
                 Button("Copy with Timestamps") { model.copyTranscriptToPasteboard(withTimestamps: true) }
                     .keyboardShortcut("c", modifiers: [.command, .option])
-                    .disabled(!model.hasTranscript)
+                    .disabled(!model.mainTranscriptCommandsEnabled)
                 Button("Copy as SRT") { model.copyTranscriptAsFormat(.srt) }
-                    .disabled(!model.hasTranscript)
+                    .disabled(!model.mainTranscriptCommandsEnabled)
                 Button("Copy Favorites") { model.copyTranscriptToPasteboard(withTimestamps: true, favoritesOnly: true) }
-                    .disabled(model.favoriteSegmentIDs.isEmpty)
+                    .disabled(model.favoriteSegmentIDs.isEmpty || model.keyWindowIsViewer)
                 Button("Send via Mail…") { model.shareTranscriptViaMail() }
                     .keyboardShortcut("m", modifiers: [.command, .shift])
-                    .disabled(!model.hasTranscript)
+                    .disabled(!model.mainTranscriptCommandsEnabled)
                 Button("Share…") { model.shareTranscriptAsTextFile() }
-                    .disabled(!model.hasTranscript)
+                    .disabled(!model.mainTranscriptCommandsEnabled)
                 Divider()
                 Button("Jump to Next Speaker") { model.jumpToNextSpeaker() }
                     .keyboardShortcut("j", modifiers: [.command, .shift])
-                    .disabled(!model.hasTranscript)
+                    .disabled(!model.mainTranscriptCommandsEnabled)
                 Button("Manage People…") { model.showingPeopleSheet = true }
                 Button("Favorite Segment") {
                     guard let id = model.focusedSegmentIDForCommands else { return }
                     model.toggleSegmentFavorite(id)
                 }
                 .keyboardShortcut("d", modifiers: [.command])
-                .disabled(!model.hasTranscript)
+                .disabled(!model.mainTranscriptCommandsEnabled)
                 Button("Copy as Markdown") { model.copyTranscriptAsFormat(.md) }
-                    .disabled(!model.hasTranscript)
+                    .disabled(!model.mainTranscriptCommandsEnabled)
                 Button("Export Segment Notes…") { model.exportSegmentNotesAsMarkdown() }
-                    .disabled(!model.hasTranscript)
+                    .disabled(!model.mainTranscriptCommandsEnabled)
                 Divider()
                 Button("Export…") { model.openExportSheet() }
                     .keyboardShortcut("e", modifiers: [.command, .shift])
-                    .disabled(!model.hasTranscript)
+                    .disabled(!model.mainTranscriptCommandsEnabled)
                 Menu("Export As") {
                     ForEach(Array(model.exportPresets.enumerated()), id: \.element.id) { position, preset in
                         Button(LocalizedStringKey(preset.name)) { model.exportWithPreset(preset.id) }
@@ -298,20 +298,15 @@ struct ParolaApp: App {
                             .keyboardShortcut(position == 0 ? KeyboardShortcut("e", modifiers: .command) : nil)
                     }
                 }
-                .disabled(!model.hasTranscript)
+                .disabled(!model.mainTranscriptCommandsEnabled)
                 Divider()
                 Button("Open in New Window") {
-                    if let t = model.transcript {
-                        let title = AppModel.transcriptDisplayTitle(
-                            sourceFileURL: model.sourceFileURL,
-                            entry: model.selectedEntryID.flatMap { model.libraryEntry(id: $0) },
-                            fallback: String(localized: "Transcript")
-                        )
-                        TranscriptWindowController.shared.open(transcript: t, title: title)
-                    }
+                    guard let id = model.selectedEntryID else { return }
+                    model.openEntryWindow(id)
                 }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
-                .disabled(!model.hasTranscript)
+                .disabled(model.selectedEntryID == nil || model.keyWindowIsViewer)
+                .help("Save the transcript to the library first")
                 if model.destinationsEnabled {
                     Divider()
                     SendToMenu(model: model, entryID: model.selectedEntryID)
@@ -319,10 +314,10 @@ struct ParolaApp: App {
                 Divider()
                 Button("Print Transcript…") { model.printTranscript() }
                     .keyboardShortcut("p", modifiers: [.command])
-                    .disabled(!model.hasTranscript)
+                    .disabled(!model.mainTranscriptCommandsEnabled)
                 Divider()
                 Button("Burn Subtitles into Video…") { model.requestBurnSubtitles() }
-                    .disabled(!model.hasTranscript)
+                    .disabled(!model.mainTranscriptCommandsEnabled)
             }
         }
 

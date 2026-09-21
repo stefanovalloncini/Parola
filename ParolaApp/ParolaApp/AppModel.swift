@@ -741,6 +741,7 @@ final class AppModel {
         self.liveCaptionsTranslate = defaults.bool(forKey: "liveCaptionsTranslate")
         self.remoteAIAcknowledged = defaults.bool(forKey: "remoteAIAcknowledged")
         self.showMostUsedPeople = readBool("showMostUsedPeople", default: true)
+        self.openEntriesInNewWindow = defaults.bool(forKey: "openEntriesInNewWindow")
         introduction.reloadFromDefaults()
     }
 
@@ -1031,6 +1032,11 @@ final class AppModel {
 
     @ObservationIgnored let entryWindows = EntryWindowRegistry()
     @ObservationIgnored var openEntryWindowAction: ((LibraryEntry.ID) -> Void)?
+    var keyViewerEntryIDs: Set<LibraryEntry.ID> = []
+    var openEntriesInNewWindow: Bool = false {
+        didSet { defaults.set(openEntriesInNewWindow, forKey: "openEntriesInNewWindow") }
+    }
+
     @ObservationIgnored private var libraryEntriesByID: [String: LibraryEntry] = [:]
 
     private func rebuildLibraryIndex() {

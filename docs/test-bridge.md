@@ -49,7 +49,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | Tool | Args | What it does |
 |---|---|---|
 | `parola_app_ping` | — | Returns `{pong: true}`. Use to confirm the bridge is up. |
-| `parola_app_state` | — | Full state snapshot: phase, route, selectedModel, language, libraryFilter, libraryOrigin, appTheme, availableModels, transcript presence, and `introduction` (`{visible, step, steps, engine, engineChoices}`). While transcribing, `phaseDetail` also carries `progress`, `stage` and `hasPartialText`. |
+| `parola_app_state` | — | Full state snapshot: phase, route, selectedModel, language, libraryFilter, libraryOrigin, appTheme, availableModels, transcript presence, and `introduction` (`{visible, step, steps, engine, engineChoices}`). `openEntryWindows` lists the entry ids open in their own transcript windows, and `openEntriesInNewWindow` says whether a double-click routes there. While transcribing, `phaseDetail` also carries `progress`, `stage` and `hasPartialText`. |
 | `parola_app_select_model` | **name** | Set selectedModel to a catalog id. |
 | `parola_app_set_language` | code | Two-letter language code, or empty string to auto-detect. |
 | `parola_app_set_theme` | **theme** | `light` / `dark` / `system`. |
@@ -69,7 +69,8 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_get_transcript` | — | Text + language + modelName + segment count + duration. Null if none loaded. |
 | `parola_app_clear_transcript` | — | Drop the in-memory transcript. |
 | `parola_app_list_entries` | category, limit | Library entries with id, title (as stored), displayTitle (what the rows show), category, createdAt, durationSeconds, language. |
-| `parola_app_load_entry` | **id** | Open a library entry by id. |
+| `parola_app_load_entry` | **id** | Open a library entry by id — into the main pane, or into its own window when `openEntriesInNewWindow` is on. |
+| `openEntryInNewWindow` | **entryID** | Open a library entry in its own read-only transcript window, the way ⇧⌘N and the row's context menu do. The window is titled after the entry. Replies `{opened, openEntryWindows}`. |
 | `parola_app_delete_entry` | **id** | Move an entry to Recently Deleted. |
 | `parola_app_download_model` | **name** | Trigger a download from inside the app. Progress shows in the UI. |
 | `parola_app_delete_model` | **name** | Delete a downloaded model. |
@@ -92,7 +93,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `exportDiagnostics` | — | Render the diagnostics report and write it to the save destination. Returns `{path}`. In test mode, queue the destination with `queueSaveDestination` first. A dismissed panel is `PRECONDITION`; a failed write is `INTERNAL`. |
 | `parola_app_dismiss_error` | — | Clear a failed phase (equivalent to clicking "Try again"). |
 | `parola_app_screenshot` | path | Capture the main window to PNG via ScreenCaptureKit (needs Screen Recording permission). `path` is a bare filename stored under `Caches/Parola/Screenshots`. |
-| `parola_app_list_windows` | — | Visible NSWindows: title, size, key/main flags. |
+| `parola_app_list_windows` | — | Visible NSWindows: title, size, key/main flags. A transcript window carries the entry's title, so a driver can find it. |
 | `translateTranscript` | **language** | Translate the loaded transcript into that language code and store the result. Uses whichever translator is installed (`installMockTranslator` in test mode). Replies `{translated, targetLanguage, segmentCount, provider}`, or `{translated: false, reason}` when the run failed or was refused. |
 | `removeTranslation` | — | Drop the loaded transcript's translation. Replies `{removed}`. |
 | `toggleInspector` | — | Toggle the transcript inspector, the same way ⌘⇧I does. Below ~1050 pt of window the pane folds the inspector away, and this is the only way to bring it back. |

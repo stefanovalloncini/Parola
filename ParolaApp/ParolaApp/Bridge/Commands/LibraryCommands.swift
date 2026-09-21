@@ -68,7 +68,7 @@ extension ParolaAutomationServer {
             AutomationCommand(
                 name: "loadEntry",
                 area: .library,
-                summary: "Loads a library entry as the current transcript.",
+                summary: "Opens a library entry the way a double-click does: into the main pane, or into its own window when the 'Always open transcripts in a new window' setting is on.",
                 kind: .mutating,
                 args: [
                     .init(name: "id", kind: .string(), required: true, summary: "Library entry ID"),
@@ -76,8 +76,11 @@ extension ParolaAutomationServer {
                 followsWith: ["waitForPhase"],
                 handler: { args, ctx in
                     let id = try args.string("id")
-                    ctx.model.loadEntry(id)
-                    return .object(["loaded": .string(id)])
+                    ctx.model.openEntryFromLibrary(id, inNewWindow: false)
+                    return .object([
+                        "loaded": .string(id),
+                        "inNewWindow": .bool(ctx.model.openEntriesInNewWindow),
+                    ])
                 }
             ),
 

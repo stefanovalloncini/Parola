@@ -371,6 +371,7 @@ final class ParolaAutomationServer {
         "customTitlePrompt", "customSummaryPrompt", "appAccentColor",
         "inspectorMode", "introductionComplete", "autostartSummary",
         "translationSideBySide", "remoteAIAcknowledged", "showMostUsedPeople",
+        "openEntriesInNewWindow",
     ]
 
     func runScreenshot(requestedFileName: String?) async throws -> AutomationValue {
@@ -513,6 +514,8 @@ final class ParolaAutomationServer {
             "speakerAssignments": Self.speakerAssignmentsState(model),
             "personFilter": model.personFilter.map { .string($0.uuidString) } ?? .null,
             "showMostUsedPeople": .bool(model.showMostUsedPeople),
+            "openEntriesInNewWindow": .bool(model.openEntriesInNewWindow),
+            "openEntryWindows": .array(model.openEntryWindowIDs.map { .string($0) }),
         ])
     }
 

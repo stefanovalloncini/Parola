@@ -92,7 +92,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     /// Search keywords surfaced by the sidebar search beyond the label match.
     var searchKeywords: [String] {
         switch self {
-        case .general: return ["karaoke", "highlight", "word timestamps", "streaming", "diarize", "speakers", "vocabulary", "prompt", "menu bar", "login", "launch", "startup", "title"]
+        case .general: return ["karaoke", "highlight", "word timestamps", "streaming", "diarize", "speakers", "vocabulary", "prompt", "menu bar", "login", "launch", "startup", "title", "window", "new window"]
         case .customization: return ["appearance", "theme", "light", "dark", "density", "sidebar", "monospaced", "accent", "color", "terracotta", "custom colors", "palette"]
         case .watchedFolders: return ["watch", "folder", "auto", "drop"]
         case .recordMeetings: return ["zoom", "teams", "meet", "webex", "meeting", "detect", "system audio", "permission", "screen recording", "consent"]
@@ -127,7 +127,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
                 "useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt", "diarize",
                 "showMenuBarExtra", "generateCardMetadata", "showAITitles", "showAISummaries",
                 "customTitlePrompt", "customSummaryPrompt", "showSubtitleQC",
-                "summaryOptions", "autostartSummary"
+                "summaryOptions", "autostartSummary", "openEntriesInNewWindow"
             ]
         case .customization:
             return [

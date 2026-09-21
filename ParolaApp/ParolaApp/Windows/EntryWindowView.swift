@@ -7,6 +7,7 @@ struct EntryWindowView: View {
     let entryID: LibraryEntry.ID?
 
     @Environment(AppModel.self) private var model
+    @Environment(\.controlActiveState) private var controlActiveState
     @State private var session: EntryWindowSession?
     @State private var showsEditHint = false
     @State private var hintTask: Task<Void, Never>?
@@ -27,6 +28,11 @@ struct EntryWindowView: View {
         .task(id: entryID) {
             guard let entryID else { return }
             session = model.entryWindowSession(for: entryID)
+        }
+        // initial: a window opens already key, and the commands have to know that before focus moves again.
+        .onChange(of: controlActiveState, initial: true) { _, state in
+            guard let entryID else { return }
+            model.entryWindowKeyChanged(entryID, isKey: state == .key)
         }
         .onDisappear {
             hintTask?.cancel()
