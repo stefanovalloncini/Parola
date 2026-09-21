@@ -8391,6 +8391,17 @@
         }
       }
     },
+    "Search Library": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca nella libreria"
+          }
+        }
+      }
+    },
     "Search Settings…": {
       "extractionState": "manual",
       "localizations": {

@@ -929,6 +929,8 @@ final class AppModel {
     /// Lets a waiter tell "the query finished" from "the query returned what the last one did".
     @ObservationIgnored private(set) var searchResultsVersion: Int = 0
     var searchQuery: String = ""
+    /// Bumped by Edit › Search Library; the toolbar field watches the count rather than a flag the menu would have to clear.
+    var librarySearchFocusRequests: Int = 0
     /// True while the content area shows a library list instead of the phase machine's panes.
     var isBrowsingLibrary: Bool {
         guard route == .transcript, batchJobs.isEmpty else { return false }

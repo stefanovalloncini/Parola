@@ -190,6 +190,11 @@ struct ParolaApp: App {
                     .keyboardShortcut("e", modifiers: [.command, .option])
                     .disabled(!model.findIsOpen || !model.hasMatches)
                 Divider()
+                Button("Search Library") { model.focusLibrarySearch() }
+                    .keyboardShortcut("f", modifiers: [.command, .option])
+                    .disabled(model.introduction.isPresented)
+                    .axLeaf("Menu.Edit.SearchLibrary")
+                Divider()
                 Button("Auto-Detect Language") { model.selectedLanguage = nil }
                     .keyboardShortcut("d", modifiers: [.command, .shift])
                 FocusChatComposerCommand()

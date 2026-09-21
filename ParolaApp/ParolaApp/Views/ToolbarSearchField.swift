@@ -73,6 +73,11 @@ struct ToolbarSearchField: View {
             guard !nowFocused, model.searchQuery.isEmpty else { return }
             expanded = false
         }
+        .onChange(of: model.librarySearchFocusRequests) { _, _ in
+            expanded = true
+            // The field is not first responder on the frame it appears in, so the ask waits a runloop turn.
+            DispatchQueue.main.async { focused = true }
+        }
     }
 
     private var collapsed: Bool {

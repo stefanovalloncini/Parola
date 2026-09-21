@@ -566,4 +566,8 @@ extension AppModel {
     func clearSearch() {
         search("")
     }
+
+    func focusLibrarySearch() {
+        librarySearchFocusRequests &+= 1
+    }
 }
