@@ -521,6 +521,36 @@ struct LibrarySearchIndexTests {
         }
     }
 
+    @Test("indexing an entry whose tokens are all known keeps the sorted vocabulary")
+    func knownTokensKeepTheSortedVocabulary() async throws {
+        let (index, _) = makeTempIndex()
+        await index.index(id: "e1", title: "Notes", text: "sprint planning", createdAt: Date())
+        _ = await index.search("sprint")
+        #expect(await index.vocabularySorts == 1)
+
+        await index.index(id: "e2", title: "Notes", text: "planning sprint", createdAt: Date())
+        _ = await index.search("sprint")
+        #expect(await index.vocabularySorts == 1)
+
+        await index.index(id: "e3", title: "Notes", text: "retro feedback", createdAt: Date())
+        _ = await index.search("sprint")
+        #expect(await index.vocabularySorts == 2)
+    }
+
+    @Test("removing an entry whose tokens survive keeps the sorted vocabulary")
+    func survivingTokensKeepTheSortedVocabulary() async throws {
+        let (index, _) = makeTempIndex()
+        await index.index(id: "e1", title: "Notes", text: "sprint planning", createdAt: Date())
+        await index.index(id: "e2", title: "Notes", text: "sprint planning", createdAt: Date())
+        _ = await index.search("sprint")
+        #expect(await index.vocabularySorts == 1)
+
+        await index.remove("e2")
+        let matches = await index.search("sprint")
+        #expect(matches.map(\.entryID) == ["e1"])
+        #expect(await index.vocabularySorts == 1)
+    }
+
     @Test("removing one entry leaves shared tokens for the other")
     func removalKeepsSharedTokens() async throws {
         let (index, _) = makeTempIndex()

@@ -185,6 +185,7 @@ public actor LibrarySearchIndex {
     private let latestGeneration = OSAllocatedUnfairLock(initialState: 0)
     private(set) var snapshotGeneration = 0
     private(set) var entriesEncoded = 0
+    private(set) var vocabularySorts = 0
 
     public init(
         indexURL: URL,
@@ -244,7 +245,10 @@ public actor LibrarySearchIndex {
         guard !queryTokens.isEmpty else { return [] }
         await ensureLoaded()
 
-        if sortedTokens == nil { sortedTokens = inverted.keys.sorted() }
+        if sortedTokens == nil {
+            sortedTokens = inverted.keys.sorted()
+            vocabularySorts &+= 1
+        }
         let tokens = sortedTokens ?? []
         var scores: [String: Int] = [:]
         var hits: [String: Int] = [:]
@@ -463,26 +467,30 @@ public actor LibrarySearchIndex {
         entries[id] = entry
         encodedEntries[id] = try? JSONEncoder().encode(Self.snapshotEntry(id: id, entry: entry))
         entriesEncoded &+= 1
+        var vocabularyGrew = false
         for token in tokens {
+            if inverted[token] == nil { vocabularyGrew = true }
             inverted[token, default: []].insert(id)
         }
-        sortedTokens = nil
+        if vocabularyGrew { sortedTokens = nil }
         isDirty = true
     }
 
     private func removeFromIndex(_ id: String) {
         guard let entry = entries.removeValue(forKey: id) else { return }
         encodedEntries.removeValue(forKey: id)
+        var vocabularyShrank = false
         for token in entry.tokens {
             guard var ids = inverted[token] else { continue }
             ids.remove(id)
             if ids.isEmpty {
                 inverted.removeValue(forKey: token)
+                vocabularyShrank = true
             } else {
                 inverted[token] = ids
             }
         }
-        sortedTokens = nil
+        if vocabularyShrank { sortedTokens = nil }
         isDirty = true
     }
 
