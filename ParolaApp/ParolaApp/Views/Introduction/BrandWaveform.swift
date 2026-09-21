@@ -17,6 +17,10 @@ struct BrandWaveform: View {
     private static let fractions = AppIconArtwork.barFractions
     private static let centerIndex = fractions.count / 2
 
+    private static let levelEase: Double = 0.08
+    /// Settling back to the icon is a beat of its own, slower than tracking the next sample.
+    private static let settleEase: Double = 0.25
+
     /// A level's share of a bar's full height, with a floor so a silent mark is still the app's mark.
     nonisolated static func scale(level: Float) -> CGFloat {
         let value = Double(level)
@@ -26,16 +30,11 @@ struct BrandWaveform: View {
 
     var body: some View {
         Group {
-            switch drive {
-            case .levels(let levels):
-                levelBars(levels)
-            case .breathing:
-                if reduceMotion {
-                    breathingBars(seconds: nil)
-                } else {
-                    TimelineView(.animation) { context in
-                        breathingBars(seconds: context.date.timeIntervalSinceReferenceDate)
-                    }
+            if reduceMotion {
+                bars(seconds: nil)
+            } else {
+                TimelineView(.animation) { context in
+                    bars(seconds: context.date.timeIntervalSinceReferenceDate)
                 }
             }
         }
@@ -44,29 +43,28 @@ struct BrandWaveform: View {
         .accessibilityHidden(true)
     }
 
-    private func breathingBars(seconds: TimeInterval?) -> some View {
+    /// One row across both drives: a branch per drive would swap subtrees and snap the heights instead of easing them.
+    private func bars(seconds: TimeInterval?) -> some View {
         HStack(spacing: spacing) {
-            ForEach(Array(Self.fractions.enumerated()), id: \.offset) { index, fraction in
-                bar(height: barHeight(fraction) * (risen || reduceMotion ? 1 : 0.08))
+            ForEach(Self.fractions.indices, id: \.self) { index in
+                Capsule(style: .continuous)
+                    .fill(DS.Color.accent)
+                    .frame(width: barWidth, height: height(index: index))
                     .scaleEffect(y: breath(index: index, seconds: seconds), anchor: .center)
                     .animation(rise(index: index), value: risen)
             }
         }
+        .animation(.easeOut(duration: drive == .breathing ? Self.settleEase : Self.levelEase), value: drive)
     }
 
-    private func levelBars(_ levels: [Float]) -> some View {
-        HStack(spacing: spacing) {
-            ForEach(Array(Self.fractions.enumerated()), id: \.offset) { index, fraction in
-                bar(height: barHeight(fraction) * Self.scale(level: index < levels.count ? levels[index] : 0))
-            }
+    private func height(index: Int) -> CGFloat {
+        let full = barHeight(Self.fractions[index])
+        switch drive {
+        case .breathing:
+            return full * (risen || reduceMotion ? 1 : 0.08)
+        case .levels(let levels):
+            return full * Self.scale(level: index < levels.count ? levels[index] : 0)
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: levels)
-    }
-
-    private func bar(height: CGFloat) -> some View {
-        Capsule(style: .continuous)
-            .fill(DS.Color.accent)
-            .frame(width: barWidth, height: height)
     }
 
     private var usableWidth: CGFloat { side * 0.56 }
@@ -82,13 +80,13 @@ struct BrandWaveform: View {
     }
 
     private func rise(index: Int) -> Animation? {
-        guard !reduceMotion else { return nil }
+        guard !reduceMotion, drive == .breathing else { return nil }
         let stagger = Double(abs(index - Self.centerIndex)) * 0.06
         return .spring(response: 0.55, dampingFraction: 0.72).delay(stagger)
     }
 
     private func breath(index: Int, seconds: TimeInterval?) -> CGFloat {
-        guard risen, let seconds else { return 1 }
+        guard drive == .breathing, risen, let seconds else { return 1 }
         return 1 + 0.06 * sin(seconds * 1.4 + Double(index) * 0.5)
     }
 }
