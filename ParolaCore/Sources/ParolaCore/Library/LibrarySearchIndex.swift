@@ -2,6 +2,7 @@ import Foundation
 import NaturalLanguage
 import os
 
+/// The snapshot directory assumes a single writer per library; two processes writing it concurrently degrade to a rebuild on the next launch, never to corruption.
 public actor LibrarySearchIndex {
     public struct Highlight: Sendable, Equatable {
         public let start: Int
@@ -916,12 +917,14 @@ public actor LibrarySearchIndex {
         }
     }
 
+    /// Also catches an atomic write's crash-orphaned temp file, which carries no `.json` extension.
     private static func unlistedEntryFiles(in entriesDirectory: URL, keeping ids: Set<String>) -> [URL] {
         let contents = (try? FileManager.default.contentsOfDirectory(
-            at: entriesDirectory, includingPropertiesForKeys: nil
+            at: entriesDirectory, includingPropertiesForKeys: [.isRegularFileKey]
         )) ?? []
-        return contents.filter {
-            $0.pathExtension == "json" && !ids.contains($0.deletingPathExtension().lastPathComponent)
+        return contents.filter { url in
+            guard (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { return false }
+            return !ids.contains(url.deletingPathExtension().lastPathComponent)
         }
     }
 

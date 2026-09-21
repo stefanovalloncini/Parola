@@ -24,7 +24,13 @@ private struct SnapshotWrites: Sendable {
 }
 
 @Suite("LibrarySearchIndex")
-struct LibrarySearchIndexTests {
+final class LibrarySearchIndexTests {
+    private var tempDirectories: [URL] = []
+
+    deinit {
+        for url in tempDirectories { try? FileManager.default.removeItem(at: url) }
+    }
+
     private func makeObservedIndex(
         at directory: URL,
         saveDebounce: Duration = .seconds(60)
@@ -51,9 +57,10 @@ struct LibrarySearchIndexTests {
             .appendingPathComponent("\(name)-\(UUID().uuidString)", isDirectory: true)
     }
 
-    private func makeTempIndex() -> (LibrarySearchIndex, URL) {
+    private func makeTempIndex(saveDebounce: Duration = .seconds(60)) -> (LibrarySearchIndex, URL) {
         let url = makeTempDirectory()
-        return (LibrarySearchIndex(indexDirectory: url), url)
+        tempDirectories.append(url)
+        return (LibrarySearchIndex(indexDirectory: url, saveDebounce: saveDebounce), url)
     }
 
     private func manifestURL(in directory: URL) -> URL {
@@ -819,6 +826,28 @@ struct LibrarySearchIndexTests {
         #expect(try manifestEntries(in: url).keys.sorted() == ["e1", "e2"])
     }
 
+    @Test("a crash-orphaned temp file in entries/ is pruned even without a json extension")
+    func unlistedNonJSONFileIsPruned() async throws {
+        let (index1, url) = makeTempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+        await index1.index(id: "e1", title: "Notes", text: "sprint planning", createdAt: Date())
+        await index1.flush()
+        let entryData = try Data(contentsOf: entryURL("e1", in: url))
+        let junk = url.appendingPathComponent("entries", isDirectory: true).appendingPathComponent("junk.tmp")
+        try entryData.write(to: junk)
+        let ghost = entryURL("ghost", in: url)
+        try entryData.write(to: ghost)
+
+        let index2 = LibrarySearchIndex(indexDirectory: url)
+        await index2.index(id: "e2", title: "Other", text: "retro feedback", createdAt: Date())
+        await index2.flush()
+
+        #expect(FileManager.default.fileExists(atPath: junk.path) == false)
+        #expect(FileManager.default.fileExists(atPath: ghost.path) == false)
+        #expect(FileManager.default.fileExists(atPath: entryURL("e1", in: url).path))
+        #expect(try manifestEntries(in: url).keys.sorted() == ["e1", "e2"])
+    }
+
     @Test("an incrementally updated index matches a from-scratch rebuild")
     func incrementalMatchesRebuild() async throws {
         let final: [LibrarySearchIndex.RebuildEntry] = [
@@ -1038,7 +1067,8 @@ struct LibrarySearchIndexTests {
         )
 
         await index.index(id: "e1", title: "One", text: "sprint planning", createdAt: Date())
-        #expect(await eventually { FileManager.default.fileExists(atPath: manifestURL(in: url).path) })
+        let manifestPath = manifestURL(in: url).path
+        #expect(await eventually { FileManager.default.fileExists(atPath: manifestPath) })
     }
 
     @Test("a missing snapshot asks for a rebuild")
