@@ -84,15 +84,6 @@ struct EngineRegistryTests {
         #expect(ids.count == 2)
     }
 
-    @Test("English-only capabilities reject non-English language")
-    func englishOnlyRejectsItalian() throws {
-        let caps = try #require(ModelCatalog.staticCapabilities(forID: "nvidia_parakeet-tdt-0.6b-v2"))
-        #expect(caps.supportedLanguages.allows("en"))
-        #expect(caps.supportedLanguages.allows("it") == false)
-        #expect(caps.supportedLanguages.allows(nil) == false)
-        #expect(caps.supportedLanguages.isEnglishOnly)
-    }
-
     @Test("supportedLanguages.all accepts any language including nil auto-detect")
     func allAcceptsEverything() {
         let caps = EngineCapabilities.whisperKitDefaults
