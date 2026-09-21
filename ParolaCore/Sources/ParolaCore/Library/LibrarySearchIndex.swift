@@ -90,6 +90,12 @@ public actor LibrarySearchIndex {
         }
     }
 
+    /// Where a query's terms first land in an entry's body, and how much of it the term covers.
+    private struct Hit {
+        let offset: Int
+        let length: Int
+    }
+
     /// One pass over the text answers both "how many" and "where first", so the tokens are hashed once.
     private struct Tally {
         var count = 0
@@ -252,7 +258,7 @@ public actor LibrarySearchIndex {
         let tokens = sortedTokens ?? []
         var scores: [String: Int] = [:]
         var hits: [String: Int] = [:]
-        var earliest: [String: Int] = [:]
+        var earliest: [String: Hit] = [:]
         for queryToken in Set(queryTokens) {
             // Prefix matches sort contiguously; binary-search the range instead of scanning the whole vocabulary.
             let lower = Self.firstIndex(in: tokens, atLeast: queryToken)
@@ -263,8 +269,9 @@ public actor LibrarySearchIndex {
                     guard let entry = entries[id] else { continue }
                     let position = Self.position(of: indexToken, in: entry)
                     hits[id, default: 0] += Self.occurrences(at: position, in: entry)
-                    if let offset = Self.bodyOffset(at: position, in: entry) {
-                        earliest[id] = min(earliest[id] ?? offset, offset)
+                    if let offset = Self.bodyOffset(at: position, in: entry),
+                       offset < earliest[id]?.offset ?? Int.max {
+                        earliest[id] = Hit(offset: offset, length: queryToken.count)
                     }
                 }
             }
@@ -274,15 +281,15 @@ public actor LibrarySearchIndex {
         results.reserveCapacity(scores.count)
         for (id, score) in scores.sorted(by: { $0.value > $1.value }) {
             guard let entry = entries[id] else { continue }
-            let hitOffset = earliest[id]
-            let snippet = Self.makeSnippet(text: entry.text, tokens: queryTokens)
+            let hit = earliest[id]
+            let snippet = Self.makeSnippet(text: entry.text, tokens: queryTokens, hit: hit)
             results.append(Match(
                 entryID: id,
                 score: score,
                 matchCount: hits[id] ?? 0,
                 snippet: snippet.text,
                 highlights: snippet.highlights,
-                firstHit: hitOffset.flatMap { Self.firstHit(atOffset: $0, in: entry) }
+                firstHit: hit.flatMap { Self.firstHit(atOffset: $0.offset, in: entry) }
             ))
         }
         return results
@@ -586,17 +593,20 @@ public actor LibrarySearchIndex {
         return Int(exactly: (seconds * 100).rounded()) ?? 0
     }
 
+    /// `hit` is the offset the search already found in the inverted index, so the body is walked to
+    /// the window and no further; nil means the entry matched on its title or auxiliary text alone.
     private static func makeSnippet(
         text: String,
-        tokens: [String]
+        tokens: [String],
+        hit: Hit?
     ) -> (text: String, highlights: [Highlight]) {
         guard !text.isEmpty else { return ("", []) }
         var firstHit: Range<String.Index>?
-        for token in tokens {
-            if let range = text.range(of: token, options: .caseInsensitive) {
-                firstHit = range
-                break
-            }
+        if let hit,
+           let lower = text.index(text.startIndex, offsetBy: hit.offset, limitedBy: text.endIndex),
+           lower < text.endIndex {
+            let upper = text.index(lower, offsetBy: hit.length, limitedBy: text.endIndex) ?? text.endIndex
+            firstHit = lower..<upper
         }
         let window: Range<String.Index>
         if let firstHit {

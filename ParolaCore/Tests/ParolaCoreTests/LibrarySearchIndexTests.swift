@@ -419,6 +419,31 @@ struct LibrarySearchIndexTests {
         #expect(match.snippet == "sprint retro")
     }
 
+    @Test("a two-term query snippets the earlier of the two hits")
+    func snippetTakesTheEarliestTerm() async throws {
+        let (index, _) = makeTempIndex()
+        let body = "parliamo del lancio di primavera " + String(repeating: "riempitivo ", count: 20) + "poi le domande"
+        await index.index(id: "e1", title: "Riunione", text: body, createdAt: Date())
+        let match = try #require(await index.search("domande lancio").first(where: { $0.entryID == "e1" }))
+        #expect(match.snippet.contains("lancio"))
+        #expect(match.snippet.contains("domande") == false)
+    }
+
+    @Test("a match on the title alone snippets the opening of the body")
+    func titleOnlyMatchSnippetsTheOpening() async throws {
+        let (index, _) = makeTempIndex()
+        await index.index(
+            id: "e1",
+            title: "Riunione",
+            text: "parliamo del lancio di primavera e poi delle domande aperte del reparto "
+                + String(repeating: "e delle altre cose ", count: 5),
+            createdAt: Date()
+        )
+        let match = try #require(await index.search("riunione").first(where: { $0.entryID == "e1" }))
+        #expect(match.snippet.hasPrefix("parliamo del lancio"))
+        #expect(match.snippet.hasSuffix("…"))
+    }
+
     @Test("a cut snippet starts and ends on whole words")
     func snippetCutsOnWordBoundaries() async throws {
         let (index, _) = makeTempIndex()
