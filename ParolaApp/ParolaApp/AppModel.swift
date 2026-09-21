@@ -508,6 +508,7 @@ final class AppModel {
     }
 
     func toggleLiveCaptions() {
+        introduction.defer()
         guard features.isEnabled(.liveCaptions) else { return }
         guard let liveCaptions else { return }
         if !liveCaptions.isActive, let reason = liveCaptionsUnavailableReason {

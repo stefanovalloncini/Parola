@@ -377,6 +377,7 @@ extension AppModel {
     }
 
     func loadEntry(_ id: LibraryEntry.ID) {
+        introduction.defer()
         loadEntryGeneration &+= 1
         let generation = loadEntryGeneration
         // Read before the transcript takes the content area, which is what hides the list it came from.

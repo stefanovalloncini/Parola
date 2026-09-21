@@ -288,6 +288,36 @@ struct IntroductionBackstopTests {
         #expect(model.introduction.isDeferred)
         #expect(model.introduction.isPresented == false)
     }
+
+    /// The menu bar extra keeps both items live during the introduction, so each has to step out of it itself.
+    @Test("a transcript picked in the menu bar extra steps out of the introduction")
+    func loadEntryDefers() {
+        let model = makeModel()
+        model.introduction.restart()
+        #expect(model.introduction.isPresented)
+
+        model.loadEntry("missing")
+
+        #expect(model.introduction.isDeferred)
+        #expect(model.introduction.isPresented == false)
+    }
+
+    @Test("live captions started from outside the window step out of the introduction")
+    func liveCaptionsDefer() {
+        let model = AppModel(
+            skipBootstrap: true,
+            defaults: temporaryDefaults(),
+            libraryURL: makeTempLibraryURL("introduction-backstop-captions"),
+            features: []
+        )
+        model.introduction.restart()
+        #expect(model.introduction.isPresented)
+
+        model.toggleLiveCaptions()
+
+        #expect(model.introduction.isDeferred)
+        #expect(model.introduction.isPresented == false)
+    }
 }
 
 @MainActor
