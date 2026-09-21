@@ -31,6 +31,22 @@ extension CloudLLMProviderID: LogSafe {
     public var logToken: String { LogAllowlist.providerID(rawValue) }
 }
 
+extension LanguageModelTask: LogSafe {
+    public var logToken: String { rawValue }
+}
+
+extension LanguageModelProviderChoice: LogSafe {
+    /// The kind and the provider only: a model name or an endpoint the user typed is not structural.
+    public var logToken: String {
+        switch self {
+        case .onDevice: return "onDevice"
+        case .cloud(let provider, _): return "cloud:\(provider.logToken)"
+        case .ollama: return "ollama"
+        case .custom: return "custom"
+        }
+    }
+}
+
 extension ParolaFeature: LogSafe {
     public var logToken: String { rawValue }
 }

@@ -10,6 +10,9 @@ public struct CloudLLMProviderID: RawRepresentable, Hashable, Sendable, Codable,
     public static let anthropic = CloudLLMProviderID("anthropic")
     public static let groq = CloudLLMProviderID("groq")
     public static let cerebras = CloudLLMProviderID("cerebras")
+    /// The one user-supplied OpenAI-compatible endpoint per install; it has no built-in URL, so it
+    /// stays out of `allKnown` and only names the keychain slot its key lives in.
+    public static let custom = CloudLLMProviderID("custom")
 
     public static let allKnown: [CloudLLMProviderID] = [.openAI, .anthropic, .groq, .cerebras]
 }

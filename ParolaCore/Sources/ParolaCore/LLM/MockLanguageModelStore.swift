@@ -10,6 +10,7 @@ public actor MockLanguageModelStore {
         case cerebras
         case ollama
         case foundation
+        case custom
     }
 
     private var byProvider: [Provider: MockLanguageModelResponse] = [:]
@@ -59,6 +60,7 @@ extension MockLanguageModelStore.Provider {
         case .anthropic: self = .anthropic
         case .groq: self = .groq
         case .cerebras: self = .cerebras
+        case .custom: self = .custom
         default: return nil
         }
     }

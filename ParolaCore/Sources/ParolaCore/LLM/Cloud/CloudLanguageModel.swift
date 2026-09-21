@@ -19,12 +19,14 @@ struct CloudLanguageModel: LanguageModel {
     private let apiKey: String
     private let instructions: String
     private let session: URLSession
+    /// Set for a user-supplied OpenAI-compatible server; nil for the providers we ship URLs for.
+    private let baseURL: URL?
 
     init(
         provider: CloudLLMProviderID,
         model: String? = nil,
         apiKey: String,
-        instructions: String = "You're a helpful assistant.",
+        instructions: String = LanguageModelFactory.defaultInstructions,
         session: URLSession? = nil
     ) {
         self.provider = provider
@@ -32,6 +34,22 @@ struct CloudLanguageModel: LanguageModel {
         self.apiKey = apiKey
         self.instructions = instructions
         self.session = session ?? Self.streamingSession
+        self.baseURL = nil
+    }
+
+    init(
+        openAICompatibleBaseURL baseURL: URL,
+        model: String,
+        apiKey: String?,
+        instructions: String = LanguageModelFactory.defaultInstructions,
+        session: URLSession? = nil
+    ) {
+        self.provider = .custom
+        self.model = model
+        self.apiKey = apiKey ?? ""
+        self.instructions = instructions
+        self.session = session ?? Self.streamingSession
+        self.baseURL = baseURL
     }
 
     static func isSupported(_ provider: CloudLLMProviderID) -> Bool {
@@ -108,22 +126,29 @@ struct CloudLanguageModel: LanguageModel {
         history: [ChatTurn],
         streaming: Bool
     ) throws -> (URLRequest, (Data) throws -> String) {
+        if let baseURL {
+            return try buildOpenAICompatibleRequest(
+                url: baseURL.appending(path: "chat/completions"),
+                history: history,
+                streaming: streaming
+            )
+        }
         switch provider {
         case .openAI:
             return try buildOpenAICompatibleRequest(
-                url: "https://api.openai.com/v1/chat/completions",
+                url: URL(string: "https://api.openai.com/v1/chat/completions")!,
                 history: history,
                 streaming: streaming
             )
         case .groq:
             return try buildOpenAICompatibleRequest(
-                url: "https://api.groq.com/openai/v1/chat/completions",
+                url: URL(string: "https://api.groq.com/openai/v1/chat/completions")!,
                 history: history,
                 streaming: streaming
             )
         case .cerebras:
             return try buildOpenAICompatibleRequest(
-                url: "https://api.cerebras.ai/v1/chat/completions",
+                url: URL(string: "https://api.cerebras.ai/v1/chat/completions")!,
                 history: history,
                 streaming: streaming
             )
@@ -138,10 +163,14 @@ struct CloudLanguageModel: LanguageModel {
         history: [ChatTurn]
     ) throws -> (URLRequest, @Sendable (String) -> CloudStreamLine) {
         let parser: @Sendable (String) -> CloudStreamLine
-        switch provider {
-        case .openAI, .groq, .cerebras: parser = Self.parseOpenAIStreamLine
-        case .anthropic: parser = Self.parseAnthropicStreamLine
-        default: throw CloudLLMError.unsupportedProvider(provider)
+        if baseURL != nil {
+            parser = Self.parseOpenAIStreamLine
+        } else {
+            switch provider {
+            case .openAI, .groq, .cerebras: parser = Self.parseOpenAIStreamLine
+            case .anthropic: parser = Self.parseAnthropicStreamLine
+            default: throw CloudLLMError.unsupportedProvider(provider)
+            }
         }
         let (request, _) = try buildRequest(history: history, streaming: true)
         return (request, parser)
@@ -160,14 +189,16 @@ struct CloudLanguageModel: LanguageModel {
     }
 
     private func buildOpenAICompatibleRequest(
-        url: String,
+        url: URL,
         history: [ChatTurn],
         streaming: Bool
     ) throws -> (URLRequest, (Data) throws -> String) {
-        var request = URLRequest(url: URL(string: url)!)
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        if !apiKey.isEmpty {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
         var body: [String: Any] = [
             "model": model,
             "messages": openAIMessages(history: history)

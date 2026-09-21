@@ -17,9 +17,58 @@ public enum LanguageModelFactory {
         public var errorDescription: String? { description }
     }
 
+    public static let defaultInstructions = "You're a helpful assistant."
+
+    /// Builds the model picked for `task`, or the on-device one when nothing is picked.
+    /// A remote choice refused by policy throws rather than quietly answering on device.
+    public static func make(
+        for task: LanguageModelTask,
+        selection: LanguageModelSelection,
+        instructions: String? = nil,
+        keyStore: any APIKeyStore = KeychainAPIKeyStore.shared,
+        managed: ManagedConfiguration = .shared,
+        clock: any Clock<Duration> = ContinuousClock()
+    ) async throws -> any LanguageModel {
+        let choice = selection[task]
+        let instructions = instructions ?? defaultInstructions
+        switch choice {
+        case .onDevice:
+            return try await makeOnDevice(instructions: instructions, clock: clock)
+        case .cloud(let provider, let model):
+            return try await makeBYOKCloud(
+                provider: provider,
+                model: model,
+                instructions: instructions,
+                keyStore: keyStore,
+                managed: managed,
+                clock: clock
+            )
+        case .ollama(let endpoint, let model):
+            if choice.isRemote && managed.disableCloudLLM {
+                throw CloudLLMError.disabledByPolicy
+            }
+            return await makeOllama(
+                model: model,
+                endpoint: endpoint,
+                instructions: instructions,
+                clock: clock
+            )
+        case .custom(let baseURL, let model):
+            return try await makeCustomEndpoint(
+                baseURL: baseURL,
+                model: model,
+                instructions: instructions,
+                keyStore: keyStore,
+                managed: managed,
+                clock: clock
+            )
+        }
+    }
+
     public static func makeBYOKCloud(
         provider: CloudLLMProviderID,
-        instructions: String = "You're a helpful assistant.",
+        model: String? = nil,
+        instructions: String = defaultInstructions,
         keyStore: APIKeyStore = KeychainAPIKeyStore.shared,
         managed: ManagedConfiguration = .shared,
         clock: any Clock<Duration> = ContinuousClock()
@@ -37,13 +86,38 @@ public enum LanguageModelFactory {
         guard let key = try await keyStore.get(for: provider), !key.isEmpty else {
             throw CloudLLMError.missingAPIKey(provider)
         }
-        return CloudLanguageModel(provider: provider, apiKey: key, instructions: instructions)
+        return CloudLanguageModel(provider: provider, model: model, apiKey: key, instructions: instructions)
+    }
+
+    /// An OpenAI-compatible server the user runs or pays for themselves. Its key, when it wants one,
+    /// lives under ``CloudLLMProviderID/custom``.
+    public static func makeCustomEndpoint(
+        baseURL: URL,
+        model: String,
+        instructions: String = defaultInstructions,
+        keyStore: any APIKeyStore = KeychainAPIKeyStore.shared,
+        managed: ManagedConfiguration = .shared,
+        clock: any Clock<Duration> = ContinuousClock()
+    ) async throws -> any LanguageModel {
+        if let mock = await MockLanguageModelStore.shared.resolve(for: .custom) {
+            return MockLanguageModel.make(response: mock, clock: clock)
+        }
+        if managed.disableCloudLLM {
+            throw CloudLLMError.disabledByPolicy
+        }
+        let key = try await keyStore.get(for: .custom)
+        return CloudLanguageModel(
+            openAICompatibleBaseURL: baseURL,
+            model: model,
+            apiKey: key,
+            instructions: instructions
+        )
     }
 
     public static func makeOllama(
         model: String = "llama3",
         endpoint: URL = URL(string: "http://localhost:11434")!,
-        instructions: String = "You're a helpful assistant.",
+        instructions: String = defaultInstructions,
         contextTokens: Int = 8192,
         clock: any Clock<Duration> = ContinuousClock()
     ) async -> any LanguageModel {
@@ -121,7 +195,7 @@ public enum LanguageModelFactory {
     }
 
     public static func makeOnDevice(
-        instructions: String = "You're a helpful assistant.",
+        instructions: String = defaultInstructions,
         clock: any Clock<Duration> = ContinuousClock()
     ) async throws -> any LanguageModel {
         if let mock = await MockLanguageModelStore.shared.resolve(for: .foundation) {
