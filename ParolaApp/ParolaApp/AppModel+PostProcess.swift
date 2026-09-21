@@ -49,8 +49,13 @@ extension AppModel {
     /// The Speakers sheet's bulk rename: one label at a time through the entry point that keeps
     /// the entry's speaker map in step.
     func applySpeakerRenames(_ renames: [String: String]) {
-        for (from, to) in renames {
+        let effective = renames.filter { renamesSomething($0.key, to: $0.value) }
+        guard !effective.isEmpty else { return }
+        // One group, so the sheet's whole pass comes back on a single ⌘Z.
+        undoManager?.beginUndoGrouping()
+        for (from, to) in effective {
             renameSpeakerLabel(from, to: to)
         }
+        undoManager?.endUndoGrouping()
     }
 }

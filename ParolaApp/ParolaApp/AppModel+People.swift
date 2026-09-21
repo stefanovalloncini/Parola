@@ -40,6 +40,13 @@ extension AppModel {
         people.first { $0.id == id }
     }
 
+    /// The person under a name, matched the way the store matches it.
+    func person(named name: String) -> Person? {
+        let key = Person.normalizedName(name)
+        guard !key.isEmpty else { return nil }
+        return people.first { Person.normalizedName($0.name) == key }
+    }
+
     /// The directory in the order every list shows it: most assigned, then most recently used.
     var peopleByUse: [Person] {
         people.sorted {
@@ -140,19 +147,36 @@ extension AppModel {
 
     /// The one way a speaker label's text changes: the segments and the entry's map move together,
     /// inside the same undo step.
+    /// Whether ``renameSpeakerLabel(_:to:)`` would do anything — what a bulk rename groups on, so a
+    /// sheet that changed nothing leaves no empty undo step behind.
+    func renamesSomething(_ label: String, to newName: String) -> Bool {
+        let from = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let to = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !from.isEmpty, !to.isEmpty, from != to else { return false }
+        return transcript?.uniqueSpeakers.contains(from) ?? false
+    }
+
     func renameSpeakerLabel(_ label: String, to newName: String) {
         let from = label.trimmingCharacters(in: .whitespacesAndNewlines)
         let to = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !from.isEmpty, !to.isEmpty, from != to, let current = transcript else { return }
-        let assigned = speakerAssignments[from]
-        let edit = assigned.map { SpeakerAssignmentEdit(assign: [to: $0], clear: [from]) }
+        var edit: SpeakerAssignmentEdit?
+        var used: Person?
+        if let assigned = speakerAssignments[from] {
+            // A label that already stands for someone keeps pointing at them under its new text.
+            edit = SpeakerAssignmentEdit(assign: [to: assigned], clear: [from])
+        } else if let existing = person(named: to) {
+            // Renaming a label to someone the directory knows is an assignment under another name.
+            edit = SpeakerAssignmentEdit(assign: [to: existing.id], clear: [from])
+            used = existing
+        }
         let renamed = current.renamingSpeaker(from, to: to)
         guard renamed != current else { return }
         applyTranscriptEdit(renamed, actionName: String(localized: "Rename Speaker"), assignments: edit)
+        guard let used else { return }
         Task { [peopleStore] in
-            // Naming a speaker nobody stands for is how a person gets made; a label that already
-            // has one keeps pointing at them under its new text.
-            if assigned == nil { _ = await peopleStore.recordUsage(name: to) }
+            // The stored spelling, not the typed one: counting a use must not rename the person.
+            _ = await peopleStore.recordUsage(name: used.name)
             await refreshPeople()
         }
     }

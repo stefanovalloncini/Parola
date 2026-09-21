@@ -29,3 +29,13 @@ public struct Person: Codable, Sendable, Identifiable, Hashable {
         colorIndex = try c.decodeIfPresent(Int.self, forKey: .colorIndex) ?? 0
     }
 }
+
+public extension Person {
+    /// The form two names are compared in: trimmed, composition-folded, lowercased. The store and
+    /// the app both match on this, so "josé" and "Jose\u{0301}" are one person everywhere.
+    static func normalizedName(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .precomposedStringWithCanonicalMapping
+            .localizedLowercase
+    }
+}

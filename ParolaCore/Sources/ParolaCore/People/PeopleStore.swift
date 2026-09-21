@@ -119,7 +119,7 @@ public actor PeopleStore {
     }
 
     static func normalize(_ name: String) -> String {
-        name.precomposedStringWithCanonicalMapping.localizedLowercase
+        Person.normalizedName(name)
     }
 
     private func save() {

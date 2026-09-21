@@ -186,15 +186,72 @@ struct AssignSpeakerPeopleTests {
         #expect(try await model.library.load(entry.id).entry.speakerAssignments == ["Ada L.": ada.id])
     }
 
-    @Test("renaming a label nobody stands for names a person")
-    func renamingAnUnassignedLabelMintsAPerson() async throws {
+    @Test("renaming a label nobody stands for to a fresh name mints nobody")
+    func renamingAnUnassignedLabelMintsNobody() async throws {
         let model = PeopleTestSupport.makeModel("assignrenamefresh")
         _ = try await PeopleTestSupport.openSeededEntry(model)
 
         model.renameSpeakerLabel("SPEAKER_01", to: "Grace")
-        try await PeopleTestSupport.until { model.people.map(\.name) == ["Grace"] }
+        await model.awaitSpeakerAssignmentWrites()
 
         #expect(model.transcript?.segments.map(\.speaker) == ["SPEAKER_00", "Grace", "SPEAKER_00"])
+        #expect(model.people.isEmpty)
+        #expect(model.speakerAssignments.isEmpty)
+    }
+
+    @Test("renaming a label to someone the directory knows assigns them")
+    func renamingAnUnassignedLabelToAKnownPersonAssigns() async throws {
+        let model = PeopleTestSupport.makeModel("assignrenameknown")
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+        await model.addPerson(named: "Grace")
+        let grace = try #require(model.person(named: "Grace"))
+
+        model.renameSpeakerLabel("SPEAKER_01", to: "Grace")
+        try await PeopleTestSupport.until { model.people.first?.usageCount == 2 }
+
+        #expect(model.transcript?.segments.map(\.speaker) == ["SPEAKER_00", "Grace", "SPEAKER_00"])
+        #expect(model.speakerAssignments == ["Grace": grace.id])
+        #expect(model.person(forSpeaker: "Grace")?.id == grace.id)
+        #expect(model.speakerColorIndices["Grace"] == grace.colorIndex)
+        #expect(model.people.map(\.name) == ["Grace"])
+    }
+
+    @Test("a name that only differs in case still lands on the same person")
+    func renamingToADifferentSpellingAssignsTheSamePerson() async throws {
+        let model = PeopleTestSupport.makeModel("assignrenamecase")
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+        await model.addPerson(named: "Grace Hopper")
+        let grace = try #require(model.person(named: "Grace Hopper"))
+
+        model.renameSpeakerLabel("SPEAKER_01", to: "grace hopper")
+        try await PeopleTestSupport.until { model.people.first?.usageCount == 2 }
+
+        #expect(model.speakerAssignments == ["grace hopper": grace.id])
+        // Counting the use must not rewrite the person to the typed spelling.
+        #expect(model.people.map(\.name) == ["Grace Hopper"])
+    }
+
+    @Test("the Speakers sheet's renames come back on one undo")
+    func bulkRenamesUndoTogether() async throws {
+        let model = PeopleTestSupport.makeModel("assignbulkundo")
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+        await model.addPerson(named: "Ada")
+        await model.addPerson(named: "Grace")
+        let ada = try #require(model.person(named: "Ada"))
+        let grace = try #require(model.person(named: "Grace"))
+
+        model.applySpeakerRenames(["SPEAKER_00": "Ada", "SPEAKER_01": "Grace"])
+        await model.awaitSpeakerAssignmentWrites()
+        #expect(model.transcript?.segments.map(\.speaker) == ["Ada", "Grace", "Ada"])
+        #expect(model.speakerAssignments == ["Ada": ada.id, "Grace": grace.id])
+
+        undo.undo()
+
+        #expect(model.transcript?.segments.map(\.speaker) == ["SPEAKER_00", "SPEAKER_01", "SPEAKER_00"])
+        #expect(model.speakerAssignments.isEmpty)
     }
 
     @Test("undo puts the map back, and redo re-applies it")
