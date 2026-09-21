@@ -2135,7 +2135,11 @@ final class AppModel {
                 let processed = await postProcessDetached(result)
                 installFetchedSubtitles(processed)
                 phase = .ready
-                persistToLibrary(processed, audioSource: nil)
+                persistToLibrary(
+                    processed,
+                    audioSource: nil,
+                    title: LibraryEntryDisplay.webVideoTitle(createdAt: Date())
+                )
             } catch {
                 if !Task.isCancelled { applyTranscriptionError(error) }
             }

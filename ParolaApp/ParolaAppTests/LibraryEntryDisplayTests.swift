@@ -79,15 +79,17 @@ struct LibraryEntryDisplayTests {
         #expect(title != LibraryEntryDisplay.title(raw: "audio.m4a", createdAt: date))
     }
 
-    @Test("a stored web-video title is left alone by the placeholder rules")
-    func webVideoTitleSurvivesTheDisplayPath() {
+    /// The empty audio name is the subtitles path, which keeps no working file and would otherwise read "Untitled".
+    @Test("a stored web-video title is left alone by the placeholder rules",
+          arguments: ["audio.m4a", ""])
+    func webVideoTitleSurvivesTheDisplayPath(audioName: String) {
         let stored = LibraryEntryDisplay.webVideoTitle(createdAt: date)
         let entry = LibraryEntry(
             id: "e",
             bundleURL: URL(fileURLWithPath: "/tmp/LibraryEntryDisplayTests/e.parola"),
             manifest: ParolaDocument.Manifest(
                 createdAt: date,
-                originalAudioName: "audio.m4a",
+                originalAudioName: audioName,
                 title: stored,
                 modelName: "stub",
                 language: "en"
