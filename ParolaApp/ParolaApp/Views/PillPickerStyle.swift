@@ -41,7 +41,7 @@ struct PillPickerButton<MenuContent: View>: View {
             .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
-        .opacity(isEnabled ? 1 : 0.45)
+        .opacity(isEnabled ? 1 : DS.Opacity.disabled)
         .onHover { hovering = isEnabled && $0 }
         .accessibilityLabel("\(caption): \(value)")
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {

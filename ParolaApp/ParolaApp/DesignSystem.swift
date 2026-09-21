@@ -29,6 +29,11 @@ enum DS {
         static let resize = SwiftUI.Animation.easeOut(duration: 0.25)
     }
 
+    /// One reading of "you can't press this", so two disabled controls never sit side by side at different weights.
+    enum Opacity {
+        static let disabled = 0.4
+    }
+
     enum Size {
         static let progressBarHeight: CGFloat = 6
         static let liveTranscriptMinHeight: CGFloat = 180

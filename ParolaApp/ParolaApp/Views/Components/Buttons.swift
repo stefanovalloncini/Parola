@@ -29,9 +29,12 @@ struct DSPillButtonStyle: ButtonStyle {
                     Capsule().strokeBorder(DS.Color.separator, lineWidth: 0.5)
                 }
             }
-            .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1.0) : 0.4)
+            .opacity(dimsWholeView && !isEnabled ? DS.Opacity.disabled : (configuration.isPressed ? 0.85 : 1.0))
             .contentShape(Capsule())
     }
+
+    /// A primary pill dims its fill alone: fading `onAccent` with it walks the label toward the colour it sits on.
+    private var dimsWholeView: Bool { kind == .secondary }
 
     private var foreground: Color {
         switch kind {
@@ -43,7 +46,7 @@ struct DSPillButtonStyle: ButtonStyle {
     private func background(pressed: Bool) -> Color {
         switch kind {
         case .primary:
-            return DS.Color.accent.opacity(pressed ? 0.85 : 1.0)
+            return DS.Color.accent.opacity(isEnabled ? (pressed ? 0.85 : 1.0) : DS.Opacity.disabled)
         case .secondary:
             return DS.Color.surfaceElevated
         }
@@ -77,6 +80,8 @@ struct DSIconChipButtonStyle: ButtonStyle {
     /// A chip carrying a word instead of a glyph: `side` is then only its height, and the label sets the width.
     var fitsLabel = false
 
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(DS.Font.bodyStrong)
@@ -87,6 +92,7 @@ struct DSIconChipButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                     .fill(configuration.isPressed ? DS.Palette.pillFillHover : DS.Color.surfaceElevated)
             )
+            .opacity(isEnabled ? 1 : DS.Opacity.disabled)
             .contentShape(RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous))
     }
 }
