@@ -59,7 +59,8 @@ extension TranscriberMockSuites {
             await clearMocks()
         }
 
-        private func waitUntil(timeoutMs: Int = 15_000, _ condition: @MainActor () -> Bool) async -> Bool {
+        /// 60 s, not 15: a run of the suite under load average 7 took 46 s to settle one of these waits.
+        private func waitUntil(timeoutMs: Int = 60_000, _ condition: @MainActor () -> Bool) async -> Bool {
             var elapsed = 0
             while elapsed < timeoutMs {
                 if condition() { return true }
