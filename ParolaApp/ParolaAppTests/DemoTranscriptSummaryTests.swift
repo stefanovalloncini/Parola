@@ -46,4 +46,11 @@ struct DemoTranscriptSummaryTests {
         #expect(DemoTranscriptSummary.label(for: .docx) == "Word")
         #expect(DemoTranscriptSummary.label(for: .pdf) == "PDF")
     }
+
+    @Test("every format the footer names carries a short label of its own")
+    func everyNamedFormatHasAShortLabel() {
+        #expect(DemoTranscriptSummary.exportFormats.allSatisfy { DemoTranscriptSummary.shortLabel(for: $0) != nil })
+        #expect(DemoTranscriptSummary.shortLabel(for: .json) == nil)
+        #expect(DemoTranscriptSummary.label(for: .json) == LocalizedStringKey(ExportFormat.json.displayName))
+    }
 }

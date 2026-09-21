@@ -16,14 +16,19 @@ struct DemoTranscriptSummary {
     /// The formats the footer names, each one the app really writes.
     static let exportFormats: [ExportFormat] = [.txt, .md, .srt, .docx, .pdf]
 
-    static func label(for format: ExportFormat) -> LocalizedStringKey {
+    /// The short name a footer chip wears, nil for a format the footer never names.
+    static func shortLabel(for format: ExportFormat) -> LocalizedStringKey? {
         switch format {
         case .txt: "Text"
         case .md: "Markdown"
         case .srt: "SRT"
         case .docx: "Word"
         case .pdf: "PDF"
-        default: LocalizedStringKey(format.displayName)
+        default: nil
         }
+    }
+
+    static func label(for format: ExportFormat) -> LocalizedStringKey {
+        shortLabel(for: format) ?? LocalizedStringKey(format.displayName)
     }
 }
