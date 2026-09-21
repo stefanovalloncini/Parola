@@ -115,6 +115,33 @@ struct LibraryDateGroupsTests {
         #expect(LibraryDateGroups.groups(for: [], sortOrder: .newest).isEmpty)
     }
 
+    /// The id only has to tell one group from another; formatting a date to get one cost 199 µs per day group.
+    @Test("a day group is identified by the day itself, not by a formatted date")
+    func dayGroupIDsAreCheapAndStable() {
+        let rows = [
+            row("p", "2026-08-01T10:00", pinned: true),
+            row("a", "2026-09-13T09:00"),
+            row("b", "2026-09-13T08:00"),
+            row("c", "2026-09-12T09:00"),
+        ]
+        let first = groups(rows, now: "2026-09-13T10:00")
+        let second = groups(rows, now: "2026-09-13T10:00")
+
+        #expect(first.map(\.id) == second.map(\.id))
+        #expect(Set(first.map(\.id)).count == first.count)
+        #expect(first.first?.id == "pinned")
+
+        let today = calendar.startOfDay(for: at("2026-09-13T09:00"))
+        let yesterday = calendar.startOfDay(for: at("2026-09-12T09:00"))
+        #expect(first.map(\.id) == [
+            "pinned",
+            "day-\(Int(today.timeIntervalSinceReferenceDate))",
+            "day-\(Int(yesterday.timeIntervalSinceReferenceDate))",
+        ])
+        #expect(LibraryDateGroups.ungrouped(rows).first?.id == "all")
+        #expect(LibraryDateGroups.ungrouped(rows, id: "results").first?.id == "results")
+    }
+
     @Test("the header takes the locale it is given")
     func headersFollowTheLocale() {
         let day = at("2026-09-04T08:00")

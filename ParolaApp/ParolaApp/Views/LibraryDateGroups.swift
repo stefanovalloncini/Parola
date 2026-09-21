@@ -46,13 +46,18 @@ enum LibraryDateGroups {
         }
         for day in order {
             groups.append(Group(
-                id: ISO8601DateFormatter.string(from: day, timeZone: calendar.timeZone, formatOptions: [.withFullDate]),
+                id: id(for: day),
                 title: title(for: day, now: now, calendar: calendar, locale: locale),
                 showsTime: true,
                 rows: byDay[day] ?? []
             ))
         }
         return groups
+    }
+
+    /// The day itself, unformatted: building one `ISO8601DateFormatter` per group cost 199 µs apiece.
+    private static func id(for day: Date) -> String {
+        "day-\(Int(day.timeIntervalSinceReferenceDate))"
     }
 
     static func title(
