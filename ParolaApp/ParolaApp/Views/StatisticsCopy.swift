@@ -13,7 +13,7 @@ enum StatisticsCopy {
         String(localized: "\(transcripts(entries, bundle: bundle, locale: locale)) · \(AppFormat.duration(seconds: audioSeconds, locale: locale)) transcribed", bundle: bundle)
     }
 
-    /// Why three of the four tiles can cover less than the library does.
+    /// Why the two timed tiles and the model table can cover less than the library does.
     static func coverage(
         _ timed: LibraryStatistics.Coverage,
         bundle: Bundle = .main,

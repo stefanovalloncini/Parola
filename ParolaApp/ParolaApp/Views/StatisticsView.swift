@@ -114,8 +114,9 @@ struct StatisticsView: View {
                 .font(DS.Font.caption)
                 .textCase(.uppercase)
                 .foregroundStyle(DS.Color.secondaryText)
+                let fastest = fastestSpeed(stats)
                 ForEach(stats.perModel) { row in
-                    ModelTableRow(row: row, fastest: fastestSpeed(stats))
+                    ModelTableRow(row: row, fastest: fastest)
                 }
             }
         }
