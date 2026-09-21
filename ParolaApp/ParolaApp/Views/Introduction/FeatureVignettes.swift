@@ -194,7 +194,8 @@ struct DictationFrame: Equatable {
 
 /// One frame of the captions loop: the panel listens, then one caption arrives and holds. The real panel shows one or the other, never both.
 struct CaptionsFrame: Equatable {
-    static let listenFrom = 0.12
+    /// Starts where the caption's own fade-out ends, so the panel is never blank for longer than a frame.
+    static let listenFrom = FeatureVignettePhase.resetSpan
     static let listenUntil = 0.34
     static let captionFrom = 0.4
     static let fade = 0.06
