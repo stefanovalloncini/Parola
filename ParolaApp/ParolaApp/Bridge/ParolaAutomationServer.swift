@@ -367,6 +367,7 @@ final class ParolaAutomationServer {
         "transcriptDisplayMode", "generateCardMetadata", "showAITitles", "showAISummaries",
         "customTitlePrompt", "customSummaryPrompt", "appAccentColor",
         "inspectorMode", "introductionComplete", "autostartSummary",
+        "translationSideBySide",
     ]
 
     func runScreenshot(requestedFileName: String?) async throws -> AutomationValue {
@@ -499,6 +500,18 @@ final class ParolaAutomationServer {
             "autostartSummary": .bool(model.autostartSummary),
             "exportPresets": Self.encode(model.exportPresets),
             "exportSpec": model.exportSheetOpen ? Self.encode(model.exportSheetSpec) : .null,
+            "translation": Self.translationState(model),
+            "translationSideBySide": .bool(model.translationSideBySide),
+        ])
+    }
+
+    static func translationState(_ model: AppModel) -> AutomationValue {
+        guard let translation = model.transcript?.translation else { return .null }
+        return .object([
+            "targetLanguage": .string(translation.targetLanguage),
+            "segmentCount": .int(translation.segments.count),
+            "inProgress": .bool(model.translationCoordinator.isRunning),
+            "provider": .string(translation.provider),
         ])
     }
 

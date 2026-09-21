@@ -41,6 +41,7 @@ struct ContentView: View {
                 .modifier(HideToolbarTitleIfAvailable())
         }
         .contentSheets()
+        .background { TranslationHostView() }
         .modifier(SplitDropZone())
         .overlay {
             if let count = model.recordingCountdown {

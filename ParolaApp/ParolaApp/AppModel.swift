@@ -157,6 +157,9 @@ final class AppModel {
     var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue { didSet { defaults.set(subtitleCaptionLengthRaw, forKey: "subtitleCaptionLength") } }
     var transcriptCompact: Bool = false { didSet { defaults.set(transcriptCompact, forKey: "transcriptCompact") } }
     var showSubtitleQC: Bool = false { didSet { defaults.set(showSubtitleQC, forKey: "showSubtitleQC") } }
+    var translationSideBySide: Bool = true { didSet { defaults.set(translationSideBySide, forKey: "translationSideBySide") } }
+    /// Stored, not lazily made: the host view reads its published configuration every time the body runs.
+    @ObservationIgnored let translationCoordinator = TranslationCoordinator()
     var skipSilences: Bool = false { didSet { defaults.set(skipSilences, forKey: "skipSilences") } }
     var pausePlayerOnAppHidden: Bool = false { didSet { defaults.set(pausePlayerOnAppHidden, forKey: "pausePlayerOnAppHidden") } }
     var markdownTimestamps: Bool = false { didSet { defaults.set(markdownTimestamps, forKey: "markdownTimestamps") } }
@@ -668,6 +671,7 @@ final class AppModel {
         self.subtitleCaptionLengthRaw = defaults.string(forKey: "subtitleCaptionLength") ?? CaptionLength.none.rawValue
         self.transcriptCompact = defaults.bool(forKey: "transcriptCompact")
         self.showSubtitleQC = defaults.bool(forKey: "showSubtitleQC")
+        self.translationSideBySide = readBool("translationSideBySide", default: true)
         self.skipSilences = defaults.bool(forKey: "skipSilences")
         self.pausePlayerOnAppHidden = defaults.bool(forKey: "pausePlayerOnAppHidden")
         self.markdownTimestamps = defaults.bool(forKey: "markdownTimestamps")

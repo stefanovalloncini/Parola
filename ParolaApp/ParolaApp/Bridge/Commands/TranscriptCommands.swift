@@ -123,6 +123,44 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "translateTranscript",
+                area: .transcript,
+                summary: "Translates the open transcript into a language and stores the result. Uses whichever translator is installed.",
+                kind: .mutating,
+                args: [
+                    .init(name: "language", kind: .string(), required: true, summary: "BCP-47 language code to translate into"),
+                ],
+                handler: { args, ctx in
+                    let language = try args.string("language")
+                    guard ctx.model.transcript != nil else {
+                        throw AutomationError.precondition("no transcript is open")
+                    }
+                    await ctx.model.translateTranscript(to: language)
+                    guard let translation = ctx.model.transcript?.translation else {
+                        return .object(["translated": .bool(false)])
+                    }
+                    return .object([
+                        "translated": .bool(true),
+                        "targetLanguage": .string(translation.targetLanguage),
+                        "segmentCount": .int(translation.segments.count),
+                        "provider": .string(translation.provider),
+                    ])
+                }
+            ),
+
+            AutomationCommand(
+                name: "removeTranslation",
+                area: .transcript,
+                summary: "Drops the open transcript's translation.",
+                kind: .mutating,
+                handler: { _, ctx in
+                    let had = ctx.model.transcript?.translation != nil
+                    await ctx.model.removeTranslation()
+                    return .object(["removed": .bool(had)])
+                }
+            ),
+
+            AutomationCommand(
                 name: "setTheme",
                 area: .transcript,
                 summary: "Sets the appearance (light/dark/system) and/or the color preset.",

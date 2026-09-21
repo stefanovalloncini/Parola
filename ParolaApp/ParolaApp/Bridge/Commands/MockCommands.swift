@@ -88,6 +88,37 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "installMockTranslator",
+                area: .test,
+                summary: "Installs a translator that never touches the Translation framework. Test-mode only.",
+                kind: .mutating,
+                args: [
+                    .init(name: "mode", kind: .string(enum: MockTranslator.Mode.allCases.map(\.rawValue)), required: true, summary: "How the mock translates"),
+                    .init(name: "map", kind: .object, required: false, summary: "Source text to translated text, for the 'map' mode"),
+                ],
+                handler: { args, ctx in
+                    try requireTestMode(ctx)
+                    let modeRaw = try args.string("mode")
+                    guard let mode = MockTranslator.Mode(rawValue: modeRaw) else {
+                        throw AutomationError.invalidArgs(field: "mode", reason: "unknown mode '\(modeRaw)'")
+                    }
+                    var map: [String: String] = [:]
+                    for (key, value) in args.contains("map") ? try args.object("map") : [:] {
+                        guard case .string(let text) = value else {
+                            throw AutomationError.invalidArgs(field: "map", reason: "every value must be a string")
+                        }
+                        map[key] = text
+                    }
+                    MockTranslatorRegistry.shared.install(MockTranslator(mode: mode, map: map))
+                    return .object([
+                        "installed": .bool(true),
+                        "mode": .string(modeRaw),
+                        "mapCount": .int(map.count),
+                    ])
+                }
+            ),
+
+            AutomationCommand(
                 name: "installMockAudioInput",
                 area: .test,
                 summary: "Swaps live audio sources for a WAV fixture. Test-mode only.",
@@ -120,7 +151,7 @@ extension ParolaAutomationServer {
                 summary: "Clears installed mocks. Test-mode only.",
                 kind: .mutating,
                 args: [
-                    .init(name: "scope", kind: .string(enum: ["transcriber", "llm", "audio", "media", "all"]), required: false, summary: "Scope to clear", defaultValue: .string("all")),
+                    .init(name: "scope", kind: .string(enum: ["transcriber", "llm", "audio", "media", "translator", "all"]), required: false, summary: "Scope to clear", defaultValue: .string("all")),
                 ],
                 handler: { args, ctx in
                     try requireTestMode(ctx)
@@ -141,6 +172,9 @@ extension ParolaAutomationServer {
                     }
                     if scope == "media" || scope == "all" {
                         MockMediaFetcherRegistry.shared.clear()
+                    }
+                    if scope == "translator" || scope == "all" {
+                        MockTranslatorRegistry.shared.clear()
                     }
                     return .object([
                         "cleared": .bool(true),
@@ -168,6 +202,7 @@ extension ParolaAutomationServer {
                         "audio": .object(audioObject),
                         "capturedInsertions": .int(CapturedInsertionStore.shared.all().count),
                         "mediaFetcher": .bool(MockMediaFetcherRegistry.shared.resolve() != nil),
+                        "translator": MockTranslatorRegistry.shared.resolve().map { .string($0.mode.rawValue) } ?? .null,
                     ])
                 }
             ),
