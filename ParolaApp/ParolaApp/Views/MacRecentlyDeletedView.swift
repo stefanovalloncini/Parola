@@ -40,15 +40,14 @@ struct MacRecentlyDeletedView: View {
             let live = Set(entries.map(\.id))
             previews = previews.filter { live.contains($0.key) }
             model.recentlyDeletedSelection = model.recentlyDeletedSelection.intersection(live)
-            now = Date()
-            recomputeRows()
         }
-        // Keyed on the entries so an arrival while the page is open gets its preview too.
+        // Keyed on the entries so it runs on open and again whenever the trash changes.
         .task(id: model.deletedEntries) {
             now = Date()
             recomputeRows()
-            for entry in model.deletedEntries { await loadPreview(for: entry) }
         }
+        // One rebuild for the previews that arrived together, not one per row.
+        .onChange(of: previews) { recomputeRows() }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)
         .tint(DS.Color.accent)
@@ -126,6 +125,8 @@ struct MacRecentlyDeletedView: View {
         ))
         // The expiry bar is the rule between rows; the List's own would run three points under it.
         .listRowSeparator(.hidden)
+        // Per row, so opening the page decodes what is on screen instead of the whole trash.
+        .task(id: display.id) { await loadPreview(for: entry) }
     }
 
     @ViewBuilder
@@ -252,7 +253,6 @@ struct MacRecentlyDeletedView: View {
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         previews[entry.id] = trimmed.isEmpty ? "" : String(trimmed.prefix(280))
-        recomputeRows()
     }
 
     private func recomputeRows() {
