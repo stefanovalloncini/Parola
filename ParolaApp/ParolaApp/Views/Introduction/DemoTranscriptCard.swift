@@ -42,12 +42,7 @@ struct DemoTranscriptCard: View {
     private func header(at time: Double) -> some View {
         HStack(spacing: DS.Spacing.regular) {
             BrandWaveform(side: Self.barsSide, drive: drive(at: time))
-                // An empty property set leaves the bars where they are: no flight under reduce motion.
-                .matchedGeometryEffect(
-                    id: IntroductionView.brandBarsID,
-                    in: brand,
-                    properties: reduceMotion ? [] : .frame
-                )
+                .brandBars(in: brand)
             Text(verbatim: clock(at: time))
                 .font(DS.Font.mono)
                 .foregroundStyle(DS.Color.secondaryText)

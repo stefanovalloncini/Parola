@@ -9,12 +9,7 @@ struct HelloScene: View {
     var body: some View {
         VStack(spacing: DS.Spacing.large) {
             BrandWaveform(side: 240)
-                // An empty property set leaves the bars where they are: no flight under reduce motion.
-                .matchedGeometryEffect(
-                    id: IntroductionView.brandBarsID,
-                    in: brand,
-                    properties: reduceMotion ? [] : .frame
-                )
+                .brandBars(in: brand)
             VStack(spacing: DS.Spacing.small) {
                 Text(verbatim: "Parola")
                     .font(DS.Font.wordmark)

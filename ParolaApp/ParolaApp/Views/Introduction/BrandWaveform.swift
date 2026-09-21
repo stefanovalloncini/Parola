@@ -90,3 +90,21 @@ struct BrandWaveform: View {
         return 1 + 0.06 * sin(seconds * 1.4 + Double(index) * 0.5)
     }
 }
+
+extension View {
+    /// The bars Hello and the demo card hand to each other; both sites are sources, so whichever is on screen carries the frame.
+    func brandBars(in namespace: Namespace.ID) -> some View {
+        modifier(BrandBarsHandoff(namespace: namespace))
+    }
+}
+
+private struct BrandBarsHandoff: ViewModifier {
+    let namespace: Namespace.ID
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        // An empty property set copies nothing from the source, so the bars stay put under reduce motion.
+        content.matchedGeometryEffect(id: "brandBars", in: namespace, properties: reduceMotion ? [] : .frame)
+    }
+}
