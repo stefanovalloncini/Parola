@@ -14,10 +14,10 @@ enum EntrySourceKind: Equatable {
         case .meeting: self = .meeting
         case .dictation: self = .dictation
         case .transcription:
-            if entry.modelName.hasPrefix("youtube-") {
-                self = .web
-            } else {
-                self.init(fileName: entry.manifest.originalAudioName)
+            switch entry.manifest.source {
+            case .web: self = .web
+            case .microphone, .systemAudio: self = .audio
+            case .file: self.init(fileName: entry.manifest.originalAudioName)
             }
         }
     }

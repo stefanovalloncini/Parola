@@ -144,7 +144,9 @@ extension AppModel {
         Task { [weak self] in
             guard let self else { return }
             do {
-                _ = try await library.add(transcript: transcript, audioSource: sourceURL, category: .transcription)
+                _ = try await library.add(
+                    transcript: transcript, audioSource: sourceURL, category: .transcription, source: .file
+                )
             } catch {
                 nonFatalWarning = "\(sourceURL.lastPathComponent) was transcribed, but Parola couldn't save it to your library. \(error.localizedDescription)"
             }

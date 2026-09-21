@@ -40,7 +40,7 @@ struct AppModelSelectionSafetyTests {
         let model = makeModel()
         let result = makeTranscript()
         model.transcript = result
-        model.persistToLibrary(result, audioSource: nil)
+        model.persistToLibrary(result, audioSource: nil, source: .file)
         let selected = await poll { model.selectedEntryID != nil }
         #expect(selected, "the freshly saved recording should become the selected entry")
     }
@@ -50,7 +50,7 @@ struct AppModelSelectionSafetyTests {
         let model = makeModel()
         let result = makeTranscript()
         model.transcript = result
-        model.persistToLibrary(result, audioSource: nil)
+        model.persistToLibrary(result, audioSource: nil, source: .file)
         // The user opens another entry while library.add is still copying.
         model.loadEntryGeneration &+= 1
 

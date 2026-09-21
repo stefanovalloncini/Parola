@@ -58,7 +58,7 @@ struct RecoveryLoggingTests {
                 )
             }
 
-            model.persistToLibrary(makeTranscript(), audioSource: nil, activate: false)
+            model.persistToLibrary(makeTranscript(), audioSource: nil, source: .file, activate: false)
 
             let record = try #require(
                 await waitForRecord(sink, .library, message: "transcript could not be saved to the library")

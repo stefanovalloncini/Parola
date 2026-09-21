@@ -20,6 +20,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
     var segments: [TranscriptSegment]
     var audioURL: URL?
     var title: String?
+    /// Nil in a file written before the field, which a restored take reads as a microphone take.
+    var source: EntrySource?
 
     init(
         kind: Kind,
@@ -29,7 +31,8 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         language: String? = nil,
         segments: [TranscriptSegment] = [],
         audioURL: URL? = nil,
-        title: String? = nil
+        title: String? = nil,
+        source: EntrySource? = nil
     ) {
         self.kind = kind
         self.startedAt = startedAt
@@ -39,6 +42,7 @@ struct RecoveryCheckpoint: Codable, Equatable, Sendable {
         self.segments = segments
         self.audioURL = audioURL
         self.title = title
+        self.source = source
     }
 }
 
@@ -49,7 +53,7 @@ extension AppModel {
     }
 
     @discardableResult
-    func beginFileTranscribeRecovery(sourceURL: URL, title: String? = nil) -> Int {
+    func beginFileTranscribeRecovery(sourceURL: URL, title: String? = nil, source: EntrySource = .file) -> Int {
         recoveryGeneration += 1
         activeRecoveryGeneration = recoveryGeneration
         recordingRecoveryStartedAt = nil
@@ -58,7 +62,8 @@ extension AppModel {
             startedAt: Date(),
             modelName: selectedModel,
             sourceURL: sourceURL,
-            title: title
+            title: title,
+            source: source
         ))
         return recoveryGeneration
     }
@@ -80,7 +85,8 @@ extension AppModel {
             modelName: selectedModel,
             language: selectedLanguage,
             segments: liveSegments,
-            audioURL: liveRecordingAudioURL
+            audioURL: liveRecordingAudioURL,
+            source: pendingRecordingSource
         ))
     }
 
@@ -188,7 +194,7 @@ extension AppModel {
                 fileTranscribeTask?.cancel()
                 fileTranscribeTask = Task { [weak self] in
                     guard let self else { return }
-                    await transcribeRecordedTake(url: url, title: title)
+                    await transcribeRecordedTake(url: url, title: title, source: checkpoint.source ?? .microphone)
                     if !Task.isCancelled {
                         self.fileTranscribeTask = nil
                         self.drainDeferredArrivals()
@@ -243,7 +249,12 @@ extension AppModel {
         if audioURL != nil { adoptLoadedMediaDuration() }
         phase = .ready
         route = .transcript
-        persistToLibrary(restored, audioSource: audioURL, title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt))
+        persistToLibrary(
+            restored,
+            audioSource: audioURL,
+            source: checkpoint.source ?? .microphone,
+            title: Self.recoveredRecordingTitle(startedAt: checkpoint.startedAt)
+        )
     }
 
     nonisolated static func readableRecordingURL(_ url: URL) -> URL? {

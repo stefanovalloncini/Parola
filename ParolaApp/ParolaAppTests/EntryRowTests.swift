@@ -39,7 +39,8 @@ struct EntryRowTests {
     private func entry(
         _ name: String,
         category: EntryCategory = .transcription,
-        model: String = "stub"
+        model: String = "stub",
+        source: EntrySource? = nil
     ) -> LibraryEntry {
         let manifest = ParolaDocument.Manifest(
             createdAt: Date(timeIntervalSince1970: 1_700_000_000),
@@ -47,7 +48,8 @@ struct EntryRowTests {
             title: name,
             modelName: model,
             language: "en",
-            category: category
+            category: category,
+            source: source
         )
         return LibraryEntry(
             id: "e",
@@ -70,6 +72,18 @@ struct EntryRowTests {
         #expect(EntrySourceKind(entry: entry("talk.mp4", model: "youtube-auto-subs")) == .web)
         #expect(EntrySourceKind(entry: entry("standup.mp4", category: .meeting)) == .meeting)
         #expect(EntrySourceKind(entry: entry("memo.wav", category: .dictation)) == .dictation)
+    }
+
+    @Test("a link transcribed with a local model still reads as a link")
+    func sourceKindFollowsTheManifest() {
+        #expect(EntrySourceKind(entry: entry("audio.m4a", source: .web)) == .web)
+        #expect(EntrySourceKind(entry: entry("video.mp4", source: .web)) == .web)
+    }
+
+    @Test("a take reads as audio whatever its working file is called")
+    func sourceKindOfATake() {
+        #expect(EntrySourceKind(entry: entry("take.mp4", source: .microphone)) == .audio)
+        #expect(EntrySourceKind(entry: entry("take.mp4", source: .systemAudio)) == .audio)
     }
 
     @Test("every source kind has a glyph of its own")

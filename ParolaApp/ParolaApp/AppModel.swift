@@ -42,6 +42,12 @@ final class AppModel {
             case .systemAudio: return "waveform"
             }
         }
+        var entrySource: EntrySource {
+            switch self {
+            case .microphone: return .microphone
+            case .systemAudio: return .systemAudio
+            }
+        }
     }
 
     enum Route: String, Hashable, CaseIterable {
@@ -255,6 +261,7 @@ final class AppModel {
     var failedTranslateOverride: Bool?
     @ObservationIgnored var failedTakeTitle: String?
     @ObservationIgnored var failedTakeCategory: EntryCategory?
+    @ObservationIgnored var failedTakeSource: EntrySource?
     @ObservationIgnored var pendingDictationRestart: Task<Void, Never>?
 
     var recordingDiskSpaceLow: Bool = false
@@ -888,6 +895,8 @@ final class AppModel {
     var meetingDetectedApp: String?
     var meetingCaptureAppOnly: Bool = false { didSet { defaults.set(meetingCaptureAppOnly, forKey: "meetingCaptureAppOnly") } }
     @ObservationIgnored var pendingRecordingCategory: EntryCategory = .transcription
+    /// Where the take in flight is listening, for the manifest a persist writes after the phase has moved on.
+    @ObservationIgnored var pendingRecordingSource: EntrySource = .microphone
     @ObservationIgnored var pendingCaptureBundleIDs: Set<String>?
     @ObservationIgnored lazy var meetingDetector: MeetingDetector = MeetingDetector { [weak self] appName in
         guard let self else { return }
@@ -1441,6 +1450,7 @@ final class AppModel {
     func persistToLibrary(
         _ result: Transcript,
         audioSource: URL?,
+        source: EntrySource,
         title: String? = nil,
         activate: Bool = true,
         sourceDigest: String? = nil
@@ -1456,7 +1466,8 @@ final class AppModel {
                     audioSource: audioSource,
                     category: category,
                     title: title,
-                    sourceDigest: sourceDigest
+                    sourceDigest: sourceDigest,
+                    source: source
                 )
                 refreshLibrary()
                 // library.add copies media for seconds; if the user navigated meanwhile,
@@ -1789,7 +1800,12 @@ final class AppModel {
         tearDownPlayer()
         transcript = processed
         phase = .ready
-        persistToLibrary(processed, audioSource: nil, title: fileURL.deletingPathExtension().lastPathComponent)
+        persistToLibrary(
+            processed,
+            audioSource: nil,
+            source: .file,
+            title: fileURL.deletingPathExtension().lastPathComponent
+        )
     }
 
     nonisolated static func parseSubtitleFile(at url: URL) throws -> Transcript {
@@ -1881,7 +1897,7 @@ final class AppModel {
                 fileTranscribeStage = nil
                 endRecovery(recoveryToken)
                 phase = .ready
-                persistToLibrary(processed, audioSource: fileURL, sourceDigest: sourceDigest)
+                persistToLibrary(processed, audioSource: fileURL, source: .file, sourceDigest: sourceDigest)
             } catch {
                 endRecovery(recoveryToken)
                 filePartialText = ""
@@ -2107,6 +2123,7 @@ final class AppModel {
                 persistToLibrary(
                     processed,
                     audioSource: audioURL,
+                    source: .web,
                     title: LibraryEntryDisplay.webVideoTitle(createdAt: Date())
                 )
             } catch {
@@ -2146,6 +2163,7 @@ final class AppModel {
                 persistToLibrary(
                     processed,
                     audioSource: nil,
+                    source: .web,
                     title: LibraryEntryDisplay.webVideoTitle(createdAt: Date())
                 )
             } catch {
@@ -2354,6 +2372,7 @@ final class AppModel {
     }
 
     private func beginRecordingNow(source: RecordSource) {
+        pendingRecordingSource = source.entrySource
         let config = recordingMediaConfig(for: source)
         // A recording replaces any transcription in flight, like a user file-open does;
         // otherwise the old run would finish later and stomp the new take's transcript.
@@ -2608,6 +2627,7 @@ final class AppModel {
             let audioURL = await streaming?.recordingAudioURL()
             var message = msg
             let takeCategory = pendingRecordingCategory
+            let takeSource = pendingRecordingSource
             let takeTitle = Self.liveRecordingTitle(category: takeCategory, endedAt: Date())
             let savedPartial = !confirmed.isEmpty || audioURL != nil
             if savedPartial {
@@ -2621,6 +2641,7 @@ final class AppModel {
                 persistToLibrary(
                     partial,
                     audioSource: audioURL,
+                    source: takeSource,
                     title: takeTitle + " (interrupted)",
                     activate: false
                 )
@@ -2635,6 +2656,7 @@ final class AppModel {
                 failedTakeAudioURL = audioURL
                 failedTakeTitle = takeTitle
                 failedTakeCategory = takeCategory
+                failedTakeSource = takeSource
             }
             resolveRecordingOutcome(.failure(IntentActionError.failed(message)))
             drainDeferredArrivals()
@@ -2656,6 +2678,7 @@ final class AppModel {
             persistToLibrary(
                 processed,
                 audioSource: processed.sourceURL,
+                source: pendingRecordingSource,
                 title: Self.liveRecordingTitle(category: pendingRecordingCategory, endedAt: Date())
             )
             resolveRecordingOutcome(.success(processed.text))
@@ -2699,7 +2722,8 @@ final class AppModel {
                 stopRecordingLevelObserver()
                 await transcribeRecordedTake(
                     url: url,
-                    title: Self.liveRecordingTitle(category: pendingRecordingCategory, endedAt: Date())
+                    title: Self.liveRecordingTitle(category: pendingRecordingCategory, endedAt: Date()),
+                    source: pendingRecordingSource
                 )
             } catch {
                 stopRecordingLevelObserver()
@@ -2719,9 +2743,9 @@ final class AppModel {
     /// Transcribes a finished take from its in-flight file. Unlike a user-opened file the
     /// audio is irreplaceable, so a failure saves it to the library and arms the error
     /// pane's Retry instead of leaving the file orphaned.
-    func transcribeRecordedTake(url: URL, title: String) async {
+    func transcribeRecordedTake(url: URL, title: String, source: EntrySource) async {
         liveRecordingAudioURL = nil
-        let recoveryToken = beginFileTranscribeRecovery(sourceURL: url, title: title)
+        let recoveryToken = beginFileTranscribeRecovery(sourceURL: url, title: title, source: source)
         sourceFileURL = url
         installPlayer(for: url)
         phase = .transcribing(file: url)
@@ -2738,7 +2762,7 @@ final class AppModel {
             adoptLoadedMediaDuration()
             endRecovery(recoveryToken)
             phase = .ready
-            persistToLibrary(processed, audioSource: url, title: title)
+            persistToLibrary(processed, audioSource: url, source: source, title: title)
             resolveRecordingOutcome(.success(processed.text))
         } catch {
             endRecovery(recoveryToken)
@@ -2754,6 +2778,7 @@ final class AppModel {
                         sourceURL: url
                     ),
                     audioSource: url,
+                    source: source,
                     title: title + " (transcription failed)",
                     activate: false
                 )
@@ -2764,6 +2789,7 @@ final class AppModel {
                 failedTakeAudioURL = url
                 failedTakeTitle = title
                 failedTakeCategory = category
+                failedTakeSource = source
             } else {
                 phase = .failed(message: message)
             }
@@ -2779,6 +2805,7 @@ final class AppModel {
         if failedTakeAudioURL != nil { failedTakeAudioURL = nil }
         failedTakeTitle = nil
         failedTakeCategory = nil
+        failedTakeSource = nil
     }
 
     var canRetryFailedTranscription: Bool {
@@ -2810,10 +2837,11 @@ final class AppModel {
     func retryFailedTake() {
         guard let url = failedTakeAudioURL else { return }
         let title = failedTakeTitle ?? Self.liveRecordingTitle(category: .transcription, endedAt: Date())
+        let source = failedTakeSource ?? .microphone
         pendingRecordingCategory = failedTakeCategory ?? .transcription
         fileTranscribeTask?.cancel()
         fileTranscribeTask = Task {
-            await transcribeRecordedTake(url: url, title: title)
+            await transcribeRecordedTake(url: url, title: title, source: source)
             if !Task.isCancelled {
                 self.fileTranscribeTask = nil
                 self.drainDeferredArrivals()
