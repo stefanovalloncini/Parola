@@ -3,7 +3,7 @@ import Foundation
 import os
 @testable import ParolaCore
 
-@Suite("LibraryStore load cache", .tags(.fileSystem))
+@Suite("LibraryStore load cache", .serialized, .tags(.fileSystem))
 struct LibraryLoadCacheTests {
     private func makeStore(
         didDecodeDocument: (@Sendable () -> Void)? = nil
@@ -125,6 +125,7 @@ struct LibraryLoadCacheTests {
     private final class DecodeGate: Sendable {
         private struct Arming: Sendable {
             let release: DispatchSemaphore
+            let allParked: AsyncStream<Void>.Continuation
             var remaining: Int
             var parked: Int
         }
@@ -133,34 +134,51 @@ struct LibraryLoadCacheTests {
 
         var hook: @Sendable () -> Void {
             { [state] in
-                let release: DispatchSemaphore? = state.withLock { current in
+                let arrival: (DispatchSemaphore, AsyncStream<Void>.Continuation?)? = state.withLock { current in
                     guard var arming = current, arming.remaining > 0 else { return nil }
                     arming.remaining -= 1
                     arming.parked += 1
                     current = arming
-                    return arming.release
+                    return (arming.release, arming.remaining == 0 ? arming.allParked : nil)
                 }
-                release?.wait()
+                guard let (release, allParked) = arrival else { return }
+                allParked?.yield()
+                release.wait()
             }
         }
 
         /// Runs `body` once `count` decodes are parked, then lets them all answer.
         func holding(_ count: Int, _ body: () async throws -> Void) async rethrows {
             let release = DispatchSemaphore(value: 0)
-            state.withLock { $0 = Arming(release: release, remaining: count, parked: 0) }
+            let (parked, signal) = AsyncStream<Void>.makeStream()
+            state.withLock { $0 = Arming(release: release, allParked: signal, remaining: count, parked: 0) }
             defer {
                 state.withLock { $0 = nil }
+                signal.finish()
                 for _ in 0..<count { release.signal() }
             }
-            let deadline = ContinuousClock.now + .seconds(10)
-            while state.withLock({ $0?.parked ?? count }) < count {
-                if ContinuousClock.now > deadline {
-                    Issue.record("the decodes never reached the gate")
-                    break
-                }
-                try? await Task.sleep(for: .milliseconds(1))
+            let reached = await signalled(parked)
+            if !reached, state.withLock({ $0?.parked ?? count }) < count {
+                Issue.record("the decodes never reached the gate")
             }
             try await body()
+        }
+
+        /// The last decode to park signals; nothing polls, so a starved pool delays the answer instead of faking a timeout.
+        private func signalled(_ parked: AsyncStream<Void>) async -> Bool {
+            await withTaskGroup(of: Bool.self) { group in
+                group.addTask {
+                    var arrivals = parked.makeAsyncIterator()
+                    return await arrivals.next() != nil
+                }
+                group.addTask {
+                    try? await Task.sleep(for: .seconds(30))
+                    return false
+                }
+                let first = await group.next() ?? false
+                group.cancelAll()
+                return first
+            }
         }
     }
 
