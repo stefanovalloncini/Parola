@@ -3245,8 +3245,7 @@ final class AppModel {
         }
     }
 
-    /// The one entry point for switching Transcript/Summary/Chat: the header picker, the AI menu,
-    /// the ⌘1/2/3 commands and the bridge all call this, so the guard can't be bypassed from any of them.
+    /// The one entry point for switching modes: the picker, the AI menu, ⌘1/2/3 and the bridge all call this.
     func setTranscriptPaneMode(_ mode: TranscriptPaneMode) {
         guard canShow(mode) else { return }
         transcriptPaneMode = mode

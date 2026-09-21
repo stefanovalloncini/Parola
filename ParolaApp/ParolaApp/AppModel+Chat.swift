@@ -29,8 +29,7 @@ extension AppModel {
         }
     }
 
-    /// The saved summary options with the given fields overridden — used by the bridge, which
-    /// sends only the fields a caller wants to change.
+    /// The saved summary options with the given fields overridden, for a bridge caller that sends only what changed.
     func mergedSummaryOptions(overriding raw: [String: AutomationValue]) -> SummaryOptions {
         guard let base = try? JSONSerialization.jsonObject(with: JSONEncoder().encode(summaryOptions)) as? [String: Any] else {
             return summaryOptions
