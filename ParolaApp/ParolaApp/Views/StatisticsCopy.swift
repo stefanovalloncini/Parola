@@ -29,16 +29,35 @@ enum StatisticsCopy {
         return String(localized: "Timing recorded since \(AppFormat.day(since, locale: locale)) · \(share) transcripts", bundle: bundle)
     }
 
-    static func last30Days(
+    /// The caption under the activity chart: what the shown span adds up to.
+    static func activity(
+        range: ActivityRange,
         entries: Int,
         audioSeconds: Double,
         bundle: Bundle = .main,
         locale: Locale = AppFormat.locale
     ) -> String {
         guard entries > 0 else {
-            return String(localized: "Nothing transcribed in the last 30 days", bundle: bundle)
+            switch range {
+            case .days30: return String(localized: "Nothing transcribed in the last 30 days", bundle: bundle)
+            case .months12: return String(localized: "Nothing transcribed in the last 12 months", bundle: bundle)
+            }
         }
         return String(localized: "\(transcripts(entries, bundle: bundle, locale: locale)) · \(AppFormat.duration(seconds: audioSeconds, locale: locale)) of audio", bundle: bundle)
+    }
+
+    /// The card over a hovered bar: the day or month, then what it holds.
+    static func bucket(
+        label: String,
+        entries: Int,
+        audioSeconds: Double,
+        bundle: Bundle = .main,
+        locale: Locale = AppFormat.locale
+    ) -> String {
+        guard entries > 0 else {
+            return "\(label) · \(String(localized: "Nothing transcribed", bundle: bundle))"
+        }
+        return "\(label) · \(transcripts(entries, bundle: bundle, locale: locale)) · \(AppFormat.duration(seconds: audioSeconds, locale: locale))"
     }
 
     private static func transcripts(_ count: Int, bundle: Bundle, locale: Locale) -> String {
@@ -68,4 +87,10 @@ enum StatisticsCopy {
         }
         return "\(took) · \(speed)"
     }
+}
+
+/// The two spans the activity chart draws.
+enum ActivityRange: CaseIterable, Hashable {
+    case days30
+    case months12
 }

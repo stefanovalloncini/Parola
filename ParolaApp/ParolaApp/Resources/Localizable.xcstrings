@@ -745,6 +745,17 @@
         }
       }
     },
+    "12 Months": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "12 mesi"
+          }
+        }
+      }
+    },
     "120 min": {
       "extractionState": "manual",
       "localizations": {
@@ -774,6 +785,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "3 secondi"
+          }
+        }
+      }
+    },
+    "30 Days": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 giorni"
           }
         }
       }
@@ -5870,17 +5892,6 @@
         }
       }
     },
-    "Last 30 Days": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ultimi 30 giorni"
-          }
-        }
-      }
-    },
     "Last 30 days": {
       "extractionState": "manual",
       "localizations": {
@@ -7491,13 +7502,35 @@
         }
       }
     },
+    "Nothing transcribed": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna trascrizione"
+          }
+        }
+      }
+    },
+    "Nothing transcribed in the last 12 months": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna trascrizione negli ultimi 12 mesi"
+          }
+        }
+      }
+    },
     "Nothing transcribed in the last 30 days": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Niente trascritto negli ultimi 30 giorni"
+            "value": "Nessuna trascrizione negli ultimi 30 giorni"
           }
         }
       }
@@ -13391,6 +13424,17 @@
         }
       }
     },
+    "h": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "h"
+          }
+        }
+      }
+    },
     "heard": {
       "extractionState": "manual",
       "localizations": {
@@ -13409,6 +13453,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "https://www.youtube.com/watch?v=…"
+          }
+        }
+      }
+    },
+    "min": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "min"
           }
         }
       }

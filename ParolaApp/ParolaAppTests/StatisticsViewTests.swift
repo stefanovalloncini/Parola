@@ -22,9 +22,11 @@ struct StatisticsViewTests {
         return model
     }
 
-    private func entry(_ id: String, timing: Double?, audio: Double = 600, words: Int? = 100) -> LibraryEntry {
+    private func entry(
+        _ id: String, timing: Double?, audio: Double = 600, words: Int? = 100, daysAgo: Double = 0
+    ) -> LibraryEntry {
         var manifest = ParolaDocument.Manifest(
-            createdAt: Self.reference,
+            createdAt: Self.reference.addingTimeInterval(-daysAgo * 86_400),
             originalAudioName: "\(id).wav",
             modelName: "openai_whisper-large-v3_turbo",
             language: "en",
@@ -62,17 +64,20 @@ struct StatisticsViewTests {
         return names
     }
 
+    /// Spread over the year and with a longest and a fastest entry, so every section of the page has something to draw.
+    private var seededEntries: [LibraryEntry] {
+        [
+            entry("a", timing: 37.5),
+            entry("b", timing: 1_205, audio: 12_500, daysAgo: 3),
+            entry("c", timing: nil, daysAgo: 12),
+            entry("d", timing: 20, audio: 3_600, daysAgo: 45),
+            entry("e", timing: 90, audio: 900, words: nil, daysAgo: 200),
+        ]
+    }
+
     /// Seeded through the view's own init: the `.task` that fills `stats` can't run inside a synchronous test body.
     private func populated() -> LibraryStatistics {
-        LibraryStatistics.compute(
-            entries: [
-                entry("a", timing: 37.5),
-                entry("b", timing: 1_205, audio: 12_500),
-                entry("c", timing: nil),
-            ],
-            now: Self.reference,
-            calendar: Calendar(identifier: .gregorian)
-        )
+        LibraryStatistics.compute(entries: seededEntries, now: Self.reference, calendar: Calendar(identifier: .gregorian))
     }
 
     @Test("the populated page fits the detail column of every window it is given", arguments: [
@@ -80,7 +85,7 @@ struct StatisticsViewTests {
     ])
     func pageFitsTheWindow(size: CGSize) {
         withIsolatedDefaults { defaults in
-            let model = makeModel(defaults, entries: [])
+            let model = makeModel(defaults, entries: seededEntries)
             // The narrowest the page can be in that window: the sidebar may take its widest.
             let width = size.width - MainWindowLayout.sidebarMaxWidth
             let host = NSHostingView(rootView: StatisticsView(stats: populated()).environment(model))

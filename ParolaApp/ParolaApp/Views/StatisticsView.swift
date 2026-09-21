@@ -3,7 +3,9 @@ import ParolaCore
 
 struct StatisticsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var stats: LibraryStatistics?
+    @State private var activityRange: ActivityRange = .days30
 
     /// Seeded only by tests; in the app the `.task` fills it on the first pass.
     init(stats: LibraryStatistics? = nil) {
@@ -57,11 +59,11 @@ struct StatisticsView: View {
                     .foregroundStyle(DS.Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                     .axLeaf("Text.Coverage")
+                activity(stats)
                 if !stats.perModel.isEmpty {
                     modelTable(stats)
                 }
                 kinds(stats)
-                recent(stats)
             }
             .padding(DS.Spacing.large)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -133,17 +135,42 @@ struct StatisticsView: View {
         }
     }
 
-    private func recent(_ stats: LibraryStatistics) -> some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            SectionCaption("Last 30 Days")
-            Text(StatisticsCopy.last30Days(
-                entries: stats.last30Days.entries,
-                audioSeconds: stats.last30Days.audioSeconds
-            ))
-            .font(DS.Font.body)
-            .foregroundStyle(DS.Color.primaryText)
-            .axLeaf("Text.Last30Days")
+    private func activity(_ stats: LibraryStatistics) -> some View {
+        let buckets = activityRange == .days30 ? stats.dailyActivity : stats.monthlyActivity
+        let caption = StatisticsCopy.activity(
+            range: activityRange,
+            entries: buckets.reduce(0) { $0 + $1.entries },
+            audioSeconds: buckets.reduce(0) { $0 + $1.audioSeconds }
+        )
+        return VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            HStack {
+                SectionCaption("Activity")
+                Spacer()
+                Picker(selection: rangeSelection) {
+                    Text("30 Days").tag(ActivityRange.days30)
+                    Text("12 Months").tag(ActivityRange.months12)
+                } label: {
+                    Text("Activity")
+                }
+                .pickerStyle(.segmented)
+                .controlSize(.small)
+                .labelsHidden()
+                .fixedSize()
+                .axLeaf("Picker.ActivityRange")
+            }
+            ActivityChart(buckets: buckets, range: activityRange, caption: caption)
+            Text(caption)
+                .font(DS.Font.body)
+                .foregroundStyle(DS.Color.primaryText)
+                .axLeaf(activityRange == .days30 ? "Text.Last30Days" : "Text.Last12Months")
         }
+    }
+
+    private var rangeSelection: Binding<ActivityRange> {
+        Binding(
+            get: { activityRange },
+            set: { range in withAnimation(reduceMotion ? nil : DS.Motion.route) { activityRange = range } }
+        )
     }
 
     private func visibleCategories(_ stats: LibraryStatistics) -> [EntryCategory] {

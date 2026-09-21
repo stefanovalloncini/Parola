@@ -35,7 +35,13 @@ struct StatisticsLocalizationTests {
             ("Average speed", "Velocità media"),
             ("By Model", "Per modello"),
             ("By Kind", "Per tipo"),
-            ("Last 30 Days", "Ultimi 30 giorni"),
+            ("Activity", "Attività"),
+            ("30 Days", "30 giorni"),
+            ("12 Months", "12 mesi"),
+            ("Nothing transcribed in the last 12 months", "Nessuna trascrizione negli ultimi 12 mesi"),
+            ("Nothing transcribed", "Nessuna trascrizione"),
+            ("min", "min"),
+            ("h", "h"),
             ("Runs", "Esecuzioni"),
             ("Speed", "Velocità"),
             ("No Statistics Yet", "Ancora nessuna statistica"),
@@ -60,13 +66,33 @@ struct StatisticsLocalizationTests {
                 == "1 trascrizione · \(audio) trascritti"
         )
         #expect(
-            StatisticsCopy.last30Days(entries: 4, audioSeconds: 4_800, bundle: bundle, locale: italian)
+            StatisticsCopy.activity(range: .days30, entries: 4, audioSeconds: 4_800, bundle: bundle, locale: italian)
                 == "4 trascrizioni · \(audio) di audio"
         )
         #expect(
-            StatisticsCopy.last30Days(entries: 0, audioSeconds: 0, bundle: bundle, locale: italian)
-                == "Niente trascritto negli ultimi 30 giorni"
+            StatisticsCopy.activity(range: .days30, entries: 0, audioSeconds: 0, bundle: bundle, locale: italian)
+                == "Nessuna trascrizione negli ultimi 30 giorni"
         )
+        #expect(
+            StatisticsCopy.activity(range: .months12, entries: 0, audioSeconds: 0, bundle: bundle, locale: italian)
+                == "Nessuna trascrizione negli ultimi 12 mesi"
+        )
+        #expect(
+            StatisticsCopy.bucket(label: "18 set", entries: 0, audioSeconds: 0, bundle: bundle, locale: italian)
+                == "18 set · Nessuna trascrizione"
+        )
+        #expect(
+            StatisticsCopy.bucket(label: "18 set", entries: 4, audioSeconds: 4_800, bundle: bundle, locale: italian)
+                == "18 set · 4 trascrizioni · \(audio)"
+        )
+    }
+
+    @Test("the chart's axis units read in Italian with the locale's decimal separator")
+    func axisUnitsInItalian() throws {
+        let bundle = try italianBundle()
+        let hours = ActivityAxis(maxMinutes: 200)
+        #expect(hours.label(90, bundle: bundle, locale: italian) == "1,5 h")
+        #expect(ActivityAxis(maxMinutes: 45).label(30, bundle: bundle, locale: italian) == "30 min")
     }
 
     @Test("the coverage note reads in Italian in each of its three forms")

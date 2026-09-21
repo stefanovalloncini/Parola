@@ -24,6 +24,14 @@ enum AppFormat {
         date.formatted(.dateTime.month(.abbreviated).day().locale(locale))
     }
 
+    static func month(_ date: Date, locale: Locale = AppFormat.locale) -> String {
+        date.formatted(.dateTime.month(.abbreviated).locale(locale))
+    }
+
+    static func monthAndYear(_ date: Date, locale: Locale = AppFormat.locale) -> String {
+        date.formatted(.dateTime.month(.abbreviated).year().locale(locale))
+    }
+
     /// For a row under a day header, where the date is already on screen.
     static func timeOfDay(_ date: Date, locale: Locale = AppFormat.locale) -> String {
         date.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(locale))
