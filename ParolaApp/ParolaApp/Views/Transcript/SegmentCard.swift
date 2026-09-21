@@ -128,6 +128,13 @@ struct SegmentCard: View {
                     }
             }
             Spacer(minLength: DS.Spacing.small)
+            if isFavorite {
+                Image(systemName: "star.fill")
+                    .font(DS.Font.caption)
+                    .foregroundStyle(DS.Color.accent)
+                    .accessibilityLabel("Favorite")
+                    .axLeaf("Card.Badge.Favorite")
+            }
             Button {
                 if model.player != nil { model.seek(to: segment) }
             } label: {
