@@ -73,7 +73,8 @@ enum ToolbarSearchFocus {
     static func placeCaret() -> Bool {
         allowLookup()
         guard let (window, field) = locate() else { return false }
-        if window.firstResponder !== field { previousResponder = window.firstResponder as? NSView }
+        // A focused field answers with its field editor, not itself, so only a field that is not editing has an outgoing responder to keep.
+        if field.currentEditor() == nil { previousResponder = window.firstResponder as? NSView }
         return window.makeFirstResponder(field)
     }
 
@@ -143,6 +144,7 @@ struct ToolbarSearchField: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var editing = false
     @State private var expanded = false
+    @State private var hasMeasuredWidth = false
 
     var body: some View {
         Group {
@@ -154,7 +156,8 @@ struct ToolbarSearchField: View {
         }
         .animation(reduceMotion ? nil : DS.Motion.resize, value: editing)
         // An unmeasured window renders the field first, so its first swap to the chip must not animate.
-        .animation(reduceMotion || windowWidth == 0 ? nil : DS.Motion.resize, value: collapsed)
+        .animation(reduceMotion || !hasMeasuredWidth ? nil : DS.Motion.resize, value: collapsed)
+        .onChange(of: windowWidth) { _, measured in if measured > 0 { hasMeasuredWidth = true } }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didUpdateNotification)) { note in
             guard !collapsed, (note.object as? NSWindow)?.isKeyWindow == true else { return }
             let holdsCaret = ToolbarSearchFocus.holdsCaret()
