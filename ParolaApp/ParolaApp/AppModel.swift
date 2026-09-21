@@ -1503,7 +1503,10 @@ final class AppModel {
                     selectedEntryID = entry.id
                 }
                 if activate {
-                    await generateCardMetadata(for: entry.id, transcript: result)
+                    // A parked on-device model session must never hold up auto-export.
+                    await AsyncTimeout.run(.seconds(30)) { [weak self] in
+                        await self?.generateCardMetadata(for: entry.id, transcript: result)
+                    }
                 }
             } catch {
                 ParolaLog.error(.library, "transcript could not be saved to the library", [.error: .error(error)])
