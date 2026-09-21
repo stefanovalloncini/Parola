@@ -146,17 +146,24 @@ struct MeetingFrame: Equatable {
     }
 }
 
-/// One frame of the dictation loop: the key goes down, the words land one by one behind a blinking caret.
+/// One frame of the dictation loop: the key is held down while the words land one by one behind a blinking caret.
 struct DictationFrame: Equatable {
     static let firstWord = 0.24
     static let lastWord = 0.7
     static let wordSpan = 0.12
+    static let pressTravel = 0.08
 
     let press: Double
+    let isHeld: Bool
     let caretVisible: Bool
 
     init(phase: Double) {
-        press = FeatureVignettePhase.pulse(phase, from: 0.06, span: 0.2)
+        // Down before the first word and up after the last: the card says "Hold a key and speak".
+        press = min(
+            FeatureVignettePhase.ease(FeatureVignettePhase.ramp(phase, from: 0.06, span: Self.pressTravel)),
+            1 - FeatureVignettePhase.ease(FeatureVignettePhase.ramp(phase, from: Self.lastWord, span: Self.pressTravel))
+        )
+        isHeld = press > 0.5
         caretVisible = Int(phase * FeatureVignettePhase.period / StreamingReveal.caretBlinkPeriod) % 2 == 0
     }
 
@@ -274,11 +281,11 @@ private struct DictationVignette: View {
                 .frame(minWidth: 22)
                 .background(
                     RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                        .fill(frame.press > 0.4 ? DS.Palette.pillFillHover : DS.Palette.pillFill)
+                        .fill(frame.isHeld ? DS.Color.accentWash : DS.Palette.pillFill)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                        .strokeBorder(DS.Palette.divider, lineWidth: 1)
+                        .strokeBorder(frame.isHeld ? DS.Color.accent : DS.Palette.divider, lineWidth: frame.isHeld ? 2 : 1)
                 )
                 .scaleEffect(1 - 0.08 * frame.press)
             HStack(spacing: DS.Spacing.tight) {

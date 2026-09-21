@@ -79,10 +79,20 @@ struct FeaturesGridTests {
 
         let dictation = DictationFrame(phase: 1)
         #expect(dictation.press == 0)
+        #expect(!dictation.isHeld)
         #expect(dictation.caretVisible)
         #expect((0..<3).allSatisfy { DictationFrame.word($0, of: 3, at: 1) == 1 })
 
         #expect(CaptionsFrame(phase: 1).first == 1)
+    }
+
+    @Test("the key stays down for as long as the words are landing")
+    func keyIsHeldThroughThePhrase() {
+        #expect(!DictationFrame(phase: 0).isHeld)
+        #expect(DictationFrame(phase: DictationFrame.firstWord).isHeld)
+        #expect(DictationFrame(phase: DictationFrame.lastWord).isHeld)
+        #expect(!DictationFrame(phase: DictationFrame.lastWord + DictationFrame.pressTravel).isHeld)
+        #expect(DictationFrame(phase: DictationFrame.lastWord).press == 1)
     }
 
     @Test("the dictated phrase lands by the end of the hold, whatever its word count")
