@@ -103,13 +103,15 @@ struct FeatureRow: View {
     let item: Item
 
     @ScaledMetric(relativeTo: .title) private var glyphSize: CGFloat = 26
+    // 36, not the glyph's 26: `person.2` draws 35 pt of ink at that point size and a narrower box lets it overhang the title.
+    @ScaledMetric(relativeTo: .title) private var glyphBox: CGFloat = 36
 
     var body: some View {
         HStack(alignment: .top, spacing: DS.Spacing.small) {
             Image(systemName: item.symbol)
                 .font(.system(size: glyphSize, weight: .regular))
                 .foregroundStyle(DS.Color.accent)
-                .frame(width: 30, height: 30, alignment: .leading)
+                .frame(width: glyphBox, height: 30, alignment: .leading)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: DS.Spacing.tight) {
                 Text(item.title)

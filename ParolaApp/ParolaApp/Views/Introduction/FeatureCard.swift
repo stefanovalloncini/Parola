@@ -6,7 +6,7 @@ struct FeatureCard: View {
     let hotkeyName: String
 
     var body: some View {
-        HStack(alignment: .center, spacing: DS.Spacing.regular) {
+        HStack(alignment: .center, spacing: DS.Spacing.small) {
             FeatureRow(item: item)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
