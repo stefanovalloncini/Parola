@@ -29,25 +29,23 @@ struct ReadyScene: View {
             Text("You're ready.")
                 .font(DS.Font.hero)
                 .foregroundStyle(DS.Color.primaryText)
+                .sceneEntrance(order: 0)
             if !rows.isEmpty {
                 Text("Grant a permission now, or the first time you use its feature.")
                     .font(DS.Font.title)
                     .foregroundStyle(DS.Color.secondaryText)
-                SettingsSection {
-                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, kind in
-                        permissionRow(kind, isFirst: index == 0)
+                    .sceneEntrance(order: 1)
+                HStack(alignment: .top, spacing: DS.Spacing.medium) {
+                    ForEach(rows) { kind in
+                        permissionCard(kind)
                     }
                 }
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, DS.Spacing.small)
+                .sceneEntrance(order: 2)
             }
             modelStatus
-            Button("Open a File…") {
-                model.introduction.finish()
-                model.presentOpenPanel()
-            }
-            .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .regular))
-            .axLeaf("Introduction.Button.OpenFile")
-            .padding(.top, DS.Spacing.small)
+                .sceneEntrance(order: 3)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
@@ -57,14 +55,13 @@ struct ReadyScene: View {
     }
 
     @ViewBuilder
-    private func permissionRow(_ kind: PermissionKind, isFirst: Bool) -> some View {
+    private func permissionCard(_ kind: PermissionKind) -> some View {
         switch kind {
         case .microphone:
-            PermissionRow(
+            PermissionCard(
                 title: String(localized: "Microphone"),
                 detail: String(localized: "Captures your voice for recordings and dictation."),
                 granted: model.dictationPermissions.microphoneAuthorized,
-                isFirst: isFirst,
                 axID: "Introduction.Button.GrantMicrophone",
                 action: {
                     if model.dictationPermissions.microphoneUndetermined {
@@ -76,21 +73,19 @@ struct ReadyScene: View {
                 actionLabel: String(localized: "Allow…")
             )
         case .systemAudio:
-            PermissionRow(
+            PermissionCard(
                 title: String(localized: "System Audio Recording"),
                 detail: String(localized: "Records meetings and anything else your Mac plays."),
                 granted: model.capturePermissions.systemAudioGranted,
-                isFirst: isFirst,
                 axID: "Introduction.Button.GrantSystemAudio",
                 action: { model.capturePermissions.requestSystemAudio() },
                 actionLabel: String(localized: "Allow…")
             )
         case .accessibility:
-            PermissionRow(
+            PermissionCard(
                 title: String(localized: "Accessibility"),
                 detail: String(localized: "Watches for the dictation hotkey and inserts text where you type."),
                 granted: model.dictationPermissions.accessibilityGranted,
-                isFirst: isFirst,
                 axID: "Introduction.Button.GrantAccessibility",
                 action: { model.dictationPermissions.openAccessibilitySettings() },
                 actionLabel: String(localized: "Open System Settings…")
@@ -102,21 +97,40 @@ struct ReadyScene: View {
     private var modelStatus: some View {
         switch model.phase {
         case .downloadingModel(let name, let progress):
-            VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            statusCard {
                 Text("\(AppModel.modelLabel(name)) keeps downloading in the background.")
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
-                DSProgressBar(value: progress)
-                    .frame(width: 280)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: DS.Spacing.small) {
+                    DSProgressBar(value: progress)
+                    Text(AppFormat.percent(progress))
+                        .font(DS.Font.mono)
+                        .foregroundStyle(DS.Color.secondaryText)
+                }
             }
-            .padding(.top, DS.Spacing.small)
         case .failed(let message):
-            Text(message)
-                .font(DS.Font.secondary)
-                .foregroundStyle(DS.Color.dangerText)
-                .padding(.top, DS.Spacing.small)
+            statusCard {
+                Text(message)
+                    .font(DS.Font.secondary)
+                    .foregroundStyle(DS.Color.dangerText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         default:
             EmptyView()
         }
+    }
+
+    private func statusCard<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(DS.Spacing.medium)
+        .background(
+            DS.Palette.surface,
+            in: RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
+        )
+        .padding(.top, DS.Spacing.small)
     }
 }
