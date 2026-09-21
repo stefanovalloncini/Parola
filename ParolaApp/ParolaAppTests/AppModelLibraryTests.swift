@@ -296,7 +296,7 @@ struct AppModelLibraryTests {
             category: .transcription
         )
         let model = AppModel(skipBootstrap: true, defaults: makeIsolatedDefaults(), libraryURL: libraryURL)
-        model.summariseOperation = { _ in Summary(text: "recap") }
+        model.summariseOperation = { _, _ in Summary(text: "recap") }
         model.smartChapters = [Chapter(title: "stale chapter", start: 0)]
 
         model.summarizeLatestEntry()

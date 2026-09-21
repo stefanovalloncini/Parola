@@ -366,7 +366,7 @@ final class ParolaAutomationServer {
         "dictationIndicatorStyleRaw", "automationBridgeEnabled",
         "transcriptDisplayMode", "generateCardMetadata", "showAITitles", "showAISummaries",
         "customTitlePrompt", "customSummaryPrompt", "appAccentColor",
-        "inspectorMode", "introductionComplete",
+        "inspectorMode", "introductionComplete", "autostartSummary",
     ]
 
     func runScreenshot(requestedFileName: String?) async throws -> AutomationValue {
@@ -494,6 +494,7 @@ final class ParolaAutomationServer {
             "introduction": Self.introductionState(model.introduction, currentModel: model.selectedModel),
             "favoriteSegments": .array(model.favoriteSegmentIDs.sorted().map { .int($0) }),
             "favoritesOnly": .bool(model.favoritesOnly),
+            "transcriptPaneMode": .string(model.transcriptPaneMode.rawValue),
         ])
     }
 

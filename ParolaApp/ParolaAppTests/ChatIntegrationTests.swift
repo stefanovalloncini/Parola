@@ -169,7 +169,7 @@ struct ChatIntegrationTests {
     func summariseSurvivesDurationBump() async throws {
         let model = makeModel(entryID: "entry-sum", transcript: makeTranscript())
         let gate = SummariseGate()
-        model.summariseOperation = { _ in
+        model.summariseOperation = { _, _ in
             await gate.wait()
             return Summary(text: "the summary", chapters: [])
         }
@@ -190,7 +190,7 @@ struct ChatIntegrationTests {
     func summariseDropsOnEntrySwitch() async throws {
         let model = makeModel(entryID: "entry-A", transcript: makeTranscript())
         let gate = SummariseGate()
-        model.summariseOperation = { _ in
+        model.summariseOperation = { _, _ in
             await gate.wait()
             return Summary(text: "summary for A", chapters: [])
         }
@@ -214,7 +214,7 @@ struct ChatIntegrationTests {
         let transcript = makeTranscript()
         model.transcript = transcript
         let gate = SummariseGate()
-        model.summariseOperation = { _ in
+        model.summariseOperation = { _, _ in
             await gate.wait()
             return Summary(text: "fresh take summary", chapters: [])
         }
@@ -246,7 +246,7 @@ struct ChatIntegrationTests {
         let seeded = try await seedStore.add(transcript: makeTranscript(), audioSource: nil, category: .transcription)
         model.transcript = makeTranscript()
         let gate = SummariseGate()
-        model.summariseOperation = { _ in
+        model.summariseOperation = { _, _ in
             await gate.wait()
             return Summary(text: "orphan summary", chapters: [])
         }
@@ -269,7 +269,7 @@ struct ChatIntegrationTests {
         let seeded = try await seedStore.add(transcript: transcript, audioSource: nil, category: .transcription)
         model.transcript = transcript
         model.selectedEntryID = seeded.id
-        model.summariseOperation = { _ in Summary(text: "persisted summary", chapters: []) }
+        model.summariseOperation = { _, _ in Summary(text: "persisted summary", chapters: []) }
 
         model.summariseTranscript()
         try await waitUntil { !model.isSummarising }

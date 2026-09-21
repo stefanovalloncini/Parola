@@ -13,7 +13,7 @@ extension AppModel {
         }
     }
 
-    func summarizeLatestEntry() {
+    func summarizeLatestEntry(options: SummaryOptions? = nil) {
         introduction.defer()
         guard features.isEnabled(.ai) else { return }
         Task { [weak self, library] in
@@ -24,8 +24,29 @@ extension AppModel {
                 let loaded = try await library.load(latest.id)
                 self.installStoredTranscript(loaded.document.transcript)
                 self.selectedEntryID = latest.id
-                self.summariseTranscript()
+                self.summariseTranscript(options: options)
             } catch { }
         }
+    }
+
+    /// The saved summary options with the given fields overridden — used by the bridge, which
+    /// sends only the fields a caller wants to change.
+    func mergedSummaryOptions(overriding raw: [String: AutomationValue]) -> SummaryOptions {
+        guard let base = try? JSONSerialization.jsonObject(with: JSONEncoder().encode(summaryOptions)) as? [String: Any] else {
+            return summaryOptions
+        }
+        var merged = base
+        for (key, value) in raw {
+            if case .null = value {
+                merged.removeValue(forKey: key)
+            } else {
+                merged[key] = value.jsonObject
+            }
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: merged),
+              let decoded = try? JSONDecoder().decode(SummaryOptions.self, from: data) else {
+            return summaryOptions
+        }
+        return decoded
     }
 }

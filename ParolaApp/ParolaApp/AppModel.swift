@@ -659,6 +659,8 @@ final class AppModel {
         self.showAISummaries = readBool("showAISummaries", default: true)
         self.customTitlePrompt = defaults.string(forKey: "customTitlePrompt") ?? ""
         self.customSummaryPrompt = defaults.string(forKey: "customSummaryPrompt") ?? ""
+        self.summaryOptions = readJSON(SummaryOptions.self, forKey: "summaryOptions") ?? .default
+        self.autostartSummary = readBool("autostartSummary", default: false)
         self.meetingCaptureAppOnly = defaults.bool(forKey: "meetingCaptureAppOnly")
         self.subtitleFPS = readDouble("subtitleFPS", default: 30)
         self.subtitleCaptionLengthRaw = defaults.string(forKey: "subtitleCaptionLength") ?? CaptionLength.none.rawValue
@@ -986,7 +988,9 @@ final class AppModel {
     }
     /// Why each result matched, keyed by entry: the snippet the results list shows under the row.
     var searchMatches: [String: LibrarySearchIndex.Match] = [:]
-    var selectedEntryID: LibraryEntry.ID?
+    var selectedEntryID: LibraryEntry.ID? {
+        didSet { transcriptPaneMode = .transcript }
+    }
     @ObservationIgnored private var libraryEntriesByID: [String: LibraryEntry] = [:]
 
     private func rebuildLibraryIndex() {
@@ -1507,6 +1511,11 @@ final class AppModel {
                     // A parked on-device model session must never hold up auto-export.
                     await AsyncTimeout.run(.seconds(30)) { [weak self] in
                         await self?.generateCardMetadata(for: entry.id, transcript: result)
+                    }
+                    if autostartSummary,
+                       features.isEnabled(.ai),
+                       result.text.trimmingCharacters(in: .whitespacesAndNewlines).count >= CardMetadataService.minimumCharacters {
+                        summariseTranscript()
                     }
                 }
             } catch {
@@ -3157,11 +3166,20 @@ final class AppModel {
     var summaryError: String?
     @ObservationIgnored private var summaryGeneration: Int = 0
     /// Test seam: when set, replaces the on-device SummaryService so summarise timing is deterministic.
-    @ObservationIgnored var summariseOperation: (@Sendable (Transcript) async throws -> Summary)?
+    @ObservationIgnored var summariseOperation: (@Sendable (Transcript, SummaryOptions) async throws -> Summary)?
 
-    func summariseTranscript() {
+    var summaryOptions: SummaryOptions = .default {
+        didSet { writeJSON(summaryOptions, forKey: "summaryOptions") }
+    }
+
+    var autostartSummary: Bool = false {
+        didSet { defaults.set(autostartSummary, forKey: "autostartSummary") }
+    }
+
+    func summariseTranscript(options: SummaryOptions? = nil) {
         guard features.isEnabled(.ai) else { return }
         guard let transcript, !isSummarising else { return }
+        let resolvedOptions = options ?? summaryOptions
         isSummarising = true
         summaryError = nil
         summaryGeneration &+= 1
@@ -3169,10 +3187,10 @@ final class AppModel {
         let snapshot = transcript
         let entryID = selectedEntryID
         let artifacts = derivedArtifactsGeneration
-        let summarise = summariseOperation ?? { [features] in try await SummaryService(features: features).summarise($0) }
+        let summarise = summariseOperation ?? { [features] in try await SummaryService(features: features).summarise($0, options: $1) }
         Task { [weak self] in
             do {
-                let summary = try await summarise(snapshot)
+                let summary = try await summarise(snapshot, resolvedOptions)
                 guard let self, generation == summaryGeneration else { return }
                 // A nil entry id means the transcript wasn't in the library yet: persistToLibrary
                 // selects it moments later, and that late selection owns this summary.
@@ -3192,6 +3210,29 @@ final class AppModel {
                 refreshAIAvailability()
             }
         }
+    }
+
+    // MARK: - Transcript pane mode
+
+    enum TranscriptPaneMode: String, CaseIterable, Sendable {
+        case transcript, summary, chat
+    }
+
+    var transcriptPaneMode: TranscriptPaneMode = .transcript
+
+    /// `.transcript` always shows, even with nothing loaded; `.summary`/`.chat` need a transcript and the AI feature.
+    func canShow(_ mode: TranscriptPaneMode) -> Bool {
+        switch mode {
+        case .transcript: return true
+        case .summary, .chat: return transcript != nil && features.isEnabled(.ai)
+        }
+    }
+
+    /// The one entry point for switching Transcript/Summary/Chat: the header picker, the AI menu,
+    /// the ⌘1/2/3 commands and the bridge all call this, so the guard can't be bypassed from any of them.
+    func setTranscriptPaneMode(_ mode: TranscriptPaneMode) {
+        guard canShow(mode) else { return }
+        transcriptPaneMode = mode
     }
 
     // MARK: - Burn subtitles into video

@@ -285,9 +285,15 @@ extension ParolaAutomationServer {
                 area: .library,
                 summary: "Runs the summarise prompt on the most recent library entry.",
                 kind: .mutating,
-                handler: { _, ctx in
+                args: [
+                    .init(name: "options", kind: .object, required: false, summary: "SummaryOptions fields to override, merged over the saved options"),
+                ],
+                handler: { args, ctx in
                     try ctx.require(.ai)
-                    ctx.model.summarizeLatestEntry()
+                    let options: SummaryOptions? = args.contains("options")
+                        ? ctx.model.mergedSummaryOptions(overriding: try args.object("options"))
+                        : nil
+                    ctx.model.summarizeLatestEntry(options: options)
                     return .object(["started": .bool(true)])
                 }
             ),
