@@ -37,6 +37,9 @@ struct ContentToolbar: ToolbarContent {
         }
         ToolbarSpacer(.flexible, placement: .navigation)
         ToolbarItemGroup(placement: .primaryAction) {
+            if showsSearch {
+                ToolbarSearchField(intakeShown: showsIntakeSettings)
+            }
             if isRecording {
                 Button {
                     model.stopRecordingAndTranscribe()
@@ -151,6 +154,10 @@ struct ContentToolbar: ToolbarContent {
         .help("Start a new transcription.")
         .accessibilityIdentifier("toolbar.new")
         .axLeaf("Toolbar.Menu.New")
+    }
+
+    private var showsSearch: Bool {
+        ToolbarSearchMetrics.isShown(introductionPresented: model.introduction.isPresented)
     }
 
     private var showsIntakeSettings: Bool {

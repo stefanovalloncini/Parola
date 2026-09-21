@@ -8424,6 +8424,17 @@
         }
       }
     },
+    "Search history": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cerca nella cronologia"
+          }
+        }
+      }
+    },
     "Search history…": {
       "extractionState": "manual",
       "localizations": {
