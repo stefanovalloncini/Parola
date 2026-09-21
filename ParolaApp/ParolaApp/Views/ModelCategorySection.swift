@@ -27,7 +27,7 @@ struct ModelsCategory: Identifiable {
         .init(
             id: "parakeet",
             title: "Parakeet",
-            description: "NVIDIA Parakeet via FluidAudio. Fast, English only.",
+            description: String(localized: "NVIDIA Parakeet via FluidAudio. The fastest engine; v3 is multilingual."),
             symbol: "bird",
             tint: DS.Palette.success
         )
