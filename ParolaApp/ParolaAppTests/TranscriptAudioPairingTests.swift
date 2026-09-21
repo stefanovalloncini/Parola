@@ -1,13 +1,21 @@
 import Foundation
 import Testing
 import AVFoundation
+import os
 @testable import Parola
 import ParolaCore
 import ParolaTestSupport
 
+private let fixtureSerial = OSAllocatedUnfairLock(initialState: 0)
+
+/// A length of its own per fixture: two silent files of equal length are byte-identical, and an import whose digest matches a library entry is dropped as a duplicate instead of transcribed.
 private func makeSilentWAV(label: String) throws -> URL {
+    let serial = fixtureSerial.withLock { count -> Int in
+        count += 1
+        return count
+    }
     let sampleRate = 16_000, channels = 1, bytesPerSample = 2
-    let frames = Int(Double(sampleRate) * 0.3)
+    let frames = Int(Double(sampleRate) * 0.3) + serial
     let dataBytes = frames * channels * bytesPerSample
     var data = Data()
     func ascii(_ s: String) { data.append(contentsOf: Array(s.utf8)) }
@@ -59,16 +67,18 @@ extension TranscriberMockSuites {
             await clearMocks()
         }
 
-        /// 60 s, not 15: a run of the suite under load average 7 took 46 s to settle one of these waits.
-        private func waitUntil(timeoutMs: Int = 60_000, _ condition: @MainActor () -> Bool) async -> Bool {
-            var elapsed = 0
-            while elapsed < timeoutMs {
+        /// A wall-clock deadline, not a tally of 15 ms sleeps: under load each one lands nearer 50, so counting them bounds the checks rather than the wait.
+        private func waitUntil(timeout: Duration = .seconds(30), _ condition: @MainActor () -> Bool) async -> Bool {
+            let deadline = ContinuousClock.now + timeout
+            while ContinuousClock.now < deadline {
                 if condition() { return true }
                 try? await Task.sleep(for: .milliseconds(15))
-                elapsed += 15
             }
             return condition()
         }
+
+        /// A run that lands empty resolved no mock: a fire-and-forget teardown from an earlier suite cleared the registry between this one's install and the run's resolve.
+        private let mockWentMissing: Comment = "the run landed without the mock's words"
 
         private func playerURL(_ model: AppModel) -> URL? {
             (model.player?.currentItem?.asset as? AVURLAsset)?.url
@@ -112,14 +122,16 @@ extension TranscriberMockSuites {
                 defer { try? FileManager.default.removeItem(at: wav) }
 
                 model.transcribe(fileURL: wav)
+                await model.awaitDuplicateCheck()
+                try #require(model.fileTranscribeTask != nil, "the import never started a run")
                 let entryAudio = try await openOtherEntry(in: model)
                 #expect(model.sourceFileURL == entryAudio)
                 try #require(model.transcript?.text.contains("own words") != true, "the run must still be in flight")
 
                 await gate.open()
-                let finished = await waitUntil { model.phase == .ready && model.transcript?.text.contains("own words") == true }
+                let finished = await waitUntil { model.phase == .ready && model.sourceFileURL == wav }
                 #expect(finished)
-                #expect(model.sourceFileURL == wav)
+                #expect(model.transcript?.text.contains("own words") == true, mockWentMissing)
                 #expect(playerURL(model) == wav, "the transcript would play the entry's audio instead of the file it describes")
             }
         }
@@ -154,9 +166,9 @@ extension TranscriberMockSuites {
                 try #require(model.transcript?.text.contains("own words") != true, "the take must still be transcribing")
 
                 await gate.open()
-                let finished = await waitUntil { model.phase == .ready && model.transcript?.text.contains("own words") == true }
+                let finished = await waitUntil { model.phase == .ready && model.sourceFileURL == fixture }
                 #expect(finished)
-                #expect(model.sourceFileURL == fixture)
+                #expect(model.transcript?.text.contains("own words") == true, mockWentMissing)
                 #expect(playerURL(model) == fixture, "the take's transcript would play the entry's audio")
             }
         }
@@ -180,9 +192,9 @@ extension TranscriberMockSuites {
                 try #require(model.transcript?.text.contains("own words") != true, "the fetch's run must still be in flight")
 
                 await gate.open()
-                let finished = await waitUntil { model.phase == .ready && model.transcript?.text.contains("own words") == true }
+                let finished = await waitUntil { model.phase == .ready && model.sourceFileURL == fixture }
                 #expect(finished)
-                #expect(model.sourceFileURL == fixture)
+                #expect(model.transcript?.text.contains("own words") == true, mockWentMissing)
                 #expect(playerURL(model) == fixture, "the fetched audio would be replaced by the entry's")
             }
         }
