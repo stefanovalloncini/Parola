@@ -2942,17 +2942,6 @@
         }
       }
     },
-    "Delete %lld": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Elimina %lld"
-          }
-        }
-      }
-    },
     "Delete %lld entries?": {
       "extractionState": "manual",
       "localizations": {
@@ -3848,13 +3837,13 @@
         }
       }
     },
-    "Export %lld": {
+    "Export (%lld)": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Esporta %lld"
+            "value": "Esporta (%lld)"
           }
         }
       }

@@ -373,6 +373,8 @@ struct LibraryListView: View {
     private func listRow(_ row: LibraryRowDisplay, showsTime: Bool, showsTimestamp: Bool) -> some View {
         let entry = row.entry
         return rowContent(for: row, showsTime: showsTime, showsTimestamp: showsTimestamp)
+            // Both branches draw the same anatomy, so the rule runs under the text, never under the badge.
+            .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] + SearchResultRow.separatorInset }
             .contentShape(Rectangle())
             .draggable(entry.bundleURL)
             .onTapGesture(count: 2) {
@@ -434,7 +436,6 @@ struct LibraryListView: View {
                 isSelected: selection.contains(row.id),
                 showsTimestamp: showsTimestamp
             )
-            .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] + SearchResultRow.separatorInset }
         }
     }
 
@@ -470,18 +471,20 @@ struct LibraryListView: View {
                             .axLeaf("Header.MenuItem.Export\(format.rawValue.capitalized)")
                         }
                     } label: {
-                        Label("Export \(selection.count)", systemImage: "square.and.arrow.up")
+                        Text("Export (\(selection.count))")
                     }
                     .menuStyle(.button)
-                    .controlSize(.small)
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .menuIndicator(.hidden)
                     .fixedSize()
                     .axLeaf("Header.Menu.BulkExport")
-                    Button(role: .destructive) {
+                    Button {
                         pendingBulkDelete = true
                     } label: {
-                        Label("Delete \(selection.count)", systemImage: "trash")
+                        Text(verbatim: RecentlyDeletedCopy.deleteSelection(selection.count))
+                            .foregroundStyle(DS.Color.dangerText)
                     }
-                    .controlSize(.small)
+                    .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf("Header.Button.BulkDelete")
                 }
             }
