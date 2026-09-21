@@ -32,53 +32,20 @@ struct AppModelBatchTests {
         )
     }
 
-    @Test("addBatchExportFormat appends new formats and ignores duplicates")
-    func addBatchFormatsDeduplicates() {
+    @Test("toggling a batch preset appends it and ignores duplicates")
+    func toggleBatchPresetsDeduplicates() {
         let model = makeModel()
-        model.batchExportFormats = []
+        model.batchExportPresetIDs = []
+        let srt = ExportPreset.builtIn(for: .srt)!.id
+        let txt = ExportPreset.builtIn(for: .txt)!.id
 
-        model.addBatchExportFormat(.srt)
-        model.addBatchExportFormat(.txt)
-        model.addBatchExportFormat(.srt)
+        model.toggleBatchExportPreset(srt)
+        model.toggleBatchExportPreset(txt)
 
-        #expect(model.batchExportFormats == [.srt, .txt])
-    }
+        #expect(model.batchExportPresetIDs == [srt, txt])
 
-    @Test("removeBatchExportFormat strips a format from the list")
-    func removeBatchFormat() {
-        let model = makeModel()
-        model.batchExportFormats = [.srt, .txt, .vtt]
-
-        model.removeBatchExportFormat(.txt)
-
-        #expect(model.batchExportFormats == [.srt, .vtt])
-    }
-
-    @Test("options(for:) falls back to global defaults when no per-format entry exists")
-    func optionsFallback() {
-        let model = makeModel()
-        model.batchExportFormatOptionsJSON = "{}"
-        model.batchExportToSourceFolder = false
-        model.batchExportIncludeTimestamps = true
-
-        let opts = model.options(for: .srt)
-
-        #expect(opts.writeToSourceFolder == false)
-        #expect(opts.includeTimestamps)
-    }
-
-    @Test("setOptions writes a per-format override that overrides the defaults")
-    func setOptionsRoundTrip() {
-        let model = makeModel()
-        model.batchExportFormatOptionsJSON = "{}"
-        model.batchExportToSourceFolder = false
-
-        let custom = BatchExportFormatOptions(writeToSourceFolder: true, includeTimestamps: true)
-        model.setOptions(custom, for: .vtt)
-
-        let read = model.options(for: .vtt)
-        #expect(read == custom)
-        #expect(model.options(for: .srt).writeToSourceFolder == false)
+        model.toggleBatchExportPreset(txt)
+        #expect(model.batchExportPresetIDs == [srt])
     }
 
     @Test("reorderPendingBatchJobs moves only pending jobs and preserves their ids")
@@ -271,19 +238,15 @@ struct AppModelBatchTests {
         #expect(model.batchIsRunning)
     }
 
-    @Test("BatchExportFormatOptions encodes and decodes through the JSON sidecar")
-    func formatOptionsRoundTrip() {
-        let model = makeModel()
-        model.batchExportFormatOptionsJSON = "{}"
+    @Test("the batch preset selection persists through the JSON helpers")
+    func batchSelectionRoundTrip() {
+        let defaults = makeIsolatedDefaults()
+        let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("batch"))
+        let vtt = ExportPreset.builtIn(for: .vtt)!.id
 
-        let options: [String: BatchExportFormatOptions] = [
-            "srt": BatchExportFormatOptions(writeToSourceFolder: false, includeTimestamps: true),
-            "txt": BatchExportFormatOptions(writeToSourceFolder: true, includeTimestamps: false),
-        ]
-        model.batchExportFormatOptions = options
+        model.batchExportPresetIDs = [vtt]
 
-        let read = model.batchExportFormatOptions
-        #expect(read == options)
+        #expect(model.readJSON([UUID].self, forKey: "batchExportPresets") == [vtt])
     }
 
     @Test("batch export specs honor caption length, HTML theme, and per-batch timestamps")
@@ -302,7 +265,7 @@ struct AppModelBatchTests {
     @Test("a completed batch job is post-processed before it is stored and shown")
     func completedBatchJobIsPostProcessed() async {
         let model = makeModel()
-        model.batchExportFormats = []
+        model.batchExportPresetIDs = []
         model.ignoredSegmentRules = [IgnoredSegmentRule(pattern: "uh")]
         model.findReplaceRules = [FindReplaceRule(find: "acme", replace: "Acme")]
         let job = Self.makeJob("clip", status: .transcribing)
@@ -346,8 +309,8 @@ struct AppModelBatchTests {
         defer { try? FileManager.default.removeItem(at: scratch) }
 
         let model = makeModel()
-        model.batchExportFormats = []
-        model.autoExportRules = [AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.txt])]
+        model.batchExportPresetIDs = []
+        model.autoExportRules = [AutoExportRule(sourceExtensions: ["wav"], presetIDs: [ExportPreset.builtIn(for: .txt)!.id])]
         let source = scratch.appendingPathComponent("clip.wav")
         try Data("fake".utf8).write(to: source)
         let job = BatchJob(url: source, status: .transcribing)
@@ -365,10 +328,17 @@ struct AppModelBatchTests {
         defer { try? FileManager.default.removeItem(at: scratch) }
 
         let model = makeModel()
-        model.batchExportFormats = [.md]
-        model.setOptions(BatchExportFormatOptions(writeToSourceFolder: true, includeTimestamps: true), for: .md)
+        var timestampedSpec = ExportSpec.standard(for: .md)
+        timestampedSpec.options.timestamps = true
+        let timestampedMarkdown = model.addExportPreset(name: "Markdown with timestamps", spec: timestampedSpec)
+        model.batchExportPresetIDs = [timestampedMarkdown.id]
         model.markdownTimestamps = false
-        model.autoExportRules = [AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.md, .txt])]
+        model.autoExportRules = [
+            AutoExportRule(
+                sourceExtensions: ["wav"],
+                presetIDs: [ExportPreset.builtIn(for: .md)!.id, ExportPreset.builtIn(for: .txt)!.id]
+            )
+        ]
         let source = scratch.appendingPathComponent("clip.wav")
         try Data("fake".utf8).write(to: source)
         let job = BatchJob(url: source, status: .transcribing)
@@ -400,7 +370,7 @@ struct AppModelBatchTests {
         let scratch = try Self.makeScratchDirectory()
         defer { try? FileManager.default.removeItem(at: scratch) }
         let model = makeModel()
-        model.batchExportFormats = []
+        model.batchExportPresetIDs = []
         model.selectedEntryID = "keep-me"
         let source = scratch.appendingPathComponent("interview.wav")
         try Data("fake".utf8).write(to: source)
@@ -424,7 +394,7 @@ struct AppModelBatchTests {
         defer { try? FileManager.default.removeItem(at: scratch) }
         let model = makeModel()
         await model.libraryRefreshTask?.value
-        model.batchExportFormats = []
+        model.batchExportPresetIDs = []
         let source = scratch.appendingPathComponent("clip.wav")
         try Data("fake".utf8).write(to: source)
         let job = BatchJob(url: source, status: .transcribing)
@@ -445,8 +415,8 @@ struct AppModelBatchTests {
         let scratch = try Self.makeScratchDirectory()
         defer { try? FileManager.default.removeItem(at: scratch) }
         let model = makeModel()
-        model.batchExportFormats = []
-        model.autoExportRules = [AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.txt])]
+        model.batchExportPresetIDs = []
+        model.autoExportRules = [AutoExportRule(sourceExtensions: ["wav"], presetIDs: [ExportPreset.builtIn(for: .txt)!.id])]
         let source = scratch.appendingPathComponent("clip.wav")
         try Data("fake".utf8).write(to: source)
         let job = BatchJob(url: source, status: .transcribing)

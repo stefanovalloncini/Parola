@@ -329,7 +329,7 @@ struct ReloadSettingsTests {
     func autoExportRulesResetWhenKeyAbsent() {
         let defaults = temporaryDefaults()
         let model = makeModel(defaults)
-        model.autoExportRules = [AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.txt])]
+        model.autoExportRules = [AutoExportRule(sourceExtensions: ["wav"], presetIDs: [ExportPreset.builtIn(for: .txt)!.id])]
 
         defaults.removeObject(forKey: "autoExportRules")
         model.loadAutoExportRules()

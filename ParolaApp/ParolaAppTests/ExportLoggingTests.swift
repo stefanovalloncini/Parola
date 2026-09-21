@@ -124,7 +124,7 @@ struct ExportLoggingTests {
 
         let model = makeModel()
         model.autoExportRules = [
-            AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.txt])
+            AutoExportRule(sourceExtensions: ["wav"], presetIDs: [ExportPreset.builtIn(for: .txt)!.id])
         ]
 
         model.runAutoExports(

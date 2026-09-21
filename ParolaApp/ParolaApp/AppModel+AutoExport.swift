@@ -13,12 +13,12 @@ extension AppModel {
     }
 
     func runAutoExports(transcript: Transcript, sourceURL: URL, skippingTargets: Set<URL> = []) {
-        let formats = AutoExportEngine.plannedFormats(
+        let specs = AutoExportEngine.plannedPresets(
             rules: autoExportRules,
-            sourceExtension: sourceURL.pathExtension
-        )
-        guard !formats.isEmpty else { return }
-        let specs = formats.map { exportSpec(for: $0) }
+            sourceExtension: sourceURL.pathExtension,
+            presets: exportPresets
+        ).map(\.spec)
+        guard !specs.isEmpty else { return }
         Task.detached(priority: .utility) {
             for spec in specs {
                 do {

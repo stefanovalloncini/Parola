@@ -35,7 +35,10 @@ struct AutoExportSettings: View {
                 }
                 Button {
                     model.autoExportRules.append(
-                        AutoExportRule(sourceExtensions: ["mp4"], outputFormats: [.srt])
+                        AutoExportRule(
+                            sourceExtensions: ["mp4"],
+                            presetIDs: [ExportPreset.builtIn(for: .srt)?.id].compactMap { $0 }
+                        )
                     )
                 } label: {
                     Label("Add rule", systemImage: "plus.circle")
@@ -49,6 +52,10 @@ struct AutoExportSettings: View {
         .searchable(text: $query, prompt: "Search extensions or formats")
     }
 
+    static func presetNames(for rule: AutoExportRule) -> [String] {
+        rule.presetIDs.compactMap { id in ExportPreset.builtIns.first { $0.id == id }?.name }
+    }
+
     private var filteredRuleIDs: Set<AutoExportRule.ID> {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return Set(
@@ -59,9 +66,8 @@ struct AutoExportSettings: View {
                     if rule.sourceExtensions.contains(where: { $0.lowercased().contains(trimmed) }) {
                         return true
                     }
-                    return rule.outputFormats.contains { format in
-                        format.fileExtension.lowercased().contains(trimmed)
-                            || format.rawValue.lowercased().contains(trimmed)
+                    return AutoExportSettings.presetNames(for: rule).contains { name in
+                        name.lowercased().contains(trimmed)
                     }
                 }
                 .map(\.id)
@@ -102,11 +108,14 @@ private struct AutoExportRuleEditor: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Also write").font(.caption).foregroundStyle(.secondary)
                 FlowGrid {
-                    ForEach(ExportFormat.allCases, id: \.self) { format in
-                        let isOn = rule.outputFormats.contains(format)
-                        Button(format.fileExtension) {
-                            if isOn { rule.outputFormats.remove(format) }
-                            else { rule.outputFormats.insert(format) }
+                    ForEach(ExportPreset.builtIns) { preset in
+                        let isOn = rule.presetIDs.contains(preset.id)
+                        Button(preset.name) {
+                            if isOn {
+                                rule.presetIDs.removeAll { $0 == preset.id }
+                            } else {
+                                rule.presetIDs.append(preset.id)
+                            }
                         }
                         .buttonStyle(.bordered)
                         .tint(isOn ? .accentColor : .secondary)
@@ -123,9 +132,9 @@ private struct AutoExportRuleEditor: View {
 
     private var summary: String {
         let exts = rule.sourceExtensions.sorted().joined(separator: ", ")
-        let fmts = rule.outputFormats.map(\.rawValue).sorted().joined(separator: ", ")
+        let names = AutoExportSettings.presetNames(for: rule)
         let left = exts.isEmpty ? "any" : exts
-        let right = fmts.isEmpty ? "nothing" : fmts
+        let right = names.isEmpty ? "nothing" : names.joined(separator: ", ")
         return "\(left) → \(right)"
     }
 }

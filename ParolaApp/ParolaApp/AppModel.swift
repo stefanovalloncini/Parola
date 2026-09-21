@@ -297,10 +297,8 @@ final class AppModel {
     @ObservationIgnored var batchTask: Task<Void, Never>?
     @ObservationIgnored var lastSavedBatchQueueURLs: [URL]?
 
-    var batchExportFormatsRaw: String = "txt,srt" { didSet { defaults.set(batchExportFormatsRaw, forKey: "batchExportFormats") } }
-    var batchExportToSourceFolder: Bool = true { didSet { defaults.set(batchExportToSourceFolder, forKey: "batchExportToSourceFolder") } }
-    var batchExportIncludeTimestamps: Bool = false { didSet { defaults.set(batchExportIncludeTimestamps, forKey: "batchExportIncludeTimestamps") } }
-    var batchExportFormatOptionsJSON: String = "{}" { didSet { defaults.set(batchExportFormatOptionsJSON, forKey: "batchExportFormatOptions") } }
+    var exportPresets: [ExportPreset] = ExportPreset.builtIns { didSet { saveExportPresets() } }
+    var batchExportPresetIDs: [UUID] = [] { didSet { writeJSON(batchExportPresetIDs, forKey: "batchExportPresets") } }
 
     var findIsOpen: Bool = false
     var findQuery: String = "" { didSet { scheduleRecomputeMatches() } }
@@ -695,10 +693,6 @@ final class AppModel {
         self.recordingCountInSeconds = defaults.integer(forKey: "recordingCountInSeconds")
         self.autoMuteWhileRecording = defaults.bool(forKey: "autoMuteWhileRecording")
         self.autoPauseMediaWhileRecording = defaults.bool(forKey: "autoPauseMediaWhileRecording")
-        self.batchExportFormatsRaw = defaults.string(forKey: "batchExportFormats") ?? "txt,srt"
-        self.batchExportToSourceFolder = readBool("batchExportToSourceFolder", default: true)
-        self.batchExportIncludeTimestamps = defaults.bool(forKey: "batchExportIncludeTimestamps")
-        self.batchExportFormatOptionsJSON = defaults.string(forKey: "batchExportFormatOptions") ?? "{}"
         self.inputDeviceUID = defaults.string(forKey: "inputDeviceUID") ?? ""
         self.selectedModel = defaults.string(forKey: "selectedModel") ?? ModelCatalog.defaultModelID()
         self.selectedLanguageRaw = defaults.string(forKey: "selectedLanguageRaw") ?? ""
@@ -722,6 +716,8 @@ final class AppModel {
         isReloadingSettings = true
         readPersistedSettings()
         loadAutoExportRules()
+        loadExportPresets()
+        loadBatchExportSelection()
         loadIgnoredSegmentRules()
         loadFindReplaceRules()
         loadSnippets()
@@ -1381,6 +1377,8 @@ final class AppModel {
         isReloadingSettings = false
         applyTheme()
         loadAutoExportRules()
+        loadExportPresets()
+        loadBatchExportSelection()
         loadIgnoredSegmentRules()
         loadFindReplaceRules()
         loadSnippets()

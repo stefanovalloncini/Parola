@@ -3,66 +3,10 @@ import SwiftUI
 import AppKit
 import ParolaCore
 
-struct BatchExportFormatOptions: Codable, Hashable, Sendable {
-    var writeToSourceFolder: Bool
-    var includeTimestamps: Bool
-
-    static let defaults = BatchExportFormatOptions(writeToSourceFolder: true, includeTimestamps: false)
-}
-
 extension AppModel {
 
-    private static let batchOptionsDecoder = JSONDecoder()
-    private static let batchOptionsEncoder = JSONEncoder()
-
-    var batchExportFormatOptions: [String: BatchExportFormatOptions] {
-        get {
-            guard let data = batchExportFormatOptionsJSON.data(using: .utf8),
-                  let decoded = try? Self.batchOptionsDecoder.decode([String: BatchExportFormatOptions].self, from: data)
-            else { return [:] }
-            return decoded
-        }
-        set {
-            let data = (try? Self.batchOptionsEncoder.encode(newValue)) ?? Data()
-            batchExportFormatOptionsJSON = String(data: data, encoding: .utf8) ?? "{}"
-        }
-    }
-
-    func options(for format: ExportFormat) -> BatchExportFormatOptions {
-        if let stored = batchExportFormatOptions[format.rawValue] { return stored }
-        return BatchExportFormatOptions(
-            writeToSourceFolder: batchExportToSourceFolder,
-            includeTimestamps: batchExportIncludeTimestamps
-        )
-    }
-
-    func setOptions(_ options: BatchExportFormatOptions, for format: ExportFormat) {
-        var current = batchExportFormatOptions
-        current[format.rawValue] = options
-        batchExportFormatOptions = current
-    }
-
-    var batchExportFormats: [ExportFormat] {
-        get {
-            batchExportFormatsRaw
-                .split(separator: ",")
-                .compactMap { ExportFormat(rawValue: String($0)) }
-        }
-        set {
-            batchExportFormatsRaw = newValue.map(\.rawValue).joined(separator: ",")
-        }
-    }
-
-    func addBatchExportFormat(_ format: ExportFormat) {
-        var formats = batchExportFormats
-        guard !formats.contains(format) else { return }
-        formats.append(format)
-        batchExportFormats = formats
-    }
-
-    func removeBatchExportFormat(_ format: ExportFormat) {
-        batchExportFormats = batchExportFormats.filter { $0 != format }
-    }
+    private static let batchQueueDecoder = JSONDecoder()
+    private static let batchQueueEncoder = JSONEncoder()
 
     func startBatch(urls: [URL]) {
         guard features.isEnabled(.batch) else {
@@ -173,11 +117,8 @@ extension AppModel {
 
     @discardableResult
     private func writeBatchExports(transcript: Transcript, sourceURL: URL) -> Set<URL> {
-        let plans: [(spec: ExportSpec, target: URL)] = batchExportFormats.compactMap { format in
-            let opts = options(for: format)
-            guard opts.writeToSourceFolder else { return nil }
-            let target = sourceURL.deletingPathExtension().appendingPathExtension(format.fileExtension)
-            return (exportSpec(for: format, includeTimestamps: opts.includeTimestamps), target)
+        let plans: [(spec: ExportSpec, target: URL)] = batchExportPresets.map { preset in
+            (preset.spec, sourceURL.deletingPathExtension().appendingPathExtension(preset.spec.format.fileExtension))
         }
         guard !plans.isEmpty else { return [] }
         Task.detached {
@@ -259,7 +200,7 @@ extension AppModel {
         lastSavedBatchQueueURLs = urls
         if urls.isEmpty {
             try? FileManager.default.removeItem(at: batchQueueFileURL)
-        } else if let data = try? Self.batchOptionsEncoder.encode(urls) {
+        } else if let data = try? Self.batchQueueEncoder.encode(urls) {
             try? data.write(to: batchQueueFileURL, options: .atomic)
         }
     }
@@ -269,7 +210,7 @@ extension AppModel {
         guard features.isEnabled(.batch) else { return }
         guard batchJobs.isEmpty,
               let data = try? Data(contentsOf: batchQueueFileURL),
-              let urls = try? Self.batchOptionsDecoder.decode([URL].self, from: data),
+              let urls = try? Self.batchQueueDecoder.decode([URL].self, from: data),
               !urls.isEmpty
         else { return }
         lastSavedBatchQueueURLs = urls

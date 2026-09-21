@@ -30,8 +30,15 @@ struct AppModelRulesTests {
         let defaults = freshDefaults()
         let writer = try makeModel(defaults: defaults)
         let rules = [
-            AutoExportRule(sourceExtensions: ["m4a", "wav"], outputFormats: [.srt, .txt]),
-            AutoExportRule(sourceExtensions: ["mp3"], outputFormats: [.json], enabled: false),
+            AutoExportRule(
+                sourceExtensions: ["m4a", "wav"],
+                presetIDs: [ExportPreset.builtIn(for: .srt)!.id, ExportPreset.builtIn(for: .txt)!.id]
+            ),
+            AutoExportRule(
+                sourceExtensions: ["mp3"],
+                presetIDs: [ExportPreset.builtIn(for: .json)!.id],
+                enabled: false
+            ),
         ]
         writer.autoExportRules = rules
 
@@ -90,11 +97,14 @@ struct AppModelRulesTests {
         return url
     }
 
-    @Test("runAutoExports writes the planned formats for a matching rule")
+    @Test("runAutoExports writes the planned presets for a matching rule")
     func runAutoExportsWritesFiles() async throws {
         let model = try makeModel(defaults: freshDefaults())
         model.autoExportRules = [
-            AutoExportRule(sourceExtensions: ["m4a"], outputFormats: [.srt, .txt]),
+            AutoExportRule(
+                sourceExtensions: ["m4a"],
+                presetIDs: [ExportPreset.builtIn(for: .srt)!.id, ExportPreset.builtIn(for: .txt)!.id]
+            ),
         ]
         let audio = try makeAudioFile(ext: "m4a")
         let entry = try await model.library.add(transcript: transcript("hello there"), audioSource: audio)
@@ -121,7 +131,7 @@ struct AppModelRulesTests {
     func runAutoExportsSkipsUnmatched() async throws {
         let model = try makeModel(defaults: freshDefaults())
         model.autoExportRules = [
-            AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.srt]),
+            AutoExportRule(sourceExtensions: ["wav"], presetIDs: [ExportPreset.builtIn(for: .srt)!.id]),
         ]
         let audio = try makeAudioFile(ext: "m4a")
         let entry = try await model.library.add(transcript: transcript("hi"), audioSource: audio)
@@ -137,7 +147,11 @@ struct AppModelRulesTests {
     func runAutoExportsIgnoresDisabled() async throws {
         let model = try makeModel(defaults: freshDefaults())
         model.autoExportRules = [
-            AutoExportRule(sourceExtensions: ["m4a"], outputFormats: [.srt], enabled: false),
+            AutoExportRule(
+                sourceExtensions: ["m4a"],
+                presetIDs: [ExportPreset.builtIn(for: .srt)!.id],
+                enabled: false
+            ),
         ]
         let audio = try makeAudioFile(ext: "m4a")
         let entry = try await model.library.add(transcript: transcript("hi"), audioSource: audio)

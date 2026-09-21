@@ -358,8 +358,7 @@ final class ParolaAutomationServer {
 
     static let writableSettingKeys: Set<String> = [
         "useStreaming", "wordTimestamps", "karaokeHighlight", "initialPrompt",
-        "diarize", "batchExportFormats", "batchExportToSourceFolder",
-        "batchExportIncludeTimestamps", "selectedModel", "selectedLanguageRaw",
+        "diarize", "selectedModel", "selectedLanguageRaw",
         "translate", "dictationEnabled", "appTheme", "monospacedTimestamps",
         "sidebarDensity", "dictationCleanupPromptID", "dictationPerAppOverridesJSON",
         "meetingDetectorEnabled", "dictationModeRaw", "dictationKeyCode",

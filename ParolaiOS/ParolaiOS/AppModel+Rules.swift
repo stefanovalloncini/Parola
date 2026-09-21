@@ -41,8 +41,12 @@ extension AppModel {
 
     func runAutoExports(for entry: LibraryEntry) {
         let ext = (entry.manifest.originalAudioName as NSString).pathExtension
-        let formats = AutoExportEngine.plannedFormats(rules: autoExportRules, sourceExtension: ext)
-        guard !formats.isEmpty else { return }
+        let presets = AutoExportEngine.plannedPresets(
+            rules: autoExportRules,
+            sourceExtension: ext,
+            presets: ExportPreset.builtIns
+        )
+        guard !presets.isEmpty else { return }
         Task { [weak self] in
             guard let self else { return }
             do {
@@ -50,9 +54,9 @@ extension AppModel {
                 let exportsDir = library.libraryURL.appendingPathComponent("Exports", isDirectory: true)
                 try FileManager.default.createDirectory(at: exportsDir, withIntermediateDirectories: true)
                 let base = (entry.title as NSString).deletingPathExtension
-                for format in formats {
-                    let target = exportsDir.appendingPathComponent("\(base).\(format.fileExtension)")
-                    let data = try Exporters.exporter(for: format).render(loaded.document.transcript)
+                for preset in presets {
+                    let target = exportsDir.appendingPathComponent("\(base).\(preset.spec.format.fileExtension)")
+                    let data = try Exporters.exporter(for: preset.spec).render(loaded.document.transcript)
                     try data.write(to: target, options: .atomic)
                 }
             } catch {

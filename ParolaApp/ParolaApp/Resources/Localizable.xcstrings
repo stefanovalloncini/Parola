@@ -144,6 +144,17 @@
         }
       }
     },
+    "%@ with timestamps": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ con i timestamp"
+          }
+        }
+      }
+    },
     "%@ · %@ of audio": {
       "extractionState": "manual",
       "localizations": {
@@ -1095,6 +1106,17 @@
         }
       }
     },
+    "Add Preset": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi preset"
+          }
+        }
+      }
+    },
     "Add Prompt": {
       "extractionState": "manual",
       "localizations": {
@@ -1848,6 +1870,17 @@
         }
       }
     },
+    "Batch view": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vista Batch"
+          }
+        }
+      }
+    },
     "Batch — %@ files": {
       "extractionState": "stale",
       "localizations": {
@@ -2372,6 +2405,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scegli quali formati scrivere accanto a ogni file trascritto."
+          }
+        }
+      }
+    },
+    "Choose which presets Parola writes next to each transcribed file.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli quali preset Parola scrive accanto a ogni file trascritto."
           }
         }
       }
@@ -3335,6 +3379,17 @@
         }
       }
     },
+    "Delete this preset": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elimina questo preset"
+          }
+        }
+      }
+    },
     "Deleted %@": {
       "extractionState": "manual",
       "localizations": {
@@ -4084,6 +4139,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esporta pack"
+          }
+        }
+      }
+    },
+    "Export Presets": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preset di esportazione"
           }
         }
       }
@@ -6110,6 +6176,17 @@
         }
       }
     },
+    "Move down": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sposta giù"
+          }
+        }
+      }
+    },
     "Move to": {
       "extractionState": "manual",
       "localizations": {
@@ -6128,6 +6205,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sposta in cima"
+          }
+        }
+      }
+    },
+    "Move up": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sposta su"
           }
         }
       }
@@ -6568,6 +6656,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ancora nessun pattern"
+          }
+        }
+      }
+    },
+    "No presets selected": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun preset selezionato"
           }
         }
       }
@@ -7330,6 +7429,17 @@
         }
       }
     },
+    "Parola writes these presets beside every file a batch transcribes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola scrive questi preset accanto a ogni file trascritto in batch."
+          }
+        }
+      }
+    },
     "Past Deadline": {
       "extractionState": "manual",
       "localizations": {
@@ -7529,6 +7639,17 @@
         }
       }
     },
+    "Pick presets in the Batch view too. Parola writes them as each transcription finishes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Puoi scegliere i preset anche nella vista Batch. Parola li scrive man mano che ogni trascrizione finisce."
+          }
+        }
+      }
+    },
     "Pin": {
       "extractionState": "manual",
       "localizations": {
@@ -7569,6 +7690,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Placeholder: {{DATE}} · {{TIME}} · {{ISODATE}} · {{CLIPBOARD}}"
+          }
+        }
+      }
+    },
+    "Plain Text": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Testo semplice"
           }
         }
       }
@@ -7652,6 +7784,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Antepone a ogni paragrafo Markdown il suo tempo di inizio."
+          }
+        }
+      }
+    },
+    "Presets are what the Export As menu, the auto-export rules and the batch runs write. Add one from the Export sheet with Save as Preset.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I preset sono ciò che scrivono il menu Esporta come, le regole di esportazione automatica e i batch. Aggiungine uno dal pannello Esporta con Salva come preset."
           }
         }
       }
@@ -8318,6 +8461,17 @@
         }
       }
     },
+    "Remove this preset": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi questo preset"
+          }
+        }
+      }
+    },
     "Rename": {
       "extractionState": "manual",
       "localizations": {
@@ -8796,6 +8950,17 @@
         }
       }
     },
+    "Save the name": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salva il nome"
+          }
+        }
+      }
+    },
     "Save your settings to a `.parola-settings` file, or restore one. Downloaded models and the prompt library are not included.": {
       "extractionState": "manual",
       "localizations": {
@@ -9034,6 +9199,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Segmenti"
+          }
+        }
+      }
+    },
+    "Segments (.json)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segmenti (.json)"
           }
         }
       }
@@ -9386,6 +9562,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Densità sidebar"
+          }
+        }
+      }
+    },
+    "Sidecar presets": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preset affiancati"
           }
         }
       }
@@ -10069,6 +10256,17 @@
         }
       }
     },
+    "Subtitles": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli"
+          }
+        }
+      }
+    },
     "Subtitles (.srt)": {
       "extractionState": "manual",
       "localizations": {
@@ -10076,6 +10274,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sottotitoli (.srt)"
+          }
+        }
+      }
+    },
+    "Subtitles (.vtt)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottotitoli (.vtt)"
           }
         }
       }
@@ -10869,6 +11078,28 @@
         }
       }
     },
+    "Transcript (.md)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione (.md)"
+          }
+        }
+      }
+    },
+    "Transcript (.txt)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione (.txt)"
+          }
+        }
+      }
+    },
     "Transcript appears as you speak. Off records the whole take first, then transcribes.": {
       "extractionState": "manual",
       "localizations": {
@@ -11210,6 +11441,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Usa Aggiungi formato qui sopra per scegliere quali file Parola scrive accanto a ogni audio o video trascritto."
+          }
+        }
+      }
+    },
+    "Use Add Preset above to pick the files Parola writes next to each transcribed audio or video.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa Aggiungi preset qui sopra per scegliere i file che Parola scrive accanto a ogni audio o video trascritto."
           }
         }
       }
@@ -11582,6 +11824,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Word"
+          }
+        }
+      }
+    },
+    "Word (.docx)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Word (.docx)"
           }
         }
       }

@@ -97,9 +97,9 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .transcriptionDefaults: return ["default", "model", "language", "engine", "whisper", "privacy", "cloud", "llm", "speakers", "diarize", "word timestamps", "apple speech", "playback"]
         case .ignoredSegments: return ["filler", "uh", "um", "ignore", "skip"]
         case .findReplace: return ["regex", "replace", "term pack", "substitution", "rule"]
-        case .exportFormats: return ["txt", "srt", "vtt", "csv", "tsv", "docx", "pdf", "markdown", "html", "json", "jsonl", "fcpxml", "final cut", "lrc", "lyrics", "subtitles"]
-        case .batchExport: return ["batch", "multiple files", "drag drop", "queue", "sidecar", "folder"]
-        case .autoExport: return ["auto export", "rule", "line length", "qc", "timestamps", "html theme"]
+        case .exportFormats: return ["preset", "txt", "srt", "vtt", "csv", "tsv", "docx", "pdf", "markdown", "html", "json", "jsonl", "fcpxml", "final cut", "lrc", "lyrics", "subtitles"]
+        case .batchExport: return ["batch", "multiple files", "drag drop", "queue", "sidecar", "folder", "preset"]
+        case .autoExport: return ["auto export", "rule", "line length", "qc", "timestamps", "html theme", "preset"]
         case .integrations: return ["yt-dlp", "youtube", "homebrew", "install"]
         case .prompts: return ["prompt", "cleanup", "translate", "bullet", "action", "trigger words", "assistant", "rewrite"]
         case .automation: return ["mcp", "bridge", "claude code", "codex", "loopback"]
@@ -176,11 +176,11 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .findReplace:
             return ["findReplaceRules"]
         case .exportFormats:
-            return []
+            return ["exportPresets"]
         case .batchExport:
             return [
-                "batchExportFormats", "batchExportToSourceFolder", "batchExportIncludeTimestamps",
-                "batchExportFormatOptions"
+                "batchExportPresets", "batchExportFormats", "batchExportToSourceFolder",
+                "batchExportIncludeTimestamps", "batchExportFormatOptions"
             ]
         case .autoExport:
             return ["autoExportRules", "subtitleCaptionLength", "markdownTimestamps", "txtExportTimestamps", "htmlExportTheme"]

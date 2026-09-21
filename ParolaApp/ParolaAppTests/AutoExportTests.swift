@@ -48,29 +48,34 @@ struct AutoExportTests {
         #expect(data.isEmpty == false)
     }
 
-    @Test("planned formats follow the rule set and ignore disabled rules")
-    func plannedFormatsRespectRules() {
+    @Test("planned presets follow the rule set and ignore disabled rules")
+    func plannedPresetsRespectRules() {
+        let library = ExportPreset.builtIns
+        let srt = ExportPreset.builtIn(for: .srt)!.id
+        let txt = ExportPreset.builtIn(for: .txt)!.id
+        let vtt = ExportPreset.builtIn(for: .vtt)!.id
+        let md = ExportPreset.builtIn(for: .md)!.id
         let rules = [
-            AutoExportRule(sourceExtensions: ["mp4"], outputFormats: [.srt, .txt]),
-            AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.md], enabled: false),
-            AutoExportRule(sourceExtensions: ["mp4", "mov"], outputFormats: [.vtt]),
+            AutoExportRule(sourceExtensions: ["mp4"], presetIDs: [srt, txt]),
+            AutoExportRule(sourceExtensions: ["wav"], presetIDs: [md], enabled: false),
+            AutoExportRule(sourceExtensions: ["mp4", "mov"], presetIDs: [vtt]),
         ]
-        let mp4 = AutoExportEngine.plannedFormats(rules: rules, sourceExtension: "mp4")
-        #expect(Set(mp4) == [.srt, .txt, .vtt])
+        let mp4 = AutoExportEngine.plannedPresets(rules: rules, sourceExtension: "mp4", presets: library)
+        #expect(mp4.map(\.id) == [srt, txt, vtt])
 
-        let wav = AutoExportEngine.plannedFormats(rules: rules, sourceExtension: "wav")
+        let wav = AutoExportEngine.plannedPresets(rules: rules, sourceExtension: "wav", presets: library)
         #expect(wav.isEmpty)
 
-        let mov = AutoExportEngine.plannedFormats(rules: rules, sourceExtension: "mov")
-        #expect(mov == [.vtt])
+        let mov = AutoExportEngine.plannedPresets(rules: rules, sourceExtension: "mov", presets: library)
+        #expect(mov.map(\.id) == [vtt])
     }
 
-    @Test("empty path extension produces no planned formats")
+    @Test("empty path extension produces no planned presets")
     func emptyExtensionPlansNothing() {
         let url = URL(fileURLWithPath: "/tmp/no_extension")
-        let rules = [AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.txt])]
-        let formats = AutoExportEngine.plannedFormats(rules: rules, sourceExtension: url.pathExtension)
-        #expect(formats.isEmpty)
+        let rules = [AutoExportRule(sourceExtensions: ["wav"], presetIDs: [ExportPreset.builtIn(for: .txt)!.id])]
+        let presets = AutoExportEngine.plannedPresets(rules: rules, sourceExtension: url.pathExtension, presets: ExportPreset.builtIns)
+        #expect(presets.isEmpty)
     }
 
     @MainActor
@@ -80,16 +85,18 @@ struct AutoExportTests {
         let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("autoexport"))
         let key = "autoExportTests.rules"
 
+        let srt = ExportPreset.builtIn(for: .srt)!.id
+        let vtt = ExportPreset.builtIn(for: .vtt)!.id
         let written = [
-            AutoExportRule(sourceExtensions: ["mp4", "mov"], outputFormats: [.srt, .vtt]),
-            AutoExportRule(sourceExtensions: ["wav"], outputFormats: [.txt], enabled: false),
+            AutoExportRule(sourceExtensions: ["mp4", "mov"], presetIDs: [srt, vtt]),
+            AutoExportRule(sourceExtensions: ["wav"], presetIDs: [ExportPreset.builtIn(for: .txt)!.id], enabled: false),
         ]
         model.writeJSON(written, forKey: key)
 
         let read = model.readJSON([AutoExportRule].self, forKey: key)
         #expect(read?.count == 2)
         #expect(read?.first?.sourceExtensions == ["mp4", "mov"])
-        #expect(read?.first?.outputFormats == [.srt, .vtt])
+        #expect(read?.first?.presetIDs == [srt, vtt])
         #expect(read?.last?.enabled == false)
     }
 
@@ -113,11 +120,20 @@ struct AutoExportTests {
         let source = scratch.appendingPathComponent("clip.mp4")
         try Data("fake".utf8).write(to: source)
 
-        let rules = [AutoExportRule(sourceExtensions: ["mp4"], outputFormats: [.txt, .srt])]
-        let formats = AutoExportEngine.plannedFormats(rules: rules, sourceExtension: source.pathExtension)
-        for format in formats {
-            let target = source.deletingPathExtension().appendingPathExtension(format.fileExtension)
-            let data = try Exporters.exporter(for: format).render(Self.sampleTranscript())
+        let rules = [
+            AutoExportRule(
+                sourceExtensions: ["mp4"],
+                presetIDs: [ExportPreset.builtIn(for: .txt)!.id, ExportPreset.builtIn(for: .srt)!.id]
+            )
+        ]
+        let presets = AutoExportEngine.plannedPresets(
+            rules: rules,
+            sourceExtension: source.pathExtension,
+            presets: ExportPreset.builtIns
+        )
+        for preset in presets {
+            let target = source.deletingPathExtension().appendingPathExtension(preset.spec.format.fileExtension)
+            let data = try Exporters.exporter(for: preset.spec).render(Self.sampleTranscript())
             try data.write(to: target, options: .atomic)
         }
 

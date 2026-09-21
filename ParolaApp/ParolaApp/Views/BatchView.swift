@@ -35,32 +35,28 @@ struct BatchView: View {
             subtitleAxID: caption?.isProgress == true ? "Header.Text.Progress" : nil,
             trailing: {
                 Menu {
-                    ForEach(ExportFormat.allCases, id: \.self) { format in
-                        let isOn = model.batchExportFormats.contains(format)
+                    ForEach(model.exportPresets) { preset in
+                        let isOn = model.batchExportPresetIDs.contains(preset.id)
                         Button {
-                            if isOn {
-                                model.removeBatchExportFormat(format)
-                            } else {
-                                model.addBatchExportFormat(format)
-                            }
+                            model.toggleBatchExportPreset(preset.id)
                         } label: {
                             if isOn {
-                                Label(format.fileExtension.uppercased(), systemImage: "checkmark")
+                                Label(LocalizedStringKey(preset.name), systemImage: "checkmark")
                             } else {
-                                Text(format.fileExtension.uppercased())
+                                Text(LocalizedStringKey(preset.name))
                             }
                         }
-                        .axLeaf("Header.MenuItem.Format.\(format.fileExtension)")
+                        .axLeaf("Header.MenuItem.Preset.\(ExportPresetChecks.slug(preset))")
                     }
                 } label: {
-                    Label("Add Format", systemImage: "plus")
+                    Label("Add Preset", systemImage: "plus")
                         .labelStyle(.titleAndIcon)
                 }
                 .menuStyle(.button)
                 .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
-                .help("Choose which formats to write next to each transcribed file.")
+                .help("Choose which presets Parola writes next to each transcribed file.")
                 .accessibilityIdentifier("batch.addFormat")
-                .axLeaf("Header.Menu.AddFormat")
+                .axLeaf("Header.Menu.AddPreset")
 
                 Button {
                     exportPaneVisible.toggle()

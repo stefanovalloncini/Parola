@@ -30,7 +30,7 @@ struct AutoExportPane: View {
                 } else {
                     ForEach(Array(displayedRules.enumerated()), id: \.element.id) { position, rule in
                         if let binding = binding(for: rule.id) {
-                            AutoExportRuleRow(rule: binding, isFirst: position == 0) {
+                            AutoExportRuleRow(rule: binding, presets: model.exportPresets, isFirst: position == 0) {
                                 model.autoExportRules.removeAll { $0.id == rule.id }
                             }
                             // Row state (the extensions draft) must follow the rule, not the slot index.
@@ -42,7 +42,10 @@ struct AutoExportPane: View {
 
             Button {
                 model.autoExportRules.append(
-                    AutoExportRule(sourceExtensions: ["mp4"], outputFormats: [.srt])
+                    AutoExportRule(
+                        sourceExtensions: ["mp4"],
+                        presetIDs: [ExportPreset.builtIn(for: .srt)?.id].compactMap { $0 }
+                    )
                 )
                 // A live search or the Disabled filter would hide the fresh rule.
                 searchText = ""
@@ -103,8 +106,8 @@ struct AutoExportPane: View {
             if !enabledFilter.includes(rule.enabled) { return false }
             if query.isEmpty { return true }
             let sources = rule.sourceExtensions.sorted().joined(separator: ",").lowercased()
-            let formats = rule.outputFormats.map(\.rawValue).sorted().joined(separator: ",").lowercased()
-            return sources.contains(query) || formats.contains(query)
+            let presets = presetNames(for: rule).joined(separator: ",").lowercased()
+            return sources.contains(query) || presets.contains(query)
         }
         switch sort {
         case .originalOrder:
@@ -132,6 +135,10 @@ struct AutoExportPane: View {
                 model.autoExportRules[idx] = newValue
             }
         )
+    }
+
+    private func presetNames(for rule: AutoExportRule) -> [String] {
+        rule.presetIDs.compactMap { id in model.exportPresets.first { $0.id == id }?.name }
     }
 
     private func sourceKey(at index: Int) -> String {
@@ -190,6 +197,7 @@ enum AutoExportSort: CaseIterable {
 
 private struct AutoExportRuleRow: View {
     @Binding var rule: AutoExportRule
+    let presets: [ExportPreset]
     let isFirst: Bool
     let onDelete: () -> Void
     @State private var extensionsText: String = ""
@@ -224,7 +232,18 @@ private struct AutoExportRuleRow: View {
                 }
                 HStack(alignment: .top) {
                     Text("Also write").font(DS.Font.secondary).foregroundStyle(DS.Color.secondaryText)
-                    AutoExportFormatChips(selected: $rule.outputFormats)
+                    ExportPresetChecks(
+                        presets: presets,
+                        leafPrefix: "AutoExport",
+                        isOn: { rule.presetIDs.contains($0) },
+                        toggle: { id in
+                            if rule.presetIDs.contains(id) {
+                                rule.presetIDs.removeAll { $0 == id }
+                            } else {
+                                rule.presetIDs.append(id)
+                            }
+                        }
+                    )
                 }
             }
             .padding(.horizontal, DS.Spacing.medium)
@@ -237,27 +256,9 @@ private struct AutoExportRuleRow: View {
 
     private var summary: String {
         let exts = rule.sourceExtensions.sorted().joined(separator: ", ")
-        let fmts = rule.outputFormats.map(\.rawValue).sorted().joined(separator: ", ")
+        let names = rule.presetIDs.compactMap { id in presets.first { $0.id == id }?.name }
         let left = exts.isEmpty ? String(localized: "any") : exts
-        let right = fmts.isEmpty ? String(localized: "nothing") : fmts
+        let right = names.isEmpty ? String(localized: "nothing") : names.joined(separator: ", ")
         return "\(left) → \(right)"
-    }
-}
-
-private struct AutoExportFormatChips: View {
-    @Binding var selected: Set<ExportFormat>
-
-    var body: some View {
-        let grid = [GridItem(.adaptive(minimum: 50))]
-        LazyVGrid(columns: grid, alignment: .leading, spacing: 4) {
-            ForEach(ExportFormat.allCases, id: \.self) { format in
-                let isOn = selected.contains(format)
-                Button(format.fileExtension) {
-                    if isOn { selected.remove(format) } else { selected.insert(format) }
-                }
-                .buttonStyle(DSPillButtonStyle(kind: isOn ? .primary : .secondary, size: .compact))
-                .axLeaf("AutoExport.Button.Format.\(format.fileExtension)")
-            }
-        }
     }
 }
