@@ -209,4 +209,112 @@ struct PeopleStoreTests {
         #expect(people.count == 1)
         #expect(people.first?.usageCount == 2)
     }
+
+    @Test("merge sums usage, keeps the newest date, and drops the source")
+    func mergeSumsUsage() async throws {
+        let store = PeopleStore(storageURL: makeTempURL())
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        let source = await store.recordUsage(name: "SPEAKER_01", at: base.addingTimeInterval(600))
+        _ = await store.recordUsage(name: "Stefano", at: base)
+        let target = await store.recordUsage(name: "Stefano", at: base)
+
+        let merged = try #require(await store.merge(source.id, into: target.id))
+
+        #expect(merged.name == "Stefano")
+        #expect(merged.usageCount == 3)
+        #expect(merged.lastUsedAt == base.addingTimeInterval(600))
+        let people = await store.people
+        #expect(people.map(\.id) == [target.id])
+    }
+
+    @Test("merging a person into itself changes nothing")
+    func mergeIntoSelf() async throws {
+        let store = PeopleStore(storageURL: makeTempURL())
+        let person = await store.recordUsage(name: "Stefano")
+
+        #expect(await store.merge(person.id, into: person.id) == nil)
+        #expect(await store.people.count == 1)
+        #expect(await store.people.first?.usageCount == 1)
+    }
+
+    @Test("merging an unknown id changes nothing")
+    func mergeUnknown() async throws {
+        let store = PeopleStore(storageURL: makeTempURL())
+        let person = await store.recordUsage(name: "Stefano")
+
+        #expect(await store.merge(UUID(), into: person.id) == nil)
+        #expect(await store.merge(person.id, into: UUID()) == nil)
+        #expect(await store.people.count == 1)
+    }
+
+    @Test("delete drops the person and persists")
+    func deletePersists() async throws {
+        let url = makeTempURL()
+        let store = PeopleStore(storageURL: url)
+        let person = await store.recordUsage(name: "Stefano")
+
+        #expect(await store.delete(person.id))
+        #expect(await PeopleStore(storageURL: url).people.isEmpty)
+    }
+
+    @Test("mostUsed sorts by usage, then by the newest use")
+    func mostUsedOrder() async throws {
+        let store = PeopleStore(storageURL: makeTempURL())
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        _ = await store.recordUsage(name: "Alice", at: base)
+        _ = await store.recordUsage(name: "Alice", at: base)
+        _ = await store.recordUsage(name: "Bob", at: base.addingTimeInterval(60))
+        _ = await store.recordUsage(name: "Cara", at: base.addingTimeInterval(120))
+
+        #expect(await store.mostUsed(limit: 2).map(\.name) == ["Alice", "Cara"])
+        #expect(await store.mostUsed(limit: 10).map(\.name) == ["Alice", "Cara", "Bob"])
+    }
+
+    @Test("person(named:) matches the way recordUsage does")
+    func lookupByName() async throws {
+        let store = PeopleStore(storageURL: makeTempURL())
+        let person = await store.recordUsage(name: "Stefano")
+
+        #expect(await store.person(named: " stefano ")?.id == person.id)
+        #expect(await store.person(named: "Nobody") == nil)
+    }
+
+    @Test("each new person takes the next free colour, and it survives a reopen")
+    func colourIndicesAreStableAndPersisted() async throws {
+        let url = makeTempURL()
+        let store = PeopleStore(storageURL: url)
+        for name in ["A", "B", "C"] { _ = await store.recordUsage(name: name) }
+
+        #expect(await store.people.map(\.colorIndex) == [0, 1, 2])
+
+        _ = await store.delete(try #require(await store.person(named: "B")).id)
+        let filling = await store.recordUsage(name: "D")
+        #expect(filling.colorIndex == 1)
+
+        let reopened = PeopleStore(storageURL: url)
+        #expect(await reopened.people.map(\.colorIndex).sorted() == [0, 1, 2])
+    }
+
+    @Test("colours wrap once every index is taken")
+    func colourIndicesWrap() async throws {
+        let store = PeopleStore(storageURL: makeTempURL())
+        for index in 0..<(PeopleStore.colorCount + 1) {
+            _ = await store.recordUsage(name: "P\(index)")
+        }
+        let people = await store.people
+        #expect(people.count == PeopleStore.colorCount + 1)
+        #expect(people.last?.colorIndex == 0)
+        #expect(people.allSatisfy { (0..<PeopleStore.colorCount).contains($0.colorIndex) })
+    }
+
+    @Test("a person stored before colours decodes with the first one")
+    func legacyPersonDecode() throws {
+        let json = """
+        [{"id":"11111111-2222-3333-4444-555555555555","name":"Ada",
+          "lastUsedAt":770000000,"usageCount":3}]
+        """
+        let people = try JSONDecoder().decode([Person].self, from: Data(json.utf8))
+        #expect(people.first?.colorIndex == 0)
+        #expect(people.first?.usageCount == 3)
+    }
 }

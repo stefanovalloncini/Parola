@@ -36,6 +36,9 @@ public struct LibraryEntry: Identifiable, Hashable, Sendable {
     public var aiTitle: String? { manifest.aiTitle }
     public var shortSummary: String? { manifest.shortSummary }
     public var deliveries: [DeliveryReceipt] { manifest.deliveries }
+    public var speakerAssignments: [String: UUID] { manifest.speakerAssignments }
+    /// The people this transcript's speakers stand for.
+    public var personIDs: Set<UUID> { Set(manifest.speakerAssignments.values) }
 
     public func note(forSegment id: Int) -> String? {
         manifest.segmentNotes[String(id)]

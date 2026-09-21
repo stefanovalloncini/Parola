@@ -40,6 +40,9 @@ public struct ParolaDocument: Sendable {
         public var shortSummary: String?
         /// Where this transcript has been sent, oldest first.
         public var deliveries: [DeliveryReceipt]
+        /// Which person each speaker label in this transcript stands for, keyed by the label the
+        /// segments carry now.
+        public var speakerAssignments: [String: UUID]
 
         public init(
             version: Int = Manifest.currentVersion,
@@ -64,7 +67,8 @@ public struct ParolaDocument: Sendable {
             source: EntrySource? = nil,
             aiTitle: String? = nil,
             shortSummary: String? = nil,
-            deliveries: [DeliveryReceipt] = []
+            deliveries: [DeliveryReceipt] = [],
+            speakerAssignments: [String: UUID] = [:]
         ) {
             self.version = version
             self.createdAt = createdAt
@@ -89,6 +93,7 @@ public struct ParolaDocument: Sendable {
             self.aiTitle = aiTitle
             self.shortSummary = shortSummary
             self.deliveries = deliveries
+            self.speakerAssignments = speakerAssignments
         }
 
         /// A bundle written before the field kept one trace of a link: the sentinel a caption fetcher stamps.
@@ -120,6 +125,7 @@ public struct ParolaDocument: Sendable {
             case aiTitle
             case shortSummary
             case deliveries
+            case speakerAssignments
         }
 
         public init(from decoder: any Decoder) throws {
@@ -148,6 +154,7 @@ public struct ParolaDocument: Sendable {
             aiTitle = try c.decodeIfPresent(String.self, forKey: .aiTitle)
             shortSummary = try c.decodeIfPresent(String.self, forKey: .shortSummary)
             deliveries = try c.decodeIfPresent([DeliveryReceipt].self, forKey: .deliveries) ?? []
+            speakerAssignments = try c.decodeIfPresent([String: UUID].self, forKey: .speakerAssignments) ?? [:]
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -184,6 +191,9 @@ public struct ParolaDocument: Sendable {
             try c.encodeIfPresent(shortSummary, forKey: .shortSummary)
             if !deliveries.isEmpty {
                 try c.encode(deliveries, forKey: .deliveries)
+            }
+            if !speakerAssignments.isEmpty {
+                try c.encode(speakerAssignments, forKey: .speakerAssignments)
             }
         }
     }

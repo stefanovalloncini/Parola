@@ -5,6 +5,9 @@ public actor PeopleStore {
         URL.applicationSupportDirectory.appending(path: "Parola/People.json")
     }
 
+    /// How many colours a person can take. Matches the app's speaker palette.
+    public static let colorCount = 7
+
     private let storageURL: URL
     public private(set) var people: [Person]
 
@@ -30,7 +33,7 @@ public actor PeopleStore {
             save()
             return people[idx]
         } else {
-            let person = Person(name: trimmed, lastUsedAt: date)
+            let person = Person(name: trimmed, lastUsedAt: date, colorIndex: nextColorIndex())
             people.append(person)
             save()
             return person
@@ -39,6 +42,41 @@ public actor PeopleStore {
 
     public func suggestions(limit: Int = 10) -> [Person] {
         Array(people.sorted { $0.lastUsedAt > $1.lastUsedAt }.prefix(limit))
+    }
+
+    /// The people worth offering first: the most assigned, then the most recently used.
+    public func mostUsed(limit: Int = 5) -> [Person] {
+        let sorted = people.sorted {
+            $0.usageCount == $1.usageCount ? $0.lastUsedAt > $1.lastUsedAt : $0.usageCount > $1.usageCount
+        }
+        return Array(sorted.prefix(limit))
+    }
+
+    public func person(named name: String) -> Person? {
+        let key = Self.normalize(name.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard !key.isEmpty else { return nil }
+        return people.first { Self.normalize($0.name) == key }
+    }
+
+    /// Folds `source` into `target`: usage counts add up, the newer date wins, and `source` is gone.
+    @discardableResult
+    public func merge(_ source: UUID, into target: UUID) -> Person? {
+        guard source != target,
+              let sourceIndex = people.firstIndex(where: { $0.id == source }),
+              let targetIndex = people.firstIndex(where: { $0.id == target }) else { return nil }
+        let absorbed = people[sourceIndex]
+        people[targetIndex].usageCount += absorbed.usageCount
+        if absorbed.lastUsedAt > people[targetIndex].lastUsedAt {
+            people[targetIndex].lastUsedAt = absorbed.lastUsedAt
+        }
+        people.remove(at: sourceIndex)
+        save()
+        return people.first { $0.id == target }
+    }
+
+    @discardableResult
+    public func delete(_ id: UUID) -> Bool {
+        remove(id)
     }
 
     @discardableResult
@@ -72,6 +110,12 @@ public actor PeopleStore {
         people[idx].name = trimmed
         save()
         return people[idx]
+    }
+
+    /// The lowest colour nobody holds, so a deleted person's colour comes back into use.
+    private func nextColorIndex() -> Int {
+        let taken = Set(people.map(\.colorIndex))
+        return (0..<Self.colorCount).first { !taken.contains($0) } ?? (people.count % Self.colorCount)
     }
 
     static func normalize(_ name: String) -> String {

@@ -693,6 +693,19 @@ public actor LibraryStore {
         try recacheEntry(at: bundleURL)
     }
 
+    /// Replaces the entry's speaker-to-person map. The names themselves live in the transcript, so
+    /// this write skips the index.
+    public func setSpeakerAssignments(_ assignments: [String: UUID], for id: LibraryEntry.ID) throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.speakerAssignments = assignments
+        }
+        try recacheEntry(at: bundleURL)
+    }
+
     /// Sets a note for a segment within an entry, then re-indexes so notes are searchable.
     /// Pass `nil` or empty to clear it.
     public func setSegmentNote(_ note: String?, segmentID: Int, for id: LibraryEntry.ID) async throws {
