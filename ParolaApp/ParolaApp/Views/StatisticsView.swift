@@ -221,12 +221,12 @@ struct StatisticsView: View {
         stats.perModel.compactMap(\.speed).max()
     }
 
-    /// "ESECUZIONI" is half again as wide as "RUNS" and would take the header row to two lines.
     private func columnHeading(_ title: LocalizedStringKey) -> some View {
         Text(title)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
-            .frame(width: ModelRowMetrics.numberWidth, alignment: .trailing)
+            .fixedSize()
+            .gridColumnAlignment(.trailing)
     }
 }
 
@@ -248,7 +248,6 @@ enum StatisticsPageState: Equatable {
 }
 
 private enum ModelRowMetrics {
-    static let numberWidth: CGFloat = 64
     static let barWidth: CGFloat = 72
 }
 
@@ -330,7 +329,9 @@ private struct ModelTableRow: View {
         Text(text)
             .font(DS.Font.mono)
             .foregroundStyle(DS.Color.secondaryText)
-            .frame(width: ModelRowMetrics.numberWidth, alignment: .trailing)
+            .lineLimit(1)
+            .fixedSize()
+            .gridColumnAlignment(.trailing)
     }
 
     @ViewBuilder

@@ -23,13 +23,20 @@ struct StatisticsViewTests {
     }
 
     private func entry(
-        _ id: String, timing: Double?, audio: Double = 600, words: Int? = 100, daysAgo: Double = 0
+        _ id: String,
+        timing: Double?,
+        audio: Double = 600,
+        words: Int? = 100,
+        daysAgo: Double = 0,
+        model: String = "openai_whisper-large-v3_turbo",
+        category: EntryCategory = .transcription
     ) -> LibraryEntry {
         var manifest = ParolaDocument.Manifest(
             createdAt: Self.reference.addingTimeInterval(-daysAgo * 86_400),
             originalAudioName: "\(id).wav",
-            modelName: "openai_whisper-large-v3_turbo",
+            modelName: model,
             language: "en",
+            category: category,
             durationSeconds: audio
         )
         manifest.transcriptionSeconds = timing
@@ -64,7 +71,8 @@ struct StatisticsViewTests {
         return names
     }
 
-    /// Spread over the year and with a longest and a fastest entry, so every section of the page has something to draw.
+    /// Spread over the year, two models (one past twelve hours, so the table's widest cell is measured), a longest and a
+    /// fastest entry and a second kind, so every section of the page has something to draw.
     private var seededEntries: [LibraryEntry] {
         [
             entry("a", timing: 37.5),
@@ -72,6 +80,8 @@ struct StatisticsViewTests {
             entry("c", timing: nil, daysAgo: 12),
             entry("d", timing: 20, audio: 3_600, daysAgo: 45),
             entry("e", timing: 90, audio: 900, words: nil, daysAgo: 200),
+            entry("f", timing: 2_400, audio: 45_800, daysAgo: 60, model: "nvidia_parakeet-tdt-0.6b-v3"),
+            entry("g", timing: 30, audio: 300, daysAgo: 7, category: .meeting),
         ]
     }
 
