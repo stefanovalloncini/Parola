@@ -41,6 +41,9 @@ struct PermissionCard: View {
             if status.showsAction {
                 Button(actionLabel, action: action)
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
+                    .lineLimit(1)
+                    // "Apri Impostazioni di Sistema…" is 15 pt wider than a third of the column.
+                    .minimumScaleFactor(0.85)
                     .axLeaf(axID)
             }
         }
