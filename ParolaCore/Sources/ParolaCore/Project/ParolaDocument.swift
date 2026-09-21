@@ -32,6 +32,8 @@ public struct ParolaDocument: Sendable {
         /// Words of spoken text, counted when the bundle is written so the statistics page never
         /// has to open transcript.json. Absent on bundles written before it was recorded.
         public var wordCount: Int?
+        /// Where the media came from. Bundles written before it was stamped derive it from the model name.
+        public var source: EntrySource
 
         public init(
             version: Int = Manifest.currentVersion,
@@ -51,7 +53,8 @@ public struct ParolaDocument: Sendable {
             durationSeconds: Double? = nil,
             sourceDigest: String? = nil,
             transcriptionSeconds: Double? = nil,
-            wordCount: Int? = nil
+            wordCount: Int? = nil,
+            source: EntrySource? = nil
         ) {
             self.version = version
             self.createdAt = createdAt
@@ -71,6 +74,12 @@ public struct ParolaDocument: Sendable {
             self.sourceDigest = sourceDigest
             self.transcriptionSeconds = transcriptionSeconds
             self.wordCount = wordCount
+            self.source = source ?? Manifest.derivedSource(modelName: modelName)
+        }
+
+        /// A bundle written before the field kept one trace of a link: the sentinel a caption fetcher stamps.
+        static func derivedSource(modelName: String) -> EntrySource {
+            modelName.hasPrefix("youtube-") ? .web : .file
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -92,6 +101,7 @@ public struct ParolaDocument: Sendable {
             case sourceDigest
             case transcriptionSeconds
             case wordCount
+            case source
         }
 
         public init(from decoder: any Decoder) throws {
@@ -114,6 +124,8 @@ public struct ParolaDocument: Sendable {
             sourceDigest = try c.decodeIfPresent(String.self, forKey: .sourceDigest)
             transcriptionSeconds = try c.decodeIfPresent(Double.self, forKey: .transcriptionSeconds)
             wordCount = try c.decodeIfPresent(Int.self, forKey: .wordCount)
+            source = try c.decodeIfPresent(EntrySource.self, forKey: .source)
+                ?? Manifest.derivedSource(modelName: modelName)
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -142,6 +154,7 @@ public struct ParolaDocument: Sendable {
             try c.encodeIfPresent(sourceDigest, forKey: .sourceDigest)
             try c.encodeIfPresent(transcriptionSeconds, forKey: .transcriptionSeconds)
             try c.encodeIfPresent(wordCount, forKey: .wordCount)
+            try c.encode(source, forKey: .source)
         }
     }
 
@@ -165,7 +178,8 @@ public struct ParolaDocument: Sendable {
         category: EntryCategory = .transcription,
         deletedAt: Date? = nil,
         titleOverride: String? = nil,
-        sourceDigest: String? = nil
+        sourceDigest: String? = nil,
+        source entrySource: EntrySource? = nil
     ) throws -> URL {
         let target = destination.pathExtension == "parola"
             ? destination
@@ -201,7 +215,8 @@ public struct ParolaDocument: Sendable {
                 durationSeconds: transcript.durationSeconds.flatMap { $0 > 0 ? $0 : nil },
                 sourceDigest: source == nil ? nil : sourceDigest,
                 transcriptionSeconds: transcript.transcriptionSeconds,
-                wordCount: transcript.wordCount
+                wordCount: transcript.wordCount,
+                source: entrySource
             )
             try writeJSON(manifest, to: staging.appendingPathComponent("manifest.json"))
             // Word timings make transcript.json the biggest file in the bundle; indenting it costs more than it's worth.
