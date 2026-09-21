@@ -27,7 +27,7 @@ struct TranscriptionDefaultsPane: View {
                 SettingRow("Default language",
                            description: "Auto detects the language from the audio with Whisper models. Pick one when the audio language is known.") {
                     Picker("", selection: languageBinding) {
-                        Text("Auto").tag(String?.none)
+                        Text("Auto-detect").tag(String?.none)
                         ForEach(SupportedLanguages.options, id: \.code) { option in
                             Text(option.name).tag(String?.some(option.code))
                         }
