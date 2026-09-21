@@ -75,28 +75,7 @@ struct TranscriptHeaderBar: View {
 
             if model.features.isEnabled(.ai) {
                 groupDivider
-
-                Button(action: onOpenSummary) {
-                    Image(systemName: "sparkles")
-                }
-                .buttonStyle(.borderless)
-                .help("Summary")
-                .accessibilityLabel("Summary")
-                .axLeaf("HeaderBar.Button.OpenSummary")
-
-                Button(action: onOpenChat) {
-                    Image(systemName: "bubble.left.and.text.bubble.right")
-                }
-                .buttonStyle(.borderless)
-                .help("Chat with this transcript")
-                .accessibilityLabel("Chat with this transcript")
-                .axLeaf("HeaderBar.Button.OpenChat")
-
-                PromptsMenu()
-                    .menuStyle(.button)
-                    .buttonStyle(.borderless)
-                    .fixedSize()
-                    .disabled(model.isRunningPrompt)
+                aiMenu
             }
 
             groupDivider
@@ -127,6 +106,16 @@ struct TranscriptHeaderBar: View {
                 .axLeaf("HeaderBar.Button.Share")
             }
 
+            groupDivider
+
+            if model.features.isEnabled(.ai) {
+                PromptsMenu()
+                    .menuStyle(.button)
+                    .buttonStyle(.borderless)
+                    .fixedSize()
+                    .disabled(model.isRunningPrompt)
+            }
+
             Button(action: onAdvance) {
                 Image(systemName: "chevron.right.2")
                     .font(DS.Font.heading)
@@ -146,6 +135,38 @@ struct TranscriptHeaderBar: View {
         .onAppear { rebuildShareItem() }
         .onChange(of: model.transcriptVersion) { _, _ in rebuildShareItem() }
         .onChange(of: title) { _, _ in rebuildShareItem() }
+    }
+
+    private var aiMenu: some View {
+        Menu {
+            Button("Summary", action: onOpenSummary)
+                .axLeaf("HeaderBar.Button.OpenSummary")
+            Button("Chat", action: onOpenChat)
+                .axLeaf("HeaderBar.Button.OpenChat")
+            Divider()
+            Group {
+                Button("Chapters") { runInInspector(model.extractSmartChapters) }
+                    .axLeaf("HeaderBar.MenuItem.Chapters")
+                Button("Action Items") { runInInspector(model.extractActionItems) }
+                    .axLeaf("HeaderBar.MenuItem.ActionItems")
+            }
+            .disabled(!model.isAIAvailable)
+        } label: {
+            Image(systemName: "sparkles")
+        }
+        .menuStyle(.button)
+        .buttonStyle(.borderless)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Summary, chat, chapters and action items")
+        .accessibilityLabel("AI")
+        .axLeaf("HeaderBar.Menu.AI")
+    }
+
+    /// Chapters and action items land in the inspector, so a run started here has to open it.
+    private func runInInspector(_ run: () -> Void) {
+        InspectorVisibility.show(in: DefaultsStore.current, isNarrow: model.transcriptPaneIsNarrow)
+        run()
     }
 
     private var groupDivider: some View {

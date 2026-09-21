@@ -9588,6 +9588,17 @@
         }
       }
     },
+    "Summary, chat, chapters and action items": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riassunto, chat, capitoli e azioni"
+          }
+        }
+      }
+    },
     "System Audio": {
       "extractionState": "manual",
       "localizations": {

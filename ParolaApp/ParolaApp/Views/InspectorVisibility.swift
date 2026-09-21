@@ -18,6 +18,11 @@ enum InspectorVisibility {
         defaults.set(!showing, forKey: isNarrow ? forcedAtNarrowWidthKey : preferenceKey)
     }
 
+    /// For actions whose result only lands in the inspector, so running one from elsewhere shows it.
+    static func show(in defaults: UserDefaults, isNarrow: Bool) {
+        defaults.set(true, forKey: isNarrow ? forcedAtNarrowWidthKey : preferenceKey)
+    }
+
     /// An unset key means visible, matching the pane's `@AppStorage` default.
     static func preference(in defaults: UserDefaults) -> Bool {
         (defaults.object(forKey: preferenceKey) as? Bool) ?? true
