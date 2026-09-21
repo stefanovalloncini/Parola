@@ -34,6 +34,9 @@ public struct ParolaDocument: Sendable {
         public var wordCount: Int?
         /// Where the media came from. Bundles written before it was stamped derive it from the model name.
         public var source: EntrySource
+        /// Short title and one-line summary written on device when the transcription finished.
+        public var aiTitle: String?
+        public var shortSummary: String?
 
         public init(
             version: Int = Manifest.currentVersion,
@@ -54,7 +57,9 @@ public struct ParolaDocument: Sendable {
             sourceDigest: String? = nil,
             transcriptionSeconds: Double? = nil,
             wordCount: Int? = nil,
-            source: EntrySource? = nil
+            source: EntrySource? = nil,
+            aiTitle: String? = nil,
+            shortSummary: String? = nil
         ) {
             self.version = version
             self.createdAt = createdAt
@@ -75,6 +80,8 @@ public struct ParolaDocument: Sendable {
             self.transcriptionSeconds = transcriptionSeconds
             self.wordCount = wordCount
             self.source = source ?? Manifest.derivedSource(modelName: modelName)
+            self.aiTitle = aiTitle
+            self.shortSummary = shortSummary
         }
 
         /// A bundle written before the field kept one trace of a link: the sentinel a caption fetcher stamps.
@@ -102,6 +109,8 @@ public struct ParolaDocument: Sendable {
             case transcriptionSeconds
             case wordCount
             case source
+            case aiTitle
+            case shortSummary
         }
 
         public init(from decoder: any Decoder) throws {
@@ -126,6 +135,8 @@ public struct ParolaDocument: Sendable {
             wordCount = try c.decodeIfPresent(Int.self, forKey: .wordCount)
             source = try c.decodeIfPresent(EntrySource.self, forKey: .source)
                 ?? Manifest.derivedSource(modelName: modelName)
+            aiTitle = try c.decodeIfPresent(String.self, forKey: .aiTitle)
+            shortSummary = try c.decodeIfPresent(String.self, forKey: .shortSummary)
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -155,6 +166,8 @@ public struct ParolaDocument: Sendable {
             try c.encodeIfPresent(transcriptionSeconds, forKey: .transcriptionSeconds)
             try c.encodeIfPresent(wordCount, forKey: .wordCount)
             try c.encode(source, forKey: .source)
+            try c.encodeIfPresent(aiTitle, forKey: .aiTitle)
+            try c.encodeIfPresent(shortSummary, forKey: .shortSummary)
         }
     }
 
