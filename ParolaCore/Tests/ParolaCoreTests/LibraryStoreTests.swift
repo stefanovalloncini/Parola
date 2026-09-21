@@ -40,6 +40,20 @@ struct LibraryStoreTests {
         #expect(entries.isEmpty)
     }
 
+    @Test("card metadata is written to the manifest and searchable")
+    func cardMetadataWrittenAndIndexed() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: makeFakeAudio(), category: .transcription)
+        try await store.setCardMetadata(aiTitle: "Quarterly sync", shortSummary: "Budget zebra review.", for: entry.id)
+        let reloaded = try #require(await store.list().first { $0.id == entry.id })
+        #expect(reloaded.aiTitle == "Quarterly sync")
+        #expect(reloaded.shortSummary == "Budget zebra review.")
+        let hits = await store.search("zebra")
+        #expect(hits.map(\.entryID).contains(entry.id))
+        try await store.setCardMetadata(aiTitle: nil, shortSummary: nil, for: entry.id)
+        #expect(await store.list().first { $0.id == entry.id }?.aiTitle == nil)
+    }
+
     private struct HangingIndexer: LibraryIndexer {
         func index(id: String, title: String, text: String, createdAt: Date) async {
             try? await Task.sleep(for: .seconds(3600))

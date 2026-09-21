@@ -159,9 +159,8 @@ public actor LibrarySearchIndex {
         case failed(any Error)
     }
 
-    // v9: stores each entry's full body text instead of a 200-char excerpt, so a snippet never
-    // needs a disk read at query time. A v8 (or older) snapshot is discarded and rebuilt.
-    private static let snapshotVersion = 9
+    // v10: auxiliary text carries the card title and summary; older snapshots are discarded and rebuilt.
+    private static let snapshotVersion = 10
     private static let noOffset = -1
     private static let snapshotPrefix = Data(#"{"version":\#(snapshotVersion),"entries":["#.utf8)
     private static let snapshotSeparator = Data(",".utf8)

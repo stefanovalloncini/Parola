@@ -227,7 +227,8 @@ public actor LibraryStore {
                     return .init(
                         id: entry.id, title: entry.title, text: "",
                         auxiliaryText: Self.searchAuxiliaryText(
-                            notes: entry.segmentNotes, transcript: nil
+                            notes: entry.segmentNotes, transcript: nil,
+                            aiTitle: entry.aiTitle, shortSummary: entry.shortSummary
                         ),
                         fingerprint: fingerprint
                     )
@@ -236,7 +237,10 @@ public actor LibraryStore {
                     id: entry.id,
                     title: entry.title,
                     text: doc.transcript.text,
-                    auxiliaryText: Self.searchAuxiliaryText(notes: entry.segmentNotes, transcript: doc.transcript),
+                    auxiliaryText: Self.searchAuxiliaryText(
+                        notes: entry.segmentNotes, transcript: doc.transcript,
+                        aiTitle: entry.aiTitle, shortSummary: entry.shortSummary
+                    ),
                     boundaries: Self.segmentBoundaries(for: doc.transcript),
                     fingerprint: fingerprint
                 )
@@ -495,7 +499,10 @@ public actor LibraryStore {
             id: entry.id,
             title: entry.title,
             text: text,
-            auxiliaryText: Self.searchAuxiliaryText(notes: entry.segmentNotes, transcript: transcript),
+            auxiliaryText: Self.searchAuxiliaryText(
+                notes: entry.segmentNotes, transcript: transcript,
+                aiTitle: entry.aiTitle, shortSummary: entry.shortSummary
+            ),
             boundaries: Self.segmentBoundaries(for: transcript),
             fingerprint: Self.bundleFingerprint(entry.bundleURL),
             createdAt: entry.createdAt
@@ -537,8 +544,15 @@ public actor LibraryStore {
     }
 
     /// `transcript` is nil for a bundle whose transcript is unreadable; its manifest notes still index.
-    static func searchAuxiliaryText(notes: [String: String], transcript: Transcript?) -> String {
+    static func searchAuxiliaryText(
+        notes: [String: String],
+        transcript: Transcript?,
+        aiTitle: String? = nil,
+        shortSummary: String? = nil
+    ) -> String {
         var parts: [String] = []
+        if let aiTitle, !aiTitle.isEmpty { parts.append(aiTitle) }
+        if let shortSummary, !shortSummary.isEmpty { parts.append(shortSummary) }
         if let summary = transcript?.summary?.text, !summary.isEmpty { parts.append(summary) }
         parts.append(contentsOf: notes.sorted { $0.key < $1.key }.map(\.value))
         parts.append(contentsOf: transcript?.uniqueSpeakers ?? [])
@@ -634,6 +648,22 @@ public actor LibraryStore {
         guard !trimmed.isEmpty else { return }
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
             manifest.title = trimmed
+        }
+        let entry = try recacheEntry(at: bundleURL)
+        if let transcript = await transcriptForReindex(id, at: bundleURL) {
+            await indexEntry(entry, transcript: transcript)
+        }
+    }
+
+    /// Writes the on-device title and summary shown on the entry's card, then re-indexes so both are searchable.
+    public func setCardMetadata(aiTitle: String?, shortSummary: String?, for id: LibraryEntry.ID) async throws {
+        let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: bundleURL.path) else {
+            throw LibraryError.notFound(id)
+        }
+        try ParolaDocument.updateManifest(at: bundleURL) { manifest in
+            manifest.aiTitle = aiTitle?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+            manifest.shortSummary = shortSummary?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
         }
         let entry = try recacheEntry(at: bundleURL)
         if let transcript = await transcriptForReindex(id, at: bundleURL) {
@@ -995,4 +1025,8 @@ private func offActorThrowingIO<T: Sendable>(
     }
     try Task.checkCancellation()
     return value
+}
+
+private extension String {
+    var nonEmpty: String? { isEmpty ? nil : self }
 }
