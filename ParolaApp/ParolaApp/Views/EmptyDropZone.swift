@@ -8,6 +8,7 @@ struct EmptyDropZone: View {
     @Environment(AppModel.self) private var model
     @State private var paneHeight: CGFloat = 0
     @State private var recentRowSpace: CGFloat = 0
+    @State private var recentDays: [LibraryDateGroups.Group] = []
     @State private var recentGroups: [LibraryDateGroups.Group] = []
     @State private var recentCache = LibraryRowDisplayCache()
     /// A day header costs the list what it measures: `heading` plus the space above and below it.
@@ -167,8 +168,14 @@ struct EmptyDropZone: View {
                 )
             }
         recentCache = cache
+        recentDays = LibraryDateGroups.groups(for: displays, pinsFirst: false)
+        retrimRecents()
+    }
+
+    /// A live resize changes only how much of the strip fits, so it never rebuilds the rows behind it.
+    private func retrimRecents() {
         recentGroups = LibraryDateGroups.trimmed(
-            LibraryDateGroups.groups(for: displays, pinsFirst: false),
+            recentDays,
             toHeight: recentRowSpace,
             rowHeight: recentRowHeight,
             headerHeight: Self.recentHeaderHeight
@@ -223,7 +230,7 @@ struct EmptyDropZone: View {
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { recentRowSpace = $0 }
         }
         .onAppear { recomputeRecents() }
-        .onChange(of: recentRowSpace) { _, _ in recomputeRecents() }
+        .onChange(of: recentRowSpace) { _, _ in retrimRecents() }
         .onChange(of: model.libraryVersion) { _, _ in recomputeRecents() }
         .onChange(of: model.libraryExcerptsVersion) { _, _ in recomputeRecents() }
         .onChange(of: model.sidebarDensity) { _, _ in recomputeRecents() }
