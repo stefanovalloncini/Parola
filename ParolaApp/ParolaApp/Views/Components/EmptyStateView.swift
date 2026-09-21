@@ -44,11 +44,10 @@ struct EmptyStateView<Actions: View>: View {
             // A floor too: proposed no width the message wraps per character, and the route's minimum height explodes.
             .frame(minWidth: MainWindowLayout.narrowestPaneWidth - 2 * DS.Spacing.large, maxWidth: 420)
             if hasActions {
-                // Outside the reading width: a third pill wraps its own label at 420.
-                HStack(spacing: DS.Spacing.small) {
+                // Outside the reading width, and wrapping rather than squeezing: three pills overrun a narrow pane in Italian.
+                CentredFlow(spacing: DS.Spacing.small) {
                     actions
                 }
-                .fixedSize()
                 .padding(.top, DS.Spacing.small)
             }
         }
