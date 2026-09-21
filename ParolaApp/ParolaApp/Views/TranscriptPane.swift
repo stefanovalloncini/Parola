@@ -63,7 +63,7 @@ enum InspectorMode: String, CaseIterable, Identifiable {
 struct TranscriptPane: View {
     @Environment(AppModel.self) private var model
     @AppStorage(InspectorVisibility.preferenceKey, store: DefaultsStore.current) private var inspectorVisible: Bool = true
-    @AppStorage("inspectorMode", store: DefaultsStore.current) private var inspectorModeRaw: String = InspectorMode.format.rawValue
+    @AppStorage(InspectorVisibility.modeKey, store: DefaultsStore.current) private var inspectorModeRaw: String = InspectorMode.format.rawValue
     @State private var summarySheetOpen = false
     @State private var chatSheetOpen = false
     // Persisted: the pane is rebuilt on every phase and route change, and the ask has to outlive that.

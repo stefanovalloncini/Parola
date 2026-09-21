@@ -183,6 +183,27 @@ struct RouteLayoutTests {
         }
     }
 
+    @Test("showInfo reveals the inspector and selects the pane that renders the result")
+    func showInfoOpensTheInfoPane() {
+        let defaults = temporaryDefaults("test-inspector-info-")
+        defaults.set(false, forKey: InspectorVisibility.preferenceKey)
+        defaults.set(InspectorMode.format.rawValue, forKey: InspectorVisibility.modeKey)
+
+        InspectorVisibility.showInfo(in: defaults, isNarrow: false)
+
+        #expect(InspectorVisibility.preference(in: defaults) == true)
+        #expect(InspectorMode(stored: defaults.string(forKey: InspectorVisibility.modeKey) ?? "") == .info)
+    }
+
+    @Test("showInfo at a narrow width writes the key that width answers to")
+    func showInfoAtANarrowWidth() {
+        let defaults = temporaryDefaults("test-inspector-info-narrow-")
+        InspectorVisibility.showInfo(in: defaults, isNarrow: true)
+
+        #expect(defaults.bool(forKey: InspectorVisibility.forcedAtNarrowWidthKey) == true)
+        #expect(InspectorMode(stored: defaults.string(forKey: InspectorVisibility.modeKey) ?? "") == .info)
+    }
+
     @Test("the toggle flips the key that the current width answers to")
     func toggleFlipsTheKeyForTheWidth() {
         let defaults = temporaryDefaults("test-inspector-")

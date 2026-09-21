@@ -163,9 +163,9 @@ struct TranscriptHeaderBar: View {
         .axLeaf("HeaderBar.Menu.AI")
     }
 
-    /// Chapters and action items land in the inspector, so a run started here has to open it.
+    /// Chapters and action items land in the Info inspector, so a run started here has to open it there.
     private func runInInspector(_ run: () -> Void) {
-        InspectorVisibility.show(in: DefaultsStore.current, isNarrow: model.transcriptPaneIsNarrow)
+        InspectorVisibility.showInfo(in: DefaultsStore.current, isNarrow: model.transcriptPaneIsNarrow)
         run()
     }
 
