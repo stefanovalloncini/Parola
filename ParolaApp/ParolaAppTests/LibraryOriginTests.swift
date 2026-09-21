@@ -175,6 +175,27 @@ struct LibraryOriginTests {
         #expect(model.transcriptOrigin == nil, "the menu bar extra opens entries with no list behind them")
     }
 
+    @Test("an entry opened while a page is up takes the content area")
+    func opensOverAPage() async throws {
+        let model = makeModel()
+        let entry = try await seedEntry(in: model, text: "voice memo")
+        model.openStatistics()
+
+        #expect(await openEntry(entry.id, in: model))
+
+        #expect(model.route == .transcript)
+    }
+
+    @Test("a query typed while a page is up shows its results")
+    func searchLeavesAPage() async throws {
+        let model = makeModel()
+        model.openRecentlyDeleted()
+
+        model.search("bianchi")
+
+        #expect(model.route == .transcript)
+    }
+
     @Test("a transcript that arrives another way does not inherit the last entry's origin")
     func documentDoesNotInheritTheOrigin() async throws {
         let model = makeModel()

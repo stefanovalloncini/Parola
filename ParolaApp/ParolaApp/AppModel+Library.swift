@@ -402,6 +402,8 @@ extension AppModel {
                     tearDownPlayer()
                 }
                 phase = .ready
+                // Opened from the extra, a link or the duplicate sheet, it would otherwise load behind a page.
+                route = .transcript
                 libraryOrigin = origin
                 libraryOriginEntryID = id
                 if let hit, !hit.isEmpty { revealInTranscript(hit, at: hitPosition) }
@@ -524,6 +526,8 @@ extension AppModel {
             searchMatches = [:]
             return
         }
+        // Results land in the content area, so a query typed from Statistics or the trash has to leave the page.
+        route = .transcript
         let clock = clock
         searchTask = Task { [weak self] in
             try? await Task.sleep(for: Self.searchDebounce, clock: clock)
