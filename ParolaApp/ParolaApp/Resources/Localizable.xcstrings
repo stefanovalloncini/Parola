@@ -3324,6 +3324,17 @@
         }
       }
     },
+    "Dictation Settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impostazioni dettatura"
+          }
+        }
+      }
+    },
     "Dictations": {
       "extractionState": "manual",
       "localizations": {
@@ -8668,6 +8679,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Frasi"
+          }
+        }
+      }
+    },
+    "Set Up Meeting Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configura la registrazione delle riunioni"
           }
         }
       }

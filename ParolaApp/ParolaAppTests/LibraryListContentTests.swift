@@ -309,6 +309,21 @@ struct LibraryListContentTests {
         #expect(LibraryListContent.emptyActions(for: .dictation, features: noCapture) == [.openFile])
     }
 
+    @Test("the meeting and dictation empty states end on a way into their settings")
+    func emptyActionsOfferTheirSettings() {
+        #expect(LibraryListContent.emptyActions(for: .meeting, features: .all).last == .meetingSettings)
+        #expect(LibraryListContent.emptyActions(for: .dictation, features: .all).last == .dictationSettings)
+        #expect(!LibraryListContent.emptyActions(for: .transcription, features: .all).contains(.meetingSettings))
+        #expect(!LibraryListContent.emptyActions(for: nil, features: .all).contains(.dictationSettings))
+    }
+
+    @Test("a gated-off feature takes its settings shortcut with it")
+    func settingsShortcutsFollowTheirFeature() {
+        let noMeetings = FeatureSet(enabled: [.dictation])
+        #expect(!LibraryListContent.emptyActions(for: .meeting, features: noMeetings).contains(.meetingSettings))
+        #expect(LibraryListContent.emptyActions(for: .dictation, features: noMeetings).contains(.dictationSettings))
+    }
+
     @Test("the totals caption hides for an empty library and pluralizes otherwise")
     func totalsLabelPluralizes() {
         let english = Locale(identifier: "en_US")

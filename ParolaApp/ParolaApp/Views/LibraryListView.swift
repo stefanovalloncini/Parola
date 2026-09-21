@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import ParolaCore
 
@@ -6,6 +7,8 @@ enum LibraryEmptyAction {
     case recordMicrophone
     case recordSystemAudio
     case startDictation
+    case meetingSettings
+    case dictationSettings
 }
 
 enum LibraryListContent {
@@ -18,6 +21,8 @@ enum LibraryListContent {
         if category != .meeting, category != .dictation, features.isEnabled(.micRecording) {
             actions.append(.recordMicrophone)
         }
+        if category == .meeting, features.isEnabled(.meetings) { actions.append(.meetingSettings) }
+        if category == .dictation, features.isEnabled(.dictation) { actions.append(.dictationSettings) }
         return actions
     }
 
@@ -554,7 +559,15 @@ struct LibraryListView: View {
         case .recordMicrophone: model.startRecording(source: .microphone)
         case .recordSystemAudio: model.startRecording(source: .systemAudio)
         case .startDictation: model.startDictationFromIntent()
+        case .meetingSettings: openSettings(.recordMeetings)
+        case .dictationSettings: openSettings(.dictation)
         }
+    }
+
+    /// A `SettingsLink` carries no action, and the pane has to be picked before the window opens.
+    private func openSettings(_ pane: SettingsRoute) {
+        model.settingsPane = pane.rawValue
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 
     private var searchQueryText: String {
@@ -590,6 +603,8 @@ extension LibraryEmptyAction {
         case .recordMicrophone: return "Record"
         case .recordSystemAudio: return "Record System Audio"
         case .startDictation: return "Start Dictation"
+        case .meetingSettings: return "Set Up Meeting Recording"
+        case .dictationSettings: return "Dictation Settings"
         }
     }
 
@@ -599,6 +614,7 @@ extension LibraryEmptyAction {
         case .recordMicrophone: return "mic.fill"
         case .recordSystemAudio: return "waveform.circle.fill"
         case .startDictation: return "text.cursor"
+        case .meetingSettings, .dictationSettings: return "gearshape"
         }
     }
 
@@ -608,6 +624,8 @@ extension LibraryEmptyAction {
         case .recordMicrophone: return "Empty.Button.Record"
         case .recordSystemAudio: return "Empty.Button.RecordSystemAudio"
         case .startDictation: return "Empty.Button.StartDictation"
+        case .meetingSettings: return "Empty.Button.MeetingSettings"
+        case .dictationSettings: return "Empty.Button.DictationSettings"
         }
     }
 }
