@@ -81,8 +81,7 @@ extension AppModel {
         }
     }
 
-    /// Rows show the first couple of lines of a transcript; the index is the only place that text
-    /// is already in memory, and an entry it has not reached yet simply has none yet.
+    /// Rows quote a transcript's first lines; the index is the only place that text is already in memory.
     func refreshLibraryExcerpts() {
         libraryExcerptsTask?.cancel()
         // The store compares against what is already on screen, so the main actor never walks the map.
@@ -389,8 +388,7 @@ extension AppModel {
             await flushPendingTranscriptSave()
             do {
                 let loaded = try await library.load(id)
-                // Two quick clicks race across the load await; the slower load would otherwise
-                // finish last and install the entry the user already navigated away from.
+                // Two quick clicks race across the await, and the slower load would land last.
                 guard generation == loadEntryGeneration else { return }
                 installStoredTranscript(loaded.document.transcript)
                 closeFind()
@@ -420,8 +418,7 @@ extension AppModel {
         }
     }
 
-    /// Sidebar Home. The launcher only renders with nothing loaded, so a transcript left in
-    /// place would keep showing under a selected Home row.
+    /// Sidebar Home: the launcher only renders with nothing loaded, so the transcript has to go.
     func goHome() {
         libraryFilter = nil
         libraryBrowsingAll = false

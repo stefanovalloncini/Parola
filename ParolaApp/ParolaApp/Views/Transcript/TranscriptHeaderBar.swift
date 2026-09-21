@@ -13,8 +13,7 @@ struct TranscriptHeaderBar: View {
     @State private var jumpOpen = false
     @State private var jumpDraft = ""
     @FocusState private var jumpFocused: Bool
-    // Cached so `transcript.text` (a full-segment join) isn't rebuilt on every header re-render;
-    // only recomputed when the transcript actually changes or the title changes.
+    // Cached so the header doesn't rebuild `transcript.text`, a full-segment join, on every re-render.
     @State private var shareItem: TranscriptShareFile?
 
     var body: some View {
@@ -106,9 +105,8 @@ struct TranscriptHeaderBar: View {
                 .axLeaf("HeaderBar.Button.Share")
             }
 
-            groupDivider
-
             if model.features.isEnabled(.ai) {
+                groupDivider
                 PromptsMenu()
                     .menuStyle(.button)
                     .buttonStyle(.borderless)
