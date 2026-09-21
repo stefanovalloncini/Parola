@@ -33,7 +33,7 @@ struct BrandWaveform: View {
             if reduceMotion {
                 bars(seconds: nil)
             } else {
-                TimelineView(.animation) { context in
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
                     bars(seconds: context.date.timeIntervalSinceReferenceDate)
                 }
             }
