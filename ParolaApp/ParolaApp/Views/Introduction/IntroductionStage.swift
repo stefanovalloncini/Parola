@@ -16,7 +16,7 @@ struct IntroductionStage: View {
             if reduceMotion {
                 mesh(warm: Self.rest, colors: colors)
             } else {
-                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
+                TimelineView(.animation(minimumInterval: 1.0 / 10.0)) { context in
                     mesh(
                         warm: Self.warmPoint(seconds: context.date.timeIntervalSinceReferenceDate),
                         colors: colors
@@ -28,7 +28,7 @@ struct IntroductionStage: View {
         .allowsHitTesting(false)
     }
 
-    static func warmPoint(seconds: TimeInterval) -> SIMD2<Float> {
+    nonisolated static func warmPoint(seconds: TimeInterval) -> SIMD2<Float> {
         SIMD2(
             rest.x + amplitude.x * Float(sin(seconds * 2 * .pi / periods.x)),
             rest.y + amplitude.y * Float(sin(seconds * 2 * .pi / periods.y))
