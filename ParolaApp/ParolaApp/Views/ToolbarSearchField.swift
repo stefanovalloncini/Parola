@@ -14,8 +14,7 @@ enum ToolbarSearchMetrics {
     /// Below this a field is a sliver: the chip expands to at least this much or stays a chip.
     static let minimumFieldWidth: CGFloat = 132
 
-    /// Measured on the built toolbar at 1180: 248 pt of lights and sidebar toggle, the 9 pt and 7 pt gaps
-    /// around the field, and 50.5 pt of New menu and window inset.
+    /// Measured at 1180: 248 pt of lights and sidebar toggle, the 9 and 7 pt gaps, 50.5 pt of New menu and inset.
     static let chromeBesideSearch: CGFloat = 314.5
     /// What the capsule is worth before it has reported its own width: the widest stock pair, measured the same way.
     static let defaultIntakeWidth: CGFloat = 393
@@ -154,7 +153,8 @@ struct ToolbarSearchField: View {
             }
         }
         .animation(reduceMotion ? nil : DS.Motion.resize, value: editing)
-        .animation(reduceMotion ? nil : DS.Motion.resize, value: collapsed)
+        // An unmeasured window renders the field first, so its first swap to the chip must not animate.
+        .animation(reduceMotion || windowWidth == 0 ? nil : DS.Motion.resize, value: collapsed)
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didUpdateNotification)) { note in
             guard !collapsed, (note.object as? NSWindow)?.isKeyWindow == true else { return }
             let holdsCaret = ToolbarSearchFocus.holdsCaret()
@@ -186,11 +186,12 @@ struct ToolbarSearchField: View {
     private var field: some View {
         HStack(spacing: DS.Spacing.snug) {
             Image(systemName: "magnifyingglass")
-                .font(DS.Font.secondary)
+                .font(DS.Font.body)
                 .foregroundStyle(DS.Color.secondaryText)
             TextField("Search library", text: query)
                 .textFieldStyle(.plain)
-                .font(DS.Font.secondary)
+                .font(DS.Font.body)
+                .accessibilityIdentifier("toolbar.search")
                 .axLeaf("Toolbar.TextField.Search")
                 .onKeyPress(.escape) { escape() }
             if !model.searchQuery.isEmpty {
