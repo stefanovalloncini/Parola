@@ -195,6 +195,16 @@ enum LibraryListContent {
         // The entries arrive in the order the sidebar's sort menu picked; only pinning is layered on top.
         return filtered.filter(\.pinned) + filtered.filter { !$0.pinned }
     }
+
+    /// Groups are content, not new lists: the `List` itself stays one view across category switches.
+    static func groups(
+        for rows: [LibraryRowDisplay],
+        sortOrder: LibrarySortOrder,
+        isSearchResult: Bool
+    ) -> [LibraryDateGroups.Group] {
+        guard !isSearchResult else { return LibraryDateGroups.ungrouped(rows, id: "results") }
+        return LibraryDateGroups.groups(for: rows, sortOrder: sortOrder)
+    }
 }
 
 struct LibraryListView: View {
@@ -211,6 +221,7 @@ struct LibraryListView: View {
     @State private var languageFilter: String?
     @State private var dateRangeFilter: LibraryDateRangeFilter = .all
     @State private var entries: [LibraryRowDisplay] = []
+    @State private var rowGroups: [LibraryDateGroups.Group] = []
     @State private var totalsLabel: String = ""
     @State private var totalsHelp: String?
     @State private var displayCache = LibraryRowDisplayCache()
@@ -256,6 +267,11 @@ struct LibraryListView: View {
         }
         displayCache = cache
         entries = displays
+        rowGroups = LibraryListContent.groups(
+            for: displays,
+            sortOrder: model.librarySortOrder,
+            isSearchResult: searchResults != nil
+        )
         // Count and duration, never size: bundle sizes land later and only for audio, so the label used to change shape.
         totalsLabel = LibraryListContent.listSubtitle(count: displays.count, totalSeconds: totalSeconds) ?? ""
         totalsHelp = totalBytes > 0 ? String(localized: "Total size: \(AppFormat.byteSize(totalBytes))") : nil
@@ -348,12 +364,6 @@ struct LibraryListView: View {
             .accessibilityIdentifier("alert.rename.confirm")
         }
         .axBranch("Library")
-    }
-
-    /// Groups are content, not new lists: the `List` itself stays one view across category switches.
-    private var rowGroups: [LibraryDateGroups.Group] {
-        guard searchResults == nil else { return LibraryDateGroups.ungrouped(entries, id: "results") }
-        return LibraryDateGroups.groups(for: entries, sortOrder: model.librarySortOrder)
     }
 
     @ViewBuilder

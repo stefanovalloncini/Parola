@@ -89,6 +89,48 @@ struct LibraryListContentTests {
         #expect(rows(model.libraryEntries).map(\.id) == ["b", "c", "a"])
     }
 
+    /// The list holds these in state; `body` only reads them, so a row click no longer regroups the library.
+    @Test("the groups the list holds follow its entries and its sort order")
+    func groupsFollowTheSortOrder() {
+        let displays = [
+            entry(id: "a", title: "Alpha", offset: 0),
+            entry(id: "b", title: "Beta", offset: -90_000),
+        ].map { LibraryRowDisplay(entry: $0) }
+
+        let byDay = LibraryListContent.groups(for: displays, sortOrder: .newest, isSearchResult: false)
+        #expect(byDay.map { $0.rows.map(\.id) } == [["a"], ["b"]])
+        #expect(byDay.map(\.showsTime) == [true, true])
+        #expect(Set(byDay.map(\.id)).count == 2)
+
+        let byTitle = LibraryListContent.groups(for: displays, sortOrder: .titleAZ, isSearchResult: false)
+        #expect(byTitle.map(\.id) == ["all"])
+        #expect(byTitle.first?.title == nil)
+
+        let results = LibraryListContent.groups(for: displays, sortOrder: .newest, isSearchResult: true)
+        #expect(results.map(\.id) == ["results"])
+        #expect(results.first?.rows.map(\.id) == ["a", "b"])
+
+        #expect(LibraryListContent.groups(for: [], sortOrder: .newest, isSearchResult: false).isEmpty)
+    }
+
+    /// The list recomputes on `libraryVersion`; that is how the sort menu reaches it without an `onChange` of its own.
+    @Test("picking a sort order ticks the library version the list watches")
+    func sortOrderTicksTheLibraryVersion() async {
+        let model = await makeModel()
+        model.libraryEntries = [
+            entry(id: "a", title: "Banana", offset: 100),
+            entry(id: "b", title: "apple", offset: 300),
+        ]
+
+        let before = model.libraryVersion
+        model.librarySortOrder = .titleAZ
+        #expect(model.libraryVersion > before)
+
+        let afterTitle = model.libraryVersion
+        model.librarySortOrder = .oldest
+        #expect(model.libraryVersion > afterTitle)
+    }
+
     @Test("pinned entries stay on top without reshuffling the rest")
     func pinnedStayOnTop() async {
         let model = await makeModel()
