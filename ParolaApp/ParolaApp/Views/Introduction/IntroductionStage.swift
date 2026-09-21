@@ -14,11 +14,12 @@ struct IntroductionStage: View {
         return ZStack {
             DS.Palette.canvas
             if reduceMotion {
-                mesh(warm: Self.rest, colors: colors)
+                // Both sines cross their rest position at zero.
+                mesh(points: Self.points(seconds: 0), colors: colors)
             } else {
                 TimelineView(.animation(minimumInterval: 1.0 / 10.0)) { context in
                     mesh(
-                        warm: Self.warmPoint(seconds: context.date.timeIntervalSinceReferenceDate),
+                        points: Self.points(seconds: context.date.timeIntervalSinceReferenceDate),
                         colors: colors
                     )
                 }
@@ -35,7 +36,17 @@ struct IntroductionStage: View {
         )
     }
 
-    private static func colors() -> [Color] {
+    /// The mesh's nine control points, row by row: eight on their own edge or corner, the warm one adrift.
+    nonisolated static func points(seconds: TimeInterval) -> [SIMD2<Float>] {
+        let warm = warmPoint(seconds: seconds)
+        return [
+            [0, 0], [0.5, 0], [1, 0],
+            [0, 0.5], warm, [1, 0.5],
+            [0, 1], [0.5, 1], [1, 1]
+        ]
+    }
+
+    static func colors() -> [Color] {
         let canvas = DS.Palette.canvas
         return [
             canvas, canvas, canvas,
@@ -44,16 +55,7 @@ struct IntroductionStage: View {
         ]
     }
 
-    private func mesh(warm: SIMD2<Float>, colors: [Color]) -> some View {
-        MeshGradient(
-            width: 3,
-            height: 3,
-            points: [
-                [0, 0], [0.5, 0], [1, 0],
-                [0, 0.5], warm, [1, 0.5],
-                [0, 1], [0.5, 1], [1, 1]
-            ],
-            colors: colors
-        )
+    private func mesh(points: [SIMD2<Float>], colors: [Color]) -> some View {
+        MeshGradient(width: 3, height: 3, points: points, colors: colors)
     }
 }
