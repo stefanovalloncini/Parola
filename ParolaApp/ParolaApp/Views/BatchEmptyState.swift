@@ -6,7 +6,7 @@ struct BatchEmptyState: View {
     var body: some View {
         EmptyStateView(
             systemImage: "square.stack.3d.up",
-            title: "Batch",
+            title: "No Batch Jobs Yet",
             message: "Transcribe and export multiple files at once. Add files or drag them onto the app."
         ) {
             Button {

@@ -5958,6 +5958,17 @@
         }
       }
     },
+    "No Batch Jobs Yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessun lavoro batch"
+          }
+        }
+      }
+    },
     "No Dictations Yet": {
       "extractionState": "manual",
       "localizations": {
