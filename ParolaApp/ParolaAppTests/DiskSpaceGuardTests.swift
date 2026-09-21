@@ -93,21 +93,22 @@ extension TranscriberMockSuites {
 
         @Test("startRecording below 1 GB warns but still records")
         func startWarnsButRecords() async throws {
-            let fixture = try makeSilentWAV()
-            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
-            defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+            try await withMocksCleared(.audioSource) {
+                let fixture = try makeSilentWAV()
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
-            let model = makeModel()
-            model.useStreaming = false
-            model.recordingCountInSeconds = 0
-            model.freeDiskSpaceProvider = { 500_000_000 }
+                let model = makeModel()
+                model.useStreaming = false
+                model.recordingCountInSeconds = 0
+                model.freeDiskSpaceProvider = { 500_000_000 }
 
-            model.startRecording(source: .microphone)
+                model.startRecording(source: .microphone)
 
-            #expect(model.recordingDiskSpaceLow)
-            let started = await waitUntil { self.isRecording(model) }
-            #expect(started)
-            model.cancelCurrentWork()
+                #expect(model.recordingDiskSpaceLow)
+                let started = await waitUntil { self.isRecording(model) }
+                #expect(started)
+                model.cancelCurrentWork()
+            }
         }
 
         @Test("startRecording with plenty of space clears a stale warning")
@@ -150,36 +151,32 @@ extension TranscriberMockSuites {
 
         @Test("crossing below 200 MB stops the recording gracefully")
         func refuseMidRecordingStops() async throws {
-            let fixture = try makeSilentWAV()
-            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
-            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                failure: MockTranscriberFailure(code: .transcriptionFailed, message: "disk guard fired")
-            ))
-            defer {
-                Task {
-                    await MockAudioSourceRegistry.shared.clear()
-                    await MockTranscriberRegistry.shared.clear()
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let fixture = try makeSilentWAV()
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "disk guard fired")
+                ))
+
+                let model = makeModel()
+                model.useStreaming = false
+                model.recordingCountInSeconds = 0
+                model.freeDiskSpaceProvider = { 50_000_000_000 }
+
+                model.startRecording(source: .microphone)
+                let started = await waitUntil { self.isRecording(model) }
+                #expect(started)
+
+                model.freeDiskSpaceProvider = { 100_000_000 }
+                model.checkRecordingDiskSpace()
+
+                let stopped = await waitUntil {
+                    if case .failed = model.phase { return true }
+                    return false
                 }
+                #expect(stopped)
+                #expect(!isRecording(model))
             }
-
-            let model = makeModel()
-            model.useStreaming = false
-            model.recordingCountInSeconds = 0
-            model.freeDiskSpaceProvider = { 50_000_000_000 }
-
-            model.startRecording(source: .microphone)
-            let started = await waitUntil { self.isRecording(model) }
-            #expect(started)
-
-            model.freeDiskSpaceProvider = { 100_000_000 }
-            model.checkRecordingDiskSpace()
-
-            let stopped = await waitUntil {
-                if case .failed = model.phase { return true }
-                return false
-            }
-            #expect(stopped)
-            #expect(!isRecording(model))
         }
 
         @Test("the recording watch runs the disk check on the clock cadence")

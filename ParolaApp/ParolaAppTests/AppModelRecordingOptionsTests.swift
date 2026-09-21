@@ -115,51 +115,54 @@ struct RecordingMediaSessionConfigTests {
 struct RecordingCountInTests {
     @Test("a positive count-in shows the countdown and defers capture")
     func positiveCountInDefersCapture() async throws {
-        let fixture = try makeSilentWAV()
-        await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
-        defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+        try await withMocksCleared(.audioSource) {
+            let fixture = try makeSilentWAV()
+            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
-        let model = makeRecordingModel()
-        model.useStreaming = false
-        model.recordingCountInSeconds = 3
+            let model = makeRecordingModel()
+            model.useStreaming = false
+            model.recordingCountInSeconds = 3
 
-        model.startRecording(source: .microphone)
-        #expect(model.recordingCountdown == 3)
+            model.startRecording(source: .microphone)
+            #expect(model.recordingCountdown == 3)
 
-        model.cancelRecordingCountdown()
-        #expect(model.recordingCountdown == nil)
+            model.cancelRecordingCountdown()
+            #expect(model.recordingCountdown == nil)
+        }
     }
 
     @Test("a zero count-in shows no countdown")
     func zeroCountInNoCountdown() async throws {
-        let fixture = try makeSilentWAV()
-        await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
-        defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+        try await withMocksCleared(.audioSource) {
+            let fixture = try makeSilentWAV()
+            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
-        let model = makeRecordingModel()
-        model.useStreaming = false
-        model.recordingCountInSeconds = 0
+            let model = makeRecordingModel()
+            model.useStreaming = false
+            model.recordingCountInSeconds = 0
 
-        model.startRecording(source: .microphone)
-        #expect(model.recordingCountdown == nil)
+            model.startRecording(source: .microphone)
+            #expect(model.recordingCountdown == nil)
 
-        model.cancelCurrentWork()
+            model.cancelCurrentWork()
+        }
     }
 
     @Test("a negative count-in is clamped to zero")
     func negativeCountInClamped() async throws {
-        let fixture = try makeSilentWAV()
-        await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
-        defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+        try await withMocksCleared(.audioSource) {
+            let fixture = try makeSilentWAV()
+            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
-        let model = makeRecordingModel()
-        model.useStreaming = false
-        model.recordingCountInSeconds = -5
+            let model = makeRecordingModel()
+            model.useStreaming = false
+            model.recordingCountInSeconds = -5
 
-        model.startRecording(source: .microphone)
-        #expect(model.recordingCountdown == nil)
+            model.startRecording(source: .microphone)
+            #expect(model.recordingCountdown == nil)
 
-        model.cancelCurrentWork()
+            model.cancelCurrentWork()
+        }
     }
 }
 
@@ -184,56 +187,53 @@ extension TranscriberMockSuites {
 
         @Test("a positive max-minutes auto-stops the recording on its own")
         func autoStopFires() async throws {
-            let fixture = try makeSilentWAV()
-            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
-            // A failing mock routes the auto-stop's stop→transcribe into the catch (.failed) so the
-            // run never persists to the library (CoreSpotlight indexing hangs the xctest host).
-            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                failure: MockTranscriberFailure(code: .transcriptionFailed, message: "auto-stop fired")
-            ))
-            defer {
-                Task {
-                    await MockAudioSourceRegistry.shared.clear()
-                    await MockTranscriberRegistry.shared.clear()
+            try await withMocksCleared([.audioSource, .transcriber]) {
+                let fixture = try makeSilentWAV()
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+                // A failing mock routes the auto-stop's stop→transcribe into the catch (.failed) so the
+                // run never persists to the library (CoreSpotlight indexing hangs the xctest host).
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "auto-stop fired")
+                ))
+
+                let model = makeRecordingModel(clock: ImmediateClock())
+                model.useStreaming = false
+                model.selectedModel = "openai_whisper-tiny"
+                model.recordingCountInSeconds = 0
+                model.recordingMaxMinutes = 1
+
+                model.startRecording(source: .microphone)
+
+                let stopped = await waitUntil {
+                    if case .failed = model.phase { return true }
+                    return false
                 }
+                #expect(stopped)
+                #expect(!isRecording(model))
             }
-
-            let model = makeRecordingModel(clock: ImmediateClock())
-            model.useStreaming = false
-            model.selectedModel = "openai_whisper-tiny"
-            model.recordingCountInSeconds = 0
-            model.recordingMaxMinutes = 1
-
-            model.startRecording(source: .microphone)
-
-            let stopped = await waitUntil {
-                if case .failed = model.phase { return true }
-                return false
-            }
-            #expect(stopped)
-            #expect(!isRecording(model))
         }
 
         @Test("a zero max-minutes leaves the recording running")
         func zeroMaxMinutesNeverStops() async throws {
-            let fixture = try makeSilentWAV()
-            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
-            defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+            try await withMocksCleared(.audioSource) {
+                let fixture = try makeSilentWAV()
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
-            let model = makeRecordingModel(clock: ImmediateClock())
-            model.useStreaming = false
-            model.recordingCountInSeconds = 0
-            model.recordingMaxMinutes = 0
+                let model = makeRecordingModel(clock: ImmediateClock())
+                model.useStreaming = false
+                model.recordingCountInSeconds = 0
+                model.recordingMaxMinutes = 0
 
-            model.startRecording(source: .microphone)
+                model.startRecording(source: .microphone)
 
-            let started = await waitUntil { self.isRecording(model) }
-            #expect(started)
+                let started = await waitUntil { self.isRecording(model) }
+                #expect(started)
 
-            try? await Task.sleep(for: .milliseconds(300))
-            #expect(isRecording(model))
+                try? await Task.sleep(for: .milliseconds(300))
+                #expect(isRecording(model))
 
-            model.cancelCurrentWork()
+                model.cancelCurrentWork()
+            }
         }
     }
 }
@@ -259,70 +259,76 @@ extension TranscriberMockSuites {
 
         @Test("a stop that lands while the capture is still starting discards the take")
         func stopDuringStartupWins() async throws {
-            let fixture = try makeSilentWAV()
-            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
-            defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+            try await withMocksCleared(.audioSource) {
+                let fixture = try makeSilentWAV()
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
-            let model = makeRecordingModel()
-            model.useStreaming = false
-            model.selectedModel = "openai_whisper-tiny"
-            model.recordingCountInSeconds = 0
+                let model = makeRecordingModel()
+                model.useStreaming = false
+                model.selectedModel = "openai_whisper-tiny"
+                model.recordingCountInSeconds = 0
 
-            model.startRecording(source: .microphone)
-            #expect(model.recordingActive)
-            #expect(model.liveSource == nil, "the capture has not landed yet")
+                model.startRecording(source: .microphone)
+                #expect(model.recordingActive)
+                #expect(model.liveSource == nil, "the capture has not landed yet")
 
-            model.stopRecordingAndTranscribe()
+                model.stopRecordingAndTranscribe()
 
-            let settled = await waitUntil { !model.recordingActive }
-            #expect(settled, "the stop must not be swallowed by the startup window")
-            #expect(model.liveSource == nil)
-            #expect(model.phase == .idle)
-            #expect(model.transcript == nil)
+                let settled = await waitUntil { !model.recordingActive }
+                #expect(settled, "the stop must not be swallowed by the startup window")
+                #expect(model.liveSource == nil)
+                #expect(model.phase == .idle)
+                #expect(model.transcript == nil)
+            }
         }
 
         @Test("a stop during startup leaves the next recording free to start")
         func stopDuringStartupDoesNotLatch() async throws {
-            let fixture = try makeSilentWAV()
-            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
-            defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+            try await withMocksCleared(.audioSource) {
+                let fixture = try makeSilentWAV()
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
-            let model = makeRecordingModel()
-            model.useStreaming = false
-            model.selectedModel = "openai_whisper-tiny"
-            model.recordingCountInSeconds = 0
+                let model = makeRecordingModel()
+                model.useStreaming = false
+                model.selectedModel = "openai_whisper-tiny"
+                model.recordingCountInSeconds = 0
 
-            model.startRecording(source: .microphone)
-            model.stopRecordingAndTranscribe()
-            let settled = await waitUntil { !model.recordingActive }
-            #expect(settled)
-            #expect(model.liveSource == nil)
+                model.startRecording(source: .microphone)
+                model.stopRecordingAndTranscribe()
+                let settled = await waitUntil { !model.recordingActive }
+                #expect(settled)
+                #expect(model.liveSource == nil)
 
-            model.startRecording(source: .microphone)
-            let restarted = await waitUntil { self.isRecording(model) && model.liveSource != nil }
-            #expect(restarted, "the discarded take must not latch the recording state")
+                model.startRecording(source: .microphone)
+                let restarted = await waitUntil { self.isRecording(model) && model.liveSource != nil }
+                #expect(restarted, "the discarded take must not latch the recording state")
 
-            model.cancelCurrentWork()
+                model.cancelCurrentWork()
+            }
         }
 
         @Test("a stop held for startup resolves its waiter as cancelled", .timeLimit(.minutes(1)))
         func stopHeldForStartupResolvesWaiter() async throws {
-            let fixture = try makeSilentWAV()
-            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+            try await withMocksCleared(.audioSource) {
+                let fixture = try makeSilentWAV()
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
-            let model = makeRecordingModel()
-            model.useStreaming = false
-            model.selectedModel = "openai_whisper-tiny"
-            model.recordingCountInSeconds = 0
+                let model = makeRecordingModel()
+                model.useStreaming = false
+                model.selectedModel = "openai_whisper-tiny"
+                model.recordingCountInSeconds = 0
 
-            model.startRecording(source: .microphone)
-            model.stopRecordingAndTranscribe()
-            #expect(model.stopHeldForStartup, "a stop intent has to wait for the take instead of reporting nothing recording")
+                model.startRecording(source: .microphone)
+                model.stopRecordingAndTranscribe()
+                #expect(
+                    model.stopHeldForStartup,
+                    "a stop intent has to wait for the take instead of reporting nothing recording"
+                )
 
-            await #expect(throws: IntentActionError.cancelled) {
-                _ = try await model.awaitRecordingOutcome()
+                await #expect(throws: IntentActionError.cancelled) {
+                    _ = try await model.awaitRecordingOutcome()
+                }
             }
-            await MockAudioSourceRegistry.shared.clear()
         }
 
         @Test("a stop during startup also discards a streaming take")

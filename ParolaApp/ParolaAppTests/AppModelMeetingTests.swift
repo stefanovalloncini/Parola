@@ -49,79 +49,83 @@ struct AppModelMeetingTests {
     }
 
     @Test("starting a meeting recording tags it as a Meeting and clears the prompt")
-    func startMeetingRecordingSelectsMeetingCategory() async {
-        let fixture = try? makeSilentMeetingWAV()
-        guard let fixture else { Issue.record("could not write fixture"); return }
-        defer { try? FileManager.default.removeItem(at: fixture) }
-        await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
-        defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+    func startMeetingRecordingSelectsMeetingCategory() async throws {
+        try await withMocksCleared(.audioSource) {
+            let fixture = try? makeSilentMeetingWAV()
+            guard let fixture else { Issue.record("could not write fixture"); return }
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
 
-        let model = makeModel()
-        model.meetingDetectedApp = "Zoom"
+            let model = makeModel()
+            model.meetingDetectedApp = "Zoom"
 
-        model.startMeetingRecording()
+            model.startMeetingRecording()
 
-        #expect(model.pendingRecordingCategory == .meeting)
-        #expect(model.meetingDetectedApp == nil)
+            #expect(model.pendingRecordingCategory == .meeting)
+            #expect(model.meetingDetectedApp == nil)
 
-        model.cancelCurrentWork()
-        #expect(model.pendingRecordingCategory == .transcription)
+            model.cancelCurrentWork()
+            #expect(model.pendingRecordingCategory == .transcription)
+        }
     }
 
     @Test("app-only capture stashes the detected vendor's bundle IDs")
-    func appOnlyCaptureStashesBundleIDs() async {
-        let fixture = try? makeSilentMeetingWAV()
-        guard let fixture else { Issue.record("could not write fixture"); return }
-        defer { try? FileManager.default.removeItem(at: fixture) }
-        await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
-        defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+    func appOnlyCaptureStashesBundleIDs() async throws {
+        try await withMocksCleared(.audioSource) {
+            let fixture = try? makeSilentMeetingWAV()
+            guard let fixture else { Issue.record("could not write fixture"); return }
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
 
-        let model = makeModel()
-        model.meetingCaptureAppOnly = true
-        model.meetingDetectedApp = "Microsoft Teams"
+            let model = makeModel()
+            model.meetingCaptureAppOnly = true
+            model.meetingDetectedApp = "Microsoft Teams"
 
-        model.startMeetingRecording()
+            model.startMeetingRecording()
 
-        #expect(model.pendingCaptureBundleIDs == ["com.microsoft.teams", "com.microsoft.teams2"])
-        model.cancelCurrentWork()
+            #expect(model.pendingCaptureBundleIDs == ["com.microsoft.teams", "com.microsoft.teams2"])
+            model.cancelCurrentWork()
+        }
     }
 
     @Test("full-mix capture leaves no bundle ID stash")
-    func fullMixCaptureLeavesNoStash() async {
-        let fixture = try? makeSilentMeetingWAV()
-        guard let fixture else { Issue.record("could not write fixture"); return }
-        defer { try? FileManager.default.removeItem(at: fixture) }
-        await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
-        defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+    func fullMixCaptureLeavesNoStash() async throws {
+        try await withMocksCleared(.audioSource) {
+            let fixture = try? makeSilentMeetingWAV()
+            guard let fixture else { Issue.record("could not write fixture"); return }
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
 
-        let model = makeModel()
-        model.meetingCaptureAppOnly = false
-        model.meetingDetectedApp = "Zoom"
+            let model = makeModel()
+            model.meetingCaptureAppOnly = false
+            model.meetingDetectedApp = "Zoom"
 
-        model.startMeetingRecording()
+            model.startMeetingRecording()
 
-        #expect(model.pendingCaptureBundleIDs == nil)
-        model.cancelCurrentWork()
+            #expect(model.pendingCaptureBundleIDs == nil)
+            model.cancelCurrentWork()
+        }
     }
 
     @Test("the app-name overload tags the category and clears the prompt for a different app")
-    func startMeetingRecordingWithAppNameSelectsCategoryAndBundleIDs() async {
-        let fixture = try? makeSilentMeetingWAV()
-        guard let fixture else { Issue.record("could not write fixture"); return }
-        defer { try? FileManager.default.removeItem(at: fixture) }
-        await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
-        defer { Task { await MockAudioSourceRegistry.shared.clear() } }
+    func startMeetingRecordingWithAppNameSelectsCategoryAndBundleIDs() async throws {
+        try await withMocksCleared(.audioSource) {
+            let fixture = try? makeSilentMeetingWAV()
+            guard let fixture else { Issue.record("could not write fixture"); return }
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
 
-        let model = makeModel()
-        model.meetingCaptureAppOnly = true
-        model.meetingDetectedApp = "Zoom"
+            let model = makeModel()
+            model.meetingCaptureAppOnly = true
+            model.meetingDetectedApp = "Zoom"
 
-        model.startMeetingRecording(appName: "Microsoft Teams")
+            model.startMeetingRecording(appName: "Microsoft Teams")
 
-        #expect(model.pendingRecordingCategory == .meeting)
-        #expect(model.meetingDetectedApp == nil)
-        #expect(model.pendingCaptureBundleIDs == ["com.microsoft.teams", "com.microsoft.teams2"])
-        model.cancelCurrentWork()
+            #expect(model.pendingRecordingCategory == .meeting)
+            #expect(model.meetingDetectedApp == nil)
+            #expect(model.pendingCaptureBundleIDs == ["com.microsoft.teams", "com.microsoft.teams2"])
+            model.cancelCurrentWork()
+        }
     }
 
     @Test("vendor display names map back to every known bundle ID")
