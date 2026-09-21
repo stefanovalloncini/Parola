@@ -110,58 +110,60 @@ struct RecordingMediaSessionConfigTests {
     }
 }
 
-@MainActor
-@Suite("Recording count-in", .serialized)
-struct RecordingCountInTests {
-    @Test("a positive count-in shows the countdown and defers capture")
-    func positiveCountInDefersCapture() async throws {
-        let fixture = try makeSilentWAV()
-        try await withMocksCleared(.audioSource) {
-            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+extension TranscriberMockSuites {
+    @MainActor
+    @Suite("Recording count-in", .serialized)
+    struct RecordingCountInTests {
+        @Test("a positive count-in shows the countdown and defers capture")
+        func positiveCountInDefersCapture() async throws {
+            let fixture = try makeSilentWAV()
+            try await withMocksCleared(.audioSource) {
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
-            let model = makeRecordingModel()
-            model.useStreaming = false
-            model.recordingCountInSeconds = 3
+                let model = makeRecordingModel()
+                model.useStreaming = false
+                model.recordingCountInSeconds = 3
 
-            model.startRecording(source: .microphone)
-            #expect(model.recordingCountdown == 3)
+                model.startRecording(source: .microphone)
+                #expect(model.recordingCountdown == 3)
 
-            model.cancelRecordingCountdown()
-            #expect(model.recordingCountdown == nil)
+                model.cancelRecordingCountdown()
+                #expect(model.recordingCountdown == nil)
+            }
         }
-    }
 
-    @Test("a zero count-in shows no countdown")
-    func zeroCountInNoCountdown() async throws {
-        let fixture = try makeSilentWAV()
-        try await withMocksCleared(.audioSource) {
-            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+        @Test("a zero count-in shows no countdown")
+        func zeroCountInNoCountdown() async throws {
+            let fixture = try makeSilentWAV()
+            try await withMocksCleared(.audioSource) {
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
-            let model = makeRecordingModel()
-            model.useStreaming = false
-            model.recordingCountInSeconds = 0
+                let model = makeRecordingModel()
+                model.useStreaming = false
+                model.recordingCountInSeconds = 0
 
-            model.startRecording(source: .microphone)
-            #expect(model.recordingCountdown == nil)
+                model.startRecording(source: .microphone)
+                #expect(model.recordingCountdown == nil)
 
-            model.cancelCurrentWork()
+                model.cancelCurrentWork()
+            }
         }
-    }
 
-    @Test("a negative count-in is clamped to zero")
-    func negativeCountInClamped() async throws {
-        let fixture = try makeSilentWAV()
-        try await withMocksCleared(.audioSource) {
-            await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
+        @Test("a negative count-in is clamped to zero")
+        func negativeCountInClamped() async throws {
+            let fixture = try makeSilentWAV()
+            try await withMocksCleared(.audioSource) {
+                await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
-            let model = makeRecordingModel()
-            model.useStreaming = false
-            model.recordingCountInSeconds = -5
+                let model = makeRecordingModel()
+                model.useStreaming = false
+                model.recordingCountInSeconds = -5
 
-            model.startRecording(source: .microphone)
-            #expect(model.recordingCountdown == nil)
+                model.startRecording(source: .microphone)
+                #expect(model.recordingCountdown == nil)
 
-            model.cancelCurrentWork()
+                model.cancelCurrentWork()
+            }
         }
     }
 }
