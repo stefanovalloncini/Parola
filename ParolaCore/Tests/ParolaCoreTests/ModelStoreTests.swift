@@ -47,6 +47,19 @@ struct ModelStoreTests {
         #expect(tiny?.installedURL?.path == installedURL.path)
     }
 
+    @Test("catalog reports isMultilingual by language scope, not by whether one is set")
+    func catalogIsMultilingualByScope() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-test-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let store = ModelStore(modelsDirectory: tmp)
+        let entries = store.catalog()
+        #expect(entries.first { $0.name == "nvidia_parakeet-tdt-0.6b-v3" }?.isMultilingual == true)
+        #expect(entries.first { $0.name == "nvidia_parakeet-tdt-0.6b-v2" }?.isMultilingual == false)
+    }
+
     @Test("a partial download (leftover sidecar) is reported not-installed by catalog, isInstalled, and installedModels")
     func partialDownloadNotReportedInstalled() async throws {
         let tmp = FileManager.default.temporaryDirectory

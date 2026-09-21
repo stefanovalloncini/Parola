@@ -432,7 +432,7 @@ public final class ModelStore: Sendable {
             name: variant.id,
             label: variant.displayName,
             approximateSizeBytes: Int(variant.sizeBytes),
-            isMultilingual: variant.languageScope == nil,
+            isMultilingual: variant.languageScope.map { !$0.isEnglishOnly } ?? true,
             isInstalled: isInstalled,
             installedURL: url
         )
