@@ -246,28 +246,21 @@ struct MacRecentlyDeletedView: View {
 
     private func loadPreview(for entry: LibraryEntry) async {
         if previews[entry.id] != nil { return }
-        previews[entry.id] = Self.preview(of: await readTranscriptText(at: entry.bundleURL))
+        previews[entry.id] = RecentlyDeletedPreviews.preview(of: await readTranscriptText(at: entry.bundleURL))
     }
 
     /// Only the rows a filter keeps carry a preview task, so a search has to decode the rows it would otherwise never reach.
     private func loadPreviewsForSearch() async {
         guard !searchText.isEmpty else { return }
-        let pending = model.deletedEntries.filter { previews[$0.id] == nil }
-        guard !pending.isEmpty else { return }
-        var decoded: [LibraryEntry.ID: String] = [:]
-        for entry in pending {
-            guard !Task.isCancelled else { return }
-            decoded[entry.id] = Self.preview(of: await readTranscriptText(at: entry.bundleURL))
+        let pending = model.deletedEntries.filter {
+            previews[$0.id] == nil && categoryFilter.matches($0.category)
         }
-        guard !Task.isCancelled else { return }
-        previews.merge(decoded) { loaded, _ in loaded }
-    }
-
-    private static func preview(of text: String) -> String {
-        let trimmed = text
-            .replacingOccurrences(of: "\n", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "" : String(trimmed.prefix(280))
+        guard !pending.isEmpty else { return }
+        await RecentlyDeletedPreviews.decode(pending) { entry in
+            await readTranscriptText(at: entry.bundleURL)
+        } publish: { decoded in
+            previews.merge(decoded) { loaded, _ in loaded }
+        }
     }
 
     private func recomputeRows() {

@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import Parola
+import ParolaCore
 
 @Suite("Recently Deleted count copy")
 struct RecentlyDeletedCopyTests {
@@ -244,5 +245,55 @@ struct RecentlyDeletedSearchTests {
     @Test("an empty query keeps every row")
     func emptyQueryKeepsEverything() {
         #expect(RecentlyDeletedCopy.matches(query: "", title: "Board meeting", preview: nil))
+    }
+}
+
+@MainActor
+@Suite("Recently Deleted preview pass")
+struct RecentlyDeletedPreviewPassTests {
+    private func entry(_ id: String) -> LibraryEntry {
+        LibraryEntry(
+            id: id,
+            bundleURL: URL(fileURLWithPath: "/tmp/RecentlyDeletedPreviewPassTests/\(id).parola"),
+            manifest: ParolaDocument.Manifest(
+                originalAudioName: "\(id).m4a", modelName: "stub", language: "en"
+            )
+        )
+    }
+
+    @Test("a long pass hands its previews over as it goes, not when the last bundle is read")
+    func passPublishesAsItDecodes() async {
+        let entries = (0..<7).map { entry("e\($0)") }
+        var published: [[LibraryEntry.ID: String]] = []
+
+        await RecentlyDeletedPreviews.decode(entries, batchSize: 3) { entry in
+            "the transcript of \(entry.id)"
+        } publish: { batch in
+            published.append(batch)
+        }
+
+        #expect(published.count == 3)
+        #expect(published.dropLast().allSatisfy { $0.count == 3 })
+        #expect(Set(published.flatMap(\.keys)) == Set(entries.map(\.id)))
+        #expect(published.first?["e0"] == "the transcript of e0")
+    }
+
+    @Test("a pass short of a batch still hands over what it read")
+    func shortPassPublishesOnce() async {
+        var published: [[LibraryEntry.ID: String]] = []
+
+        await RecentlyDeletedPreviews.decode([entry("only")], batchSize: 25) { _ in "text" } publish: {
+            published.append($0)
+        }
+
+        #expect(published.count == 1)
+        #expect(published.first?["only"] == "text")
+    }
+
+    @Test("a preview collapses its line breaks and stops at the cap")
+    func previewIsTrimmedAndCapped() {
+        #expect(RecentlyDeletedPreviews.preview(of: "  first line\nsecond line  ") == "first line second line")
+        #expect(RecentlyDeletedPreviews.preview(of: "   ").isEmpty)
+        #expect(RecentlyDeletedPreviews.preview(of: String(repeating: "a", count: 400)).count == 280)
     }
 }
