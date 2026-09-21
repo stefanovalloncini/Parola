@@ -45,6 +45,7 @@ struct FeaturesScene: View {
             Text("What it does.")
                 .font(DS.Font.hero)
                 .foregroundStyle(DS.Color.primaryText)
+                .sceneEntrance(order: 0)
             VStack(alignment: .leading, spacing: DS.Spacing.medium) {
                 ForEach(Array(Self.rows(features: model.features).enumerated()), id: \.element.id) { index, item in
                     FeatureRow(item: item)
