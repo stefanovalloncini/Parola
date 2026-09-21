@@ -34,10 +34,27 @@ struct ChatPane: View {
     @State private var searchQuery: String = ""
     @State private var senderFilter: ChatSenderFilter = .all
     @State private var sendTask: Task<Void, Never>?
+    @State private var userPrompts: [Prompt] = []
     @FocusState private var composerFocused: Bool
     @FocusState private var searchFocused: Bool
 
     var body: some View {
+        HStack(spacing: 0) {
+            mainColumn
+            Divider()
+            presetsColumn
+                .frame(width: 240)
+        }
+        .background(DS.Color.surface)
+        .task(id: sessionKey) { await rebuildSession() }
+        .task { userPrompts = await model.promptLibrary.userPrompts }
+        .onAppear { isSearching = isSearchingPersisted }
+        .onChange(of: isSearching) { _, value in isSearchingPersisted = value }
+        .focusedSceneValue(\.focusChatComposer, FocusChatComposerAction { composerFocused = true })
+        .axBranch("Chat")
+    }
+
+    private var mainColumn: some View {
         VStack(spacing: 0) {
             header
             Divider().opacity(0.4)
@@ -47,12 +64,59 @@ struct ChatPane: View {
             }
             content
         }
-        .background(DS.Color.surface)
-        .task(id: sessionKey) { await rebuildSession() }
-        .onAppear { isSearching = isSearchingPersisted }
-        .onChange(of: isSearching) { _, value in isSearchingPersisted = value }
-        .focusedSceneValue(\.focusChatComposer, FocusChatComposerAction { composerFocused = true })
-        .axBranch("Chat")
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var presetsColumn: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: DS.Spacing.regular) {
+                Text("Prompts")
+                    .font(DS.Font.heading)
+                VStack(alignment: .leading, spacing: DS.Spacing.tight) {
+                    ForEach(Self.presets(userPrompts: userPrompts)) { prompt in
+                        Button(prompt.name) { sendPreset(prompt.instructions) }
+                            .buttonStyle(.plain)
+                            .disabled(presetsDisabled)
+                            .accessibilityIdentifier("chat.preset.\(Self.identifierSlug(prompt.name))")
+                            .axLeaf("Chat.Button.Preset.\(Self.identifierSlug(prompt.name))")
+                    }
+                }
+                Divider().opacity(0.4)
+                Button("Manage prompts") { model.openSettings(route: .prompts) }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(DS.Color.accent)
+                    .accessibilityIdentifier("chat.manage_prompts")
+                    .axLeaf("Chat.Button.ManagePrompts")
+            }
+            .padding(DS.Spacing.regular)
+        }
+    }
+
+    private var presetsDisabled: Bool {
+        session == nil || isSending
+    }
+
+    private func sendPreset(_ instructions: String) {
+        guard !presetsDisabled else { return }
+        input = instructions
+        send()
+    }
+
+    static let excludedBuiltInIDs: Set<UUID> = [
+        UUID(uuidString: "00000000-0000-0000-0000-000000000009")!, // Note
+        UUID(uuidString: "00000000-0000-0000-0000-00000000000A")!, // Code comment
+        UUID(uuidString: "00000000-0000-0000-0000-00000000000B")!, // Assistant
+    ]
+
+    static func presets(builtIns: [Prompt] = Prompt.builtIns, userPrompts: [Prompt]) -> [Prompt] {
+        builtIns.filter { !excludedBuiltInIDs.contains($0.id) } + userPrompts
+    }
+
+    private static func identifierSlug(_ name: String) -> String {
+        name
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "_")
+            .filter { $0.isLetter || $0.isNumber || $0 == "_" }
     }
 
     private var header: some View {

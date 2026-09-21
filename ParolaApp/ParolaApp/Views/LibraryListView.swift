@@ -572,15 +572,9 @@ struct LibraryListView: View {
         case .recordMicrophone: model.startRecording(source: .microphone)
         case .recordSystemAudio: model.startRecording(source: .systemAudio)
         case .startDictation: model.startDictationFromIntent()
-        case .meetingSettings: openSettings(.recordMeetings)
-        case .dictationSettings: openSettings(.dictation)
+        case .meetingSettings: model.openSettings(route: .recordMeetings)
+        case .dictationSettings: model.openSettings(route: .dictation)
         }
-    }
-
-    /// A `SettingsLink` carries no action, and the pane has to be picked before the window opens.
-    private func openSettings(_ pane: SettingsRoute) {
-        model.settingsPane = pane.rawValue
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 
     private var searchQueryText: String {

@@ -135,6 +135,62 @@ public extension Prompt {
             triggerWords: ["assistant", "hey assistant"],
             useSystemInstructions: false
         ),
+        Prompt(
+            id: UUID(uuidString: "00000000-0000-0000-0000-00000000000C")!,
+            name: "Split into paragraphs",
+            instructions: "Break the text below into paragraphs by topic, without changing any words.",
+            isBuiltIn: true,
+            version: 1
+        ),
+        Prompt(
+            id: UUID(uuidString: "00000000-0000-0000-0000-00000000000D")!,
+            name: "Highlight key points",
+            instructions: "List the key points from the text below, one per line, in the order they appear.",
+            isBuiltIn: true,
+            version: 1
+        ),
+        Prompt(
+            id: UUID(uuidString: "00000000-0000-0000-0000-00000000000E")!,
+            name: "Extract questions",
+            instructions: "List every question asked in the text below, one per line, in the order they were asked.",
+            isBuiltIn: true,
+            version: 1
+        ),
+        Prompt(
+            id: UUID(uuidString: "00000000-0000-0000-0000-00000000000F")!,
+            name: "Identify emotions",
+            instructions: "Describe the emotional tone of the text below, naming who expressed what and where it shifts.",
+            isBuiltIn: true,
+            version: 1
+        ),
+        Prompt(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000010")!,
+            name: "Generate FAQ",
+            instructions: "Write a short FAQ covering the questions a reader of the text below would likely have, with concise answers drawn only from the text.",
+            isBuiltIn: true,
+            version: 1
+        ),
+        Prompt(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000011")!,
+            name: "Extract statistics",
+            instructions: "List every number, measurement, date, and statistic mentioned in the text below, one per line, with enough context to understand each one.",
+            isBuiltIn: true,
+            version: 1
+        ),
+        Prompt(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000012")!,
+            name: "Paraphrase",
+            instructions: "Rewrite the text below in different words, keeping the same meaning and level of detail.",
+            isBuiltIn: true,
+            version: 1
+        ),
+        Prompt(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000013")!,
+            name: "Create a mind map",
+            instructions: "Turn the text below into a Markdown outline, with the central topic as the top heading and supporting ideas nested underneath.",
+            isBuiltIn: true,
+            version: 1
+        ),
     ]
 
     static let rewritePresets: [Prompt] = {

@@ -65,6 +65,12 @@ final class AppModel {
     }
     var settingsPane: String = "general"
     var settingsRoutePreview = false  // test-mode only: renders SettingsView in the main window so the bridge can screenshot panes
+
+    /// Opens the settings window on a specific pane — the one place a route is picked before the window opens.
+    func openSettings(route: SettingsRoute) {
+        settingsPane = route.rawValue
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
     // Published by TranscriptPane so the Toggle Inspector command knows which of the two visibility keys to flip.
     var transcriptPaneIsNarrow = false
     var dropDragPayload: DroppedFiles.Kind?

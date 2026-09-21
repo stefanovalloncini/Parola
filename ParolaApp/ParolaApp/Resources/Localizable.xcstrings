@@ -5747,6 +5747,17 @@
         }
       }
     },
+    "Manage prompts": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestisci prompt"
+          }
+        }
+      }
+    },
     "Markdown": {
       "extractionState": "manual",
       "localizations": {
