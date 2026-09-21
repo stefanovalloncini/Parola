@@ -53,229 +53,229 @@ extension TranscriberMockSuites {
 
         @Test("a failed file names the file and retries it with the current settings")
         func retryRunsTheSameFileAgain() async throws {
-            await MockTranscriberRegistry.shared.clear()
-            let wav = try makeWAV()
-            defer {
-                try? FileManager.default.removeItem(at: wav)
-                Task { await MockTranscriberRegistry.shared.clear() }
-            }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.clear()
+                let wav = try makeWAV()
+                defer { try? FileManager.default.removeItem(at: wav) }
 
-            await MockTranscriberRegistry.shared.install(
-                engineID: nil,
-                response: MockTranscriberResponse(
-                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "the model could not read the audio")
+                await MockTranscriberRegistry.shared.install(
+                    engineID: nil,
+                    response: MockTranscriberResponse(
+                        failure: MockTranscriberFailure(
+                            code: .transcriptionFailed,
+                            message: "the model could not read the audio"
+                        )
+                    )
                 )
-            )
 
-            let model = makeModel()
-            model.transcribe(fileURL: wav)
-            let failed = await waitUntil {
-                if case .failed = model.phase { return true }
-                return false
-            }
-            #expect(failed)
-            #expect(model.failedFileURL == wav)
-            #expect(model.failedSourceName == wav.lastPathComponent)
-            #expect(model.canRetryFailedTranscription)
+                let model = makeModel()
+                model.transcribe(fileURL: wav)
+                let failed = await waitUntil {
+                    if case .failed = model.phase { return true }
+                    return false
+                }
+                #expect(failed)
+                #expect(model.failedFileURL == wav)
+                #expect(model.failedSourceName == wav.lastPathComponent)
+                #expect(model.canRetryFailedTranscription)
 
-            await MockTranscriberRegistry.shared.install(
-                engineID: nil,
-                response: MockTranscriberResponse(
-                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the second run's words")]
+                await MockTranscriberRegistry.shared.install(
+                    engineID: nil,
+                    response: MockTranscriberResponse(
+                        segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the second run's words")]
+                    )
                 )
-            )
-            // The session holds the transcriber it already built, mock included.
-            await model.session.unloadModel()
-            model.retryFailedTranscription()
-            let recovered = await waitUntil {
-                model.phase == .ready && model.transcript?.text.contains("second run") == true
+                // The session holds the transcriber it already built, mock included.
+                await model.session.unloadModel()
+                model.retryFailedTranscription()
+                let recovered = await waitUntil {
+                    model.phase == .ready && model.transcript?.text.contains("second run") == true
+                }
+                #expect(recovered)
+                #expect(model.failedFileURL == nil)
+                #expect(!model.canRetryFailedTranscription)
             }
-            #expect(recovered)
-            #expect(model.failedFileURL == nil)
-            #expect(!model.canRetryFailedTranscription)
         }
 
         @Test("a translate-on retry keeps translate on, even if the toggle is off")
         func retryKeepsTheTranslateOverride() async throws {
-            await MockTranscriberRegistry.shared.clear()
-            let wav = try makeWAV()
-            defer {
-                try? FileManager.default.removeItem(at: wav)
-                Task { await MockTranscriberRegistry.shared.clear() }
-            }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.clear()
+                let wav = try makeWAV()
+                defer { try? FileManager.default.removeItem(at: wav) }
 
-            await MockTranscriberRegistry.shared.install(
-                engineID: nil,
-                response: MockTranscriberResponse(
-                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
+                await MockTranscriberRegistry.shared.install(
+                    engineID: nil,
+                    response: MockTranscriberResponse(
+                        failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
+                    )
                 )
-            )
 
-            let model = makeModel()
-            model.translate = false
-            model.transcribe(fileURL: wav, translateOverride: true)
-            let failed = await waitUntil {
-                if case .failed = model.phase { return true }
-                return false
-            }
-            #expect(failed)
-            #expect(model.failedTranslateOverride == true)
+                let model = makeModel()
+                model.translate = false
+                model.transcribe(fileURL: wav, translateOverride: true)
+                let failed = await waitUntil {
+                    if case .failed = model.phase { return true }
+                    return false
+                }
+                #expect(failed)
+                #expect(model.failedTranslateOverride == true)
 
-            model.retryFailedTranscription()
-            let failedAgain = await waitUntil {
-                if case .failed = model.phase { return true }
-                return false
+                model.retryFailedTranscription()
+                let failedAgain = await waitUntil {
+                    if case .failed = model.phase { return true }
+                    return false
+                }
+                #expect(failedAgain)
+                #expect(
+                    model.failedTranslateOverride == true,
+                    "Retry must not fall back to the current translate toggle"
+                )
             }
-            #expect(failedAgain)
-            #expect(model.failedTranslateOverride == true, "Retry must not fall back to the current translate toggle")
         }
 
         @Test("opening an entry forgets the file the last failure named")
         func openingAnEntryForgetsTheFailedFile() async throws {
-            await MockTranscriberRegistry.shared.clear()
-            let wav = try makeWAV()
-            defer {
-                try? FileManager.default.removeItem(at: wav)
-                Task { await MockTranscriberRegistry.shared.clear() }
-            }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.clear()
+                let wav = try makeWAV()
+                defer { try? FileManager.default.removeItem(at: wav) }
 
-            await MockTranscriberRegistry.shared.install(
-                engineID: nil,
-                response: MockTranscriberResponse(
-                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
+                await MockTranscriberRegistry.shared.install(
+                    engineID: nil,
+                    response: MockTranscriberResponse(
+                        failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
+                    )
                 )
-            )
 
-            let model = makeModel()
-            model.transcribe(fileURL: wav)
-            let failed = await waitUntil {
-                if case .failed = model.phase { return true }
-                return false
+                let model = makeModel()
+                model.transcribe(fileURL: wav)
+                let failed = await waitUntil {
+                    if case .failed = model.phase { return true }
+                    return false
+                }
+                #expect(failed)
+                #expect(model.failedSourceName == wav.lastPathComponent)
+
+                let seed = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+                let entry = try await seed.add(
+                    transcript: Transcript(
+                        segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "an older take")],
+                        language: "en",
+                        modelName: "stub"
+                    ),
+                    audioSource: nil,
+                    category: .transcription
+                )
+                model.loadEntry(entry.id)
+                let opened = await waitUntil { model.selectedEntryID == entry.id }
+                #expect(opened)
+                #expect(model.failedFileURL == nil)
+                #expect(model.failedSourceName == nil)
+                #expect(!model.canRetryFailedTranscription)
             }
-            #expect(failed)
-            #expect(model.failedSourceName == wav.lastPathComponent)
-
-            let seed = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
-            let entry = try await seed.add(
-                transcript: Transcript(
-                    segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "an older take")],
-                    language: "en",
-                    modelName: "stub"
-                ),
-                audioSource: nil,
-                category: .transcription
-            )
-            model.loadEntry(entry.id)
-            let opened = await waitUntil { model.selectedEntryID == entry.id }
-            #expect(opened)
-            #expect(model.failedFileURL == nil)
-            #expect(model.failedSourceName == nil)
-            #expect(!model.canRetryFailedTranscription)
         }
 
         @Test("a failure that isn't a transcription's keeps the generic card")
         func otherFailuresDoNotClaimAFile() async throws {
-            await MockTranscriberRegistry.shared.clear()
-            let wav = try makeWAV()
-            defer {
-                try? FileManager.default.removeItem(at: wav)
-                Task { await MockTranscriberRegistry.shared.clear() }
-            }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.clear()
+                let wav = try makeWAV()
+                defer { try? FileManager.default.removeItem(at: wav) }
 
-            await MockTranscriberRegistry.shared.install(
-                engineID: nil,
-                response: MockTranscriberResponse(
-                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
+                await MockTranscriberRegistry.shared.install(
+                    engineID: nil,
+                    response: MockTranscriberResponse(
+                        failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
+                    )
                 )
-            )
 
-            let model = makeModel()
-            model.transcribe(fileURL: wav)
-            let failed = await waitUntil {
-                if case .failed = model.phase { return true }
-                return false
+                let model = makeModel()
+                model.transcribe(fileURL: wav)
+                let failed = await waitUntil {
+                    if case .failed = model.phase { return true }
+                    return false
+                }
+                #expect(failed)
+                #expect(model.failureKind == .transcription)
+
+                model.phase = .failed(message: "Save failed: the disk is full.")
+                #expect(model.failureKind == .other)
+                #expect(model.failedSourceName == nil)
+                #expect(model.failedFileURL == nil)
+                #expect(!model.canRetryFailedTranscription)
             }
-            #expect(failed)
-            #expect(model.failureKind == .transcription)
-
-            model.phase = .failed(message: "Save failed: the disk is full.")
-            #expect(model.failureKind == .other)
-            #expect(model.failedSourceName == nil)
-            #expect(model.failedFileURL == nil)
-            #expect(!model.canRetryFailedTranscription)
         }
 
         @Test("Retry runs the file itself while a batch is running")
         func retryDoesNotJoinTheBatch() async throws {
-            await MockTranscriberRegistry.shared.clear()
-            let wav = try makeWAV()
-            defer {
-                try? FileManager.default.removeItem(at: wav)
-                Task { await MockTranscriberRegistry.shared.clear() }
-            }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.clear()
+                let wav = try makeWAV()
+                defer { try? FileManager.default.removeItem(at: wav) }
 
-            await MockTranscriberRegistry.shared.install(
-                engineID: nil,
-                response: MockTranscriberResponse(
-                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
+                await MockTranscriberRegistry.shared.install(
+                    engineID: nil,
+                    response: MockTranscriberResponse(
+                        failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
+                    )
                 )
-            )
 
-            let model = makeModel()
-            model.transcribe(fileURL: wav)
-            let failed = await waitUntil {
-                if case .failed = model.phase { return true }
-                return false
-            }
-            #expect(failed)
+                let model = makeModel()
+                model.transcribe(fileURL: wav)
+                let failed = await waitUntil {
+                    if case .failed = model.phase { return true }
+                    return false
+                }
+                #expect(failed)
 
-            model.batchJobs = [BatchJob(url: URL(fileURLWithPath: "/tmp/batch-a.wav"), status: .transcribing)]
-            #expect(model.batchIsRunning)
+                model.batchJobs = [BatchJob(url: URL(fileURLWithPath: "/tmp/batch-a.wav"), status: .transcribing)]
+                #expect(model.batchIsRunning)
 
-            await MockTranscriberRegistry.shared.install(
-                engineID: nil,
-                response: MockTranscriberResponse(
-                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the second run's words")]
+                await MockTranscriberRegistry.shared.install(
+                    engineID: nil,
+                    response: MockTranscriberResponse(
+                        segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the second run's words")]
+                    )
                 )
-            )
-            // The session holds the transcriber it already built, mock included.
-            await model.session.unloadModel()
-            model.retryFailedTranscription()
-            let recovered = await waitUntil {
-                model.transcript?.text.contains("second run") == true
+                // The session holds the transcriber it already built, mock included.
+                await model.session.unloadModel()
+                model.retryFailedTranscription()
+                let recovered = await waitUntil {
+                    model.transcript?.text.contains("second run") == true
+                }
+                #expect(recovered, "Retry became a queue add instead of running the file")
+                #expect(model.batchJobs.count == 1, "Retry must not append the file to the batch")
             }
-            #expect(recovered, "Retry became a queue add instead of running the file")
-            #expect(model.batchJobs.count == 1, "Retry must not append the file to the batch")
         }
 
         @Test("dismissing a failure forgets the file behind it")
         func dismissForgetsTheFailedFile() async throws {
-            await MockTranscriberRegistry.shared.clear()
-            let wav = try makeWAV()
-            defer {
-                try? FileManager.default.removeItem(at: wav)
-                Task { await MockTranscriberRegistry.shared.clear() }
-            }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.clear()
+                let wav = try makeWAV()
+                defer { try? FileManager.default.removeItem(at: wav) }
 
-            await MockTranscriberRegistry.shared.install(
-                engineID: nil,
-                response: MockTranscriberResponse(
-                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
+                await MockTranscriberRegistry.shared.install(
+                    engineID: nil,
+                    response: MockTranscriberResponse(
+                        failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
+                    )
                 )
-            )
 
-            let model = makeModel()
-            model.transcribe(fileURL: wav)
-            let failed = await waitUntil {
-                if case .failed = model.phase { return true }
-                return false
+                let model = makeModel()
+                model.transcribe(fileURL: wav)
+                let failed = await waitUntil {
+                    if case .failed = model.phase { return true }
+                    return false
+                }
+                #expect(failed)
+
+                model.dismissError()
+                #expect(model.phase == .idle)
+                #expect(model.failedFileURL == nil)
+                #expect(model.failedSourceName == nil)
             }
-            #expect(failed)
-
-            model.dismissError()
-            #expect(model.phase == .idle)
-            #expect(model.failedFileURL == nil)
-            #expect(model.failedSourceName == nil)
         }
     }
 }

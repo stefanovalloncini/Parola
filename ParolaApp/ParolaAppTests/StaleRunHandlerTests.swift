@@ -55,41 +55,40 @@ extension TranscriberMockSuites {
         /// current generation.
         @Test("a zombie run's partials, progress and stage never reach the pane")
         func staleHandlersAreDropped() async throws {
-            await MockTranscriberRegistry.shared.clear()
-            let wav = try makeWAV()
-            defer {
-                try? FileManager.default.removeItem(at: wav)
-                Task { await MockTranscriberRegistry.shared.clear() }
-            }
-            await MockTranscriberRegistry.shared.install(
-                engineID: nil,
-                response: MockTranscriberResponse(
-                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the run's own words")]
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.clear()
+                let wav = try makeWAV()
+                defer { try? FileManager.default.removeItem(at: wav) }
+                await MockTranscriberRegistry.shared.install(
+                    engineID: nil,
+                    response: MockTranscriberResponse(
+                        segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "the run's own words")]
+                    )
                 )
-            )
 
-            let model = makeModel()
-            let zombieToken = model.fileRunGeneration
-            let zombiePartial = model.makeFilePartialHandler(runToken: zombieToken)
-            let zombieProgress = model.makeFileProgressHandler(runToken: zombieToken)
-            let zombieStage = model.makeFileStageHandler(fileURL: wav, runToken: zombieToken)
+                let model = makeModel()
+                let zombieToken = model.fileRunGeneration
+                let zombiePartial = model.makeFilePartialHandler(runToken: zombieToken)
+                let zombieProgress = model.makeFileProgressHandler(runToken: zombieToken)
+                let zombieStage = model.makeFileStageHandler(fileURL: wav, runToken: zombieToken)
 
-            model.transcribe(fileURL: wav)
-            let finished = await waitUntil { model.phase == .ready }
-            #expect(finished)
-            #expect(model.fileRunGeneration != zombieToken)
+                model.transcribe(fileURL: wav)
+                let finished = await waitUntil { model.phase == .ready }
+                #expect(finished)
+                #expect(model.fileRunGeneration != zombieToken)
 
-            model.mediaDurationSeconds = 100
-            model.filePartialText = "the live run's text"
-            zombiePartial("zombie text")
-            zombieProgress(50)
-            zombieStage(.transcribing)
-            try await Task.sleep(for: .milliseconds(200))
+                model.mediaDurationSeconds = 100
+                model.filePartialText = "the live run's text"
+                zombiePartial("zombie text")
+                zombieProgress(50)
+                zombieStage(.transcribing)
+                try await Task.sleep(for: .milliseconds(200))
 
-            #expect(model.filePartialText == "the live run's text")
-            #expect(model.fileTranscribeFraction == nil)
-            #expect(model.fileTranscribeStage == nil)
-            #expect(model.phase == .ready)
+                #expect(model.filePartialText == "the live run's text")
+                #expect(model.fileTranscribeFraction == nil)
+                #expect(model.fileTranscribeStage == nil)
+                #expect(model.phase == .ready)
+            }
         }
 
         @Test("the live run's handlers still write")

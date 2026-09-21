@@ -99,70 +99,73 @@ extension TranscriberMockSuites {
 
         @Test("transcribe(fileURL:) writes the recovery file at start and deletes it on success")
         func fileTranscribeWritesAndClearsOnSuccess() async throws {
-            // The delay keeps completion from deleting the checkpoint before it's asserted on.
-            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "hello")],
-                delayMs: 500
-            ))
-            defer { Task { await MockTranscriberRegistry.shared.clear() } }
-            let model = makeModel()
-            let wav = try makeSilentWAV(label: "success")
-            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                // The delay keeps completion from deleting the checkpoint before it's asserted on.
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "hello")],
+                    delayMs: 500
+                ))
+                let model = makeModel()
+                let wav = try makeSilentWAV(label: "success")
+                defer { try? FileManager.default.removeItem(at: wav) }
 
-            model.transcribe(fileURL: wav)
+                model.transcribe(fileURL: wav)
 
-            let checkpoint = try await decodeRecoveryFile(model)
-            #expect(checkpoint.kind == .fileTranscription)
-            #expect(checkpoint.sourceURL == wav)
-            #expect(checkpoint.modelName == model.selectedModel)
+                let checkpoint = try await decodeRecoveryFile(model)
+                #expect(checkpoint.kind == .fileTranscription)
+                #expect(checkpoint.sourceURL == wav)
+                #expect(checkpoint.modelName == model.selectedModel)
 
-            let finished = await waitUntil { model.phase == .ready }
-            #expect(finished)
-            #expect(!recoveryFileExists(model))
+                let finished = await waitUntil { model.phase == .ready }
+                #expect(finished)
+                #expect(!recoveryFileExists(model))
+            }
         }
 
         @Test("a failed transcription deletes the recovery file")
         func fileTranscribeClearsOnFailure() async throws {
-            // The delay keeps the failure from landing before the checkpoint write we assert on.
-            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                delayMs: 500,
-                failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
-            ))
-            defer { Task { await MockTranscriberRegistry.shared.clear() } }
-            let model = makeModel()
-            let wav = try makeSilentWAV(label: "failure")
-            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                // The delay keeps the failure from landing before the checkpoint write we assert on.
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    delayMs: 500,
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "boom")
+                ))
+                let model = makeModel()
+                let wav = try makeSilentWAV(label: "failure")
+                defer { try? FileManager.default.removeItem(at: wav) }
 
-            model.transcribe(fileURL: wav)
-            await flushRecoveryWrites(model)
-            #expect(recoveryFileExists(model))
+                model.transcribe(fileURL: wav)
+                await flushRecoveryWrites(model)
+                #expect(recoveryFileExists(model))
 
-            let failed = await waitUntil {
-                if case .failed = model.phase { return true }
-                return false
+                let failed = await waitUntil {
+                    if case .failed = model.phase { return true }
+                    return false
+                }
+                #expect(failed)
+                #expect(!recoveryFileExists(model))
             }
-            #expect(failed)
-            #expect(!recoveryFileExists(model))
         }
 
         @Test("cancelling a transcription deletes the recovery file")
         func fileTranscribeClearsOnCancel() async throws {
-            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "slow")],
-                delayMs: 5000
-            ))
-            defer { Task { await MockTranscriberRegistry.shared.clear() } }
-            let model = makeModel()
-            let wav = try makeSilentWAV(label: "cancel")
-            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "slow")],
+                    delayMs: 5000
+                ))
+                let model = makeModel()
+                let wav = try makeSilentWAV(label: "cancel")
+                defer { try? FileManager.default.removeItem(at: wav) }
 
-            model.transcribe(fileURL: wav)
-            await flushRecoveryWrites(model)
-            #expect(recoveryFileExists(model))
+                model.transcribe(fileURL: wav)
+                await flushRecoveryWrites(model)
+                #expect(recoveryFileExists(model))
 
-            model.cancelCurrentWork()
-            #expect(!recoveryFileExists(model))
-            #expect(model.phase == .idle)
+                model.cancelCurrentWork()
+                #expect(!recoveryFileExists(model))
+                #expect(model.phase == .idle)
+            }
         }
 
         @Test("a superseding transcription's recovery file survives the old task's exit")
@@ -389,26 +392,27 @@ extension TranscriberMockSuites {
 
         @Test("accepting a file recovery re-runs the transcription")
         func acceptRerunsFileTranscription() async throws {
-            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "ripresa")]
-            ))
-            defer { Task { await MockTranscriberRegistry.shared.clear() } }
-            let lib = makeTempLibraryURL("recovery-rerun")
-            let wav = try makeSilentWAV(label: "rerun")
-            defer { try? FileManager.default.removeItem(at: wav) }
-            try writeCheckpoint(
-                RecoveryCheckpoint(kind: .fileTranscription, startedAt: Date(), modelName: "m", sourceURL: wav),
-                libraryURL: lib
-            )
-            let model = makeModel(libraryURL: lib)
-            #expect(model.pendingRecovery != nil)
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "ripresa")]
+                ))
+                let lib = makeTempLibraryURL("recovery-rerun")
+                let wav = try makeSilentWAV(label: "rerun")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                try writeCheckpoint(
+                    RecoveryCheckpoint(kind: .fileTranscription, startedAt: Date(), modelName: "m", sourceURL: wav),
+                    libraryURL: lib
+                )
+                let model = makeModel(libraryURL: lib)
+                #expect(model.pendingRecovery != nil)
 
-            model.acceptPendingRecovery()
+                model.acceptPendingRecovery()
 
-            let finished = await waitUntil { model.phase == .ready }
-            #expect(finished)
-            #expect(model.transcript?.text == "ripresa")
-            #expect(!recoveryFileExists(model))
+                let finished = await waitUntil { model.phase == .ready }
+                #expect(finished)
+                #expect(model.transcript?.text == "ripresa")
+                #expect(!recoveryFileExists(model))
+            }
         }
 
         @Test("recovered recording titles carry the timestamp and suffix")

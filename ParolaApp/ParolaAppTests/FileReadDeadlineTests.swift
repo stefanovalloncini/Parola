@@ -35,37 +35,38 @@ extension TranscriberMockSuites {
         /// A FIFO with no writer parks `open()` the way a TCC-denied folder or a stalled share does.
         @Test("a file that never opens ends the run instead of preparing forever")
         func wedgedOpenFailsTheRun() async throws {
-            await MockTranscriberRegistry.shared.clear()
-            let dir = FileManager.default.temporaryDirectory
-                .appendingPathComponent("parola-app-fileread-\(UUID().uuidString)")
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let wedged = dir.appendingPathComponent("wedged.m4a")
-            #expect(mkfifo(wedged.path, 0o644) == 0, "could not create the FIFO the test needs")
-            defer {
-                let writer = open(wedged.path, O_WRONLY | O_NONBLOCK)
-                if writer >= 0 { close(writer) }
-                try? FileManager.default.removeItem(at: dir)
-                Task { await MockTranscriberRegistry.shared.clear() }
-            }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.clear()
+                let dir = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("parola-app-fileread-\(UUID().uuidString)")
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                let wedged = dir.appendingPathComponent("wedged.m4a")
+                #expect(mkfifo(wedged.path, 0o644) == 0, "could not create the FIFO the test needs")
+                defer {
+                    let writer = open(wedged.path, O_WRONLY | O_NONBLOCK)
+                    if writer >= 0 { close(writer) }
+                    try? FileManager.default.removeItem(at: dir)
+                }
 
-            await MockTranscriberRegistry.shared.install(
-                engineID: nil,
-                response: MockTranscriberResponse(
-                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "never reached")]
+                await MockTranscriberRegistry.shared.install(
+                    engineID: nil,
+                    response: MockTranscriberResponse(
+                        segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "never reached")]
+                    )
                 )
-            )
 
-            let model = makeModel(fileReadDeadline: .milliseconds(200))
-            model.transcribe(fileURL: wedged)
+                let model = makeModel(fileReadDeadline: .milliseconds(200))
+                model.transcribe(fileURL: wedged)
 
-            let failed = await waitUntil(timeoutMs: 5_000) {
-                if case .failed = model.phase { return true }
-                return false
+                let failed = await waitUntil(timeoutMs: 5_000) {
+                    if case .failed = model.phase { return true }
+                    return false
+                }
+                #expect(failed, "the run should stop waiting on a file that never opens")
+                guard case .failed(let message) = model.phase else { return }
+                #expect(message == "Parola couldn't read wedged.m4a in time.")
+                #expect(model.failedFileURL == wedged)
             }
-            #expect(failed, "the run should stop waiting on a file that never opens")
-            guard case .failed(let message) = model.phase else { return }
-            #expect(message == "Parola couldn't read wedged.m4a in time.")
-            #expect(model.failedFileURL == wedged)
         }
 
         @Test("the failure names the file and says the read ran out of time")

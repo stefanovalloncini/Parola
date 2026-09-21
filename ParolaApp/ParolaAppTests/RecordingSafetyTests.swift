@@ -73,43 +73,44 @@ extension TranscriberMockSuites {
 
         @Test("a failed take is saved to the library and Retry re-transcribes it")
         func failedTakeSavesAudioAndRetryWorks() async throws {
-            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                failure: MockTranscriberFailure(code: .transcriptionFailed, message: "engine boom")
-            ))
-            defer { Task { await MockTranscriberRegistry.shared.clear() } }
-            let model = makeModel()
-            let wav = try makeTakeWAV(label: "failed")
-            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    failure: MockTranscriberFailure(code: .transcriptionFailed, message: "engine boom")
+                ))
+                let model = makeModel()
+                let wav = try makeTakeWAV(label: "failed")
+                defer { try? FileManager.default.removeItem(at: wav) }
 
-            model.liveSource = StubLiveSource(url: wav)
-            model.stopRecordingAndTranscribe()
+                model.liveSource = StubLiveSource(url: wav)
+                model.stopRecordingAndTranscribe()
 
-            let failed = await waitUntil {
-                if case .failed(let message) = model.phase { return message.contains("saved to your library") }
-                return false
+                let failed = await waitUntil {
+                    if case .failed(let message) = model.phase { return message.contains("saved to your library") }
+                    return false
+                }
+                #expect(failed)
+                #expect(model.failedTakeAudioURL == wav)
+
+                let saved = await entries(model, count: 1)
+                #expect(saved.count == 1)
+                #expect(saved.first?.title.hasSuffix("(transcription failed)") == true)
+                #expect(saved.first?.manifest.originalAudioName.isEmpty == false)
+
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "recovered text")]
+                ))
+                await model.unloadTranscriptionSession()
+
+                model.retryFailedTake()
+
+                let ready = await waitUntil { model.phase == .ready }
+                #expect(ready)
+                #expect(model.transcript?.text == "recovered text")
+                #expect(model.failedTakeAudioURL == nil)
+                let after = await entries(model, count: 2)
+                #expect(after.count == 2)
+                #expect(after.contains { !$0.title.hasSuffix("(transcription failed)") })
             }
-            #expect(failed)
-            #expect(model.failedTakeAudioURL == wav)
-
-            let saved = await entries(model, count: 1)
-            #expect(saved.count == 1)
-            #expect(saved.first?.title.hasSuffix("(transcription failed)") == true)
-            #expect(saved.first?.manifest.originalAudioName.isEmpty == false)
-
-            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "recovered text")]
-            ))
-            await model.unloadTranscriptionSession()
-
-            model.retryFailedTake()
-
-            let ready = await waitUntil { model.phase == .ready }
-            #expect(ready)
-            #expect(model.transcript?.text == "recovered text")
-            #expect(model.failedTakeAudioURL == nil)
-            let after = await entries(model, count: 2)
-            #expect(after.count == 2)
-            #expect(after.contains { !$0.title.hasSuffix("(transcription failed)") })
         }
 
         @Test("a streaming failure persists the confirmed segments as an interrupted take")
@@ -182,30 +183,31 @@ extension TranscriberMockSuites {
 
         @Test("accepting a take's transcription recovery keeps its title")
         func acceptResumesTakeWithTitle() async throws {
-            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "ripresa")]
-            ))
-            defer { Task { await MockTranscriberRegistry.shared.clear() } }
-            let lib = makeTempLibraryURL("recovery-take-title")
-            let wav = try makeTakeWAV(label: "take-title")
-            defer { try? FileManager.default.removeItem(at: wav) }
-            let checkpoint = RecoveryCheckpoint(
-                kind: .fileTranscription,
-                startedAt: Date(),
-                modelName: "m",
-                sourceURL: wav,
-                title: "Meeting 21 Aug 2026"
-            )
-            try FileManager.default.createDirectory(at: lib, withIntermediateDirectories: true)
-            try JSONEncoder().encode(checkpoint).write(to: lib.appendingPathComponent("recovery.json"))
-            let model = makeModel(libraryURL: lib)
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "ripresa")]
+                ))
+                let lib = makeTempLibraryURL("recovery-take-title")
+                let wav = try makeTakeWAV(label: "take-title")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                let checkpoint = RecoveryCheckpoint(
+                    kind: .fileTranscription,
+                    startedAt: Date(),
+                    modelName: "m",
+                    sourceURL: wav,
+                    title: "Meeting 21 Aug 2026"
+                )
+                try FileManager.default.createDirectory(at: lib, withIntermediateDirectories: true)
+                try JSONEncoder().encode(checkpoint).write(to: lib.appendingPathComponent("recovery.json"))
+                let model = makeModel(libraryURL: lib)
 
-            model.acceptPendingRecovery()
+                model.acceptPendingRecovery()
 
-            let ready = await waitUntil { model.phase == .ready }
-            #expect(ready)
-            let saved = await entries(model, count: 1)
-            #expect(saved.first?.title == "Meeting 21 Aug 2026")
+                let ready = await waitUntil { model.phase == .ready }
+                #expect(ready)
+                let saved = await entries(model, count: 1)
+                #expect(saved.first?.title == "Meeting 21 Aug 2026")
+            }
         }
 
         @Test("a stale .finished after a streaming failure cannot resurrect the take")

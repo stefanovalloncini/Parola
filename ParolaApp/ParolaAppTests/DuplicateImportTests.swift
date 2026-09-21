@@ -80,20 +80,21 @@ extension TranscriberMockSuites {
 
         @Test("a file the library has never seen transcribes without a sheet")
         func firstImportRunsStraightThrough() async throws {
-            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "fresh")], delayMs: 500
-            ))
-            defer { Task { await MockTranscriberRegistry.shared.clear() } }
-            let model = makeModel()
-            let wav = try makeWAV("fresh")
-            defer { try? FileManager.default.removeItem(at: wav) }
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "fresh")], delayMs: 500
+                ))
+                let model = makeModel()
+                let wav = try makeWAV("fresh")
+                defer { try? FileManager.default.removeItem(at: wav) }
 
-            model.transcribe(fileURL: wav)
-            await model.awaitDuplicateCheck()
+                model.transcribe(fileURL: wav)
+                await model.awaitDuplicateCheck()
 
-            #expect(model.duplicateImport == nil)
-            #expect(model.fileTranscribeTask != nil)
-            model.cancelCurrentWork()
+                #expect(model.duplicateImport == nil)
+                #expect(model.fileTranscribeTask != nil)
+                model.cancelCurrentWork()
+            }
         }
 
         @Test("a copy under a different name still counts as the same recording")
@@ -132,23 +133,24 @@ extension TranscriberMockSuites {
 
         @Test("Transcribe Again starts the run the sheet was holding")
         func transcribeAgainStartsTheRun() async throws {
-            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "again")], delayMs: 500
-            ))
-            defer { Task { await MockTranscriberRegistry.shared.clear() } }
-            let model = makeModel()
-            let wav = try makeWAV("again")
-            defer { try? FileManager.default.removeItem(at: wav) }
-            _ = try await seedLibrary(model, with: wav)
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "again")], delayMs: 500
+                ))
+                let model = makeModel()
+                let wav = try makeWAV("again")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                _ = try await seedLibrary(model, with: wav)
 
-            model.transcribe(fileURL: wav)
-            await model.awaitDuplicateCheck()
-            model.transcribeDuplicateAgain()
+                model.transcribe(fileURL: wav)
+                await model.awaitDuplicateCheck()
+                model.transcribeDuplicateAgain()
 
-            #expect(model.duplicateImport == nil)
-            #expect(model.fileTranscribeTask != nil)
-            #expect(model.sourceFileURL == wav)
-            model.cancelCurrentWork()
+                #expect(model.duplicateImport == nil)
+                #expect(model.fileTranscribeTask != nil)
+                #expect(model.sourceFileURL == wav)
+                model.cancelCurrentWork()
+            }
         }
 
         @Test("dismissing the sheet transcribes nothing")
@@ -168,26 +170,27 @@ extension TranscriberMockSuites {
 
         @Test("a batch import skips the duplicates and counts them once")
         func batchImportSkipsDuplicates() async throws {
-            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "queued")]
-            ))
-            defer { Task { await MockTranscriberRegistry.shared.clear() } }
-            let model = makeModel()
-            let known = try makeWAV("known")
-            let fresh = try makeWAV("unknown", seconds: 0.4)
-            defer {
-                try? FileManager.default.removeItem(at: known)
-                try? FileManager.default.removeItem(at: fresh)
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "queued")]
+                ))
+                let model = makeModel()
+                let known = try makeWAV("known")
+                let fresh = try makeWAV("unknown", seconds: 0.4)
+                defer {
+                    try? FileManager.default.removeItem(at: known)
+                    try? FileManager.default.removeItem(at: fresh)
+                }
+                _ = try await seedLibrary(model, with: known)
+
+                model.importBatchFiles([known, fresh])
+                await model.awaitBatchImport()
+
+                #expect(model.batchJobs.map(\.url) == [fresh])
+                #expect(model.batchDuplicatesSkipped == 1)
+                #expect(model.batchDuplicateNotice == "1 already in your library")
+                model.clearBatch()
             }
-            _ = try await seedLibrary(model, with: known)
-
-            model.importBatchFiles([known, fresh])
-            await model.awaitBatchImport()
-
-            #expect(model.batchJobs.map(\.url) == [fresh])
-            #expect(model.batchDuplicatesSkipped == 1)
-            #expect(model.batchDuplicateNotice == "1 already in your library")
-            model.clearBatch()
         }
 
         @Test("a batch of nothing but duplicates shows the page and the count")
@@ -212,51 +215,53 @@ extension TranscriberMockSuites {
 
         @Test("a duplicate deferred during a run is still filtered when the queue drains")
         func deferredArrivalsAreFiltered() async throws {
-            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "drained")]
-            ))
-            defer { Task { await MockTranscriberRegistry.shared.clear() } }
-            let model = makeModel()
-            let known = try makeWAV("deferred-known")
-            let fresh = try makeWAV("deferred-fresh", seconds: 0.4)
-            defer {
-                try? FileManager.default.removeItem(at: known)
-                try? FileManager.default.removeItem(at: fresh)
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "drained")]
+                ))
+                let model = makeModel()
+                let known = try makeWAV("deferred-known")
+                let fresh = try makeWAV("deferred-fresh", seconds: 0.4)
+                defer {
+                    try? FileManager.default.removeItem(at: known)
+                    try? FileManager.default.removeItem(at: fresh)
+                }
+                _ = try await seedLibrary(model, with: known)
+
+                model.fileTranscribeTask = Task {}
+                model.transcribeNow(urls: [known, fresh])
+                #expect(model.deferredArrivals == [known, fresh])
+
+                model.fileTranscribeTask?.cancel()
+                model.fileTranscribeTask = nil
+                model.drainDeferredArrivals()
+                await model.awaitBatchImport()
+
+                #expect(model.batchJobs.map(\.url) == [fresh])
+                #expect(model.batchDuplicateNotice == "1 already in your library")
+                model.clearBatch()
             }
-            _ = try await seedLibrary(model, with: known)
-
-            model.fileTranscribeTask = Task {}
-            model.transcribeNow(urls: [known, fresh])
-            #expect(model.deferredArrivals == [known, fresh])
-
-            model.fileTranscribeTask?.cancel()
-            model.fileTranscribeTask = nil
-            model.drainDeferredArrivals()
-            await model.awaitBatchImport()
-
-            #expect(model.batchJobs.map(\.url) == [fresh])
-            #expect(model.batchDuplicateNotice == "1 already in your library")
-            model.clearBatch()
         }
 
         @Test("a deleted entry stops holding up its file")
         func deletedEntryDoesNotPrompt() async throws {
-            await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
-                segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "back")], delayMs: 500
-            ))
-            defer { Task { await MockTranscriberRegistry.shared.clear() } }
-            let model = makeModel()
-            let wav = try makeWAV("deleted")
-            defer { try? FileManager.default.removeItem(at: wav) }
-            let existing = try await seedLibrary(model, with: wav)
-            try await model.library.delete(existing.id)
+            try await withMocksCleared(.transcriber) {
+                await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
+                    segments: [TranscriptSegmentSeed(start: 0, end: 1, text: "back")], delayMs: 500
+                ))
+                let model = makeModel()
+                let wav = try makeWAV("deleted")
+                defer { try? FileManager.default.removeItem(at: wav) }
+                let existing = try await seedLibrary(model, with: wav)
+                try await model.library.delete(existing.id)
 
-            model.transcribe(fileURL: wav)
-            await model.awaitDuplicateCheck()
+                model.transcribe(fileURL: wav)
+                await model.awaitDuplicateCheck()
 
-            #expect(model.duplicateImport == nil)
-            #expect(model.fileTranscribeTask != nil)
-            model.cancelCurrentWork()
+                #expect(model.duplicateImport == nil)
+                #expect(model.fileTranscribeTask != nil)
+                model.cancelCurrentWork()
+            }
         }
 
         @Test("the app test host is recognised as a test process too")
