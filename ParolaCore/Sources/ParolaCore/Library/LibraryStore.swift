@@ -910,9 +910,12 @@ public actor LibraryStore {
                 problems.append(.init(bundleURL: bundleURL, issue: .missingTranscript))
                 continue
             }
-            let id = (bundleURL.lastPathComponent as NSString).deletingPathExtension
             healthy.append(
-                LibraryEntry(id: id, bundleURL: bundleURL, manifest: stampingDigest(manifest, at: bundleURL))
+                LibraryEntry(
+                    id: entryID(for: bundleURL),
+                    bundleURL: bundleURL,
+                    manifest: stampingDigest(manifest, at: bundleURL)
+                )
             )
         }
         return VerificationReport(healthy: healthy, problems: problems)
@@ -999,8 +1002,14 @@ public actor LibraryStore {
         guard manifest.version <= ParolaDocument.Manifest.currentVersion else {
             throw ParolaError.ioError("Parola document version \(manifest.version) is newer than this app understands.")
         }
-        let id = (bundleURL.lastPathComponent as NSString).deletingPathExtension
-        return LibraryEntry(id: id, bundleURL: bundleURL, manifest: manifest)
+        return LibraryEntry(id: Self.entryID(for: bundleURL), bundleURL: bundleURL, manifest: manifest)
+    }
+
+    /// Copied into native storage: an id left bridged from NSURL is Unicode-normalised on every list-diff hash.
+    private nonisolated static func entryID(for bundleURL: URL) -> LibraryEntry.ID {
+        var id = bundleURL.deletingPathExtension().lastPathComponent
+        id.makeContiguousUTF8()
+        return id
     }
 
     /// One per scan, never a shared static: `makeEntry` is nonisolated and runs both on the actor and on the off-actor scan.

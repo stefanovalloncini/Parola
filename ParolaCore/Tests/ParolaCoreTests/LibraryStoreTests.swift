@@ -111,6 +111,31 @@ struct LibraryStoreTests {
         #expect(entries.first?.id == entry.id)
     }
 
+    /// A bridged NSString id is hashed character by character through the bridge every time a
+    /// SwiftUI `ForEach` looks a row up; a native string hashes its own bytes.
+    @Test("a listed entry's id is a native Swift string, not a bridged NSString")
+    func listedIDsAreNativeStrings() async throws {
+        let dir = try makeTempLibraryDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let name = "20260921T101530-A1B2C3D4-1111-2222-3333-444455556666"
+        try seedBundle(in: dir, named: name, text: "minutes of the meeting")
+        let store = LibraryStore(libraryURL: dir, extraIndexer: nil)
+
+        let entry = try #require(await store.list().first)
+        let bundleName = entry.bundleURL.lastPathComponent
+        #expect(entry.id == (bundleName as NSString).deletingPathExtension)
+        #expect(entry.id == name)
+        #expect(entry.id.utf8.withContiguousStorageIfAvailable { _ in true } == true)
+
+        let loaded = try await store.load(name).entry
+        #expect(loaded.id == name)
+        #expect(loaded.id.utf8.withContiguousStorageIfAvailable { _ in true } == true)
+
+        let verified = try #require(await store.verify().healthy.first)
+        #expect(verified.id == name)
+        #expect(verified.id.utf8.withContiguousStorageIfAvailable { _ in true } == true)
+    }
+
     @Test("dropCaches makes a wiped library directory read empty instead of resurrecting it")
     func dropCachesAfterDirectoryWipe() async throws {
         let (store, libraryURL) = try makeTempLibrary()
