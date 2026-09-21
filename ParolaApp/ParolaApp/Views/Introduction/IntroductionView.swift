@@ -27,25 +27,16 @@ struct IntroductionView: View {
         case slide
     }
 
-    /// The nine bars Hello hands to the demo card.
-    static let brandBarsID = "brandBars"
-
     /// Hello and the demo card trade the bars, so the scenes around them cross-fade instead of sliding past each other.
     nonisolated static func transitionKind(from: IntroductionStep, to: IntroductionStep) -> TransitionKind {
         let pair: Set<IntroductionStep> = [from, to]
         return pair == [.hello, .transcribe] ? .fade : .slide
     }
 
-    /// SwiftUI keeps the transition a scene was built with for its own removal, so the first scene has to
-    /// be built with the move ahead of it: with nothing behind it, forwards is the only way out.
-    nonisolated static func transitionPartner(
-        previous: IntroductionStep?,
-        step: IntroductionStep,
-        steps: [IntroductionStep]
-    ) -> IntroductionStep {
-        if let previous { return previous }
-        guard let index = steps.firstIndex(of: step), steps.indices.contains(index + 1) else { return step }
-        return steps[index + 1]
+    /// A scene is removed with the transition it was built with, never one chosen for the move that takes it
+    /// away, so the two that hand the bars over leave by fading whatever they are moving to.
+    nonisolated static func leavesByFading(_ step: IntroductionStep) -> Bool {
+        step == .hello || step == .transcribe
     }
 
     @Environment(AppModel.self) private var model
@@ -56,19 +47,18 @@ struct IntroductionView: View {
 
     var body: some View {
         let introduction = model.introduction
-        let partner = Self.transitionPartner(
-            previous: introduction.previousStep,
-            step: introduction.step,
-            steps: introduction.steps
-        )
-        let kind = Self.transitionKind(from: partner, to: introduction.step)
+        let kind = Self.transitionKind(from: introduction.previousStep ?? introduction.step, to: introduction.step)
         return ZStack {
             IntroductionStage()
             VStack(spacing: DS.Spacing.large) {
                 GeometryReader { proxy in
                     staged(introduction.step, stageHeight: proxy.size.height)
                         .id(introduction.step)
-                        .transition(sceneTransition(kind: kind, back: introduction.isMovingBack))
+                        .transition(sceneTransition(
+                            kind: kind,
+                            step: introduction.step,
+                            back: introduction.isMovingBack
+                        ))
                 }
                 IntroductionBottomBar()
             }
@@ -115,11 +105,14 @@ struct IntroductionView: View {
         }
     }
 
-    private func sceneTransition(kind: TransitionKind, back: Bool) -> AnyTransition {
-        guard !reduceMotion, kind == .slide else { return .opacity }
-        return .asymmetric(
-            insertion: .move(edge: back ? .leading : .trailing).combined(with: .opacity),
-            removal: .move(edge: back ? .trailing : .leading).combined(with: .opacity)
-        )
+    private func sceneTransition(kind: TransitionKind, step: IntroductionStep, back: Bool) -> AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        let arriving: AnyTransition = kind == .fade
+            ? .opacity
+            : .move(edge: back ? .leading : .trailing).combined(with: .opacity)
+        let leaving: AnyTransition = Self.leavesByFading(step)
+            ? .opacity
+            : .move(edge: back ? .trailing : .leading).combined(with: .opacity)
+        return .asymmetric(insertion: arriving, removal: leaving)
     }
 }
