@@ -37,6 +37,7 @@ enum DS {
     enum Size {
         static let progressBarHeight: CGFloat = 6
         static let liveTranscriptMinHeight: CGFloat = 180
+        static let demoTranscriptMinHeight: CGFloat = 220
     }
 
     /// Thirteen fixed tiers, ours rather than the system text styles, so a tier means the same thing

@@ -27,6 +27,9 @@ struct IntroductionView: View {
         case slide
     }
 
+    /// The nine bars Hello hands to the demo card.
+    static let brandBarsID = "brandBars"
+
     /// Hello and the demo card trade the bars, so the scenes around them cross-fade instead of sliding past each other.
     nonisolated static func transitionKind(from: IntroductionStep, to: IntroductionStep) -> TransitionKind {
         let pair: Set<IntroductionStep> = [from, to]
@@ -35,6 +38,7 @@ struct IntroductionView: View {
 
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var brand
     // Held as an optional and filled on appear: a default value would open an AVAudioPlayer on every init.
     @State private var playback: DemoPlayback?
 
@@ -77,9 +81,9 @@ struct IntroductionView: View {
     @ViewBuilder
     private func scene(_ step: IntroductionStep) -> some View {
         switch step {
-        case .hello: HelloScene()
+        case .hello: HelloScene(brand: brand)
         case .transcribe:
-            if let playback { TranscribeScene(demo: playback) }
+            if let playback { TranscribeScene(demo: playback, brand: brand) }
         case .features: FeaturesScene()
         case .engine: EngineScene()
         case .ready: ReadyScene()

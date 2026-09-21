@@ -1,12 +1,20 @@
 import SwiftUI
 
 struct HelloScene: View {
+    let brand: Namespace.ID
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var titleVisible = false
 
     var body: some View {
         VStack(spacing: DS.Spacing.large) {
             BrandWaveform(side: 240)
+                // An empty property set leaves the bars where they are: no flight under reduce motion.
+                .matchedGeometryEffect(
+                    id: IntroductionView.brandBarsID,
+                    in: brand,
+                    properties: reduceMotion ? [] : .frame
+                )
             VStack(spacing: DS.Spacing.small) {
                 Text(verbatim: "Parola")
                     .font(DS.Font.wordmark)
