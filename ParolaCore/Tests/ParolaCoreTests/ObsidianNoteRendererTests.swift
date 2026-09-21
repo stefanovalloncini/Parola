@@ -165,13 +165,11 @@ struct ObsidianNoteRendererTests {
 struct ObsidianFilenameTests {
     private let utc = TimeZone(identifier: "UTC")!
 
+    /// `{title}` is the entry's own title, so a case that needs another one puts it on the payload.
     private func filename(_ template: String, title: String = "Interview") -> String {
-        ObsidianNoteRenderer.filename(
-            template: template,
-            payload: ObsidianNoteRendererTests.payload(),
-            title: title,
-            timeZone: utc
-        )
+        var payload = ObsidianNoteRendererTests.payload()
+        payload.title = title
+        return ObsidianNoteRenderer.filename(template: template, payload: payload, timeZone: utc)
     }
 
     @Test("every token is replaced")
@@ -197,6 +195,15 @@ struct ObsidianFilenameTests {
     func lengthCap() {
         let long = String(repeating: "x", count: 400)
         #expect(filename("{title}", title: long).count == 200)
+    }
+
+    @Test("the title format never reaches the filename")
+    func titleFormatDoesNotNameTheFile() {
+        var payload = ObsidianNoteRendererTests.payload()
+        payload.aiTitle = "Release chat"
+        let name = ObsidianNoteRenderer.filename(template: "{title}", payload: payload, timeZone: utc)
+        #expect(name == "Interview")
+        #expect(TitleFormat.aiTitle.title(for: payload) == "Release chat")
     }
 
     @Test("a name that sanitises away falls back to a readable one")

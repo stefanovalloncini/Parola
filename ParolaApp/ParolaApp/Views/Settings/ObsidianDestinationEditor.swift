@@ -185,11 +185,14 @@ struct ObsidianDestinationEditor: View {
 
     // MARK: - Actions
 
+    /// Built once: the example is recomputed on every keystroke in the template field, and the
+    /// payload carries a rendered Markdown export.
+    private static let samplePayload = AppModel.sampleDeliveryPayload()
+
     private var filenameHelp: String {
         let example = ObsidianNoteRenderer.filename(
             template: draft.filenameTemplate,
-            payload: AppModel.sampleDeliveryPayload(),
-            title: draft.titleFormat.title(for: AppModel.sampleDeliveryPayload())
+            payload: Self.samplePayload
         )
         let tokens = ObsidianNoteRenderer.filenameTokens.joined(separator: " ")
         return String(localized: "\(tokens) — for example \(example).md")

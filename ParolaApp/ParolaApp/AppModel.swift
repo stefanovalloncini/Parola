@@ -1393,6 +1393,12 @@ final class AppModel {
         isReloadingSettings = false
         applyTheme()
         loadAutoExportRules()
+        loadDestinations()
+        // Built here, not on first send: its init reloads the queue from disk and re-arms the
+        // timers, so a delivery queued by an earlier launch does not wait for an unrelated send.
+        if features.isEnabled(.destinations) {
+            _ = deliveryEngine
+        }
         loadExportPresets()
         loadBatchExportSelection()
         loadIgnoredSegmentRules()

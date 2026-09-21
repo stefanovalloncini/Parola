@@ -7,6 +7,18 @@ public enum DeliveryOutcome: Sendable, Equatable {
     case skipped(reason: DeliverySkipReason)
 }
 
+public extension DeliveryOutcome {
+    var isDelivered: Bool {
+        if case .delivered = self { return true }
+        return false
+    }
+
+    var receipt: DeliveryReceipt? {
+        guard case .delivered(let receipt) = self else { return nil }
+        return receipt
+    }
+}
+
 /// Why a delivery was not attempted, or was given up on.
 public enum DeliverySkipReason: Sendable, Equatable {
     case unknownDestination
@@ -130,8 +142,13 @@ public struct DeliveryQueueStore: Sendable {
     public var logURL: URL { directory.appendingPathComponent("log.json") }
 
     public func loadQueue() -> [QueuedDelivery] {
-        guard let data = try? Data(contentsOf: queueURL) else { return [] }
-        return (try? Self.decoder.decode([QueuedDelivery].self, from: data)) ?? []
+        guard FileManager.default.fileExists(atPath: queueURL.path) else { return [] }
+        do {
+            return try Self.decoder.decode([QueuedDelivery].self, from: try Data(contentsOf: queueURL))
+        } catch {
+            ParolaLog.error(.export, "delivery queue could not be read", [.error: .error(error)])
+            return []
+        }
     }
 
     public func save(queue: [QueuedDelivery]) {
@@ -139,8 +156,13 @@ public struct DeliveryQueueStore: Sendable {
     }
 
     public func loadLog() -> DeliveryLog {
-        guard let data = try? Data(contentsOf: logURL) else { return DeliveryLog() }
-        return (try? Self.decoder.decode(DeliveryLog.self, from: data)) ?? DeliveryLog()
+        guard FileManager.default.fileExists(atPath: logURL.path) else { return DeliveryLog() }
+        do {
+            return try Self.decoder.decode(DeliveryLog.self, from: try Data(contentsOf: logURL))
+        } catch {
+            ParolaLog.error(.export, "delivery log could not be read", [.error: .error(error)])
+            return DeliveryLog()
+        }
     }
 
     public func save(log: DeliveryLog) {
@@ -280,6 +302,12 @@ public actor DeliveryEngine {
 
     public func recentLog() -> [DeliveryLogEntry] { log.entries }
 
+    /// The task waiting to retry one delivery. A test takes it before it advances the clock and
+    /// awaits it afterwards, so the retry is a suspension point rather than a wait on real time.
+    func timerTask(for entryID: LibraryEntry.ID, destinationID: UUID) -> Task<Void, Never>? {
+        timers[QueueKey(entryID: entryID, destinationID: destinationID)]
+    }
+
     private func attempt(payload: DeliveryPayload, destination: any DeliveryDestination) async -> DeliveryOutcome {
         let key = QueueKey(entryID: payload.entryID, destinationID: destination.id)
         let attemptsSoFar = queue.first { $0.entryID == key.entryID && $0.destinationID == key.destinationID }?.attempt ?? 0
@@ -336,10 +364,10 @@ public actor DeliveryEngine {
 
     private func schedule(_ key: QueueKey, after delay: Duration) {
         timers.removeValue(forKey: key)?.cancel()
-        timers[key] = Task { [clock] in
+        timers[key] = Task { [weak self, clock] in
             try? await clock.sleep(for: delay, tolerance: nil)
             guard !Task.isCancelled else { return }
-            await self.runQueued(key)
+            await self?.runQueued(key)
         }
     }
 

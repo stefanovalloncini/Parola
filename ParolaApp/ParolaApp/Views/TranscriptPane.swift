@@ -141,7 +141,7 @@ struct TranscriptPane: View {
 
             // In the column's flow, not over it: a toast on top of the media bar would cover the
             // transport for as long as it is up.
-            if let notice = model.deliveryNotice {
+            if let notice = model.visibleDeliveryNotice {
                 DeliveryToast(notice: notice)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -158,7 +158,7 @@ struct TranscriptPane: View {
                 MediaBar()
             }
         }
-        .animation(.smooth(duration: 0.25), value: model.deliveryNotice)
+        .animation(.smooth(duration: 0.25), value: model.visibleDeliveryNotice)
     }
 
     @ViewBuilder

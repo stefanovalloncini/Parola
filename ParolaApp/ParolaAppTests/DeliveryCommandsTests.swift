@@ -59,8 +59,9 @@ struct DeliveryCommandsTests {
 
     @Test("installMockDestination lands in the list and in getState")
     func installMock() async throws {
+        // Cleared here rather than in a defer: a `Task` in a defer is unordered and can land
+        // after the next test has installed its own failures.
         await MockDeliveryRecorder.shared.reset()
-        defer { Task { await MockDeliveryRecorder.shared.reset() } }
         let (model, server, context, commands) = try makeRig()
 
         let installed = try await run(commands, "installMockDestination", ["name": .string("Bridge mock")], context)
@@ -78,8 +79,9 @@ struct DeliveryCommandsTests {
 
     @Test("sendEntry delivers, records the receipt and reads it back")
     func sendEntryRoundTrip() async throws {
+        // Cleared here rather than in a defer: a `Task` in a defer is unordered and can land
+        // after the next test has installed its own failures.
         await MockDeliveryRecorder.shared.reset()
-        defer { Task { await MockDeliveryRecorder.shared.reset() } }
         let (model, server, context, commands) = try makeRig()
         let entryID = try await seed(model)
         let installed = try await run(commands, "installMockDestination", [:], context)
@@ -114,8 +116,9 @@ struct DeliveryCommandsTests {
 
     @Test("a mock told to fail reports the send as queued")
     func failingSendIsQueued() async throws {
+        // Cleared here rather than in a defer: a `Task` in a defer is unordered and can land
+        // after the next test has installed its own failures.
         await MockDeliveryRecorder.shared.reset()
-        defer { Task { await MockDeliveryRecorder.shared.reset() } }
         let (model, server, context, commands) = try makeRig()
         let entryID = try await seed(model)
         let installed = try await run(

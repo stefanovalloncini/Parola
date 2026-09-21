@@ -142,6 +142,124 @@ struct DeliveryHookTests {
         #expect(model.deliveryNotice == nil)
     }
 
+    @Test("a delivery queued by an earlier launch runs at the next launch")
+    func queuedDeliveryResumesAtLaunch() async throws {
+        let defaults = temporaryDefaults()
+        let libraryURL = makeTempLibraryURL("deliveryresume")
+        let vault = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-resume-vault-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: vault, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: vault) }
+
+        let seeded = try await LibraryStore(libraryURL: libraryURL, extraIndexer: nil).add(
+            transcript: Self.transcript(), audioSource: nil, category: .transcription, title: "Riunione"
+        )
+        let destination = ObsidianVaultFolderDestination(
+            name: "Vault",
+            vaultBookmark: try ObsidianVaultFolderDestination.bookmark(for: vault),
+            vaultPath: vault.path
+        )
+        defaults.set(
+            try JSONEncoder().encode([AnyDestination.obsidianFolder(destination)]),
+            forKey: "destinations"
+        )
+        let store = DeliveryQueueStore(
+            directory: libraryURL.appendingPathComponent("Delivery", isDirectory: true)
+        )
+        store.save(queue: [
+            QueuedDelivery(
+                entryID: seeded.id,
+                destinationID: destination.id,
+                attempt: 1,
+                nextAttemptAt: Date(timeIntervalSince1970: 0)
+            )
+        ])
+
+        let written = try #require(defaults.data(forKey: "destinations"))
+        #expect(try JSONDecoder().decode([AnyDestination].self, from: written).count == 1)
+
+        // No send of any kind: building the model is the whole trigger.
+        let model = AppModel(skipBootstrap: true, defaults: defaults, libraryURL: libraryURL)
+
+        let note = vault.appendingPathComponent("Riunione.md")
+        #expect(
+            await poll { FileManager.default.fileExists(atPath: note.path) },
+            "the queued delivery should have run at launch"
+        )
+        #expect(await poll { store.loadQueue().isEmpty })
+        #expect(model.destinations.count == 1)
+    }
+
+    @Test("the toast belongs to the entry it was raised for")
+    func noticeIsKeyedToItsEntry() {
+        let model = makeModel()
+        model.deliveryNotice = DeliveryNotice(
+            entryID: "entry-A",
+            destinationID: UUID(),
+            destinationName: "Vault",
+            state: .sent(nil)
+        )
+
+        model.selectedEntryID = "entry-B"
+        #expect(model.visibleDeliveryNotice == nil, "another entry's send must not show here")
+
+        model.selectedEntryID = "entry-A"
+        #expect(model.visibleDeliveryNotice != nil)
+
+        model.selectedEntryID = nil
+        #expect(model.visibleDeliveryNotice != nil, "a library-row send stays visible with nothing open")
+    }
+
+    @Test("a fan-out reports every destination, and a failure wins")
+    func fanOutNotice() throws {
+        let first = UUID()
+        let second = UUID()
+        let delivered = DeliveryAttempt(
+            destinationID: first,
+            destinationName: "Vault A",
+            outcome: .delivered(
+                DeliveryReceipt(
+                    destinationID: first,
+                    destinationName: "Vault A",
+                    deliveredAt: Date(),
+                    location: URL(fileURLWithPath: "/tmp/parola-fanout/A.md")
+                )
+            )
+        )
+        let alsoDelivered = DeliveryAttempt(
+            destinationID: second,
+            destinationName: "Vault B",
+            outcome: .delivered(
+                DeliveryReceipt(
+                    destinationID: second,
+                    destinationName: "Vault B",
+                    deliveredAt: Date(),
+                    location: URL(fileURLWithPath: "/tmp/parola-fanout/B.md")
+                )
+            )
+        )
+        let queued = DeliveryAttempt(
+            destinationID: second,
+            destinationName: "Vault B",
+            outcome: .queued(attempt: 1, nextAt: Date().addingTimeInterval(60))
+        )
+
+        let one = try #require(AppModel.notice(for: [delivered], entryID: "entry-1"))
+        #expect(one.destinationName == "Vault A")
+        #expect(one.state == .sent(URL(fileURLWithPath: "/tmp/parola-fanout/A.md")))
+
+        let both = try #require(AppModel.notice(for: [delivered, alsoDelivered], entryID: "entry-1"))
+        #expect(both.destinationName == "Vault A, Vault B")
+        #expect(both.state == .sent(nil), "Reveal can only point at one note")
+
+        let mixed = try #require(AppModel.notice(for: [delivered, queued], entryID: "entry-1"))
+        #expect(mixed.destinationName == "Vault B")
+        #expect(mixed.destinationID == second)
+        if case .queued = mixed.state {} else {
+            Issue.record("expected the queued destination to win, got \(mixed.state)")
+        }
+    }
+
     @Test("a manual send reports itself in the toast")
     func manualSendSetsTheNotice() async throws {
         let model = makeModel()

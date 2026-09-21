@@ -142,11 +142,10 @@ public struct ObsidianVaultFolderDestination: DeliveryDestination, Codable, Send
         }
 
         let directory = Self.folder(in: vault, subfolder: subfolder)
-        let title = titleFormat.title(for: payload)
-        let base = ObsidianNoteRenderer.filename(
-            template: filenameTemplate, payload: payload, title: title
+        let base = ObsidianNoteRenderer.filename(template: filenameTemplate, payload: payload)
+        let note = ObsidianNoteRenderer.render(
+            payload, options: noteOptions, title: titleFormat.title(for: payload)
         )
-        let note = ObsidianNoteRenderer.render(payload, options: noteOptions, title: title)
 
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -164,19 +163,24 @@ public struct ObsidianVaultFolderDestination: DeliveryDestination, Codable, Send
     }
 
     /// The vault folder the bookmark points at. A bookmark made without the security scope (a
-    /// process that cannot mint one) still resolves, so this tries both.
+    /// process that cannot mint one) still resolves, so this tries both. Through `NSURL`, whose
+    /// stale flag is optional: a stale bookmark still resolves, and this type cannot re-mint one.
     func resolvedVaultURL() throws -> URL {
         guard !vaultBookmark.isEmpty else { throw DeliveryError.vaultUnavailable(name, vaultPath) }
-        var stale = false
-        if let url = try? URL(
+        if let url = try? NSURL(
             resolvingBookmarkData: vaultBookmark,
             options: .withSecurityScope,
             relativeTo: nil,
-            bookmarkDataIsStale: &stale
-        ) {
+            bookmarkDataIsStale: nil
+        ) as URL {
             return url
         }
-        if let url = try? URL(resolvingBookmarkData: vaultBookmark, relativeTo: nil, bookmarkDataIsStale: &stale) {
+        if let url = try? NSURL(
+            resolvingBookmarkData: vaultBookmark,
+            options: [],
+            relativeTo: nil,
+            bookmarkDataIsStale: nil
+        ) as URL {
             return url
         }
         throw DeliveryError.vaultUnavailable(name, vaultPath)

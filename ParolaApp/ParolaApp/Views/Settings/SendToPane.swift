@@ -97,13 +97,18 @@ private struct DestinationRow: View {
         }
     }
 
+    /// Every control in a row carries the destination id, so two rows never share an ax id.
+    private func leaf(_ suffix: String) -> String {
+        "SendTo.Row.\(stored.id.uuidString).\(suffix)"
+    }
+
     private var header: some View {
         HStack(spacing: 8) {
             Toggle("", isOn: enabledBinding)
                 .labelsHidden()
                 .toggleStyle(DSSwitchToggleStyle())
                 .disabled(stored.destination == nil)
-                .axLeaf("SendTo.Toggle.Enabled")
+                .axLeaf(leaf("Toggle.Enabled"))
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: stored.name)
                     .font(DS.Font.bodyStrong)
@@ -124,7 +129,7 @@ private struct DestinationRow: View {
                 .buttonStyle(.borderless)
                 .disabled(!canMoveUp)
                 .help("Move up")
-                .axLeaf("SendTo.Button.MoveUp")
+                .axLeaf(leaf("Button.MoveUp"))
                 Button {
                     model.moveDestination(id: stored.id, by: 1)
                 } label: {
@@ -133,10 +138,10 @@ private struct DestinationRow: View {
                 .buttonStyle(.borderless)
                 .disabled(!canMoveDown)
                 .help("Move down")
-                .axLeaf("SendTo.Button.MoveDown")
+                .axLeaf(leaf("Button.MoveDown"))
                 Button("Edit…", action: onEdit)
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                    .axLeaf("SendTo.Button.Edit")
+                    .axLeaf(leaf("Button.Edit"))
             }
             Button(role: .destructive) {
                 model.removeDestination(id: stored.id)
@@ -144,7 +149,7 @@ private struct DestinationRow: View {
                 Image(systemName: "trash")
             }
             .buttonStyle(.borderless)
-            .axLeaf("SendTo.Button.Remove")
+            .axLeaf(leaf("Button.Remove"))
         }
     }
 
@@ -155,12 +160,13 @@ private struct DestinationRow: View {
                     .font(DS.Font.secondary)
             }
             .toggleStyle(DSSwitchToggleStyle())
-            .axLeaf("SendTo.Toggle.AutoSend")
+            .axLeaf(leaf("Toggle.AutoSend"))
 
             ForEach(EntryCategory.allCases, id: \.self) { category in
                 CategoryChip(
                     category: category,
                     isSelected: stored.categories.contains(category),
+                    leaf: leaf("Chip.Category.\(category.rawValue)"),
                     toggle: { toggle(category) }
                 )
             }
@@ -175,7 +181,7 @@ private struct DestinationRow: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .frame(width: 150, alignment: .trailing)
-            .axLeaf("SendTo.Picker.TitleFormat")
+            .axLeaf(leaf("Picker.TitleFormat"))
         }
     }
 
@@ -233,6 +239,7 @@ private struct DestinationRow: View {
 private struct CategoryChip: View {
     let category: EntryCategory
     let isSelected: Bool
+    let leaf: String
     let toggle: () -> Void
 
     var body: some View {
@@ -241,6 +248,6 @@ private struct CategoryChip: View {
             isSelected: isSelected,
             action: toggle
         )
-        .axLeaf("SendTo.Chip.Category.\(category.rawValue)")
+        .axLeaf(leaf)
     }
 }

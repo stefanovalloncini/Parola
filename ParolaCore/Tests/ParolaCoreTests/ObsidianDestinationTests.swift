@@ -79,8 +79,8 @@ struct ObsidianDestinationTests {
         #expect(names == [".obsidian", "Interview.md"])
     }
 
-    @Test("the title format names the note")
-    func titleFormatNamesTheNote() async throws {
+    @Test("the title format names the note's heading, never its file")
+    func titleFormatNamesTheHeading() async throws {
         let vault = try makeVault()
         defer { try? FileManager.default.removeItem(at: vault) }
         var destination = try destination(vault: vault)
@@ -88,7 +88,10 @@ struct ObsidianDestinationTests {
 
         let receipt = try await destination.deliver(ObsidianNoteRendererTests.payload())
 
-        #expect(receipt.location?.lastPathComponent == "Release chat.md")
+        #expect(receipt.location?.lastPathComponent == "Interview.md")
+        let note = try String(contentsOf: try #require(receipt.location), encoding: .utf8)
+        #expect(note.contains("title: \"Release chat\""))
+        #expect(note.contains("# Release chat"))
     }
 
     @Test("a subfolder cannot climb out of the vault")

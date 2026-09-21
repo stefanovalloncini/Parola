@@ -159,6 +159,89 @@ struct DeliveryEngineTests {
         #expect(await recorder.recorded().isEmpty)
     }
 
+    @Test("the clock brings a queued delivery back and it lands")
+    func theClockRetriesAQueuedDelivery() async throws {
+        let recorder = MockDeliveryRecorder()
+        let receipts = ReceiptSpy()
+        let clock = TestClock()
+        let destination = await mock(failuresBeforeSuccess: 1, recorder: recorder)
+        let engine = makeEngine(
+            destinations: [.mock(destination)], store: try makeStore(), clock: clock, receipts: receipts
+        )
+
+        let outcome = await engine.send(entryID: "entry-1", to: destination.id)
+        guard case .queued(let attempt, _) = outcome else {
+            Issue.record("expected the delivery to be queued, got \(outcome)")
+            return
+        }
+        #expect(attempt == 1)
+        #expect(await poll { clock.sleeperCount == 1 }, "the retry timer should be armed")
+
+        // Taken before the clock moves, awaited after: the retry is a suspension point here,
+        // never a wait on real time.
+        let timer = await engine.timerTask(for: "entry-1", destinationID: destination.id)
+        clock.advance(by: DeliveryEngine.delay(forAttempt: 1))
+        await timer?.value
+
+        #expect(await engine.pending().isEmpty, "the retry should have cleared the queue")
+        #expect(await recorder.recorded().map(\.entryID) == ["entry-1"])
+        #expect(await receipts.entries.values.contains("entry-1"))
+        #expect(await engine.recentLog().last?.event == .delivered)
+    }
+
+    @Test("a retry that fails again moves to the next backoff step")
+    func aSecondFailureMovesToTheNextStep() async throws {
+        let recorder = MockDeliveryRecorder()
+        let clock = TestClock()
+        let destination = await mock(failuresBeforeSuccess: 99, recorder: recorder)
+        let engine = makeEngine(destinations: [.mock(destination)], store: try makeStore(), clock: clock)
+
+        _ = await engine.send(entryID: "entry-1", to: destination.id)
+        #expect(await poll { clock.sleeperCount == 1 })
+        let timer = await engine.timerTask(for: "entry-1", destinationID: destination.id)
+        clock.advance(by: DeliveryEngine.delay(forAttempt: 1))
+        await timer?.value
+
+        let queued = try #require(await engine.pending().first)
+        #expect(queued.attempt == 2)
+        #expect(
+            abs(queued.nextAttemptAt.timeIntervalSinceNow - DeliveryEngine.delay(forAttempt: 2).wallSeconds) < 5,
+            "the second attempt waits out the second step"
+        )
+        #expect(await engine.recentLog().filter { $0.event == .queued }.count == 2)
+        #expect(await recorder.recorded().isEmpty)
+    }
+
+    @Test("a queue with a future attempt waits out what is left of it, not zero")
+    func aFutureAttemptKeepsItsRemainingDelay() async throws {
+        let recorder = MockDeliveryRecorder()
+        let clock = TestClock()
+        let store = try makeStore()
+        let destination = await mock(recorder: recorder)
+        store.save(queue: [
+            QueuedDelivery(
+                entryID: "entry-1",
+                destinationID: destination.id,
+                attempt: 2,
+                nextAttemptAt: Date().addingTimeInterval(600)
+            )
+        ])
+
+        let engine = makeEngine(destinations: [.mock(destination)], store: store, clock: clock)
+
+        #expect(await poll { clock.sleeperCount == 1 }, "the stored delivery should have armed a timer")
+        clock.advance(by: .seconds(60))
+        #expect(clock.sleeperCount == 1, "a minute in, the timer is still waiting out the rest")
+        #expect(await recorder.recorded().isEmpty)
+
+        let timer = await engine.timerTask(for: "entry-1", destinationID: destination.id)
+        clock.advance(by: .seconds(600))
+        await timer?.value
+
+        #expect(await engine.pending().isEmpty)
+        #expect(await recorder.recorded().map(\.entryID) == ["entry-1"])
+    }
+
     @Test("auto-send only runs the destinations that asked for it")
     func autoSendFansOut() async throws {
         let recorder = MockDeliveryRecorder()

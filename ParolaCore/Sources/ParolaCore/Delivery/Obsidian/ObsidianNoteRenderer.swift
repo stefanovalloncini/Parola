@@ -123,15 +123,16 @@ public enum ObsidianNoteRenderer {
     }
 
     /// The note's filename without its extension: tokens replaced, then made safe for the filesystem.
+    /// `{title}` is always the entry's own title; the title format governs the note's heading and
+    /// its frontmatter, not what the file is called.
     public static func filename(
         template: String,
         payload: DeliveryPayload,
-        title: String,
         timeZone: TimeZone = .current
     ) -> String {
         let pattern = template.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "{title}" : template
         let filled = pattern
-            .replacingOccurrences(of: "{title}", with: title)
+            .replacingOccurrences(of: "{title}", with: payload.title)
             .replacingOccurrences(of: "{date}", with: DeliveryDateFormat.day(payload.createdAt, timeZone: timeZone))
             .replacingOccurrences(of: "{time}", with: DeliveryDateFormat.time(payload.createdAt, timeZone: timeZone))
             .replacingOccurrences(of: "{category}", with: payload.category.rawValue)

@@ -31,6 +31,14 @@ extension AppModel {
         return destinations.filter { $0.isEnabled && $0.destination != nil }
     }
 
+    /// The notice the transcript column shows: the one raised for the entry on screen, or any
+    /// notice while nothing is open (a send from a library row).
+    var visibleDeliveryNotice: DeliveryNotice? {
+        guard let notice = deliveryNotice else { return nil }
+        guard let selected = selectedEntryID else { return notice }
+        return notice.entryID == selected ? notice : nil
+    }
+
     var canSendOpenTranscript: Bool {
         destinationsEnabled && selectedEntryID != nil && !sendableDestinations.isEmpty
     }
@@ -132,12 +140,29 @@ extension AppModel {
     func autoSendEntry(_ entryID: LibraryEntry.ID) async {
         guard destinationsEnabled else { return }
         let attempts = await deliveryEngine.sendAutomatically(entryID: entryID)
-        guard let attempt = attempts.first else { return }
-        deliveryNotice = DeliveryNotice(
+        guard !attempts.isEmpty else { return }
+        deliveryNotice = Self.notice(for: attempts, entryID: entryID)
+    }
+
+    /// One line for a fan-out: the first destination that did not deliver, or every destination
+    /// that did.
+    static func notice(for attempts: [DeliveryAttempt], entryID: LibraryEntry.ID) -> DeliveryNotice? {
+        guard let first = attempts.first else { return nil }
+        if let problem = attempts.first(where: { !$0.outcome.isDelivered }) {
+            return DeliveryNotice(
+                entryID: entryID,
+                destinationID: problem.destinationID,
+                destinationName: problem.destinationName,
+                state: noticeState(for: problem.outcome)
+            )
+        }
+        // Reveal can only point at one note, so it is offered when there is only one.
+        let location = attempts.count == 1 ? first.outcome.receipt?.location : nil
+        return DeliveryNotice(
             entryID: entryID,
-            destinationID: attempt.destinationID,
-            destinationName: attempt.destinationName,
-            state: Self.noticeState(for: attempt.outcome)
+            destinationID: first.destinationID,
+            destinationName: attempts.map(\.destinationName).joined(separator: ", "),
+            state: .sent(location)
         )
     }
 
@@ -164,7 +189,7 @@ extension AppModel {
         }
     }
 
-    static func sampleDeliveryPayload() -> DeliveryPayload {
+    nonisolated static func sampleDeliveryPayload() -> DeliveryPayload {
         let segments = [
             TranscriptSegment(
                 id: 0, start: 0, end: 4,
