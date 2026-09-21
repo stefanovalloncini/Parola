@@ -14,8 +14,7 @@ struct DSPillButtonStyle: ButtonStyle {
     let kind: Kind
     var size: Size = .regular
 
-    /// A disabled primary goes neutral rather than fading the accent: a faded fill takes `onAccent` down with it.
-    /// Computed, not stored: a stored one would freeze the palette the app launched with.
+    // Computed, not stored: a stored pair would freeze the palette the app launched with.
     static var disabledFill: Color { DS.Palette.subtleFill }
     static var disabledLabel: Color { DS.Color.secondaryText }
 
