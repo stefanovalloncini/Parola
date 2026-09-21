@@ -36,6 +36,18 @@ struct IntroductionView: View {
         return pair == [.hello, .transcribe] ? .fade : .slide
     }
 
+    /// SwiftUI keeps the transition a scene was built with for its own removal, so the first scene has to
+    /// be built with the move ahead of it: with nothing behind it, forwards is the only way out.
+    nonisolated static func transitionPartner(
+        previous: IntroductionStep?,
+        step: IntroductionStep,
+        steps: [IntroductionStep]
+    ) -> IntroductionStep {
+        if let previous { return previous }
+        guard let index = steps.firstIndex(of: step), steps.indices.contains(index + 1) else { return step }
+        return steps[index + 1]
+    }
+
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var brand
@@ -44,7 +56,12 @@ struct IntroductionView: View {
 
     var body: some View {
         let introduction = model.introduction
-        let kind = Self.transitionKind(from: introduction.previousStep ?? introduction.step, to: introduction.step)
+        let partner = Self.transitionPartner(
+            previous: introduction.previousStep,
+            step: introduction.step,
+            steps: introduction.steps
+        )
+        let kind = Self.transitionKind(from: partner, to: introduction.step)
         return ZStack {
             IntroductionStage()
             VStack(spacing: DS.Spacing.large) {

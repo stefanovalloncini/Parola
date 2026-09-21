@@ -26,6 +26,22 @@ struct IntroductionTransitionTests {
         }
     }
 
+    @Test("a scene with no move behind it is paired with the step ahead")
+    func firstSceneLooksForward() {
+        let steps = IntroductionStep.sequence(hasEngineChoice: true)
+        #expect(IntroductionView.transitionPartner(previous: nil, step: .hello, steps: steps) == .transcribe)
+        #expect(IntroductionView.transitionPartner(previous: nil, step: .features, steps: steps) == .engine)
+        #expect(IntroductionView.transitionPartner(previous: nil, step: .ready, steps: steps) == .ready)
+        #expect(IntroductionView.transitionPartner(previous: .features, step: .transcribe, steps: steps) == .features)
+    }
+
+    @Test("Hello leaves the way it arrived, however the introduction opens")
+    func helloAlwaysFades() {
+        let steps = IntroductionStep.sequence(hasEngineChoice: false)
+        let partner = IntroductionView.transitionPartner(previous: nil, step: .hello, steps: steps)
+        #expect(IntroductionView.transitionKind(from: partner, to: .hello) == .fade)
+    }
+
     @MainActor
     @Test("the controller remembers the step each move came from")
     func controllerRemembersThePreviousStep() {
