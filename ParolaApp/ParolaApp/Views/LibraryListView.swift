@@ -513,6 +513,7 @@ struct LibraryListView: View {
                         Label(action.title, systemImage: action.systemImage)
                     }
                     .buttonStyle(DSPillButtonStyle(kind: index == 0 ? .primary : .secondary))
+                    .accessibilityIdentifier(action.identifier)
                     .axLeaf(action.axIdentifier)
                 }
             }
@@ -615,6 +616,17 @@ extension LibraryEmptyAction {
         case .recordSystemAudio: return "waveform.circle.fill"
         case .startDictation: return "text.cursor"
         case .meetingSettings, .dictationSettings: return "gearshape"
+        }
+    }
+
+    var identifier: String {
+        switch self {
+        case .openFile: return "empty.openFile"
+        case .recordMicrophone: return "empty.record"
+        case .recordSystemAudio: return "empty.recordSystemAudio"
+        case .startDictation: return "empty.startDictation"
+        case .meetingSettings: return "empty.meetingSettings"
+        case .dictationSettings: return "empty.dictationSettings"
         }
     }
 

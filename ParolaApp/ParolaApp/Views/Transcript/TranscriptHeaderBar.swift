@@ -140,14 +140,18 @@ struct TranscriptHeaderBar: View {
     private var aiMenu: some View {
         Menu {
             Button("Summary", action: onOpenSummary)
+                .accessibilityIdentifier("ai.summary")
                 .axLeaf("HeaderBar.Button.OpenSummary")
             Button("Chat", action: onOpenChat)
+                .accessibilityIdentifier("ai.chat")
                 .axLeaf("HeaderBar.Button.OpenChat")
             Divider()
             Group {
                 Button("Chapters") { runInInspector(model.extractSmartChapters) }
+                    .accessibilityIdentifier("ai.chapters")
                     .axLeaf("HeaderBar.MenuItem.Chapters")
                 Button("Action Items") { runInInspector(model.extractActionItems) }
+                    .accessibilityIdentifier("ai.action_items")
                     .axLeaf("HeaderBar.MenuItem.ActionItems")
             }
             .disabled(!model.isAIAvailable)
@@ -160,6 +164,7 @@ struct TranscriptHeaderBar: View {
         .fixedSize()
         .help("Summary, chat, chapters and action items")
         .accessibilityLabel("AI")
+        .accessibilityIdentifier("toolbar.ai")
         .axLeaf("HeaderBar.Menu.AI")
     }
 
