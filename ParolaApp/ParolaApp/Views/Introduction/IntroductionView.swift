@@ -3,6 +3,21 @@ import SwiftUI
 enum IntroductionLayout {
     /// The usable width every scene lays its content out in; page margins sit outside it, so a scene can run edge to edge across exactly this much.
     static let columnWidth: CGFloat = 720
+
+    /// The row every scene after Hello starts on, measured from the top of the stage: one shared
+    /// anchor, so a headline never jumps when the scene changes.
+    static func topInset(stageHeight: CGFloat) -> CGFloat {
+        max(DS.Spacing.xlarge, floor(stageHeight * 0.20))
+    }
+
+    /// Hello is a centred lockup, but dead centre reads low with the bottom bar under it.
+    static func helloCentre(stageHeight: CGFloat) -> CGFloat {
+        stageHeight * 0.46
+    }
+
+    static func helloOffset(stageHeight: CGFloat) -> CGFloat {
+        helloCentre(stageHeight: stageHeight) - stageHeight / 2
+    }
 }
 
 /// The whole window during the first run: one scene at a time over the stage, with the step dots and navigation pills pinned to the bottom.
@@ -17,10 +32,11 @@ struct IntroductionView: View {
         return ZStack {
             IntroductionStage()
             VStack(spacing: DS.Spacing.large) {
-                scene(introduction.step)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .id(introduction.step)
-                    .transition(sceneTransition(back: introduction.isMovingBack))
+                GeometryReader { proxy in
+                    staged(introduction.step, stageHeight: proxy.size.height)
+                        .id(introduction.step)
+                        .transition(sceneTransition(back: introduction.isMovingBack))
+                }
                 IntroductionBottomBar()
             }
             .frame(maxWidth: IntroductionLayout.columnWidth)
@@ -30,6 +46,20 @@ struct IntroductionView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task { if playback == nil { playback = DemoPlayback() } }
         .axBranch("Introduction")
+    }
+
+    @ViewBuilder
+    private func staged(_ step: IntroductionStep, stageHeight: CGFloat) -> some View {
+        if step == .hello {
+            scene(step)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .offset(y: IntroductionLayout.helloOffset(stageHeight: stageHeight))
+        } else {
+            scene(step)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, IntroductionLayout.topInset(stageHeight: stageHeight))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
     }
 
     @ViewBuilder
