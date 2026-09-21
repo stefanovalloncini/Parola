@@ -135,9 +135,9 @@ struct LibraryRowDisplay: Identifiable {
 struct LibraryRowDisplayCache {
     private(set) var displays: [LibraryEntry.ID: LibraryRowDisplay] = [:]
 
-    /// Only entries that left the library: the rest are kept, since `display(for:)` checks each row itself.
+    /// Only entries that left the kept set: the rest stay, since `display(for:)` checks each row itself.
     mutating func prune(keeping ids: some Collection<LibraryEntry.ID>) {
-        guard displays.count > ids.count else { return }
+        guard !displays.isEmpty else { return }
         let live = Set(ids)
         displays = displays.filter { live.contains($0.key) }
     }

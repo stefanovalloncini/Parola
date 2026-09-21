@@ -166,6 +166,36 @@ struct LibraryEntryDisplayTests {
         #expect(cache.displays.keys.sorted() == ["e"])
     }
 
+    /// A view that shows a subset (Home's recents, a filtered category) must not let the rest of the library pile up.
+    @Test("pruning to a subset drops the rows that fell outside it")
+    func pruneToASubsetDropsTheRest() {
+        let a = LibraryEntry(id: "a", bundleURL: URL(fileURLWithPath: "/tmp/LibraryEntryDisplayTests/a.parola"), manifest: display().entry.manifest)
+        let b = LibraryEntry(id: "b", bundleURL: URL(fileURLWithPath: "/tmp/LibraryEntryDisplayTests/b.parola"), manifest: display().entry.manifest)
+        let c = LibraryEntry(id: "c", bundleURL: URL(fileURLWithPath: "/tmp/LibraryEntryDisplayTests/c.parola"), manifest: display().entry.manifest)
+        var cache = LibraryRowDisplayCache()
+
+        _ = cache.display(for: a)
+        _ = cache.display(for: b)
+        _ = cache.display(for: c)
+        #expect(cache.displays.count == 3)
+
+        cache.prune(keeping: [a.id, b.id])
+        #expect(cache.displays.keys.sorted() == ["a", "b"])
+    }
+
+    /// The library case, where "kept" is the whole library and outnumbers the handful of rows ever rendered.
+    @Test("pruning still drops a row whose entry left even when the kept set is larger than the cache")
+    func pruneDropsALeftEntryEvenWhenTheKeptSetIsLarger() {
+        let a = LibraryEntry(id: "a", bundleURL: URL(fileURLWithPath: "/tmp/LibraryEntryDisplayTests/a.parola"), manifest: display().entry.manifest)
+        var cache = LibraryRowDisplayCache()
+
+        _ = cache.display(for: a)
+        #expect(cache.displays.count == 1)
+
+        cache.prune(keeping: ["other-1", "other-2", "other-3"])
+        #expect(cache.displays.isEmpty)
+    }
+
     /// The index fills in after the rows are already on screen, and a cached row would keep the blank.
     @Test("an entry the index has just reached drops its cached row")
     func displayCacheFollowsTheIndex() {
