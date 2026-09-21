@@ -1,6 +1,7 @@
 import Testing
 import ParolaCore
 
+/// Load-bearing: the mock registries are process-global and tests here assume theirs stays put across awaits.
 @Suite(.serialized)
 struct TranscriberMockSuites {}
 
