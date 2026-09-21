@@ -50,23 +50,6 @@ extension TranscriberMockSuites {
             return AppModel(bootstrap: bootstrap)
         }
 
-        private func clearMocks() async {
-            await MockTranscriberRegistry.shared.clear()
-            await MockAudioSourceRegistry.shared.clear()
-            MockMediaFetcherRegistry.shared.clear()
-        }
-
-        /// Awaited teardown on every exit: a fire-and-forget clear can land after the next test installed its mock.
-        private func withMocksCleared(_ body: @MainActor () async throws -> Void) async throws {
-            do {
-                try await body()
-            } catch {
-                await clearMocks()
-                throw error
-            }
-            await clearMocks()
-        }
-
         /// A wall-clock deadline: 15 ms sleeps drift under load, so a tally bounds the checks, not the wait.
         private func waitUntil(timeout: Duration = .seconds(30), _ condition: @MainActor () -> Bool) async -> Bool {
             let deadline = ContinuousClock.now + timeout
@@ -113,7 +96,7 @@ extension TranscriberMockSuites {
 
         @Test("a file transcription that lands after the user opened an entry keeps its own audio")
         func fileTranscribePairsWithItsSource() async throws {
-            try await withMocksCleared {
+            try await withMocksCleared(.all) {
                 let gate = MockTranscriberGate()
                 defer { Task { await gate.open() } }
                 await MockTranscriberRegistry.shared.install(engineID: nil, response: heldMock(gate))
@@ -140,7 +123,7 @@ extension TranscriberMockSuites {
 
         @Test("a recording's transcript lands with the recording's audio, not the entry opened meanwhile")
         func recordingPairsWithItsSource() async throws {
-            try await withMocksCleared {
+            try await withMocksCleared(.all) {
                 let gate = MockTranscriberGate()
                 defer { Task { await gate.open() } }
                 let fixture = try makeSilentWAV(label: "take")
@@ -179,7 +162,7 @@ extension TranscriberMockSuites {
 
         @Test("a YouTube transcription that lands after a navigation keeps its own audio")
         func youtubePairsWithItsSource() async throws {
-            try await withMocksCleared {
+            try await withMocksCleared(.all) {
                 let gate = MockTranscriberGate()
                 defer { Task { await gate.open() } }
                 let fixture = try makeSilentWAV(label: "youtube")
