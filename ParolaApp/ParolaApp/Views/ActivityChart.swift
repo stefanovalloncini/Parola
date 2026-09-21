@@ -100,10 +100,12 @@ struct ActivityChart: View {
     private var xAxis: some AxisContent {
         AxisMarks(values: labelledDates) { value in
             if let date = value.as(Date.self) {
-                AxisValueLabel {
+                // Charts sizes a label to the slot it computes, and one month's slot came out too narrow for "Jul".
+                AxisValueLabel(collisionResolution: .disabled) {
                     Text(axisLabel(for: date))
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.Color.secondaryText)
+                        .fixedSize()
                 }
             }
         }

@@ -33,6 +33,12 @@ struct StatisticsLocalizationTests {
             ("Audio transcribed", "Audio trascritto"),
             ("Time transcribing", "Tempo di trascrizione"),
             ("Average speed", "Velocità media"),
+            ("Words", "Parole"),
+            ("Records", "Record"),
+            ("Longest transcript", "Trascrizione più lunga"),
+            ("Longest run", "Esecuzione più lunga"),
+            ("Fastest run", "Esecuzione più veloce"),
+            ("No word counts yet", "nessun conteggio parole"),
             ("By Model", "Per modello"),
             ("By Kind", "Per tipo"),
             ("Activity", "Attività"),
@@ -103,18 +109,36 @@ struct StatisticsLocalizationTests {
 
         #expect(
             StatisticsCopy.coverage(
-                LibraryStatistics.Coverage(count: 4, total: 27, since: day), bundle: bundle, locale: italian
+                LibraryStatistics.Coverage(count: 4, total: 27, since: day),
+                wordsCountedFor: 27, entries: 27, bundle: bundle, locale: italian
             ) == "Tempi registrati dal \(dayLabel) · 4 / 27 trascrizioni"
         )
         #expect(
             StatisticsCopy.coverage(
-                LibraryStatistics.Coverage(count: 3, total: 3, since: day), bundle: bundle, locale: italian
+                LibraryStatistics.Coverage(count: 3, total: 3, since: day),
+                wordsCountedFor: 3, entries: 3, bundle: bundle, locale: italian
             ) == "Tempi registrati per ogni trascrizione."
         )
         #expect(
             StatisticsCopy.coverage(
-                LibraryStatistics.Coverage(count: 0, total: 9, since: nil), bundle: bundle, locale: italian
+                LibraryStatistics.Coverage(count: 0, total: 9, since: nil),
+                wordsCountedFor: 9, entries: 9, bundle: bundle, locale: italian
             ) == "Nessun tempo registrato finora: le nuove trascrizioni misurano quanto impiegano."
+        )
+    }
+
+    @Test("the word-count suffixes read in Italian")
+    func wordCoverageInItalian() throws {
+        let bundle = try italianBundle()
+        let day = Date(timeIntervalSince1970: 1_757_635_200)
+        let all = LibraryStatistics.Coverage(count: 3, total: 3, since: day)
+        #expect(
+            StatisticsCopy.coverage(all, wordsCountedFor: 2, entries: 3, bundle: bundle, locale: italian)
+                == "Tempi registrati per ogni trascrizione · parole contate per 2 / 3"
+        )
+        #expect(
+            StatisticsCopy.coverage(all, wordsCountedFor: 0, entries: 3, bundle: bundle, locale: italian)
+                == "Tempi registrati per ogni trascrizione · nessun conteggio parole"
         )
     }
 }

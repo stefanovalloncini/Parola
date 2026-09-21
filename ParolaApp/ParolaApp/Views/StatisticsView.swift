@@ -54,7 +54,9 @@ struct StatisticsView: View {
             VStack(alignment: .leading, spacing: DS.Spacing.large) {
                 tiles(stats)
                 // The caveat for the timed tiles and the table below, not a fact about the page.
-                Text(StatisticsCopy.coverage(stats.timed))
+                Text(StatisticsCopy.coverage(
+                    stats.timed, wordsCountedFor: stats.totals.wordsCountedFor, entries: stats.totals.entries
+                ))
                     .font(DS.Font.secondary)
                     .foregroundStyle(DS.Color.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -63,6 +65,7 @@ struct StatisticsView: View {
                 if !stats.perModel.isEmpty {
                     modelTable(stats)
                 }
+                records(stats)
                 kinds(stats)
             }
             .padding(DS.Spacing.large)
@@ -70,36 +73,46 @@ struct StatisticsView: View {
         }
     }
 
+    /// One row of five where they fit, otherwise three and two: a lone tile on its own row is never an option.
     private func tiles(_ stats: LibraryStatistics) -> some View {
-        LazyVGrid(columns: Self.tileColumns, spacing: DS.Spacing.regular) {
-            StatTile(
-                label: "Transcripts",
-                value: AppFormat.integer(stats.totals.entries),
-                axID: "Tile.Transcripts"
-            )
-            StatTile(
-                label: "Audio transcribed",
-                value: AppFormat.duration(seconds: stats.totals.audioSeconds),
-                axID: "Tile.Audio"
-            )
-            StatTile(
-                label: "Time transcribing",
-                value: AppFormat.duration(seconds: stats.totals.transcriptionSeconds),
-                axID: "Tile.Time"
-            )
-            StatTile(
-                label: "Average speed",
-                value: stats.averageSpeed.map { TranscriptionSpeed.label($0, locale: AppFormat.locale) } ?? "—",
-                axID: "Tile.Speed"
-            )
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: TileGrid.spacing) {
+                tileViews(stats)
+            }
+            LazyVGrid(columns: TileGrid.wrappedColumns, spacing: TileGrid.spacing) {
+                tileViews(stats)
+            }
         }
     }
 
-    /// Four across whatever the window gives them: an adaptive grid packs them left and leaves a gutter.
-    private static let tileColumns = Array(
-        repeating: GridItem(.flexible(minimum: 120), spacing: DS.Spacing.regular),
-        count: 4
-    )
+    @ViewBuilder
+    private func tileViews(_ stats: LibraryStatistics) -> some View {
+        StatTile(
+            label: "Transcripts",
+            value: AppFormat.integer(stats.totals.entries),
+            axID: "Tile.Transcripts"
+        )
+        StatTile(
+            label: "Audio transcribed",
+            value: AppFormat.duration(seconds: stats.totals.audioSeconds),
+            axID: "Tile.Audio"
+        )
+        StatTile(
+            label: "Time transcribing",
+            value: AppFormat.duration(seconds: stats.totals.transcriptionSeconds),
+            axID: "Tile.Time"
+        )
+        StatTile(
+            label: "Average speed",
+            value: stats.averageSpeed.map { TranscriptionSpeed.label($0, locale: AppFormat.locale) } ?? "—",
+            axID: "Tile.Speed"
+        )
+        StatTile(
+            label: "Words",
+            value: stats.totals.wordsCountedFor == 0 ? "—" : AppFormat.integer(stats.totals.words),
+            axID: "Tile.Words"
+        )
+    }
 
     private func modelTable(_ stats: LibraryStatistics) -> some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
@@ -124,11 +137,32 @@ struct StatisticsView: View {
         }
     }
 
+    @ViewBuilder
+    private func records(_ stats: LibraryStatistics) -> some View {
+        let records = StatisticsRecord.records(from: stats, entry: model.libraryEntry(id:))
+        if !records.isEmpty {
+            VStack(alignment: .leading, spacing: DS.Spacing.tight) {
+                SectionCaption("Records")
+                VStack(spacing: 0) {
+                    ForEach(records) { record in
+                        RecordRow(record: record, showsAITitle: model.showAITitles, open: model.loadEntry)
+                    }
+                }
+                .padding(.horizontal, -DS.Spacing.small)
+            }
+        }
+    }
+
     private func kinds(_ stats: LibraryStatistics) -> some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.small) {
+        let categories = visibleCategories(stats)
+        let shares = KindShare.shares(counts: categories.map { ($0, stats.totals.count($0)) })
+        return VStack(alignment: .leading, spacing: DS.Spacing.small) {
             SectionCaption("By Kind")
+            if categories.count > 1, !shares.isEmpty {
+                KindShareBar(shares: shares)
+            }
             HStack(spacing: DS.Spacing.regular) {
-                ForEach(visibleCategories(stats), id: \.self) { category in
+                ForEach(categories, id: \.self) { category in
                     KindCount(category: category, count: stats.totals.count(category))
                 }
             }
@@ -218,6 +252,26 @@ private enum ModelRowMetrics {
     static let barWidth: CGFloat = 72
 }
 
+enum TileGrid {
+    static let count = 5
+    static let tileMinimum: CGFloat = 150
+    static let spacing = DS.Spacing.regular
+    static let wrappedColumns = Array(
+        repeating: GridItem(.flexible(minimum: tileMinimum), spacing: spacing),
+        count: 3
+    )
+
+    /// What `ViewThatFits` picks: the single row when its ideal width fits, else the three-column grid.
+    static func columns(fitting width: CGFloat) -> Int {
+        CGFloat(count) * tileMinimum + CGFloat(count - 1) * spacing <= width ? count : wrappedColumns.count
+    }
+
+    static func leavesLoneTile(width: CGFloat) -> Bool {
+        let columns = columns(fitting: width)
+        return count > columns && count % columns == 1
+    }
+}
+
 private struct StatTile: View {
     let label: LocalizedStringKey
     let value: String
@@ -248,6 +302,8 @@ private struct StatTile: View {
             RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
                 .strokeBorder(DS.Palette.divider, lineWidth: 1)
         )
+        // The ideal width is what `ViewThatFits` measures; the text inside scales down rather than widening the tile.
+        .frame(minWidth: TileGrid.tileMinimum, idealWidth: TileGrid.tileMinimum, maxWidth: .infinity)
     }
 }
 

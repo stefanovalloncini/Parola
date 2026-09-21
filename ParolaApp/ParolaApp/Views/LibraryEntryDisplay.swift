@@ -7,6 +7,11 @@ enum LibraryEntryDisplay {
         return title(raw: entry.title, createdAt: entry.createdAt, fromFileName: stored.isEmpty)
     }
 
+    /// The title a library row shows: the generated one when the setting asks for it and the entry has one.
+    static func listTitle(for entry: LibraryEntry, showsAITitle: Bool) -> String {
+        showsAITitle ? (entry.aiTitle ?? title(for: entry)) : title(for: entry)
+    }
+
     /// The catalogue's name for the model an entry was transcribed with, falling back to the
     /// stored id for imports and models the catalogue no longer lists.
     static func modelName(raw: String) -> String? {
@@ -104,8 +109,7 @@ struct LibraryRowDisplay: Identifiable {
         showsAITitle: Bool = false,
         showsAISummary: Bool = false
     ) {
-        let baseTitle = LibraryEntryDisplay.title(for: entry)
-        let title = showsAITitle ? (entry.aiTitle ?? baseTitle) : baseTitle
+        let title = LibraryEntryDisplay.listTitle(for: entry, showsAITitle: showsAITitle)
         let stated = date ?? entry.createdAt
         self.entry = entry
         self.title = title

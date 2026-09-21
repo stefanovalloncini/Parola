@@ -4580,6 +4580,17 @@
         }
       }
     },
+    "Fastest run": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esecuzione più veloce"
+          }
+        }
+      }
+    },
     "Favorite": {
       "extractionState": "manual",
       "localizations": {
@@ -6239,6 +6250,28 @@
         }
       }
     },
+    "Longest run": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esecuzione più lunga"
+          }
+        }
+      }
+    },
+    "Longest transcript": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trascrizione più lunga"
+          }
+        }
+      }
+    },
     "Looks for a new version straight away.": {
       "extractionState": "manual",
       "localizations": {
@@ -7377,6 +7410,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ancora nessuna cartella sorvegliata"
+          }
+        }
+      }
+    },
+    "No word counts yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nessun conteggio parole"
           }
         }
       }
@@ -9103,6 +9147,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registrazione — %@"
+          }
+        }
+      }
+    },
+    "Records": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record"
           }
         }
       }
@@ -13162,6 +13217,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Le parole mentre vengono dette"
+          }
+        }
+      }
+    },
+    "Words counted for %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "parole contate per %@"
           }
         }
       }

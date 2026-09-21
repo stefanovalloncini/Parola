@@ -13,12 +13,29 @@ enum StatisticsCopy {
         String(localized: "\(transcripts(entries, bundle: bundle, locale: locale)) · \(AppFormat.duration(seconds: audioSeconds, locale: locale)) transcribed", bundle: bundle)
     }
 
-    /// Why the two timed tiles and the model table can cover less than the library does.
+    /// Why the timed tiles, the model table and the word count can cover less than the library does.
     static func coverage(
         _ timed: LibraryStatistics.Coverage,
+        wordsCountedFor: Int,
+        entries: Int,
         bundle: Bundle = .main,
         locale: Locale = AppFormat.locale
     ) -> String {
+        let timing = timingCoverage(timed, bundle: bundle, locale: locale)
+        guard entries > 0, wordsCountedFor < entries else { return timing }
+        let words: String
+        if wordsCountedFor == 0 {
+            words = String(localized: "No word counts yet", bundle: bundle)
+        } else {
+            let share = "\(AppFormat.integer(wordsCountedFor, locale: locale)) / \(AppFormat.integer(entries, locale: locale))"
+            words = String(localized: "Words counted for \(share)", bundle: bundle)
+        }
+        // A full stop mid-line would read as two sentences; the separator carries the pause.
+        let lead = timing.hasSuffix(".") ? String(timing.dropLast()) : timing
+        return "\(lead) · \(words)"
+    }
+
+    private static func timingCoverage(_ timed: LibraryStatistics.Coverage, bundle: Bundle, locale: Locale) -> String {
         guard let since = timed.since, timed.count > 0 else {
             return String(localized: "No run has been timed yet — new transcriptions record how long they take.", bundle: bundle)
         }

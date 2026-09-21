@@ -204,4 +204,30 @@ struct StatisticsViewTests {
     func statisticsIsNotAList() {
         #expect(LibraryOrigin.capture(sidebar: .statistics, homeOnScreen: false) == nil)
     }
+
+    @Test("a Records row opens the transcript it names")
+    func recordRowOpensItsEntry() async throws {
+        let previous = DefaultsStore.current
+        DefaultsStore.current = temporaryDefaults("test-statistics-")
+        defer { DefaultsStore.current = previous }
+        let model = makeModel(DefaultsStore.current, entries: [])
+        let seeded = try await model.library.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 9, text: "ordine del giorno")],
+                language: "it", modelName: "m", durationSeconds: 9, transcriptionSeconds: 1
+            ),
+            audioSource: nil, title: "Assemblea"
+        )
+        model.libraryEntries = [seeded]
+        let record = StatisticsRecord(kind: .longestRun, entry: seeded, value: "1 sec")
+
+        RecordRow(record: record, showsAITitle: false, open: model.loadEntry).activate()
+        for _ in 0..<200 where model.selectedEntryID != seeded.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(model.selectedEntryID == seeded.id)
+        #expect(model.route == .transcript)
+        #expect(model.transcriptOrigin == nil)
+    }
 }
