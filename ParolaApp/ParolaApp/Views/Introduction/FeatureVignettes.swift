@@ -149,7 +149,7 @@ struct TranscribeFrame: Equatable {
     }
 }
 
-/// One frame of the meetings loop: the detection pill, a Record pill that beats once, a recording dot that arrives late.
+/// One frame of the meetings loop: a detection pill over a Record pill that beats once before the recording dot lights.
 struct MeetingFrame: Equatable {
     static let beatFrom = 0.38
     static let beatSpan = 0.24

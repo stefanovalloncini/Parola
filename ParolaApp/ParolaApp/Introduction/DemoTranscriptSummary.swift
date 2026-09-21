@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 import ParolaCore
 
-/// What the demo card states once the clip has played: how long it ran, how many words it wrote, and the formats that transcript could be saved as.
+/// What the demo card states once the clip has played: how long it ran and what that transcript could be saved as.
 struct DemoTranscriptSummary {
     let durationLabel: String
     let wordCount: Int?
