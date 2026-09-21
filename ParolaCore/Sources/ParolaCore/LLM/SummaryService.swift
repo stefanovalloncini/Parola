@@ -32,21 +32,29 @@ public actor SummaryService {
     }
 
     public func summarise(_ transcript: Transcript) async throws -> Summary {
+        try await summarise(transcript, options: .default)
+    }
+
+    public func summarise(_ transcript: Transcript, options: SummaryOptions) async throws -> Summary {
         try features.require(.ai)
         #if canImport(FoundationModels)
         // The structured path talks to FoundationModels directly, so it can't see an installed
         // mock — route mocked runs through the text path, which resolves models via the factory.
         if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *),
            await MockLanguageModelStore.shared.resolve(for: .foundation) == nil {
-            return try await summariseStructured(transcript)
+            return try await summariseStructured(transcript, options: options)
         }
         #endif
-        return try await summariseText(transcript)
+        return try await summariseText(transcript, options: options)
     }
 
     public func summarise(_ transcript: Transcript, model: any LanguageModel) async throws -> Summary {
         try features.require(.ai)
-        return try await summarise(transcript) { prompt in
+        return try await summarise(transcript, model: model, options: .default)
+    }
+
+    private func summarise(_ transcript: Transcript, model: any LanguageModel, options: SummaryOptions) async throws -> Summary {
+        try await summarise(transcript, options: options) { prompt in
             do {
                 return SummaryService.parse(try await model.respond(to: prompt))
             } catch {
@@ -58,9 +66,10 @@ public actor SummaryService {
 
     private func summarise(
         _ transcript: Transcript,
+        options: SummaryOptions,
         respond: (String) async throws -> Summary
     ) async throws -> Summary {
-        let lines = transcript.segments.map(TranscriptPromptContext.timestampedLine(for:))
+        let lines = transcript.segments.map { SummaryService.line(for: $0, options: options) }
         let prompt = SummaryService.promptHeader + lines.compactMap { $0 }.joined()
         guard TokenBudget.estimateTokens(prompt) > budgetTokens else {
             return try await respond(prompt)
@@ -71,17 +80,21 @@ public actor SummaryService {
             parts.append(try await respond(window.prompt))
         }
         let reduced = try await respond(SummaryService.buildReducePrompt(parts.map(\.text)))
-        return Summary(text: reduced.text, chapters: SummaryService.mergeChapters(parts.flatMap(\.chapters)))
+        return Summary(
+            text: reduced.text,
+            chapters: SummaryService.mergeChapters(parts.flatMap(\.chapters)),
+            actionItems: reduced.actionItems
+        )
     }
 
-    private func summariseText(_ transcript: Transcript) async throws -> Summary {
-        let model = try await LanguageModelFactory.makeOnDevice(instructions: SummaryService.textInstructions)
-        return try await summarise(transcript, model: model)
+    private func summariseText(_ transcript: Transcript, options: SummaryOptions) async throws -> Summary {
+        let model = try await LanguageModelFactory.makeOnDevice(instructions: SummaryService.textInstructions(for: options))
+        return try await summarise(transcript, model: model, options: options)
     }
 
     #if canImport(FoundationModels)
     @available(macOS 26.0, iOS 26.0, visionOS 26.0, *)
-    private func summariseStructured(_ transcript: Transcript) async throws -> Summary {
+    private func summariseStructured(_ transcript: Transcript, options: SummaryOptions) async throws -> Summary {
         switch SystemLanguageModel.default.availability {
         case .available:
             break
@@ -91,8 +104,8 @@ public actor SummaryService {
             throw FailureReason.notAvailable("Apple Intelligence isn't available right now.")
         }
 
-        return try await summarise(transcript) { prompt in
-            let session = LanguageModelSession(instructions: SummaryService.structuredInstructions)
+        return try await summarise(transcript, options: options) { prompt in
+            let session = LanguageModelSession(instructions: SummaryService.structuredInstructions(for: options))
             do {
                 let response = try await session.respond(to: prompt, generating: GenerableSummary.self)
                 return response.content.toSummary()
@@ -104,7 +117,56 @@ public actor SummaryService {
     }
     #endif
 
-    static let textInstructions = """
+    static func line(for segment: TranscriptSegment, options: SummaryOptions) -> String? {
+        guard options.includeTimestamps else {
+            let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !body.isEmpty else { return nil }
+            guard options.includeSpeakers,
+                  let speaker = segment.speaker?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !speaker.isEmpty else {
+                return "\(body)\n"
+            }
+            return "\(speaker): \(body)\n"
+        }
+        return TranscriptPromptContext.timestampedLine(for: segment)
+    }
+
+    static func textInstructions(for options: SummaryOptions) -> String {
+        var out = textInstructionsBase
+        if options.actionItems {
+            out += "\n\nACTION ITEMS:\nOne action per line starting with '- '."
+        }
+        out += optionSentences(for: options)
+        return out
+    }
+
+    static func structuredInstructions(for options: SummaryOptions) -> String {
+        structuredInstructionsBase + optionSentences(for: options)
+    }
+
+    private static func optionSentences(for options: SummaryOptions) -> String {
+        var sentences: [String] = []
+        if options.sections {
+            sentences.append("Organise the summary under two to four short section headings.")
+        }
+        if options.bulletPoints {
+            sentences.append("Write the summary as bullet points.")
+        }
+        if options.keyPointsOnly {
+            sentences.append("Give only the key points, no narrative.")
+        }
+        if let code = options.outputLanguage {
+            let name = Locale.current.localizedString(forLanguageCode: code) ?? code
+            sentences.append("Write everything in \(name).")
+        }
+        if let customPrompt = options.customPrompt, !customPrompt.isEmpty {
+            sentences.append("Additional instructions: \(customPrompt)")
+        }
+        guard !sentences.isEmpty else { return "" }
+        return "\n\n" + sentences.joined(separator: " ")
+    }
+
+    private static let textInstructionsBase = """
     You summarise transcripts. Always respond with exactly two sections:
 
     SUMMARY:
@@ -114,7 +176,7 @@ public actor SummaryService {
     One line per chapter, in the form "MM:SS  Short title". Three to six words for the title. Five to ten chapters total, fewer if the transcript is short.
     """
 
-    static let structuredInstructions = """
+    private static let structuredInstructionsBase = """
     You summarise transcripts. Produce a two-to-four-sentence summary plus five to ten chapter markers. Each chapter has a timestamp in seconds from the start of the transcript and a three-to-six-word title.
     """
 
@@ -191,8 +253,9 @@ public actor SummaryService {
         var summaryParagraphs: [[String]] = []
         var currentParagraph: [String] = []
         var chapters: [Chapter] = []
+        var actionItems: [String] = []
 
-        enum Section { case none, summary, chapters }
+        enum Section { case none, summary, chapters, actionItems }
         var section: Section = .none
 
         func flushParagraph() {
@@ -218,6 +281,11 @@ public actor SummaryService {
                 section = .chapters
                 continue
             }
+            if header.uppercased().hasPrefix("ACTION ITEMS:") {
+                flushParagraph()
+                section = .actionItems
+                continue
+            }
 
             switch section {
             case .none:
@@ -231,6 +299,10 @@ public actor SummaryService {
             case .chapters:
                 guard let chapter = SummaryService.parseChapter(line) else { continue }
                 chapters.append(chapter)
+            case .actionItems:
+                let item = line.drop(while: { "-•* ".contains($0) }).trimmingCharacters(in: .whitespaces)
+                guard !item.isEmpty else { continue }
+                actionItems.append(item)
             }
         }
         flushParagraph()
@@ -239,7 +311,7 @@ public actor SummaryService {
             .map { $0.joined(separator: " ").split(whereSeparator: { $0.isWhitespace }).joined(separator: " ") }
             .joined(separator: "\n\n")
             .trimmingCharacters(in: .whitespaces)
-        return Summary(text: summaryText, chapters: chapters)
+        return Summary(text: summaryText, chapters: chapters, actionItems: actionItems)
     }
 
     static func parseChapter(_ line: String) -> Chapter? {
@@ -268,10 +340,14 @@ struct GenerableSummary: Sendable {
     @Guide(description: "Five to ten chapter markers covering the transcript in order.")
     var chapters: [GenerableChapter]
 
+    @Guide(description: "Concrete action items, one per entry; empty when none.")
+    var actionItems: [String]
+
     func toSummary() -> Summary {
         Summary(
             text: summary.trimmingCharacters(in: .whitespacesAndNewlines),
-            chapters: chapters.compactMap { Chapter.cleaned(title: $0.title, start: $0.startSeconds) }
+            chapters: chapters.compactMap { Chapter.cleaned(title: $0.title, start: $0.startSeconds) },
+            actionItems: actionItems.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         )
     }
 }

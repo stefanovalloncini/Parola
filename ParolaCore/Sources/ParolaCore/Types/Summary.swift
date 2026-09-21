@@ -37,9 +37,29 @@ public struct Chapter: Codable, Hashable, Sendable, Identifiable {
 public struct Summary: Codable, Hashable, Sendable {
     public var text: String
     public var chapters: [Chapter]
+    public var actionItems: [String]
 
-    public init(text: String, chapters: [Chapter] = []) {
+    public init(text: String, chapters: [Chapter] = [], actionItems: [String] = []) {
         self.text = text
         self.chapters = chapters
+        self.actionItems = actionItems
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case text, chapters, actionItems
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        text = try c.decode(String.self, forKey: .text)
+        chapters = try c.decode([Chapter].self, forKey: .chapters)
+        actionItems = try c.decodeIfPresent([String].self, forKey: .actionItems) ?? []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(text, forKey: .text)
+        try c.encode(chapters, forKey: .chapters)
+        try c.encode(actionItems, forKey: .actionItems)
     }
 }
