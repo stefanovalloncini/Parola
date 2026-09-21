@@ -188,7 +188,9 @@ final class TranscriptionCoordinator {
             let processed = postProcessor?(final) ?? final
             Task { [generation] in
                 do {
-                    let entry = try await library.add(transcript: processed, audioSource: final.sourceURL)
+                    let entry = try await library.add(
+                        transcript: processed, audioSource: final.sourceURL, source: .microphone
+                    )
                     guard generation != cancelledGeneration else {
                         phase = .idle
                         return
