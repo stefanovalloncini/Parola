@@ -4806,6 +4806,17 @@
         }
       }
     },
+    "In a panel that stays on top": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In un pannello sempre in primo piano"
+          }
+        }
+      }
+    },
     "In progress": {
       "extractionState": "manual",
       "localizations": {
@@ -8831,6 +8842,17 @@
         }
       }
     },
+    "Send the notes": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manda gli appunti"
+          }
+        }
+      }
+    },
     "Send via Mail…": {
       "extractionState": "manual",
       "localizations": {
@@ -11257,6 +11279,17 @@
         }
       }
     },
+    "Words as they are spoken": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le parole mentre vengono dette"
+          }
+        }
+      }
+    },
     "Words that switch to this prompt for one dictation. Separate with commas.": {
       "extractionState": "manual",
       "localizations": {
@@ -11412,6 +11445,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Le tue parole come sottotitoli, in un pannello sempre in primo piano."
+          }
+        }
+      }
+    },
+    "Zoom is running": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zoom è in esecuzione"
           }
         }
       }
