@@ -373,6 +373,37 @@ struct DownloadCompletionPhaseTests {
         #expect(await waitUntil { model.phase == .downloadingModel(name: installed, progress: 0.5) })
     }
 
+    @Test("a digest in flight paints no phase, so the finished download still hands it back")
+    func duplicateDigestDoesNotHoldTheBar() {
+        let model = makeModel()
+        model.phase = .downloadingModel(name: installed, progress: 1)
+        model.duplicateCheckTask = Task { try? await Task.sleep(for: .seconds(60)) }
+        defer {
+            model.duplicateCheckTask?.cancel()
+            model.duplicateCheckTask = nil
+        }
+
+        model.finishModelDownload()
+
+        #expect(model.phase == .idle)
+    }
+
+    @Test("a run parked in front of the engine keeps the bar it painted")
+    func parkedRunKeepsItsOwnBar() {
+        let model = makeModel()
+        let parked = AppModel.Phase.downloadingModel(name: "openai_whisper-tiny", progress: 0)
+        model.phase = parked
+        model.fileTranscribeTask = Task { try? await Task.sleep(for: .seconds(60)) }
+        defer {
+            model.fileTranscribeTask?.cancel()
+            model.fileTranscribeTask = nil
+        }
+
+        model.finishModelDownload()
+
+        #expect(model.phase == parked)
+    }
+
     @Test("a batch job holding the phase keeps it")
     func batchRunKeepsThePhase() {
         let model = makeModel()

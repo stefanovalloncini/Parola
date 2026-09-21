@@ -1082,6 +1082,13 @@ final class AppModel {
             || duplicateCheckTask != nil
     }
 
+    /// The runs that paint a phase of their own. A duplicate-check digest is not one: it hashes the
+    /// file before its run claims the phase, so a bar behind it is still the download's to hand back.
+    var runOwnsPhase: Bool {
+        fileTranscribeTask != nil || youtubeTranscribeTask != nil || youtubeSubsTask != nil
+            || batchTask != nil
+    }
+
     /// A stop held for the startup window: no transcribe task yet, but the take still resolves an outcome.
     var stopHeldForStartup: Bool {
         recordingStartInFlight && stopRequestedDuringStart
@@ -1682,7 +1689,7 @@ final class AppModel {
 
     /// Hands the phase back only while it is still the download's: a run, a take or a batch owns it too.
     func finishModelDownload() {
-        if !transcribeTaskRunning, batchTask == nil, case .downloadingModel = phase { phase = .idle }
+        if !runOwnsPhase, case .downloadingModel = phase { phase = .idle }
         refreshModelList()
     }
 
