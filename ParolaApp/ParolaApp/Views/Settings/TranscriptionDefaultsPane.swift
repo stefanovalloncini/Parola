@@ -11,31 +11,12 @@ struct TranscriptionDefaultsPane: View {
                 SettingRow("Default model",
                            description: "Applies to every new transcription and to dictation. The toolbar model picker edits this same setting.",
                            isFirst: true) {
-                    Picker("", selection: Binding(
-                        get: { model.selectedModel },
-                        set: { model.activateModel($0) }
-                    )) {
-                        ForEach(AppModel.selectableModels(model.availableModels), id: \.name) { info in
-                            Text(info.label).tag(info.name)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(minWidth: 220, alignment: .trailing)
-                    .axLeaf("TranscriptionDefaults.Picker.Model")
+                    ModelPickerView(shell: .standalone, leaf: "TranscriptionDefaults.Picker.Model")
                 }
                 SettingRow("Default language",
                            description: "Auto detects the language from the audio with Whisper models. Pick one when the audio language is known.") {
-                    Picker("", selection: languageBinding) {
-                        Text("Auto-detect").tag(String?.none)
-                        ForEach(SupportedLanguages.options, id: \.code) { option in
-                            Text(option.name).tag(String?.some(option.code))
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(minWidth: 220, alignment: .trailing)
-                    .axLeaf("TranscriptionDefaults.Picker.Language")
+                    LanguagePickerView(shell: .standalone, leaf: "TranscriptionDefaults.Picker.Language")
+                        .disabled(model.selectedModelCapabilities.supportedLanguages.isEnglishOnly)
                 }
                 SettingRow("Word timestamps",
                            description: "Captures the start and end time of each word. Karaoke estimates timings without it.") {
@@ -91,13 +72,6 @@ struct TranscriptionDefaultsPane: View {
 
             ResetPaneButton(scope: .transcriptionDefaults)
         }
-    }
-
-    private var languageBinding: Binding<String?> {
-        Binding(
-            get: { model.selectedLanguage },
-            set: { model.selectedLanguage = $0 }
-        )
     }
 }
 

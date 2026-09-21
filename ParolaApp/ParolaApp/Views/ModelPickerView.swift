@@ -3,9 +3,53 @@ import ParolaCore
 
 struct ModelPickerView: View {
     @Environment(AppModel.self) private var model
+    var shell: PillPickerShell = .segment
+    var leaf: String? = nil
 
     @State private var searchText = ""
     @State private var installedOnly = false
+
+    var body: some View {
+        PillPickerButton(icon: "cpu", caption: "Model", value: currentLabel, shell: shell, popoverWidth: 400, leaf: leaf) {
+            ModelPickerPopover(searchText: $searchText, installedOnly: $installedOnly, offersDownloads: shell == .segment)
+        }
+        .help(shell == .segment ? "Active model. Models are downloaded on demand." : "Default model. Installed models only.")
+    }
+
+    private var currentLabel: String {
+        if let variant = ModelCatalog.variant(id: model.selectedModel) {
+            return shell == .standalone ? variant.displayName : Self.shortLabel(for: variant.displayName)
+        }
+        let installed = model.availableModels.first(where: { $0.name == model.selectedModel })?.label
+        return Self.capped(installed ?? model.selectedModel)
+    }
+
+    static func shortLabel(for displayName: String) -> String {
+        let replacements: [String: String] = [
+            "Whisper Large v3 Turbo": "Whisper Turbo",
+            "Whisper Large v3": "Whisper Large",
+            "Whisper Tiny (English)": "Whisper Tiny EN",
+            "Parakeet TDT 0.6B v2": "Parakeet v2",
+            "Parakeet TDT 0.6B v3": "Parakeet v3",
+            "Distil Whisper Large v3": "Distil Large",
+        ]
+        return capped(replacements[displayName] ?? displayName)
+    }
+
+    /// The catalog's own names all fit; an uncurated model id would widen the capsule past what the toolbar can spare the search field.
+    static let labelCharacterCap = 24
+
+    static func capped(_ label: String) -> String {
+        label.count <= labelCharacterCap ? label : String(label.prefix(labelCharacterCap - 1)) + "…"
+    }
+}
+
+/// A picker that offers downloads lists the whole catalog; one that does not (Settings) only lists what is installed.
+struct ModelPickerPopover: View {
+    @Environment(AppModel.self) private var model
+    @Binding var searchText: String
+    @Binding var installedOnly: Bool
+    let offersDownloads: Bool
 
     private var groups: [(ModelCategory, [ModelVariant])] {
         let installed = Set(model.availableModels.filter(\.isInstalled).map(\.name))
@@ -13,18 +57,20 @@ struct ModelPickerView: View {
     }
 
     var body: some View {
-        PillPickerButton(icon: "cpu", caption: "Model", value: currentLabel) {
-            VStack(spacing: 0) {
-                searchField
-                    .onAppear { model.prewarmSelectedModel() }
-                    .padding(.horizontal, DS.Spacing.small)
-                    .padding(.top, DS.Spacing.tight)
-                    .padding(.bottom, DS.Spacing.snug)
+        VStack(spacing: 0) {
+            searchField
+                .onAppear { model.prewarmSelectedModel() }
+                .padding(.horizontal, DS.Spacing.small)
+                .padding(.top, DS.Spacing.tight)
+                .padding(.bottom, DS.Spacing.snug)
 
+            if offersDownloads {
                 installedOnlyToggle
                     .padding(.horizontal, DS.Spacing.regular)
                     .padding(.bottom, DS.Spacing.tight)
+            }
 
+            PillPopoverList {
                 let filtered = filteredGroups
                 if filtered.isEmpty {
                     Text("No models match")
@@ -35,57 +81,55 @@ struct ModelPickerView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     if let pinned = pinnedVariant {
-                        PillPopoverSectionHeader(title: "Pinned")
-                        let installed = isInstalled(pinned)
-                        PillPopoverRow(
-                            title: pinned.displayName,
-                            isSelected: pinned.id == model.selectedModel,
-                            trailingText: Self.sizeLabel(pinned),
-                            badgeText: Self.badge(for: pinned),
-                            help: pinned.tagline,
-                            leadingSystemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle",
-                            leadingTint: installed ? DS.Palette.success : .secondary,
-                            action: { select(variant: pinned) }
-                        )
-                        .contextMenu {
-                            Button("Unpin") { model.pinnedModel = "" }
-                        }
+                        PillPopoverSectionHeader(title: String(localized: "Pinned"))
+                        row(for: pinned)
+                            .contextMenu {
+                                Button("Unpin") { model.pinnedModel = "" }
+                            }
                     }
                     ForEach(filtered, id: \.0) { category, variants in
                         PillPopoverSectionHeader(title: category.displayName)
                         ForEach(variants, id: \.id) { variant in
-                            let installed = isInstalled(variant)
-                            PillPopoverRow(
-                                title: variant.displayName,
-                                isSelected: variant.id == model.selectedModel,
-                                trailingText: Self.sizeLabel(variant),
-                                badgeText: Self.badge(for: variant),
-                                help: variant.tagline,
-                                leadingSystemImage: installed ? "checkmark.circle.fill" : "arrow.down.circle",
-                                leadingTint: installed ? DS.Palette.success : .secondary,
-                                action: { select(variant: variant) }
-                            )
-                            .contextMenu {
-                                if model.pinnedModel == variant.id {
-                                    Button("Unpin") { model.pinnedModel = "" }
-                                } else {
-                                    Button("Pin to Top") { model.pinnedModel = variant.id }
+                            row(for: variant)
+                                .contextMenu {
+                                    if model.pinnedModel == variant.id {
+                                        Button("Unpin") { model.pinnedModel = "" }
+                                    } else {
+                                        Button("Pin to Top") { model.pinnedModel = variant.id }
+                                    }
                                 }
-                            }
                         }
                     }
                 }
-
-                Divider().padding(.vertical, DS.Spacing.tight)
-                PillPopoverRow(
-                    title: "Refresh",
-                    leadingSystemImage: "arrow.clockwise",
-                    action: { model.refreshModelList() }
-                )
             }
-            .padding(.horizontal, DS.Spacing.snug)
+
+            Divider().padding(.vertical, DS.Spacing.tight)
+            PillPopoverRow(
+                title: String(localized: "Manage models…"),
+                leading: .symbol("slider.horizontal.3"),
+                action: { model.openSettings(route: .localModels) }
+            )
+            PillPopoverRow(
+                title: String(localized: "Refresh"),
+                leading: .symbol("arrow.clockwise"),
+                dismissesOnSelect: false,
+                action: { model.refreshModelList() }
+            )
         }
-        .help("Active model. Models are downloaded on demand.")
+        .padding(.horizontal, DS.Spacing.snug)
+    }
+
+    private func row(for variant: ModelVariant) -> some View {
+        PillPopoverRow(
+            title: variant.displayName,
+            subtitle: variant.tagline,
+            badge: Self.scopeBadge(for: variant),
+            isSelected: variant.id == model.selectedModel,
+            leading: .tile(ModelEngineIcon.symbol(for: variant.engineID), tint: ModelEngineIcon.tint(for: variant.engineID)),
+            trailing: Self.trailing(for: variant, isInstalled: isInstalled(variant), phase: model.phase),
+            dismissesOnSelect: isInstalled(variant),
+            action: { select(variant: variant) }
+        )
     }
 
     /// Built-in engines report no download size; "Zero kB" reads like a bug next to real sizes.
@@ -93,10 +137,18 @@ struct ModelPickerView: View {
         variant.sizeBytes > 0 ? AppFormat.byteSize(variant.sizeBytes) : String(localized: "Built in")
     }
 
-    /// English-only models silently disable the language picker, so say so before the pick.
-    static func badge(for variant: ModelVariant) -> String? {
-        guard case .some(.only(let codes)) = variant.languageScope, codes == ["en"] else { return nil }
-        return String(localized: "EN only")
+    /// A restricted language scope narrows the language picker, and the badge says so before the pick.
+    static func scopeBadge(for variant: ModelVariant) -> String? {
+        guard case .some(.only(let codes)) = variant.languageScope else { return nil }
+        if codes == ["en"] { return String(localized: "English only") }
+        return String(localized: "\(codes.count) languages")
+    }
+
+    static func trailing(for variant: ModelVariant, isInstalled: Bool, phase: AppModel.Phase) -> PillPopoverRow.Trailing {
+        if case .downloadingModel(let name, let progress) = phase, name == variant.id {
+            return .progress(progress)
+        }
+        return isInstalled ? .text(sizeLabel(variant)) : .download(sizeLabel(variant))
     }
 
     private var searchField: some View {
@@ -118,7 +170,7 @@ struct ModelPickerView: View {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return groups.compactMap { category, variants in
             let matches = variants.filter { variant in
-                if installedOnly && !isInstalled(variant) { return false }
+                if (installedOnly || !offersDownloads) && !isInstalled(variant) { return false }
                 if query.isEmpty { return true }
                 return variant.displayName.lowercased().contains(query)
             }
@@ -142,31 +194,5 @@ struct ModelPickerView: View {
         if !isInstalled(variant) {
             model.downloadModel(variant.id)
         }
-    }
-
-    private var currentLabel: String {
-        if let variant = ModelCatalog.variant(id: model.selectedModel) {
-            return Self.shortLabel(for: variant.displayName)
-        }
-        let installed = model.availableModels.first(where: { $0.name == model.selectedModel })?.label
-        return Self.capped(installed ?? model.selectedModel)
-    }
-
-    static func shortLabel(for displayName: String) -> String {
-        let replacements: [String: String] = [
-            "Whisper Large v3 Turbo": "Whisper Turbo",
-            "Whisper Large v3": "Whisper Large",
-            "Whisper Tiny (English)": "Whisper Tiny EN",
-            "Parakeet TDT 0.6B v2": "Parakeet v2",
-            "Distil Whisper Large v3": "Distil Large",
-        ]
-        return capped(replacements[displayName] ?? displayName)
-    }
-
-    /// The catalog's own names all fit; an uncurated model id would widen the capsule past what the toolbar can spare the search field.
-    static let labelCharacterCap = 24
-
-    static func capped(_ label: String) -> String {
-        label.count <= labelCharacterCap ? label : String(label.prefix(labelCharacterCap - 1)) + "…"
     }
 }

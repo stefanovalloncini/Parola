@@ -34,4 +34,12 @@ enum SupportedLanguages {
     static var options: [(code: String, name: String)] {
         codes.map { ($0, displayName(for: $0)) }
     }
+
+    /// The language's name in itself, or nil when it would only repeat the localized one.
+    static func endonym(for code: String) -> String? {
+        let locale = Locale(identifier: code)
+        guard let name = locale.localizedString(forLanguageCode: code), let first = name.first else { return nil }
+        let endonym = String(first).uppercased(with: locale) + name.dropFirst()
+        return endonym == displayName(for: code) ? nil : endonym
+    }
 }

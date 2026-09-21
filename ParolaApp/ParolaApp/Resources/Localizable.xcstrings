@@ -368,6 +368,47 @@
         }
       }
     },
+    "%lld languages": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld language"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld languages"
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld lingua"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld lingue"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld low-confidence segments": {
       "extractionState": "manual",
       "localizations": {
@@ -4136,6 +4177,17 @@
         }
       }
     },
+    "English only": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo inglese"
+          }
+        }
+      }
+    },
     "Enter Presenter Mode": {
       "extractionState": "manual",
       "localizations": {
@@ -5232,6 +5284,17 @@
         }
       }
     },
+    "Identified from the audio": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riconosciuta dall'audio"
+          }
+        }
+      }
+    },
     "Identify multiple speakers in the audio (slower).": {
       "extractionState": "manual",
       "localizations": {
@@ -6227,6 +6290,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gestisci modelli"
+          }
+        }
+      }
+    },
+    "Manage models…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestisci modelli…"
           }
         }
       }
@@ -7347,6 +7421,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Non installato"
+          }
+        }
+      }
+    },
+    "Not supported by %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non supportata da %@"
           }
         }
       }
@@ -8996,6 +9081,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Registra le riunioni e qualsiasi audio riprodotto dal Mac."
+          }
+        }
+      }
+    },
+    "Refresh": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiorna"
           }
         }
       }
