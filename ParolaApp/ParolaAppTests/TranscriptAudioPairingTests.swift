@@ -96,7 +96,7 @@ extension TranscriberMockSuites {
 
         @Test("a file transcription that lands after the user opened an entry keeps its own audio")
         func fileTranscribePairsWithItsSource() async throws {
-            try await withMocksCleared(.all) {
+            try await withMocksCleared(.transcriber) {
                 let gate = MockTranscriberGate()
                 defer { Task { await gate.open() } }
                 await MockTranscriberRegistry.shared.install(engineID: nil, response: heldMock(gate))
@@ -123,11 +123,11 @@ extension TranscriberMockSuites {
 
         @Test("a recording's transcript lands with the recording's audio, not the entry opened meanwhile")
         func recordingPairsWithItsSource() async throws {
-            try await withMocksCleared(.all) {
+            let fixture = try makeSilentWAV(label: "take")
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared([.transcriber, .audioSource]) {
                 let gate = MockTranscriberGate()
                 defer { Task { await gate.open() } }
-                let fixture = try makeSilentWAV(label: "take")
-                defer { try? FileManager.default.removeItem(at: fixture) }
                 await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
                 await MockTranscriberRegistry.shared.install(engineID: nil, response: heldMock(gate))
 
@@ -162,11 +162,11 @@ extension TranscriberMockSuites {
 
         @Test("a YouTube transcription that lands after a navigation keeps its own audio")
         func youtubePairsWithItsSource() async throws {
-            try await withMocksCleared(.all) {
+            let fixture = try makeSilentWAV(label: "youtube")
+            defer { try? FileManager.default.removeItem(at: fixture) }
+            try await withMocksCleared([.transcriber, .mediaFetcher]) {
                 let gate = MockTranscriberGate()
                 defer { Task { await gate.open() } }
-                let fixture = try makeSilentWAV(label: "youtube")
-                defer { try? FileManager.default.removeItem(at: fixture) }
                 MockMediaFetcherRegistry.shared.install(fixture)
                 await MockTranscriberRegistry.shared.install(engineID: nil, response: heldMock(gate))
 
