@@ -29,10 +29,23 @@ struct FavoriteSegmentsTests {
         )
     }
 
-    private func loadedModel() async throws -> (AppModel, LibraryEntry.ID) {
+    private func splittableTranscript() -> Transcript {
+        Transcript(
+            segments: [
+                TranscriptSegment(id: 0, start: 0, end: 2, text: "hello world"),
+                TranscriptSegment(id: 1, start: 2, end: 4, text: "second segment"),
+            ],
+            language: "en",
+            modelName: "stub"
+        )
+    }
+
+    private func loadedModel(_ transcript: Transcript? = nil) async throws -> (AppModel, LibraryEntry.ID) {
         let model = makeModel()
         let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
-        let seeded = try await seedStore.add(transcript: threeSegmentTranscript(), audioSource: nil, category: .transcription)
+        let seeded = try await seedStore.add(
+            transcript: transcript ?? threeSegmentTranscript(), audioSource: nil, category: .transcription
+        )
         model.loadEntry(seeded.id)
         for _ in 0..<200 where model.selectedEntryID != seeded.id {
             try await Task.sleep(for: .milliseconds(10))
@@ -89,7 +102,7 @@ struct FavoriteSegmentsTests {
         var text: String?
         for _ in 0..<200 {
             text = NSPasteboard.general.string(forType: .string)
-            if text != nil { break }
+            if text == "second" { break }
             try await Task.sleep(for: .milliseconds(10))
         }
 
@@ -109,5 +122,103 @@ struct FavoriteSegmentsTests {
             from: segments, speakerFilter: nil, favorites: [1], favoritesOnly: false
         )
         #expect(unfiltered.map(\.id) == [0, 1, 2])
+    }
+
+    @Test("favoritesOnly resets when a new entry loads")
+    func favoritesOnlyResetsOnLoadEntry() async throws {
+        let (model, _) = try await loadedModel()
+        model.favoritesOnly = true
+
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let other = try await seedStore.add(
+            transcript: threeSegmentTranscript(), audioSource: nil, category: .transcription
+        )
+        model.loadEntry(other.id)
+        for _ in 0..<200 where model.selectedEntryID != other.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(!model.favoritesOnly)
+    }
+
+    @Test("favoritesOnly resets when the loaded entry is cleared")
+    func favoritesOnlyResetsOnClearLoadedEntry() async throws {
+        let (model, _) = try await loadedModel()
+        model.favoritesOnly = true
+
+        model.clearLoadedEntry()
+
+        #expect(!model.favoritesOnly)
+    }
+
+    @Test("unfavoriting the last favorite turns the filter off")
+    func unfavoritingLastFavoriteTurnsOffFilter() async throws {
+        let (model, _) = try await loadedModel()
+
+        model.toggleSegmentFavorite(1)
+        for _ in 0..<200 where !model.isSegmentFavorite(1) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        model.favoritesOnly = true
+
+        model.toggleSegmentFavorite(1)
+
+        #expect(!model.favoritesOnly)
+        for _ in 0..<200 where model.isSegmentFavorite(1) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(!model.isSegmentFavorite(1))
+    }
+
+    @Test("splitting a favorited segment keeps the favorite on the first half")
+    func splitSegmentRemapsFavoriteToFirstHalf() async throws {
+        let (model, _) = try await loadedModel(splittableTranscript())
+
+        model.toggleSegmentFavorite(0)
+        for _ in 0..<200 where !model.isSegmentFavorite(0) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        model.splitSegment(id: 0, atFraction: 0.5)
+        let firstHalfID = try #require(model.transcript?.segments.first?.id)
+        #expect(firstHalfID != 0)
+
+        for _ in 0..<200 where model.favoriteSegmentIDs != [firstHalfID] {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.favoriteSegmentIDs == [firstHalfID])
+    }
+
+    @Test("undo restores the favorite to the original id and redo puts it back on the first half")
+    func splitUndoRedoCarriesFavorites() async throws {
+        let (model, _) = try await loadedModel(splittableTranscript())
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+
+        model.toggleSegmentFavorite(0)
+        for _ in 0..<200 where !model.isSegmentFavorite(0) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        model.splitSegment(id: 0, atFraction: 0.5)
+        let firstHalfID = try #require(model.transcript?.segments.first?.id)
+        for _ in 0..<200 where model.favoriteSegmentIDs != [firstHalfID] {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.favoriteSegmentIDs == [firstHalfID])
+
+        undo.undo()
+        for _ in 0..<200 where model.favoriteSegmentIDs != [0] {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.favoriteSegmentIDs == [0])
+        #expect(model.transcript?.segments.first?.id == 0)
+
+        undo.redo()
+        for _ in 0..<200 where model.favoriteSegmentIDs != [firstHalfID] {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.favoriteSegmentIDs == [firstHalfID])
     }
 }

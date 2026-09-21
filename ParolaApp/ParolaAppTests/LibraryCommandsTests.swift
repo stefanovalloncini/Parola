@@ -235,16 +235,14 @@ struct LibraryCommandsTests {
             Issue.record("setSegmentFavorite should return an object")
             return
         }
+        #expect(fields["applied"] == .bool(true))
         #expect(fields["segmentID"] == .int(0))
         #expect(fields["isFavorite"] == .bool(true))
-        for _ in 0..<200 where !model.isSegmentFavorite(0) {
-            try await Task.sleep(for: .milliseconds(10))
-        }
         #expect(model.isSegmentFavorite(0))
     }
 
-    @Test("setSegmentFavorite is a no-op when the state already matches")
-    func setSegmentFavoriteSkipsWhenUnchanged() async throws {
+    @Test("setSegmentFavorite awaits the write, so the state is correct with no sleep")
+    func setSegmentFavoriteReportsActualStateWithoutSleep() async throws {
         let (model, server, context, commands) = try makeRig()
         let entry = try await makeCardMetadataEntry(model)
         model.loadEntry(entry.id)
@@ -253,12 +251,34 @@ struct LibraryCommandsTests {
         }
         let command = try #require(commands["setSegmentFavorite"])
 
-        _ = try await command.handler(
+        let result = try await command.handler(
             try command.validate(AutomationArgs(["segmentID": .int(0), "isFavorite": .bool(false)])), context
         )
         withExtendedLifetime(server) {}
 
-        try await Task.sleep(for: .milliseconds(30))
+        guard case .object(let fields) = result else {
+            Issue.record("setSegmentFavorite should return an object")
+            return
+        }
+        #expect(fields["isFavorite"] == .bool(false))
         #expect(!model.isSegmentFavorite(0))
+    }
+
+    @Test("setSegmentFavorite reports it was not applied when no entry is selected")
+    func setSegmentFavoriteNoEntrySelected() async throws {
+        let (model, server, context, commands) = try makeRig()
+        model.selectedEntryID = nil
+        let command = try #require(commands["setSegmentFavorite"])
+
+        let result = try await command.handler(
+            try command.validate(AutomationArgs(["segmentID": .int(0), "isFavorite": .bool(true)])), context
+        )
+        withExtendedLifetime(server) {}
+
+        guard case .object(let fields) = result else {
+            Issue.record("setSegmentFavorite should return an object")
+            return
+        }
+        #expect(fields["applied"] == .bool(false))
     }
 }
