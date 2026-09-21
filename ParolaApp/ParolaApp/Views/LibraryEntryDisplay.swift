@@ -142,6 +142,11 @@ struct LibraryRowDisplayCache {
         displays = displays.filter { live.contains($0.key) }
     }
 
+    /// For the one input no entry carries: the locale and clock format every row was written with.
+    mutating func removeAll() {
+        displays.removeAll(keepingCapacity: true)
+    }
+
     /// `date` and `dateLabel` are left out of the hit test because every caller derives them from the manifest.
     mutating func display(
         for entry: LibraryEntry,

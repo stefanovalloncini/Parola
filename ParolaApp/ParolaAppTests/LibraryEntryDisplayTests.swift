@@ -177,6 +177,21 @@ struct LibraryEntryDisplayTests {
         #expect(cache.displays.count == 1)
     }
 
+    /// Row strings are formatted through `AppFormat.locale`, which follows the system, and no entry changes when it does.
+    @Test("clearing the cache drops every row so a locale change can reformat them")
+    func displayCacheClearsWholesale() {
+        let entry = display().entry
+        var cache = LibraryRowDisplayCache()
+        _ = cache.display(for: entry, excerpt: "Prime parole.")
+        #expect(cache.displays.count == 1)
+
+        cache.removeAll()
+        #expect(cache.displays.isEmpty)
+
+        #expect(cache.display(for: entry, excerpt: "Prime parole.").excerpt == "Prime parole.")
+        #expect(cache.displays.count == 1)
+    }
+
     @Test("a cached display is handed back rather than formatted again")
     func displayCacheReturnsTheSameRow() {
         let entry = display().entry

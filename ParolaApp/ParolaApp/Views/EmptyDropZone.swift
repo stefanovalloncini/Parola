@@ -168,14 +168,15 @@ struct EmptyDropZone: View {
                 )
             }
         recentCache = cache
-        recentDays = LibraryDateGroups.groups(for: displays, pinsFirst: false)
-        retrimRecents()
+        let days = LibraryDateGroups.groups(for: displays, pinsFirst: false)
+        recentDays = days
+        retrimRecents(days)
     }
 
     /// A live resize changes only how much of the strip fits, so it never rebuilds the rows behind it.
-    private func retrimRecents() {
+    private func retrimRecents(_ days: [LibraryDateGroups.Group]) {
         recentGroups = LibraryDateGroups.trimmed(
-            recentDays,
+            days,
             toHeight: recentRowSpace,
             rowHeight: recentRowHeight,
             headerHeight: Self.recentHeaderHeight
@@ -230,10 +231,19 @@ struct EmptyDropZone: View {
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { recentRowSpace = $0 }
         }
         .onAppear { recomputeRecents() }
-        .onChange(of: recentRowSpace) { _, _ in retrimRecents() }
+        .onChange(of: recentRowSpace) { _, _ in retrimRecents(recentDays) }
         .onChange(of: model.libraryVersion) { _, _ in recomputeRecents() }
         .onChange(of: model.libraryExcerptsVersion) { _, _ in recomputeRecents() }
         .onChange(of: model.sidebarDensity) { _, _ in recomputeRecents() }
+        // The day headers are written when the groups are built, so midnight has to rewrite them.
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            recomputeRecents()
+        }
+        // The one input no entry carries, so no row notices it changed on its own.
+        .onReceive(NotificationCenter.default.publisher(for: NSLocale.currentLocaleDidChangeNotification)) { _ in
+            recentCache.removeAll()
+            recomputeRecents()
+        }
     }
 }
 

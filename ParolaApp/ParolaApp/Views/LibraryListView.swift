@@ -340,6 +340,15 @@ struct LibraryListView: View {
             let newEntries = recomputeEntries(with: kept)
             selection = selection.intersection(Set(newEntries.map(\.id)))
         }
+        // The day headers are written when the groups are built, so midnight has to rewrite them.
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            recomputeEntries()
+        }
+        // The one input no entry carries, so no row notices it changed on its own.
+        .onReceive(NotificationCenter.default.publisher(for: NSLocale.currentLocaleDidChangeNotification)) { _ in
+            displayCache.removeAll()
+            recomputeEntries()
+        }
         .alert("Delete \(selection.count) entries?", isPresented: $pendingBulkDelete) {
             Button("Cancel", role: .cancel) {}
                 .accessibilityIdentifier("alert.bulkDelete.cancel")

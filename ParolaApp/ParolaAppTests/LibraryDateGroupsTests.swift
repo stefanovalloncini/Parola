@@ -142,6 +142,20 @@ struct LibraryDateGroupsTests {
         #expect(LibraryDateGroups.ungrouped(rows, id: "results").first?.id == "results")
     }
 
+    /// Headers are frozen when the groups are built, so a list left open over midnight has to rebuild them.
+    @Test("the same rows read as Today before midnight and as Yesterday after it")
+    func headersFollowTheDayTurningOver() {
+        let rows = [row("a", "2026-09-13T23:50"), row("b", "2026-09-12T10:00")]
+        let before = groups(rows, now: "2026-09-13T23:55")
+        let after = groups(rows, now: "2026-09-14T00:05")
+
+        let older = AppFormat.day(at("2026-09-12T10:00"), locale: Self.english)
+        #expect(before.map(\.title) == ["Today", "Yesterday"])
+        #expect(after.map(\.title) == ["Yesterday", older])
+        // The ids are the days themselves, so the rebuilt groups are the same groups with new headers.
+        #expect(before.map(\.id) == after.map(\.id))
+    }
+
     @Test("the header takes the locale it is given")
     func headersFollowTheLocale() {
         let day = at("2026-09-04T08:00")
