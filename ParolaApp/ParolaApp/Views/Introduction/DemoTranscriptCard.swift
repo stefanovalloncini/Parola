@@ -46,7 +46,7 @@ struct DemoTranscriptCard: View {
             Text(verbatim: clock(at: time))
                 .font(DS.Font.mono)
                 .foregroundStyle(DS.Color.secondaryText)
-                .contentTransition(.numericText())
+                .contentTransition(reduceMotion ? .identity : .numericText())
             if demo.isSettled {
                 replayButton
             }
@@ -55,8 +55,9 @@ struct DemoTranscriptCard: View {
         }
     }
 
+    /// Under reduce motion the mark stays the static icon while the words still land: a level meter is the most kinetic thing in the introduction.
     private func drive(at time: Double) -> BrandWaveform.Drive {
-        isPlaying ? .levels(script.barLevels(at: time)) : .breathing
+        isPlaying && !reduceMotion ? .levels(script.barLevels(at: time)) : .breathing
     }
 
     private var speakerLine: some View {
