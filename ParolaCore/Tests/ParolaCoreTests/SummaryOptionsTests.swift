@@ -62,13 +62,23 @@ struct SummaryOptionsTests {
 
     @Test("the mock text path receives the options' instructions")
     func mockPathUsesOptions() async throws {
-        await MockLanguageModelStore.shared.install(provider: .foundation, response: MockLanguageModelResponse(text: "SUMMARY:\nOk.\n\nCHAPTERS:\n00:00  A\n"))
-        defer { Task { await MockLanguageModelStore.shared.clear() } }
-        let t = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 3, text: "Ciao a tutti, benvenuti.")], language: "it", modelName: "m", sourceURL: URL(fileURLWithPath: "/tmp/a.wav"))
-        var o = SummaryOptions.default; o.outputLanguage = "en"
-        let s = try await SummaryService(features: FeatureSet(enabled: [.ai])).summarise(t, options: o)
-        #expect(s.text == "Ok.")
-        let instructions = await MockLanguageModelStore.shared.lastInstructions(for: .foundation)
-        #expect(instructions?.contains("English") == true)
+        // The store is process-global and swift-testing runs suites in parallel: hold the lease
+        // for the whole install → run → clear, or another suite resolves this slot.
+        try await MockLanguageModelStore.shared.withLease {
+            await MockLanguageModelStore.shared.clear()
+            await MockLanguageModelStore.shared.install(provider: .foundation, response: MockLanguageModelResponse(text: "SUMMARY:\nOk.\n\nCHAPTERS:\n00:00  A\n"))
+            do {
+                let t = Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 3, text: "Ciao a tutti, benvenuti.")], language: "it", modelName: "m", sourceURL: URL(fileURLWithPath: "/tmp/a.wav"))
+                var o = SummaryOptions.default; o.outputLanguage = "en"
+                let s = try await SummaryService(features: FeatureSet(enabled: [.ai])).summarise(t, options: o)
+                #expect(s.text == "Ok.")
+                let instructions = await MockLanguageModelStore.shared.lastInstructions(for: .foundation)
+                #expect(instructions?.contains("English") == true)
+            } catch {
+                await MockLanguageModelStore.shared.clear()
+                throw error
+            }
+            await MockLanguageModelStore.shared.clear()
+        }
     }
 }

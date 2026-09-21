@@ -101,25 +101,29 @@ struct AICommandsTests {
         withExtendedLifetime(server) {}
     }
 
-    /// Installs the mocks, runs the body, and clears them whether the body returns or throws.
-    private func withMocks<T>(
+    /// Takes the store's lease, installs the mocks, runs the body, and clears whether the body
+    /// returns or throws. The store is process-global while swift-testing runs suites in parallel,
+    /// so the lease is what stops another suite from resolving these slots mid-test.
+    private func withMocks<T: Sendable>(
         _ responses: [MockLanguageModelStore.Provider: String],
-        _ body: () async throws -> T
+        _ body: @MainActor () async throws -> T
     ) async throws -> T {
-        await MockLanguageModelStore.shared.clear()
-        for (provider, text) in responses {
-            await MockLanguageModelStore.shared.install(
-                provider: provider,
-                response: MockLanguageModelResponse(text: text)
-            )
-        }
-        do {
-            let value = try await body()
+        try await MockLanguageModelStore.shared.withLease {
             await MockLanguageModelStore.shared.clear()
-            return value
-        } catch {
-            await MockLanguageModelStore.shared.clear()
-            throw error
+            for (provider, text) in responses {
+                await MockLanguageModelStore.shared.install(
+                    provider: provider,
+                    response: MockLanguageModelResponse(text: text)
+                )
+            }
+            do {
+                let value = try await body()
+                await MockLanguageModelStore.shared.clear()
+                return value
+            } catch {
+                await MockLanguageModelStore.shared.clear()
+                throw error
+            }
         }
     }
 

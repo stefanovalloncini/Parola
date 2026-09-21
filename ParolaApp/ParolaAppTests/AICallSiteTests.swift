@@ -46,20 +46,24 @@ struct AICallSiteTests {
         }
     }
 
-    /// Installs the mocks, runs the body, and clears the process-global store whether the body
-    /// returns or throws. A `defer { Task { … } }` would not be ordered against the next test.
-    private func withInstalledMocks<T>(
+    /// Takes the store's lease, installs the mocks, runs the body, and clears whether the body
+    /// returns or throws. The store is process-global while swift-testing runs suites in parallel,
+    /// so the lease is what stops another suite from resolving these slots mid-test; a
+    /// `defer { Task { … } }` would not be ordered against the next test either.
+    private func withInstalledMocks<T: Sendable>(
         _ extra: [MockLanguageModelStore.Provider: String] = [:],
-        _ body: () async throws -> T
+        _ body: @MainActor () async throws -> T
     ) async throws -> T {
-        await installMocks(extra)
-        do {
-            let value = try await body()
-            await MockLanguageModelStore.shared.clear()
-            return value
-        } catch {
-            await MockLanguageModelStore.shared.clear()
-            throw error
+        try await MockLanguageModelStore.shared.withLease {
+            await installMocks(extra)
+            do {
+                let value = try await body()
+                await MockLanguageModelStore.shared.clear()
+                return value
+            } catch {
+                await MockLanguageModelStore.shared.clear()
+                throw error
+            }
         }
     }
 

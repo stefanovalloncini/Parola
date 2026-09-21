@@ -137,27 +137,47 @@ struct LibraryCommandsTests {
         )
     }
 
+    /// Takes the store's lease, installs the mock, runs the body and clears it whether the body
+    /// returns or throws. The store is process-global while swift-testing runs suites in parallel.
+    private func withOnDeviceMock<T: Sendable>(
+        _ text: String,
+        _ body: @MainActor () async throws -> T
+    ) async rethrows -> T {
+        try await MockLanguageModelStore.shared.withLease {
+            await MockLanguageModelStore.shared.clear()
+            await MockLanguageModelStore.shared.install(
+                provider: .foundation,
+                response: MockLanguageModelResponse(text: text)
+            )
+            do {
+                let value = try await body()
+                await MockLanguageModelStore.shared.clear()
+                return value
+            } catch {
+                await MockLanguageModelStore.shared.clear()
+                throw error
+            }
+        }
+    }
+
     @Test("generateCardMetadata writes the AI title and summary using the mock model")
     func generateCardMetadataWritesFields() async throws {
-        let (model, server, context, commands) = try makeRig()
-        let entry = try await makeCardMetadataEntry(model)
-        await MockLanguageModelStore.shared.install(
-            provider: .foundation,
-            response: MockLanguageModelResponse(text: "Piano vendite\nRiepilogo delle quote per canale.")
-        )
-        let command = try #require(commands["generateCardMetadata"])
+        try await withOnDeviceMock("Piano vendite\nRiepilogo delle quote per canale.") {
+            let (model, server, context, commands) = try makeRig()
+            let entry = try await makeCardMetadataEntry(model)
+            let command = try #require(commands["generateCardMetadata"])
 
-        let result = try await command.handler(try command.validate(AutomationArgs(["id": .string(entry.id)])), context)
-        withExtendedLifetime(server) {}
+            let result = try await command.handler(try command.validate(AutomationArgs(["id": .string(entry.id)])), context)
+            withExtendedLifetime(server) {}
 
-        guard case .object(let fields) = result else {
-            Issue.record("generateCardMetadata should return an object")
-            return
+            guard case .object(let fields) = result else {
+                Issue.record("generateCardMetadata should return an object")
+                return
+            }
+            #expect(fields["generated"] == .bool(true))
+            #expect(fields["aiTitle"] == .string("Piano vendite"))
+            #expect(fields["shortSummary"] == .string("Riepilogo delle quote per canale."))
         }
-        #expect(fields["generated"] == .bool(true))
-        #expect(fields["aiTitle"] == .string("Piano vendite"))
-        #expect(fields["shortSummary"] == .string("Riepilogo delle quote per canale."))
-        await MockLanguageModelStore.shared.clear()
     }
 
     @Test("generateCardMetadata reports why it skipped when the AI feature is off")

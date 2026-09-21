@@ -23,15 +23,30 @@ struct AppModelAIFailureTests {
         return model
     }
 
-    private func installFailingModel() async {
-        await MockLanguageModelStore.shared.clear()
-        await MockLanguageModelStore.shared.install(
-            provider: .foundation,
-            response: MockLanguageModelResponse(
-                failure: MockLanguageModelFailure(code: .notAvailable, message: "Apple Intelligence is off.")
-            )
-        )
+    /// Takes the store's lease, installs the mocks, runs the body and clears them whether it returns
+    /// or throws. The store is process-global while swift-testing runs suites in parallel, so
+    /// without the lease another suite resolves these slots mid-test.
+    private func withOnDeviceMock<T: Sendable>(
+        _ response: MockLanguageModelResponse,
+        _ body: @MainActor () async throws -> T
+    ) async rethrows -> T {
+        try await MockLanguageModelStore.shared.withLease {
+            await MockLanguageModelStore.shared.clear()
+            await MockLanguageModelStore.shared.install(provider: .foundation, response: response)
+            do {
+                let value = try await body()
+                await MockLanguageModelStore.shared.clear()
+                return value
+            } catch {
+                await MockLanguageModelStore.shared.clear()
+                throw error
+            }
+        }
     }
+
+    private static let failingModel = MockLanguageModelResponse(
+        failure: MockLanguageModelFailure(code: .notAvailable, message: "Apple Intelligence is off.")
+    )
 
     private func waitUntil(timeoutMs: Int = 3000, _ condition: @MainActor () -> Bool) async -> Bool {
         var elapsed = 0
@@ -45,50 +60,46 @@ struct AppModelAIFailureTests {
 
     @Test("a failed prompt reports in its own sheet and leaves the transcript on screen")
     func promptFailureKeepsTranscriptVisible() async throws {
-        await installFailingModel()
-        let model = makeModel()
+        try await withOnDeviceMock(Self.failingModel) {
+            let model = makeModel()
 
-        model.runPrompt(try #require(Prompt.builtIns.first))
-        #expect(await waitUntil { model.promptOutput != nil })
+            model.runPrompt(try #require(Prompt.builtIns.first))
+            #expect(await waitUntil { model.promptOutput != nil })
 
-        #expect(model.phase == .ready)
-        #expect(model.promptOutput?.failure?.contains("Apple Intelligence is off.") == true)
-        await MockLanguageModelStore.shared.clear()
+            #expect(model.phase == .ready)
+            #expect(model.promptOutput?.failure?.contains("Apple Intelligence is off.") == true)
+        }
     }
 
     @Test("a failed action-item extraction reports in the inspector, not as an app failure")
     func actionItemFailureStaysInSection() async {
-        await installFailingModel()
-        let model = makeModel()
+        await withOnDeviceMock(Self.failingModel) {
+            let model = makeModel()
 
-        model.extractActionItems()
-        #expect(await waitUntil { model.actionItemsError != nil })
+            model.extractActionItems()
+            #expect(await waitUntil { model.actionItemsError != nil })
 
-        #expect(model.phase == .ready)
-        #expect(model.actionItems.isEmpty)
-        await MockLanguageModelStore.shared.clear()
+            #expect(model.phase == .ready)
+            #expect(model.actionItems.isEmpty)
+        }
     }
 
     @Test("a failed chapter extraction reports in the inspector, not as an app failure")
     func chapterFailureStaysInSection() async {
-        await installFailingModel()
-        let model = makeModel()
+        await withOnDeviceMock(Self.failingModel) {
+            let model = makeModel()
 
-        model.extractSmartChapters()
-        #expect(await waitUntil { model.chaptersError != nil })
+            model.extractSmartChapters()
+            #expect(await waitUntil { model.chaptersError != nil })
 
-        #expect(model.phase == .ready)
-        #expect(model.smartChapters.isEmpty)
-        await MockLanguageModelStore.shared.clear()
+            #expect(model.phase == .ready)
+            #expect(model.smartChapters.isEmpty)
+        }
     }
 
     @Test("generated chapters replace the ones the entry saved")
     func generatedChaptersOverrideSavedOnes() async {
-        await MockLanguageModelStore.shared.clear()
-        await MockLanguageModelStore.shared.install(
-            provider: .foundation,
-            response: MockLanguageModelResponse(text: "00:00 Fresh opening\n00:30 Fresh close")
-        )
+        await withOnDeviceMock(MockLanguageModelResponse(text: "00:00 Fresh opening\n00:30 Fresh close")) {
         let model = makeModel()
         model.transcript = Transcript(
             segments: [TranscriptSegment(id: 0, start: 0, end: 120, text: "we ship the patch on Friday")],
@@ -103,7 +114,7 @@ struct AppModelAIFailureTests {
 
         #expect(await waitUntil { model.smartChapters.map(\.title) == ["Fresh opening", "Fresh close"] })
         #expect(model.transcript?.summary?.chapters.map(\.title) == ["Fresh opening", "Fresh close"])
-        await MockLanguageModelStore.shared.clear()
+        }
     }
 
     @Test("clearing chapters empties the saved summary too")
@@ -126,18 +137,14 @@ struct AppModelAIFailureTests {
 
     @Test("an entry with no saved summary keeps its generated chapters in memory")
     func generatedChaptersWithoutASummaryStayInMemory() async {
-        await MockLanguageModelStore.shared.clear()
-        await MockLanguageModelStore.shared.install(
-            provider: .foundation,
-            response: MockLanguageModelResponse(text: "00:00 Fresh opening")
-        )
-        let model = makeModel()
+        await withOnDeviceMock(MockLanguageModelResponse(text: "00:00 Fresh opening")) {
+            let model = makeModel()
 
-        model.extractSmartChapters()
+            model.extractSmartChapters()
 
-        #expect(await waitUntil { model.smartChapters.map(\.title) == ["Fresh opening"] })
-        #expect(model.transcript?.summary == nil)
-        await MockLanguageModelStore.shared.clear()
+            #expect(await waitUntil { model.smartChapters.map(\.title) == ["Fresh opening"] })
+            #expect(model.transcript?.summary == nil)
+        }
     }
 
     @Test("clearing derived artifacts drops the AI errors too")
@@ -175,13 +182,8 @@ struct AppModelAIFailureTests {
 
     @Test("an installed mock counts as available so AI affordances stay live in test mode")
     func mockKeepsAIAvailable() async {
-        await MockLanguageModelStore.shared.clear()
-        await MockLanguageModelStore.shared.install(
-            provider: .foundation,
-            response: MockLanguageModelResponse(text: "ok")
-        )
-
-        #expect(await LanguageModelFactory.onDeviceAvailability().isAvailable)
-        await MockLanguageModelStore.shared.clear()
+        await withOnDeviceMock(MockLanguageModelResponse(text: "ok")) {
+            #expect(await LanguageModelFactory.onDeviceAvailability().isAvailable)
+        }
     }
 }

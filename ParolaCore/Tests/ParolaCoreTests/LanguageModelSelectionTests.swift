@@ -110,26 +110,29 @@ struct LanguageModelSelectionTests {
         return try await model.respond(to: "hello")
     }
 
-    /// Installs the given mocks, runs the body, and clears the process-global store whether the body
-    /// returns or throws. A `defer { Task { … } }` would not be ordered against the next test.
-    private func withMocks<T>(
+    /// Takes the store's lease, installs the given mocks, runs the body, and clears whether the body
+    /// returns or throws. The lease is what keeps a suite running in parallel with this one from
+    /// resolving these slots; a `defer { Task { … } }` would not be ordered against the next test.
+    private func withMocks<T: Sendable>(
         _ responses: [MockLanguageModelStore.Provider: String],
-        _ body: () async throws -> T
+        _ body: @Sendable () async throws -> T
     ) async throws -> T {
-        await MockLanguageModelStore.shared.clear()
-        for (provider, text) in responses {
-            await MockLanguageModelStore.shared.install(
-                provider: provider,
-                response: MockLanguageModelResponse(text: text)
-            )
-        }
-        do {
-            let value = try await body()
+        try await MockLanguageModelStore.shared.withLease {
             await MockLanguageModelStore.shared.clear()
-            return value
-        } catch {
-            await MockLanguageModelStore.shared.clear()
-            throw error
+            for (provider, text) in responses {
+                await MockLanguageModelStore.shared.install(
+                    provider: provider,
+                    response: MockLanguageModelResponse(text: text)
+                )
+            }
+            do {
+                let value = try await body()
+                await MockLanguageModelStore.shared.clear()
+                return value
+            } catch {
+                await MockLanguageModelStore.shared.clear()
+                throw error
+            }
         }
     }
 

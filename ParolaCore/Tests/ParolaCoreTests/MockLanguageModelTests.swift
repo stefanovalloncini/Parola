@@ -75,4 +75,49 @@ struct MockLanguageModelTests {
         #expect(await store.resolve(for: .anthropic) == nil)
         #expect(await store.list().isEmpty)
     }
+
+    @Test("a lease keeps two callers from overlapping")
+    func leaseSerialisesCallers() async throws {
+        let store = MockLanguageModelStore()
+        let log = LeaseLog()
+        let first = Task {
+            await store.withLease {
+                await log.record("first in")
+                try? await Task.sleep(for: .milliseconds(60))
+                await log.record("first out")
+            }
+        }
+        // Give the first lessee time to take the lease before the second asks for it.
+        try await Task.sleep(for: .milliseconds(20))
+        let second = Task {
+            await store.withLease {
+                await log.record("second in")
+                await log.record("second out")
+            }
+        }
+        await first.value
+        await second.value
+
+        #expect(await log.entries == ["first in", "first out", "second in", "second out"])
+    }
+
+    @Test("a throwing body still releases the lease")
+    func leaseReleasesOnThrow() async throws {
+        let store = MockLanguageModelStore()
+        struct Boom: Error {}
+
+        await #expect(throws: Boom.self) {
+            try await store.withLease { throw Boom() }
+        }
+
+        let ran = await store.withLease { true }
+        #expect(ran)
+    }
+
+}
+
+/// Records what each lessee did, in order.
+private actor LeaseLog {
+    private(set) var entries: [String] = []
+    func record(_ entry: String) { entries.append(entry) }
 }

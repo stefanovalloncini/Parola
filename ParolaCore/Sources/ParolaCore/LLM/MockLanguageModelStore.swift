@@ -16,8 +16,43 @@ public actor MockLanguageModelStore {
     private var byProvider: [Provider: MockLanguageModelResponse] = [:]
     private var globalMock: MockLanguageModelResponse?
     private var lastInstructions: [Provider: String] = [:]
+    private var leased = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
 
     public init() {}
+
+    /// Runs `body` with exclusive use of this store. The slots are process-global while
+    /// swift-testing runs suites in parallel, so two suites installing at once would resolve each
+    /// other's mocks; lessees are served first come, first served, and a throwing body still releases.
+    public func withLease<T: Sendable>(_ body: @Sendable () async throws -> T) async rethrows -> T {
+        await acquire()
+        do {
+            let value = try await body()
+            release()
+            return value
+        } catch {
+            release()
+            throw error
+        }
+    }
+
+    private func acquire() async {
+        guard leased else {
+            leased = true
+            return
+        }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            waiters.append(continuation)
+        }
+    }
+
+    private func release() {
+        guard !waiters.isEmpty else {
+            leased = false
+            return
+        }
+        waiters.removeFirst().resume()
+    }
 
     public func install(provider: Provider?, response: MockLanguageModelResponse) {
         if let provider {

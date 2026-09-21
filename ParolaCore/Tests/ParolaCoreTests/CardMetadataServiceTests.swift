@@ -11,17 +11,35 @@ struct CardMetadataServiceTests {
         )
     }
 
+    /// The store is process-global and swift-testing runs suites in parallel: the lease keeps the
+    /// install, the run and the clear from interleaving with another suite's mocks.
+    private func withMock(
+        _ response: MockLanguageModelResponse,
+        _ body: @Sendable () async throws -> Void
+    ) async throws {
+        try await MockLanguageModelStore.shared.withLease {
+            await MockLanguageModelStore.shared.clear()
+            await MockLanguageModelStore.shared.install(provider: .foundation, response: response)
+            do {
+                try await body()
+            } catch {
+                await MockLanguageModelStore.shared.clear()
+                throw error
+            }
+            await MockLanguageModelStore.shared.clear()
+        }
+    }
+
     @Test("parses a two-line mock reply into title and summary")
     func parsesMock() async throws {
-        await MockLanguageModelStore.shared.install(
-            provider: .foundation,
-            response: MockLanguageModelResponse(text: "\"Riunione fornitori.\"\nDistinta base e ordini al magazzino per i sensori.\n")
-        )
-        let meta = try await CardMetadataService.generate(
-            for: transcript("Buongiorno, oggi parliamo della distinta base e degli ordini al magazzino per i sensori.")
-        )
-        #expect(meta == CardMetadata(title: "Riunione fornitori", summary: "Distinta base e ordini al magazzino per i sensori."))
-        await MockLanguageModelStore.shared.clear()
+        try await withMock(
+            MockLanguageModelResponse(text: "\"Riunione fornitori.\"\nDistinta base e ordini al magazzino per i sensori.\n")
+        ) {
+            let meta = try await CardMetadataService.generate(
+                for: transcript("Buongiorno, oggi parliamo della distinta base e degli ordini al magazzino per i sensori.")
+            )
+            #expect(meta == CardMetadata(title: "Riunione fornitori", summary: "Distinta base e ordini al magazzino per i sensori."))
+        }
     }
 
     @Test("refuses transcripts under the minimum length")

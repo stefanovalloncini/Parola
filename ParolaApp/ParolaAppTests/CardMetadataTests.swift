@@ -19,51 +19,74 @@ struct CardMetadataTests {
         #expect(model.showAISummaries)
     }
 
+    /// Takes the store's lease, installs the mock, runs the body and clears it whether the body
+    /// returns or throws. The store is process-global while swift-testing runs suites in parallel.
+    private func withOnDeviceMock<T: Sendable>(
+        _ text: String,
+        _ body: @MainActor () async throws -> T
+    ) async rethrows -> T {
+        try await MockLanguageModelStore.shared.withLease {
+            await MockLanguageModelStore.shared.clear()
+            await MockLanguageModelStore.shared.install(
+                provider: .foundation,
+                response: MockLanguageModelResponse(text: text)
+            )
+            do {
+                let value = try await body()
+                await MockLanguageModelStore.shared.clear()
+                return value
+            } catch {
+                await MockLanguageModelStore.shared.clear()
+                throw error
+            }
+        }
+    }
+
     @Test("a finished transcript gets an AI title and summary from the mock model")
     func generatesOnCompletion() async throws {
-        await MockLanguageModelStore.shared.install(provider: .foundation, response: MockLanguageModelResponse(text: "Piano vendite\nRiepilogo delle quote per canale."))
-        let model = makeModel(temporaryDefaults())
-        let entry = try await model.library.add(transcript: longTranscript(), audioSource: nil, category: .transcription, source: .file)
-        await model.generateCardMetadata(for: entry.id, transcript: longTranscript())
-        let reloaded = try #require(model.libraryEntry(id: entry.id))
-        #expect(reloaded.aiTitle == "Piano vendite")
-        #expect(reloaded.shortSummary == "Riepilogo delle quote per canale.")
-        await MockLanguageModelStore.shared.clear()
+        try await withOnDeviceMock("Piano vendite\nRiepilogo delle quote per canale.") {
+            let model = makeModel(temporaryDefaults())
+            let entry = try await model.library.add(transcript: longTranscript(), audioSource: nil, category: .transcription, source: .file)
+            await model.generateCardMetadata(for: entry.id, transcript: longTranscript())
+            let reloaded = try #require(model.libraryEntry(id: entry.id))
+            #expect(reloaded.aiTitle == "Piano vendite")
+            #expect(reloaded.shortSummary == "Riepilogo delle quote per canale.")
+        }
     }
 
     @Test("generation is skipped when the toggle is off")
     func skippedWhenOff() async throws {
-        await MockLanguageModelStore.shared.install(provider: .foundation, response: MockLanguageModelResponse(text: "T\nS"))
-        let model = makeModel(temporaryDefaults())
-        model.generatesCardMetadata = false
-        let entry = try await model.library.add(transcript: longTranscript(), audioSource: nil, category: .transcription, source: .file)
-        await model.generateCardMetadata(for: entry.id, transcript: longTranscript())
-        let stored = try await model.library.load(entry.id)
-        #expect(stored.entry.aiTitle == nil)
-        #expect(stored.entry.shortSummary == nil)
-        await MockLanguageModelStore.shared.clear()
+        try await withOnDeviceMock("T\nS") {
+            let model = makeModel(temporaryDefaults())
+            model.generatesCardMetadata = false
+            let entry = try await model.library.add(transcript: longTranscript(), audioSource: nil, category: .transcription, source: .file)
+            await model.generateCardMetadata(for: entry.id, transcript: longTranscript())
+            let stored = try await model.library.load(entry.id)
+            #expect(stored.entry.aiTitle == nil)
+            #expect(stored.entry.shortSummary == nil)
+        }
     }
 
     @Test("regenerateCardMetadata bypasses the generation toggle")
     func regenerateBypassesToggle() async throws {
-        await MockLanguageModelStore.shared.install(provider: .foundation, response: MockLanguageModelResponse(text: "Piano vendite\nRiepilogo delle quote per canale."))
-        let model = makeModel(temporaryDefaults())
-        model.generatesCardMetadata = false
-        let entry = try await model.library.add(transcript: longTranscript(), audioSource: nil, category: .transcription, source: .file)
-        model.selectedEntryID = entry.id
-        model.transcript = longTranscript()
+        try await withOnDeviceMock("Piano vendite\nRiepilogo delle quote per canale.") {
+            let model = makeModel(temporaryDefaults())
+            model.generatesCardMetadata = false
+            let entry = try await model.library.add(transcript: longTranscript(), audioSource: nil, category: .transcription, source: .file)
+            model.selectedEntryID = entry.id
+            model.transcript = longTranscript()
 
-        model.regenerateCardMetadata()
-        var written = false
-        for _ in 0..<200 {
-            if try await model.library.load(entry.id).entry.aiTitle != nil { written = true; break }
-            try await Task.sleep(for: .milliseconds(10))
+            model.regenerateCardMetadata()
+            var written = false
+            for _ in 0..<200 {
+                if try await model.library.load(entry.id).entry.aiTitle != nil { written = true; break }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            #expect(written)
+            let reloaded = try await model.library.load(entry.id).entry
+            #expect(reloaded.aiTitle == "Piano vendite")
+            #expect(reloaded.shortSummary == "Riepilogo delle quote per canale.")
         }
-        #expect(written)
-        let reloaded = try await model.library.load(entry.id).entry
-        #expect(reloaded.aiTitle == "Piano vendite")
-        #expect(reloaded.shortSummary == "Riepilogo delle quote per canale.")
-        await MockLanguageModelStore.shared.clear()
     }
 
     @Test("toggling AI titles bumps the library version so rows redraw")
