@@ -38,6 +38,8 @@ public struct ParolaDocument: Sendable {
         /// Short title and one-line summary written on device when the transcription finished.
         public var aiTitle: String?
         public var shortSummary: String?
+        /// Where this transcript has been sent, oldest first.
+        public var deliveries: [DeliveryReceipt]
 
         public init(
             version: Int = Manifest.currentVersion,
@@ -61,7 +63,8 @@ public struct ParolaDocument: Sendable {
             wordCount: Int? = nil,
             source: EntrySource? = nil,
             aiTitle: String? = nil,
-            shortSummary: String? = nil
+            shortSummary: String? = nil,
+            deliveries: [DeliveryReceipt] = []
         ) {
             self.version = version
             self.createdAt = createdAt
@@ -85,6 +88,7 @@ public struct ParolaDocument: Sendable {
             self.source = source ?? Manifest.derivedSource(modelName: modelName)
             self.aiTitle = aiTitle
             self.shortSummary = shortSummary
+            self.deliveries = deliveries
         }
 
         /// A bundle written before the field kept one trace of a link: the sentinel a caption fetcher stamps.
@@ -115,6 +119,7 @@ public struct ParolaDocument: Sendable {
             case source
             case aiTitle
             case shortSummary
+            case deliveries
         }
 
         public init(from decoder: any Decoder) throws {
@@ -142,6 +147,7 @@ public struct ParolaDocument: Sendable {
                 ?? Manifest.derivedSource(modelName: modelName)
             aiTitle = try c.decodeIfPresent(String.self, forKey: .aiTitle)
             shortSummary = try c.decodeIfPresent(String.self, forKey: .shortSummary)
+            deliveries = try c.decodeIfPresent([DeliveryReceipt].self, forKey: .deliveries) ?? []
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -176,6 +182,9 @@ public struct ParolaDocument: Sendable {
             try c.encode(source, forKey: .source)
             try c.encodeIfPresent(aiTitle, forKey: .aiTitle)
             try c.encodeIfPresent(shortSummary, forKey: .shortSummary)
+            if !deliveries.isEmpty {
+                try c.encode(deliveries, forKey: .deliveries)
+            }
         }
     }
 

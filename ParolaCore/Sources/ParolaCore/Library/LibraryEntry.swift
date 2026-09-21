@@ -35,6 +35,7 @@ public struct LibraryEntry: Identifiable, Hashable, Sendable {
     public var wordCount: Int? { manifest.wordCount }
     public var aiTitle: String? { manifest.aiTitle }
     public var shortSummary: String? { manifest.shortSummary }
+    public var deliveries: [DeliveryReceipt] { manifest.deliveries }
 
     public func note(forSegment id: Int) -> String? {
         manifest.segmentNotes[String(id)]

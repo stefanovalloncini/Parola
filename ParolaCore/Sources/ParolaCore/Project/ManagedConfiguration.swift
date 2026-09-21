@@ -9,6 +9,7 @@ public struct ManagedConfiguration: @unchecked Sendable {
         case enabledFeatures
         case disableYouTubeIngestion
         case disableDictation
+        case disableDestinations
         case disableCloudLLM
         case disableModelDownloads
         case requireEnglishOnly
@@ -64,6 +65,11 @@ public struct ManagedConfiguration: @unchecked Sendable {
 
     public var disableDictation: Bool {
         managedDict?[Key.disableDictation.rawValue] as? Bool ?? false
+    }
+
+    /// Hides the Send To pane, its menus and the auto-send hook.
+    public var disableDestinations: Bool {
+        managedDict?[Key.disableDestinations.rawValue] as? Bool ?? false
     }
 
     public static let userPrivacyModeKey = "parola.userPrivacyMode"

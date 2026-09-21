@@ -11,6 +11,7 @@ public enum ParolaFeature: String, CaseIterable, Sendable, Codable {
     case ai
     case automation
     case watchedFolders
+    case destinations
 
     public var displayName: String {
         switch self {
@@ -23,6 +24,7 @@ public enum ParolaFeature: String, CaseIterable, Sendable, Codable {
         case .ai: return "AI"
         case .automation: return "Automation"
         case .watchedFolders: return "Watched folders"
+        case .destinations: return "Send To"
         }
     }
 }
@@ -54,6 +56,7 @@ public struct FeatureSet: Sendable, Equatable {
         }
         if managed.disableDictation { enabled.remove(.dictation) }
         if managed.disableYouTubeIngestion { enabled.remove(.youtube) }
+        if managed.disableDestinations { enabled.remove(.destinations) }
         return FeatureSet(enabled: enabled)
     }
 
