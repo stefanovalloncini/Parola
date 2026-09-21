@@ -31,6 +31,19 @@ public enum DeliverySkipReason: Sendable, Equatable {
     }
 }
 
+/// One destination's outcome in a fan-out, with the destination it belongs to.
+public struct DeliveryAttempt: Sendable, Equatable {
+    public let destinationID: UUID
+    public let destinationName: String
+    public let outcome: DeliveryOutcome
+
+    public init(destinationID: UUID, destinationName: String, outcome: DeliveryOutcome) {
+        self.destinationID = destinationID
+        self.destinationName = destinationName
+        self.outcome = outcome
+    }
+}
+
 /// A delivery waiting for its next attempt.
 public struct QueuedDelivery: Codable, Sendable, Equatable {
     public var entryID: LibraryEntry.ID
@@ -232,7 +245,7 @@ public actor DeliveryEngine {
     }
 
     /// Every enabled auto-send destination that takes this entry's category.
-    public func sendAutomatically(entryID: LibraryEntry.ID) async -> [DeliveryOutcome] {
+    public func sendAutomatically(entryID: LibraryEntry.ID) async -> [DeliveryAttempt] {
         let candidates = await destinationsProvider()
             .compactMap(\.destination)
             .filter { $0.isEnabled && $0.autoSend }
@@ -241,13 +254,24 @@ public actor DeliveryEngine {
         do {
             payload = try await payloadProvider(entryID)
         } catch {
-            return [.skipped(reason: .payloadUnavailable(error.localizedDescription))]
+            appendMissing(
+                QueueKey(entryID: entryID, destinationID: UUID()),
+                name: "", event: .skipped,
+                detail: DeliverySkipReason.payloadUnavailable(error.localizedDescription).message
+            )
+            return []
         }
-        var outcomes: [DeliveryOutcome] = []
+        var attempts: [DeliveryAttempt] = []
         for destination in candidates where destination.accepts(payload.category) {
-            outcomes.append(await attempt(payload: payload, destination: destination))
+            attempts.append(
+                DeliveryAttempt(
+                    destinationID: destination.id,
+                    destinationName: destination.name,
+                    outcome: await attempt(payload: payload, destination: destination)
+                )
+            )
         }
-        return outcomes
+        return attempts
     }
 
     // MARK: - Queue
@@ -255,15 +279,6 @@ public actor DeliveryEngine {
     public func pending() -> [QueuedDelivery] { queue }
 
     public func recentLog() -> [DeliveryLogEntry] { log.entries }
-
-    /// Drops everything queued for an entry — its bundle is gone, so no retry can succeed.
-    public func forget(entryID: LibraryEntry.ID) {
-        for item in queue where item.entryID == entryID {
-            timers.removeValue(forKey: QueueKey(entryID: item.entryID, destinationID: item.destinationID))?.cancel()
-        }
-        queue.removeAll { $0.entryID == entryID }
-        store.save(queue: queue)
-    }
 
     private func attempt(payload: DeliveryPayload, destination: any DeliveryDestination) async -> DeliveryOutcome {
         let key = QueueKey(entryID: payload.entryID, destinationID: destination.id)
@@ -297,7 +312,7 @@ public actor DeliveryEngine {
             return .skipped(reason: .givenUp(destination.name))
         }
         let delay = Self.delay(forAttempt: attempt)
-        let nextAt = Date().addingTimeInterval(delay.seconds)
+        let nextAt = Date().addingTimeInterval(delay.wallSeconds)
         enqueue(
             QueuedDelivery(
                 entryID: key.entryID, destinationID: key.destinationID,
@@ -429,7 +444,7 @@ public actor DeliveryEngine {
 
 extension Duration {
     /// Seconds as a Double, for a deadline that has to travel as a `Date`.
-    var seconds: Double {
+    var wallSeconds: Double {
         let parts = components
         return Double(parts.seconds) + Double(parts.attoseconds) / 1e18
     }

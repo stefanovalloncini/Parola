@@ -18,6 +18,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     case exportFormats
     case batchExport
     case autoExport
+    case sendTo
     case integrations
     case prompts
     case automation
@@ -45,6 +46,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .exportFormats: return "Export Formats"
         case .batchExport: return "Batch Export"
         case .autoExport: return "Auto-Export"
+        case .sendTo: return "Send To"
         case .integrations: return "Integrations"
         case .prompts: return "Prompts"
         case .automation: return "MCP & Automation"
@@ -72,6 +74,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .exportFormats: return String(localized: "Export Formats")
         case .batchExport: return String(localized: "Batch Export")
         case .autoExport: return String(localized: "Auto-Export")
+        case .sendTo: return String(localized: "Send To")
         case .integrations: return String(localized: "Integrations")
         case .prompts: return String(localized: "Prompts")
         case .automation: return String(localized: "MCP & Automation")
@@ -100,6 +103,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .exportFormats: return ["preset", "txt", "srt", "vtt", "csv", "tsv", "docx", "pdf", "markdown", "html", "json", "jsonl", "fcpxml", "final cut", "lrc", "lyrics", "subtitles"]
         case .batchExport: return ["batch", "multiple files", "drag drop", "queue", "sidecar", "folder", "preset"]
         case .autoExport: return ["auto export", "rule", "line length", "qc", "timestamps", "html theme", "preset"]
+        case .sendTo: return ["obsidian", "vault", "send", "destination", "note", "markdown", "frontmatter", "wikilink"]
         case .integrations: return ["yt-dlp", "youtube", "homebrew", "install"]
         case .prompts: return ["prompt", "cleanup", "translate", "bullet", "action", "trigger words", "assistant", "rewrite"]
         case .automation: return ["mcp", "bridge", "claude code", "codex", "loopback"]
@@ -184,6 +188,8 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
             ]
         case .autoExport:
             return ["autoExportRules", "subtitleCaptionLength", "markdownTimestamps", "txtExportTimestamps", "htmlExportTheme"]
+        case .sendTo:
+            return ["destinations"]
         case .integrations, .prompts:
             return []
         case .automation:

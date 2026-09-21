@@ -78,6 +78,11 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `setExportSpec` | **spec** | Merge fields over the sheet's spec (`options` merges field by field, so `{"options":{"timestamps":true}}` keeps the rest). Naming `format` moves the spec to that format's style; naming `style` alone picks that style's first format. Replies `{spec}`. |
 | `exportWithSpec` | **spec**, **path** | Write the loaded transcript straight to `path` with that spec — no save panel. Replies `{path, format}`. |
 | `setExportPresets` | **presets** | Replace the saved export presets with an array of `ExportPreset` objects. Built-ins are kept and re-stamped. Replies `{exportPresets}`. |
+| `sendEntry` | **entryID**, **destinationID** | Send a library entry to one Send To destination. Replies `{outcome}`: `delivered` carries `destinationName` and the note `path`, `queued` the `attempt` and `nextAt`, `skipped` the `reason`. |
+| `listDeliveries` | **entryID** | The delivery receipts stored in that entry's manifest (`destinationID`, `destinationName`, `deliveredAt`, `location`). |
+| `setDestinations` | **destinations** | Replace the Send To list with an array of `{kind, config}` envelopes. In test mode a config may carry `vaultPath` instead of `vaultBookmark` and the app makes the bookmark for it. Replies `{destinations}`. |
+| `installMockDestination` | name, autoSend, categories, failuresBeforeSuccess | Test mode: add a destination that records what it is handed and writes nothing. Replies `{installed, destinationID}`. |
+| `readMockDeliveries` | — | Test mode: `{deliveries, receipts}` — what the mock destinations were handed (`entryID`, `title`, `category`, `segmentCount`, `markdownBytes`, `favorites`) and the receipts they gave back. |
 | `exportDiagnostics` | — | Render the diagnostics report and write it to the save destination. Returns `{path}`. In test mode, queue the destination with `queueSaveDestination` first. A dismissed panel is `PRECONDITION`; a failed write is `INTERNAL`. |
 | `parola_app_dismiss_error` | — | Clear a failed phase (equivalent to clicking "Try again"). |
 | `parola_app_screenshot` | path | Capture the main window to PNG via ScreenCaptureKit (needs Screen Recording permission). `path` is a bare filename stored under `Caches/Parola/Screenshots`. |
@@ -100,6 +105,8 @@ The five introduction commands and `getState.introduction` all reply `{visible, 
 `null` otherwise. A run in flight wins over a translation already stored: it reports the target it is heading for,
 `segmentCount` as the segments sent so far and `inProgress: true`, so a script can wait on a first translation.
 `getState.translationSideBySide` is the two-column preference.
+`getState.destinations` lists the Send To destinations in order (`id`, `kind`, `name`, `isEnabled`, `autoSend`, `categories`); a
+kind this build cannot run comes back with the kind it was stored as and `isEnabled: false`.
 `visible` says whether the introduction is on screen; `step` is the scene showing now and `steps` the order this
 deployment walks, drawn from `hello`, `transcribe`, `features`, `engine`, `ready`. The `engine` step is present
 only when `engineChoices` is non-empty; otherwise it is left out of `steps` and the reply's `engine` field is

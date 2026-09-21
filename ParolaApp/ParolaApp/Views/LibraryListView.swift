@@ -418,6 +418,10 @@ struct LibraryListView: View {
                     }
                 }
                 .accessibilityIdentifier("library.row.\(entry.id).moveTo")
+                if model.destinationsEnabled {
+                    SendToMenu(model: model, entryID: entry.id)
+                        .accessibilityIdentifier("library.row.\(entry.id).sendTo")
+                }
                 Button("Reveal in Finder") {
                     NSWorkspace.shared.activateFileViewerSelecting([entry.bundleURL])
                 }

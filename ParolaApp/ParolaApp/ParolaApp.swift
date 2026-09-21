@@ -310,6 +310,10 @@ struct ParolaApp: App {
                 }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
                 .disabled(!model.hasTranscript)
+                if model.destinationsEnabled {
+                    Divider()
+                    SendToMenu(model: model, entryID: model.selectedEntryID)
+                }
                 Divider()
                 Button("Print Transcript…") { model.printTranscript() }
                     .keyboardShortcut("p", modifiers: [.command])

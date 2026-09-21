@@ -1,8 +1,13 @@
 import Foundation
 import Testing
 @testable import ParolaCore
+import ParolaTestSupport
 
-@Suite("Delivery engine", .tags(.fileSystem))
+// .serialized: each test drives its own engine through a TestClock, and running six of them at once
+// adds enough parked tasks to the pool to stall the rest of the run.
+// .logFacade: every attempt writes a ParolaLog line, which would otherwise land in a sink another
+// suite installed process-wide while it asserts on what it wrote.
+@Suite("Delivery engine", .serialized, .tags(.fileSystem), .logFacade)
 struct DeliveryEngineTests {
 
     // MARK: - Rig
@@ -88,8 +93,8 @@ struct DeliveryEngineTests {
         #expect(await engine.pending().isEmpty)
     }
 
-    @Test("a failure queues the delivery and the clock brings it back")
-    func failureIsRetried() async throws {
+    @Test("a failure queues the delivery, arms its timer, and a retry clears it")
+    func failureIsQueuedThenRetried() async throws {
         let recorder = MockDeliveryRecorder()
         let receipts = ReceiptSpy()
         let clock = TestClock()
@@ -99,19 +104,30 @@ struct DeliveryEngineTests {
         )
 
         let outcome = await engine.send(entryID: "entry-1", to: destination.id)
-        guard case .queued(let attempt, _) = outcome else {
+        guard case .queued(let attempt, let nextAt) = outcome else {
             Issue.record("expected the delivery to be queued, got \(outcome)")
             return
         }
         #expect(attempt == 1)
+        #expect(nextAt.timeIntervalSinceNow > 30, "the first retry is a minute out")
         #expect(await engine.pending().count == 1)
+        #expect(
+            await poll { clock.sleeperCount == 1 },
+            "the retry timer should be armed on the injected clock"
+        )
 
-        #expect(await poll { clock.sleeperCount == 1 }, "the retry timer should be armed")
-        clock.advance(by: DeliveryEngine.retryDelays[0])
+        // The same entry point the toast's Retry runs through.
+        let retried = await engine.send(entryID: "entry-1", to: destination.id)
 
-        #expect(await poll { await engine.pending().isEmpty }, "the retry should have cleared the queue")
+        guard case .delivered(let receipt) = retried else {
+            Issue.record("expected the retry to deliver, got \(retried)")
+            return
+        }
+        #expect(receipt.destinationName == "Mock vault")
+        #expect(await engine.pending().isEmpty, "the retry should have cleared the queue")
         #expect(await receipts.entries.values.contains("entry-1"))
         #expect(await recorder.recorded().count == 1)
+        #expect(await poll { clock.sleeperCount == 0 }, "the armed timer should have been cancelled")
     }
 
     @Test("a delivery that never works is dropped after the last attempt")
@@ -119,16 +135,23 @@ struct DeliveryEngineTests {
         let recorder = MockDeliveryRecorder()
         let clock = TestClock()
         let destination = await mock(failuresBeforeSuccess: 99, recorder: recorder)
-        let store = try makeStore()
-        let engine = makeEngine(destinations: [.mock(destination)], store: store, clock: clock)
+        let engine = makeEngine(destinations: [.mock(destination)], store: try makeStore(), clock: clock)
 
-        _ = await engine.send(entryID: "entry-1", to: destination.id)
-        for _ in 1..<DeliveryEngine.maxAttempts {
-            #expect(await poll { clock.sleeperCount == 1 })
-            clock.advance(by: .seconds(86_400))
+        var outcome = await engine.send(entryID: "entry-1", to: destination.id)
+        for attemptsSoFar in 1..<DeliveryEngine.maxAttempts {
+            guard case .queued(let attempt, let nextAt) = outcome else {
+                Issue.record("attempt \(attemptsSoFar) should have been queued, got \(outcome)")
+                return
+            }
+            // A retry continues the backoff instead of starting it over.
+            #expect(attempt == attemptsSoFar)
+            let delay = DeliveryEngine.delay(forAttempt: attemptsSoFar)
+            #expect(abs(nextAt.timeIntervalSinceNow - delay.wallSeconds) < 5)
+            outcome = await engine.send(entryID: "entry-1", to: destination.id)
         }
 
-        #expect(await poll { await engine.pending().isEmpty }, "the delivery should have been dropped")
+        #expect(outcome == .skipped(reason: .givenUp("Mock vault")))
+        #expect(await engine.pending().isEmpty, "the delivery should have been dropped")
         let log = await engine.recentLog()
         #expect(log.last?.event == .dropped)
         #expect(log.last?.attempt == DeliveryEngine.maxAttempts)
@@ -145,9 +168,9 @@ struct DeliveryEngineTests {
             destinations: [.mock(auto), .mock(manual)], store: try makeStore(), clock: TestClock()
         )
 
-        let outcomes = await engine.sendAutomatically(entryID: "entry-1")
+        let attempts = await engine.sendAutomatically(entryID: "entry-1")
 
-        #expect(outcomes.count == 1)
+        #expect(attempts.map(\.destinationName) == ["Auto"])
         let names = await recorder.receipts().map(\.destinationName)
         #expect(names == ["Auto"])
     }
@@ -163,9 +186,9 @@ struct DeliveryEngineTests {
             clock: TestClock()
         )
 
-        let outcomes = await engine.sendAutomatically(entryID: "entry-1")
+        let attempts = await engine.sendAutomatically(entryID: "entry-1")
 
-        #expect(outcomes.count == 1)
+        #expect(attempts.map(\.destinationName) == ["Meetings"])
         #expect(await recorder.receipts().map(\.destinationName) == ["Meetings"])
     }
 

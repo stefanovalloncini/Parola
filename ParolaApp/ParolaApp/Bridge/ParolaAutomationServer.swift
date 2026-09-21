@@ -58,6 +58,7 @@ final class ParolaAutomationServer {
             server.modelCommands(),
             server.transcriptCommands(),
             server.exportCommands(),
+            server.deliveryCommands(),
             server.libraryCommands(),
             server.batchCommands(),
             server.recordingCommands(),
@@ -502,6 +503,7 @@ final class ParolaAutomationServer {
             "exportSpec": model.exportSheetOpen ? Self.encode(model.exportSheetSpec) : .null,
             "translation": Self.translationState(model),
             "translationSideBySide": .bool(model.translationSideBySide),
+            "destinations": Self.destinationsState(model),
         ])
     }
 

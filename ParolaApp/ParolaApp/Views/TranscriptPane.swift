@@ -139,6 +139,13 @@ struct TranscriptPane: View {
             transcriptBody
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
+            // In the column's flow, not over it: a toast on top of the media bar would cover the
+            // transport for as long as it is up.
+            if let notice = model.deliveryNotice {
+                DeliveryToast(notice: notice)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
             if model.hasVideo, let player = model.player {
                 Divider()
                 PlayerSurface(player: player)
@@ -151,6 +158,7 @@ struct TranscriptPane: View {
                 MediaBar()
             }
         }
+        .animation(.smooth(duration: 0.25), value: model.deliveryNotice)
     }
 
     @ViewBuilder

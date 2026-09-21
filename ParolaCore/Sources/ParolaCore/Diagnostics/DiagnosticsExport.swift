@@ -34,6 +34,8 @@ public struct DiagnosticsEnvironment: Sendable {
     public var libraryEntryCount: Int?
     public var libraryBytes: UInt64?
     public var features: FeatureSet
+    /// The delivery ring, stripped to its structural fields by the renderer.
+    public var deliveryLog: [DeliveryLogEntry]
 
     public init(
         appVersion: String? = nil,
@@ -50,7 +52,8 @@ public struct DiagnosticsEnvironment: Sendable {
         models: [InstalledModel] = [],
         libraryEntryCount: Int? = nil,
         libraryBytes: UInt64? = nil,
-        features: FeatureSet = .all
+        features: FeatureSet = .all,
+        deliveryLog: [DeliveryLogEntry] = []
     ) {
         self.appVersion = appVersion
         self.appBuild = appBuild
@@ -67,6 +70,7 @@ public struct DiagnosticsEnvironment: Sendable {
         self.libraryEntryCount = libraryEntryCount
         self.libraryBytes = libraryBytes
         self.features = features
+        self.deliveryLog = deliveryLog
     }
 
     public static var currentOSVersion: String {

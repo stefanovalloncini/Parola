@@ -177,6 +177,17 @@
         }
       }
     },
+    "%@ — for example %@.md": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ — per esempio %@.md"
+          }
+        }
+      }
+    },
     "%@%%": {
       "extractionState": "manual",
       "localizations": {
@@ -803,6 +814,28 @@
         }
       }
     },
+    "A destination writes a Markdown note when you send a transcript to it. Turn on Send automatically to write one as soon as a transcription finishes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Una destinazione scrive una nota Markdown quando le mandi una trascrizione. Attiva Invia automaticamente per scriverla appena la trascrizione è pronta."
+          }
+        }
+      }
+    },
+    "A sample Parola writes to check a destination.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un esempio che Parola scrive per provare una destinazione."
+          }
+        }
+      }
+    },
     "A short list of names or jargon helps Whisper get unusual words right.": {
       "localizations": {
         "it": {
@@ -1058,6 +1091,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aggiungi correzione"
+          }
+        }
+      }
+    },
+    "Add Destination": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi destinazione"
           }
         }
       }
@@ -2453,6 +2497,17 @@
         }
       }
     },
+    "Choose the Obsidian vault folder Parola writes notes into.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scegli la cartella del vault Obsidian in cui Parola scrive le note."
+          }
+        }
+      }
+    },
     "Choose which formats to write next to each transcribed file.": {
       "extractionState": "manual",
       "localizations": {
@@ -3056,6 +3111,17 @@
         }
       }
     },
+    "Couldn't send to %@, retrying %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invio a %@ non riuscito, riprovo %@"
+          }
+        }
+      }
+    },
     "Couldn't transcribe %@": {
       "localizations": {
         "it": {
@@ -3188,6 +3254,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scuro"
+          }
+        }
+      }
+    },
+    "Date": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data"
+          }
+        }
+      }
+    },
+    "Date and title": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data e titolo"
           }
         }
       }
@@ -3866,6 +3954,17 @@
         }
       }
     },
+    "Duration": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durata"
+          }
+        }
+      }
+    },
     "EN only": {
       "extractionState": "manual",
       "localizations": {
@@ -3910,6 +4009,17 @@
         }
       }
     },
+    "Edit Destination": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifica destinazione"
+          }
+        }
+      }
+    },
     "Edit Prompt": {
       "extractionState": "manual",
       "localizations": {
@@ -3928,6 +4038,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Modifica prompt"
+          }
+        }
+      }
+    },
+    "Edit…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifica…"
           }
         }
       }
@@ -4407,6 +4528,17 @@
         }
       }
     },
+    "Favorites": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preferiti"
+          }
+        }
+      }
+    },
     "Favorites only (%lld)": {
       "extractionState": "manual",
       "localizations": {
@@ -4414,6 +4546,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Solo preferiti (%lld)"
+          }
+        }
+      }
+    },
+    "Filename": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nome del file"
           }
         }
       }
@@ -4674,6 +4817,17 @@
         }
       }
     },
+    "Folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cartella"
+          }
+        }
+      }
+    },
     "Folders Parola watches, so anything dropped in is transcribed on its own.": {
       "extractionState": "manual",
       "localizations": {
@@ -4738,6 +4892,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Formato"
+          }
+        }
+      }
+    },
+    "Frontmatter": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frontmatter"
           }
         }
       }
@@ -5085,6 +5250,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Identifica gli speaker"
+          }
+        }
+      }
+    },
+    "If you can read it in your vault, the folder and the filename work.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se la leggi nel tuo vault, la cartella e il nome del file funzionano."
           }
         }
       }
@@ -5466,6 +5642,28 @@
         }
       }
     },
+    "Keep both": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tieni entrambe"
+          }
+        }
+      }
+    },
+    "Keep both writes a second note with a counter.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tieni entrambe scrive una seconda nota con un contatore."
+          }
+        }
+      }
+    },
     "Kept for 7 days, up to 10 MB. No transcript text, file names, or paths.": {
       "extractionState": "manual",
       "localizations": {
@@ -5777,6 +5975,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Chiaro"
+          }
+        }
+      }
+    },
+    "Link speaker names": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collega i nomi di chi parla"
           }
         }
       }
@@ -6572,6 +6781,17 @@
         }
       }
     },
+    "New Destination": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuova destinazione"
+          }
+        }
+      }
+    },
     "New Prompt": {
       "extractionState": "manual",
       "localizations": {
@@ -6809,6 +7029,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Senza scadenza"
+          }
+        }
+      }
+    },
+    "No destinations yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessuna destinazione"
+          }
+        }
+      }
+    },
+    "No folder picked": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna cartella scelta"
           }
         }
       }
@@ -7109,6 +7351,17 @@
         }
       }
     },
+    "Not supported in this version of Parola.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non supportata in questa versione di Parola."
+          }
+        }
+      }
+    },
     "Notch": {
       "extractionState": "manual",
       "localizations": {
@@ -7127,6 +7380,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nota"
+          }
+        }
+      }
+    },
+    "Note body": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corpo della nota"
+          }
+        }
+      }
+    },
+    "Note name": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nome della nota"
           }
         }
       }
@@ -7171,6 +7446,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "OK"
+          }
+        }
+      }
+    },
+    "Obsidian": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obsidian"
+          }
+        }
+      }
+    },
+    "Obsidian Vault Folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cartella di un vault Obsidian"
           }
         }
       }
@@ -7451,6 +7748,17 @@
         }
       }
     },
+    "Open in Obsidian": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apri in Obsidian"
+          }
+        }
+      }
+    },
     "Open multiple audio files at once to queue them for batch transcription.": {
       "extractionState": "manual",
       "localizations": {
@@ -7699,6 +8007,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Parola usa questi strumenti solo quando glielo chiedi."
+          }
+        }
+      }
+    },
+    "Parola test note": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nota di prova di Parola"
           }
         }
       }
@@ -8725,6 +9044,17 @@
         }
       }
     },
+    "Relative to the vault. Leave empty to write into the vault root.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relativa al vault. Lasciala vuota per scrivere nella radice del vault."
+          }
+        }
+      }
+    },
     "Release builds keep the bridge off by default so notarised binaries don't open a local listener without consent. Turn it on when you want to drive Parola from Claude Code / Codex / a custom MCP client.": {
       "extractionState": "manual",
       "localizations": {
@@ -9105,6 +9435,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riporta ogni impostazione al suo valore predefinito. I modelli su disco non vengono toccati."
+          }
+        }
+      }
+    },
+    "Reveal": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra nel Finder"
           }
         }
       }
@@ -9654,6 +9995,50 @@
         }
       }
     },
+    "Send To": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia a"
+          }
+        }
+      }
+    },
+    "Send To is turned off.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia a è disattivato."
+          }
+        }
+      }
+    },
+    "Send a Test Note": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manda una nota di prova"
+          }
+        }
+      }
+    },
+    "Send automatically": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia automaticamente"
+          }
+        }
+      }
+    },
     "Send the notes": {
       "extractionState": "manual",
       "localizations": {
@@ -9661,6 +10046,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Manda gli appunti"
+          }
+        }
+      }
+    },
+    "Send to": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invia a"
           }
         }
       }
@@ -9698,6 +10094,17 @@
         }
       }
     },
+    "Sent to %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inviata a %@"
+          }
+        }
+      }
+    },
     "Sentences": {
       "extractionState": "manual",
       "localizations": {
@@ -9716,6 +10123,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Seppia"
+          }
+        }
+      }
+    },
+    "Set Up Destinations…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configura le destinazioni…"
           }
         }
       }
@@ -10182,6 +10600,17 @@
         }
       }
     },
+    "Source": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Origine"
+          }
+        }
+      }
+    },
     "Source A→Z": {
       "extractionState": "manual",
       "localizations": {
@@ -10211,6 +10640,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Spaziatura nella sidebar della libreria."
+          }
+        }
+      }
+    },
+    "Speaker 1": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voce 1"
+          }
+        }
+      }
+    },
+    "Speaker 2": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voce 2"
+          }
+        }
+      }
+    },
+    "Speaker names": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nomi di chi parla"
           }
         }
       }
@@ -10652,6 +11114,17 @@
         }
       }
     },
+    "Subfolder": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sottocartella"
+          }
+        }
+      }
+    },
     "Substitutions applied to every new transcript before it's saved. Term packs add curated rules in one click.": {
       "extractionState": "manual",
       "localizations": {
@@ -10885,6 +11358,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "TSV"
+          }
+        }
+      }
+    },
+    "Tags": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tag"
           }
         }
       }
@@ -11159,6 +11643,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "L'operazione non può essere annullata."
+          }
+        }
+      }
+    },
+    "This is a test note from Parola.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questa è una nota di prova di Parola."
           }
         }
       }
@@ -12138,6 +12633,17 @@
         }
       }
     },
+    "Vault": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vault"
+          }
+        }
+      }
+    },
     "Version %@": {
       "localizations": {
         "it": {
@@ -12313,6 +12819,17 @@
         }
       }
     },
+    "What this destination is called in the Send to menu.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il nome con cui compare nel menu Invia a."
+          }
+        }
+      }
+    },
     "When on, the LLM answers your dictation instead of cleaning it up. Use this for voice Q&A.": {
       "extractionState": "manual",
       "localizations": {
@@ -12341,6 +12858,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Quando l'app in primo piano corrisponde, la dettatura usa queste regole. Il prompt pulisce il testo dopo la trascrizione; la lingua suggerisce al motore prima della trascrizione. Le regole URL hanno la precedenza sul predefinito dell'app per i browser supportati."
+          }
+        }
+      }
+    },
+    "When the note exists": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se la nota esiste già"
+          }
+        }
+      }
+    },
+    "Where a finished transcript is sent, starting with a folder in your Obsidian vault.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dove finisce una trascrizione pronta, a partire da una cartella del tuo vault Obsidian."
           }
         }
       }
@@ -12553,6 +13092,17 @@
         }
       }
     },
+    "Writes a speaker as [[Name]] so Obsidian links the note to a person.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scrive chi parla come [[Nome]] così Obsidian collega la nota a una persona."
+          }
+        }
+      }
+    },
     "Writes start times alongside each segment.": {
       "extractionState": "manual",
       "localizations": {
@@ -12560,6 +13110,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scrive l'orario di inizio accanto a ogni segmento."
+          }
+        }
+      }
+    },
+    "Wrote %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scritta in %@"
           }
         }
       }
@@ -12873,6 +13434,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "sostituzione"
+          }
+        }
+      }
+    },
+    "sample": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "esempio"
           }
         }
       }

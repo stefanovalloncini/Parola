@@ -515,6 +515,13 @@ final class AppModel {
         didSet { saveAutoExportRules() }
     }
 
+    // MARK: - Send To
+
+    /// Written only through `setDestinations(_:)`.
+    var destinations: [AnyDestination] = []
+    var deliveryNotice: DeliveryNotice?
+    @ObservationIgnored lazy var deliveryEngine: DeliveryEngine = makeDeliveryEngine()
+
     // MARK: - Watched folders
 
     @ObservationIgnored lazy var watchedFolders: WatchedFoldersStore = WatchedFoldersStore { [weak self] url in
@@ -724,6 +731,7 @@ final class AppModel {
         isReloadingSettings = true
         readPersistedSettings()
         loadAutoExportRules()
+        loadDestinations()
         loadExportPresets()
         loadBatchExportSelection()
         loadIgnoredSegmentRules()
@@ -1500,6 +1508,7 @@ final class AppModel {
         let navigationGeneration = loadEntryGeneration
         Task { [weak self] in
             guard let self else { return }
+            var persistedEntryID: LibraryEntry.ID?
             do {
                 let entry = try await library.add(
                     transcript: result,
@@ -1509,6 +1518,7 @@ final class AppModel {
                     sourceDigest: sourceDigest,
                     source: source
                 )
+                persistedEntryID = entry.id
                 refreshLibrary()
                 // library.add copies media for seconds; if the user navigated meanwhile,
                 // taking the selection would repoint their next edits at this new entry.
@@ -1533,6 +1543,9 @@ final class AppModel {
             }
             if activate, let audioSource {
                 runAutoExports(transcript: result, sourceURL: audioSource)
+            }
+            if activate, let persistedEntryID {
+                await autoSendEntry(persistedEntryID)
             }
         }
     }

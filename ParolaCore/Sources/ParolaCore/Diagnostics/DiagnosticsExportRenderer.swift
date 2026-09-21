@@ -15,6 +15,11 @@ extension DiagnosticsExport {
             "",
         ]
         lines += header(environment)
+        let delivery = deliveryLines(environment.deliveryLog)
+        if !delivery.isEmpty {
+            lines.append("")
+            lines += delivery
+        }
         lines.append("")
         if reading.records.isEmpty {
             lines.append("No diagnostics recorded.")
@@ -44,6 +49,14 @@ extension DiagnosticsExport {
             row("Library", libraryText(environment)),
             row("Features", featuresText(environment.features)),
         ]
+    }
+
+    /// Destination names, entry ids and note paths stay out: the report promises none of them.
+    private static func deliveryLines(_ entries: [DeliveryLogEntry]) -> [String] {
+        guard !entries.isEmpty else { return [] }
+        return ["Delivery log (\(entries.count))"] + entries.map { entry in
+            "  \(Date.ISO8601FormatStyle().format(entry.at))  \(entry.event.rawValue)  attempt \(entry.attempt)"
+        }
     }
 
     private static func row(_ label: String, _ value: String) -> String {

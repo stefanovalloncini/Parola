@@ -35,7 +35,7 @@ enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
     case general, customization, watchedFolders, recordMeetings, shortcuts
     case microphone, liveCaptions, dictation, snippets, corrections
     case localModels, transcriptionDefaults, translation, ignoredSegments, findReplace
-    case exportFormats, batchExport, autoExport, integrations
+    case exportFormats, batchExport, autoExport, sendTo, integrations
     case prompts
     case automation
     case updates
@@ -62,6 +62,7 @@ enum SettingsRoute: String, CaseIterable, Identifiable, Hashable {
         case .prompts: return features.isEnabled(.ai)
         case .automation: return features.isEnabled(.automation)
         case .watchedFolders: return features.isEnabled(.watchedFolders)
+        case .sendTo: return features.isEnabled(.destinations)
         case .microphone:
             return features.isEnabled(.micRecording) || features.isEnabled(.dictation)
                 || features.isEnabled(.liveCaptions)
@@ -115,6 +116,7 @@ private struct SettingsRouteMeta {
         .exportFormats: SettingsRouteMeta(titleKey: "Export Formats", summaryKey: "The named exports Parola can write, and what each one puts in the file.", symbol: "square.and.arrow.up", scope: .exportFormats),
         .batchExport: SettingsRouteMeta(titleKey: "Batch Export", summaryKey: "What happens to files exported from a batch run.", symbol: "rectangle.stack.badge.play", scope: .batchExport),
         .autoExport: SettingsRouteMeta(titleKey: "Auto-Export", summaryKey: "Rules that write a transcript to disk as soon as it's ready.", symbol: "arrow.up.doc", scope: .autoExport),
+        .sendTo: SettingsRouteMeta(titleKey: "Send To", summaryKey: "Where a finished transcript is sent, starting with a folder in your Obsidian vault.", symbol: "paperplane", scope: .sendTo),
         .integrations: SettingsRouteMeta(titleKey: "Integrations", summaryKey: "Helper tools Parola uses to fetch audio from links.", symbol: "puzzlepiece.extension", scope: .integrations),
         .prompts: SettingsRouteMeta(titleKey: "Prompts", summaryKey: "The prompt library behind dictation cleanup and the Transcript menu.", symbol: "text.cursor", scope: .prompts),
         .automation: SettingsRouteMeta(titleKey: "MCP & Automation", summaryKey: "The MCP server other apps and agents use to drive Parola.", symbol: "bolt.horizontal.circle", scope: .automation),
@@ -138,7 +140,7 @@ enum SettingsSidebarCatalog {
             SidebarGroup(id: "dictation", title: "DICTATION", routes: [.dictation, .snippets, .corrections]),
             SidebarGroup(id: "sources", title: "SOURCES", routes: [.watchedFolders, .integrations]),
             SidebarGroup(id: "transcription", title: "TRANSCRIPTION", routes: [.localModels, .transcriptionDefaults, .translation, .ignoredSegments, .findReplace]),
-            SidebarGroup(id: "export", title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport]),
+            SidebarGroup(id: "export", title: "EXPORT", routes: [.exportFormats, .batchExport, .autoExport, .sendTo]),
             SidebarGroup(id: "ai", title: "AI", routes: [.prompts]),
             SidebarGroup(id: "automation", title: "AUTOMATION", routes: [.automation]),
             SidebarGroup(id: "end", title: "SUPPORT", routes: [.advanced, .about])
@@ -264,6 +266,7 @@ private struct SettingsDetail: View {
         case .exportFormats: ExportFormatsPane()
         case .batchExport: BatchExportSettingsPane()
         case .autoExport: AutoExportPane()
+        case .sendTo: SendToPane()
         case .integrations: IntegrationsPane()
         case .prompts: PromptsPane()
         case .automation: AutomationPane()

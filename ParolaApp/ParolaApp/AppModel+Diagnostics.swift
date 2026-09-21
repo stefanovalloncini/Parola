@@ -97,8 +97,15 @@ extension AppModel {
             models: models ?? [],
             libraryEntryCount: await library.list().count,
             libraryBytes: await library.sizeOnDisk(),
-            features: features
+            features: features,
+            deliveryLog: deliveryLogEntries()
         )
+    }
+
+    /// The delivery ring that goes into the report. Read here so the store stays behind the model.
+    func deliveryLogEntries() -> [DeliveryLogEntry] {
+        guard destinationsEnabled else { return [] }
+        return DeliveryQueueStore(directory: deliveryDirectory).loadLog().entries
     }
 
     static func diagnosticsEngines(registry: EngineRegistry) async -> [EngineID: Bool] {
