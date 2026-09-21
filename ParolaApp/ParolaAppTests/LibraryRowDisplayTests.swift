@@ -30,12 +30,15 @@ struct LibraryRowDisplayTests {
         #expect(off.excerpt == "sensori fattivi…")
     }
 
-    @Test("the cache reuses a display for a matching raw excerpt and recomputes for a changed one")
-    func cacheReusesOnMatchingRawExcerpt() {
+    @Test("the cache reuses a row until its entry or its excerpt changes")
+    func cacheReusesUntilTheEntryOrExcerptChanges() {
         var cache = LibraryRowDisplayCache()
         let original = entry(aiTitle: "Riunione fornitori", summary: "Ordini al magazzino.")
         let first = cache.display(for: original, excerpt: "sensori fattivi…", showsAITitle: true, showsAISummary: true)
         #expect(first.title == "Riunione fornitori")
+
+        let again = cache.display(for: original, excerpt: "sensori fattivi…", showsAITitle: true, showsAISummary: true)
+        #expect(buffer(of: again.tooltip) == buffer(of: first.tooltip))
 
         let changed = entry(aiTitle: "Titolo diverso", summary: "Riassunto diverso.")
         let second = cache.display(for: changed, excerpt: "sensori fattivi…", showsAITitle: true, showsAISummary: true)
@@ -57,7 +60,7 @@ struct LibraryRowDisplayTests {
         return LibraryEntry(id: id, bundleURL: URL(fileURLWithPath: "/tmp/\(id).parola"), manifest: manifest)
     }
 
-    /// A reused display hands back the very same string, buffer and all; a rebuilt one allocates a fresh one.
+    /// A reused display hands back the same heap buffer — readable only past the 15-byte small-string form, as every fixture tooltip is.
     private func buffer(of string: String) -> UInt {
         var copy = string
         return copy.withUTF8 { UInt(bitPattern: $0.baseAddress) }
