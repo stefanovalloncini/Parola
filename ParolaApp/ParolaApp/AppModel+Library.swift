@@ -381,6 +381,7 @@ extension AppModel {
                 // finish last and install the entry the user already navigated away from.
                 guard generation == loadEntryGeneration else { return }
                 installStoredTranscript(loaded.document.transcript)
+                closeFind()
                 sourceFileURL = loaded.document.audioURL
                 selectedEntryID = id
                 if let audioURL = loaded.document.audioURL {

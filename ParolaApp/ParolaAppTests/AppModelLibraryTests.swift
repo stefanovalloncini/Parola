@@ -122,6 +122,57 @@ struct AppModelLibraryTests {
         #expect(model.smartChapters.isEmpty)
     }
 
+    @Test("loadEntry shuts the find bar the previous entry left open")
+    func loadEntryClosesFind() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        model.findIsOpen = true
+        model.findQuery = "previous entry"
+
+        model.loadEntry(seeded.id)
+        for _ in 0..<200 where model.selectedEntryID != seeded.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(!model.findIsOpen)
+        #expect(model.findQuery.isEmpty)
+        #expect(model.matches.isEmpty)
+    }
+
+    @Test("a row opened from a search result still lands on its match")
+    func loadEntryFromSearchKeepsTheQuery() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "a quarterly review")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+        model.searchResults = []
+        model.searchQuery = "quarterly"
+
+        model.loadEntry(seeded.id)
+        for _ in 0..<200 where model.selectedEntryID != seeded.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(model.findIsOpen)
+        #expect(model.findQuery == "quarterly")
+    }
+
     private static func transcriptWithSavedChapters(
         _ chapters: [Chapter] = [Chapter(title: "Opening", start: 0), Chapter(title: "Wrap up", start: 40)]
     ) -> Transcript {

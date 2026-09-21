@@ -2964,10 +2964,16 @@ final class AppModel {
                 findQuery = lastFindQuery
             }
         } else {
-            findQuery = ""
-            matches = []
-            currentMatchIndex = 0
+            closeFind()
         }
+    }
+
+    /// The query belongs to the transcript it was typed against, so a new entry starts with Find shut.
+    func closeFind() {
+        findIsOpen = false
+        findQuery = ""
+        matches = []
+        currentMatchIndex = 0
     }
 
     /// Opens Find on `word`. Order matters: a query set while Find is closed is discarded by the recompute.
