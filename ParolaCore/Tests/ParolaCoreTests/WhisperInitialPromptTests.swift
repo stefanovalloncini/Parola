@@ -90,7 +90,7 @@ struct WhisperInitialPromptTests {
     }
 
     @Test("a streaming session installs its filters on a decoder of its own")
-    func theStreamingSessionLeavesTheCachedDecoderAlone() {
+    func theStreamingSessionLeavesTheCachedDecoderAlone() throws {
         let shared = TextDecoder()
         shared.isModelMultilingual = true
         var own = StreamingTranscriptionSession.ownDecoder(borrowing: shared, tokenizer: StubTokenizer())
@@ -102,7 +102,7 @@ struct WhisperInitialPromptTests {
         #expect(own.logitsFilters?.count == 2)
         #expect(shared.logitsFilters?.isEmpty == true)
         #expect(own.isModelMultilingual)
-        #expect((own as? TextDecoder) !== shared)
+        #expect(try #require(own as? TextDecoder) !== shared)
     }
 
     @Test("a run that transcribed nothing but the prompt back returns nothing")

@@ -55,7 +55,7 @@ public actor StreamingTranscriptionSession: StreamingTranscriber {
     }
 
     /// A decoder of our own over the borrowed model, so this session's logits filters never land on
-    /// the cached kit. Every other `TextDecoder` member is derived from `model`.
+    /// the cached kit. Every other member of its public surface derives from `model`.
     static func ownDecoder(borrowing shared: any TextDecoding, tokenizer: WhisperTokenizer) -> any TextDecoding {
         guard let shared = shared as? TextDecoder else { return shared }
         let own = TextDecoder()
