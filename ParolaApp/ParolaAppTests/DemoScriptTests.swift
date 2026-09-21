@@ -145,6 +145,7 @@ struct DemoScriptTests {
     func levelOutsideTheClip() throws {
         for script in try bothScripts() {
             #expect(script.level(at: -1) == 0)
+            #expect(script.level(at: -0.05) == 0)
             #expect(script.level(at: script.duration + 5) == 0)
             #expect(script.level(at: script.duration / 2) >= 0)
         }

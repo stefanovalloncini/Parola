@@ -20,6 +20,7 @@ struct DemoScript: Codable, Equatable {
     }
 
     func level(at time: Double) -> Float {
+        guard time >= 0 else { return 0 }
         let index = Int(time * levelRate)
         guard levels.indices.contains(index) else { return 0 }
         return levels[index]
