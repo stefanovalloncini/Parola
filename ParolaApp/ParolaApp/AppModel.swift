@@ -151,6 +151,8 @@ final class AppModel {
     }
     var customTitlePrompt: String = "" { didSet { defaults.set(customTitlePrompt, forKey: "customTitlePrompt") } }
     var customSummaryPrompt: String = "" { didSet { defaults.set(customSummaryPrompt, forKey: "customSummaryPrompt") } }
+    /// Test seam: when set, replaces CardMetadataService so a test never touches the shared mock LLM store.
+    @ObservationIgnored var cardMetadataOperation: (@Sendable (Transcript) async -> CardMetadata?)?
     var subtitleFPS: Double = 30 { didSet { defaults.set(subtitleFPS, forKey: "subtitleFPS") } }
     var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue { didSet { defaults.set(subtitleCaptionLengthRaw, forKey: "subtitleCaptionLength") } }
     var transcriptCompact: Bool = false { didSet { defaults.set(transcriptCompact, forKey: "transcriptCompact") } }
@@ -3232,10 +3234,10 @@ final class AppModel {
 
     var transcriptPaneMode: TranscriptPaneMode = .transcript
 
-    /// `.transcript` always shows, even with nothing loaded; `.summary`/`.chat` need a transcript and the AI feature.
+    /// Every mode needs a transcript; `.summary`/`.chat` also need the AI feature.
     func canShow(_ mode: TranscriptPaneMode) -> Bool {
         switch mode {
-        case .transcript: return true
+        case .transcript: return transcript != nil
         case .summary, .chat: return transcript != nil && features.isEnabled(.ai)
         }
     }

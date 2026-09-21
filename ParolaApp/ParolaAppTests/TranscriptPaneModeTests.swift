@@ -15,12 +15,19 @@ struct TranscriptPaneModeTests {
         Transcript(segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")], language: "en", modelName: "stub")
     }
 
-    @Test("canShow(.transcript) is always true")
-    func transcriptAlwaysShowable() {
+    @Test("no mode — including .transcript — is showable without a transcript")
+    func noModeShowableWithoutTranscript() {
         let model = makeModel()
+        #expect(model.transcript == nil)
+        #expect(model.canShow(.transcript) == false)
+        #expect(model.canShow(.summary) == false)
+        #expect(model.canShow(.chat) == false)
+
+        model.transcript = makeTranscript()
         #expect(model.canShow(.transcript))
+
         model.transcript = nil
-        #expect(model.canShow(.transcript))
+        #expect(model.canShow(.transcript) == false)
     }
 
     @Test("canShow(.summary/.chat) needs a transcript and the AI feature")

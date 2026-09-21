@@ -51,6 +51,7 @@ struct SummaryOptionsSettingsTests {
     func autostartSummarisesOnActivate() async {
         let model = makeModel()
         model.autostartSummary = true
+        model.cardMetadataOperation = { _ in nil }
         let callCount = CallCounter()
         model.summariseOperation = { _, _ in
             await callCount.increment()
@@ -70,6 +71,7 @@ struct SummaryOptionsSettingsTests {
     func autostartSkipsWhenNotActivating() async {
         let model = makeModel()
         model.autostartSummary = true
+        model.cardMetadataOperation = { _ in nil }
         let callCount = CallCounter()
         model.summariseOperation = { _, _ in
             await callCount.increment()
@@ -114,14 +116,13 @@ struct SummaryOptionsSettingsTests {
 
     @Test("autostart skips when the user navigates away during the card-metadata wait")
     func autostartSkipsOnNavigationAway() async {
-        await MockLanguageModelStore.shared.install(
-            provider: .foundation,
-            response: MockLanguageModelResponse(text: "Title\nOne line summary.", delayMs: 300)
-        )
-        defer { Task { await MockLanguageModelStore.shared.clear() } }
-
         let model = makeModel()
         model.autostartSummary = true
+        // Stands in for the real card-metadata call's latency without touching the shared mock LLM store.
+        model.cardMetadataOperation = { _ in
+            try? await Task.sleep(for: .milliseconds(300))
+            return nil
+        }
         let callCount = CallCounter()
         model.summariseOperation = { _, _ in
             await callCount.increment()

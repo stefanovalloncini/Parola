@@ -190,6 +190,12 @@ extension AppModel {
     @discardableResult
     private func writeCardMetadata(for id: LibraryEntry.ID, transcript: Transcript) async -> CardMetadata? {
         guard features.isEnabled(.ai) else { return nil }
+        if let cardMetadataOperation {
+            guard let meta = await cardMetadataOperation(transcript) else { return nil }
+            try? await library.setCardMetadata(aiTitle: meta.title, shortSummary: meta.summary, for: id)
+            await refreshLibraryAndWait()
+            return meta
+        }
         let prompts = CardMetadataPrompts(
             title: Self.resolvedPrompt(customTitlePrompt),
             summary: Self.resolvedPrompt(customSummaryPrompt)
