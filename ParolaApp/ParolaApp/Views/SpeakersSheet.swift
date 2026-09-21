@@ -29,7 +29,7 @@ struct SpeakersSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Spacing.medium) {
                 if !transcript.uniqueSpeakers.isEmpty {
-                    SearchPill(text: $searchText, placeholder: "Search speakers…")
+                    SearchPill(text: $searchText, placeholder: "Search speakers…", leaf: "Speakers.TextField.Search")
                 }
                 if transcript.uniqueSpeakers.isEmpty {
                     Text("This transcript wasn't diarized — turn on Identify speakers in Settings before transcribing.")

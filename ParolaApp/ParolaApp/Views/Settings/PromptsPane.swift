@@ -11,7 +11,7 @@ struct PromptsPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SearchPill(text: $searchText, placeholder: "Search prompts…")
+            SearchPill(text: $searchText, placeholder: "Search prompts…", leaf: "Prompts.TextField.Search")
             sortRow
             if saveFailed { saveErrorBanner }
 

@@ -24,9 +24,8 @@ enum PageHeaderMetrics {
 struct CollapsingSearchPill: View {
     @Binding var text: String
     var placeholder: LocalizedStringKey = "Search"
-    var identifier: String = "search.field"
-    var clearButtonIdentifier: String = "search.field.clear"
-    var expandIdentifier: String = "search.field.expand"
+    /// The ax segment under the screen's branch; the clear and expand buttons hang off it.
+    var leaf: String = "TextField.Search"
     var width: CGFloat = 220
 
     @Environment(\.pageHeaderWidth) private var pageWidth
@@ -49,8 +48,7 @@ struct CollapsingSearchPill: View {
         SearchPill(
             text: $text,
             placeholder: placeholder,
-            identifier: identifier,
-            clearButtonIdentifier: clearButtonIdentifier,
+            leaf: leaf,
             focusesOnAppear: focusesOnAppear
         )
     }
@@ -64,7 +62,7 @@ struct CollapsingSearchPill: View {
         .buttonStyle(DSIconChipButtonStyle(side: 26))
         .help(placeholder)
         .accessibilityLabel(placeholder)
-        .accessibilityIdentifier(expandIdentifier)
+        .axLeaf("\(leaf).Expand")
         .popover(isPresented: $expanded, arrowEdge: .bottom) {
             field(focusesOnAppear: true)
                 .frame(width: width)

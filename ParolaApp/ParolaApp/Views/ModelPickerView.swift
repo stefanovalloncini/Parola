@@ -98,12 +98,7 @@ struct ModelPickerView: View {
     }
 
     private var searchField: some View {
-        SearchPill(
-            text: $searchText,
-            placeholder: "Search models",
-            identifier: "ModelPicker.TextField.Search",
-            clearButtonIdentifier: "ModelPicker.Button.ClearSearch"
-        )
+        SearchPill(text: $searchText, placeholder: "Search models", leaf: "ModelPicker.TextField.Search")
     }
 
     private var installedOnlyToggle: some View {

@@ -34,7 +34,7 @@ struct MacLibrarySidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SearchPill(text: searchBinding, placeholder: "Search history…", clearsOnEscape: true)
+            SearchPill(text: searchBinding, placeholder: "Search history…", clearsOnEscape: true, leaf: "Sidebar.TextField.Search")
                 .padding(.horizontal, DS.Spacing.regular)
                 .padding(.top, DS.Spacing.regular)
                 .padding(.bottom, DS.Spacing.small)

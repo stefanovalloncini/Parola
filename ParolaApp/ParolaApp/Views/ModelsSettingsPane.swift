@@ -127,7 +127,7 @@ struct ModelsSettingsPane: View {
     private var controls: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                SearchPill(text: $searchText, placeholder: "Search models…")
+                SearchPill(text: $searchText, placeholder: "Search models…", leaf: "Models.TextField.Search")
                 sortMenu
             }
             chipsRow

@@ -8,7 +8,7 @@ struct CorrectionsPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SearchPill(text: $searchText, placeholder: "Search corrections…")
+            SearchPill(text: $searchText, placeholder: "Search corrections…", leaf: "Corrections.TextField.Search")
 
             SettingsSection {
                 let visible = visibleRules

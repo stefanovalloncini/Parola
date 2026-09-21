@@ -8,7 +8,7 @@ struct SnippetsPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SearchPill(text: $searchText, placeholder: "Search snippets…")
+            SearchPill(text: $searchText, placeholder: "Search snippets…", leaf: "Snippets.TextField.Search")
 
             SettingsSection {
                 let visible = visibleSnippets

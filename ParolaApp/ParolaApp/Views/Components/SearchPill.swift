@@ -5,8 +5,8 @@ struct SearchPill: View {
     var placeholder: LocalizedStringKey
     var prompt: String?
     var clearsOnEscape: Bool
-    var identifier: String
-    var clearButtonIdentifier: String
+    /// The ax segment under the screen's branch; the clear button hangs off it.
+    var leaf: String
     /// A field the user reached by opening something takes the keyboard; one that is just there does not.
     var focusesOnAppear: Bool
 
@@ -17,16 +17,14 @@ struct SearchPill: View {
         placeholder: LocalizedStringKey = "Search",
         prompt: String? = nil,
         clearsOnEscape: Bool = false,
-        identifier: String = "search.field",
-        clearButtonIdentifier: String = "search.field.clear",
+        leaf: String = "TextField.Search",
         focusesOnAppear: Bool = false
     ) {
         self._text = text
         self.placeholder = placeholder
         self.prompt = prompt
         self.clearsOnEscape = clearsOnEscape
-        self.identifier = identifier
-        self.clearButtonIdentifier = clearButtonIdentifier
+        self.leaf = leaf
         self.focusesOnAppear = focusesOnAppear
     }
 
@@ -49,7 +47,7 @@ struct SearchPill: View {
                 .textFieldStyle(.plain)
                 .font(DS.Font.secondary)
                 .focused($focused)
-                .accessibilityIdentifier(identifier)
+                .axLeaf(leaf)
                 .onKeyPress(.escape) {
                     guard Self.escapeOutcome(clearsOnEscape: clearsOnEscape, isEmpty: text.isEmpty) == .clear
                     else { return .ignored }
@@ -68,7 +66,7 @@ struct SearchPill: View {
                 .buttonStyle(.plain)
                 .help("Clear search")
                 .accessibilityLabel("Clear search")
-                .accessibilityIdentifier(clearButtonIdentifier)
+                .axLeaf("\(leaf).Clear")
             }
         }
         .padding(.horizontal, DS.Spacing.small)

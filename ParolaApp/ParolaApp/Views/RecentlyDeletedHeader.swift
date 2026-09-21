@@ -68,13 +68,7 @@ struct RecentlyDeletedHeader: View {
             ),
             leading: { kindMenu },
             trailing: {
-                CollapsingSearchPill(
-                    text: $searchText,
-                    placeholder: "Search",
-                    identifier: "RecentlyDeleted.Toolbar.TextField.Search",
-                    clearButtonIdentifier: "RecentlyDeleted.Toolbar.Button.ClearSearch",
-                    expandIdentifier: "RecentlyDeleted.Toolbar.Button.ExpandSearch"
-                )
+                CollapsingSearchPill(text: $searchText, placeholder: "Search", leaf: "Toolbar.TextField.Search")
                 sortMenu
                 if selection.isEmpty {
                     deleteAllButton

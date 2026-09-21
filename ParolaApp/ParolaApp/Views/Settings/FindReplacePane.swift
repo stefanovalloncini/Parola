@@ -9,7 +9,7 @@ struct FindReplacePane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SearchPill(text: $searchText, placeholder: "Search rules…")
+            SearchPill(text: $searchText, placeholder: "Search rules…", leaf: "FindReplace.TextField.Search")
             filterRow
 
             SettingsSection {

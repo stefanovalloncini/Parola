@@ -174,7 +174,7 @@ private struct SettingsSidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SearchPill(text: $search, placeholder: "Search Settings…")
+            SearchPill(text: $search, placeholder: "Search Settings…", leaf: "Sidebar.TextField.Search")
                 .padding(.horizontal, DS.Spacing.regular)
                 .padding(.top, DS.Spacing.regular)
                 .padding(.bottom, DS.Spacing.small)

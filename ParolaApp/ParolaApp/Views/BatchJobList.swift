@@ -11,7 +11,7 @@ struct BatchJobList: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: DS.Spacing.small) {
-                SearchPill(text: $searchText, placeholder: "Search files…")
+                SearchPill(text: $searchText, placeholder: "Search files…", leaf: "Toolbar.TextField.Search")
                 sortMenu
                 Button("Clear") { model.clearBatch() }
                     .buttonStyle(.borderless)
