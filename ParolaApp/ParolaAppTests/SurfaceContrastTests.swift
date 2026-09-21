@@ -105,6 +105,24 @@ struct SurfaceContrastTests {
         }
     }
 
+    /// A disabled primary pill drops the accent for the neutral pair; `subtleFill` is `Color.primary` at 6% over the page.
+    @Test("a disabled primary pill's label clears 3:1 on its neutral fill")
+    func disabledPrimaryPillPair() throws {
+        let label = try #require(Self.pair(ThemePalette.sharedNeutrals.textSecondary))
+        let backdrops: [(String, ThemeColor)] = [
+            ("surface", ThemePalette.sharedNeutrals.surface),
+            ("surfaceElevated", ThemePalette.sharedNeutrals.surfaceElevated),
+            ("canvas", ThemePalette.sharedNeutrals.canvas),
+        ]
+        for (name, backdrop) in backdrops {
+            let behind = try #require(Self.pair(backdrop))
+            let light = behind.light.blended(toward: RGBA(0, 0, 0), amount: 0.06)
+            let dark = behind.dark.blended(toward: RGBA(1, 1, 1), amount: 0.06)
+            #expect(label.light.contrast(against: light) >= 3, "light on \(name)")
+            #expect(label.dark.contrast(against: dark) >= 3, "dark on \(name)")
+        }
+    }
+
     /// Every label set on the accent *fill* — pills, chips, selected rows, the rule filter, the captions mode chip.
     @Test("a label on the accent fill never reads worse than a hard-coded white one",
           arguments: ThemePreset.allCases)

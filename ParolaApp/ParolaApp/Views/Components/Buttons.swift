@@ -14,6 +14,11 @@ struct DSPillButtonStyle: ButtonStyle {
     let kind: Kind
     var size: Size = .regular
 
+    /// A disabled primary goes neutral rather than fading the accent: a faded fill takes `onAccent` down with it.
+    /// Computed, not stored: a stored one would freeze the palette the app launched with.
+    static var disabledFill: Color { DS.Palette.subtleFill }
+    static var disabledLabel: Color { DS.Color.secondaryText }
+
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
@@ -33,12 +38,12 @@ struct DSPillButtonStyle: ButtonStyle {
             .contentShape(Capsule())
     }
 
-    /// A primary pill dims its fill alone: fading `onAccent` with it walks the label toward the colour it sits on.
+    /// Only the secondary pill fades whole: the primary swaps its pair instead, so neither half thins out.
     private var dimsWholeView: Bool { kind == .secondary }
 
     private var foreground: Color {
         switch kind {
-        case .primary: return DS.Color.onAccent
+        case .primary: return isEnabled ? DS.Color.onAccent : Self.disabledLabel
         case .secondary: return DS.Color.primaryText
         }
     }
@@ -46,7 +51,7 @@ struct DSPillButtonStyle: ButtonStyle {
     private func background(pressed: Bool) -> Color {
         switch kind {
         case .primary:
-            return DS.Color.accent.opacity(isEnabled ? (pressed ? 0.85 : 1.0) : DS.Opacity.disabled)
+            return isEnabled ? DS.Color.accent.opacity(pressed ? 0.85 : 1.0) : Self.disabledFill
         case .secondary:
             return DS.Color.surfaceElevated
         }
