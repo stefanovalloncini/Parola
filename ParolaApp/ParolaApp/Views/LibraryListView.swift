@@ -120,22 +120,28 @@ enum LibraryListContent {
         return true
     }
 
-    static func totalsLabel(for count: Int, locale: Locale = AppFormat.locale) -> String? {
+    static func totalsLabel(
+        for count: Int,
+        bundle: Bundle = .main,
+        locale: Locale = AppFormat.locale
+    ) -> String? {
         guard count > 0 else { return nil }
-        if count == 1 { return String(localized: "1 transcript", locale: locale) }
-        return String(localized: "\(count) transcripts", locale: locale)
+        if count == 1 { return String(localized: "1 transcript", bundle: bundle, locale: locale) }
+        return String(localized: "\(count) transcripts", bundle: bundle, locale: locale)
     }
 
-    /// The line under a list's title: how many entries, and how long they run between them.
+    /// The line under a list's title: how many entries, and how much audio they hold between them.
     static func listSubtitle(
         count: Int,
         totalSeconds: Double,
+        bundle: Bundle = .main,
         locale: Locale = AppFormat.locale
     ) -> String? {
-        guard let transcripts = totalsLabel(for: count, locale: locale) else { return nil }
+        guard let transcripts = totalsLabel(for: count, bundle: bundle, locale: locale) else { return nil }
         // A list whose entries carry no media length says how many there are and stops there.
         guard totalSeconds.rounded() >= 1 else { return transcripts }
-        return "\(transcripts) · \(AppFormat.duration(seconds: totalSeconds, locale: locale))"
+        let span = AppFormat.duration(seconds: totalSeconds, locale: locale)
+        return String(localized: "\(transcripts) · \(span) of audio", bundle: bundle)
     }
 
     /// The search page counts two things: the entries that matched, and the hits they hold between them.

@@ -340,7 +340,19 @@ struct LibraryListContentTests {
         #expect(LibraryListContent.listSubtitle(count: 3, totalSeconds: 0.4, locale: english) == "3 transcripts")
         #expect(
             LibraryListContent.listSubtitle(count: 11, totalSeconds: 4800, locale: english)
-                == "11 transcripts · 1 hr, 20 min"
+                == "11 transcripts · 1 hr, 20 min of audio"
+        )
+    }
+
+    /// The same duration means "transcribed" one page over, so the list has to say which of the two it is.
+    @Test("the header subtitle says the span is audio, in Italian too")
+    func listSubtitleNamesItsSpan() throws {
+        let path = try #require(Bundle.main.path(forResource: "it", ofType: "lproj"))
+        let bundle = try #require(Bundle(path: path))
+        let italian = Locale(identifier: "it_IT")
+        #expect(
+            LibraryListContent.listSubtitle(count: 2, totalSeconds: 120, bundle: bundle, locale: italian)
+                == "2 trascrizioni · \(AppFormat.duration(seconds: 120, locale: italian)) di audio"
         )
     }
 
@@ -408,9 +420,9 @@ struct LibraryListContentTests {
             )
         }
 
-        #expect(subtitle(nil) == "3 transcripts · 2 min, 30 sec")
-        #expect(subtitle(.meeting) == "2 transcripts · 2 min")
-        #expect(subtitle(.transcription) == "1 transcript · 30 sec")
+        #expect(subtitle(nil) == "3 transcripts · 2 min, 30 sec of audio")
+        #expect(subtitle(.meeting) == "2 transcripts · 2 min of audio")
+        #expect(subtitle(.transcription) == "1 transcript · 30 sec of audio")
     }
 
     /// An index written before the counts existed answers 0, and a caption reading "· 0 matches" would be a lie.
