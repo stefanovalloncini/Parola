@@ -17,11 +17,11 @@ struct CardMetadataServiceTests {
             provider: .foundation,
             response: MockLanguageModelResponse(text: "\"Riunione fornitori.\"\nDistinta base e ordini al magazzino per i sensori.\n")
         )
-        defer { Task { await MockLanguageModelStore.shared.clear() } }
         let meta = try await CardMetadataService.generate(
             for: transcript("Buongiorno, oggi parliamo della distinta base e degli ordini al magazzino per i sensori.")
         )
         #expect(meta == CardMetadata(title: "Riunione fornitori", summary: "Distinta base e ordini al magazzino per i sensori."))
+        await MockLanguageModelStore.shared.clear()
     }
 
     @Test("refuses transcripts under the minimum length")
@@ -44,5 +44,18 @@ struct CardMetadataServiceTests {
         #expect(CardMetadata.sanitizedTitle("  \"Weekly sync.\"\nmore ") == "Weekly sync")
         #expect(CardMetadata.sanitizedSummary("First sentence here.\nSecond line") == "First sentence here.")
         #expect(CardMetadata.sanitizedSummary(String(repeating: "x", count: 200)).count == 160)
+    }
+
+    @Test("textInstructions folds in custom title and summary overrides, and falls back to the defaults when absent")
+    func textInstructionsUsesOverrides() {
+        let custom = CardMetadataService.textInstructions(
+            CardMetadataPrompts(title: "a title mentioning the client's name", summary: "a summary noting the next steps")
+        )
+        #expect(custom.contains("a title mentioning the client's name"))
+        #expect(custom.contains("a summary noting the next steps"))
+
+        let defaultInstructions = CardMetadataService.textInstructions(CardMetadataPrompts())
+        #expect(defaultInstructions.contains("3 to 6 words"))
+        #expect(defaultInstructions.contains("140 characters"))
     }
 }
