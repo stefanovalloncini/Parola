@@ -57,12 +57,19 @@ enum ToolbarSearchFocus {
     @discardableResult
     static func placeCaret() -> Bool {
         guard let (window, field) = locate() else { return false }
+        if window.firstResponder !== field { previousResponder = window.firstResponder as? NSView }
         return window.makeFirstResponder(field)
     }
 
+    /// Handing the keyboard to the window itself would take the content's own key handling and Tab order with it.
     static func resignCaret() {
-        locate()?.window.makeFirstResponder(nil)
+        guard let (window, field) = locate() else { return }
+        let restored = previousResponder.flatMap { $0.window === window && $0 !== field ? $0 : nil }
+        previousResponder = nil
+        window.makeFirstResponder(restored ?? window.contentView)
     }
+
+    private static weak var previousResponder: NSView?
 
     /// The field posts its begin-editing notification only once text changes, so the caret is read off the field editor instead.
     static func holdsCaret() -> Bool {
