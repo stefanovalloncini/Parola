@@ -75,14 +75,35 @@ struct FormatInspector: View {
     }
 }
 
+/// What the row's pill says: naming the person again next to an identical label says nothing.
+enum SpeakerPillState: Equatable {
+    case unassigned
+    case assigned
+    case person(String)
+
+    static func of(person: Person?, label: String) -> SpeakerPillState {
+        guard let person else { return .unassigned }
+        return person.name == label ? .assigned : .person(person.name)
+    }
+}
+
 /// One speaker in this transcript: what it is called, how much of it there is, and who it is.
-private struct SpeakerPersonRow: View {
+struct SpeakerPersonRow: View {
     let label: String
     let segmentCount: Int
 
     @Environment(AppModel.self) private var model
 
     private var person: Person? { model.person(forSpeaker: label) }
+
+    @ViewBuilder
+    private var pillLabel: some View {
+        switch SpeakerPillState.of(person: person, label: label) {
+        case .assigned: Label("Assigned", systemImage: "checkmark")
+        case .person(let name): Text(verbatim: name)
+        case .unassigned: Text("Unassigned")
+        }
+    }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: DS.Spacing.small) {
@@ -109,7 +130,7 @@ private struct SpeakerPersonRow: View {
                         .axLeaf("Inspector.MenuItem.ClearSpeaker")
                 }
             } label: {
-                (person.map { Text(verbatim: $0.name) } ?? Text("Unassigned"))
+                pillLabel
                     .font(DS.Font.caption)
             }
             .menuStyle(.button)

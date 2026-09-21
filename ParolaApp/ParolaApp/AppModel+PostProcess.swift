@@ -46,20 +46,11 @@ extension AppModel {
         }.value
     }
 
+    /// The Speakers sheet's bulk rename: one label at a time through the entry point that keeps
+    /// the entry's speaker map in step.
     func applySpeakerRenames(_ renames: [String: String]) {
-        guard var transcript = self.transcript else { return }
-        let nonEmpty = renames.compactMapValues { name -> String? in
-            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? nil : trimmed
-        }
-        for (from, to) in nonEmpty {
-            transcript = transcript.renamingSpeaker(from, to: to)
-        }
-        applyTranscriptEdit(transcript, actionName: String(localized: "Rename Speaker"))
-        Task { [peopleStore] in
-            for to in nonEmpty.values {
-                _ = await peopleStore.recordUsage(name: to)
-            }
+        for (from, to) in renames {
+            renameSpeakerLabel(from, to: to)
         }
     }
 }

@@ -519,7 +519,7 @@ struct LibraryListView: View {
                         personFilter: personFilterBinding,
                         labelOptions: model.knownLabels(in: category),
                         languageOptions: model.knownLanguages(in: category),
-                        peopleOptions: model.peopleByUse
+                        peopleOptions: model.knownPeople(in: category)
                     )
                 }
             },

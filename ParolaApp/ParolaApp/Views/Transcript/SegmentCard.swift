@@ -70,7 +70,7 @@ struct SegmentCard: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: radius))
         .contentShape(Rectangle())
-        .contextMenu { assignSelectionMenu }
+        .contextMenu { assignSegmentMenu }
         .draggable(draggablePayload)
         .onHover { hover in
             withAnimation(.easeOut(duration: 0.12)) { hovering = hover }
@@ -89,8 +89,7 @@ struct SegmentCard: View {
             Button("Cancel", role: .cancel) {}
             Button("Rename") {
                 let trimmed = draftSpeakerName.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty, trimmed != current else { return }
-                model.applySpeakerRenames([current: trimmed])
+                model.renameSpeakerLabel(current, to: trimmed)
             }
         }
         .alert("Assign speaker", isPresented: $assigningSpeaker) {
@@ -98,8 +97,7 @@ struct SegmentCard: View {
             Button("Cancel", role: .cancel) {}
             Button("Assign") {
                 let trimmed = draftAssignSpeakerName.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty else { return }
-                model.assignSpeaker(trimmed, toSegmentID: segment.id)
+                Task { await model.assignSegment(segment.id, toNewPersonNamed: trimmed) }
             }
         }
         .alert("Segment note", isPresented: $editingNote) {
@@ -186,7 +184,9 @@ struct SegmentCard: View {
                 .foregroundStyle(DS.speakerColor(for: raw, colorIndex: person?.colorIndex))
         }
         .buttonStyle(.plain)
-        .help(person == nil ? String(localized: "Unknown speaker, click to assign") : "")
+        .help(person == nil
+            ? String(localized: "Unknown speaker, click to assign")
+            : String(localized: "Click to reassign this speaker"))
         .onHover { hovering in
             hoveredSpeaker.wrappedValue = hovering ? raw : nil
         }
@@ -375,6 +375,8 @@ struct SegmentCard: View {
             Button("Copy Link to This Segment") { copyDeeplink() }
                 .axLeaf("Card.Button.CopyLink")
             Divider()
+            assignSegmentMenu
+            Divider()
             Button("Delete Segment", role: .destructive) { model.deleteSegment(id: segment.id) }
                 .axLeaf("Card.Button.Delete")
         } label: {
@@ -414,9 +416,10 @@ struct SegmentCard: View {
         model.transcript?.segments.last?.id == segment.id
     }
 
-    /// The card the menu was opened on is the selection; the people it offers are the directory's.
-    private var assignSelectionMenu: some View {
-        Menu("Assign Selection to") {
+    /// One segment's own people menu: the card's context menu and its ••• menu both show it, since
+    /// a right-click over selectable text can land on the system editing menu instead.
+    private var assignSegmentMenu: some View {
+        Menu("Assign This Segment to") {
             ForEach(model.mostUsedPeople(limit: 10)) { person in
                 Button(person.name) { model.assignSpeaker(person.name, toSegmentID: segment.id) }
                     .axLeaf("Card.MenuItem.AssignPerson.\(person.name)")

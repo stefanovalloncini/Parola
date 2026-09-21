@@ -136,20 +136,6 @@ struct AssignSpeakerPeopleTests {
         #expect(model.speakerAssignments.isEmpty)
     }
 
-    @Test("a per-segment assign still touches one segment, and records the person it named")
-    func perSegmentAssignRecordsTheMap() async throws {
-        let model = PeopleTestSupport.makeModel("assignsegment")
-        _ = try await PeopleTestSupport.openSeededEntry(model)
-
-        model.assignSpeaker("Grace", toSegmentID: 1)
-        try await PeopleTestSupport.until { model.speakerAssignments["Grace"] != nil }
-
-        #expect(model.transcript?.segments.map(\.speaker) == ["SPEAKER_00", "Grace", "SPEAKER_00"])
-        let grace = try #require(model.person(forSpeaker: "Grace"))
-        #expect(grace.name == "Grace")
-        #expect(model.people.map(\.name) == ["Grace"])
-    }
-
     @Test("an assignment outside the library rewrites the transcript and records nothing")
     func assignWithoutAnEntry() async throws {
         let model = PeopleTestSupport.makeModel("assignnoentry")
@@ -177,6 +163,153 @@ struct AssignSpeakerPeopleTests {
     @Test("the palette has a colour for every index the store hands out")
     func paletteCoversTheStore() {
         #expect(DS.speakerPalette.count == PeopleStore.colorCount)
+    }
+
+    @Test("renaming the label keeps the assignment, its colour and the filter")
+    func renamingTheLabelKeepsTheAssignment() async throws {
+        let model = PeopleTestSupport.makeModel("assignrenamelabel")
+        let entry = try await PeopleTestSupport.openSeededEntry(model)
+        await model.assignSpeaker(label: "SPEAKER_00", toNewPersonNamed: "Ada")
+        let ada = try #require(model.person(forSpeaker: "Ada"))
+
+        model.renameSpeakerLabel("Ada", to: "Ada L.")
+        await model.awaitSpeakerAssignmentWrites()
+
+        #expect(model.transcript?.segments.map(\.speaker) == ["Ada L.", "SPEAKER_01", "Ada L."])
+        #expect(model.speakerAssignments == ["Ada L.": ada.id])
+        #expect(model.person(forSpeaker: "Ada L.")?.id == ada.id)
+        #expect(SpeakerPillState.of(person: model.person(forSpeaker: "Ada L."), label: "Ada L.") == .person("Ada"))
+        #expect(model.speakerColorIndices["Ada L."] == ada.colorIndex)
+        #expect(model.entries(withPerson: ada.id).map(\.id) == [entry.id])
+        // The rename carried the person over instead of minting one under the new text.
+        #expect(model.people.map(\.name) == ["Ada"])
+        #expect(try await model.library.load(entry.id).entry.speakerAssignments == ["Ada L.": ada.id])
+    }
+
+    @Test("renaming a label nobody stands for names a person")
+    func renamingAnUnassignedLabelMintsAPerson() async throws {
+        let model = PeopleTestSupport.makeModel("assignrenamefresh")
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+
+        model.renameSpeakerLabel("SPEAKER_01", to: "Grace")
+        try await PeopleTestSupport.until { model.people.map(\.name) == ["Grace"] }
+
+        #expect(model.transcript?.segments.map(\.speaker) == ["SPEAKER_00", "Grace", "SPEAKER_00"])
+    }
+
+    @Test("undo puts the map back, and redo re-applies it")
+    func assignmentMapRoundTripsThroughUndo() async throws {
+        let model = PeopleTestSupport.makeModel("assignmapundo")
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+
+        await model.assignSpeaker(label: "SPEAKER_00", toNewPersonNamed: "Ada")
+        let ada = try #require(model.person(forSpeaker: "Ada"))
+        #expect(model.speakerAssignments == ["Ada": ada.id])
+
+        undo.undo()
+        #expect(model.transcript?.segments.first?.speaker == "SPEAKER_00")
+        #expect(model.speakerAssignments.isEmpty)
+
+        undo.redo()
+        #expect(model.transcript?.segments.first?.speaker == "Ada")
+        #expect(model.speakerAssignments == ["Ada": ada.id])
+    }
+
+    @Test("undo of a label rename re-keys the map back")
+    func labelRenameMapRoundTripsThroughUndo() async throws {
+        let model = PeopleTestSupport.makeModel("assignrenameundo")
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+        await model.assignSpeaker(label: "SPEAKER_00", toNewPersonNamed: "Ada")
+        let ada = try #require(model.person(forSpeaker: "Ada"))
+
+        model.renameSpeakerLabel("Ada", to: "Ada L.")
+        await model.awaitSpeakerAssignmentWrites()
+        undo.undo()
+
+        #expect(model.transcript?.segments.first?.speaker == "Ada")
+        #expect(model.speakerAssignments == ["Ada": ada.id])
+    }
+
+    @Test("two assignments in flight both land in the map")
+    func concurrentAssignmentsBothLand() async throws {
+        let model = PeopleTestSupport.makeModel("assignconcurrent")
+        let entry = try await PeopleTestSupport.openSeededEntry(model)
+
+        async let first: Void = model.assignSpeaker(label: "SPEAKER_00", toNewPersonNamed: "Ada")
+        async let second: Void = model.assignSpeaker(label: "SPEAKER_01", toNewPersonNamed: "Grace")
+        _ = await (first, second)
+        await model.awaitSpeakerAssignmentWrites()
+
+        #expect(Set(model.speakerAssignments.keys) == ["Ada", "Grace"])
+        let stored = try await model.library.load(entry.id).entry.speakerAssignments
+        #expect(Set(stored.keys) == ["Ada", "Grace"])
+    }
+
+    @Test("re-picking the person already on a label counts no new use")
+    func rePickingCountsNothing() async throws {
+        let model = PeopleTestSupport.makeModel("assignrepick")
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+        await model.assignSpeaker(label: "SPEAKER_00", toNewPersonNamed: "Ada")
+        let ada = try #require(model.person(forSpeaker: "Ada"))
+
+        await model.assignSpeaker(label: "Ada", to: ada)
+
+        #expect(model.people.first?.usageCount == 1)
+    }
+
+    @Test("picking a raw label for one segment mints nobody")
+    func perSegmentRawLabelMintsNobody() async throws {
+        let model = PeopleTestSupport.makeModel("assignrawlabel")
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+
+        model.assignSpeaker("SPEAKER_01", toSegmentID: 0)
+        // Let the store hop the per-segment path takes settle before reading the directory.
+        for _ in 0..<20 where model.people.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+
+        #expect(model.transcript?.segments.map(\.speaker) == ["SPEAKER_01", "SPEAKER_01", "SPEAKER_00"])
+        #expect(model.people.isEmpty)
+        #expect(model.speakerAssignments.isEmpty)
+    }
+
+    @Test("naming a segment's speaker makes the person and records the map")
+    func perSegmentNewPersonMints() async throws {
+        let model = PeopleTestSupport.makeModel("assignsegmentnew")
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+
+        await model.assignSegment(1, toNewPersonNamed: "Grace")
+
+        #expect(model.transcript?.segments.map(\.speaker) == ["SPEAKER_00", "Grace", "SPEAKER_00"])
+        let grace = try #require(model.person(forSpeaker: "Grace"))
+        #expect(grace.usageCount == 1)
+        #expect(model.speakerAssignments == ["Grace": grace.id])
+    }
+
+    @Test("a per-segment pick of a name the directory knows records the map")
+    func perSegmentKnownPersonRecordsTheMap() async throws {
+        let model = PeopleTestSupport.makeModel("assignknownperson")
+        _ = try await PeopleTestSupport.openSeededEntry(model)
+        await model.addPerson(named: "Grace")
+
+        model.assignSpeaker("Grace", toSegmentID: 1)
+        try await PeopleTestSupport.until { model.speakerAssignments["Grace"] != nil }
+
+        let grace = try #require(model.person(forSpeaker: "Grace"))
+        #expect(grace.usageCount == 2)
+        #expect(model.people.map(\.name) == ["Grace"])
+    }
+
+    @Test("the pill names the person only when the label differs")
+    func pillStates() {
+        let ada = Person(name: "Ada")
+        #expect(SpeakerPillState.of(person: nil, label: "SPEAKER_00") == .unassigned)
+        #expect(SpeakerPillState.of(person: ada, label: "Ada") == .assigned)
+        #expect(SpeakerPillState.of(person: ada, label: "SPEAKER_00") == .person("Ada"))
     }
 
     @Test("the inspector counts the segments behind each speaker")

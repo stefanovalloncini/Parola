@@ -97,6 +97,42 @@ struct SpeakerAssignmentTests {
         #expect(entry.personIDs.isEmpty)
     }
 
+    @Test("a transform changes the map in place, keyed and by value")
+    func mutateChangesInPlace() async throws {
+        let store = try makeStore()
+        let entry = try await addEntry(to: store)
+
+        try await store.mutateSpeakerAssignments(for: entry.id) { $0["Ada"] = ada }
+        let both = try await store.mutateSpeakerAssignments(for: entry.id) { $0["Grace"] = grace }
+        #expect(both == ["Ada": ada, "Grace": grace])
+
+        let left = try await store.mutateSpeakerAssignments(for: entry.id) { map in
+            map = map.filter { $0.value != ada }
+        }
+        #expect(left == ["Grace": grace])
+        #expect(try await store.load(entry.id).entry.speakerAssignments == ["Grace": grace])
+    }
+
+    @Test("two assignments in flight both land")
+    func concurrentMutationsBothLand() async throws {
+        let store = try makeStore()
+        let entry = try await addEntry(to: store)
+
+        async let first = store.mutateSpeakerAssignments(for: entry.id) { $0["Ada"] = self.ada }
+        async let second = store.mutateSpeakerAssignments(for: entry.id) { $0["Grace"] = self.grace }
+        _ = try await (first, second)
+
+        #expect(try await store.load(entry.id).entry.speakerAssignments == ["Ada": ada, "Grace": grace])
+    }
+
+    @Test("a transform on an entry that isn't there reports it")
+    func mutateMissingEntry() async throws {
+        let store = try makeStore()
+        await #expect(throws: LibraryStore.LibraryError.self) {
+            try await store.mutateSpeakerAssignments(for: "nope") { $0["Ada"] = self.ada }
+        }
+    }
+
     @Test("assigning on an entry that isn't there reports it")
     func missingEntry() async throws {
         let store = try makeStore()

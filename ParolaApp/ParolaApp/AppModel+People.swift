@@ -2,6 +2,29 @@ import Foundation
 import SwiftUI
 import ParolaCore
 
+/// Keys to set or drop in an entry's speaker map. Edits travel as a transform, never as a whole
+/// map read somewhere else, so two assignments in flight can't drop each other's key.
+struct SpeakerAssignmentEdit: Equatable, Sendable {
+    var assign: [String: UUID] = [:]
+    var clear: [String] = []
+
+    var isEmpty: Bool { assign.isEmpty && clear.isEmpty }
+
+    func apply(to map: inout [String: UUID]) {
+        for key in clear { map.removeValue(forKey: key) }
+        for (key, id) in assign { map[key] = id }
+    }
+
+    /// What puts `map` back the way it was, so undo and redo both re-key it.
+    func inverse(of map: [String: UUID]) -> SpeakerAssignmentEdit {
+        var undo = SpeakerAssignmentEdit()
+        for key in Set(assign.keys).union(clear) {
+            if let previous = map[key] { undo.assign[key] = previous } else { undo.clear.append(key) }
+        }
+        return undo
+    }
+}
+
 extension AppModel {
 
     // MARK: - The directory
@@ -39,6 +62,16 @@ extension AppModel {
         return person(id: id)
     }
 
+    /// The colour each speaker label wears: the person's when it has one, its own hash otherwise.
+    var speakerColorIndices: [String: Int] {
+        var indices: [String: Int] = [:]
+        for (label, id) in speakerAssignments {
+            guard let person = person(id: id) else { continue }
+            indices[label] = person.colorIndex
+        }
+        return indices
+    }
+
     /// How many segments carry each speaker label, in the order the labels first appear.
     var speakerSegmentCounts: [(label: String, count: Int)] {
         guard let transcript else { return [] }
@@ -59,9 +92,10 @@ extension AppModel {
     /// The one way a speaker label becomes a person: every segment (and word) carrying the label
     /// takes the person's name, and the open entry records whose name it now is.
     func assignSpeaker(label: String, to person: Person) async {
-        guard await applyAssignment(label: label, to: person) else { return }
+        guard applyAssignment(label: label, to: person) else { return }
         _ = await peopleStore.recordUsage(name: person.name)
         await refreshPeople()
+        await awaitSpeakerAssignmentWrites()
     }
 
     /// Creates the person (or reuses one already under that name) and assigns the label to them.
@@ -71,24 +105,56 @@ extension AppModel {
         guard !personName.isEmpty else { return }
         let person = await peopleStore.recordUsage(name: personName)
         await refreshPeople()
-        await applyAssignment(label: label, to: person)
+        applyAssignment(label: label, to: person)
+        await awaitSpeakerAssignmentWrites()
+    }
+
+    /// Names one segment's speaker and makes a person of that name. The submenu's plain picks go
+    /// through ``assignSpeaker(_:toSegmentID:)`` instead, which mints nobody.
+    func assignSegment(_ id: TranscriptSegment.ID, toNewPersonNamed name: String) async {
+        let personName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !personName.isEmpty else { return }
+        let person = await peopleStore.recordUsage(name: personName)
+        await refreshPeople()
+        applySegmentSpeaker(personName, toSegmentID: id)
+        await recordSpeakerAssignment(label: personName, person: person)
     }
 
     @discardableResult
-    private func applyAssignment(label: String, to person: Person) async -> Bool {
+    private func applyAssignment(label: String, to person: Person) -> Bool {
         let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let current = transcript else { return false }
-        if trimmed != person.name {
-            applyTranscriptEdit(
-                current.renamingSpeaker(trimmed, to: person.name),
-                actionName: String(localized: "Assign Speaker")
-            )
+        guard trimmed != person.name || speakerAssignments[person.name] != person.id else { return false }
+        let edit = SpeakerAssignmentEdit(
+            assign: [person.name: person.id],
+            clear: trimmed == person.name ? [] : [trimmed]
+        )
+        let renamed = current.renamingSpeaker(trimmed, to: person.name)
+        if renamed != current {
+            applyTranscriptEdit(renamed, actionName: String(localized: "Assign Speaker"), assignments: edit)
+        } else {
+            applySpeakerAssignmentEdit(edit)
         }
-        var map = speakerAssignments
-        map.removeValue(forKey: trimmed)
-        map[person.name] = person.id
-        await writeSpeakerAssignments(map)
         return true
+    }
+
+    /// The one way a speaker label's text changes: the segments and the entry's map move together,
+    /// inside the same undo step.
+    func renameSpeakerLabel(_ label: String, to newName: String) {
+        let from = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let to = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !from.isEmpty, !to.isEmpty, from != to, let current = transcript else { return }
+        let assigned = speakerAssignments[from]
+        let edit = assigned.map { SpeakerAssignmentEdit(assign: [to: $0], clear: [from]) }
+        let renamed = current.renamingSpeaker(from, to: to)
+        guard renamed != current else { return }
+        applyTranscriptEdit(renamed, actionName: String(localized: "Rename Speaker"), assignments: edit)
+        Task { [peopleStore] in
+            // Naming a speaker nobody stands for is how a person gets made; a label that already
+            // has one keeps pointing at them under its new text.
+            if assigned == nil { _ = await peopleStore.recordUsage(name: to) }
+            await refreshPeople()
+        }
     }
 
     /// Drops the speaker from every segment carrying the label, and the label from the map.
@@ -105,24 +171,27 @@ extension AppModel {
             changed = true
         }
         guard changed else { return }
-        applyTranscriptEdit(updated, actionName: String(localized: "Clear Speaker"))
-        var map = speakerAssignments
-        map.removeValue(forKey: trimmed)
-        await writeSpeakerAssignments(map)
+        applyTranscriptEdit(
+            updated,
+            actionName: String(localized: "Clear Speaker"),
+            assignments: SpeakerAssignmentEdit(clear: [trimmed])
+        )
+        await awaitSpeakerAssignmentWrites()
     }
 
     /// Records who a name stands for without touching the transcript — what a per-segment assign
     /// leaves behind once the label matches a person.
     func recordSpeakerAssignment(label: String, person: Person) async {
-        var map = speakerAssignments
-        guard map[label] != person.id else { return }
-        map[label] = person.id
-        await writeSpeakerAssignments(map)
+        guard speakerAssignments[label] != person.id else { return }
+        applySpeakerAssignmentEdit(SpeakerAssignmentEdit(assign: [label: person.id]))
+        await awaitSpeakerAssignmentWrites()
     }
 
-    private func writeSpeakerAssignments(_ map: [String: UUID]) async {
-        guard let id = selectedEntryID else { return }
-        await writeAssignments(map, to: id)
+    /// Applies one edit to the open entry: to the cached map now, to the bundle next.
+    func applySpeakerAssignmentEdit(_ edit: SpeakerAssignmentEdit) {
+        guard !edit.isEmpty, let id = selectedEntryID else { return }
+        patchLibraryEntry(id: id) { edit.apply(to: &$0.speakerAssignments) }
+        scheduleAssignmentWrite(for: id) { edit.apply(to: &$0) }
     }
 
     // MARK: - The directory's own edits
@@ -162,7 +231,9 @@ extension AppModel {
         if personFilter == id { personFilter = nil }
         await refreshPeople()
         for entry in targets {
-            await writeAssignments(entry.speakerAssignments.filter { $0.value != id }, to: entry.id)
+            await mutateAssignments(for: entry.id) { map in
+                map = map.filter { $0.value != id }
+            }
         }
     }
 
@@ -178,15 +249,20 @@ extension AppModel {
     ) async {
         for entry in entries {
             let oldNames = entry.speakerAssignments.filter { $0.value == personID }.map(\.key)
-            var map = entry.speakerAssignments
-            for name in oldNames { map.removeValue(forKey: name) }
-            map[newName] = survivor
             let renames = oldNames.filter { $0 != newName }
             if entry.id == selectedEntryID, let current = transcript {
                 var updated = current
                 for name in renames { updated = updated.renamingSpeaker(name, to: newName) }
-                applyTranscriptEdit(updated, actionName: String(localized: "Rename Person"))
-            } else if !renames.isEmpty {
+                let edit = SpeakerAssignmentEdit(assign: [newName: survivor], clear: renames)
+                if updated != current {
+                    applyTranscriptEdit(updated, actionName: String(localized: "Rename Person"), assignments: edit)
+                } else {
+                    applySpeakerAssignmentEdit(edit)
+                }
+                await awaitSpeakerAssignmentWrites()
+                continue
+            }
+            if !renames.isEmpty {
                 do {
                     var stored = try await library.load(entry.id).document.transcript
                     for name in renames { stored = stored.renamingSpeaker(name, to: newName) }
@@ -196,20 +272,45 @@ extension AppModel {
                     continue
                 }
             }
-            await writeAssignments(map, to: entry.id)
+            await mutateAssignments(for: entry.id) { map in
+                map = map.filter { $0.value != personID }
+                map[newName] = survivor
+            }
         }
     }
 
-    private func writeAssignments(_ map: [String: UUID], to entryID: LibraryEntry.ID) async {
-        do {
-            try await library.setSpeakerAssignments(map, for: entryID)
-            patchLibraryEntry(id: entryID) { $0.speakerAssignments = map }
-        } catch {
-            ParolaLog.error(.library, "speaker assignments not written", Self.entryFields(entryID, error))
+    // MARK: - Writing the map
+
+    private func mutateAssignments(
+        for entryID: LibraryEntry.ID,
+        _ transform: @escaping @Sendable (inout [String: UUID]) -> Void
+    ) async {
+        scheduleAssignmentWrite(for: entryID, transform)
+        await awaitSpeakerAssignmentWrites()
+    }
+
+    /// Queues one map transform behind the last, so the bundle sees them in the order they were made.
+    private func scheduleAssignmentWrite(
+        for entryID: LibraryEntry.ID,
+        _ transform: @escaping @Sendable (inout [String: UUID]) -> Void
+    ) {
+        let previous = speakerAssignmentWriteTask
+        speakerAssignmentWriteTask = Task { [library] in
+            await previous?.value
+            do {
+                let updated = try await library.mutateSpeakerAssignments(for: entryID, transform)
+                patchLibraryEntry(id: entryID) { $0.speakerAssignments = updated }
+            } catch {
+                ParolaLog.error(.library, "speaker assignments not written", Self.entryFields(entryID, error))
+            }
         }
     }
 
-    nonisolated static func entryFields(_ entryID: LibraryEntry.ID, _ error: any Error) -> [LogField: LogValue] {
+    func awaitSpeakerAssignmentWrites() async {
+        await speakerAssignmentWriteTask?.value
+    }
+
+    static func entryFields(_ entryID: LibraryEntry.ID, _ error: any Error) -> [LogField: LogValue] {
         var fields: [LogField: LogValue] = [.error: .error(error)]
         if let uuid = UUID(uuidString: entryID) { fields[.entry] = .id(uuid) }
         return fields

@@ -39,6 +39,14 @@ struct PeopleDirectoryList: View {
     @State private var renaming: Person?
     @State private var renameDraft: String = ""
     @State private var deleting: Person?
+    @State private var merging: MergePair?
+
+    /// Who is folded into whom, while the confirmation is up.
+    private struct MergePair: Identifiable {
+        let source: Person
+        let target: Person
+        var id: UUID { source.id }
+    }
 
     private var people: [Person] { model.peopleByUse }
 
@@ -67,6 +75,15 @@ struct PeopleDirectoryList: View {
             }
         } message: { _ in
             Text("The new name replaces the old one in every transcript. That rewrite can't be undone.")
+        }
+        .alert("Merge people", isPresented: isMerging, presenting: merging) { pair in
+            Button("Cancel", role: .cancel) { merging = nil }
+            Button("Merge") {
+                Task { await model.mergePerson(pair.source.id, into: pair.target.id) }
+                merging = nil
+            }
+        } message: { pair in
+            Text("\(pair.source.name) is folded into \(pair.target.name), and the transcripts that named them take the new name. That rewrite can't be undone.")
         }
         .alert("Delete person", isPresented: isDeleting, presenting: deleting) { person in
             Button("Cancel", role: .cancel) { deleting = nil }
@@ -99,7 +116,7 @@ struct PeopleDirectoryList: View {
                 .axLeaf("People.MenuItem.Rename.\(person.name)")
                 Menu("Merge Into") {
                     ForEach(people.filter { $0.id != person.id }) { target in
-                        Button(target.name) { Task { await model.mergePerson(person.id, into: target.id) } }
+                        Button(target.name) { merging = MergePair(source: person, target: target) }
                             .axLeaf("People.MenuItem.MergeInto.\(target.name)")
                     }
                 }
@@ -144,6 +161,10 @@ struct PeopleDirectoryList: View {
 
     private var isRenaming: Binding<Bool> {
         Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
+    }
+
+    private var isMerging: Binding<Bool> {
+        Binding(get: { merging != nil }, set: { if !$0 { merging = nil } })
     }
 
     private var isDeleting: Binding<Bool> {

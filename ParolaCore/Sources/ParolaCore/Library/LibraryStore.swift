@@ -696,14 +696,27 @@ public actor LibraryStore {
     /// Replaces the entry's speaker-to-person map. The names themselves live in the transcript, so
     /// this write skips the index.
     public func setSpeakerAssignments(_ assignments: [String: UUID], for id: LibraryEntry.ID) throws {
+        try mutateSpeakerAssignments(for: id) { $0 = assignments }
+    }
+
+    /// Changes the entry's speaker-to-person map in place and returns what it holds afterwards.
+    /// The transform runs inside the actor, so two assignments in flight can't drop each other's key.
+    @discardableResult
+    public func mutateSpeakerAssignments(
+        for id: LibraryEntry.ID,
+        _ transform: @Sendable (inout [String: UUID]) -> Void
+    ) throws -> [String: UUID] {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             throw LibraryError.notFound(id)
         }
+        var updated: [String: UUID] = [:]
         try ParolaDocument.updateManifest(at: bundleURL) { manifest in
-            manifest.speakerAssignments = assignments
+            transform(&manifest.speakerAssignments)
+            updated = manifest.speakerAssignments
         }
         try recacheEntry(at: bundleURL)
+        return updated
     }
 
     /// Sets a note for a segment within an entry, then re-indexes so notes are searchable.

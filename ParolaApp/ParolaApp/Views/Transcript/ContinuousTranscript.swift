@@ -97,8 +97,7 @@ struct ContinuousChunks: View {
             Button("Rename") {
                 let trimmed = draftSpeakerName.trimmingCharacters(in: .whitespacesAndNewlines)
                 renamingSpeaker = nil
-                guard !trimmed.isEmpty, trimmed != current else { return }
-                model.applySpeakerRenames([current: trimmed])
+                model.renameSpeakerLabel(current, to: trimmed)
             }
         }
     }
@@ -177,6 +176,7 @@ struct ContinuousChunks: View {
             return
         }
         let useSpeakerColor = model.transcriptSpeakers.count >= 2
+        let speakerColorIndices = useSpeakerColor ? model.speakerColorIndices : [:]
         let favoritesOnly = model.favoritesOnly
         let favorites = model.favoriteSegmentIDs
         let segments = favoritesOnly ? transcript.segments.filter { favorites.contains($0.id) } : transcript.segments
@@ -185,7 +185,7 @@ struct ContinuousChunks: View {
         // (duration backfill, playback bookkeeping); skip the expensive rebuild for those.
         let signature = Self.contentSignature(
             segments: segments, useSpeakerColor: useSpeakerColor, favoritesOnly: favoritesOnly,
-            favorites: favorites, translations: translations
+            favorites: favorites, translations: translations, speakerColorIndices: speakerColorIndices
         )
         guard gate.needsRebuild(for: signature) else { return }
         buildTask?.cancel()
@@ -196,7 +196,8 @@ struct ContinuousChunks: View {
         if segments.count <= Self.synchronousBuildCap {
             apply(
                 Self.build(
-                    segments: segments, useSpeakerColor: useSpeakerColor, primaryText: primaryText,
+                    segments: segments, useSpeakerColor: useSpeakerColor,
+                    speakerColorIndices: speakerColorIndices, primaryText: primaryText,
                     favoriteColor: accent, favorites: favorites, translations: translations,
                     translationColor: secondaryText
                 ),
@@ -207,6 +208,7 @@ struct ContinuousChunks: View {
                 await Self.buildOffMain(
                     segments: segments,
                     useSpeakerColor: useSpeakerColor,
+                    speakerColorIndices: speakerColorIndices,
                     primaryText: primaryText,
                     favoriteColor: accent,
                     favorites: favorites,
@@ -223,6 +225,7 @@ struct ContinuousChunks: View {
     static func buildOffMain(
         segments: [TranscriptSegment],
         useSpeakerColor: Bool,
+        speakerColorIndices: [String: Int],
         primaryText: Color,
         favoriteColor: Color,
         favorites: Set<Int>,
@@ -233,7 +236,8 @@ struct ContinuousChunks: View {
     ) async {
         let built = await Task.detached(priority: .userInitiated) {
             build(
-                segments: segments, useSpeakerColor: useSpeakerColor, primaryText: primaryText,
+                segments: segments, useSpeakerColor: useSpeakerColor,
+                speakerColorIndices: speakerColorIndices, primaryText: primaryText,
                 favoriteColor: favoriteColor, favorites: favorites, translations: translations,
                 translationColor: translationColor
             )
@@ -252,11 +256,15 @@ struct ContinuousChunks: View {
 
     nonisolated static func contentSignature(
         segments: [TranscriptSegment], useSpeakerColor: Bool, favoritesOnly: Bool, favorites: Set<Int>,
-        translations: [Int: String]
+        translations: [Int: String], speakerColorIndices: [String: Int]
     ) -> Int {
         var hasher = Hasher()
         hasher.combine(useSpeakerColor)
         hasher.combine(favoritesOnly)
+        for (label, index) in speakerColorIndices.sorted(by: { $0.key < $1.key }) {
+            hasher.combine(label)
+            hasher.combine(index)
+        }
         for seg in segments {
             hasher.combine(seg.id)
             hasher.combine(seg.text)
@@ -295,6 +303,7 @@ struct ContinuousChunks: View {
     nonisolated static func build(
         segments: [TranscriptSegment],
         useSpeakerColor: Bool,
+        speakerColorIndices: [String: Int],
         primaryText: Color,
         favoriteColor: Color,
         favorites: Set<Int>,
@@ -341,7 +350,9 @@ struct ContinuousChunks: View {
             guard !body.isEmpty else { continue }
             let pauseBreak = TranscriptParagraphs.breaksParagraph(after: lastEnd, start: seg.start, pause: paragraphPause)
             lastEnd = seg.end
-            let speakerTint: Color? = useSpeakerColor ? seg.speaker.map(DS.speakerColor(for:)) : nil
+            let speakerTint: Color? = useSpeakerColor
+                ? seg.speaker.map { DS.speakerColor(for: $0, colorIndex: speakerColorIndices[$0]) }
+                : nil
             if let label = useSpeakerColor ? SegmentCard.speakerLabel(for: seg.speaker) : nil,
                label != shownSpeaker {
                 closeChunk()

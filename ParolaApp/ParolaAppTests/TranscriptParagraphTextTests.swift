@@ -82,6 +82,7 @@ struct TranscriptParagraphTextTests {
         let rendered = ContinuousChunks.build(
             segments: segments,
             useSpeakerColor: true,
+            speakerColorIndices: [:],
             primaryText: DS.Color.primaryText,
             favoriteColor: DS.Color.accent,
             favorites: [],

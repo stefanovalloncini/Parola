@@ -29,6 +29,7 @@ struct ContinuousChunksTests {
     private func build(
         _ segments: [TranscriptSegment],
         useSpeakerColor: Bool = false,
+        speakerColorIndices: [String: Int] = [:],
         translations: [Int: String] = [:],
         softCap: Int = ContinuousChunks.softSegmentCap,
         hardCap: Int = ContinuousChunks.hardSegmentCap
@@ -36,6 +37,7 @@ struct ContinuousChunksTests {
         ContinuousChunks.build(
             segments: segments,
             useSpeakerColor: useSpeakerColor,
+            speakerColorIndices: speakerColorIndices,
             primaryText: DS.Color.primaryText,
             favoriteColor: DS.Color.accent,
             favorites: [],
@@ -111,10 +113,12 @@ struct ContinuousChunksTests {
     func translationChangesTheSignature() {
         let segments = [segment(0, "Ciao.")]
         let before = ContinuousChunks.contentSignature(
-            segments: segments, useSpeakerColor: false, favoritesOnly: false, favorites: [], translations: [:]
+            segments: segments, useSpeakerColor: false, favoritesOnly: false, favorites: [],
+            translations: [:], speakerColorIndices: [:]
         )
         let after = ContinuousChunks.contentSignature(
-            segments: segments, useSpeakerColor: false, favoritesOnly: false, favorites: [], translations: [0: "Hello."]
+            segments: segments, useSpeakerColor: false, favoritesOnly: false, favorites: [],
+            translations: [0: "Hello."], speakerColorIndices: [:]
         )
 
         #expect(before != after)
@@ -389,6 +393,27 @@ struct ContinuousChunksTests {
         #expect(chunks[1].runs[1]?.baseColor == DS.Color.primaryText)
     }
 
+    @Test("an assigned speaker wears the person's colour, an unassigned one its own hash")
+    func headingsFollowThePersonColour() {
+        let segments = [segment(0, "Hi.", speaker: "Alice"), segment(1, "Yo.", speaker: "Bob")]
+        let chunks = build(segments, useSpeakerColor: true, speakerColorIndices: ["Alice": 3])
+        #expect(chunks[0].text.runs.first?.foregroundColor == DS.speakerPalette[3])
+        #expect(chunks[1].text.runs.first?.foregroundColor == DS.speakerColor(for: "Bob"))
+    }
+
+    @Test("a colour change alone rebuilds the chunks")
+    func colourChangeMovesTheSignature() {
+        let segments = [segment(0, "Hi.", speaker: "Alice")]
+        func signature(_ indices: [String: Int]) -> Int {
+            ContinuousChunks.contentSignature(
+                segments: segments, useSpeakerColor: true, favoritesOnly: false, favorites: [],
+                translations: [:], speakerColorIndices: indices
+            )
+        }
+        #expect(signature([:]) != signature(["Alice": 2]))
+        #expect(signature(["Alice": 2]) == signature(["Alice": 2]))
+    }
+
     @Test("a heading links to its own assign popover, never to a seek")
     func headingRunsCarryTheAssignLink() {
         let segments = [segment(0, "Hi.", speaker: "Alice"), segment(1, "Yo.", speaker: "Bob")]
@@ -506,6 +531,7 @@ struct ContinuousChunksTests {
         await ContinuousChunks.buildOffMain(
             segments: segments,
             useSpeakerColor: false,
+            speakerColorIndices: [:],
             primaryText: DS.Color.primaryText,
             favoriteColor: DS.Color.accent,
             favorites: [],
@@ -519,7 +545,8 @@ struct ContinuousChunksTests {
     func cancelledOffMainBuildLeavesGateOpen() async {
         let segments = (0..<(ContinuousChunks.synchronousBuildCap + 40)).map { segment($0, "Sentence \($0).") }
         let signature = ContinuousChunks.contentSignature(
-            segments: segments, useSpeakerColor: false, favoritesOnly: false, favorites: [], translations: [:]
+            segments: segments, useSpeakerColor: false, favoritesOnly: false, favorites: [],
+            translations: [:], speakerColorIndices: [:]
         )
         let box = GateBox()
 

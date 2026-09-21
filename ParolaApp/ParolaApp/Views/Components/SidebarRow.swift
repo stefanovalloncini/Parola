@@ -4,12 +4,12 @@ struct SidebarRow: View {
     private let titleText: Text
     let systemImage: String
     let isSelected: Bool
-    var badge: Int? = nil
-    var height: CGFloat = 32
+    let badge: Int?
+    let height: CGFloat
     /// The footer rows keep a resting outline, so they read as buttons against the empty space below the list.
-    var bordered: Bool = false
+    let bordered: Bool
     /// Set where the rows belong to groups: the glyph sits in a badge of the group's colour.
-    var iconTint: Color? = nil
+    let iconTint: Color?
     let action: () -> Void
 
     init(
@@ -74,11 +74,11 @@ struct SidebarRow: View {
 struct SidebarRowLabel: View {
     private let titleText: Text
     let systemImage: String
-    var isSelected: Bool = false
-    var badge: Int? = nil
-    var height: CGFloat = 32
-    var bordered: Bool = false
-    var iconTint: Color? = nil
+    let isSelected: Bool
+    let badge: Int?
+    let height: CGFloat
+    let bordered: Bool
+    let iconTint: Color?
 
     init(
         text: Text,

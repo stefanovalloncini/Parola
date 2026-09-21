@@ -11,12 +11,18 @@ struct PersonFilterTests {
     private let ada = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!
     private let grace = UUID(uuidString: "66666666-7777-8888-9999-000000000000")!
 
-    private func entry(id: String, offset: TimeInterval, assignments: [String: UUID]) -> LibraryEntry {
+    private func entry(
+        id: String,
+        offset: TimeInterval,
+        assignments: [String: UUID],
+        category: EntryCategory = .transcription
+    ) -> LibraryEntry {
         let manifest = ParolaDocument.Manifest(
             createdAt: Date(timeIntervalSince1970: 1_700_000_000 + offset),
             originalAudioName: "\(id).m4a",
             modelName: "stub",
             language: "en",
+            category: category,
             speakerAssignments: assignments
         )
         return LibraryEntry(
@@ -108,6 +114,24 @@ struct PersonFilterTests {
         model.setPersonFilter(nil)
         #expect(model.personFilter == nil)
         #expect(model.libraryBrowsingAll)
+    }
+
+    @Test("the filter offers only people with an entry in the category on screen")
+    func knownPeopleAreScoped() async {
+        let model = await makeModel()
+        let adaPerson = Person(id: ada, name: "Ada")
+        let gracePerson = Person(id: grace, name: "Grace")
+        let stranger = Person(name: "Nobody here")
+        model.people = [adaPerson, gracePerson, stranger]
+        model.libraryEntries = [
+            entry(id: "a", offset: 100, assignments: ["Ada": ada]),
+            entry(id: "b", offset: 200, assignments: ["Grace": grace], category: .meeting),
+        ]
+
+        #expect(Set(model.knownPeople(in: nil).map(\.id)) == [ada, grace])
+        #expect(model.knownPeople(in: .transcription).map(\.id) == [ada])
+        #expect(model.knownPeople(in: .meeting).map(\.id) == [grace])
+        #expect(!model.knownPeople(in: nil).contains { $0.id == stranger.id })
     }
 
     @Test("the sidebar section hides when it is switched off or the directory is empty")

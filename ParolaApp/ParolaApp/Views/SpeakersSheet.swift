@@ -84,7 +84,7 @@ struct SpeakersSheet: View {
             Spacer()
 
             Button("Done") {
-                model.applySpeakerRenames(renames)
+                model.applySpeakerRenames(renames.filter { $0.key != $0.value })
                 dismiss()
             }
             .sheetPrimaryAction()

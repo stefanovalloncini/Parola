@@ -29,7 +29,7 @@ extension ParolaAutomationServer {
                         throw AutomationError.notFound(kind: "speaker", id: label)
                     }
                     await ctx.model.assignSpeaker(label: label, toNewPersonNamed: name)
-                    guard let person = Self.person(named: name, in: ctx.model) else {
+                    guard let person = await ctx.model.peopleStore.person(named: name) else {
                         throw AutomationError.internal("the person was not recorded")
                     }
                     return .object([
@@ -77,10 +77,6 @@ extension ParolaAutomationServer {
                 }
             ),
         ]
-    }
-
-    static func person(named name: String, in model: AppModel) -> Person? {
-        model.people.first { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
     }
 
     static func personState(_ person: Person) -> AutomationValue {

@@ -489,6 +489,8 @@ final class AppModel {
     /// Which person the library list is filtered to, set from the sidebar, the filter bar or the bridge.
     var personFilter: UUID?
     var showMostUsedPeople: Bool = true { didSet { defaults.set(showMostUsedPeople, forKey: "showMostUsedPeople") } }
+    /// The speaker-map writes in flight, kept in order so the bundle never sees them out of turn.
+    @ObservationIgnored var speakerAssignmentWriteTask: Task<Void, Never>?
 
     // MARK: - Prompt library
 
@@ -1039,6 +1041,7 @@ final class AppModel {
     struct FilterVocabulary {
         var labels: [String] = []
         var languages: [String] = []
+        var personIDs: [UUID] = []
     }
 
     @ObservationIgnored private var cachedVocabulary: [EntryCategory?: FilterVocabulary] = [:]
@@ -1053,6 +1056,12 @@ final class AppModel {
     /// Every label in the library. Label suggestions are not scoped to the category the entry happens to be in.
     var allKnownLabels: [String] { knownLabels(in: nil) }
 
+    /// The people with at least one entry in one category, in the order every people list shows them.
+    func knownPeople(in category: EntryCategory?) -> [Person] {
+        let ids = Set(vocabulary(in: category).personIDs)
+        return peopleByUse.filter { ids.contains($0.id) }
+    }
+
     private func vocabulary(in category: EntryCategory?) -> FilterVocabulary {
         let version = libraryVersion
         if cachedVocabularyVersion != version {
@@ -1062,6 +1071,7 @@ final class AppModel {
         if let cached = cachedVocabulary[category] { return cached }
         var seenLabels = Set<String>()
         var seenLanguages = Set<String>()
+        var seenPeople = Set<UUID>()
         var found = FilterVocabulary()
         for entry in libraryEntries where category == nil || entry.category == category {
             for label in entry.labels where seenLabels.insert(label).inserted {
@@ -1069,6 +1079,9 @@ final class AppModel {
             }
             if let code = LanguageDisplay.code(for: entry.language), seenLanguages.insert(code).inserted {
                 found.languages.append(code)
+            }
+            for id in entry.personIDs where seenPeople.insert(id).inserted {
+                found.personIDs.append(id)
             }
         }
         found.labels.sort { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
@@ -3002,15 +3015,20 @@ final class AppModel {
         _ new: Transcript,
         actionName: String,
         textChanged: Bool = true,
-        favorites: (old: Set<Int>, new: Set<Int>)? = nil
+        favorites: (old: Set<Int>, new: Set<Int>)? = nil,
+        assignments: SpeakerAssignmentEdit? = nil
     ) {
         guard let old = transcript, old != new else { return }
         let resolvedFavorites = favorites ?? (favoriteSegmentIDs, favoriteSegmentIDs)
+        // Read before the edit lands: the inverse has to restore what the map held a moment ago.
+        let inverseAssignments = assignments.map { $0.inverse(of: speakerAssignments) }
         transcript = new
         persistCurrentTranscriptIfLoaded(textChanged: textChanged)
         if resolvedFavorites.new != resolvedFavorites.old { replaceFavorites(resolvedFavorites.new) }
+        if let assignments { applySpeakerAssignmentEdit(assignments) }
         registerTranscriptUndo(
-            restoring: old, favorites: resolvedFavorites, actionName: actionName, textChanged: textChanged
+            restoring: old, favorites: resolvedFavorites, actionName: actionName, textChanged: textChanged,
+            assignments: inverseAssignments
         )
     }
 
@@ -3018,7 +3036,8 @@ final class AppModel {
         restoring old: Transcript,
         favorites: (old: Set<Int>, new: Set<Int>),
         actionName: String,
-        textChanged: Bool
+        textChanged: Bool,
+        assignments: SpeakerAssignmentEdit?
     ) {
         guard let undoManager else { return }
         let entryID = selectedEntryID
@@ -3033,7 +3052,8 @@ final class AppModel {
             MainActor.assumeIsolated {
                 guard model.selectedEntryID == entryID else { return }
                 model.applyTranscriptEdit(
-                    old, actionName: actionName, textChanged: textChanged, favorites: inverseFavorites
+                    old, actionName: actionName, textChanged: textChanged, favorites: inverseFavorites,
+                    assignments: assignments
                 )
             }
         }
@@ -3061,7 +3081,22 @@ final class AppModel {
     }
 
     func assignSpeaker(_ name: String?, toSegmentID id: TranscriptSegment.ID) {
-        guard var t = transcript, let idx = t.segments.firstIndex(where: { $0.id == id }) else { return }
+        guard let speaker = applySegmentSpeaker(name, toSegmentID: id) else { return }
+        // Only a name the directory already knows: picking a raw diarizer label off the submenu
+        // must not mint a person out of "SPEAKER_01".
+        Task { [peopleStore] in
+            guard await peopleStore.person(named: speaker) != nil else { return }
+            let person = await peopleStore.recordUsage(name: speaker)
+            await recordSpeakerAssignment(label: speaker, person: person)
+            await refreshPeople()
+        }
+    }
+
+    /// Writes one segment's speaker, and its words'. Returns the new name when it changed, so the
+    /// caller decides what the people directory should make of it.
+    @discardableResult
+    func applySegmentSpeaker(_ name: String?, toSegmentID id: TranscriptSegment.ID) -> String? {
+        guard var t = transcript, let idx = t.segments.firstIndex(where: { $0.id == id }) else { return nil }
         let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines)
         let speaker = (trimmed?.isEmpty ?? true) ? nil : trimmed
         let previous = t.segments[idx].speaker
@@ -3071,13 +3106,8 @@ final class AppModel {
             t.segments[idx].words = words
         }
         applyTranscriptEdit(t, actionName: String(localized: "Assign Speaker"), textChanged: false)
-        if let speaker, speaker != previous {
-            Task { [peopleStore] in
-                let person = await peopleStore.recordUsage(name: speaker)
-                await recordSpeakerAssignment(label: speaker, person: person)
-                await refreshPeople()
-            }
-        }
+        guard let speaker, speaker != previous else { return nil }
+        return speaker
     }
 
     func splitSegment(id: TranscriptSegment.ID, atWordIndex index: Int) {

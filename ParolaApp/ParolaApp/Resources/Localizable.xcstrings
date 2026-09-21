@@ -12,6 +12,17 @@
         }
       }
     },
+    "%1$@ is folded into %2$@, and the transcripts that named them take the new name. That rewrite can't be undone.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ viene unita a %2$@ e le trascrizioni che la nominavano prendono il nuovo nome. La riscrittura non si può annullare."
+          }
+        }
+      }
+    },
     "%@": {
       "extractionState": "manual",
       "localizations": {
@@ -1807,17 +1818,6 @@
         }
       }
     },
-    "Assign Selection to": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Assegna la selezione a"
-          }
-        }
-      }
-    },
     "Assign Speaker": {
       "extractionState": "manual",
       "localizations": {
@@ -1825,6 +1825,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Assegna speaker"
+          }
+        }
+      }
+    },
+    "Assign This Segment to": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assegna questo segmento a"
+          }
+        }
+      }
+    },
+    "Assigned": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assegnato"
           }
         }
       }
@@ -2942,6 +2964,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cancella le impostazioni salvate in questo pannello. Gli altri pannelli non vengono toccati."
+          }
+        }
+      }
+    },
+    "Click to reassign this speaker": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fai clic per riassegnare questo speaker"
           }
         }
       }
@@ -6805,6 +6838,17 @@
         }
       }
     },
+    "Merge": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unisci"
+          }
+        }
+      }
+    },
     "Merge Into": {
       "extractionState": "manual",
       "localizations": {
@@ -6823,6 +6867,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Unisci in uno i segmenti consecutivi di chi parla."
+          }
+        }
+      }
+    },
+    "Merge people": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unisci le persone"
           }
         }
       }
