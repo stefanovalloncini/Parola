@@ -11,8 +11,15 @@ struct SceneEntranceTests {
         #expect(abs(SceneEntrance.delay(order: 3) - 0.21) < 0.0001)
     }
 
+    // Four feature cards at order 1 + index is the longest ladder any scene builds.
     @Test("the whole entrance is over inside a third of a second")
     func lastBlockStartsSoon() {
-        #expect(SceneEntrance.delay(order: 3) < 0.25)
+        #expect(SceneEntrance.delay(order: 4) < 0.25)
+    }
+
+    @Test("the ramp stops at 210 ms however deep the scene goes")
+    func delayIsCapped() {
+        #expect(abs(SceneEntrance.delay(order: 4) - 0.21) < 0.0001)
+        #expect(abs(SceneEntrance.delay(order: 9) - 0.21) < 0.0001)
     }
 }

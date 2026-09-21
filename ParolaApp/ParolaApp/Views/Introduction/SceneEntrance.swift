@@ -1,9 +1,9 @@
 import SwiftUI
 
 enum SceneEntrance {
-    /// How long the block at `order` waits before it comes in, so a scene reads top to bottom.
+    /// How long the block at `order` waits before it comes in, so a scene reads top to bottom, capped so the whole entrance stays short.
     static func delay(order: Int) -> Double {
-        0.07 * Double(order)
+        min(0.07 * Double(order), 0.21)
     }
 }
 

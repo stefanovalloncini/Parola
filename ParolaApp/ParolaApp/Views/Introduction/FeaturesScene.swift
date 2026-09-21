@@ -68,7 +68,7 @@ struct FeaturesScene: View {
                     ForEach(indices, id: \.self) { index in
                         FeatureCard(item: items[index], hotkeyName: hotkeyName)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .sceneEntrance(order: 2 + index)
+                            .sceneEntrance(order: 1 + index)
                     }
                     if indices.count == 1 {
                         Color.clear
