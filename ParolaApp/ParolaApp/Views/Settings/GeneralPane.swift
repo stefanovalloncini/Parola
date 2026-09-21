@@ -92,31 +92,28 @@ struct GeneralPane: View {
                     Toggle("", isOn: $model.showAISummaries).labelsHidden()
                         .axLeaf("General.Toggle.ShowAISummaries")
                 }
-                Divider().padding(.leading, DS.Spacing.medium)
+            }
+
+            SettingsSection("Custom instructions") {
                 VStack(alignment: .leading, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Custom title instructions")
-                            .font(DS.Font.secondary)
-                            .foregroundStyle(DS.Color.secondaryText)
-                        TextField("For example, mention the client's name.",
-                                  text: $model.customTitlePrompt, axis: .vertical)
-                            .lineLimit(1...3)
-                            .textFieldStyle(.roundedBorder)
-                            .axLeaf("General.TextField.CustomTitlePrompt")
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Custom summary instructions")
-                            .font(DS.Font.secondary)
-                            .foregroundStyle(DS.Color.secondaryText)
-                        TextField("For example, keep numbers and dates.",
-                                  text: $model.customSummaryPrompt, axis: .vertical)
-                            .lineLimit(1...3)
-                            .textFieldStyle(.roundedBorder)
-                            .axLeaf("General.TextField.CustomSummaryPrompt")
-                    }
+                    TextField("For example, mention the client's name.",
+                              text: $model.customTitlePrompt, axis: .vertical)
+                        .lineLimit(1...3)
+                        .textFieldStyle(.roundedBorder)
+                        .axLeaf("General.TextField.CustomTitlePrompt")
+                    Text("Replaces the built-in title instructions when set.")
+                        .font(DS.Font.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
+                    TextField("For example, keep numbers and dates.",
+                              text: $model.customSummaryPrompt, axis: .vertical)
+                        .lineLimit(1...3)
+                        .textFieldStyle(.roundedBorder)
+                        .axLeaf("General.TextField.CustomSummaryPrompt")
+                    Text("Replaces the built-in summary instructions when set.")
+                        .font(DS.Font.secondary)
+                        .foregroundStyle(DS.Color.secondaryText)
                 }
-                .padding(.horizontal, DS.Spacing.medium)
-                .padding(.vertical, DS.Spacing.small)
+                .padding(DS.Spacing.medium)
             }
 
             SettingsSection("Custom vocabulary") {

@@ -2871,24 +2871,13 @@
         }
       }
     },
-    "Custom summary instructions": {
+    "Custom instructions": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Istruzioni personalizzate per il riassunto"
-          }
-        }
-      }
-    },
-    "Custom title instructions": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Istruzioni personalizzate per il titolo"
+            "value": "Istruzioni personalizzate"
           }
         }
       }
@@ -8151,6 +8140,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sostituisci tutto"
+          }
+        }
+      }
+    },
+    "Replaces the built-in summary instructions when set.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sostituisce le istruzioni predefinite per il riassunto, quando impostate."
+          }
+        }
+      }
+    },
+    "Replaces the built-in title instructions when set.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sostituisce le istruzioni predefinite per il titolo, quando impostate."
           }
         }
       }
