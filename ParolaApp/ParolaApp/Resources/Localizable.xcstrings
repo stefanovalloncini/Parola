@@ -3085,17 +3085,6 @@
         }
       }
     },
-    "Delete from disk": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cancella dal disco"
-          }
-        }
-      }
-    },
     "Delete permanently?": {
       "extractionState": "manual",
       "localizations": {
@@ -3855,6 +3844,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esporta come"
+          }
+        }
+      }
+    },
+    "Export As ▸ TXT…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esporta come ▸ TXT…"
           }
         }
       }
@@ -6604,23 +6604,6 @@
         }
       }
     },
-    "Open File": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open File"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Apri file"
-          }
-        }
-      }
-    },
     "Open Files…": {
       "extractionState": "manual",
       "localizations": {
@@ -8375,17 +8358,6 @@
         }
       }
     },
-    "Save Document": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salva documento"
-          }
-        }
-      }
-    },
     "Save next to the audio file": {
       "extractionState": "manual",
       "localizations": {
@@ -9313,6 +9285,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Avvia o ferma la registrazione del microfono da qualsiasi punto. Disattivato per default."
+          }
+        }
+      }
+    },
+    "Start/Stop Live Captions": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avvia/ferma sottotitoli live"
           }
         }
       }

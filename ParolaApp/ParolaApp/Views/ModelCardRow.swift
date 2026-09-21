@@ -48,7 +48,7 @@ struct ModelCardRow: View {
         .contextMenu {
             if canDelete, let deleteAction {
                 Button(role: .destructive, action: deleteAction) {
-                    Label("Delete from disk", systemImage: "trash")
+                    Label("Delete from Disk", systemImage: "trash")
                 }
                 .axLeaf("Card.ContextMenuItem.Delete")
             }

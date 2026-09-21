@@ -9,10 +9,10 @@ struct ShortcutsPane: View {
         return VStack(alignment: .leading, spacing: 12) {
             SettingsSection("Menu equivalents") {
                 SettingRow("Open…", isFirst: true) { Text("⌘O").foregroundStyle(DS.Color.secondaryText) }
-                SettingRow("Save Document") { Text("⌘S").foregroundStyle(DS.Color.secondaryText) }
-                SettingRow("Find") { Text("⌘F").foregroundStyle(DS.Color.secondaryText) }
-                SettingRow("Toggle Live Captions") { Text("⇧⌘L").foregroundStyle(DS.Color.secondaryText) }
-                SettingRow("Export as TXT") { Text("⌘E").foregroundStyle(DS.Color.secondaryText) }
+                SettingRow("Save As Parola Document…") { Text("⌘S").foregroundStyle(DS.Color.secondaryText) }
+                SettingRow("Find…") { Text("⌘F").foregroundStyle(DS.Color.secondaryText) }
+                SettingRow("Start/Stop Live Captions") { Text("⇧⌘L").foregroundStyle(DS.Color.secondaryText) }
+                SettingRow("Export As ▸ TXT…") { Text("⌘E").foregroundStyle(DS.Color.secondaryText) }
             }
             SettingsSection("Customizable") {
                 SettingRow("Dictation Hotkey",
