@@ -3,7 +3,7 @@ import SwiftUI
 /// Where a feature vignette's loop stands, as a fraction of its period. Pure, so the loop is testable without a view.
 enum FeatureVignettePhase {
     static let period: Double = 4
-    static let frameInterval: Double = 1.0 / 30.0
+    static let frameInterval: Double = 1.0 / 15.0
 
     static func phase(at time: Double, period: Double = FeatureVignettePhase.period) -> Double {
         guard period > 0 else { return 0 }
@@ -112,10 +112,7 @@ private struct TranscribeVignette: View {
         }
         .padding(.horizontal, DS.Spacing.regular)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
-                .fill(DS.Palette.surface)
-        )
+        .cardBackground(radius: DS.Radius.small)
     }
 
     private var clearing: Double {
@@ -124,13 +121,13 @@ private struct TranscribeVignette: View {
 
     private var drop: Double {
         guard phase >= FeatureVignettePhase.resetSpan else { return 1 }
-        return FeatureVignettePhase.ramp(phase, from: 0.1, span: 0.16)
+        return FeatureVignettePhase.ramp(phase, from: 0.08, span: 0.14)
     }
 
     private func fill(_ index: Int) -> Double {
         guard phase >= FeatureVignettePhase.resetSpan else { return 1 }
         return FeatureVignettePhase.ease(
-            FeatureVignettePhase.ramp(phase, from: 0.3 + Double(index) * 0.16, span: 0.12)
+            FeatureVignettePhase.ramp(phase, from: 0.24 + Double(index) * 0.15, span: 0.12)
         )
     }
 }
@@ -178,7 +175,7 @@ private struct DictationVignette: View {
     let phase: Double
     let keyName: String
 
-    // Split once per process: the loop re-runs this view's body thirty times a second.
+    // Split once per process: the loop re-runs this view's body on every frame.
     private static let words: [String] = String(localized: "Send the notes")
         .split(separator: " ")
         .map(String.init)
@@ -203,9 +200,12 @@ private struct DictationVignette: View {
                 .scaleEffect(1 - 0.08 * press)
             HStack(spacing: DS.Spacing.tight) {
                 ForEach(0..<Self.words.count, id: \.self) { index in
-                    Text(verbatim: Self.words[index])
-                        .offset(y: 3 * (1 - landing(index)))
-                        .opacity(word(index))
+                    // Dropped rather than hidden while it waits, so the caret sits against the last word that landed.
+                    if word(index) > 0 {
+                        Text(verbatim: Self.words[index])
+                            .offset(y: 3 * (1 - landing(index)))
+                            .opacity(word(index))
+                    }
                 }
                 StreamingReveal.caret(visible: Int(phase * 6) % 2 == 0)
             }
@@ -223,7 +223,7 @@ private struct DictationVignette: View {
     private func landing(_ index: Int) -> Double {
         guard phase >= FeatureVignettePhase.resetSpan else { return 1 }
         return FeatureVignettePhase.ease(
-            FeatureVignettePhase.ramp(phase, from: 0.3 + Double(index) * 0.16, span: 0.12)
+            FeatureVignettePhase.ramp(phase, from: 0.24 + Double(index) * 0.15, span: 0.12)
         )
     }
 
@@ -272,10 +272,13 @@ private struct CaptionsVignette: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
+    // The real panel crossfades a new caption in over 0.22 s; matched here, as a fraction of the loop.
+    private static let crossfade = 0.22 / FeatureVignettePhase.period
+
     private var first: Double {
         if phase < 0.42 { return 1 }
-        if phase < 0.5 { return 1 - (phase - 0.42) / 0.08 }
-        if phase < 0.92 { return 0 }
-        return (phase - 0.92) / 0.08
+        if phase < 0.42 + Self.crossfade { return 1 - (phase - 0.42) / Self.crossfade }
+        if phase < 1 - Self.crossfade { return 0 }
+        return (phase - (1 - Self.crossfade)) / Self.crossfade
     }
 }
