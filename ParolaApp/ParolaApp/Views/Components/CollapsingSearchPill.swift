@@ -14,6 +14,11 @@ enum PageHeaderMetrics {
     static func collapsesSearch(width: CGFloat) -> Bool {
         width > 0 && width < searchCollapseWidth
     }
+
+    /// The popover hangs off the glyph, so a resize that crosses the threshold takes its anchor with it.
+    static func popoverSurvives(resizeFrom old: CGFloat, to new: CGFloat) -> Bool {
+        collapsesSearch(width: old) == collapsesSearch(width: new)
+    }
 }
 
 /// A `SearchPill` that folds into its glyph on a narrow page and reopens in a popover.
@@ -29,10 +34,15 @@ struct CollapsingSearchPill: View {
     @State private var expanded = false
 
     var body: some View {
-        if PageHeaderMetrics.collapsesSearch(width: pageWidth) {
-            expandButton
-        } else {
-            field.frame(maxWidth: width)
+        Group {
+            if PageHeaderMetrics.collapsesSearch(width: pageWidth) {
+                expandButton
+            } else {
+                field.frame(maxWidth: width)
+            }
+        }
+        .onChange(of: pageWidth) { old, new in
+            if !PageHeaderMetrics.popoverSurvives(resizeFrom: old, to: new) { expanded = false }
         }
     }
 

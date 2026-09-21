@@ -28,6 +28,23 @@ struct PageHeaderMetricsTests {
         #expect(!PageHeaderMetrics.collapsesSearch(width: paneWidth(window: 1440)))
     }
 
+    @Test("a resize inside one band leaves the popover open")
+    func resizeWithinABandKeepsThePopover() {
+        #expect(PageHeaderMetrics.popoverSurvives(resizeFrom: paneWidth(window: 1180), to: paneWidth(window: 1440)))
+        #expect(PageHeaderMetrics.popoverSurvives(
+            resizeFrom: paneWidth(window: MainWindowLayout.minimumWidth),
+            to: paneWidth(window: MainWindowLayout.minimumWidth, sidebar: MainWindowLayout.sidebarMaxWidth)
+        ))
+    }
+
+    @Test("a resize across the threshold closes the popover, both directions")
+    func crossingTheThresholdClosesThePopover() {
+        let narrow = paneWidth(window: MainWindowLayout.minimumWidth)
+        let roomy = paneWidth(window: 1180)
+        #expect(!PageHeaderMetrics.popoverSurvives(resizeFrom: narrow, to: roomy))
+        #expect(!PageHeaderMetrics.popoverSurvives(resizeFrom: roomy, to: narrow))
+    }
+
     @Test("the threshold sits between the two window sizes the pages are checked at")
     func thresholdSeparatesTheTwoSizes() {
         #expect(paneWidth(window: MainWindowLayout.minimumWidth) < PageHeaderMetrics.searchCollapseWidth)
