@@ -19,6 +19,12 @@ public enum LibraryStatsReport {
         if let longest = stats.longestRun {
             lines.append("Longest run: \(TranscriptionSpeed.duration(seconds: longest.seconds, locale: locale)) (\(longest.entryID))")
         }
+        if let longest = stats.longestTranscript {
+            lines.append("Longest transcript: \(TranscriptionSpeed.duration(seconds: longest.seconds, locale: locale)) (\(longest.entryID))")
+        }
+        if let fastest = stats.fastestRun {
+            lines.append("Fastest run: \(TranscriptionSpeed.label(fastest.speed, locale: locale)) real time (\(fastest.entryID))")
+        }
         lines.append("Last 30 days: \(stats.last30Days.entries) transcripts, \(TranscriptionSpeed.duration(seconds: stats.last30Days.audioSeconds, locale: locale))")
         lines.append(EntryCategory.allCases.map { "\(plural($0)): \(stats.totals.count($0))" }.joined(separator: ", "))
         if !stats.perModel.isEmpty {

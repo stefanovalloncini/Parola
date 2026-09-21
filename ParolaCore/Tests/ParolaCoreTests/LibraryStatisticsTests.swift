@@ -15,10 +15,11 @@ struct LibraryStatisticsTests {
         timing: Double? = nil,
         words: Int? = nil,
         daysAgo: Double = 0,
+        at instant: Date? = nil,
         deleted: Bool = false
     ) -> LibraryEntry {
         var manifest = ParolaDocument.Manifest(
-            createdAt: Self.reference.addingTimeInterval(-daysAgo * 86_400),
+            createdAt: instant ?? Self.reference.addingTimeInterval(-daysAgo * 86_400),
             originalAudioName: "\(id).wav",
             modelName: model,
             language: "en",
@@ -42,7 +43,11 @@ struct LibraryStatisticsTests {
         #expect(stats == .empty)
         #expect(stats.averageSpeed == nil)
         #expect(stats.longestRun == nil)
+        #expect(stats.longestTranscript == nil)
+        #expect(stats.fastestRun == nil)
         #expect(stats.perModel.isEmpty)
+        #expect(stats.dailyActivity.isEmpty)
+        #expect(stats.monthlyActivity.isEmpty)
     }
 
     @Test("entries in Recently Deleted are left out of every total")
@@ -166,6 +171,105 @@ struct LibraryStatisticsTests {
         ])
         #expect(stats.last30Days.entries == 2)
         #expect(stats.last30Days.audioSeconds == 300)
+    }
+
+    @Test("the daily activity is thirty calendar days ending today, zero where nothing happened")
+    func dailyActivityIsThirtyDays() {
+        let stats = compute([
+            entry("today", audio: 100, daysAgo: 0),
+            entry("also-today", audio: 200, daysAgo: 0),
+            entry("three-days-ago", audio: 120, daysAgo: 3),
+            entry("long-ago", audio: 900, daysAgo: 45),
+        ])
+        let days = stats.dailyActivity
+        #expect(days.count == 30)
+        #expect(days.last?.start == Self.calendar.startOfDay(for: Self.reference))
+        for (earlier, later) in zip(days, days.dropFirst()) {
+            #expect(Self.calendar.date(byAdding: .day, value: 1, to: earlier.start) == later.start)
+        }
+        #expect(days[29].entries == 2)
+        #expect(days[29].audioSeconds == 300)
+        #expect(days[26].entries == 1)
+        #expect(days[26].audioSeconds == 120)
+        #expect(days.map(\.entries).reduce(0, +) == 3)
+        #expect(days.filter { $0.entries == 0 }.allSatisfy { $0.audioSeconds == 0 })
+    }
+
+    @Test("the first day starts at midnight: an entry on it is in, one second earlier is out")
+    func dailyWindowEdges() throws {
+        let today = Self.calendar.startOfDay(for: Self.reference)
+        let firstDay = try #require(Self.calendar.date(byAdding: .day, value: -29, to: today))
+        let stats = compute([
+            entry("on-the-edge", audio: 60, at: firstDay),
+            entry("just-before", audio: 60, at: firstDay.addingTimeInterval(-1)),
+        ])
+        #expect(stats.dailyActivity.first?.start == firstDay)
+        #expect(stats.dailyActivity.first?.entries == 1)
+        #expect(stats.dailyActivity.map(\.entries).reduce(0, +) == 1)
+    }
+
+    @Test("the monthly activity is twelve calendar months ending this month, across the turn of the year")
+    func monthlyActivityWrapsTheYear() throws {
+        let stats = compute([
+            entry("this-month", audio: 100, daysAgo: 0),
+            entry("december", audio: 200, daysAgo: 20),
+            entry("too-old", audio: 900, daysAgo: 400),
+        ])
+        let months = stats.monthlyActivity
+        #expect(months.count == 12)
+        let february2026 = try #require(Self.calendar.date(from: DateComponents(year: 2026, month: 2, day: 1)))
+        let january2027 = try #require(Self.calendar.date(from: DateComponents(year: 2027, month: 1, day: 1)))
+        #expect(months.first?.start == february2026)
+        #expect(months.last?.start == january2027)
+        for (earlier, later) in zip(months, months.dropFirst()) {
+            #expect(Self.calendar.date(byAdding: .month, value: 1, to: earlier.start) == later.start)
+        }
+        #expect(months[10].entries == 1)
+        #expect(months[10].audioSeconds == 200)
+        #expect(months[11].entries == 1)
+        #expect(months.map(\.entries).reduce(0, +) == 2)
+    }
+
+    @Test("entries in Recently Deleted are in no bucket")
+    func deletedEntriesStayOutOfBuckets() {
+        let stats = compute([
+            entry("kept", audio: 100),
+            entry("thrown-away", audio: 900, deleted: true),
+        ])
+        #expect(stats.dailyActivity.last?.entries == 1)
+        #expect(stats.dailyActivity.last?.audioSeconds == 100)
+        #expect(stats.monthlyActivity.last?.entries == 1)
+        #expect(stats.monthlyActivity.last?.audioSeconds == 100)
+    }
+
+    @Test("the longest transcript is the one with the most audio, timed or not")
+    func longestTranscriptIsTheLongestAudio() {
+        let stats = compute([
+            entry("short-slow", audio: 100, timing: 400),
+            entry("long-untimed", audio: 5000, timing: nil),
+            entry("as-long-and-timed", audio: 5000, timing: 10),
+        ])
+        #expect(stats.longestTranscript?.entryID == "long-untimed")
+        #expect(stats.longestTranscript?.seconds == 5000)
+        #expect(stats.longestRun?.entryID == "short-slow")
+
+        let silent = compute([entry("silent", audio: 0), entry("no-media", audio: nil)])
+        #expect(silent.longestTranscript == nil)
+    }
+
+    @Test("the fastest run skips every entry that has no speed")
+    func fastestRunSkipsEntriesWithoutASpeed() {
+        let stats = compute([
+            entry("untimed", audio: 600, timing: nil),
+            entry("no-media", audio: nil, timing: 10),
+            entry("instant", audio: 600, timing: 0),
+            entry("slow", audio: 600, timing: 60),
+            entry("fast", audio: 600, timing: 30),
+            entry("as-fast", audio: 1200, timing: 60),
+        ])
+        #expect(stats.fastestRun?.entryID == "fast")
+        #expect(stats.fastestRun?.speed == 20)
+        #expect(compute([entry("untimed", timing: nil)]).fastestRun == nil)
     }
 
     @Test("counts are kept per category")

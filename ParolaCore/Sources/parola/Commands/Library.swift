@@ -26,17 +26,28 @@ struct Library: AsyncParsableCommand {
             let store = library.map {
                 LibraryStore(libraryURL: URL(fileURLWithPath: $0, isDirectory: true), extraIndexer: nil)
             } ?? LibraryStore.shared
-            let stats = LibraryStatistics.compute(entries: await store.list())
-            print(json ? jsonOutput(stats) : LibraryStatsReport.text(stats))
+            let calendar = Calendar.current
+            let stats = LibraryStatistics.compute(entries: await store.list(), calendar: calendar)
+            print(json ? jsonOutput(stats, calendar: calendar) : LibraryStatsReport.text(stats))
         }
 
-        private func jsonOutput(_ stats: LibraryStatistics) -> String {
+        private func jsonOutput(_ stats: LibraryStatistics, calendar: Calendar) -> String {
             struct ModelRow: Encodable {
                 let model: String
                 let runs: Int
                 let audioSeconds: Double
                 let transcriptionSeconds: Double
                 let speed: Double?
+            }
+            struct ActivityDay: Encodable {
+                let day: String
+                let entries: Int
+                let audioSeconds: Double
+            }
+            struct ActivityMonth: Encodable {
+                let month: String
+                let entries: Int
+                let audioSeconds: Double
             }
             struct Payload: Encodable {
                 let transcripts: Int
@@ -49,10 +60,24 @@ struct Library: AsyncParsableCommand {
                 let averageSpeed: Double?
                 let longestRunSeconds: Double?
                 let longestRunEntry: String?
+                let longestTranscriptSeconds: Double?
+                let longestTranscriptEntry: String?
+                let fastestRunSpeed: Double?
+                let fastestRunEntry: String?
                 let last30DaysEntries: Int
                 let last30DaysAudioSeconds: Double
                 let byCategory: [String: Int]
                 let byModel: [ModelRow]
+                let dailyActivity: [ActivityDay]
+                let monthlyActivity: [ActivityMonth]
+            }
+            let day = { (date: Date) -> String in
+                let parts = calendar.dateComponents([.year, .month, .day], from: date)
+                return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+            }
+            let month = { (date: Date) -> String in
+                let parts = calendar.dateComponents([.year, .month], from: date)
+                return String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
             }
             let payload = Payload(
                 transcripts: stats.totals.entries,
@@ -65,6 +90,10 @@ struct Library: AsyncParsableCommand {
                 averageSpeed: stats.averageSpeed,
                 longestRunSeconds: stats.longestRun?.seconds,
                 longestRunEntry: stats.longestRun?.entryID,
+                longestTranscriptSeconds: stats.longestTranscript?.seconds,
+                longestTranscriptEntry: stats.longestTranscript?.entryID,
+                fastestRunSpeed: stats.fastestRun?.speed,
+                fastestRunEntry: stats.fastestRun?.entryID,
                 last30DaysEntries: stats.last30Days.entries,
                 last30DaysAudioSeconds: stats.last30Days.audioSeconds,
                 byCategory: Dictionary(uniqueKeysWithValues: EntryCategory.allCases.map {
@@ -78,6 +107,12 @@ struct Library: AsyncParsableCommand {
                         transcriptionSeconds: $0.transcriptionSeconds,
                         speed: $0.speed
                     )
+                },
+                dailyActivity: stats.dailyActivity.map {
+                    ActivityDay(day: day($0.start), entries: $0.entries, audioSeconds: $0.audioSeconds)
+                },
+                monthlyActivity: stats.monthlyActivity.map {
+                    ActivityMonth(month: month($0.start), entries: $0.entries, audioSeconds: $0.audioSeconds)
                 }
             )
             let data = (try? JSONEncoder.pretty.encode(payload)) ?? Data()

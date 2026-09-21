@@ -76,6 +76,21 @@ public struct LibraryStatistics: Equatable, Sendable {
         }
     }
 
+    /// One calendar day or month of activity: the transcripts made in it and the audio they carry.
+    public struct ActivityBucket: Equatable, Sendable, Identifiable {
+        public let start: Date
+        public let entries: Int
+        public let audioSeconds: Double
+
+        public init(start: Date, entries: Int, audioSeconds: Double) {
+            self.start = start
+            self.entries = entries
+            self.audioSeconds = audioSeconds
+        }
+
+        public var id: Date { start }
+    }
+
     public struct LongestRun: Equatable, Sendable {
         public let entryID: LibraryEntry.ID
         public let seconds: Double
@@ -86,12 +101,39 @@ public struct LibraryStatistics: Equatable, Sendable {
         }
     }
 
+    /// The entry with the most audio behind it; a run need not have been timed to hold it.
+    public struct LongestTranscript: Equatable, Sendable {
+        public let entryID: LibraryEntry.ID
+        public let seconds: Double
+
+        public init(entryID: LibraryEntry.ID, seconds: Double) {
+            self.entryID = entryID
+            self.seconds = seconds
+        }
+    }
+
+    /// The timed entry that ran the most times faster than real time.
+    public struct FastestRun: Equatable, Sendable {
+        public let entryID: LibraryEntry.ID
+        public let speed: Double
+
+        public init(entryID: LibraryEntry.ID, speed: Double) {
+            self.entryID = entryID
+            self.speed = speed
+        }
+    }
+
     public let totals: Totals
     public let timed: Coverage
     /// Timed entries only, heaviest user first: a row without a measured run has nothing to compare.
     public let perModel: [ModelRow]
     public let last30Days: RecentWindow
+    /// Thirty calendar days ending today, then twelve calendar months ending this month, both zero-filled and in order.
+    public let dailyActivity: [ActivityBucket]
+    public let monthlyActivity: [ActivityBucket]
     public let longestRun: LongestRun?
+    public let longestTranscript: LongestTranscript?
+    public let fastestRun: FastestRun?
     public let averageSpeed: Double?
 
     public static let empty = LibraryStatistics(
@@ -99,7 +141,11 @@ public struct LibraryStatistics: Equatable, Sendable {
         timed: Coverage(count: 0, total: 0, since: nil),
         perModel: [],
         last30Days: RecentWindow(entries: 0, audioSeconds: 0),
+        dailyActivity: [],
+        monthlyActivity: [],
         longestRun: nil,
+        longestTranscript: nil,
+        fastestRun: nil,
         averageSpeed: nil
     )
 
@@ -108,14 +154,22 @@ public struct LibraryStatistics: Equatable, Sendable {
         timed: Coverage,
         perModel: [ModelRow],
         last30Days: RecentWindow,
+        dailyActivity: [ActivityBucket],
+        monthlyActivity: [ActivityBucket],
         longestRun: LongestRun?,
+        longestTranscript: LongestTranscript?,
+        fastestRun: FastestRun?,
         averageSpeed: Double?
     ) {
         self.totals = totals
         self.timed = timed
         self.perModel = perModel
         self.last30Days = last30Days
+        self.dailyActivity = dailyActivity
+        self.monthlyActivity = monthlyActivity
         self.longestRun = longestRun
+        self.longestTranscript = longestTranscript
+        self.fastestRun = fastestRun
         self.averageSpeed = averageSpeed
     }
 
@@ -130,6 +184,12 @@ public struct LibraryStatistics: Equatable, Sendable {
         guard !active.isEmpty else { return .empty }
 
         let windowStart = calendar.date(byAdding: .day, value: -30, to: now) ?? now
+        let today = calendar.startOfDay(for: now)
+        let firstDay = calendar.date(byAdding: .day, value: -29, to: today) ?? today
+        let thisMonth = calendar.dateInterval(of: .month, for: now)?.start ?? today
+        let firstMonth = calendar.date(byAdding: .month, value: -11, to: thisMonth) ?? thisMonth
+        var days = [Tally](repeating: Tally(), count: 30)
+        var months = [Tally](repeating: Tally(), count: 12)
         var byCategory: [EntryCategory: Int] = [:]
         var audioSeconds = 0.0
         var words = 0
@@ -141,6 +201,8 @@ public struct LibraryStatistics: Equatable, Sendable {
         var timedAudio = 0.0
         var since: Date?
         var longestRun: LongestRun?
+        var longestTranscript: LongestTranscript?
+        var fastestRun: FastestRun?
         var modelOrder: [String] = []
         var models: [String: (runs: Int, audio: Double, seconds: Double)] = [:]
 
@@ -156,6 +218,19 @@ public struct LibraryStatistics: Equatable, Sendable {
                 recentEntries += 1
                 recentAudio += entryAudio
             }
+            if entry.createdAt >= firstDay,
+               let day = calendar.dateComponents([.day], from: firstDay, to: calendar.startOfDay(for: entry.createdAt)).day,
+               days.indices.contains(day) {
+                days[day].add(entryAudio)
+            }
+            if entry.createdAt >= firstMonth,
+               let month = calendar.dateComponents([.month], from: firstMonth, to: entry.createdAt).month,
+               months.indices.contains(month) {
+                months[month].add(entryAudio)
+            }
+            if entryAudio > (longestTranscript?.seconds ?? 0) {
+                longestTranscript = LongestTranscript(entryID: entry.id, seconds: entryAudio)
+            }
             guard let measured = entry.transcriptionSeconds, measured.isFinite, measured >= 0 else { continue }
             timedCount += 1
             timedSeconds += measured
@@ -163,6 +238,10 @@ public struct LibraryStatistics: Equatable, Sendable {
             if let earliest = since { since = min(earliest, entry.createdAt) } else { since = entry.createdAt }
             if measured > (longestRun?.seconds ?? -1) {
                 longestRun = LongestRun(entryID: entry.id, seconds: measured)
+            }
+            if let speed = TranscriptionSpeed.factor(audioSeconds: entryAudio, transcriptionSeconds: measured),
+               speed > (fastestRun?.speed ?? 0) {
+                fastestRun = FastestRun(entryID: entry.id, speed: speed)
             }
             if models[entry.modelName] == nil { modelOrder.append(entry.modelName) }
             var row = models[entry.modelName] ?? (0, 0, 0)
@@ -193,10 +272,32 @@ public struct LibraryStatistics: Equatable, Sendable {
             timed: Coverage(count: timedCount, total: active.count, since: since),
             perModel: perModel,
             last30Days: RecentWindow(entries: recentEntries, audioSeconds: recentAudio),
+            dailyActivity: days.enumerated().map { offset, tally in
+                tally.bucket(at: calendar.date(byAdding: .day, value: offset, to: firstDay) ?? firstDay)
+            },
+            monthlyActivity: months.enumerated().map { offset, tally in
+                tally.bucket(at: calendar.date(byAdding: .month, value: offset, to: firstMonth) ?? firstMonth)
+            },
             longestRun: longestRun,
+            longestTranscript: longestTranscript,
+            fastestRun: fastestRun,
             averageSpeed: TranscriptionSpeed.factor(
                 audioSeconds: timedAudio, transcriptionSeconds: timedSeconds
             )
         )
+    }
+
+    private struct Tally {
+        var entries = 0
+        var audioSeconds = 0.0
+
+        mutating func add(_ audio: Double) {
+            entries += 1
+            audioSeconds += audio
+        }
+
+        func bucket(at start: Date) -> ActivityBucket {
+            ActivityBucket(start: start, entries: entries, audioSeconds: audioSeconds)
+        }
     }
 }
