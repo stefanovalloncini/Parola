@@ -2241,12 +2241,12 @@ final class AppModel {
         fallback: String
     ) -> String {
         if let entry, sourceBelongsToEntry(sourceFileURL, bundleURL: entry.bundleURL) {
-            return entry.title
+            return LibraryEntryDisplay.title(for: entry)
         }
         if let sourceFileURL {
             return sourceFileURL.deletingPathExtension().lastPathComponent
         }
-        return entry?.title ?? fallback
+        return entry.map { LibraryEntryDisplay.title(for: $0) } ?? fallback
     }
 
     private nonisolated static func sourceBelongsToEntry(_ source: URL?, bundleURL: URL) -> Bool {

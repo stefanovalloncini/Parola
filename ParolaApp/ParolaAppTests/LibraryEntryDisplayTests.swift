@@ -32,6 +32,62 @@ struct LibraryEntryDisplayTests {
         #expect(LibraryEntryDisplay.title(raw: raw, createdAt: date) == raw)
     }
 
+    @Test("a working file's name never becomes the entry's title", arguments: [
+        "audio",
+        "audio.m4a",
+        "Audio.wav",
+        " audio ",
+        "recording.wav",
+        "output.mp3",
+    ])
+    func genericNames(raw: String) {
+        #expect(LibraryEntryDisplay.isPlaceholderName(raw))
+        #expect(LibraryEntryDisplay.title(raw: raw, createdAt: date).contains(AppFormat.dateAndTime(date)))
+    }
+
+    @Test("a name that only contains a generic word is left alone", arguments: [
+        "Audio notes",
+        "audiobook",
+        "Recording session 3",
+        "Output of the meeting",
+    ])
+    func namesAroundGenericWords(raw: String) {
+        #expect(!LibraryEntryDisplay.isPlaceholderName(raw))
+        #expect(LibraryEntryDisplay.title(raw: raw, createdAt: date) == raw)
+    }
+
+    @Test("an entry saved from a working file reads as a dated recording")
+    func entryFromWorkingFile() {
+        let entry = LibraryEntry(
+            id: "e",
+            bundleURL: URL(fileURLWithPath: "/tmp/LibraryEntryDisplayTests/e.parola"),
+            manifest: ParolaDocument.Manifest(
+                createdAt: date,
+                originalAudioName: "audio.m4a",
+                modelName: "stub",
+                language: "en"
+            )
+        )
+        #expect(entry.title == "audio")
+        #expect(LibraryEntryDisplay.title(for: entry) != "audio")
+    }
+
+    @Test("a title the user typed survives even when it reads as generic")
+    func userTitleSurvives() {
+        let entry = LibraryEntry(
+            id: "e",
+            bundleURL: URL(fileURLWithPath: "/tmp/LibraryEntryDisplayTests/e.parola"),
+            manifest: ParolaDocument.Manifest(
+                createdAt: date,
+                originalAudioName: "audio.m4a",
+                title: "Audio",
+                modelName: "stub",
+                language: "en"
+            )
+        )
+        #expect(LibraryEntryDisplay.title(for: entry) == "Audio")
+    }
+
     @Test("fallback title carries the creation date")
     func fallbackCarriesDate() {
         let title = LibraryEntryDisplay.title(raw: "6E1B2020-2CB5-4359-A6B2-CBE5B9C25199", createdAt: date)

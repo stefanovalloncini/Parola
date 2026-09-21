@@ -3,7 +3,8 @@ import ParolaCore
 
 enum LibraryEntryDisplay {
     static func title(for entry: LibraryEntry) -> String {
-        title(raw: entry.title, createdAt: entry.createdAt)
+        let stored = entry.manifest.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return title(raw: entry.title, createdAt: entry.createdAt, fromFileName: stored.isEmpty)
     }
 
     /// The catalogue's name for the model an entry was transcribed with, falling back to the
@@ -23,8 +24,9 @@ enum LibraryEntryDisplay {
         "youtube-auto-subs": String(localized: "YouTube auto subtitles"),
     ]
 
-    static func title(raw: String, createdAt: Date) -> String {
-        guard isMachineName(raw) else { return raw }
+    /// `fromFileName: false` marks a title the user typed, which stands even when it reads as a generic word.
+    static func title(raw: String, createdAt: Date, fromFileName: Bool = true) -> String {
+        guard isMachineName(raw) || (fromFileName && isGenericName(raw)) else { return raw }
         let stamp = AppFormat.dateAndTime(createdAt)
         return String(localized: "Recording — \(stamp)")
     }
@@ -34,14 +36,31 @@ enum LibraryEntryDisplay {
         return try! NSRegularExpression(pattern: "^(parola-[a-z]+-)?\(uuid)$", options: [.caseInsensitive])
     }()
 
+    /// The names a working file carries — a YouTube download and a bundle's own copy are both `audio.<ext>`.
+    private static let genericNames: Set<String> = [
+        "audio", "recording", "output", "media", "sound", "file", "temp", "tmp",
+    ]
+
+    static func isPlaceholderName(_ title: String) -> Bool {
+        isMachineName(title) || isGenericName(title)
+    }
+
+    static func isGenericName(_ title: String) -> Bool {
+        genericNames.contains(baseName(title).lowercased())
+    }
+
     static func isMachineName(_ title: String) -> Bool {
-        var base = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let dot = base.lastIndex(of: "."), dot != base.startIndex,
-           base.distance(from: base.index(after: dot), to: base.endIndex) <= 5 {
-            base = String(base[..<dot])
-        }
+        let base = baseName(title)
         let range = NSRange(base.startIndex..<base.endIndex, in: base)
         return machineNamePattern.firstMatch(in: base, range: range) != nil
+    }
+
+    private static func baseName(_ title: String) -> String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let dot = trimmed.lastIndex(of: "."), dot != trimmed.startIndex,
+              trimmed.distance(from: trimmed.index(after: dot), to: trimmed.endIndex) <= 5
+        else { return trimmed }
+        return String(trimmed[..<dot])
     }
 }
 
