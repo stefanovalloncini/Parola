@@ -83,11 +83,10 @@ struct DemoTranscriptCard: View {
     }
 
     private func wordFlow(visible: Int, caretLit: Bool) -> some View {
-        let words = Array(script.words.prefix(visible).map(\.text).enumerated())
         let freshFrom = max(0, visible - 2)
         return LeadingFlow(spacing: DS.Spacing.tight) {
-            ForEach(words, id: \.offset) { index, word in
-                Text(verbatim: word)
+            ForEach(script.words.indices.prefix(visible), id: \.self) { index in
+                Text(verbatim: script.words[index].text)
                     .font(DS.Font.transcript)
                     .foregroundStyle(DS.Color.primaryText)
                     .opacity(index >= freshFrom && !demo.isSettled ? StreamingReveal.freshOpacity : 1)
