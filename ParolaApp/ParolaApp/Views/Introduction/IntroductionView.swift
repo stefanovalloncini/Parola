@@ -33,10 +33,9 @@ struct IntroductionView: View {
         return pair == [.hello, .transcribe] ? .fade : .slide
     }
 
-    /// A scene is removed with the transition it was built with, never one chosen for the move that takes it
-    /// away, so the two that hand the bars over leave by fading whatever they are moving to.
-    nonisolated static func leavesByFading(_ step: IntroductionStep) -> Bool {
-        step == .hello || step == .transcribe
+    /// The edge a move names: a scene arrives from the trailing side going forward and from the leading side on Back.
+    nonisolated static func moveEdge(back: Bool) -> Edge {
+        back ? .trailing : .leading
     }
 
     @Environment(AppModel.self) private var model
@@ -54,11 +53,7 @@ struct IntroductionView: View {
                 GeometryReader { proxy in
                     staged(introduction.step, stageHeight: proxy.size.height)
                         .id(introduction.step)
-                        .transition(sceneTransition(
-                            kind: kind,
-                            step: introduction.step,
-                            back: introduction.isMovingBack
-                        ))
+                        .transition(sceneTransition(kind: kind, back: introduction.isMovingBack))
                 }
                 IntroductionBottomBar()
             }
@@ -105,12 +100,10 @@ struct IntroductionView: View {
         }
     }
 
-    private func sceneTransition(kind: TransitionKind, step: IntroductionStep, back: Bool) -> AnyTransition {
+    /// The arriving scene carries the whole direction: a node is removed with the transition it was built with, which predates the move taking it away.
+    private func sceneTransition(kind: TransitionKind, back: Bool) -> AnyTransition {
         guard !reduceMotion else { return .opacity }
-        // One edge covers both phases: a scene arrives from the side opposite the edge it names and leaves towards it (measured, not documented).
-        let edge: Edge = back ? .trailing : .leading
-        let arriving: AnyTransition = kind == .fade ? .opacity : .move(edge: edge).combined(with: .opacity)
-        let leaving: AnyTransition = Self.leavesByFading(step) ? .opacity : .move(edge: edge).combined(with: .opacity)
-        return .asymmetric(insertion: arriving, removal: leaving)
+        let arriving: AnyTransition = kind == .fade ? .opacity : .move(edge: Self.moveEdge(back: back))
+        return .asymmetric(insertion: arriving, removal: .opacity)
     }
 }

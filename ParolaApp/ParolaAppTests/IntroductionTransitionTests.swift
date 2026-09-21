@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 import ParolaTestSupport
@@ -26,12 +27,11 @@ struct IntroductionTransitionTests {
         }
     }
 
-    @Test("the two scenes that hand the bars over leave by fading, whatever they leave for")
-    func onlyTheBarScenesFadeOut() {
-        for step in IntroductionStep.allCases {
-            let expected = step == .hello || step == .transcribe
-            #expect(IntroductionView.leavesByFading(step) == expected, "\(step)")
-        }
+    // SwiftUI inserts a moving view from the side OPPOSITE the edge it names — measured, not documented.
+    @Test("a forward scene arrives from the trailing edge and a Back scene from the leading one")
+    func moveEdgePerDirection() {
+        #expect(IntroductionView.moveEdge(back: false) == .leading)
+        #expect(IntroductionView.moveEdge(back: true) == .trailing)
     }
 
     @MainActor
