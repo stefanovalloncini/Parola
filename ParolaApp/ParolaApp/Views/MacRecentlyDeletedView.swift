@@ -48,7 +48,7 @@ struct MacRecentlyDeletedView: View {
         }
         // One rebuild for the previews that arrived together, not one per row.
         .onChange(of: previews) { recomputeRows() }
-        .task(id: searchText.isEmpty) { await loadPreviewsForSearch() }
+        .task(id: searchText.isEmpty ? "" : categoryFilter.rawValue) { await loadPreviewsForSearch() }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DS.Color.surface)
         .tint(DS.Color.accent)

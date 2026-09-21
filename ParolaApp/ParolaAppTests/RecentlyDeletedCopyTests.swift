@@ -242,6 +242,13 @@ struct RecentlyDeletedSearchTests {
         #expect(RecentlyDeletedCopy.matches(query: "Budget", title: "Board meeting", preview: "the BUDGET again"))
     }
 
+    /// The preview pass keys its task on "" while the query is empty and on the filter otherwise; a filter
+    /// whose raw value was empty would read as "no query" and stop the pass from re-running.
+    @Test("no category filter collides with the empty-query id")
+    func filterRawValuesAreNeverEmpty() {
+        #expect(RecentlyDeletedCategoryFilter.allCases.allSatisfy { !$0.rawValue.isEmpty })
+    }
+
     @Test("an empty query keeps every row")
     func emptyQueryKeepsEverything() {
         #expect(RecentlyDeletedCopy.matches(query: "", title: "Board meeting", preview: nil))
