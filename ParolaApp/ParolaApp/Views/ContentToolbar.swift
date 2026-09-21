@@ -30,7 +30,7 @@ struct ContentToolbar: ToolbarContent {
         ToolbarSpacer(.flexible, placement: .navigation)
         ToolbarItemGroup(placement: .primaryAction) {
             if showsSearch {
-                ToolbarSearchField(intakeWidth: intakeWidth)
+                ToolbarSearchField(intakeWidth: intakeWidth, pageHasOwnSearch: pageHasOwnSearch)
             }
             if isRecording {
                 Button {
@@ -172,6 +172,14 @@ struct ContentToolbar: ToolbarContent {
     private var intakeWidth: CGFloat {
         guard showsIntakeSettings else { return 0 }
         return measuredIntakeWidth > 0 ? measuredIntakeWidth : ToolbarSearchMetrics.defaultIntakeWidth
+    }
+
+    /// A page that filters itself already shows a field; the toolbar's would read as the same control behaving differently.
+    private var pageHasOwnSearch: Bool {
+        switch model.route {
+        case .queue, .batch, .recentlyDeleted: return true
+        case .transcript, .statistics: return false
+        }
     }
 
     private var showsSearch: Bool {

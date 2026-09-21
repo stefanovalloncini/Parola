@@ -8446,13 +8446,13 @@
         }
       }
     },
-    "Search history": {
+    "Search library": {
       "extractionState": "manual",
       "localizations": {
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cerca nella cronologia"
+            "value": "Cerca nella libreria"
           }
         }
       }

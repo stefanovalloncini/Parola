@@ -9,8 +9,18 @@ struct ToolbarSearchMetricsTests {
     private let defaultWindow: CGFloat = 1180
     private let capsule = ToolbarSearchMetrics.defaultIntakeWidth
 
-    private func collapses(_ windowWidth: CGFloat, intakeWidth: CGFloat, isFocused: Bool = false) -> Bool {
-        ToolbarSearchMetrics.collapses(windowWidth: windowWidth, intakeWidth: intakeWidth, isFocused: isFocused)
+    private func collapses(
+        _ windowWidth: CGFloat,
+        intakeWidth: CGFloat,
+        isFocused: Bool = false,
+        pageHasOwnSearch: Bool = false
+    ) -> Bool {
+        ToolbarSearchMetrics.collapses(
+            windowWidth: windowWidth,
+            intakeWidth: intakeWidth,
+            isFocused: isFocused,
+            pageHasOwnSearch: pageHasOwnSearch
+        )
     }
 
     @Test("only the introduction hides the field")
@@ -51,6 +61,13 @@ struct ToolbarSearchMetricsTests {
     func focusedFieldNeverCollapses() {
         #expect(!collapses(MainWindowLayout.minimumWidth, intakeWidth: capsule, isFocused: true))
         #expect(!collapses(600, intakeWidth: capsule, isFocused: true))
+    }
+
+    @Test("a page carrying its own search field keeps the toolbar one as a chip")
+    func pageWithItsOwnSearchCollapses() {
+        #expect(collapses(defaultWindow, intakeWidth: 0, pageHasOwnSearch: true))
+        #expect(collapses(1600, intakeWidth: 0, pageHasOwnSearch: true))
+        #expect(!collapses(defaultWindow, intakeWidth: 0, isFocused: true, pageHasOwnSearch: true))
     }
 
     @Test("widening a window never takes the field away")

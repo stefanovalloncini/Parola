@@ -33,9 +33,15 @@ enum ToolbarSearchMetrics {
         windowWidth > 0 && roomForSearch(windowWidth: windowWidth, intakeWidth: intakeWidth) < focusedWidth
     }
 
-    /// A drag-resize must not take the field out from under the caret, so a focused field never collapses.
-    static func collapses(windowWidth: CGFloat, intakeWidth: CGFloat, isFocused: Bool) -> Bool {
-        !isFocused && isTight(windowWidth: windowWidth, intakeWidth: intakeWidth)
+    /// A drag-resize must not take the field out from under the caret, and a page with its own search field keeps the toolbar's as a chip.
+    static func collapses(
+        windowWidth: CGFloat,
+        intakeWidth: CGFloat,
+        isFocused: Bool,
+        pageHasOwnSearch: Bool
+    ) -> Bool {
+        guard !isFocused else { return false }
+        return pageHasOwnSearch || isTight(windowWidth: windowWidth, intakeWidth: intakeWidth)
     }
 
     /// A chip opened on a narrow toolbar takes the room that is left rather than pushing the New menu off the edge.
@@ -130,6 +136,8 @@ enum ToolbarSearchFocus {
 struct ToolbarSearchField: View {
     /// The capsule's measured width, or 0 on a page that does not show it.
     let intakeWidth: CGFloat
+    /// Queue, Batch and Recently Deleted filter themselves; the toolbar's field stays a chip there.
+    let pageHasOwnSearch: Bool
 
     @Environment(AppModel.self) private var model
     @Environment(\.mainWindowWidth) private var windowWidth
@@ -166,7 +174,8 @@ struct ToolbarSearchField: View {
         !expanded && ToolbarSearchMetrics.collapses(
             windowWidth: windowWidth,
             intakeWidth: intakeWidth,
-            isFocused: editing
+            isFocused: editing,
+            pageHasOwnSearch: pageHasOwnSearch
         )
     }
 
@@ -179,7 +188,7 @@ struct ToolbarSearchField: View {
             Image(systemName: "magnifyingglass")
                 .font(DS.Font.secondary)
                 .foregroundStyle(DS.Color.secondaryText)
-            TextField("Search history", text: query)
+            TextField("Search library", text: query)
                 .textFieldStyle(.plain)
                 .font(DS.Font.secondary)
                 .axLeaf("Toolbar.TextField.Search")
@@ -240,7 +249,7 @@ struct ToolbarSearchField: View {
     /// The chip hides the query, so what it is filtering by has to reach the tooltip and VoiceOver.
     private var chipLabel: String {
         let query = model.searchQuery.trimmingCharacters(in: .whitespaces)
-        return query.isEmpty ? String(localized: "Search history") : String(localized: "Searching for “\(query)”")
+        return query.isEmpty ? String(localized: "Search library") : String(localized: "Searching for “\(query)”")
     }
 
     /// The field is not on screen yet on the frame the chip gives way to it, so the ask waits a runloop turn — and one more before giving up.
