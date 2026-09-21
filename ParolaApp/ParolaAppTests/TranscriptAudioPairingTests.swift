@@ -8,7 +8,7 @@ import ParolaTestSupport
 
 private let fixtureSerial = OSAllocatedUnfairLock(initialState: 0)
 
-/// A length of its own per fixture: two that share a digest, and the second import is dropped as a duplicate.
+/// A length of its own per fixture: equal-length silence hashes alike, so the duplicate check drops the run.
 private func makeSilentWAV(label: String) throws -> URL {
     let serial = fixtureSerial.withLock { count -> Int in
         count += 1
@@ -67,7 +67,7 @@ extension TranscriberMockSuites {
             await clearMocks()
         }
 
-        /// A wall-clock deadline, not a tally of 15 ms sleeps: under load each one lands nearer 50.
+        /// A wall-clock deadline: 15 ms sleeps drift under load, so a tally bounds the checks, not the wait.
         private func waitUntil(timeout: Duration = .seconds(30), _ condition: @MainActor () -> Bool) async -> Bool {
             let deadline = ContinuousClock.now + timeout
             while ContinuousClock.now < deadline {
