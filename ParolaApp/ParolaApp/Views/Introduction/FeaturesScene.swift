@@ -109,7 +109,7 @@ struct FeatureRow: View {
             Image(systemName: item.symbol)
                 .font(.system(size: glyphSize, weight: .regular))
                 .foregroundStyle(DS.Color.accent)
-                .frame(width: 44, height: 30, alignment: .leading)
+                .frame(width: 30, height: 30, alignment: .leading)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: DS.Spacing.tight) {
                 Text(item.title)
