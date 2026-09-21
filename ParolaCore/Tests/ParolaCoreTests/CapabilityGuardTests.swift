@@ -137,7 +137,9 @@ struct CapabilityGuardTests {
             == "openai_whisper-large-v3_turbo")
         #expect(ModelCatalog.variantSupporting(language: "en", preferring: .parakeet)?.id
             == "nvidia_parakeet-tdt-0.6b-v2")
-        let fallback = try #require(ModelCatalog.variantSupporting(language: "it", preferring: .parakeet))
+        #expect(ModelCatalog.variantSupporting(language: "it", preferring: .parakeet)?.id
+            == "nvidia_parakeet-tdt-0.6b-v3")
+        let fallback = try #require(ModelCatalog.variantSupporting(language: "ja", preferring: .parakeet))
         #expect(fallback.engineID != .parakeet)
         #expect(fallback.category == .recommended)
     }
@@ -145,14 +147,14 @@ struct CapabilityGuardTests {
     @Test("variantSupporting's recommended fallback prefers an installed candidate")
     func variantSupportingFallbackPrefersInstalled() throws {
         let notInstalled = try #require(ModelCatalog.variantSupporting(
-            language: "it",
+            language: "ja",
             preferring: .parakeet,
             isInstalled: { _ in false }
         ))
         #expect(notInstalled.id == "openai_whisper-large-v3_turbo")
 
         let installed = try #require(ModelCatalog.variantSupporting(
-            language: "it",
+            language: "ja",
             preferring: .parakeet,
             isInstalled: { $0 == "apple-speech-analyzer" }
         ))
@@ -231,5 +233,8 @@ struct CapabilityGuardTests {
 
         let whisper = ModelCatalog.staticCapabilities(forID: "openai_whisper-large-v3_turbo")?.supportedLanguages
         #expect(whisper?.allows("it") == true)
+
+        let parakeetV3 = ModelCatalog.staticCapabilities(forID: "nvidia_parakeet-tdt-0.6b-v3")?.supportedLanguages
+        #expect(parakeetV3?.allows("it") == true)
     }
 }

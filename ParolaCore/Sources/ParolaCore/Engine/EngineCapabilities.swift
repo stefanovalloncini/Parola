@@ -70,7 +70,7 @@ public struct EngineCapabilities: Sendable, Hashable {
     )
 
     public static let parakeetDefaults = EngineCapabilities(
-        supportedLanguages: .only(["en"]),
+        supportedLanguages: .all,
         supportsTranslate: false,
         supportsInitialPrompt: false,
         supportsWordTimestamps: true,

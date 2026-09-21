@@ -85,8 +85,8 @@ struct EngineRegistryTests {
     }
 
     @Test("English-only capabilities reject non-English language")
-    func englishOnlyRejectsItalian() {
-        let caps = EngineCapabilities.parakeetDefaults
+    func englishOnlyRejectsItalian() throws {
+        let caps = try #require(ModelCatalog.staticCapabilities(forID: "nvidia_parakeet-tdt-0.6b-v2"))
         #expect(caps.supportedLanguages.allows("en"))
         #expect(caps.supportedLanguages.allows("it") == false)
         #expect(caps.supportedLanguages.allows(nil) == false)

@@ -17,6 +17,15 @@ actor ParakeetTranscriber: Transcriber {
         self.modelStore = modelStore
     }
 
+    nonisolated static func supportedLanguages(forModel model: String) -> SupportedLanguages {
+        ModelCatalog.staticCapabilities(forID: model)?.supportedLanguages ?? .only(["en"])
+    }
+
+    nonisolated static func accepts(language: String?, forModel model: String) -> Bool {
+        guard let language else { return true }
+        return supportedLanguages(forModel: model).allows(language)
+    }
+
     func load(model: String) async throws {
         if loadedModel == model, manager != nil { return }
         let interval = signposter.beginInterval("load", "model=\(model, privacy: .public)")
@@ -50,9 +59,10 @@ actor ParakeetTranscriber: Transcriber {
             ParolaLog.fault(.engineParakeet, "transcribe called with no model loaded")
             throw ParolaError.transcriptionFailed("Parakeet model not loaded")
         }
-        if let lang = options.language, lang.lowercased() != "en" {
+        if !Self.accepts(language: options.language, forModel: modelName) {
+            let lang = options.language ?? "auto"
             ParolaLog.notice(.engineParakeet, "rejected language \(LanguageToken(lang))")
-            throw ParolaError.unsupportedForEngine("Parakeet only supports English (got \"\(lang)\")")
+            throw ParolaError.unsupportedForEngine("\(modelName) does not support \"\(lang)\"")
         }
         if options.task == .translate {
             ParolaLog.notice(.engineParakeet, "rejected translate: unsupported")
@@ -83,10 +93,13 @@ actor ParakeetTranscriber: Transcriber {
         }
 
         let segments = Self.makeSegments(from: result, includeWords: options.wordTimestamps)
+        let language = options.language?.lowercased()
+            ?? (Self.supportedLanguages(forModel: modelName).isEnglishOnly ? "en"
+                : TextLanguageGuess.dominantLanguage(of: segments.map(\.text).joined(separator: " ")) ?? "en")
         // durationSeconds comes from the source asset, not the engine: TranscriptionSession fills it in.
         return Transcript(
             segments: segments,
-            language: "en",
+            language: language,
             modelName: modelName,
             sourceURL: url
         )
