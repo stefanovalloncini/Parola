@@ -30,6 +30,8 @@ struct PermissionCard: View {
                 .font(DS.Font.body)
                 .foregroundStyle(DS.Color.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
+            // The cards are equal height but their content is top-aligned, so a wrapped title would push the status line down.
+            Spacer(minLength: DS.Spacing.small)
             HStack(spacing: DS.Spacing.small) {
                 Circle()
                     .fill(granted ? DS.Palette.success : DS.Palette.warning)
