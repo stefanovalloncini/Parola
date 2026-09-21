@@ -83,7 +83,10 @@ struct FeaturesGridTests {
         #expect(dictation.caretVisible)
         #expect((0..<3).allSatisfy { DictationFrame.word($0, of: 3, at: 1) == 1 })
 
-        #expect(CaptionsFrame(phase: 1).first == 1)
+        let captions = CaptionsFrame(phase: 1)
+        #expect(captions.caption == 1)
+        #expect(captions.captionOffset == 0)
+        #expect(captions.listening == 0)
     }
 
     @Test("the key stays down for as long as the words are landing")
@@ -93,6 +96,16 @@ struct FeaturesGridTests {
         #expect(DictationFrame(phase: DictationFrame.lastWord).isHeld)
         #expect(!DictationFrame(phase: DictationFrame.lastWord + DictationFrame.pressTravel).isHeld)
         #expect(DictationFrame(phase: DictationFrame.lastWord).press == 1)
+    }
+
+    @Test("the captions panel never shows both of its states at once")
+    func captionsNeverOverlap() {
+        for step in 0...400 {
+            let frame = CaptionsFrame(phase: Double(step) / 400)
+            #expect(min(frame.listening, frame.caption) == 0)
+        }
+        #expect(CaptionsFrame(phase: 0.25).listening == 1)
+        #expect(CaptionsFrame(phase: 0.25).caption == 0)
     }
 
     @Test("the dictated phrase lands by the end of the hold, whatever its word count")

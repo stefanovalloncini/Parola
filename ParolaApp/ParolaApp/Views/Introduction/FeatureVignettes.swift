@@ -182,20 +182,30 @@ struct DictationFrame: Equatable {
     }
 }
 
-/// One frame of the captions loop.
+/// One frame of the captions loop: the panel listens, then one caption arrives and holds. The real panel shows one or the other, never both.
 struct CaptionsFrame: Equatable {
-    static let crossfade = 0.22 / FeatureVignettePhase.period
+    static let listenFrom = 0.12
+    static let listenUntil = 0.34
+    static let captionFrom = 0.4
+    static let fade = 0.06
+    static let arrival = 0.1
 
-    let first: Double
-
-    var second: Double { 1 - first }
+    let listening: Double
+    let caption: Double
+    let captionOffset: Double
 
     init(phase: Double) {
-        if phase < 0.42 + Self.crossfade {
-            first = 1 - FeatureVignettePhase.ramp(phase, from: 0.42, span: Self.crossfade)
-        } else {
-            first = FeatureVignettePhase.ramp(phase, from: 1 - Self.crossfade, span: Self.crossfade)
-        }
+        listening = phase >= Self.captionFrom
+            ? 0
+            : min(
+                FeatureVignettePhase.ramp(phase, from: Self.listenFrom, span: Self.fade),
+                1 - FeatureVignettePhase.ramp(phase, from: Self.listenUntil, span: Self.fade)
+            )
+        let arrived = phase < FeatureVignettePhase.resetSpan
+            ? 1
+            : FeatureVignettePhase.ease(FeatureVignettePhase.ramp(phase, from: Self.captionFrom, span: Self.arrival))
+        caption = phase < FeatureVignettePhase.resetSpan ? FeatureVignettePhase.clearing(phase) : arrived
+        captionOffset = 3 * (1 - arrived)
     }
 }
 
@@ -311,21 +321,32 @@ private struct DictationVignette: View {
 private struct CaptionsVignette: View {
     let frame: CaptionsFrame
 
+    private static let listening = String(localized: "Listening")
+    private static let line = String(localized: "Words as they are spoken")
+
     var body: some View {
-        VStack(alignment: .leading, spacing: DS.Spacing.tight) {
-            Text("Listening")
-                .font(DS.Font.caption)
-                // The real captions panel paints its own dark scrim, so surface-derived colours read too dark here.
-                .foregroundStyle(Color.white.opacity(0.55))
-            ZStack(alignment: .topLeading) {
-                caption("Words as they are spoken").opacity(frame.first)
-                caption("In a panel that stays on top").opacity(frame.second)
+        ZStack {
+            HStack(spacing: DS.Spacing.snug) {
+                Image(systemName: "waveform")
+                Text(verbatim: Self.listening)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .font(DS.Font.caption)
+            // The real captions panel paints its own dark scrim, so surface-derived colours read too dark here.
+            .foregroundStyle(Color.white.opacity(0.55))
+            .opacity(frame.listening)
+            Text(verbatim: Self.line)
+                .font(DS.Font.heading)
+                .foregroundStyle(Color.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
+                .offset(y: frame.captionOffset)
+                .opacity(frame.caption)
         }
         .padding(.horizontal, DS.Spacing.small)
         .padding(.vertical, DS.Spacing.snug)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
             RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                 .fill(Color.black.opacity(0.78))
@@ -334,14 +355,5 @@ private struct CaptionsVignette: View {
             RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
         )
-    }
-
-    private func caption(_ text: LocalizedStringKey) -> some View {
-        Text(text)
-            .font(DS.Font.heading)
-            .foregroundStyle(Color.white)
-            .lineLimit(2)
-            .minimumScaleFactor(0.75)
-            .fixedSize(horizontal: false, vertical: true)
     }
 }

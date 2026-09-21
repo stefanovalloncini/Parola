@@ -4806,17 +4806,6 @@
         }
       }
     },
-    "In a panel that stays on top": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In un pannello sempre in primo piano"
-          }
-        }
-      }
-    },
     "In progress": {
       "extractionState": "manual",
       "localizations": {
