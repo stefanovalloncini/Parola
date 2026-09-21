@@ -46,7 +46,7 @@ struct ChaptersSection: View {
 
     @ViewBuilder
     private var statusNote: some View {
-        if let reason = model.aiUnavailableReason {
+        if !model.isAIAvailable(for: .summary), let reason = model.aiUnavailableReason {
             AIStatusNote(message: reason)
         } else if let error = model.chaptersError {
             AIStatusNote(message: error, kind: .failure)

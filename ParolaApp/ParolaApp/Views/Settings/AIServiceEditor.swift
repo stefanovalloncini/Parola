@@ -86,10 +86,10 @@ struct AIServiceEditor: View {
 
     @ViewBuilder
     private var modelField: some View {
-        if service.kind == .ollama && !ollamaModels.isEmpty {
+        if service.kind == .ollama && !ollamaOptions.isEmpty {
             Picker("", selection: $service.model) {
-                ForEach(ollamaModels, id: \.self) { name in
-                    Text(verbatim: name).tag(name)
+                ForEach(ollamaOptions, id: \.self) { name in
+                    Text(verbatim: ollamaModels.contains(name) ? name : notInstalled(name)).tag(name)
                 }
             }
             .labelsHidden()
@@ -173,16 +173,31 @@ struct AIServiceEditor: View {
         return out
     }
 
+    /// The tag list plus the saved model when the server doesn't have it, so an edit never rewrites
+    /// a model that was working.
+    private var ollamaOptions: [String] {
+        let saved = service.model.trimmingCharacters(in: .whitespaces)
+        guard !saved.isEmpty, !ollamaModels.contains(saved) else { return ollamaModels }
+        return [saved] + ollamaModels
+    }
+
+    private func notInstalled(_ name: String) -> String {
+        String(localized: "\(name) (not installed)")
+    }
+
     private func reloadOllamaModels() async {
         guard service.kind == .ollama, let endpoint = parsedEndpoint else {
             ollamaModels = []
             return
         }
+        // Typed into per keystroke: the task is cancelled on the next one, so only a pause fetches.
+        try? await Task.sleep(for: .milliseconds(300))
+        guard !Task.isCancelled else { return }
         do {
             let names = try await OllamaCatalog.installedModels(endpoint: endpoint)
             ollamaModels = names
             ollamaReachable = true
-            if !names.contains(service.model), let first = names.first {
+            if service.model.trimmingCharacters(in: .whitespaces).isEmpty, let first = names.first {
                 service.model = first
             }
         } catch {

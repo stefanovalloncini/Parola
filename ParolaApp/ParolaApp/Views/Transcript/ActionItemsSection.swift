@@ -46,7 +46,7 @@ struct ActionItemsSection: View {
 
     @ViewBuilder
     private var statusNote: some View {
-        if let reason = model.aiUnavailableReason {
+        if !model.isAIAvailable(for: .prompts), let reason = model.aiUnavailableReason {
             AIStatusNote(message: reason)
         } else if let error = model.actionItemsError {
             AIStatusNote(message: error, kind: .failure)

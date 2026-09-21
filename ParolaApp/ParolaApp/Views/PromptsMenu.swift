@@ -8,7 +8,7 @@ struct PromptsMenu: View {
     var body: some View {
         Menu {
             Group {
-                if let reason = model.aiUnavailableReason {
+                if !model.isAIAvailable(for: .prompts), let reason = model.aiUnavailableReason {
                     Text(verbatim: reason)
                     Divider()
                 }
@@ -51,7 +51,10 @@ struct PromptsMenu: View {
             }
         }
         .menuIndicator(.hidden)
-        .modifier(PromptsMenuHelp(isRunning: model.isRunningPrompt, unavailableReason: model.aiUnavailableReason))
+        .modifier(PromptsMenuHelp(
+            isRunning: model.isRunningPrompt,
+            unavailableReason: model.isAIAvailable(for: .prompts) ? nil : model.aiUnavailableReason
+        ))
         .accessibilityIdentifier("toolbar.prompts")
         .axLeaf("HeaderBar.Menu.Prompts")
         .task {

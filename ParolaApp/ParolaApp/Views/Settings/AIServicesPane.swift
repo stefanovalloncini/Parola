@@ -105,7 +105,7 @@ struct AIServicesPane: View {
     private var addSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionCaption("ADD A SERVICE")
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
+            LeadingFlow(spacing: 8) {
                 ForEach(model.addableAIServiceKinds, id: \.self) { kind in
                     AIServiceTile(kind: kind, isConfigured: configured(kind) != nil) { add(kind) }
                 }
@@ -143,7 +143,7 @@ struct AIServicesPane: View {
                 SettingRow(AIServicesPane.taskTitle(task), isFirst: position == 0) {
                     Picker("", selection: binding(for: task)) {
                         Text("On device").tag(LanguageModelProviderChoice.onDevice)
-                        ForEach(model.selectableAIServices) { service in
+                        ForEach(model.visibleAIServices) { service in
                             Text(verbatim: service.name).tag(service.choice)
                         }
                     }
@@ -331,15 +331,13 @@ private struct AIServiceTile: View {
                     .font(DS.Font.body)
                     .foregroundStyle(DS.Color.primaryText)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Spacer(minLength: 4)
+                    .fixedSize()
                 Image(systemName: isConfigured ? "checkmark" : "plus")
                     .font(.caption)
                     .foregroundStyle(DS.Color.secondaryText)
             }
             .padding(.horizontal, DS.Spacing.regular)
             .padding(.vertical, DS.Spacing.small)
-            .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
                     .fill(DS.Color.surfaceElevated)
