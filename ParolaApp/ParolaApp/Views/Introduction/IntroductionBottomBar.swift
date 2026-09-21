@@ -1,7 +1,15 @@
 import SwiftUI
 
 struct IntroductionBottomBar: View {
+    enum SecondaryAction {
+        case openFile
+    }
+
     @Environment(AppModel.self) private var model
+
+    static func secondaryAction(for step: IntroductionStep) -> SecondaryAction? {
+        step == .ready ? .openFile : nil
+    }
 
     var body: some View {
         let introduction = model.introduction
@@ -18,6 +26,9 @@ struct IntroductionBottomBar: View {
                     .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
                     .axLeaf("Introduction.Button.Skip")
             }
+            if let secondary = Self.secondaryAction(for: introduction.step) {
+                secondaryButton(secondary)
+            }
             Button(primaryTitle(introduction.step)) {
                 if introduction.isLastStep { introduction.finish() } else { model.advanceIntroduction() }
             }
@@ -26,6 +37,19 @@ struct IntroductionBottomBar: View {
             .axLeaf("Introduction.Button.\(primaryRole(introduction.step))")
         }
         .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func secondaryButton(_ action: SecondaryAction) -> some View {
+        switch action {
+        case .openFile:
+            Button("Open a File…") {
+                model.introduction.finish()
+                model.presentOpenPanel()
+            }
+            .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .regular))
+            .axLeaf("Introduction.Button.OpenFile")
+        }
     }
 
     private func primaryTitle(_ step: IntroductionStep) -> LocalizedStringKey {
