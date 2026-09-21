@@ -7705,6 +7705,17 @@
         }
       }
     },
+    "Record %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registra %@"
+          }
+        }
+      }
+    },
     "Record Meeting": {
       "extractionState": "manual",
       "localizations": {
@@ -9650,17 +9661,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Riassunto, chat, capitoli e azioni"
-          }
-        }
-      }
-    },
-    "System Audio": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Audio di sistema"
           }
         }
       }

@@ -195,8 +195,8 @@ final class MenuBarController: NSObject {
             .separator(),
         ]
 
-        if snapshot.showsMicRecording || snapshot.showsSystemAudio {
-            items.append(recordMeetingItem(for: snapshot, target: target))
+        if let record = recordItem(for: snapshot, target: target) {
+            items.append(record)
         }
         if snapshot.captionsShown {
             items.append(liveCaptionsItem(for: snapshot, target: target))
@@ -239,19 +239,22 @@ final class MenuBarController: NSObject {
         return items
     }
 
-    private static func recordMeetingItem(for snapshot: MenuSnapshot, target: AnyObject?) -> NSMenuItem {
+    /// A meeting is what the system-audio takes are; mic recording alone has no submenu to hang under that word.
+    private static func recordItem(for snapshot: MenuSnapshot, target: AnyObject?) -> NSMenuItem? {
+        guard snapshot.showsSystemAudio else {
+            guard snapshot.showsMicRecording else { return nil }
+            return menuItem(title: String(localized: "Record Microphone"), action: #selector(recordMic), target: target)
+        }
         let submenu = NSMenu()
         submenu.autoenablesItems = false
-        if snapshot.showsSystemAudio, let app = snapshot.detectedMeetingApp {
-            let detected = menuItem(title: app, action: #selector(recordDetectedMeeting(_:)), target: target)
+        if let app = snapshot.detectedMeetingApp {
+            let detected = menuItem(title: String(localized: "Record \(app)"), action: #selector(recordDetectedMeeting(_:)), target: target)
             detected.representedObject = app
             submenu.addItem(detected)
         }
-        if snapshot.showsSystemAudio {
-            submenu.addItem(menuItem(title: String(localized: "System Audio"), action: #selector(recordSystem), target: target))
-        }
+        submenu.addItem(menuItem(title: String(localized: "Record System Audio"), action: #selector(recordSystem), target: target))
         if snapshot.showsMicRecording {
-            submenu.addItem(menuItem(title: String(localized: "Microphone"), action: #selector(recordMic), target: target))
+            submenu.addItem(menuItem(title: String(localized: "Record Microphone"), action: #selector(recordMic), target: target))
         }
         let item = NSMenuItem(title: String(localized: "Record Meeting"), action: nil, keyEquivalent: "")
         item.submenu = submenu
