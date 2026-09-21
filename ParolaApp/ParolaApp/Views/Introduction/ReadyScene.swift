@@ -45,7 +45,6 @@ struct ReadyScene: View {
                 .sceneEntrance(order: 2)
             }
             modelStatus
-                .sceneEntrance(order: 3)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
@@ -127,10 +126,8 @@ struct ReadyScene: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(DS.Spacing.medium)
-        .background(
-            DS.Palette.surface,
-            in: RoundedRectangle(cornerRadius: DS.Radius.regular, style: .continuous)
-        )
+        .cardBackground(radius: DS.Radius.regular, bordered: false)
         .padding(.top, DS.Spacing.small)
+        .sceneEntrance(order: 3)
     }
 }
