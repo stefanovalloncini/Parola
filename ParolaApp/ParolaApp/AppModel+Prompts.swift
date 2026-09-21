@@ -168,30 +168,31 @@ extension AppModel {
         persistChapters([])
     }
 
-    /// Replaces a freshly-saved entry's filename-derived title with a short LLM-written one.
-    /// Best-effort: any failure leaves the original title untouched.
-    func autoTitleEntry(_ id: LibraryEntry.ID, transcript: Transcript) {
-        guard features.isEnabled(.ai) else { return }
-        let text = transcript.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard text.count >= 40 else { return }
-        let excerpt = String(text.prefix(2000))
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                let model = try await LanguageModelFactory.makeOnDevice(
-                    instructions: "Write a concise, specific title of 3 to 6 words for this transcript. Reply with only the title — no quotes, no surrounding punctuation, no preamble."
-                )
-                let raw = try await model.respond(to: excerpt)
-                let title = Self.sanitizedTitle(raw)
-                guard !title.isEmpty else { return }
-                renameEntry(id, to: title)
-            } catch {
-                // best-effort: keep the default title
-            }
+    /// Writes the card title and one-line summary for a saved entry. Best-effort: failures only log.
+    func generateCardMetadata(for id: LibraryEntry.ID, transcript: Transcript) async {
+        guard generatesCardMetadata, features.isEnabled(.ai) else { return }
+        let prompts = CardMetadataPrompts(
+            title: customTitlePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : customTitlePrompt,
+            summary: customSummaryPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : customSummaryPrompt
+        )
+        do {
+            let meta = try await CardMetadataService.generate(for: transcript, prompts: prompts, features: features)
+            try await library.setCardMetadata(aiTitle: meta.title, shortSummary: meta.summary, for: id)
+            // refreshLibrary() is fire-and-forget elsewhere; awaited here so the card the caller
+            // just wrote is visible in libraryEntries before generateCardMetadata returns.
+            refreshLibrary()
+            await libraryRefreshTask?.value
+        } catch CardMetadataService.Failure.tooShort {
+            return
+        } catch {
+            ParolaLog.notice(.ai, "card metadata skipped", [.error: .error(error)])
         }
     }
 
-    static func sanitizedTitle(_ raw: String) -> String { CardMetadata.sanitizedTitle(raw) }
+    func regenerateCardMetadata() {
+        guard let id = selectedEntryID, let transcript else { return }
+        Task { [weak self] in await self?.generateCardMetadata(for: id, transcript: transcript) }
+    }
 
     func generateYouTubeChapters() {
         guard features.isEnabled(.ai) else { return }

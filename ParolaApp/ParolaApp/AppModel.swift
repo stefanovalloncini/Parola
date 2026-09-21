@@ -134,7 +134,21 @@ final class AppModel {
     var diarize: Bool = false { didSet { defaults.set(diarize, forKey: "diarize") } }
     /// Diarizer speaker-count hint; 0 means auto-detect and threads nil into the options.
     var expectedSpeakersRaw: Int = 0 { didSet { defaults.set(expectedSpeakersRaw, forKey: "expectedSpeakersRaw") } }
-    var autoTitleEntries: Bool = false { didSet { defaults.set(autoTitleEntries, forKey: "autoTitleEntries") } }
+    var generatesCardMetadata: Bool = true { didSet { defaults.set(generatesCardMetadata, forKey: "generateCardMetadata") } }
+    var showAITitles: Bool = true {
+        didSet {
+            defaults.set(showAITitles, forKey: "showAITitles")
+            if !isReloadingSettings { libraryVersion &+= 1 }
+        }
+    }
+    var showAISummaries: Bool = true {
+        didSet {
+            defaults.set(showAISummaries, forKey: "showAISummaries")
+            if !isReloadingSettings { libraryVersion &+= 1 }
+        }
+    }
+    var customTitlePrompt: String = "" { didSet { defaults.set(customTitlePrompt, forKey: "customTitlePrompt") } }
+    var customSummaryPrompt: String = "" { didSet { defaults.set(customSummaryPrompt, forKey: "customSummaryPrompt") } }
     var subtitleFPS: Double = 30 { didSet { defaults.set(subtitleFPS, forKey: "subtitleFPS") } }
     var subtitleCaptionLengthRaw: String = CaptionLength.none.rawValue { didSet { defaults.set(subtitleCaptionLengthRaw, forKey: "subtitleCaptionLength") } }
     var transcriptCompact: Bool = false { didSet { defaults.set(transcriptCompact, forKey: "transcriptCompact") } }
@@ -637,7 +651,11 @@ final class AppModel {
         self.initialPrompt = defaults.string(forKey: "initialPrompt") ?? ""
         self.diarize = defaults.bool(forKey: "diarize")
         self.expectedSpeakersRaw = defaults.integer(forKey: "expectedSpeakersRaw")
-        self.autoTitleEntries = defaults.bool(forKey: "autoTitleEntries")
+        self.generatesCardMetadata = readBool("generateCardMetadata", default: readBool("autoTitleEntries", default: true))
+        self.showAITitles = readBool("showAITitles", default: true)
+        self.showAISummaries = readBool("showAISummaries", default: true)
+        self.customTitlePrompt = defaults.string(forKey: "customTitlePrompt") ?? ""
+        self.customSummaryPrompt = defaults.string(forKey: "customSummaryPrompt") ?? ""
         self.meetingCaptureAppOnly = defaults.bool(forKey: "meetingCaptureAppOnly")
         self.subtitleFPS = readDouble("subtitleFPS", default: 30)
         self.subtitleCaptionLengthRaw = defaults.string(forKey: "subtitleCaptionLength") ?? CaptionLength.none.rawValue
@@ -1482,8 +1500,8 @@ final class AppModel {
                 if activate, loadEntryGeneration == navigationGeneration, selectedEntryID == nil {
                     selectedEntryID = entry.id
                 }
-                if activate, autoTitleEntries {
-                    autoTitleEntry(entry.id, transcript: result)
+                if activate {
+                    await generateCardMetadata(for: entry.id, transcript: result)
                 }
             } catch {
                 ParolaLog.error(.library, "transcript could not be saved to the library", [.error: .error(error)])

@@ -58,7 +58,8 @@ struct SettingsPaneScopeTests {
     func userFacingKeysAreScoped() {
         let scoped = Set(SettingsPaneScope.allCases.flatMap(\.defaultsKeys))
         let expected = [
-            "showMenuBarExtra", "autoTitleEntries",
+            "showMenuBarExtra", "generateCardMetadata", "showAITitles", "showAISummaries",
+            "customTitlePrompt", "customSummaryPrompt",
             "themeIsCustom", "themeCustomPaletteJSON",
             "recordingMaxMinutes", "recordingCountInSeconds",
             "autoMuteWhileRecording", "autoPauseMediaWhileRecording",

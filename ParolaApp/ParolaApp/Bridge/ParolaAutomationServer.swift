@@ -364,7 +364,8 @@ final class ParolaAutomationServer {
         "sidebarDensity", "dictationCleanupPromptID", "dictationPerAppOverridesJSON",
         "meetingDetectorEnabled", "dictationModeRaw", "dictationKeyCode",
         "dictationIndicatorStyleRaw", "automationBridgeEnabled",
-        "transcriptDisplayMode", "autoTitleEntries", "appAccentColor",
+        "transcriptDisplayMode", "generateCardMetadata", "showAITitles", "showAISummaries",
+        "customTitlePrompt", "customSummaryPrompt", "appAccentColor",
         "inspectorMode", "introductionComplete",
     ]
 

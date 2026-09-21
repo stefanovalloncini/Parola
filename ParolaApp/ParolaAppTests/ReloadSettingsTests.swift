@@ -68,13 +68,13 @@ struct ReloadSettingsTests {
     func reloadObservedSettingSyncsAnyKey() {
         let defaults = temporaryDefaults()
         let model = makeModel(defaults)
-        #expect(model.autoTitleEntries == false)
+        #expect(model.generatesCardMetadata == true)
         #expect(model.wordTimestamps == false)
         #expect(model.translate == false)
 
-        defaults.set(true, forKey: "autoTitleEntries")
-        model.reloadObservedSetting(key: "autoTitleEntries")
-        #expect(model.autoTitleEntries == true)
+        defaults.set(false, forKey: "generateCardMetadata")
+        model.reloadObservedSetting(key: "generateCardMetadata")
+        #expect(model.generatesCardMetadata == false)
 
         defaults.set(true, forKey: "wordTimestamps")
         model.reloadObservedSetting(key: "wordTimestamps")

@@ -73,11 +73,50 @@ struct GeneralPane: View {
                         .padding(.top, DS.Spacing.hair)
                         .axLeaf("General.Label.DiarizeWarning")
                 }
-                SettingRow("Name transcripts automatically",
-                           description: "Generates a short title from the content on device when a transcription finishes. Batch files keep their file names.") {
-                    Toggle("", isOn: $model.autoTitleEntries).labelsHidden()
-                        .axLeaf("General.Toggle.AutoTitle")
+            }
+
+            SettingsSection("Library cards") {
+                SettingRow("Generate an AI title and summary",
+                           description: "Writes a short title and a one-line summary from the transcript, on device, when a transcription finishes.",
+                           isFirst: true) {
+                    Toggle("", isOn: $model.generatesCardMetadata).labelsHidden()
+                        .axLeaf("General.Toggle.GenerateCardMetadata")
                 }
+                SettingRow("Show the AI title instead of the file name",
+                           description: "Card and row titles use the generated title when one exists.") {
+                    Toggle("", isOn: $model.showAITitles).labelsHidden()
+                        .axLeaf("General.Toggle.ShowAITitles")
+                }
+                SettingRow("Show the AI summary instead of the first lines",
+                           description: "Row previews use the generated summary when one exists.") {
+                    Toggle("", isOn: $model.showAISummaries).labelsHidden()
+                        .axLeaf("General.Toggle.ShowAISummaries")
+                }
+                Divider().padding(.leading, DS.Spacing.medium)
+                VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Custom title instructions")
+                            .font(DS.Font.secondary)
+                            .foregroundStyle(DS.Color.secondaryText)
+                        TextField("For example, mention the client's name.",
+                                  text: $model.customTitlePrompt, axis: .vertical)
+                            .lineLimit(1...3)
+                            .textFieldStyle(.roundedBorder)
+                            .axLeaf("General.TextField.CustomTitlePrompt")
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Custom summary instructions")
+                            .font(DS.Font.secondary)
+                            .foregroundStyle(DS.Color.secondaryText)
+                        TextField("For example, keep numbers and dates.",
+                                  text: $model.customSummaryPrompt, axis: .vertical)
+                            .lineLimit(1...3)
+                            .textFieldStyle(.roundedBorder)
+                            .axLeaf("General.TextField.CustomSummaryPrompt")
+                    }
+                }
+                .padding(.horizontal, DS.Spacing.medium)
+                .padding(.vertical, DS.Spacing.small)
             }
 
             SettingsSection("Custom vocabulary") {
