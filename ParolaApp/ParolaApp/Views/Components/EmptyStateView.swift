@@ -30,8 +30,9 @@ struct EmptyStateView<Actions: View>: View {
                     .font(.system(size: iconSize, weight: .light))
                     .foregroundStyle(DS.Color.secondaryText.opacity(0.55))
                     .padding(.bottom, DS.Spacing.tight)
+                // A tier under the page title above it: the empty state answers the page, it doesn't restate it.
                 Text(title)
-                    .font(DS.Font.title)
+                    .font(DS.Font.heading)
                     .foregroundStyle(DS.Color.primaryText)
                 if let message {
                     Text(message)
