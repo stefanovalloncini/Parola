@@ -173,6 +173,30 @@ struct AppModelLibraryTests {
         #expect(model.findQuery == "quarterly")
     }
 
+    @Test("a page opened while an entry loads keeps the window, and the transcript lands behind it")
+    func loadEntryLeavesAPageOpenedDuringTheLoad() async throws {
+        let model = makeModel()
+        let seedStore = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let seeded = try await seedStore.add(
+            transcript: Transcript(
+                segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hello")],
+                language: "en",
+                modelName: "stub"
+            ),
+            audioSource: nil,
+            category: .transcription
+        )
+
+        model.loadEntry(seeded.id)
+        model.openStatistics()
+        for _ in 0..<200 where model.selectedEntryID != seeded.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(model.route == .statistics)
+        #expect(model.transcript?.segments.first?.text == "hello")
+    }
+
     private static func transcriptWithSavedChapters(
         _ chapters: [Chapter] = [Chapter(title: "Opening", start: 0), Chapter(title: "Wrap up", start: 40)]
     ) -> Transcript {

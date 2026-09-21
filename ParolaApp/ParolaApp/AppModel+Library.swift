@@ -385,6 +385,7 @@ extension AppModel {
         let generation = loadEntryGeneration
         // Read before the transcript takes the content area, which is what hides the list it came from.
         let origin = captureLibraryOrigin()
+        let pageAtStart = route
         let hit = searchResults == nil ? nil : searchQuery.trimmingCharacters(in: .whitespaces)
         let hitPosition = searchMatches[id]?.firstHit
         Task { [weak self] in
@@ -405,8 +406,8 @@ extension AppModel {
                     tearDownPlayer()
                 }
                 phase = .ready
-                // Opened from the extra, a link or the duplicate sheet, it would otherwise load behind a page.
-                route = .transcript
+                // Opened from the extra, a link or the duplicate sheet it would load behind a page; a page opened during the load is the later word.
+                if route == pageAtStart { route = .transcript }
                 libraryOrigin = origin
                 libraryOriginEntryID = id
                 if let hit, !hit.isEmpty { revealInTranscript(hit, at: hitPosition) }
