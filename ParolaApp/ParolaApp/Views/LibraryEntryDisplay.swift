@@ -24,6 +24,12 @@ enum LibraryEntryDisplay {
         "youtube-auto-subs": String(localized: "YouTube auto subtitles"),
     ]
 
+    /// For an entry whose source was a link: the fetcher hands back a working file, never the video's own name.
+    static func webVideoTitle(createdAt: Date) -> String {
+        let stamp = AppFormat.dateAndTime(createdAt)
+        return String(localized: "Web video — \(stamp)")
+    }
+
     /// `fromFileName: false` marks a title the user typed, which stands even when it reads as a generic word.
     static func title(raw: String, createdAt: Date, fromFileName: Bool = true) -> String {
         guard isMachineName(raw) || (fromFileName && isGenericName(raw)) else { return raw }

@@ -72,6 +72,30 @@ struct LibraryEntryDisplayTests {
         #expect(LibraryEntryDisplay.title(for: entry) != "audio")
     }
 
+    @Test("a link's entry says it came from the web, not from a recording")
+    func webVideoTitleNamesItsSource() {
+        let title = LibraryEntryDisplay.webVideoTitle(createdAt: date)
+        #expect(title.contains(AppFormat.dateAndTime(date)))
+        #expect(title != LibraryEntryDisplay.title(raw: "audio.m4a", createdAt: date))
+    }
+
+    @Test("a stored web-video title is left alone by the placeholder rules")
+    func webVideoTitleSurvivesTheDisplayPath() {
+        let stored = LibraryEntryDisplay.webVideoTitle(createdAt: date)
+        let entry = LibraryEntry(
+            id: "e",
+            bundleURL: URL(fileURLWithPath: "/tmp/LibraryEntryDisplayTests/e.parola"),
+            manifest: ParolaDocument.Manifest(
+                createdAt: date,
+                originalAudioName: "audio.m4a",
+                title: stored,
+                modelName: "stub",
+                language: "en"
+            )
+        )
+        #expect(LibraryEntryDisplay.title(for: entry) == stored)
+    }
+
     @Test("a title the user typed survives even when it reads as generic")
     func userTitleSurvives() {
         let entry = LibraryEntry(

@@ -2096,7 +2096,11 @@ final class AppModel {
                 transcript = processed
                 adoptLoadedMediaDuration()
                 phase = .ready
-                persistToLibrary(processed, audioSource: audioURL)
+                persistToLibrary(
+                    processed,
+                    audioSource: audioURL,
+                    title: LibraryEntryDisplay.webVideoTitle(createdAt: Date())
+                )
             } catch {
                 if !Task.isCancelled { applyTranscriptionError(error) }
             }

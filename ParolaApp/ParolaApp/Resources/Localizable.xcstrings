@@ -10847,6 +10847,17 @@
         }
       }
     },
+    "Web video — %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video web — %@"
+          }
+        }
+      }
+    },
     "WebVTT (.vtt)": {
       "extractionState": "manual",
       "localizations": {
