@@ -81,6 +81,9 @@ public struct Transcript: Codable, Hashable, Sendable {
     /// correct; nil means the run answered no such question.
     public var languageDetection: LanguageDetection?
 
+    /// The transcript rendered in another language, or nil when it has never been translated.
+    public var translation: TranscriptTranslation?
+
     public init(
         schemaVersion: Int = Transcript.currentSchemaVersion,
         segments: [TranscriptSegment],
@@ -91,7 +94,8 @@ public struct Transcript: Codable, Hashable, Sendable {
         transcriptionSeconds: Double? = nil,
         summary: Summary? = nil,
         chatHistory: [ChatMessage]? = nil,
-        languageDetection: LanguageDetection? = nil
+        languageDetection: LanguageDetection? = nil,
+        translation: TranscriptTranslation? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.segments = segments
@@ -103,6 +107,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         self.summary = summary
         self.chatHistory = chatHistory
         self.languageDetection = languageDetection
+        self.translation = translation
     }
 
     public init(from decoder: any Decoder) throws {
@@ -117,6 +122,7 @@ public struct Transcript: Codable, Hashable, Sendable {
         summary = try c.decodeIfPresent(Summary.self, forKey: .summary)
         chatHistory = try c.decodeIfPresent([ChatMessage].self, forKey: .chatHistory)
         languageDetection = try c.decodeIfPresent(LanguageDetection.self, forKey: .languageDetection)
+        translation = try c.decodeIfPresent(TranscriptTranslation.self, forKey: .translation)
     }
 
     public var text: String {

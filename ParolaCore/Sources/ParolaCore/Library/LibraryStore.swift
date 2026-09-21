@@ -655,6 +655,15 @@ public actor LibraryStore {
         }
     }
 
+    /// Replaces the entry's translation, or clears it when `translation` is nil. Translations are
+    /// not searchable, so this write skips the index.
+    public func setTranslation(_ translation: TranscriptTranslation?, for id: LibraryEntry.ID) async throws {
+        var transcript = try await load(id).document.transcript
+        guard transcript.translation != translation else { return }
+        transcript.translation = translation
+        try await updateTranscript(transcript, for: id, reindex: false)
+    }
+
     /// Writes the on-device title and summary shown on the entry's card, then re-indexes so both are searchable.
     public func setCardMetadata(aiTitle: String?, shortSummary: String?, for id: LibraryEntry.ID) async throws {
         let bundleURL = libraryURL.appendingPathComponent("\(id).parola", isDirectory: true)

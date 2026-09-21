@@ -2998,6 +2998,7 @@ final class AppModel {
     func deleteSegment(id: TranscriptSegment.ID) {
         guard var t = transcript else { return }
         t.segments.removeAll { $0.id == id }
+        t.translation = t.translation?.afterDelete(of: id)
         let favorites = favoriteSegmentIDs
         let newFavorites = FavoriteRemap.afterDelete(favorites, of: id)
         applyTranscriptEdit(t, actionName: String(localized: "Delete Segment"), favorites: (favorites, newFavorites))
@@ -3024,6 +3025,7 @@ final class AppModel {
         let firstID = (t.segments.map(\.id).max() ?? -1) + 1
         guard let segments = SegmentSurgery.split(segments: t.segments, id: id, atWordIndex: index) else { return }
         t.segments = segments
+        t.translation = t.translation?.afterSplit(of: id, into: firstID)
         let favorites = favoriteSegmentIDs
         let newFavorites = FavoriteRemap.afterSplit(favorites, of: id, into: firstID)
         applyTranscriptEdit(t, actionName: String(localized: "Split Segment"), favorites: (favorites, newFavorites))
@@ -3034,6 +3036,7 @@ final class AppModel {
         let firstID = (t.segments.map(\.id).max() ?? -1) + 1
         guard let segments = SegmentSurgery.split(segments: t.segments, id: id, atFraction: fraction) else { return }
         t.segments = segments
+        t.translation = t.translation?.afterSplit(of: id, into: firstID)
         let favorites = favoriteSegmentIDs
         let newFavorites = FavoriteRemap.afterSplit(favorites, of: id, into: firstID)
         applyTranscriptEdit(t, actionName: String(localized: "Split Segment"), favorites: (favorites, newFavorites))
@@ -3045,6 +3048,7 @@ final class AppModel {
               let segments = SegmentSurgery.mergeWithNext(segments: t.segments, id: id) else { return }
         let nextID = t.segments[position + 1].id
         t.segments = segments
+        t.translation = t.translation?.afterMerge(of: id, with: nextID)
         let favorites = favoriteSegmentIDs
         let newFavorites = FavoriteRemap.afterMerge(favorites, of: id, with: nextID)
         applyTranscriptEdit(t, actionName: String(localized: "Merge Segments"), favorites: (favorites, newFavorites))

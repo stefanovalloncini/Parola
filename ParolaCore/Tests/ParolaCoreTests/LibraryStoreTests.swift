@@ -48,6 +48,42 @@ struct LibraryStoreTests {
         #expect(await store.search("hi").contains(where: { $0.entryID == entry.id }))
     }
 
+    @Test("a translation is written to the transcript and cleared again")
+    func translationPersistsAndClears() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+        let translation = TranscriptTranslation(
+            targetLanguage: "it",
+            segments: [0: "ciao"],
+            createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+            provider: "mock"
+        )
+
+        try await store.setTranslation(translation, for: entry.id)
+        #expect(try await store.load(entry.id).document.transcript.translation == translation)
+
+        try await store.setTranslation(nil, for: entry.id)
+        #expect(try await store.load(entry.id).document.transcript.translation == nil)
+    }
+
+    @Test("a translation is never searchable")
+    func translationIsNotIndexed() async throws {
+        let (store, _) = try makeTempLibrary()
+        let entry = try await store.add(transcript: makeTranscript(), audioSource: nil)
+
+        try await store.setTranslation(
+            TranscriptTranslation(
+                targetLanguage: "it",
+                segments: [0: "zzyzxtranslated"],
+                createdAt: Date(timeIntervalSince1970: 1_700_000_000),
+                provider: "mock"
+            ),
+            for: entry.id
+        )
+
+        #expect(await store.search("zzyzxtranslated").isEmpty)
+    }
+
     @Test("empty library lists nothing")
     func emptyList() async throws {
         let (store, _) = try makeTempLibrary()
