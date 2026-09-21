@@ -53,7 +53,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_select_model` | **name** | Set selectedModel to a catalog id. |
 | `parola_app_set_language` | code | Two-letter language code, or empty string to auto-detect. |
 | `parola_app_set_theme` | **theme** | `light` / `dark` / `system`. |
-| `parola_app_set_route` | **route** | `transcript` / `batch` / `queue` / `statistics` / `recentlyDeleted`. |
+| `parola_app_set_route` | **route** | `transcript` / `batch` / `queue` / `statistics` / `recentlyDeleted`. Takes the page the way its sidebar row does: clears any search and the category filter. |
 | `openRecentlyDeleted` | — | Route the main window to the Recently Deleted page. Replies `{open, route}`. |
 | `closeRecentlyDeleted` | — | Leave that page for Home. Replies `{open, route}`. |
 | `goBack` | — | Follow the transcript header's back link: unload the transcript and restore the list it was opened from. Replies `{origin, route, libraryFilter, libraryBrowsingAll}`. |

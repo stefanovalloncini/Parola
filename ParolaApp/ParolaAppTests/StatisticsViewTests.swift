@@ -167,6 +167,34 @@ struct StatisticsViewTests {
         }
     }
 
+    /// The bridge is how scenarios navigate; taking a shortcut past the helper would let it reach a state no click can.
+    @Test("setRoute takes the page the way the sidebar row does")
+    func setRouteLeavesTheList() async throws {
+        let previous = DefaultsStore.current
+        DefaultsStore.current = temporaryDefaults("test-statistics-")
+        defer { DefaultsStore.current = previous }
+        let model = makeModel(DefaultsStore.current, entries: [])
+        model.libraryFilter = .meeting
+        model.libraryBrowsingAll = true
+        model.route = .transcript
+        model.searchQuery = "bianchi"
+        model.searchResults = []
+        let server = try ParolaAutomationServer(model: model)
+        let context = AutomationContext(model: model, server: server)
+        let command = try #require(server.settingsCommands().first { $0.name == "setRoute" })
+
+        _ = try await command.handler(
+            try command.validate(AutomationArgs(["route": .string("statistics")])),
+            context
+        )
+        withExtendedLifetime(server) {}
+
+        #expect(model.route == .statistics)
+        #expect(model.libraryFilter == nil)
+        #expect(model.libraryBrowsingAll == false)
+        #expect(model.searchResults == nil)
+    }
+
     @Test("a transcript opened from the page records no list to go back to")
     func statisticsIsNotAList() {
         #expect(LibraryOrigin.capture(sidebar: .statistics, homeOnScreen: false) == nil)
