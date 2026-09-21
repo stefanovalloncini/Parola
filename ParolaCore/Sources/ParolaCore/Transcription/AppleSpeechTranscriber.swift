@@ -13,6 +13,8 @@ actor AppleSpeechTranscriber: Transcriber {
 
     static let syntheticModelID = "apple-speech-analyzer"
 
+    static let callbackInterval: Duration = .milliseconds(100)
+
     private let modelStore: ModelStore
     private var loadedModel: String?
     private var inFlightCancel: (@Sendable () async -> Void)?
@@ -137,6 +139,8 @@ actor AppleSpeechTranscriber: Transcriber {
             var nextID = 0
             var assembler = SpeechPartialAssembler()
             var sawFirstResult = false
+            var progress = CallbackCoalescer<Double>(minimumInterval: Self.callbackInterval)
+            var partials = CallbackCoalescer<String>(minimumInterval: Self.callbackInterval)
             for try await result in transcriber.results {
                 if !sawFirstResult {
                     sawFirstResult = true
@@ -147,7 +151,7 @@ actor AppleSpeechTranscriber: Transcriber {
                 guard !text.isEmpty else { continue }
                 let start = result.range.start.seconds
                 let end = result.range.end.seconds
-                handlers.onProgress?(end)
+                if let reported = progress.offer(end) { handlers.onProgress?(reported) }
                 segments.append(TranscriptSegment(
                     id: nextID,
                     start: start,
@@ -158,8 +162,10 @@ actor AppleSpeechTranscriber: Transcriber {
                 nextID += 1
                 meter.add(result.text)
                 assembler.addFinal(text)
-                handlers.onPartial?(assembler.tail())
+                if let tail = partials.offer(assembler.tail()) { handlers.onPartial?(tail) }
             }
+            if let reported = progress.flush() { handlers.onProgress?(reported) }
+            if let tail = partials.flush() { handlers.onPartial?(tail) }
             return (segments, meter.value)
         }
 
