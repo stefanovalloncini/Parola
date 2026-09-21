@@ -286,6 +286,36 @@ extension AppModel {
         return entry.note(forSegment: segmentID)
     }
 
+    var favoriteSegmentIDs: Set<Int> {
+        guard let id = selectedEntryID, let entry = libraryEntry(id: id) else { return [] }
+        return entry.favoriteSegments
+    }
+
+    func isSegmentFavorite(_ id: Int) -> Bool { favoriteSegmentIDs.contains(id) }
+
+    func toggleSegmentFavorite(_ id: Int) {
+        guard let entryID = selectedEntryID else { return }
+        let makeFavorite = !isSegmentFavorite(id)
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await library.setSegmentFavorite(makeFavorite, segmentID: id, for: entryID)
+            } catch {
+                phase = .failed(message: error.localizedDescription)
+            }
+            refreshLibrary()
+        }
+    }
+
+    func replaceFavorites(_ ids: Set<Int>) {
+        guard let entryID = selectedEntryID else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            try? await library.setFavoriteSegments(ids, for: entryID)
+            refreshLibrary()
+        }
+    }
+
     func deleteEntry(_ id: LibraryEntry.ID) {
         Task { [weak self] in
             guard let self else { return }
@@ -331,6 +361,7 @@ extension AppModel {
         selectedEntryID = nil
         transcript = nil
         sourceFileURL = nil
+        favoritesOnly = false
         tearDownPlayer()
         if case .ready = phase { phase = .idle }
     }

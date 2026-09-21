@@ -489,6 +489,7 @@ final class AppModel {
     var isExtractingChapters: Bool = false
     var chaptersError: String?
     var entrySpeakerFilters: [String: String] = [:]
+    var favoritesOnly: Bool = false
 
     /// Nil while the on-device model can serve requests; otherwise the reason to show the user.
     var aiUnavailableReason: String?
@@ -2921,7 +2922,10 @@ final class AppModel {
     func deleteSegment(id: TranscriptSegment.ID) {
         guard var t = transcript else { return }
         t.segments.removeAll { $0.id == id }
+        let favorites = favoriteSegmentIDs
+        let newFavorites = FavoriteRemap.afterDelete(favorites, of: id)
         applyTranscriptEdit(t, actionName: String(localized: "Delete Segment"))
+        if newFavorites != favorites { replaceFavorites(newFavorites) }
     }
 
     func assignSpeaker(_ name: String?, toSegmentID id: TranscriptSegment.ID) {
@@ -2941,24 +2945,37 @@ final class AppModel {
     }
 
     func splitSegment(id: TranscriptSegment.ID, atWordIndex index: Int) {
-        guard var t = transcript,
-              let segments = SegmentSurgery.split(segments: t.segments, id: id, atWordIndex: index) else { return }
+        guard var t = transcript else { return }
+        let firstID = (t.segments.map(\.id).max() ?? -1) + 1
+        guard let segments = SegmentSurgery.split(segments: t.segments, id: id, atWordIndex: index) else { return }
         t.segments = segments
+        let favorites = favoriteSegmentIDs
+        let newFavorites = FavoriteRemap.afterSplit(favorites, of: id, into: firstID)
         applyTranscriptEdit(t, actionName: String(localized: "Split Segment"))
+        if newFavorites != favorites { replaceFavorites(newFavorites) }
     }
 
     func splitSegment(id: TranscriptSegment.ID, atFraction fraction: Double) {
-        guard var t = transcript,
-              let segments = SegmentSurgery.split(segments: t.segments, id: id, atFraction: fraction) else { return }
+        guard var t = transcript else { return }
+        let firstID = (t.segments.map(\.id).max() ?? -1) + 1
+        guard let segments = SegmentSurgery.split(segments: t.segments, id: id, atFraction: fraction) else { return }
         t.segments = segments
+        let favorites = favoriteSegmentIDs
+        let newFavorites = FavoriteRemap.afterSplit(favorites, of: id, into: firstID)
         applyTranscriptEdit(t, actionName: String(localized: "Split Segment"))
+        if newFavorites != favorites { replaceFavorites(newFavorites) }
     }
 
     func mergeSegmentWithNext(id: TranscriptSegment.ID) {
         guard var t = transcript,
+              let position = t.segments.firstIndex(where: { $0.id == id }), position + 1 < t.segments.count,
               let segments = SegmentSurgery.mergeWithNext(segments: t.segments, id: id) else { return }
+        let nextID = t.segments[position + 1].id
         t.segments = segments
+        let favorites = favoriteSegmentIDs
+        let newFavorites = FavoriteRemap.afterMerge(favorites, of: id, with: nextID)
         applyTranscriptEdit(t, actionName: String(localized: "Merge Segments"))
+        if newFavorites != favorites { replaceFavorites(newFavorites) }
     }
 
     func nudgeSegmentStart(id: TranscriptSegment.ID, frames: Int) {
@@ -3312,11 +3329,16 @@ final class AppModel {
         picker.show(relativeTo: anchor, of: anchorView, preferredEdge: .minY)
     }
 
-    func copyTranscriptToPasteboard(withTimestamps: Bool) {
+    func copyTranscriptToPasteboard(withTimestamps: Bool, favoritesOnly: Bool = false) {
         guard let transcript else { return }
+        let favorites = favoriteSegmentIDs
         Task {
             guard let text = try? await AppModel.offMainIO({
-                withTimestamps ? TranscriptTimestampedText.render(transcript) : transcript.text
+                var source = transcript
+                if favoritesOnly {
+                    source.segments = source.segments.filter { favorites.contains($0.id) }
+                }
+                return withTimestamps ? TranscriptTimestampedText.render(source) : source.text
             }) else { return }
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
