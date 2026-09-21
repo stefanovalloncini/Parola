@@ -87,6 +87,16 @@ struct MacRecentlyDeletedView: View {
         } message: {
             Text(RecentlyDeletedCopy.emptyTrashMessage(model.deletedEntries.count))
         }
+        // The headers and the countdown are written when the rows are built, so midnight has to rewrite them.
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            now = Date()
+            recomputeRows()
+        }
+        // The one input no entry carries, so no row notices it changed on its own.
+        .onReceive(NotificationCenter.default.publisher(for: NSLocale.currentLocaleDidChangeNotification)) { _ in
+            displayCache.removeAll()
+            recomputeRows()
+        }
         .axBranch("RecentlyDeleted")
     }
 
