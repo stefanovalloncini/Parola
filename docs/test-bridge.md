@@ -81,6 +81,9 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `sendEntry` | **entryID**, **destinationID** | Send a library entry to one Send To destination. Replies `{outcome}`: `delivered` carries `destinationName` and the note `path`, `queued` the `attempt` and `nextAt`, `skipped` the `reason`. |
 | `listDeliveries` | **entryID** | The delivery receipts stored in that entry's manifest (`destinationID`, `destinationName`, `deliveredAt`, `location`). |
 | `setDestinations` | **destinations** | Replace the Send To list with an array of `{kind, config}` envelopes. In test mode a config may carry `vaultPath` instead of `vaultBookmark` and the app makes the bookmark for it. Replies `{destinations}`. |
+| `setAIServices` | **services** | Replace the configured AI services with an array of `{id, kind, name, endpoint, model}` rows (`kind` is `openAI`, `anthropic`, `groq`, `cerebras`, `ollama` or `custom`). In test mode a row may carry an `apiKey`, which goes to the in-memory key store. Replies `{aiServices}` — the key is never echoed. |
+| `setLanguageModelSelection` | **selection** | Replace the per-task model selection: `{"choices": {"summary": {"kind": "ollama", "endpoint": "http://127.0.0.1:11434", "model": "llama3.2:3b"}}}`. Tasks are `summary`, `chat`, `prompts`, `dictationCleanup`; a kind this build doesn't know reads as on device. Replies `{languageModelSelection}`. |
+| `testAIService` | **id** | Ask one configured service a one-line question, with a 20 s ceiling. Replies `{ok, message, ms}`: `message` is the reply, or the error when `ok` is false. |
 | `installMockDestination` | name, autoSend, categories, failuresBeforeSuccess | Test mode: add a destination that records what it is handed and writes nothing. Replies `{installed, destinationID}`. |
 | `readMockDeliveries` | — | Test mode: `{deliveries, receipts}` — what the mock destinations were handed (`entryID`, `title`, `category`, `segmentCount`, `markdownBytes`, `favorites`) and the receipts they gave back. |
 | `exportDiagnostics` | — | Render the diagnostics report and write it to the save destination. Returns `{path}`. In test mode, queue the destination with `queueSaveDestination` first. A dismissed panel is `PRECONDITION`; a failed write is `INTERNAL`. |
@@ -105,6 +108,8 @@ The five introduction commands and `getState.introduction` all reply `{visible, 
 `null` otherwise. A run in flight wins over a translation already stored: it reports the target it is heading for,
 `segmentCount` as the segments sent so far and `inProgress: true`, so a script can wait on a first translation.
 `getState.translationSideBySide` is the two-column preference.
+`getState.aiServices` lists the configured AI services (`id`, `kind`, `name`, `model`, `endpoint`, `hasKey`) — the API key itself is never returned by any command, and never reaches the diagnostics export.
+`getState.languageModelSelection` is the per-task selection as `setLanguageModelSelection` takes it, and `getState.remoteAIAcknowledged` says whether the one-time "transcripts leave this Mac" notice has been accepted (`setSetting remoteAIAcknowledged true` skips the sheet in a script).
 `getState.destinations` lists the Send To destinations in order (`id`, `kind`, `name`, `isEnabled`, `autoSend`, `categories`); a
 kind this build cannot run comes back with the kind it was stored as and `isEnabled: false`.
 `visible` says whether the introduction is on screen; `step` is the scene showing now and `steps` the order this

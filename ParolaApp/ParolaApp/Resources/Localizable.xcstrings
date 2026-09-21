@@ -909,6 +909,17 @@
         }
       }
     },
+    "ADD A SERVICE": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AGGIUNGI UN SERVIZIO"
+          }
+        }
+      }
+    },
     "AI": {
       "extractionState": "manual",
       "localizations": {
@@ -916,6 +927,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "AI"
+          }
+        }
+      }
+    },
+    "AI Services": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Servizi AI"
           }
         }
       }
@@ -938,6 +960,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Titolo AI"
+          }
+        }
+      }
+    },
+    "API key": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiave API"
           }
         }
       }
@@ -1549,6 +1582,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apple Intelligence"
+          }
+        }
+      }
+    },
+    "Apple Intelligence answers on this Mac. Anything else sends the text of the transcript to that service.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence risponde su questo Mac. Tutto il resto manda il testo della trascrizione a quel servizio."
+          }
+        }
+      }
+    },
+    "Apple Intelligence stays on this Mac. You can switch back to it at any time.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence resta su questo Mac. Puoi tornarci quando vuoi."
           }
         }
       }
@@ -2538,6 +2593,17 @@
         }
       }
     },
+    "Checking…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Controllo…"
+          }
+        }
+      }
+    },
     "Choose a completed file to see its transcript.": {
       "extractionState": "manual",
       "localizations": {
@@ -3228,6 +3294,17 @@
         }
       }
     },
+    "Custom endpoint": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endpoint personalizzato"
+          }
+        }
+      }
+    },
     "Custom instructions": {
       "extractionState": "manual",
       "localizations": {
@@ -3791,6 +3868,17 @@
         }
       }
     },
+    "Dictation cleanup": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pulizia della dettatura"
+          }
+        }
+      }
+    },
     "Dictations": {
       "extractionState": "manual",
       "localizations": {
@@ -4173,6 +4261,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ora di fine"
+          }
+        }
+      }
+    },
+    "Endpoint": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Endpoint"
           }
         }
       }
@@ -5317,6 +5416,17 @@
         }
       }
     },
+    "I understand": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ho capito"
+          }
+        }
+      }
+    },
     "Identified from the audio": {
       "extractionState": "manual",
       "localizations": {
@@ -5771,6 +5881,17 @@
         }
       }
     },
+    "Key": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiave"
+          }
+        }
+      }
+    },
     "Key points only": {
       "extractionState": "manual",
       "localizations": {
@@ -5778,6 +5899,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Solo punti chiave"
+          }
+        }
+      }
+    },
+    "Key saved": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiave salvata"
+          }
+        }
+      }
+    },
+    "Key saved. Type a new one to replace it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiave salvata. Scrivine una nuova per sostituirla."
           }
         }
       }
@@ -7118,6 +7261,17 @@
         }
       }
     },
+    "No answer within 20 seconds.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna risposta entro 20 secondi."
+          }
+        }
+      }
+    },
     "No corrections match.": {
       "extractionState": "manual",
       "localizations": {
@@ -7185,6 +7339,17 @@
         }
       }
     },
+    "No key": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessuna chiave"
+          }
+        }
+      }
+    },
     "No labels yet": {
       "extractionState": "manual",
       "localizations": {
@@ -7203,6 +7368,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nessuna corrispondenza"
+          }
+        }
+      }
+    },
+    "No model": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nessun modello"
           }
         }
       }
@@ -7312,6 +7488,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nessun tempo registrato finora: le nuove trascrizioni misurano quanto impiegano."
+          }
+        }
+      }
+    },
+    "No services yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessun servizio"
           }
         }
       }
@@ -7685,6 +7872,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dal meno recente"
+          }
+        }
+      }
+    },
+    "Ollama isn't answering at that address — type the model name instead.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ollama non risponde a quell'indirizzo: scrivi il nome del modello a mano."
+          }
+        }
+      }
+    },
+    "On device": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In locale"
           }
         }
       }
@@ -10300,6 +10509,17 @@
         }
       }
     },
+    "Service": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Servizio"
+          }
+        }
+      }
+    },
     "Set Up Destinations…": {
       "extractionState": "manual",
       "localizations": {
@@ -11232,6 +11452,17 @@
         }
       }
     },
+    "Stored in your keychain, never in the settings file.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finisce nel portachiavi, mai nel file delle impostazioni."
+          }
+        }
+      }
+    },
     "Stream microphone in real time": {
       "extractionState": "manual",
       "localizations": {
@@ -11579,6 +11810,17 @@
         }
       }
     },
+    "Test": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prova"
+          }
+        }
+      }
+    },
     "Text": {
       "extractionState": "manual",
       "localizations": {
@@ -11619,6 +11861,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Il server MCP con cui altre app e agenti pilotano Parola."
+          }
+        }
+      }
+    },
+    "The base URL of an OpenAI-compatible server, without /chat/completions.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'URL di base di un server compatibile con OpenAI, senza /chat/completions."
           }
         }
       }
@@ -11667,6 +11920,17 @@
         }
       }
     },
+    "The model this service answers with.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il modello con cui risponde questo servizio."
+          }
+        }
+      }
+    },
     "The named exports Parola can write, and what each one puts in the file.": {
       "extractionState": "manual",
       "localizations": {
@@ -11696,6 +11960,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "La libreria di prompt dietro la pulizia della dettatura e il menu Trascrizione."
+          }
+        }
+      }
+    },
+    "The text of the transcript is sent to %@, and is handled under that provider's terms.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il testo della trascrizione viene inviato a %@ e trattato secondo le condizioni di quel servizio."
+          }
+        }
+      }
+    },
+    "The text of the transcript is sent to the service you picked, and is handled under that provider's terms.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il testo della trascrizione viene inviato al servizio che hai scelto e trattato secondo le condizioni di quel servizio."
           }
         }
       }
@@ -12401,6 +12687,17 @@
         }
       }
     },
+    "Transcripts leave this Mac": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le trascrizioni escono da questo Mac"
+          }
+        }
+      }
+    },
     "Translate": {
       "extractionState": "manual",
       "localizations": {
@@ -12762,6 +13059,17 @@
         }
       }
     },
+    "Use for": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa per"
+          }
+        }
+      }
+    },
     "Use precise word timings": {
       "extractionState": "manual",
       "localizations": {
@@ -13003,6 +13311,17 @@
         }
       }
     },
+    "What this service is called in the pickers.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Come si chiama questo servizio nei menu."
+          }
+        }
+      }
+    },
     "When on, the LLM answers your dictation instead of cleaning it up. Use this for voice Q&A.": {
       "extractionState": "manual",
       "localizations": {
@@ -13042,6 +13361,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Se la nota esiste già"
+          }
+        }
+      }
+    },
+    "Where Ollama listens. Models are read from it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dove risponde Ollama. I modelli vengono letti da lì."
           }
         }
       }
@@ -13086,6 +13416,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Da quale ingresso registra Parola e cosa succede durante la registrazione."
+          }
+        }
+      }
+    },
+    "Which model answers each AI task: Apple Intelligence on this Mac, or a service you configure.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quale modello risponde per ogni funzione AI: Apple Intelligence su questo Mac, o un servizio che configuri tu."
           }
         }
       }
@@ -13388,6 +13729,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sottotitoli YouTube"
+          }
+        }
+      }
+    },
+    "Your services": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I tuoi servizi"
           }
         }
       }

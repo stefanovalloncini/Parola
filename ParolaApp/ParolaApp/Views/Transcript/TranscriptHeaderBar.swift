@@ -195,7 +195,7 @@ struct TranscriptHeaderBar: View {
                     .accessibilityIdentifier("ai.action_items")
                     .axLeaf("HeaderBar.MenuItem.ActionItems")
             }
-            .disabled(!model.isAIAvailable)
+            .disabled(!model.isAIAvailable(for: .summary) && !model.isAIAvailable(for: .prompts))
         } label: {
             Image(systemName: "sparkles")
         }

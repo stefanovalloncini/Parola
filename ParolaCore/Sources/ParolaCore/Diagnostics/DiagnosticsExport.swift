@@ -36,6 +36,10 @@ public struct DiagnosticsEnvironment: Sendable {
     public var features: FeatureSet
     /// The delivery ring, stripped to its structural fields by the renderer.
     public var deliveryLog: [DeliveryLogEntry]
+    /// Which model each AI task runs on. Endpoints stay out of the report, keys never reach it.
+    public var languageModelSelection: LanguageModelSelection
+    /// One line per configured AI service, already stripped of its name and key by the frontend.
+    public var aiServices: [String]
 
     public init(
         appVersion: String? = nil,
@@ -53,7 +57,9 @@ public struct DiagnosticsEnvironment: Sendable {
         libraryEntryCount: Int? = nil,
         libraryBytes: UInt64? = nil,
         features: FeatureSet = .all,
-        deliveryLog: [DeliveryLogEntry] = []
+        deliveryLog: [DeliveryLogEntry] = [],
+        languageModelSelection: LanguageModelSelection = .onDevice,
+        aiServices: [String] = []
     ) {
         self.appVersion = appVersion
         self.appBuild = appBuild
@@ -71,6 +77,8 @@ public struct DiagnosticsEnvironment: Sendable {
         self.libraryBytes = libraryBytes
         self.features = features
         self.deliveryLog = deliveryLog
+        self.languageModelSelection = languageModelSelection
+        self.aiServices = aiServices
     }
 
     public static var currentOSVersion: String {

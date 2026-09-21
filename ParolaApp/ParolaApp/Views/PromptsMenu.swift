@@ -23,7 +23,7 @@ struct PromptsMenu: View {
                         .accessibilityIdentifier("prompts.youtube_chapters")
                         .axLeaf("HeaderBar.MenuItem.YouTubeChapters")
                 }
-                .disabled(!model.isAIAvailable)
+                .disabled(!model.isAIAvailable(for: .prompts))
                 Button("Speakers…") { model.showingSpeakersSheet = true }
                     .accessibilityIdentifier("prompts.speakers")
                     .axLeaf("HeaderBar.MenuItem.Speakers")
@@ -34,7 +34,7 @@ struct PromptsMenu: View {
                             .accessibilityIdentifier("prompts.\(Self.identifierSlug(prompt.name))")
                             .axLeaf("HeaderBar.MenuItem.UserPrompt.\(Self.identifierSlug(prompt.name))")
                     }
-                    .disabled(!model.isAIAvailable)
+                    .disabled(!model.isAIAvailable(for: .prompts))
                 }
             }
             // The toolbar keeps this view alive, so .task runs once; re-read on every

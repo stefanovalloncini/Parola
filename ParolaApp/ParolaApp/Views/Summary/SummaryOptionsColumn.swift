@@ -32,7 +32,7 @@ struct SummaryOptionsColumn: View {
     }
 
     private var providerLabel: String {
-        model.isAIAvailable ? String(localized: "Apple Intelligence") : (model.aiUnavailableReason ?? "")
+        model.isAIAvailable(for: .summary) ? model.languageModelLabel(for: .summary) : (model.aiUnavailableReason ?? "")
     }
 
     private var actionButtons: some View {
@@ -51,7 +51,7 @@ struct SummaryOptionsColumn: View {
                 }
             }
             .buttonStyle(DSPillButtonStyle(kind: .primary, size: .compact))
-            .disabled(model.transcript == nil || model.isSummarising || !model.isAIAvailable)
+            .disabled(model.transcript == nil || model.isSummarising || !model.isAIAvailable(for: .summary))
             .axLeaf("Summary.Button.Regenerate")
 
             Button("Clear") { model.clearSummary() }

@@ -521,6 +521,8 @@ final class AppModel {
     var aiServices: [AIServiceConfig] = []
     /// Written only through `setLanguageModelSelection(_:)`.
     var languageModelSelection: LanguageModelSelection = .onDevice
+    /// Written only through `acknowledgeRemoteAI()`.
+    var remoteAIAcknowledged: Bool = false
 
     // MARK: - Send To
 
@@ -729,6 +731,7 @@ final class AppModel {
         self.sparkleChannelRaw = defaults.string(forKey: "sparkleChannel") ?? SparkleChannel.stable.rawValue
         self.sparkleAutomatic = readBool("sparkleAutomatic", default: true)
         self.liveCaptionsTranslate = defaults.bool(forKey: "liveCaptionsTranslate")
+        self.remoteAIAcknowledged = defaults.bool(forKey: "remoteAIAcknowledged")
         introduction.reloadFromDefaults()
     }
 

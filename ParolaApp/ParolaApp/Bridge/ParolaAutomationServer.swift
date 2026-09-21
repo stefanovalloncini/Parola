@@ -59,6 +59,7 @@ final class ParolaAutomationServer {
             server.transcriptCommands(),
             server.exportCommands(),
             server.deliveryCommands(),
+            server.aiCommands(),
             server.libraryCommands(),
             server.batchCommands(),
             server.recordingCommands(),
@@ -368,7 +369,7 @@ final class ParolaAutomationServer {
         "transcriptDisplayMode", "generateCardMetadata", "showAITitles", "showAISummaries",
         "customTitlePrompt", "customSummaryPrompt", "appAccentColor",
         "inspectorMode", "introductionComplete", "autostartSummary",
-        "translationSideBySide",
+        "translationSideBySide", "remoteAIAcknowledged",
     ]
 
     func runScreenshot(requestedFileName: String?) async throws -> AutomationValue {
@@ -504,6 +505,9 @@ final class ParolaAutomationServer {
             "translation": Self.translationState(model),
             "translationSideBySide": .bool(model.translationSideBySide),
             "destinations": Self.destinationsState(model),
+            "aiServices": Self.aiServicesState(model),
+            "languageModelSelection": Self.encode(model.languageModelSelection),
+            "remoteAIAcknowledged": .bool(model.remoteAIAcknowledged),
         ])
     }
 

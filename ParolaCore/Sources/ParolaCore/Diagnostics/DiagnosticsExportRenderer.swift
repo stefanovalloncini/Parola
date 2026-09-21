@@ -48,7 +48,17 @@ extension DiagnosticsExport {
             row("Models", modelsText(environment.models)),
             row("Library", libraryText(environment)),
             row("Features", featuresText(environment.features)),
+            row("AI models", selectionText(environment.languageModelSelection)),
+            row("AI services", environment.aiServices.isEmpty ? "none configured" : environment.aiServices.joined(separator: ", ")),
         ]
+    }
+
+    /// Kind and provider only: a model name the user typed and an endpoint they pointed at are not
+    /// structural facts, and an API key never reaches this struct at all.
+    private static func selectionText(_ selection: LanguageModelSelection) -> String {
+        LanguageModelTask.allCases
+            .map { "\($0.rawValue)=\(selection[$0].logToken)" }
+            .joined(separator: " ")
     }
 
     /// Destination names, entry ids and note paths stay out: the report promises none of them.

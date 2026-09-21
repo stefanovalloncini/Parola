@@ -40,7 +40,7 @@ struct OutlinePopover: View {
             if model.smartChapters.isEmpty {
                 Button("Generate Chapters") { model.extractSmartChapters() }
                     .controlSize(.small)
-                    .disabled(model.isExtractingChapters || !model.isAIAvailable)
+                    .disabled(model.isExtractingChapters || !model.isAIAvailable(for: .summary))
                     .help(model.aiUnavailableReason ?? "")
                     .axLeaf("Outline.Button.GenerateChapters")
             }

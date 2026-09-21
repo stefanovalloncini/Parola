@@ -84,7 +84,7 @@ struct SummaryPane: View {
                 description: Text("Open a transcript to generate a summary.")
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let reason = model.aiUnavailableReason {
+        } else if !model.isAIAvailable(for: .summary), let reason = model.aiUnavailableReason {
             ContentUnavailableView {
                 Label("Summaries Need Apple Intelligence", systemImage: "sparkles")
             } description: {

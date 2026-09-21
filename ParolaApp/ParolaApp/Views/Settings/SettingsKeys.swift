@@ -20,6 +20,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
     case autoExport
     case sendTo
     case integrations
+    case aiServices
     case prompts
     case automation
     case updates
@@ -48,6 +49,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .autoExport: return "Auto-Export"
         case .sendTo: return "Send To"
         case .integrations: return "Integrations"
+        case .aiServices: return "AI Services"
         case .prompts: return "Prompts"
         case .automation: return "MCP & Automation"
         case .updates: return "Updates"
@@ -76,6 +78,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .autoExport: return String(localized: "Auto-Export")
         case .sendTo: return String(localized: "Send To")
         case .integrations: return String(localized: "Integrations")
+        case .aiServices: return String(localized: "AI Services")
         case .prompts: return String(localized: "Prompts")
         case .automation: return String(localized: "MCP & Automation")
         case .updates: return String(localized: "Updates")
@@ -105,6 +108,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .autoExport: return ["auto export", "rule", "line length", "qc", "timestamps", "html theme", "preset"]
         case .sendTo: return ["obsidian", "vault", "send", "destination", "note", "markdown", "frontmatter", "wikilink"]
         case .integrations: return ["yt-dlp", "youtube", "homebrew", "install"]
+        case .aiServices: return ["openai", "anthropic", "claude", "groq", "cerebras", "ollama", "local model", "api key", "endpoint", "llm", "summary", "chat", "cleanup", "apple intelligence"]
         case .prompts: return ["prompt", "cleanup", "translate", "bullet", "action", "trigger words", "assistant", "rewrite"]
         case .automation: return ["mcp", "bridge", "claude code", "codex", "loopback"]
         case .updates: return ["sparkle", "appcast", "channel", "auto-update"]
@@ -190,6 +194,8 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
             return ["autoExportRules", "subtitleCaptionLength", "markdownTimestamps", "txtExportTimestamps", "htmlExportTheme"]
         case .sendTo:
             return ["destinations"]
+        case .aiServices:
+            return ["aiServices", "languageModelSelection", "remoteAIAcknowledged"]
         case .integrations, .prompts:
             return []
         case .automation:

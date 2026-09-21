@@ -37,7 +37,7 @@ struct ChaptersSection: View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             Button("Generate Chapters") { model.extractSmartChapters() }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                .disabled(!model.isAIAvailable)
+                .disabled(!model.isAIAvailable(for: .summary))
                 .accessibilityIdentifier("transcript.inspector.chapters")
                 .axLeaf("Chapters.Button.Generate")
             statusNote
@@ -57,7 +57,7 @@ struct ChaptersSection: View {
         HStack(spacing: DS.Spacing.small) {
             Button("Regenerate") { model.extractSmartChapters() }
                 .controlSize(.small)
-                .disabled(!model.isAIAvailable)
+                .disabled(!model.isAIAvailable(for: .summary))
                 .axLeaf("Chapters.Button.Regenerate")
             Spacer()
             Button("Clear") { model.clearSmartChapters() }

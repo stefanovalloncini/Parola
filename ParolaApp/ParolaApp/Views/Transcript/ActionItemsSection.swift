@@ -37,7 +37,7 @@ struct ActionItemsSection: View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             Button("Find Action Items") { model.extractActionItems() }
                 .buttonStyle(DSPillButtonStyle(kind: .secondary, size: .compact))
-                .disabled(!model.isAIAvailable)
+                .disabled(!model.isAIAvailable(for: .prompts))
                 .accessibilityIdentifier("transcript.inspector.actionItems")
                 .axLeaf("ActionItems.Button.Find")
             statusNote
@@ -57,7 +57,7 @@ struct ActionItemsSection: View {
         HStack(spacing: DS.Spacing.small) {
             Button("Re-Extract") { model.extractActionItems() }
                 .controlSize(.small)
-                .disabled(!model.isAIAvailable)
+                .disabled(!model.isAIAvailable(for: .prompts))
                 .axLeaf("ActionItems.Button.Reextract")
             Button("Copy") { copyToClipboard() }
                 .controlSize(.small)

@@ -92,11 +92,12 @@ extension AIServiceConfig.Kind {
         }
     }
 
+    /// What the editor prefills. Ollama and a custom endpoint have none to invent: the editor
+    /// fills Ollama's from the server, and a custom endpoint's model is whatever it serves.
     var defaultModel: String {
         switch self {
         case .openAI, .anthropic, .groq, .cerebras: return info?.defaultModel ?? ""
-        case .ollama: return "llama3.2:3b"
-        case .custom: return ""
+        case .ollama, .custom: return ""
         }
     }
 
@@ -235,17 +236,13 @@ extension AppModel {
 
     /// The model a task actually runs on. A pick whose service was removed, or one the managed
     /// policy refuses, reads as on-device, so a call site never throws over a stale choice.
+    /// Silent: the pickers read this on every redraw, and the fallback is logged once per call
+    /// in ``makeLanguageModel(for:instructions:)``.
     func resolvedLanguageModelChoice(for task: LanguageModelTask) -> LanguageModelProviderChoice {
         let choice = languageModelSelection[task]
         guard choice != .onDevice else { return .onDevice }
-        guard aiService(for: choice) != nil else {
-            ParolaLog.notice(.ai, "\(task) points at a service that is gone; answering on device")
-            return .onDevice
-        }
-        guard !(choice.isRemote && managedConfiguration.disableCloudLLM) else {
-            ParolaLog.notice(.ai, "policy refuses \(choice) for \(task); answering on device")
-            return .onDevice
-        }
+        guard aiService(for: choice) != nil else { return .onDevice }
+        guard !(choice.isRemote && managedConfiguration.disableCloudLLM) else { return .onDevice }
         return choice
     }
 
@@ -254,11 +251,11 @@ extension AppModel {
     /// The one place a call site gets a language model: the selection, the managed policy and the
     /// key store are applied here and nowhere else.
     func makeLanguageModel(for task: LanguageModelTask, instructions: String?) async throws -> any LanguageModel {
-        try await makeLanguageModel(
-            choice: resolvedLanguageModelChoice(for: task),
-            task: task,
-            instructions: instructions
-        )
+        let choice = resolvedLanguageModelChoice(for: task)
+        if choice == .onDevice, languageModelSelection[task] != .onDevice {
+            ParolaLog.notice(.ai, "\(task) answers on device: the service it points at is gone or refused by policy")
+        }
+        return try await makeLanguageModel(choice: choice, task: task, instructions: instructions)
     }
 
     /// Builds one given choice — what Test uses, with the typed key it hasn't saved yet.
@@ -319,5 +316,150 @@ extension AppModel {
             guard let self else { throw CancellationError() }
             return try await self.makeLanguageModel(for: .summary, instructions: instructions)
         }
+    }
+}
+
+/// What a Test run came back with: the reply, or why there wasn't one.
+struct AIServiceTestResult: Equatable, Sendable {
+    let ok: Bool
+    let message: String
+    let milliseconds: Int
+}
+
+extension AppModel {
+
+    // MARK: - What the pane may show
+
+    var allowsRemoteAIServices: Bool { !managedConfiguration.disableCloudLLM }
+
+    /// The rows the pane shows: under `disableCloudLLM` the cloud and custom ones are gone.
+    var visibleAIServices: [AIServiceConfig] {
+        allowsRemoteAIServices ? aiServices : aiServices.filter { !$0.kind.isManagedAway }
+    }
+
+    var addableAIServiceKinds: [AIServiceConfig.Kind] {
+        allowsRemoteAIServices ? AIServiceConfig.Kind.allCases : [.ollama]
+    }
+
+    /// What the per-task pickers offer. An Ollama pointed off this Mac counts as remote too.
+    var selectableAIServices: [AIServiceConfig] {
+        visibleAIServices.filter { allowsRemoteAIServices || !$0.choice.isRemote }
+    }
+
+    // MARK: - Saving a service
+
+    /// The one way the editor saves: the key goes to the key store, the row to the list, and the
+    /// row's key status is set from what was actually written.
+    func saveAIService(_ service: AIServiceConfig, apiKey: String?) async {
+        var saved = service
+        if let provider = service.kind.keyProviderID {
+            let trimmed = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let trimmed, !trimmed.isEmpty {
+                do {
+                    try await apiKeyStore.set(trimmed, for: provider)
+                    saved.hasKey = true
+                } catch {
+                    ParolaLog.error(.ai, "API key could not be saved", [.error: .error(error)])
+                }
+            } else {
+                saved.hasKey = (try? await apiKeyStore.get(for: provider)).map { !$0.isEmpty } ?? false
+            }
+        }
+        updateAIService(saved)
+    }
+
+    // MARK: - The one-time notice
+
+    /// Whether picking or saving this choice has to show the "transcripts leave this Mac" notice.
+    func needsRemoteAIAcknowledgement(for choice: LanguageModelProviderChoice) -> Bool {
+        choice.isRemote && !remoteAIAcknowledged
+    }
+
+    func acknowledgeRemoteAI() {
+        remoteAIAcknowledged = true
+        defaults.set(true, forKey: "remoteAIAcknowledged")
+    }
+
+    // MARK: - Test
+
+    static let aiTestPrompt = "Reply with the single word OK."
+    static let aiTestTimeout = Duration.seconds(20)
+
+    func testAIService(id: UUID) async -> AIServiceTestResult? {
+        guard let service = aiService(id: id) else { return nil }
+        return await testAIService(service, apiKey: nil)
+    }
+
+    /// Asks the service one short question. `apiKey` tests a key the editor hasn't saved yet; it is
+    /// handed to the model for this call only and never written anywhere.
+    func testAIService(_ service: AIServiceConfig, apiKey: String?) async -> AIServiceTestResult {
+        let trimmedKey = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let keyStore: (any APIKeyStore)? = {
+            guard let trimmedKey, !trimmedKey.isEmpty, let provider = service.kind.keyProviderID else { return nil }
+            return InMemoryAPIKeyStore(keys: [provider: trimmedKey])
+        }()
+        let choice = service.choice
+        let started = ContinuousClock.now
+        let outcome = await AsyncTimeout.run(Self.aiTestTimeout, clock: clock) { [weak self] () -> AITestOutcome in
+            guard let self else { return .failed("") }
+            do {
+                let model = try await self.makeLanguageModel(
+                    choice: choice,
+                    task: .chat,
+                    instructions: LanguageModelFactory.defaultInstructions,
+                    keyStore: keyStore
+                )
+                return .answered(try await model.respond(to: AppModel.aiTestPrompt))
+            } catch {
+                return .failed(error.localizedDescription)
+            }
+        }
+        let elapsed = ContinuousClock.now - started
+        let milliseconds = Int(elapsed.components.seconds * 1000
+            + elapsed.components.attoseconds / 1_000_000_000_000_000)
+        switch outcome {
+        case .answered(let text):
+            let reply = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return AIServiceTestResult(ok: true, message: String(reply.prefix(200)), milliseconds: milliseconds)
+        case .failed(let message):
+            return AIServiceTestResult(ok: false, message: message, milliseconds: milliseconds)
+        case nil:
+            return AIServiceTestResult(
+                ok: false,
+                message: String(localized: "No answer within 20 seconds."),
+                milliseconds: milliseconds
+            )
+        }
+    }
+
+    /// What one Test run produced, with the error already flattened to text so the race can carry it.
+    enum AITestOutcome: Sendable {
+        case answered(String)
+        case failed(String)
+    }
+
+    // MARK: - Diagnostics
+
+    /// One line per service, with the name and the endpoint left out: the report promises neither.
+    func aiServicesDiagnostics() -> [String] {
+        aiServices.map { "\($0.kind.rawValue) \($0.model) key=\($0.hasKey ? "yes" : "no")" }
+    }
+}
+
+extension AppModel {
+
+    /// Whether the model picked for `task` can answer right now. A service the user configured is
+    /// always worth trying, so Apple Intelligence's state only gates the on-device choice.
+    func isAIAvailable(for task: LanguageModelTask) -> Bool {
+        resolvedLanguageModelChoice(for: task) != .onDevice || isAIAvailable
+    }
+
+    /// What to call the model a task runs on, for a label next to its output.
+    func languageModelLabel(for task: LanguageModelTask) -> String {
+        let choice = resolvedLanguageModelChoice(for: task)
+        guard choice != .onDevice, let service = aiService(for: choice) else {
+            return String(localized: "Apple Intelligence")
+        }
+        return service.name
     }
 }

@@ -98,7 +98,9 @@ extension AppModel {
             libraryEntryCount: await library.list().count,
             libraryBytes: await library.sizeOnDisk(),
             features: features,
-            deliveryLog: deliveryLogEntries()
+            deliveryLog: deliveryLogEntries(),
+            languageModelSelection: languageModelSelection,
+            aiServices: aiServicesDiagnostics()
         )
     }
 
