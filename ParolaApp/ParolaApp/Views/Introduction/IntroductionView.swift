@@ -107,12 +107,10 @@ struct IntroductionView: View {
 
     private func sceneTransition(kind: TransitionKind, step: IntroductionStep, back: Bool) -> AnyTransition {
         guard !reduceMotion else { return .opacity }
-        let arriving: AnyTransition = kind == .fade
-            ? .opacity
-            : .move(edge: back ? .leading : .trailing).combined(with: .opacity)
-        let leaving: AnyTransition = Self.leavesByFading(step)
-            ? .opacity
-            : .move(edge: back ? .trailing : .leading).combined(with: .opacity)
+        // One edge covers both phases: a scene arrives from the side opposite the edge it names and leaves towards it (measured, not documented).
+        let edge: Edge = back ? .trailing : .leading
+        let arriving: AnyTransition = kind == .fade ? .opacity : .move(edge: edge).combined(with: .opacity)
+        let leaving: AnyTransition = Self.leavesByFading(step) ? .opacity : .move(edge: edge).combined(with: .opacity)
         return .asymmetric(insertion: arriving, removal: leaving)
     }
 }
