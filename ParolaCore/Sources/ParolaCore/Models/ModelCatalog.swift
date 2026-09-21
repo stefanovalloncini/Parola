@@ -66,7 +66,7 @@ public enum ModelCatalog {
             displayName: "Parakeet TDT 0.6B v3",
             tagline: "Fastest multilingual on Apple Silicon",
             engineID: .parakeet,
-            sizeBytes: 1_240_000_000,
+            sizeBytes: 483_000_000,
             downloadSource: ModelDownloadSource(
                 huggingFaceRepo: "FluidInference/parakeet-tdt-0.6b-v3-coreml",
                 subpath: "",
