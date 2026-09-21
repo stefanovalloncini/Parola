@@ -137,28 +137,7 @@ struct ContentToolbar: ToolbarContent {
 
     private var newMenu: some View {
         Menu {
-            Button("Open Files…") { model.presentOpenPanel() }
-                .accessibilityIdentifier("toolbar.openFile")
-                .axLeaf("Toolbar.MenuItem.NewOpenFile")
-            if model.features.isEnabled(.micRecording) || model.features.isEnabled(.meetings) {
-                Divider()
-                if model.features.isEnabled(.micRecording) {
-                    Button("Record Microphone") { model.startRecording(source: .microphone) }
-                        .accessibilityIdentifier("toolbar.record.microphone")
-                        .axLeaf("Toolbar.MenuItem.NewRecordMicrophone")
-                }
-                if model.features.isEnabled(.meetings) {
-                    Button("Record System Audio") { model.startRecording(source: .systemAudio) }
-                        .accessibilityIdentifier("toolbar.record.system")
-                        .axLeaf("Toolbar.MenuItem.NewRecordSystem")
-                }
-            }
-            if model.features.isEnabled(.youtube) {
-                Divider()
-                Button("YouTube URL…") { model.youtubeSheetOpen = true }
-                    .accessibilityIdentifier("toolbar.youtube")
-                    .axLeaf("Toolbar.MenuItem.NewYouTube")
-            }
+            newMenuItems
         } label: {
             Label("New", systemImage: "plus")
         }
@@ -166,6 +145,35 @@ struct ContentToolbar: ToolbarContent {
         .help("Start a new transcription.")
         .accessibilityIdentifier("toolbar.new")
         .axLeaf("Toolbar.Menu.New")
+    }
+
+    /// Menus drop a Label's icon unless told otherwise; the toolbar button keeps its plain plus.
+    private var newMenuItems: some View {
+        Group {
+            Button { model.presentOpenPanel() } label: { Label("Open Files…", systemImage: "folder") }
+                .accessibilityIdentifier("toolbar.openFile")
+                .axLeaf("Toolbar.MenuItem.NewOpenFile")
+            if model.features.isEnabled(.micRecording) || model.features.isEnabled(.meetings) {
+                Divider()
+                if model.features.isEnabled(.micRecording) {
+                    Button { model.startRecording(source: .microphone) } label: { Label("Record Microphone", systemImage: "mic") }
+                        .accessibilityIdentifier("toolbar.record.microphone")
+                        .axLeaf("Toolbar.MenuItem.NewRecordMicrophone")
+                }
+                if model.features.isEnabled(.meetings) {
+                    Button { model.startRecording(source: .systemAudio) } label: { Label("Record System Audio", systemImage: "speaker.wave.2") }
+                        .accessibilityIdentifier("toolbar.record.system")
+                        .axLeaf("Toolbar.MenuItem.NewRecordSystem")
+                }
+            }
+            if model.features.isEnabled(.youtube) {
+                Divider()
+                Button { model.youtubeSheetOpen = true } label: { Label("YouTube URL…", systemImage: "play.rectangle") }
+                    .accessibilityIdentifier("toolbar.youtube")
+                    .axLeaf("Toolbar.MenuItem.NewYouTube")
+            }
+        }
+        .labelStyle(.titleAndIcon)
     }
 
     /// The capsule's own width once it has reported one, so the search field's budget is the toolbar's, not a guess.

@@ -137,12 +137,13 @@ struct TranscriptHeaderBar: View {
     private var paneModePicker: some View {
         Picker(selection: paneModeBinding) {
             ForEach(availablePaneModes, id: \.self) { mode in
-                Text(Self.paneModeLabel(mode)).tag(mode)
+                Label(Self.paneModeLabel(mode), systemImage: Self.paneModeSymbol(mode)).tag(mode)
             }
         } label: {
-            Text(Self.paneModeLabel(model.transcriptPaneMode))
+            Label(Self.paneModeLabel(model.transcriptPaneMode), systemImage: Self.paneModeSymbol(model.transcriptPaneMode))
         }
         .labelsHidden()
+        .labelStyle(.titleAndIcon)
         .pickerStyle(.menu)
         .fixedSize()
         .help("Switch between Transcript, Summary and Chat")
@@ -166,6 +167,14 @@ struct TranscriptHeaderBar: View {
         case .transcript: return String(localized: "Transcript")
         case .summary: return String(localized: "Summary")
         case .chat: return String(localized: "Chat")
+        }
+    }
+
+    static func paneModeSymbol(_ mode: AppModel.TranscriptPaneMode) -> String {
+        switch mode {
+        case .transcript: return "text.alignleft"
+        case .summary: return "sparkles.rectangle.stack"
+        case .chat: return "bubble.left.and.bubble.right"
         }
     }
 
