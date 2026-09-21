@@ -222,12 +222,14 @@ struct CaptionsFrame: Equatable {
 private struct TranscribeVignette: View {
     let frame: TranscribeFrame
 
-    private static let lineWidths: [CGFloat] = [56, 42, 48]
+    private static let lineWidths: [CGFloat] = [72, 54, 62]
+
+    @ScaledMetric(relativeTo: .title) private var glyphSize: CGFloat = 18
 
     var body: some View {
         HStack(spacing: DS.Spacing.small) {
             Image(systemName: "arrow.down.doc")
-                .font(.system(size: 18))
+                .font(.system(size: glyphSize, weight: .regular))
                 .foregroundStyle(DS.Color.accent)
                 .offset(y: frame.glyphOffset)
                 .opacity(frame.glyphOpacity)
@@ -235,8 +237,8 @@ private struct TranscribeVignette: View {
                 ForEach(0..<Self.lineWidths.count, id: \.self) { index in
                     Capsule(style: .continuous)
                         .fill(DS.Color.secondaryText.opacity(0.4))
-                        .frame(width: Self.lineWidths[index] * frame.line(index), height: 4)
-                        .frame(width: Self.lineWidths[index], alignment: .leading)
+                        .frame(width: Self.lineWidths[index], height: 4)
+                        .scaleEffect(x: frame.line(index), anchor: .leading)
                         .opacity(frame.lineOpacity)
                 }
             }
@@ -250,23 +252,26 @@ private struct TranscribeVignette: View {
 private struct MeetingVignette: View {
     let frame: MeetingFrame
 
+    private static let detected = String(localized: "Zoom is running")
+    private static let record = String(localized: "Record")
+
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
-            Text("Zoom is running")
+            Text(verbatim: Self.detected)
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.secondaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .padding(.horizontal, DS.Spacing.snug)
-                .padding(.vertical, 3)
+                .padding(.vertical, DS.Spacing.tight)
                 .background(Capsule(style: .continuous).fill(DS.Palette.pillFill))
             HStack(spacing: DS.Spacing.snug) {
-                Text("Record")
+                Text(verbatim: Self.record)
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.onAccent)
                     .lineLimit(1)
                     .padding(.horizontal, DS.Spacing.small)
-                    .padding(.vertical, 3)
+                    .padding(.vertical, DS.Spacing.tight)
                     .background(Capsule(style: .continuous).fill(DS.Color.accent))
                     .scaleEffect(frame.pillScale)
                 Circle()
@@ -297,7 +302,7 @@ private struct DictationVignette: View {
                 .foregroundStyle(DS.Color.primaryText)
                 .lineLimit(1)
                 .padding(.horizontal, DS.Spacing.snug)
-                .padding(.vertical, 3)
+                .padding(.vertical, DS.Spacing.tight)
                 .frame(minWidth: 22)
                 .background(
                     RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
