@@ -43,6 +43,7 @@ struct Library: AsyncParsableCommand {
                 let audioSeconds: Double
                 let transcriptionSeconds: Double
                 let words: Int
+                let wordsCountedFor: Int
                 let timed: Int
                 let timedSince: String?
                 let averageSpeed: Double?
@@ -58,6 +59,7 @@ struct Library: AsyncParsableCommand {
                 audioSeconds: stats.totals.audioSeconds,
                 transcriptionSeconds: stats.totals.transcriptionSeconds,
                 words: stats.totals.words,
+                wordsCountedFor: stats.totals.wordsCountedFor,
                 timed: stats.timed.count,
                 timedSince: stats.timed.since.map { ISO8601DateFormatter().string(from: $0) },
                 averageSpeed: stats.averageSpeed,
