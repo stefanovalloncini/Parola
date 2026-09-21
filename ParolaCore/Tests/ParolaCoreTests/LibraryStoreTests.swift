@@ -33,6 +33,21 @@ struct LibraryStoreTests {
         )
     }
 
+    @Test("chat history is never searchable")
+    func chatHistoryIsNotIndexed() async throws {
+        let (store, _) = try makeTempLibrary()
+        var transcript = makeTranscript()
+        transcript.chatHistory = [
+            ChatMessage(role: .user, text: "zzyzxchat"),
+            ChatMessage(role: .assistant, text: "zzyzxreply")
+        ]
+        let entry = try await store.add(transcript: transcript, audioSource: nil)
+
+        #expect(await store.search("zzyzxchat").isEmpty)
+        #expect(await store.search("zzyzxreply").isEmpty)
+        #expect(await store.search("hi").contains(where: { $0.entryID == entry.id }))
+    }
+
     @Test("empty library lists nothing")
     func emptyList() async throws {
         let (store, _) = try makeTempLibrary()
