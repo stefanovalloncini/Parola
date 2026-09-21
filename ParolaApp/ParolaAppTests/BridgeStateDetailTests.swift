@@ -77,4 +77,28 @@ struct BridgeStateDetailTests {
         #expect(detail["progress"] == .double(0.5))
         #expect(detail["hasPartialText"] == nil)
     }
+
+    @Test("favoriteSegments and favoritesOnly reflect the selected entry and the filter")
+    func favoriteSegmentsInState() throws {
+        let (model, server) = try makeRig()
+        model.libraryEntries = [
+            LibraryEntry(
+                id: "a",
+                bundleURL: URL(fileURLWithPath: "/tmp/BridgeStateDetailTests/a.parola"),
+                manifest: ParolaDocument.Manifest(
+                    originalAudioName: "a.m4a", modelName: "stub", language: "en", favoriteSegments: [3, 1]
+                )
+            ),
+        ]
+        model.selectedEntryID = "a"
+        model.favoritesOnly = true
+
+        guard case .object(let fields) = server.snapshotState() else {
+            Issue.record("getState should return an object")
+            return
+        }
+
+        #expect(fields["favoriteSegments"] == .array([.int(1), .int(3)]))
+        #expect(fields["favoritesOnly"] == .bool(true))
+    }
 }

@@ -259,8 +259,18 @@ struct SegmentCard: View {
 
     @State private var timingPopoverOpen = false
 
+    private var isFavorite: Bool { model.isSegmentFavorite(segment.id) }
+
     private var actionStrip: some View {
         HStack(spacing: 4) {
+            cardButton(
+                systemName: isFavorite ? "star.fill" : "star",
+                help: isFavorite ? "Remove from favorites" : "Add to favorites",
+                tint: isFavorite ? DS.Color.accent : DS.Color.secondaryText
+            ) {
+                model.toggleSegmentFavorite(segment.id)
+            }
+            .axLeaf("Card.Button.Favorite")
             cardButton(systemName: "pencil", help: "Edit") { beginEditing() }
                 .axLeaf("Card.Button.Edit")
             cardButton(systemName: "note.text", help: "Add note") { beginEditingNote() }
@@ -289,6 +299,8 @@ struct SegmentCard: View {
 
     private var moreMenu: some View {
         Menu {
+            Button(isFavorite ? "Unfavorite" : "Favorite") { model.toggleSegmentFavorite(segment.id) }
+                .axLeaf("Card.Button.ToggleFavorite")
             Button("Nudge Timing…") { timingPopoverOpen = true }
                 .axLeaf("Card.Button.Timing")
             Button("Split Segment") { splitSegment() }
@@ -321,7 +333,7 @@ struct SegmentCard: View {
         }
     }
 
-    private func cardButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
+    private func cardButton(systemName: String, help: String, tint: Color = DS.Color.secondaryText, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(DS.Font.bodyStrong)
@@ -329,7 +341,7 @@ struct SegmentCard: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(DS.Color.secondaryText)
+        .foregroundStyle(tint)
         .help(help)
         .accessibilityLabel(help)
     }

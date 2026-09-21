@@ -12,6 +12,8 @@ struct SegmentsScroll: View {
         let transcriptVersion: Int
         let entryID: LibraryEntry.ID?
         let speakerFilter: String?
+        let favoritesOnly: Bool
+        let favorites: Set<Int>
     }
 
     private struct QCKey: Equatable {
@@ -109,7 +111,9 @@ struct SegmentsScroll: View {
         DerivedKey(
             transcriptVersion: model.transcriptVersion,
             entryID: model.selectedEntryID,
-            speakerFilter: speakerFilter
+            speakerFilter: speakerFilter,
+            favoritesOnly: model.favoritesOnly,
+            favorites: model.favoriteSegmentIDs
         )
     }
 
@@ -144,13 +148,15 @@ struct SegmentsScroll: View {
             return
         }
         let speakerFilter = key.speakerFilter
+        let favorites = key.favorites
+        let favoritesOnly = key.favoritesOnly
         guard segments.count > TranscriptDerive.synchronousCap else {
-            derived = Self.derive(segments: segments, speakerFilter: speakerFilter)
+            derived = Self.derive(segments: segments, speakerFilter: speakerFilter, favorites: favorites, favoritesOnly: favoritesOnly)
             return
         }
         deriveTask = Task {
             let computed = await Task.detached(priority: .userInitiated) {
-                Self.derive(segments: segments, speakerFilter: speakerFilter)
+                Self.derive(segments: segments, speakerFilter: speakerFilter, favorites: favorites, favoritesOnly: favoritesOnly)
             }.value
             guard !Task.isCancelled else { return }
             derived = computed
@@ -179,7 +185,9 @@ struct SegmentsScroll: View {
         }
     }
 
-    nonisolated static func derive(segments: [TranscriptSegment], speakerFilter: String?) -> Derived {
+    nonisolated static func derive(
+        segments: [TranscriptSegment], speakerFilter: String?, favorites: Set<Int> = [], favoritesOnly: Bool = false
+    ) -> Derived {
         var pauseByPrev: [Int: Double] = [:]
         for pause in SegmentPauses.detect(segments: segments, thresholdSeconds: 3.0) {
             pauseByPrev[pause.afterSegmentID] = pause.durationSeconds
@@ -193,7 +201,7 @@ struct SegmentsScroll: View {
         return Derived(
             pauseByPrev: pauseByPrev,
             confidenceByID: confidenceByID,
-            visible: visibleSegments(from: segments, speakerFilter: speakerFilter)
+            visible: visibleSegments(from: segments, speakerFilter: speakerFilter, favorites: favorites, favoritesOnly: favoritesOnly)
         )
     }
 
@@ -209,11 +217,14 @@ struct SegmentsScroll: View {
         return issuesByID
     }
 
-    nonisolated static func visibleSegments(from segments: [TranscriptSegment], speakerFilter: String?) -> [TranscriptSegment] {
+    nonisolated static func visibleSegments(
+        from segments: [TranscriptSegment], speakerFilter: String?, favorites: Set<Int> = [], favoritesOnly: Bool = false
+    ) -> [TranscriptSegment] {
         segments.filter { segment in
             guard !segment.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-            guard let speakerFilter else { return true }
-            return segment.speaker == speakerFilter
+            if let speakerFilter, segment.speaker != speakerFilter { return false }
+            guard !favoritesOnly || favorites.contains(segment.id) else { return false }
+            return true
         }
     }
 

@@ -260,6 +260,13 @@ struct ParolaApp: App {
                 Button("Jump to Next Speaker") { model.jumpToNextSpeaker() }
                     .keyboardShortcut("j", modifiers: [.command, .shift])
                     .disabled(!model.hasTranscript)
+                Button("Favorite Segment") {
+                    if let id = model.focusedSegmentIDForCommands { model.toggleSegmentFavorite(id) }
+                }
+                .keyboardShortcut("d", modifiers: [.command])
+                .disabled(model.focusedSegmentIDForCommands == nil)
+                Button("Copy Favorites") { model.copyTranscriptToPasteboard(withTimestamps: true, favoritesOnly: true) }
+                    .disabled(model.favoriteSegmentIDs.isEmpty)
                 Button("Copy as Markdown") { model.copyTranscriptAsFormat(.md) }
                     .disabled(!model.hasTranscript)
                 Button("Export Segment Notes…") { model.exportSegmentNotesAsMarkdown() }

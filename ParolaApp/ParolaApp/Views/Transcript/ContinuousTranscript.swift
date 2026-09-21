@@ -80,6 +80,8 @@ struct ContinuousChunks: View {
         })
         .onAppear { rebuildChunks() }
         .onChange(of: model.transcriptVersion) { _, _ in rebuildChunks() }
+        .onChange(of: model.favoritesOnly) { _, _ in rebuildChunks() }
+        .onChange(of: model.favoriteSegmentIDs) { _, _ in rebuildChunks() }
         .onChange(of: model.currentSegmentID) { _, _ in
             applyHighlight()
             followCurrentSegment()
@@ -113,17 +115,22 @@ struct ContinuousChunks: View {
             return
         }
         let useSpeakerColor = model.transcriptSpeakers.count >= 2
-        let segments = transcript.segments
+        let favoritesOnly = model.favoritesOnly
+        let favorites = model.favoriteSegmentIDs
+        let segments = favoritesOnly ? transcript.segments.filter { favorites.contains($0.id) } : transcript.segments
         // transcriptVersion also bumps for mutations that can't change the rendered text
         // (duration backfill, playback bookkeeping); skip the expensive rebuild for those.
-        let signature = Self.contentSignature(segments: segments, useSpeakerColor: useSpeakerColor)
+        let signature = Self.contentSignature(
+            segments: segments, useSpeakerColor: useSpeakerColor, favoritesOnly: favoritesOnly, favorites: favorites
+        )
         guard gate.needsRebuild(for: signature) else { return }
         buildTask?.cancel()
         // DS's resolved palette is main-actor storage; read it here so the detached build never touches it.
         let primaryText = DS.Color.primaryText
+        let accent = DS.Color.accent
         if segments.count <= Self.synchronousBuildCap {
             apply(
-                Self.build(segments: segments, useSpeakerColor: useSpeakerColor, primaryText: primaryText),
+                Self.build(segments: segments, useSpeakerColor: useSpeakerColor, primaryText: primaryText, favoriteColor: accent, favorites: favorites),
                 signature: signature
             )
         } else {
@@ -132,6 +139,8 @@ struct ContinuousChunks: View {
                     segments: segments,
                     useSpeakerColor: useSpeakerColor,
                     primaryText: primaryText,
+                    favoriteColor: accent,
+                    favorites: favorites,
                     signature: signature,
                     apply: apply
                 )
@@ -144,11 +153,13 @@ struct ContinuousChunks: View {
         segments: [TranscriptSegment],
         useSpeakerColor: Bool,
         primaryText: Color,
+        favoriteColor: Color = .accentColor,
+        favorites: Set<Int> = [],
         signature: Int,
         apply: ([Chunk], Int) -> Void
     ) async {
         let built = await Task.detached(priority: .userInitiated) {
-            build(segments: segments, useSpeakerColor: useSpeakerColor, primaryText: primaryText)
+            build(segments: segments, useSpeakerColor: useSpeakerColor, primaryText: primaryText, favoriteColor: favoriteColor, favorites: favorites)
         }.value
         guard !Task.isCancelled else { return }
         apply(built, signature)
@@ -162,9 +173,12 @@ struct ContinuousChunks: View {
         applyHighlight()
     }
 
-    nonisolated static func contentSignature(segments: [TranscriptSegment], useSpeakerColor: Bool) -> Int {
+    nonisolated static func contentSignature(
+        segments: [TranscriptSegment], useSpeakerColor: Bool, favoritesOnly: Bool = false, favorites: Set<Int> = []
+    ) -> Int {
         var hasher = Hasher()
         hasher.combine(useSpeakerColor)
+        hasher.combine(favoritesOnly)
         for seg in segments {
             hasher.combine(seg.id)
             hasher.combine(seg.text)
@@ -172,6 +186,7 @@ struct ContinuousChunks: View {
             // Timings are part of the render: a gap between two segments decides where a paragraph breaks.
             hasher.combine(seg.start)
             hasher.combine(seg.end)
+            hasher.combine(favorites.contains(seg.id))
         }
         return hasher.finalize()
     }
@@ -202,6 +217,8 @@ struct ContinuousChunks: View {
         segments: [TranscriptSegment],
         useSpeakerColor: Bool,
         primaryText: Color,
+        favoriteColor: Color = .accentColor,
+        favorites: Set<Int> = [],
         softCap: Int = ContinuousChunks.softSegmentCap,
         hardCap: Int = ContinuousChunks.hardSegmentCap,
         paragraphPause: TimeInterval = TranscriptDerive.paragraphPauseSeconds
@@ -248,7 +265,14 @@ struct ContinuousChunks: View {
                 text.append(separator)
             }
             let startsLine = text.characters.isEmpty || text.characters.last == "\n"
-            var piece = AttributedString(startsLine ? body : " " + body)
+            let isFavorite = favorites.contains(seg.id)
+            if isFavorite {
+                var star = AttributedString(startsLine ? "★ " : " ★ ")
+                star.foregroundColor = favoriteColor
+                offset += star.characters.count
+                text.append(star)
+            }
+            var piece = AttributedString(startsLine || isFavorite ? body : " " + body)
             piece.foregroundColor = primaryText
             piece.link = URL(string: "parola-seek://\(seg.id)")
             piece.underlineStyle = nil

@@ -492,6 +492,8 @@ final class ParolaAutomationServer {
             "dropZones": .string(model.dropZonePlan.name),
             "meetingDetectedApp": model.meetingDetectedApp.map { .string($0) } ?? .null,
             "introduction": Self.introductionState(model.introduction, currentModel: model.selectedModel),
+            "favoriteSegments": .array(model.favoriteSegmentIDs.sorted().map { .int($0) }),
+            "favoritesOnly": .bool(model.favoritesOnly),
         ])
     }
 

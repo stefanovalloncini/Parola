@@ -215,4 +215,50 @@ struct LibraryCommandsTests {
 
         #expect(arrayCount(result) == 0)
     }
+
+    @Test("setSegmentFavorite sets the state and reports it back")
+    func setSegmentFavoriteSetsState() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let entry = try await makeCardMetadataEntry(model)
+        model.loadEntry(entry.id)
+        for _ in 0..<200 where model.selectedEntryID != entry.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let command = try #require(commands["setSegmentFavorite"])
+
+        let result = try await command.handler(
+            try command.validate(AutomationArgs(["segmentID": .int(0), "isFavorite": .bool(true)])), context
+        )
+        withExtendedLifetime(server) {}
+
+        guard case .object(let fields) = result else {
+            Issue.record("setSegmentFavorite should return an object")
+            return
+        }
+        #expect(fields["segmentID"] == .int(0))
+        #expect(fields["isFavorite"] == .bool(true))
+        for _ in 0..<200 where !model.isSegmentFavorite(0) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.isSegmentFavorite(0))
+    }
+
+    @Test("setSegmentFavorite is a no-op when the state already matches")
+    func setSegmentFavoriteSkipsWhenUnchanged() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let entry = try await makeCardMetadataEntry(model)
+        model.loadEntry(entry.id)
+        for _ in 0..<200 where model.selectedEntryID != entry.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let command = try #require(commands["setSegmentFavorite"])
+
+        _ = try await command.handler(
+            try command.validate(AutomationArgs(["segmentID": .int(0), "isFavorite": .bool(false)])), context
+        )
+        withExtendedLifetime(server) {}
+
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(!model.isSegmentFavorite(0))
+    }
 }

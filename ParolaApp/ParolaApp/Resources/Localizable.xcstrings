@@ -1150,6 +1150,17 @@
         }
       }
     },
+    "Add to favorites": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aggiungi ai preferiti"
+          }
+        }
+      }
+    },
     "Add video URL": {
       "extractionState": "manual",
       "localizations": {
@@ -2671,6 +2682,17 @@
         }
       }
     },
+    "Copy Favorites": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copia preferiti"
+          }
+        }
+      }
+    },
     "Copy Link to This Segment": {
       "extractionState": "manual",
       "localizations": {
@@ -4150,6 +4172,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Errore: %@"
+          }
+        }
+      }
+    },
+    "Favorite": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preferisci"
+          }
+        }
+      }
+    },
+    "Favorite Segment": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preferisci il segmento"
+          }
+        }
+      }
+    },
+    "Favorites only (%lld)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solo preferiti (%lld)"
           }
         }
       }
@@ -8131,6 +8186,17 @@
         }
       }
     },
+    "Remove from favorites": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi dai preferiti"
+          }
+        }
+      }
+    },
     "Remove this format": {
       "extractionState": "manual",
       "localizations": {
@@ -10846,6 +10912,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Prova con un altro tipo di trascrizione."
+          }
+        }
+      }
+    },
+    "Unfavorite": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi dai preferiti"
           }
         }
       }

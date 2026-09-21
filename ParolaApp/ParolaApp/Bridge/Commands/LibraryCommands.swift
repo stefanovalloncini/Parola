@@ -258,6 +258,25 @@ extension ParolaAutomationServer {
             ),
 
             AutomationCommand(
+                name: "setSegmentFavorite",
+                area: .library,
+                summary: "Sets whether a segment of the current transcript is a favorite.",
+                kind: .mutating,
+                args: [
+                    .init(name: "segmentID", kind: .integer, required: true, summary: "Segment id within the current transcript"),
+                    .init(name: "isFavorite", kind: .boolean, required: true, summary: "Favorite state to set"),
+                ],
+                handler: { args, ctx in
+                    let segmentID = try args.int("segmentID")
+                    let isFavorite = try args.bool("isFavorite")
+                    if ctx.model.isSegmentFavorite(segmentID) != isFavorite {
+                        ctx.model.toggleSegmentFavorite(segmentID)
+                    }
+                    return .object(["segmentID": .int(segmentID), "isFavorite": .bool(isFavorite)])
+                }
+            ),
+
+            AutomationCommand(
                 name: "summarizeLatestEntry",
                 area: .library,
                 summary: "Runs the summarise prompt on the most recent library entry.",

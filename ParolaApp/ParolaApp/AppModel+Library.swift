@@ -307,6 +307,18 @@ extension AppModel {
         }
     }
 
+    var focusedSegmentIDForCommands: Int? {
+        guard let transcript else { return nil }
+        if let currentSegmentID { return currentSegmentID }
+        let speakerFilter = selectedEntryID.flatMap { entrySpeakerFilters[$0] }
+        return SegmentsScroll.visibleSegments(
+            from: transcript.segments,
+            speakerFilter: speakerFilter,
+            favorites: favoriteSegmentIDs,
+            favoritesOnly: favoritesOnly
+        ).first?.id
+    }
+
     func replaceFavorites(_ ids: Set<Int>) {
         guard let entryID = selectedEntryID else { return }
         Task { [weak self] in

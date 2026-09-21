@@ -95,4 +95,19 @@ struct FavoriteSegmentsTests {
 
         #expect(text == "second")
     }
+
+    @Test("visibleSegments applies the favorites-only filter")
+    func visibleSegmentsFavoritesFilter() {
+        let segments = threeSegmentTranscript().segments
+
+        let onlyFavorites = SegmentsScroll.visibleSegments(
+            from: segments, speakerFilter: nil, favorites: [1], favoritesOnly: true
+        )
+        #expect(onlyFavorites.map(\.id) == [1])
+
+        let unfiltered = SegmentsScroll.visibleSegments(
+            from: segments, speakerFilter: nil, favorites: [1], favoritesOnly: false
+        )
+        #expect(unfiltered.map(\.id) == [0, 1, 2])
+    }
 }
