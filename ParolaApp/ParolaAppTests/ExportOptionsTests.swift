@@ -128,3 +128,87 @@ struct ExportOptionsTests {
         #expect(model.txtExportTimestamps)
     }
 }
+
+@MainActor
+@Suite("Saved document provenance")
+struct SavedDocumentSourceTests {
+    private func makeModel(picker: TestFilePicker) -> AppModel {
+        AppModel(
+            skipBootstrap: true,
+            defaults: temporaryDefaults(),
+            filePicker: picker,
+            libraryURL: makeTempLibraryURL("saved-document")
+        )
+    }
+
+    private func temporaryAudio(_ label: String) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-saved-document-\(label)-\(UUID().uuidString).m4a")
+        try Data("audio".utf8).write(to: url)
+        return url
+    }
+
+    private func entry(id: String, source: EntrySource) -> LibraryEntry {
+        LibraryEntry(
+            id: id,
+            bundleURL: URL(fileURLWithPath: "/tmp/SavedDocumentSourceTests/\(id).parola"),
+            manifest: ParolaDocument.Manifest(
+                originalAudioName: "audio.m4a", modelName: "stub", language: "en", source: source
+            )
+        )
+    }
+
+    private func waitForBundle(at url: URL, timeoutMs: Int = 3_000) async -> Bool {
+        var elapsed = 0
+        while elapsed < timeoutMs {
+            if FileManager.default.fileExists(atPath: url.appendingPathComponent("manifest.json").path) { return true }
+            try? await Task.sleep(for: .milliseconds(15))
+            elapsed += 15
+        }
+        return false
+    }
+
+    @Test("a copy of a link's entry is saved as a link")
+    func savedCopyKeepsTheEntrySource() async throws {
+        let picker = TestFilePicker()
+        let model = makeModel(picker: picker)
+        let audio = try temporaryAudio("web")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-saved-web-\(UUID().uuidString).parola")
+        defer { try? FileManager.default.removeItem(at: destination) }
+        model.libraryEntries = [entry(id: "web", source: .web)]
+        model.selectedEntryID = "web"
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hi")], language: "en", modelName: "stub"
+        )
+        model.sourceFileURL = audio
+        await picker.queueSaveResponse(destination)
+
+        model.saveProjectDocument()
+
+        #expect(await waitForBundle(at: destination))
+        #expect(try ParolaDocument.read(at: destination).manifest.source == .web)
+    }
+
+    @Test("a copy of something that was never in the library is left to the writer")
+    func savedCopyWithoutAnEntryDerivesTheSource() async throws {
+        let picker = TestFilePicker()
+        let model = makeModel(picker: picker)
+        let audio = try temporaryAudio("file")
+        defer { try? FileManager.default.removeItem(at: audio) }
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("parola-saved-file-\(UUID().uuidString).parola")
+        defer { try? FileManager.default.removeItem(at: destination) }
+        model.transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "hi")], language: "en", modelName: "stub"
+        )
+        model.sourceFileURL = audio
+        await picker.queueSaveResponse(destination)
+
+        model.saveProjectDocument()
+
+        #expect(await waitForBundle(at: destination))
+        #expect(try ParolaDocument.read(at: destination).manifest.source == .file)
+    }
+}

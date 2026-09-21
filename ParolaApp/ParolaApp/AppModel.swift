@@ -3073,11 +3073,17 @@ final class AppModel {
     func saveProjectDocument() {
         guard let transcript, let sourceFileURL else { return }
         let suggested = sourceFileURL.deletingPathExtension().lastPathComponent + ".parola"
+        // A copy of a link's entry is still a link; with nothing loaded the writer derives it as before.
+        let entrySource = libraryEntries.first { $0.id == selectedEntryID }?.manifest.source
         Task { [weak self] in
             guard let self else { return }
             guard let dest = await self.filePicker.chooseSaveDestination(suggestedName: suggested, allowedTypes: []) else { return }
             do {
-                try await AppModel.offMainIO { _ = try ParolaDocument.write(transcript: transcript, audioURL: sourceFileURL, to: dest) }
+                try await AppModel.offMainIO {
+                    _ = try ParolaDocument.write(
+                        transcript: transcript, audioURL: sourceFileURL, to: dest, entrySource: entrySource
+                    )
+                }
             } catch {
                 ParolaLog.error(.export, "document save failed", [.error: .error(error)])
                 self.phase = .failed(message: "Save failed: \(error.localizedDescription)")

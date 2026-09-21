@@ -119,11 +119,12 @@ struct Transcribe: AsyncParsableCommand {
         return kept
     }
 
-    private enum ResolvedInput {
+    enum ResolvedInput {
         case file(URL)
         case youtube(URL)
         var url: URL { switch self { case .file(let u), .youtube(let u): return u } }
         var isURL: Bool { if case .youtube = self { return true } else { return false } }
+        var entrySource: EntrySource { isURL ? .web : .file }
     }
 
     private static func resolveInput(_ raw: String) throws -> ResolvedInput {
@@ -149,7 +150,7 @@ struct Transcribe: AsyncParsableCommand {
             stderr("Fetching captions from \(url.absoluteString)…")
             emitter.progress(.downloading, detail: url.absoluteString)
             let transcript = orthographyCorrected(try await YouTubeSubsFetcher.fetch(url: url, preferLanguage: language))
-            try emitTranscript(transcript, sourceURL: url, emitter: emitter)
+            try emitTranscript(transcript, sourceURL: url, entrySource: input.entrySource, emitter: emitter)
             return
         }
 
@@ -197,7 +198,7 @@ struct Transcribe: AsyncParsableCommand {
         }
         warnIfLanguageAssumed(transcript)
         reportTiming(transcript)
-        try emitTranscript(transcript, sourceURL: sourceURL, emitter: emitter)
+        try emitTranscript(transcript, sourceURL: sourceURL, entrySource: input.entrySource, emitter: emitter)
     }
 
     /// Stderr, and never under --mcp: that mode's stderr carries NDJSON a sentence would break.
@@ -215,7 +216,12 @@ struct Transcribe: AsyncParsableCommand {
         stderr("note: couldn't detect the language — assumed \(detection.code). Re-run with --language to set it.")
     }
 
-    private func emitTranscript(_ transcript: Transcript, sourceURL: URL, emitter: MCPProgressEmitter) throws {
+    private func emitTranscript(
+        _ transcript: Transcript,
+        sourceURL: URL,
+        entrySource: EntrySource,
+        emitter: MCPProgressEmitter
+    ) throws {
         let exporter = Exporters.exporter(for: format)
         emitter.progress(.exporting, detail: format.rawValue)
 
@@ -237,7 +243,8 @@ struct Transcribe: AsyncParsableCommand {
             let bundle = try ParolaDocument.write(
                 transcript: transcript,
                 audioURL: sourceURL,
-                to: URL(fileURLWithPath: savePath)
+                to: URL(fileURLWithPath: savePath),
+                entrySource: entrySource
             )
             stderr("Saved bundle to \(bundle.path)")
         }

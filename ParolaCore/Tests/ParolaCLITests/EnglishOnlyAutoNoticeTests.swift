@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import ParolaCore
 @testable import parola
@@ -19,5 +20,15 @@ struct EnglishOnlyAutoNoticeTests {
     @Test("an unknown model gets no notice")
     func unknownModelGetsNoNotice() {
         #expect(englishOnlyAutoNoticeText(model: "not-a-real-model") == nil)
+    }
+}
+
+@Suite("Saved bundle provenance")
+struct TranscribeEntrySourceTests {
+    @Test("a link saves as a link and a file saves as a file")
+    func entrySourceFollowsTheInput() throws {
+        let link = try #require(URL(string: "https://www.youtube.com/watch?v=abc"))
+        #expect(Transcribe.ResolvedInput.youtube(link).entrySource == .web)
+        #expect(Transcribe.ResolvedInput.file(URL(fileURLWithPath: "/tmp/talk.wav")).entrySource == .file)
     }
 }
