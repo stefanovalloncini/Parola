@@ -6,10 +6,11 @@ struct HelloScene: View {
 
     var body: some View {
         VStack(spacing: DS.Spacing.large) {
-            BrandWaveform(side: 200)
+            BrandWaveform(side: 240)
             VStack(spacing: DS.Spacing.small) {
                 Text(verbatim: "Parola")
-                    .font(DS.Font.hero)
+                    .font(DS.Font.wordmark)
+                    .kerning(-0.5)
                     .foregroundStyle(DS.Color.primaryText)
                 Text("Audio, written down.")
                     .font(DS.Font.title)
