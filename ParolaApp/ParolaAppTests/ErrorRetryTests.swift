@@ -53,10 +53,10 @@ extension TranscriberMockSuites {
 
         @Test("a failed file names the file and retries it with the current settings")
         func retryRunsTheSameFileAgain() async throws {
+            let wav = try makeWAV()
+            defer { try? FileManager.default.removeItem(at: wav) }
             try await withMocksCleared(.transcriber) {
                 await MockTranscriberRegistry.shared.clear()
-                let wav = try makeWAV()
-                defer { try? FileManager.default.removeItem(at: wav) }
 
                 await MockTranscriberRegistry.shared.install(
                     engineID: nil,
@@ -99,10 +99,10 @@ extension TranscriberMockSuites {
 
         @Test("a translate-on retry keeps translate on, even if the toggle is off")
         func retryKeepsTheTranslateOverride() async throws {
+            let wav = try makeWAV()
+            defer { try? FileManager.default.removeItem(at: wav) }
             try await withMocksCleared(.transcriber) {
                 await MockTranscriberRegistry.shared.clear()
-                let wav = try makeWAV()
-                defer { try? FileManager.default.removeItem(at: wav) }
 
                 await MockTranscriberRegistry.shared.install(
                     engineID: nil,
@@ -136,10 +136,10 @@ extension TranscriberMockSuites {
 
         @Test("opening an entry forgets the file the last failure named")
         func openingAnEntryForgetsTheFailedFile() async throws {
+            let wav = try makeWAV()
+            defer { try? FileManager.default.removeItem(at: wav) }
             try await withMocksCleared(.transcriber) {
                 await MockTranscriberRegistry.shared.clear()
-                let wav = try makeWAV()
-                defer { try? FileManager.default.removeItem(at: wav) }
 
                 await MockTranscriberRegistry.shared.install(
                     engineID: nil,
@@ -178,10 +178,10 @@ extension TranscriberMockSuites {
 
         @Test("a failure that isn't a transcription's keeps the generic card")
         func otherFailuresDoNotClaimAFile() async throws {
+            let wav = try makeWAV()
+            defer { try? FileManager.default.removeItem(at: wav) }
             try await withMocksCleared(.transcriber) {
                 await MockTranscriberRegistry.shared.clear()
-                let wav = try makeWAV()
-                defer { try? FileManager.default.removeItem(at: wav) }
 
                 await MockTranscriberRegistry.shared.install(
                     engineID: nil,
@@ -209,10 +209,10 @@ extension TranscriberMockSuites {
 
         @Test("Retry runs the file itself while a batch is running")
         func retryDoesNotJoinTheBatch() async throws {
+            let wav = try makeWAV()
+            defer { try? FileManager.default.removeItem(at: wav) }
             try await withMocksCleared(.transcriber) {
                 await MockTranscriberRegistry.shared.clear()
-                let wav = try makeWAV()
-                defer { try? FileManager.default.removeItem(at: wav) }
 
                 await MockTranscriberRegistry.shared.install(
                     engineID: nil,
@@ -251,10 +251,10 @@ extension TranscriberMockSuites {
 
         @Test("dismissing a failure forgets the file behind it")
         func dismissForgetsTheFailedFile() async throws {
+            let wav = try makeWAV()
+            defer { try? FileManager.default.removeItem(at: wav) }
             try await withMocksCleared(.transcriber) {
                 await MockTranscriberRegistry.shared.clear()
-                let wav = try makeWAV()
-                defer { try? FileManager.default.removeItem(at: wav) }
 
                 await MockTranscriberRegistry.shared.install(
                     engineID: nil,

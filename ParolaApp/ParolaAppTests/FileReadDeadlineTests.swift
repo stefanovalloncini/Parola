@@ -35,19 +35,19 @@ extension TranscriberMockSuites {
         /// A FIFO with no writer parks `open()` the way a TCC-denied folder or a stalled share does.
         @Test("a file that never opens ends the run instead of preparing forever")
         func wedgedOpenFailsTheRun() async throws {
+            let dir = FileManager.default.temporaryDirectory
+                .appendingPathComponent("parola-app-fileread-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let wedged = dir.appendingPathComponent("wedged.m4a")
+            #expect(mkfifo(wedged.path, 0o644) == 0, "could not create the FIFO the test needs")
+            defer {
+                let writer = open(wedged.path, O_WRONLY | O_NONBLOCK)
+                if writer >= 0 { close(writer) }
+                try? FileManager.default.removeItem(at: dir)
+            }
+
             try await withMocksCleared(.transcriber) {
                 await MockTranscriberRegistry.shared.clear()
-                let dir = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("parola-app-fileread-\(UUID().uuidString)")
-                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-                let wedged = dir.appendingPathComponent("wedged.m4a")
-                #expect(mkfifo(wedged.path, 0o644) == 0, "could not create the FIFO the test needs")
-                defer {
-                    let writer = open(wedged.path, O_WRONLY | O_NONBLOCK)
-                    if writer >= 0 { close(writer) }
-                    try? FileManager.default.removeItem(at: dir)
-                }
-
                 await MockTranscriberRegistry.shared.install(
                     engineID: nil,
                     response: MockTranscriberResponse(

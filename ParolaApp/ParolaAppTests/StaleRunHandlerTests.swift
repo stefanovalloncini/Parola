@@ -55,10 +55,10 @@ extension TranscriberMockSuites {
         /// current generation.
         @Test("a zombie run's partials, progress and stage never reach the pane")
         func staleHandlersAreDropped() async throws {
+            let wav = try makeWAV()
+            defer { try? FileManager.default.removeItem(at: wav) }
             try await withMocksCleared(.transcriber) {
                 await MockTranscriberRegistry.shared.clear()
-                let wav = try makeWAV()
-                defer { try? FileManager.default.removeItem(at: wav) }
                 await MockTranscriberRegistry.shared.install(
                     engineID: nil,
                     response: MockTranscriberResponse(

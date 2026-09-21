@@ -50,10 +50,10 @@ struct AppModelMeetingTests {
 
     @Test("starting a meeting recording tags it as a Meeting and clears the prompt")
     func startMeetingRecordingSelectsMeetingCategory() async throws {
+        let fixture = try? makeSilentMeetingWAV()
+        guard let fixture else { Issue.record("could not write fixture"); return }
+        defer { try? FileManager.default.removeItem(at: fixture) }
         try await withMocksCleared(.audioSource) {
-            let fixture = try? makeSilentMeetingWAV()
-            guard let fixture else { Issue.record("could not write fixture"); return }
-            defer { try? FileManager.default.removeItem(at: fixture) }
             await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
 
             let model = makeModel()
@@ -71,10 +71,10 @@ struct AppModelMeetingTests {
 
     @Test("app-only capture stashes the detected vendor's bundle IDs")
     func appOnlyCaptureStashesBundleIDs() async throws {
+        let fixture = try? makeSilentMeetingWAV()
+        guard let fixture else { Issue.record("could not write fixture"); return }
+        defer { try? FileManager.default.removeItem(at: fixture) }
         try await withMocksCleared(.audioSource) {
-            let fixture = try? makeSilentMeetingWAV()
-            guard let fixture else { Issue.record("could not write fixture"); return }
-            defer { try? FileManager.default.removeItem(at: fixture) }
             await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
 
             let model = makeModel()
@@ -90,10 +90,10 @@ struct AppModelMeetingTests {
 
     @Test("full-mix capture leaves no bundle ID stash")
     func fullMixCaptureLeavesNoStash() async throws {
+        let fixture = try? makeSilentMeetingWAV()
+        guard let fixture else { Issue.record("could not write fixture"); return }
+        defer { try? FileManager.default.removeItem(at: fixture) }
         try await withMocksCleared(.audioSource) {
-            let fixture = try? makeSilentMeetingWAV()
-            guard let fixture else { Issue.record("could not write fixture"); return }
-            defer { try? FileManager.default.removeItem(at: fixture) }
             await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
 
             let model = makeModel()
@@ -109,10 +109,10 @@ struct AppModelMeetingTests {
 
     @Test("the app-name overload tags the category and clears the prompt for a different app")
     func startMeetingRecordingWithAppNameSelectsCategoryAndBundleIDs() async throws {
+        let fixture = try? makeSilentMeetingWAV()
+        guard let fixture else { Issue.record("could not write fixture"); return }
+        defer { try? FileManager.default.removeItem(at: fixture) }
         try await withMocksCleared(.audioSource) {
-            let fixture = try? makeSilentMeetingWAV()
-            guard let fixture else { Issue.record("could not write fixture"); return }
-            defer { try? FileManager.default.removeItem(at: fixture) }
             await MockAudioSourceRegistry.shared.install(kind: .system, fixtureURL: fixture)
 
             let model = makeModel()

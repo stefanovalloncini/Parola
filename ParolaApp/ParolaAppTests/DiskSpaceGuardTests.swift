@@ -93,8 +93,8 @@ extension TranscriberMockSuites {
 
         @Test("startRecording below 1 GB warns but still records")
         func startWarnsButRecords() async throws {
+            let fixture = try makeSilentWAV()
             try await withMocksCleared(.audioSource) {
-                let fixture = try makeSilentWAV()
                 await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
                 let model = makeModel()
@@ -151,8 +151,8 @@ extension TranscriberMockSuites {
 
         @Test("crossing below 200 MB stops the recording gracefully")
         func refuseMidRecordingStops() async throws {
+            let fixture = try makeSilentWAV()
             try await withMocksCleared([.audioSource, .transcriber]) {
-                let fixture = try makeSilentWAV()
                 await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
                 await MockTranscriberRegistry.shared.install(engineID: nil, response: MockTranscriberResponse(
                     failure: MockTranscriberFailure(code: .transcriptionFailed, message: "disk guard fired")

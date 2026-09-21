@@ -115,8 +115,8 @@ struct RecordingMediaSessionConfigTests {
 struct RecordingCountInTests {
     @Test("a positive count-in shows the countdown and defers capture")
     func positiveCountInDefersCapture() async throws {
+        let fixture = try makeSilentWAV()
         try await withMocksCleared(.audioSource) {
-            let fixture = try makeSilentWAV()
             await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
             let model = makeRecordingModel()
@@ -133,8 +133,8 @@ struct RecordingCountInTests {
 
     @Test("a zero count-in shows no countdown")
     func zeroCountInNoCountdown() async throws {
+        let fixture = try makeSilentWAV()
         try await withMocksCleared(.audioSource) {
-            let fixture = try makeSilentWAV()
             await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
             let model = makeRecordingModel()
@@ -150,8 +150,8 @@ struct RecordingCountInTests {
 
     @Test("a negative count-in is clamped to zero")
     func negativeCountInClamped() async throws {
+        let fixture = try makeSilentWAV()
         try await withMocksCleared(.audioSource) {
-            let fixture = try makeSilentWAV()
             await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
             let model = makeRecordingModel()
@@ -187,8 +187,8 @@ extension TranscriberMockSuites {
 
         @Test("a positive max-minutes auto-stops the recording on its own")
         func autoStopFires() async throws {
+            let fixture = try makeSilentWAV()
             try await withMocksCleared([.audioSource, .transcriber]) {
-                let fixture = try makeSilentWAV()
                 await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
                 // A failing mock routes the auto-stop's stop→transcribe into the catch (.failed) so the
                 // run never persists to the library (CoreSpotlight indexing hangs the xctest host).
@@ -215,8 +215,8 @@ extension TranscriberMockSuites {
 
         @Test("a zero max-minutes leaves the recording running")
         func zeroMaxMinutesNeverStops() async throws {
+            let fixture = try makeSilentWAV()
             try await withMocksCleared(.audioSource) {
-                let fixture = try makeSilentWAV()
                 await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
                 let model = makeRecordingModel(clock: ImmediateClock())
@@ -259,8 +259,8 @@ extension TranscriberMockSuites {
 
         @Test("a stop that lands while the capture is still starting discards the take")
         func stopDuringStartupWins() async throws {
+            let fixture = try makeSilentWAV()
             try await withMocksCleared(.audioSource) {
-                let fixture = try makeSilentWAV()
                 await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
                 let model = makeRecordingModel()
@@ -284,8 +284,8 @@ extension TranscriberMockSuites {
 
         @Test("a stop during startup leaves the next recording free to start")
         func stopDuringStartupDoesNotLatch() async throws {
+            let fixture = try makeSilentWAV()
             try await withMocksCleared(.audioSource) {
-                let fixture = try makeSilentWAV()
                 await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
                 let model = makeRecordingModel()
@@ -309,8 +309,8 @@ extension TranscriberMockSuites {
 
         @Test("a stop held for startup resolves its waiter as cancelled", .timeLimit(.minutes(1)))
         func stopHeldForStartupResolvesWaiter() async throws {
+            let fixture = try makeSilentWAV()
             try await withMocksCleared(.audioSource) {
-                let fixture = try makeSilentWAV()
                 await MockAudioSourceRegistry.shared.install(kind: .mic, fixtureURL: fixture)
 
                 let model = makeRecordingModel()
