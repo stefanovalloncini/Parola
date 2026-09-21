@@ -238,7 +238,7 @@ public actor LibrarySearchIndex {
         self.writeSnapshotData = writeSnapshotData
         self.removeSnapshotFile = removeSnapshotFile
         self.loadTask = Task.detached(priority: .utility) {
-            Self.loadSnapshot(at: indexDirectory)
+            await Self.loadSnapshotOffPool(at: indexDirectory)
         }
     }
 
@@ -403,6 +403,7 @@ public actor LibrarySearchIndex {
         scheduleSave()
     }
 
+    /// Callers must hold off `index` and `remove` across this call: it suspends while it tokenizes, and the install that follows replaces every entry.
     func rebuild(entries rebuilt: [RebuildEntry]) async {
         await ensureLoaded()
         // Tokenized before the old index is dropped, so a search during the pass still answers from it.
@@ -458,6 +459,15 @@ public actor LibrarySearchIndex {
         directory.appendingPathExtension("json")
     }
 
+    /// The reads and the parallel decode would otherwise hold a cooperative-pool thread for the whole load.
+    private static func loadSnapshotOffPool(at directory: URL) async -> LoadResult {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                continuation.resume(returning: loadSnapshot(at: directory))
+            }
+        }
+    }
+
     private static func loadSnapshot(at directory: URL) -> LoadResult {
         let legacy = FileManager.default.fileExists(atPath: legacySnapshotURL(for: directory).path)
         guard let data = try? Data(contentsOf: manifestURL(in: directory)) else {
@@ -467,13 +477,18 @@ public actor LibrarySearchIndex {
               manifest.version == snapshotVersion else {
             return LoadResult(outcome: .staleDiscarded, legacySnapshotPresent: legacy)
         }
-        guard let decoded = decodeEntries(manifest.entries.keys.sorted(), in: entriesDirectory(in: directory)) else {
+        let ids = manifest.entries.keys.sorted()
+        guard let decoded = decodeEntries(ids, in: entriesDirectory(in: directory)) else {
             return LoadResult(outcome: .staleDiscarded, legacySnapshotPresent: legacy)
         }
         var entries: [String: IndexedEntry] = [:]
         var inverted: [String: Set<String>] = [:]
         entries.reserveCapacity(decoded.count)
-        for entry in decoded {
+        for (id, entry) in zip(ids, decoded) {
+            // A file left behind by a write that failed under a manifest a later save wrote: stale, not current.
+            guard entry.id == id, manifest.entries[id] == entry.fingerprint else {
+                return LoadResult(outcome: .staleDiscarded, legacySnapshotPresent: legacy)
+            }
             entries[entry.id] = IndexedEntry(
                 title: entry.title,
                 text: entry.text,

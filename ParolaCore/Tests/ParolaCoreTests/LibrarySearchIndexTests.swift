@@ -783,6 +783,24 @@ struct LibrarySearchIndexTests {
         #expect(await index2.search("sprint").isEmpty)
     }
 
+    @Test("an entry file whose fingerprint is not the manifest's makes the snapshot stale")
+    func fingerprintMismatchIsStale() async throws {
+        let (index1, url) = makeTempIndex()
+        defer { try? FileManager.default.removeItem(at: url) }
+        await index1.index(id: "e1", title: "Notes", text: "sprint planning", fingerprint: "f1", createdAt: Date())
+        await index1.flush()
+        // The manifest of a later save, over an entry file an earlier save failed to replace.
+        var manifest = try #require(
+            try JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL(in: url))) as? [String: Any]
+        )
+        manifest["entries"] = ["e1": "f2"]
+        try JSONSerialization.data(withJSONObject: manifest).write(to: manifestURL(in: url))
+
+        let index2 = LibrarySearchIndex(indexDirectory: url)
+        #expect(await index2.needsRebuild(matching: ["e1": "f2"]))
+        #expect(await index2.search("sprint").isEmpty)
+    }
+
     @Test("an entry file the manifest does not list is ignored and pruned")
     func unlistedEntryFileIsPruned() async throws {
         let (index1, url) = makeTempIndex()
