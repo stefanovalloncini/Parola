@@ -5,6 +5,9 @@ import ParolaCore
 struct EngineScene: View {
     @Environment(AppModel.self) private var model
 
+    /// How much accent the chosen card's fill carries; `SurfaceContrastTests` pins the detail line's contrast on it.
+    nonisolated static let selectedTintOpacity = 0.10
+
     /// Apple Speech is `.recommended` too — for its own engine — so the chip follows the rule that picked the Whisper card.
     static func isRecommended(_ variant: ModelVariant) -> Bool {
         variant.category == .recommended && variant.engineID != .appleSpeech
@@ -86,7 +89,7 @@ private struct EngineCard: View {
             .padding(DS.Spacing.medium)
             .background {
                 shape.fill(DS.Color.surfaceElevated)
-                shape.fill(isSelected ? DS.Color.accent.opacity(0.10) : .clear)
+                shape.fill(isSelected ? DS.Color.accent.opacity(EngineScene.selectedTintOpacity) : .clear)
             }
             .overlay(
                 shape.strokeBorder(
@@ -133,14 +136,19 @@ private struct EngineCard: View {
                 DSProgressBar(value: downloadProgress)
                 Text(AppFormat.percent(downloadProgress))
                     .font(DS.Font.mono)
-                    .foregroundStyle(DS.Color.secondaryText)
+                    .foregroundStyle(detailColor)
             }
         } else {
             Text(line)
                 .font(DS.Font.body)
-                .foregroundStyle(DS.Color.secondaryText)
+                .foregroundStyle(detailColor)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    /// Secondary text lands under 4.5:1 on the accent tint, so the chosen card reads its detail in the primary colour.
+    private var detailColor: Color {
+        isSelected ? DS.Color.primaryText : DS.Color.secondaryText
     }
 
     private var line: LocalizedStringKey {

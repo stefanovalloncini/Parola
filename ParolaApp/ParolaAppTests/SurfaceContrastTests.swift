@@ -105,6 +105,38 @@ struct SurfaceContrastTests {
         }
     }
 
+    /// The introduction's chosen engine card tints `surfaceElevated` with the accent and sets its detail line on that tint.
+    @Test("the chosen engine card's detail clears AA on its accent tint", arguments: ThemePreset.allCases)
+    func selectedEngineCardDetailContrast(preset: ThemePreset) throws {
+        let palette = preset.palette
+        let accent = try #require(Self.pair(palette.accent))
+        let card = try #require(Self.pair(palette.surfaceElevated))
+        let amount = EngineScene.selectedTintOpacity
+        let tint = (
+            light: card.light.blended(toward: accent.light, amount: amount),
+            dark: card.dark.blended(toward: accent.dark, amount: amount)
+        )
+
+        let ink = try Self.primaryInk(palette)
+        for (scheme, fill, label) in [("light", tint.light, ink.light), ("dark", tint.dark, ink.dark)] {
+            let drawn = fill.blended(toward: label, amount: label.a)
+            #expect(drawn.contrast(against: fill) >= Self.minimum, "\(preset.rawValue) \(scheme)")
+        }
+    }
+
+    /// `textPrimary` is a system colour, so it only has a value inside a drawing appearance — and it carries alpha.
+    private static func primaryInk(_ palette: ThemePalette) throws -> (light: RGBA, dark: RGBA) {
+        var light = RGBA(0, 0, 0)
+        var dark = RGBA(0, 0, 0)
+        try #require(NSAppearance(named: .aqua)).performAsCurrentDrawingAppearance {
+            light = RGBA(palette.textPrimary.color)
+        }
+        try #require(NSAppearance(named: .darkAqua)).performAsCurrentDrawingAppearance {
+            dark = RGBA(palette.textPrimary.color)
+        }
+        return (light, dark)
+    }
+
     /// A disabled primary pill drops the accent for the neutral pair; `subtleFill` is `Color.primary` at 6% over the page.
     @Test("a disabled primary pill's label clears 3:1 on its neutral fill")
     func disabledPrimaryPillPair() throws {
