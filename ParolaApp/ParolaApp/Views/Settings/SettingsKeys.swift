@@ -93,7 +93,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .dictation: return ["hotkey", "f5", "push to talk", "toggle", "indicator", "notch", "overlay", "cleanup", "workflows", "per-app", "hud", "opacity", "context", "clipboard", "screen", "ocr", "paste delay", "self-corrections", "url rule"]
         case .snippets: return ["snippet", "expand", "abbreviation", "trigger", "placeholder", "date", "time"]
         case .corrections: return ["correction", "fix", "replace", "dictation", "vocabulary"]
-        case .translation: return ["translate", "english"]
+        case .translation: return ["translate", "english", "side by side", "language"]
         case .transcriptionDefaults: return ["default", "model", "language", "engine", "whisper", "privacy", "cloud", "llm", "speakers", "diarize", "word timestamps", "apple speech", "playback"]
         case .ignoredSegments: return ["filler", "uh", "um", "ignore", "skip"]
         case .findReplace: return ["regex", "replace", "term pack", "substitution", "rule"]
@@ -162,7 +162,7 @@ enum SettingsPaneScope: String, CaseIterable, Identifiable {
         case .corrections:
             return ["correctionRules"]
         case .translation:
-            return ["translate"]
+            return ["translate", "translationSideBySide"]
         case .transcriptionDefaults:
             // wordTimestamps and diarize are shared with the .general scope: both panes
             // show the toggles, and each pane's reset must cover what it shows.

@@ -46,17 +46,21 @@ struct MockTranslator: TranscriptTranslating, Sendable {
 
     let mode: Mode
     let map: [String: String]
+    /// Holds each batch back, so a scripted run can be watched making progress.
+    let delayMs: Int
 
     var providerName: String { "mock" }
 
-    init(mode: Mode, map: [String: String] = [:]) {
+    init(mode: Mode, map: [String: String] = [:], delayMs: Int = 0) {
         self.mode = mode
         self.map = map
+        self.delayMs = delayMs
     }
 
     func translate(
         _ texts: [(id: Int, text: String)], from source: String?, to target: String
     ) async throws -> [Int: String] {
+        if delayMs > 0 { try await Task.sleep(for: .milliseconds(delayMs)) }
         var out: [Int: String] = [:]
         for unit in texts {
             switch mode {

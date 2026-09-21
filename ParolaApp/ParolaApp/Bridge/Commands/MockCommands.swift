@@ -95,6 +95,7 @@ extension ParolaAutomationServer {
                 args: [
                     .init(name: "mode", kind: .string(enum: MockTranslator.Mode.allCases.map(\.rawValue)), required: true, summary: "How the mock translates"),
                     .init(name: "map", kind: .object, required: false, summary: "Source text to translated text, for the 'map' mode"),
+                    .init(name: "delayMs", kind: .integer, required: false, summary: "Milliseconds to hold each batch"),
                 ],
                 handler: { args, ctx in
                     try requireTestMode(ctx)
@@ -109,11 +110,13 @@ extension ParolaAutomationServer {
                         }
                         map[key] = text
                     }
-                    MockTranslatorRegistry.shared.install(MockTranslator(mode: mode, map: map))
+                    let delayMs = (try args.optionalInt("delayMs")) ?? 0
+                    MockTranslatorRegistry.shared.install(MockTranslator(mode: mode, map: map, delayMs: delayMs))
                     return .object([
                         "installed": .bool(true),
                         "mode": .string(modeRaw),
                         "mapCount": .int(map.count),
+                        "delayMs": .int(delayMs),
                     ])
                 }
             ),

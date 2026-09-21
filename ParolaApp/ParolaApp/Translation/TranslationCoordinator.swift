@@ -35,6 +35,8 @@ final class TranslationCoordinator {
     /// Non-nil while a run waits for a live session; the host view feeds it to `.translationTask`.
     private(set) var sessionConfiguration: TranslationSession.Configuration?
     private(set) var activeEntryID: LibraryEntry.ID?
+    /// The language the last run aimed at, so Retry can repeat it.
+    private(set) var activeTarget: String?
 
     /// Test seam: when set, replaces the resolved translator so a test never touches the shared mock registry.
     @ObservationIgnored var translatorOverride: (any TranscriptTranslating)?
@@ -90,6 +92,7 @@ final class TranslationCoordinator {
         cancel()
         cancelRequested = false
         activeEntryID = entryID
+        activeTarget = target
         state = .preparing
 
         let source = Self.sourceLanguage(for: transcript.language)

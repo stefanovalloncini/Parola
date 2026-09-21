@@ -27,6 +27,7 @@ struct ContinuousChunks: View {
     struct Chunk: Identifiable {
         let id: Int
         var text: AttributedString
+        var translation: AttributedString?
         let runs: [TranscriptSegment.ID: SegmentRun]
     }
 
@@ -62,13 +63,7 @@ struct ContinuousChunks: View {
     var body: some View {
         LazyVStack(alignment: .leading, spacing: DS.Spacing.regular) {
             ForEach(chunks) { chunk in
-                Text(chunk.text)
-                    .font(model.transcriptCompact ? DS.Font.transcriptCompact : DS.Font.transcript)
-                    .lineSpacing(model.transcriptCompact ? 3 : 5)
-                    .textSelection(.enabled)
-                    // Definite height; without it the inspector's constraint pass re-typesets the chunk Text in a loop (main-thread freeze on long audio).
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                chunkRow(chunk)
                     .id(chunk.id)
             }
         }
@@ -87,6 +82,33 @@ struct ContinuousChunks: View {
             followCurrentSegment()
         }
         .task(id: model.pendingRevealSegmentID) { await revealPendingSegment() }
+    }
+
+    @ViewBuilder
+    private func chunkRow(_ chunk: Chunk) -> some View {
+        if let translation = chunk.translation, model.translationSideBySide {
+            HStack(alignment: .top, spacing: DS.Spacing.regular) {
+                chunkText(chunk.text)
+                chunkText(translation)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: DS.Spacing.small) {
+                chunkText(chunk.text)
+                if let translation = chunk.translation {
+                    chunkText(translation)
+                }
+            }
+        }
+    }
+
+    private func chunkText(_ text: AttributedString) -> some View {
+        Text(text)
+            .font(model.transcriptCompact ? DS.Font.transcriptCompact : DS.Font.transcript)
+            .lineSpacing(model.transcriptCompact ? 3 : 5)
+            .textSelection(.enabled)
+            // Definite height; without it the inspector's constraint pass re-typesets the chunk Text in a loop (main-thread freeze on long audio).
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// A search result writes its segment before this view is built, so the jump is read here rather
@@ -118,19 +140,26 @@ struct ContinuousChunks: View {
         let favoritesOnly = model.favoritesOnly
         let favorites = model.favoriteSegmentIDs
         let segments = favoritesOnly ? transcript.segments.filter { favorites.contains($0.id) } : transcript.segments
+        let translations = transcript.translation?.segments ?? [:]
         // transcriptVersion also bumps for mutations that can't change the rendered text
         // (duration backfill, playback bookkeeping); skip the expensive rebuild for those.
         let signature = Self.contentSignature(
-            segments: segments, useSpeakerColor: useSpeakerColor, favoritesOnly: favoritesOnly, favorites: favorites
+            segments: segments, useSpeakerColor: useSpeakerColor, favoritesOnly: favoritesOnly,
+            favorites: favorites, translations: translations
         )
         guard gate.needsRebuild(for: signature) else { return }
         buildTask?.cancel()
         // DS's resolved palette is main-actor storage; read it here so the detached build never touches it.
         let primaryText = DS.Color.primaryText
         let accent = DS.Color.accent
+        let secondaryText = DS.Color.secondaryText
         if segments.count <= Self.synchronousBuildCap {
             apply(
-                Self.build(segments: segments, useSpeakerColor: useSpeakerColor, primaryText: primaryText, favoriteColor: accent, favorites: favorites),
+                Self.build(
+                    segments: segments, useSpeakerColor: useSpeakerColor, primaryText: primaryText,
+                    favoriteColor: accent, favorites: favorites, translations: translations,
+                    translationColor: secondaryText
+                ),
                 signature: signature
             )
         } else {
@@ -141,6 +170,8 @@ struct ContinuousChunks: View {
                     primaryText: primaryText,
                     favoriteColor: accent,
                     favorites: favorites,
+                    translations: translations,
+                    translationColor: secondaryText,
                     signature: signature,
                     apply: apply
                 )
@@ -155,11 +186,17 @@ struct ContinuousChunks: View {
         primaryText: Color,
         favoriteColor: Color,
         favorites: Set<Int>,
+        translations: [Int: String],
+        translationColor: Color,
         signature: Int,
         apply: ([Chunk], Int) -> Void
     ) async {
         let built = await Task.detached(priority: .userInitiated) {
-            build(segments: segments, useSpeakerColor: useSpeakerColor, primaryText: primaryText, favoriteColor: favoriteColor, favorites: favorites)
+            build(
+                segments: segments, useSpeakerColor: useSpeakerColor, primaryText: primaryText,
+                favoriteColor: favoriteColor, favorites: favorites, translations: translations,
+                translationColor: translationColor
+            )
         }.value
         guard !Task.isCancelled else { return }
         apply(built, signature)
@@ -174,7 +211,8 @@ struct ContinuousChunks: View {
     }
 
     nonisolated static func contentSignature(
-        segments: [TranscriptSegment], useSpeakerColor: Bool, favoritesOnly: Bool, favorites: Set<Int>
+        segments: [TranscriptSegment], useSpeakerColor: Bool, favoritesOnly: Bool, favorites: Set<Int>,
+        translations: [Int: String]
     ) -> Int {
         var hasher = Hasher()
         hasher.combine(useSpeakerColor)
@@ -187,6 +225,7 @@ struct ContinuousChunks: View {
             hasher.combine(seg.start)
             hasher.combine(seg.end)
             hasher.combine(favorites.contains(seg.id))
+            hasher.combine(translations[seg.id])
         }
         return hasher.finalize()
     }
@@ -219,12 +258,16 @@ struct ContinuousChunks: View {
         primaryText: Color,
         favoriteColor: Color,
         favorites: Set<Int>,
+        translations: [Int: String],
+        translationColor: Color,
         softCap: Int = ContinuousChunks.softSegmentCap,
         hardCap: Int = ContinuousChunks.hardSegmentCap,
         paragraphPause: TimeInterval = TranscriptDerive.paragraphPauseSeconds
     ) -> [Chunk] {
         var chunks: [Chunk] = []
         var text = AttributedString()
+        var translated = AttributedString()
+        var translatedSegments = 0
         var runs: [TranscriptSegment.ID: SegmentRun] = [:]
         var offset = 0
         var segmentCount = 0
@@ -234,8 +277,15 @@ struct ContinuousChunks: View {
 
         func closeChunk() {
             guard !text.characters.isEmpty else { return }
-            chunks.append(Chunk(id: chunks.count, text: text, runs: runs))
+            chunks.append(Chunk(
+                id: chunks.count,
+                text: text,
+                translation: translatedSegments == 0 ? nil : translated,
+                runs: runs
+            ))
             text = AttributedString()
+            translated = AttributedString()
+            translatedSegments = 0
             runs = [:]
             offset = 0
             segmentCount = 0
@@ -255,6 +305,7 @@ struct ContinuousChunks: View {
                 heading.font = DS.Font.bodyStrong
                 offset += heading.characters.count
                 text.append(heading)
+                translated.append(heading)
                 shownSpeaker = label
             } else if segmentCount >= hardCap || (segmentCount >= softCap && (lastEndedSentence || pauseBreak)) {
                 closeChunk()
@@ -263,6 +314,7 @@ struct ContinuousChunks: View {
                 let separator = AttributedString("\n\n")
                 offset += separator.characters.count
                 text.append(separator)
+                translated.append(separator)
             }
             let startsLine = text.characters.isEmpty || text.characters.last == "\n"
             let isFavorite = favorites.contains(seg.id)
@@ -280,6 +332,14 @@ struct ContinuousChunks: View {
             runs[seg.id] = SegmentRun(offsets: offset..<offset + length, baseColor: primaryText)
             offset += length
             text.append(piece)
+            if let translation = translations[seg.id]?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !translation.isEmpty {
+                let startsTranslatedLine = translated.characters.isEmpty || translated.characters.last == "\n"
+                var translatedPiece = AttributedString(startsTranslatedLine ? translation : " " + translation)
+                translatedPiece.foregroundColor = translationColor
+                translated.append(translatedPiece)
+                translatedSegments += 1
+            }
             segmentCount += 1
             lastEndedSentence = endsSentence(body)
         }

@@ -82,12 +82,14 @@ final class AppModel {
             let speakers = transcript?.uniqueSpeakers ?? []
             if speakers != transcriptSpeakers { transcriptSpeakers = speakers }
             if hasTranscript != (transcript != nil) { hasTranscript = transcript != nil }
+            if hasTranslation != (transcript?.translation != nil) { hasTranslation = transcript?.translation != nil }
             transcriptVersion &+= 1
             if findIsOpen { scheduleRecomputeMatches() }
         }
     }
     /// Menu enablement reads this instead of the transcript itself, so a segment edit doesn't rebuild the whole command tree.
     private(set) var hasTranscript: Bool = false
+    private(set) var hasTranslation: Bool = false
     private(set) var transcriptSpeakers: [String] = []
     private(set) var transcriptVersion: Int = 0
     @ObservationIgnored private var cachedTranscriptText: String?

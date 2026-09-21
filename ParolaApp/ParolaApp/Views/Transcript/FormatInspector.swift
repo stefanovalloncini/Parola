@@ -13,6 +13,8 @@ struct FormatInspector: View {
         VStack(spacing: DS.Spacing.medium) {
             displayModesSection
 
+            TranslationSection()
+
             InspectorSection(title: "People") {
                 TextField("Add a speaker…", text: $newSpeaker)
                     .textFieldStyle(.plain)

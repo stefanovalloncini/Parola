@@ -178,6 +178,9 @@ struct ParolaApp: App {
                 Button("Show Chat") { model.setTranscriptPaneMode(.chat) }
                     .keyboardShortcut("3", modifiers: [.command])
                     .disabled(!model.canShow(.chat))
+                Toggle("Show Translations Side by Side", isOn: $model.translationSideBySide)
+                    .disabled(!model.hasTranslation)
+                    .axLeaf("Menu.View.TranslationSideBySide")
                 Divider()
                 Button("Toggle Inspector") {
                     InspectorVisibility.toggle(in: DefaultsStore.current, isNarrow: model.transcriptPaneIsNarrow)

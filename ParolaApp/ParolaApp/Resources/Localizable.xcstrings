@@ -237,6 +237,17 @@
         }
       }
     },
+    "%lld characters": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld caratteri"
+          }
+        }
+      }
+    },
     "%lld chars": {
       "extractionState": "manual",
       "localizations": {
@@ -1442,6 +1453,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apple Speech"
+          }
+        }
+      }
+    },
+    "Apple Translation (on device)": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traduzione Apple (sul dispositivo)"
           }
         }
       }
@@ -5012,6 +5034,17 @@
         }
       }
     },
+    "How Parola translates a transcript, and how it shows the result.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Come Parola traduce una trascrizione e come mostra il risultato."
+          }
+        }
+      }
+    },
     "Huge": {
       "extractionState": "manual",
       "localizations": {
@@ -7153,6 +7186,17 @@
         }
       }
     },
+    "Off puts the translation under each segment instead of beside it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se disattivato, la traduzione va sotto ogni segmento invece che accanto."
+          }
+        }
+      }
+    },
     "Offer to record system audio when Zoom, Teams, Webex, or Meet launches.": {
       "extractionState": "manual",
       "localizations": {
@@ -8030,6 +8074,17 @@
         }
       }
     },
+    "Preparing the translation…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparazione della traduzione…"
+          }
+        }
+      }
+    },
     "Preset name": {
       "extractionState": "manual",
       "localizations": {
@@ -8721,6 +8776,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rimuovi questo preset"
+          }
+        }
+      }
+    },
+    "Remove translation": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi traduzione"
           }
         }
       }
@@ -9786,6 +9852,17 @@
         }
       }
     },
+    "Show Translations Side by Side": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra le traduzioni affiancate"
+          }
+        }
+      }
+    },
     "Show all speakers": {
       "extractionState": "manual",
       "localizations": {
@@ -9870,6 +9947,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostra anche la fine di ogni segmento."
+          }
+        }
+      }
+    },
+    "Show translations side by side": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra le traduzioni affiancate"
           }
         }
       }
@@ -10933,6 +11021,17 @@
         }
       }
     },
+    "The translation is still on screen, but Parola couldn't save it to your library. %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La traduzione è ancora a schermo, ma Parola non è riuscita a salvarla nella libreria. %@"
+          }
+        }
+      }
+    },
     "Theme": {
       "extractionState": "manual",
       "localizations": {
@@ -10995,6 +11094,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Verranno spostate in Eliminati di recente."
+          }
+        }
+      }
+    },
+    "This Mac can't translate into that language.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo Mac non può tradurre in quella lingua."
           }
         }
       }
@@ -11618,6 +11728,17 @@
         }
       }
     },
+    "Translate again": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traduci di nuovo"
+          }
+        }
+      }
+    },
     "Translate captions live as you speak.": {
       "extractionState": "manual",
       "localizations": {
@@ -11662,6 +11783,50 @@
         }
       }
     },
+    "Translate to…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traduci in…"
+          }
+        }
+      }
+    },
+    "Translated to %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tradotto in %@"
+          }
+        }
+      }
+    },
+    "Translating %lld of %lld…": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traduzione %lld di %lld…"
+          }
+        }
+      }
+    },
+    "Translating a finished transcript runs on your Mac.": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La traduzione di una trascrizione completata avviene sul tuo Mac."
+          }
+        }
+      }
+    },
     "Translation": {
       "extractionState": "manual",
       "localizations": {
@@ -11669,6 +11834,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Traduzione"
+          }
+        }
+      }
+    },
+    "Translation provider": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Servizio di traduzione"
           }
         }
       }

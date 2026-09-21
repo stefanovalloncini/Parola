@@ -279,6 +279,27 @@ struct AppModelTranslationTests {
         #expect(try await store.load(entryID).document.transcript.translation == nil)
     }
 
+    @Test("side by side is on to begin with and persists")
+    func sideBySidePersists() async throws {
+        let (model, _) = try await loadedModel()
+
+        #expect(model.translationSideBySide)
+        model.translationSideBySide = false
+        #expect(model.defaults.bool(forKey: "translationSideBySide") == false)
+    }
+
+    @Test("the View menu item stays off until a translation exists")
+    func hasTranslationTracksTheTranscript() async throws {
+        let (model, _) = try await loadedModel()
+        model.translationCoordinator.translatorOverride = MockTranslator(mode: .reverseWords)
+
+        #expect(!model.hasTranslation)
+        await model.translateTranscript(to: "en")
+        #expect(model.hasTranslation)
+        await model.removeTranslation()
+        #expect(!model.hasTranslation)
+    }
+
     @Test("an installed mock translator is what a run uses")
     func installedMockIsResolved() async throws {
         let (model, _) = try await loadedModel()

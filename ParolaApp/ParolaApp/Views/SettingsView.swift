@@ -109,7 +109,7 @@ private struct SettingsRouteMeta {
         .corrections: SettingsRouteMeta(titleKey: "Corrections", summaryKey: "Word replacements applied to dictated text after each take.", symbol: "wand.and.rays", scope: .corrections),
         .localModels: SettingsRouteMeta(titleKey: "Local Models", summaryKey: "Speech models on this Mac, and the space they take up.", symbol: "cpu", scope: nil),
         .transcriptionDefaults: SettingsRouteMeta(titleKey: "Transcription Defaults", summaryKey: "The model and language new transcriptions start with.", symbol: "slider.horizontal.3", scope: .transcriptionDefaults),
-        .translation: SettingsRouteMeta(titleKey: "Translation", summaryKey: "Whether Parola translates transcripts into English as it works.", symbol: "character.book.closed", scope: .translation),
+        .translation: SettingsRouteMeta(titleKey: "Translation", summaryKey: "How Parola translates a transcript, and how it shows the result.", symbol: "character.book.closed", scope: .translation),
         .ignoredSegments: SettingsRouteMeta(titleKey: "Ignored Segments", summaryKey: "Segments dropped from a transcript when the text matches a pattern.", symbol: "line.3.horizontal.decrease.circle", scope: .ignoredSegments),
         .findReplace: SettingsRouteMeta(titleKey: "Find & Replace", summaryKey: "Substitutions applied to every transcript before it's saved.", symbol: "arrow.triangle.2.circlepath", scope: .findReplace),
         .exportFormats: SettingsRouteMeta(titleKey: "Export Formats", summaryKey: "The named exports Parola can write, and what each one puts in the file.", symbol: "square.and.arrow.up", scope: .exportFormats),

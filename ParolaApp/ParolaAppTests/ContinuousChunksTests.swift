@@ -29,6 +29,7 @@ struct ContinuousChunksTests {
     private func build(
         _ segments: [TranscriptSegment],
         useSpeakerColor: Bool = false,
+        translations: [Int: String] = [:],
         softCap: Int = ContinuousChunks.softSegmentCap,
         hardCap: Int = ContinuousChunks.hardSegmentCap
     ) -> [ContinuousChunks.Chunk] {
@@ -38,6 +39,8 @@ struct ContinuousChunksTests {
             primaryText: DS.Color.primaryText,
             favoriteColor: DS.Color.accent,
             favorites: [],
+            translations: translations,
+            translationColor: DS.Color.secondaryText,
             softCap: softCap,
             hardCap: hardCap
         )
@@ -51,6 +54,51 @@ struct ContinuousChunksTests {
     ) -> [String] {
         build(segments, useSpeakerColor: useSpeakerColor, softCap: softCap, hardCap: hardCap)
             .map { String($0.text.characters) }
+    }
+
+    @Test("a translated chunk carries a second column in the same order")
+    func translatedColumnFollowsTheOriginal() {
+        let segments = [segment(0, "Ciao."), segment(1, "Come stai?")]
+        let chunks = build(segments, translations: [0: "Hello.", 1: "How are you?"])
+
+        #expect(chunks.count == 1)
+        #expect(String(chunks[0].text.characters) == "Ciao. Come stai?")
+        #expect(chunks[0].translation.map { String($0.characters) } == "Hello. How are you?")
+    }
+
+    @Test("a segment without a translation leaves the second column shorter")
+    func untranslatedSegmentsAreSkippedInTheColumn() {
+        let chunks = build([segment(0, "Ciao."), segment(1, "Come stai?")], translations: [1: "How are you?"])
+
+        #expect(chunks[0].translation.map { String($0.characters) } == "How are you?")
+    }
+
+    @Test("a chunk with nothing translated carries no second column")
+    func untranslatedChunkHasNoColumn() {
+        let chunks = build([segment(0, "Ciao."), segment(1, "Come stai?")])
+
+        #expect(chunks[0].translation == nil)
+    }
+
+    @Test("the translated column repeats the speaker heading so the two line up")
+    func translatedColumnKeepsSpeakerHeadings() {
+        let segments = [segment(0, "Ciao.", speaker: "Ada"), segment(1, "Ciao a te.", speaker: "Grace")]
+        let chunks = build(segments, useSpeakerColor: true, translations: [0: "Hello.", 1: "Hello back."])
+
+        #expect(chunks.map { $0.translation.map { String($0.characters) } } == ["Ada\nHello.", "Grace\nHello back."])
+    }
+
+    @Test("a new translation is a different signature")
+    func translationChangesTheSignature() {
+        let segments = [segment(0, "Ciao.")]
+        let before = ContinuousChunks.contentSignature(
+            segments: segments, useSpeakerColor: false, favoritesOnly: false, favorites: [], translations: [:]
+        )
+        let after = ContinuousChunks.contentSignature(
+            segments: segments, useSpeakerColor: false, favoritesOnly: false, favorites: [], translations: [0: "Hello."]
+        )
+
+        #expect(before != after)
     }
 
     private func runText(in chunk: ContinuousChunks.Chunk, id: TranscriptSegment.ID) -> String? {
@@ -439,6 +487,8 @@ struct ContinuousChunksTests {
             primaryText: DS.Color.primaryText,
             favoriteColor: DS.Color.accent,
             favorites: [],
+            translations: [:],
+            translationColor: DS.Color.secondaryText,
             signature: signature
         ) { _, applied in box.record(applied) }
     }
@@ -446,7 +496,9 @@ struct ContinuousChunksTests {
     @Test("a cancelled off-main build never claims its signature")
     func cancelledOffMainBuildLeavesGateOpen() async {
         let segments = (0..<(ContinuousChunks.synchronousBuildCap + 40)).map { segment($0, "Sentence \($0).") }
-        let signature = ContinuousChunks.contentSignature(segments: segments, useSpeakerColor: false, favoritesOnly: false, favorites: [])
+        let signature = ContinuousChunks.contentSignature(
+            segments: segments, useSpeakerColor: false, favoritesOnly: false, favorites: [], translations: [:]
+        )
         let box = GateBox()
 
         let cancelled = Task { await buildOffMain(segments, signature: signature, into: box) }

@@ -84,7 +84,9 @@ struct TranscriptParagraphTextTests {
             useSpeakerColor: true,
             primaryText: DS.Color.primaryText,
             favoriteColor: DS.Color.accent,
-            favorites: []
+            favorites: [],
+            translations: [:],
+            translationColor: DS.Color.secondaryText
         ).map { String($0.text.characters) }
 
         #expect(rendered.joined(separator: "\n\n") == text(segments, labels: true))

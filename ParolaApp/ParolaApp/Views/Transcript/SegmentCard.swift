@@ -6,6 +6,8 @@ struct SegmentCard: View {
     var hoveredSpeaker: Binding<String?> = .constant(nil)
     var confidenceBucket: SegmentConfidence.Bucket? = nil
     var qcIssues: [SubtitleQC.Issue] = []
+    let translation: String?
+    let translationSideBySide: Bool
 
     @Environment(AppModel.self) private var model
     @State private var hovering: Bool = false
@@ -27,8 +29,7 @@ struct SegmentCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.small) {
             speakerLine
-            content
-                .frame(maxWidth: .infinity, alignment: .leading)
+            contentRow
 
             if !qcIssues.isEmpty {
                 Image(systemName: "exclamationmark.triangle")
@@ -108,6 +109,37 @@ struct SegmentCard: View {
                 }
             }
         }
+    }
+
+    /// Two equal columns when a translation shows side by side, so the original keeps its width
+    /// whatever the translation runs to.
+    @ViewBuilder
+    private var contentRow: some View {
+        if let translation, !isEditing, translationSideBySide {
+            HStack(alignment: .top, spacing: DS.Spacing.regular) {
+                content
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                translationText(translation)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: DS.Spacing.tight) {
+                content
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let translation, !isEditing {
+                    translationText(translation)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private func translationText(_ text: String) -> some View {
+        Text(Self.displayText(text))
+            .font(DS.Font.transcript)
+            .foregroundStyle(DS.Color.secondaryText)
+            .textSelection(.enabled)
+            .axLeaf("Card.Text.Translation")
     }
 
     private var speakerLine: some View {

@@ -57,6 +57,7 @@ struct SegmentsScroll: View {
                 LazyVStack(alignment: .leading, spacing: DS.Spacing.small) {
                     if model.transcript != nil {
                         let speakers = model.transcriptSpeakers
+                        let translations = model.transcript?.translation?.segments ?? [:]
                         if speakers.count >= 2 {
                             SpeakerFilterRow(speakers: speakers, selection: speakerFilterBinding)
                                 .padding(.bottom, DS.Spacing.tight)
@@ -66,7 +67,9 @@ struct SegmentsScroll: View {
                                 segment: seg,
                                 hoveredSpeaker: $hoveredSpeaker,
                                 confidenceBucket: derived.confidenceByID[seg.id],
-                                qcIssues: qcByID[seg.id] ?? []
+                                qcIssues: qcByID[seg.id] ?? [],
+                                translation: translations[seg.id],
+                                translationSideBySide: model.translationSideBySide
                             )
                             .id(seg.id)
                             .opacity(opacity(for: seg))
