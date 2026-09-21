@@ -1,0 +1,4 @@
+start_seconds,end_seconds,speaker,text
+0.0,3.5,Ada,Welcome back to the show.
+3.5,9.125,Grace,"Glad to be here — we shipped the ""export"" rewrite & it works."
+9.125,14.0,Ada,Tell me how it went.

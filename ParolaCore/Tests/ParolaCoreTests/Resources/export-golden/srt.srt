@@ -1,0 +1,12 @@
+1
+00:00:00,000 --> 00:00:03,500
+Welcome back to the show.
+
+2
+00:00:03,500 --> 00:00:09,125
+Glad to be here — we shipped the "export" rewrite & it works.
+
+3
+00:00:09,125 --> 00:00:14,000
+Tell me how it went.
+

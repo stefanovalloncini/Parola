@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE fcpxml>
+<fcpxml version="1.9">
+    <resources>
+        <format id="r1" name="FFVideoFormat1080p30" frameDuration="100/3000s" width="1920" height="1080" colorSpace="1-1-1 (Rec. 709)"/>
+    </resources>
+    <library>
+        <event name="Parola">
+            <project name="interview">
+                <sequence format="r1" duration="420000/30000s" tcStart="0s" tcFormat="NDF" audioLayout="stereo" audioRate="48k">
+                    <spine>
+                        <gap name="Gap" offset="0s" start="0s" duration="420000/30000s">
+                            <caption lane="1" offset="0/30000s" start="0s" duration="105000/30000s" role="iTT?captionFormat=ITT.en">
+                                <text placement="bottom"><text-style ref="ts1">Welcome back to the show.</text-style></text>
+                                <text-style-def id="ts1">
+                                    <text-style font=".SF NS Text" fontSize="13" fontFace="Regular" fontColor="1 1 1 1" backgroundColor="0 0 0 1"/>
+                                </text-style-def>
+                            </caption>
+                            <caption lane="1" offset="105000/30000s" start="0s" duration="168750/30000s" role="iTT?captionFormat=ITT.en">
+                                <text placement="bottom"><text-style ref="ts2">Glad to be here — we shipped the &quot;export&quot; rewrite &amp; it works.</text-style></text>
+                                <text-style-def id="ts2">
+                                    <text-style font=".SF NS Text" fontSize="13" fontFace="Regular" fontColor="1 1 1 1" backgroundColor="0 0 0 1"/>
+                                </text-style-def>
+                            </caption>
+                            <caption lane="1" offset="273750/30000s" start="0s" duration="146250/30000s" role="iTT?captionFormat=ITT.en">
+                                <text placement="bottom"><text-style ref="ts3">Tell me how it went.</text-style></text>
+                                <text-style-def id="ts3">
+                                    <text-style font=".SF NS Text" fontSize="13" fontFace="Regular" fontColor="1 1 1 1" backgroundColor="0 0 0 1"/>
+                                </text-style-def>
+                            </caption>
+                        </gap>
+                    </spine>
+                </sequence>
+            </project>
+        </event>
+    </library>
+</fcpxml>

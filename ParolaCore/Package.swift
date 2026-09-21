@@ -80,6 +80,7 @@ let package = Package(
                 .process("Resources/transcript-legacy.json"),
                 .copy("Resources/tiny.parola"),
                 .copy("Resources/expected"),
+                .copy("Resources/export-golden"),
             ]
         ),
         .testTarget(
