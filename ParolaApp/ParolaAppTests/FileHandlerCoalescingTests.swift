@@ -16,11 +16,16 @@ struct FileHandlerCoalescingTests {
         )
     }
 
-    private func settle(_ hops: () -> Int, past mark: Int) async {
+    private func settle(
+        _ hops: () -> Int,
+        past mark: Int,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) async {
         for _ in 0..<200 {
             if hops() > mark { return }
             try? await Task.sleep(for: .milliseconds(5))
         }
+        #expect(hops() > mark, "no hop past \(mark) within a second", sourceLocation: sourceLocation)
     }
 
     @Test("a burst of partials costs one hop and lands the newest text")

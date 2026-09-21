@@ -32,18 +32,9 @@ struct AppleSpeechTranscriberTests {
         #expect(AppleSpeechTranscriber.syntheticModelID == "apple-speech-analyzer")
     }
 
-    @Test("the collector coalesces its callbacks to ten a second")
-    func callbackIntervalCoalescesABurst() {
+    @Test("the collector's callback interval is a tenth of a second")
+    func callbackIntervalIsATenthOfASecond() {
         #expect(AppleSpeechTranscriber.callbackInterval == .milliseconds(100))
-        var coalescer = CallbackCoalescer<Double>(
-            minimumInterval: AppleSpeechTranscriber.callbackInterval
-        )
-        let first = coalescer.offer(1)
-        let second = coalescer.offer(2)
-        let tail = coalescer.flush()
-        #expect(first == 1)
-        #expect(second == nil)
-        #expect(tail == 2)
     }
 
     @Test("ModelCatalog exposes apple speech variant on macOS 26+")

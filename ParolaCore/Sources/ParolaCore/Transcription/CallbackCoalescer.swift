@@ -1,9 +1,8 @@
 import Foundation
 
-/// Rate-limits a stream of progress-style values to one every `minimumInterval`, keeping the newest
-/// withheld value so `flush()` can deliver it when the stream ends.
-///
-/// The first value always passes through, so a run reports as early as it does without coalescing.
+/// Rate-limits a stream of progress-style values to one every `minimumInterval`: the first value
+/// passes straight through, later ones are withheld newest-first, and `flush()` delivers the last
+/// withheld value exactly once when the stream ends.
 struct CallbackCoalescer<Value> {
     private let elapsed: @Sendable () -> Duration
     private let minimumInterval: Duration
