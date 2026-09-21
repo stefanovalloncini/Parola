@@ -43,16 +43,16 @@ struct StatisticsPageCopyTests {
         let all = LibraryStatistics.Coverage(count: 3, total: 3, since: day)
         #expect(
             StatisticsCopy.coverage(all, wordsCountedFor: 2, entries: 3, locale: english)
-                == "Timing recorded for every transcript · Words counted for 2 / 3"
+                == "Timing recorded for every transcript · words counted for 2 / 3"
         )
         #expect(
             StatisticsCopy.coverage(all, wordsCountedFor: 0, entries: 3, locale: english)
-                == "Timing recorded for every transcript · No word counts yet"
+                == "Timing recorded for every transcript · no word counts yet"
         )
         let partial = LibraryStatistics.Coverage(count: 4, total: 27, since: day)
         #expect(
             StatisticsCopy.coverage(partial, wordsCountedFor: 20, entries: 27, locale: english)
-                .hasSuffix(" · 4 / 27 transcripts · Words counted for 20 / 27")
+                .hasSuffix(" · 4 / 27 transcripts · words counted for 20 / 27")
         )
     }
 

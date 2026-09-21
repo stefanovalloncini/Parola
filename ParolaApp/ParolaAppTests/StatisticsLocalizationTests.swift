@@ -38,7 +38,7 @@ struct StatisticsLocalizationTests {
             ("Longest transcript", "Trascrizione più lunga"),
             ("Longest run", "Esecuzione più lunga"),
             ("Fastest run", "Esecuzione più veloce"),
-            ("No word counts yet", "nessun conteggio parole"),
+            ("no word counts yet", "nessun conteggio parole"),
             ("By Model", "Per modello"),
             ("By Kind", "Per tipo"),
             ("Activity", "Attività"),

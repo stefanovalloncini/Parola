@@ -25,10 +25,10 @@ enum StatisticsCopy {
         guard entries > 0, wordsCountedFor < entries else { return timing }
         let words: String
         if wordsCountedFor == 0 {
-            words = String(localized: "No word counts yet", bundle: bundle)
+            words = String(localized: "no word counts yet", bundle: bundle)
         } else {
             let share = "\(AppFormat.integer(wordsCountedFor, locale: locale)) / \(AppFormat.integer(entries, locale: locale))"
-            words = String(localized: "Words counted for \(share)", bundle: bundle)
+            words = String(localized: "words counted for \(share)", bundle: bundle)
         }
         // A full stop mid-line would read as two sentences; the separator carries the pause.
         let lead = timing.hasSuffix(".") ? String(timing.dropLast()) : timing

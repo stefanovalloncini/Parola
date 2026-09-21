@@ -7414,17 +7414,6 @@
         }
       }
     },
-    "No word counts yet": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "nessun conteggio parole"
-          }
-        }
-      }
-    },
     "None of these files was transcribed. Check the list for details.": {
       "extractionState": "manual",
       "localizations": {
@@ -13221,17 +13210,6 @@
         }
       }
     },
-    "Words counted for %@": {
-      "extractionState": "manual",
-      "localizations": {
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "parole contate per %@"
-          }
-        }
-      }
-    },
     "Words that switch to this prompt for one dictation. Separate with commas.": {
       "extractionState": "manual",
       "localizations": {
@@ -13556,6 +13534,17 @@
         }
       }
     },
+    "no word counts yet": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nessun conteggio parole"
+          }
+        }
+      }
+    },
     "nothing": {
       "extractionState": "manual",
       "localizations": {
@@ -13684,6 +13673,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "frase trigger"
+          }
+        }
+      }
+    },
+    "words counted for %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "parole contate per %@"
           }
         }
       }
