@@ -6,7 +6,6 @@ extension EnvironmentValues {
 }
 
 enum PageHeaderMetrics {
-    /// Below this the header's title starts wrapping once a page puts more than a sort control beside it.
     /// The content pane is ~679 pt at the 920 pt window minimum and ~939 pt at 1180 pt.
     static let searchCollapseWidth: CGFloat = 760
 
@@ -38,7 +37,7 @@ struct CollapsingSearchPill: View {
             if PageHeaderMetrics.collapsesSearch(width: pageWidth) {
                 expandButton
             } else {
-                field.frame(maxWidth: width)
+                field().frame(maxWidth: width)
             }
         }
         .onChange(of: pageWidth) { old, new in
@@ -46,12 +45,13 @@ struct CollapsingSearchPill: View {
         }
     }
 
-    private var field: some View {
+    private func field(focusesOnAppear: Bool = false) -> some View {
         SearchPill(
             text: $text,
             placeholder: placeholder,
             identifier: identifier,
-            clearButtonIdentifier: clearButtonIdentifier
+            clearButtonIdentifier: clearButtonIdentifier,
+            focusesOnAppear: focusesOnAppear
         )
     }
 
@@ -62,11 +62,11 @@ struct CollapsingSearchPill: View {
             Image(systemName: text.isEmpty ? "magnifyingglass" : "line.3.horizontal.decrease.circle.fill")
         }
         .buttonStyle(DSIconChipButtonStyle(side: 26))
-        .help("Search")
-        .accessibilityLabel("Search")
+        .help(placeholder)
+        .accessibilityLabel(placeholder)
         .accessibilityIdentifier(expandIdentifier)
         .popover(isPresented: $expanded, arrowEdge: .bottom) {
-            field
+            field(focusesOnAppear: true)
                 .frame(width: width)
                 .padding(DS.Spacing.small)
         }

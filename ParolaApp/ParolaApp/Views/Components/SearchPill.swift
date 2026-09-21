@@ -7,6 +7,10 @@ struct SearchPill: View {
     var clearsOnEscape: Bool
     var identifier: String
     var clearButtonIdentifier: String
+    /// A field the user reached by opening something takes the keyboard; one that is just there does not.
+    var focusesOnAppear: Bool
+
+    @FocusState private var focused: Bool
 
     init(
         text: Binding<String>,
@@ -14,7 +18,8 @@ struct SearchPill: View {
         prompt: String? = nil,
         clearsOnEscape: Bool = false,
         identifier: String = "search.field",
-        clearButtonIdentifier: String = "search.field.clear"
+        clearButtonIdentifier: String = "search.field.clear",
+        focusesOnAppear: Bool = false
     ) {
         self._text = text
         self.placeholder = placeholder
@@ -22,6 +27,7 @@ struct SearchPill: View {
         self.clearsOnEscape = clearsOnEscape
         self.identifier = identifier
         self.clearButtonIdentifier = clearButtonIdentifier
+        self.focusesOnAppear = focusesOnAppear
     }
 
     /// Esc has to keep reaching the sheet or window unless a screen asked for it and has text.
@@ -42,6 +48,7 @@ struct SearchPill: View {
             TextField(placeholder, text: $text, prompt: prompt.map(Text.init))
                 .textFieldStyle(.plain)
                 .font(DS.Font.secondary)
+                .focused($focused)
                 .accessibilityIdentifier(identifier)
                 .onKeyPress(.escape) {
                     guard Self.escapeOutcome(clearsOnEscape: clearsOnEscape, isEmpty: text.isEmpty) == .clear
@@ -70,5 +77,10 @@ struct SearchPill: View {
             RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
                 .fill(DS.Palette.subtleFill)
         )
+        // A popover's field is not first responder on the frame it appears in, so the ask waits a runloop turn.
+        .onAppear {
+            guard focusesOnAppear else { return }
+            DispatchQueue.main.async { focused = true }
+        }
     }
 }
