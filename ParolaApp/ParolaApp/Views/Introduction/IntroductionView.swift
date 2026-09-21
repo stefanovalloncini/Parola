@@ -22,6 +22,17 @@ enum IntroductionLayout {
 
 /// The whole window during the first run: one scene at a time over the stage, with the step dots and navigation pills pinned to the bottom.
 struct IntroductionView: View {
+    enum TransitionKind {
+        case fade
+        case slide
+    }
+
+    /// Hello and the demo card trade the bars, so the scenes around them cross-fade instead of sliding past each other.
+    nonisolated static func transitionKind(from: IntroductionStep, to: IntroductionStep) -> TransitionKind {
+        let pair: Set<IntroductionStep> = [from, to]
+        return pair == [.hello, .transcribe] ? .fade : .slide
+    }
+
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     // Held as an optional and filled on appear: a default value would open an AVAudioPlayer on every init.
@@ -29,20 +40,21 @@ struct IntroductionView: View {
 
     var body: some View {
         let introduction = model.introduction
+        let kind = Self.transitionKind(from: introduction.previousStep ?? introduction.step, to: introduction.step)
         return ZStack {
             IntroductionStage()
             VStack(spacing: DS.Spacing.large) {
                 GeometryReader { proxy in
                     staged(introduction.step, stageHeight: proxy.size.height)
                         .id(introduction.step)
-                        .transition(sceneTransition(back: introduction.isMovingBack))
+                        .transition(sceneTransition(kind: kind, back: introduction.isMovingBack))
                 }
                 IntroductionBottomBar()
             }
             .frame(maxWidth: IntroductionLayout.columnWidth)
             .padding(DS.Spacing.xlarge)
         }
-        .animation(sceneAnimation, value: introduction.step)
+        .animation(sceneAnimation(kind: kind), value: introduction.step)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task { if playback == nil { playback = DemoPlayback() } }
         .axBranch("Introduction")
@@ -74,12 +86,16 @@ struct IntroductionView: View {
         }
     }
 
-    private var sceneAnimation: Animation {
-        reduceMotion ? DS.Motion.route : .spring(response: 0.5, dampingFraction: 0.85)
+    private func sceneAnimation(kind: TransitionKind) -> Animation {
+        guard !reduceMotion else { return DS.Motion.route }
+        switch kind {
+        case .fade: return .spring(response: 0.55, dampingFraction: 0.85)
+        case .slide: return .spring(response: 0.5, dampingFraction: 0.85)
+        }
     }
 
-    private func sceneTransition(back: Bool) -> AnyTransition {
-        guard !reduceMotion else { return .opacity }
+    private func sceneTransition(kind: TransitionKind, back: Bool) -> AnyTransition {
+        guard !reduceMotion, kind == .slide else { return .opacity }
         return .asymmetric(
             insertion: .move(edge: back ? .leading : .trailing).combined(with: .opacity),
             removal: .move(edge: back ? .trailing : .leading).combined(with: .opacity)

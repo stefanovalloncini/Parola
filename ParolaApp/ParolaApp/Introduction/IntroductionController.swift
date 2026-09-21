@@ -24,6 +24,9 @@ final class IntroductionController {
     /// Which way the last move went, so the stage can mirror its scene transition.
     private(set) var isMovingBack = false
 
+    /// The step the last move came from, so the stage can pick the transition that pair asks for.
+    private(set) var previousStep: IntroductionStep?
+
     /// Set for this launch only, when something else (an opened URL) needs the main window.
     private(set) var isDeferred = false
 
@@ -72,12 +75,14 @@ final class IntroductionController {
     func advance() {
         guard stepIndex + 1 < steps.count else { return }
         isMovingBack = false
+        previousStep = step
         step = steps[stepIndex + 1]
     }
 
     func back() {
         guard canGoBack else { return }
         isMovingBack = true
+        previousStep = step
         step = steps[stepIndex - 1]
     }
 
@@ -98,6 +103,7 @@ final class IntroductionController {
     func finish() {
         setComplete(true)
         isMovingBack = false
+        previousStep = nil
         step = steps[0]
     }
 
@@ -106,6 +112,7 @@ final class IntroductionController {
         isDeferred = false
         isSuppressed = false
         isMovingBack = false
+        previousStep = nil
         step = steps[0]
         selectedEngineID = nil
     }
