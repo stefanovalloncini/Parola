@@ -19,14 +19,15 @@ extension AppModel {
         guard let outcome = await translationCoordinator.translate(
             entryID: entryID, transcript: transcript, to: target
         ) else { return }
-        guard selectedEntryID == entryID else { return }
         let translation = TranscriptTranslation(
             targetLanguage: target,
             segments: outcome.segments,
             createdAt: Date(),
             provider: outcome.provider
         )
-        self.transcript?.translation = translation
+        // The write is addressed to the entry that asked for it, so a run that finishes after the
+        // user moved on still lands; only the transcript on screen is left alone.
+        if selectedEntryID == entryID { self.transcript?.translation = translation }
         await persistTranslation(translation, for: entryID)
     }
 

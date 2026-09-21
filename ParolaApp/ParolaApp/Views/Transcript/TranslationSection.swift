@@ -71,6 +71,12 @@ struct TranslationSection: View {
                     .controlSize(.small)
                     .disabled(model.translationCoordinator.activeTarget == nil)
                     .axLeaf("Translation.Button.Retry")
+                // A run that failed part way still wrote what it got; it has to be removable from here.
+                if model.transcript?.translation != nil {
+                    Button("Remove translation") { Task { await model.removeTranslation() } }
+                        .controlSize(.small)
+                        .axLeaf("Translation.Button.Remove")
+                }
                 Spacer()
                 targetMenu(title: "Translate to…")
             }

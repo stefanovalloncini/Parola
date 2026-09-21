@@ -56,7 +56,7 @@ public extension TranscriptExporter {
 
     /// The translation a format writes next to a segment's own text, or nil when this export
     /// writes one language.
-    func translation(for segment: TranscriptSegment, in transcript: Transcript) -> String? {
+    internal func translation(for segment: TranscriptSegment, in transcript: Transcript) -> String? {
         guard spec.resolvedContent == .both else { return nil }
         let text = transcript.translation?.segments[segment.id]?
             .trimmingCharacters(in: .whitespacesAndNewlines)

@@ -253,11 +253,13 @@ public struct ExportSpec: Sendable, Codable, Hashable {
     /// translation when that is what the export writes.
     func prepared(_ transcript: Transcript) -> Transcript {
         var out = transcript
+        let content = resolvedContent
         let grouped = options.grouping.apply(
-            to: transcript.segments, translation: transcript.translation?.segments ?? [:]
+            to: transcript.segments,
+            translation: content == .original ? [:] : (transcript.translation?.segments ?? [:])
         )
         out.segments = grouped.segments
-        switch resolvedContent {
+        switch content {
         case .original:
             out.translation = nil
         case .translation:

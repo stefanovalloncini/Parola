@@ -506,11 +506,19 @@ final class ParolaAutomationServer {
     }
 
     static func translationState(_ model: AppModel) -> AutomationValue {
+        if let run = model.translationCoordinator.runInProgress {
+            return .object([
+                "targetLanguage": .string(run.targetLanguage),
+                "segmentCount": .int(run.segmentCount),
+                "inProgress": .bool(true),
+                "provider": .string(run.provider),
+            ])
+        }
         guard let translation = model.transcript?.translation else { return .null }
         return .object([
             "targetLanguage": .string(translation.targetLanguage),
             "segmentCount": .int(translation.segments.count),
-            "inProgress": .bool(model.translationCoordinator.isRunning),
+            "inProgress": .bool(false),
             "provider": .string(translation.provider),
         ])
     }

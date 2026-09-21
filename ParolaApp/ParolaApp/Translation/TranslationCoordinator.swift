@@ -37,6 +37,7 @@ final class TranslationCoordinator {
     private(set) var activeEntryID: LibraryEntry.ID?
     /// The language the last run aimed at, so Retry can repeat it.
     private(set) var activeTarget: String?
+    private(set) var activeProvider: String?
 
     /// Test seam: when set, replaces the resolved translator so a test never touches the shared mock registry.
     @ObservationIgnored var translatorOverride: (any TranscriptTranslating)?
@@ -56,6 +57,21 @@ final class TranslationCoordinator {
         case .preparing, .translating: return true
         case .idle, .failed: return false
         }
+    }
+
+    /// What a run in flight reports to the bridge, so a script can wait on a first translation
+    /// instead of one that has already landed.
+    struct RunSnapshot: Sendable {
+        var targetLanguage: String
+        var segmentCount: Int
+        var provider: String
+    }
+
+    var runInProgress: RunSnapshot? {
+        guard isRunning, let activeTarget, let activeProvider else { return nil }
+        var completed = 0
+        if case .translating(let done, _) = state { completed = done }
+        return RunSnapshot(targetLanguage: activeTarget, segmentCount: completed, provider: activeProvider)
     }
 
     /// Whether this Mac can translate the pair. A transcript with no language of its own answers
@@ -97,8 +113,10 @@ final class TranslationCoordinator {
 
         let source = Self.sourceLanguage(for: transcript.language)
         if let stub = stubTranslator() {
+            activeProvider = stub.providerName
             return await perform(units: units, source: source, target: target, using: stub)
         }
+        activeProvider = AppleTranslator.provider
         guard await availability(source: source, target: target) != .unsupported else {
             state = .failed(String(localized: "This Mac can't translate into that language."))
             return nil
@@ -133,11 +151,15 @@ final class TranslationCoordinator {
         run.continuation.resume(returning: nil)
     }
 
-    /// Clears the section for an entry whose translation is being removed.
+    /// Clears the section for an entry whose translation is being removed. Another entry's run is
+    /// left alone: its progress row, its Cancel and its claim on the coordinator all stay put.
     func remove(entryID: LibraryEntry.ID) {
-        if activeEntryID == entryID { cancel() }
+        guard activeEntryID == entryID else { return }
+        cancel()
         state = .idle
         activeEntryID = nil
+        activeTarget = nil
+        activeProvider = nil
     }
 
     private func perform(

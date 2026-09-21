@@ -135,9 +135,13 @@ extension ParolaAutomationServer {
                     guard ctx.model.transcript != nil else {
                         throw AutomationError.precondition("no transcript is open")
                     }
+                    let before = ctx.model.transcript?.translation
                     await ctx.model.translateTranscript(to: language)
-                    guard let translation = ctx.model.transcript?.translation else {
-                        return .object(["translated": .bool(false)])
+                    guard let translation = ctx.model.transcript?.translation, translation != before else {
+                        return .object([
+                            "translated": .bool(false),
+                            "reason": .string(translationRefusal(ctx.model)),
+                        ])
                     }
                     return .object([
                         "translated": .bool(true),
@@ -192,6 +196,16 @@ extension ParolaAutomationServer {
             ),
         ]
     }
+}
+
+/// Why a translation produced nothing: the run's own message when it failed, otherwise the guard
+/// that refused it.
+@MainActor
+private func translationRefusal(_ model: AppModel) -> String {
+    if case .failed(let message) = model.translationCoordinator.state { return message }
+    if model.translationCoordinator.isRunning { return "another translation is already running" }
+    if model.selectedEntryID == nil { return "the transcript is not a library entry" }
+    return "the transcript has no text to translate"
 }
 
 private func buildCustomPalette(_ obj: [String: AutomationValue]) -> ThemePalette {

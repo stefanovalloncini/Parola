@@ -267,6 +267,9 @@ struct ContinuousChunks: View {
         var chunks: [Chunk] = []
         var text = AttributedString()
         var translated = AttributedString()
+        // Headings and paragraph breaks wait here until a translated line needs them, so a chunk
+        // that starts with untranslated segments still lines its two columns up.
+        var translatedPrefix = AttributedString()
         var translatedSegments = 0
         var runs: [TranscriptSegment.ID: SegmentRun] = [:]
         var offset = 0
@@ -285,6 +288,7 @@ struct ContinuousChunks: View {
             ))
             text = AttributedString()
             translated = AttributedString()
+            translatedPrefix = AttributedString()
             translatedSegments = 0
             runs = [:]
             offset = 0
@@ -305,7 +309,7 @@ struct ContinuousChunks: View {
                 heading.font = DS.Font.bodyStrong
                 offset += heading.characters.count
                 text.append(heading)
-                translated.append(heading)
+                translatedPrefix = heading
                 shownSpeaker = label
             } else if segmentCount >= hardCap || (segmentCount >= softCap && (lastEndedSentence || pauseBreak)) {
                 closeChunk()
@@ -314,7 +318,7 @@ struct ContinuousChunks: View {
                 let separator = AttributedString("\n\n")
                 offset += separator.characters.count
                 text.append(separator)
-                translated.append(separator)
+                if !translated.characters.isEmpty { translatedPrefix.append(separator) }
             }
             let startsLine = text.characters.isEmpty || text.characters.last == "\n"
             let isFavorite = favorites.contains(seg.id)
@@ -334,6 +338,8 @@ struct ContinuousChunks: View {
             text.append(piece)
             if let translation = translations[seg.id]?.trimmingCharacters(in: .whitespacesAndNewlines),
                !translation.isEmpty {
+                translated.append(translatedPrefix)
+                translatedPrefix = AttributedString()
                 let startsTranslatedLine = translated.characters.isEmpty || translated.characters.last == "\n"
                 var translatedPiece = AttributedString(startsTranslatedLine ? translation : " " + translation)
                 translatedPiece.foregroundColor = translationColor

@@ -19,9 +19,11 @@ protocol TranscriptTranslating: Sendable {
 /// Drives one `TranslationSession`. The session is bound to the `.translationTask` that produced it,
 /// so this lives only as long as that modifier's action.
 final class AppleTranslator: TranscriptTranslating {
-    let providerName = "apple"
+    static let provider = "apple"
 
-    // The session's methods run off the caller's actor, and one run awaits each call, so nothing else touches it.
+    let providerName = AppleTranslator.provider
+
+    // Non-Sendable session handed from the main actor to `session.translations`; one translator per run, calls awaited in sequence, never shared.
     nonisolated(unsafe) private let session: TranslationSession
 
     init(session: TranslationSession) {
@@ -38,7 +40,7 @@ final class AppleTranslator: TranscriptTranslating {
 
 /// Test-mode translator. Never touches the Translation framework, so a sandbox run and the test
 /// suite need no language pack installed.
-struct MockTranslator: TranscriptTranslating, Sendable {
+struct MockTranslator: TranscriptTranslating {
     enum Mode: String, Sendable, CaseIterable {
         case reverseWords
         case map

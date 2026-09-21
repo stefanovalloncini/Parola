@@ -88,6 +88,25 @@ struct ContinuousChunksTests {
         #expect(chunks.map { $0.translation.map { String($0.characters) } } == ["Ada\nHello.", "Grace\nHello back."])
     }
 
+    @Test("a chunk whose first segment is untranslated still heads its second column")
+    func translatedColumnWaitsForItsFirstLine() {
+        let segments = [segment(0, "Ciao.", speaker: "Ada"), segment(1, "Come stai?", speaker: "Ada")]
+        let chunks = build(segments, useSpeakerColor: true, translations: [1: "How are you?"])
+
+        #expect(chunks[0].translation.map { String($0.characters) } == "Ada\nHow are you?")
+    }
+
+    @Test("a paragraph break only reaches the second column once it has a line")
+    func translatedColumnSkipsALeadingParagraphBreak() {
+        let segments = [
+            timed(0, "Ciao.", start: 0, end: 4),
+            timed(1, "Come stai?", start: 20, end: 24),
+        ]
+        let chunks = build(segments, translations: [1: "How are you?"])
+
+        #expect(chunks[0].translation.map { String($0.characters) } == "How are you?")
+    }
+
     @Test("a new translation is a different signature")
     func translationChangesTheSignature() {
         let segments = [segment(0, "Ciao.")]

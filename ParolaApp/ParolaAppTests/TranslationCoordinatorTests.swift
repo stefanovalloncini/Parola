@@ -39,6 +39,19 @@ private struct InterruptingTranslator: TranscriptTranslating {
     }
 }
 
+/// Runs `beforeReturning` before handing its batch back — the test uses it to leave the entry.
+private struct LeavingTranslator: TranscriptTranslating {
+    let providerName = "stub"
+    let beforeReturning: @Sendable () async -> Void
+
+    func translate(
+        _ texts: [(id: Int, text: String)], from source: String?, to target: String
+    ) async throws -> [Int: String] {
+        await beforeReturning()
+        return Dictionary(uniqueKeysWithValues: texts.map { ($0.id, "T\($0.id)") })
+    }
+}
+
 private struct RecordingTranslator: TranscriptTranslating {
     let providerName = "stub"
     let source = OSAllocatedUnfairLock<String??>(initialState: nil)
@@ -195,6 +208,41 @@ struct TranslationCoordinatorTests {
         #expect(translator.source.withLock { $0 } == .some("it"))
     }
 
+    @Test("removing another entry's translation leaves the run in flight alone")
+    func removeOnAnotherEntryKeepsTheRun() async {
+        let coordinator = TranslationCoordinator()
+        let seen = OSAllocatedUnfairLock<[TranslationState]>(initialState: [])
+        coordinator.translatorOverride = InterruptingTranslator {
+            let state = await MainActor.run {
+                coordinator.remove(entryID: "B")
+                return coordinator.state
+            }
+            seen.withLock { $0.append(state) }
+        }
+
+        let outcome = await coordinator.translate(entryID: "A", transcript: transcript(segments: 70), to: "en")
+
+        #expect(seen.withLock { $0 } == [.translating(completed: 0, total: 70), .translating(completed: 60, total: 70)])
+        #expect(outcome?.segments.count == 70)
+        #expect(coordinator.state(for: "A") == .idle)
+    }
+
+    @Test("a run in flight reports its target and progress to the bridge")
+    func runInProgressSnapshot() async {
+        let coordinator = TranslationCoordinator()
+        let seen = OSAllocatedUnfairLock<[TranslationCoordinator.RunSnapshot]>(initialState: [])
+        coordinator.translatorOverride = InterruptingTranslator {
+            let snapshot = await MainActor.run { coordinator.runInProgress }
+            if let snapshot { seen.withLock { $0.append(snapshot) } }
+        }
+
+        _ = await coordinator.translate(entryID: "A", transcript: transcript(segments: 70), to: "en")
+
+        #expect(seen.withLock { $0 }.map(\.segmentCount) == [0, 60])
+        #expect(seen.withLock { $0 }.allSatisfy { $0.targetLanguage == "en" && $0.provider == "stub" })
+        #expect(coordinator.runInProgress == nil)
+    }
+
     @Test("removing clears the section for the entry that was translating")
     func removeClearsState() async {
         let coordinator = TranslationCoordinator()
@@ -298,6 +346,22 @@ struct AppModelTranslationTests {
         #expect(model.hasTranslation)
         await model.removeTranslation()
         #expect(!model.hasTranslation)
+    }
+
+    @Test("a run that finishes after the user moved on still lands in its own bundle")
+    func translationPersistsAfterTheUserMovesOn() async throws {
+        let (model, entryID) = try await loadedModel()
+        model.translationCoordinator.translatorOverride = LeavingTranslator {
+            await MainActor.run { model.selectedEntryID = nil }
+        }
+
+        await model.translateTranscript(to: "en")
+
+        #expect(model.transcript?.translation == nil)
+        let store = LibraryStore(libraryURL: model.library.libraryURL, extraIndexer: nil)
+        let stored = try await store.load(entryID).document.transcript
+        #expect(stored.translation?.segments == [0: "T0", 1: "T1"])
+        #expect(stored.translation?.targetLanguage == "en")
     }
 
     @Test("an installed mock translator is what a run uses")

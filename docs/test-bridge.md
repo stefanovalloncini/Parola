@@ -82,7 +82,7 @@ Every `parola_app_*` tool fails with a clean error when the bridge isn't reachab
 | `parola_app_dismiss_error` | — | Clear a failed phase (equivalent to clicking "Try again"). |
 | `parola_app_screenshot` | path | Capture the main window to PNG via ScreenCaptureKit (needs Screen Recording permission). `path` is a bare filename stored under `Caches/Parola/Screenshots`. |
 | `parola_app_list_windows` | — | Visible NSWindows: title, size, key/main flags. |
-| `translateTranscript` | **language** | Translate the loaded transcript into that language code and store the result. Uses whichever translator is installed (`installMockTranslator` in test mode). Replies `{translated, targetLanguage, segmentCount, provider}`. |
+| `translateTranscript` | **language** | Translate the loaded transcript into that language code and store the result. Uses whichever translator is installed (`installMockTranslator` in test mode). Replies `{translated, targetLanguage, segmentCount, provider}`, or `{translated: false, reason}` when the run failed or was refused. |
 | `removeTranslation` | — | Drop the loaded transcript's translation. Replies `{removed}`. |
 | `toggleInspector` | — | Toggle the transcript inspector, the same way ⌘⇧I does. Below ~1050 pt of window the pane folds the inspector away, and this is the only way to bring it back. |
 | `setWindowFrame` | x, y, w, h | Move and resize the main window; the reply carries the frame that landed after the window's minimum size clamped it. AX resize is refused on ad-hoc-signed builds, so layout checks go through here. |
@@ -97,7 +97,9 @@ The five introduction commands and `getState.introduction` all reply `{visible, 
 `getState.exportPresets` carries the whole preset library (`{id, name, spec, isBuiltIn}` each) and
 `getState.exportSpec` the sheet's current spec, or `null` while the sheet is shut.
 `getState.translation` is `{targetLanguage, segmentCount, inProgress, provider}` for a translated transcript and
-`null` otherwise; `getState.translationSideBySide` is the two-column preference.
+`null` otherwise. A run in flight wins over a translation already stored: it reports the target it is heading for,
+`segmentCount` as the segments sent so far and `inProgress: true`, so a script can wait on a first translation.
+`getState.translationSideBySide` is the two-column preference.
 `visible` says whether the introduction is on screen; `step` is the scene showing now and `steps` the order this
 deployment walks, drawn from `hello`, `transcribe`, `features`, `engine`, `ready`. The `engine` step is present
 only when `engineChoices` is non-empty; otherwise it is left out of `steps` and the reply's `engine` field is
