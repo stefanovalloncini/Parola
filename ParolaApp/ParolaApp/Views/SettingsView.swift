@@ -192,7 +192,8 @@ private struct SettingsSidebar: View {
                                     title: r.localizedLabelKey,
                                     systemImage: r.symbol,
                                     isSelected: route == r,
-                                    height: 28
+                                    height: 28,
+                                    iconTint: DS.settingsGroupTint(for: group.id)
                                 ) {
                                     route = r
                                 }

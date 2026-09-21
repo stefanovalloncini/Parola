@@ -8,6 +8,8 @@ struct SidebarRow: View {
     var height: CGFloat = 32
     /// The footer rows keep a resting outline, so they read as buttons against the empty space below the list.
     var bordered: Bool = false
+    /// Set where the rows belong to groups: the glyph sits in a badge of the group's colour.
+    var iconTint: Color? = nil
     let action: () -> Void
 
     var body: some View {
@@ -18,7 +20,8 @@ struct SidebarRow: View {
                 isSelected: isSelected,
                 badge: badge,
                 height: height,
-                bordered: bordered
+                bordered: bordered,
+                iconTint: iconTint
             )
         }
         .buttonStyle(.plain)
@@ -34,16 +37,30 @@ struct SidebarRowLabel: View {
     var badge: Int? = nil
     var height: CGFloat = 32
     var bordered: Bool = false
+    var iconTint: Color? = nil
+
+    static let badgeSide: CGFloat = 20
 
     @State private var isHovering = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: DS.Spacing.small) {
-            Image(systemName: systemImage)
-                .font(DS.Font.bodyStrong)
-                .foregroundStyle(isSelected ? DS.Color.onAccent : .secondary)
-                .frame(width: 18, alignment: .center)
+            if let iconTint {
+                icon
+                    .font(DS.Font.caption)
+                    .foregroundStyle(isSelected ? DS.Color.onAccent : iconTint)
+                    .frame(width: Self.badgeSide, height: Self.badgeSide)
+                    .background(
+                        RoundedRectangle(cornerRadius: DS.Radius.small, style: .continuous)
+                            .fill(isSelected ? DS.Color.onAccent.opacity(0.18) : iconTint.opacity(0.18))
+                    )
+            } else {
+                icon
+                    .font(DS.Font.bodyStrong)
+                    .foregroundStyle(isSelected ? DS.Color.onAccent : .secondary)
+                    .frame(width: 18, alignment: .center)
+            }
             Text(title)
                 .font(DS.Font.secondary)
                 .lineLimit(1)
@@ -70,6 +87,10 @@ struct SidebarRowLabel: View {
         .background(rowBackground)
         .contentShape(Rectangle())
         .onHover { isHovering = $0 }
+    }
+
+    private var icon: some View {
+        Image(systemName: systemImage)
     }
 
     // One shape with an animatable fill: the three states have to interpolate, not swap views.

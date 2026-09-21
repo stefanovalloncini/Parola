@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import Parola
 import ParolaCore
@@ -11,6 +12,18 @@ struct SettingsSidebarCatalogTests {
         let second = SettingsSidebarCatalog.visibleGroups(features: .all, search: "")
         #expect(first.map(\.id) == second.map(\.id))
         #expect(first.map(\.routes) == second.map(\.routes))
+    }
+
+    @Test("every sidebar group carries its own tint")
+    func everyGroupHasATint() {
+        let ids = SettingsSidebarCatalog.all.map(\.id)
+        let tints = ids.map { DS.settingsGroupTint(for: $0) }
+        #expect(Set(tints).count == ids.count)
+    }
+
+    @Test("an id the catalog never uses falls back to the neutral tint")
+    func unknownGroupIsNeutral() {
+        #expect(DS.settingsGroupTint(for: "nope") == DS.settingsGroupTint(for: "end"))
     }
 
     @Test("group ids are unique")
