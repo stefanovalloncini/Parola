@@ -2,7 +2,6 @@ import Testing
 @testable import Parola
 import ParolaCore
 
-@MainActor
 @Suite("Introduction engine card")
 struct EngineCardRecommendationTests {
     @Test("the chip marks the recommended Whisper, not Apple Speech")

@@ -8,9 +8,9 @@ struct EngineScene: View {
     /// How much accent the chosen card's fill carries; `SurfaceContrastTests` pins the detail line's contrast on it.
     nonisolated static let selectedTintOpacity = 0.10
 
-    /// Apple Speech is `.recommended` too — for its own engine — so the chip follows the rule that picked the Whisper card.
-    static func isRecommended(_ variant: ModelVariant) -> Bool {
-        variant.category == .recommended && variant.engineID != .appleSpeech
+    /// The chip follows the rule that picked the card.
+    nonisolated static func isRecommended(_ variant: ModelVariant) -> Bool {
+        IntroductionEngineChoices.isRecommended(variant)
     }
 
     var body: some View {
