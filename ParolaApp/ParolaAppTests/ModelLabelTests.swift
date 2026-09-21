@@ -23,6 +23,25 @@ struct ModelLabelTests {
     func unknownIDFallsBack() {
         #expect(AppModel.modelLabel("made-up-model-id") == "made-up-model-id")
     }
+
+    @MainActor
+    @Test("every catalog name reaches the intake segment whole")
+    func catalogLabelsAreNotCapped() {
+        for name in ["Apple Speech (system)", "Whisper Turbo", "Whisper Tiny EN", "Parakeet v2", "Distil Large"] {
+            #expect(ModelPickerView.capped(name) == name)
+        }
+        #expect(ModelPickerView.shortLabel(for: "Whisper Large v3 Turbo") == "Whisper Turbo")
+    }
+
+    @MainActor
+    @Test("a label no catalog produced is capped so the capsule cannot outgrow its budget")
+    func uncuratedLabelIsCapped() {
+        let long = "community_whisper-large-v3-italian-finetune"
+        let capped = ModelPickerView.capped(long)
+        #expect(capped.count == ModelPickerView.labelCharacterCap)
+        #expect(capped.hasSuffix("…"))
+        #expect(long.hasPrefix(capped.dropLast()))
+    }
 }
 
 @Suite("Engine streams-partials gate")

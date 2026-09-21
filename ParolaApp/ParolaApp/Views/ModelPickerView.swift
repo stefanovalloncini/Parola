@@ -146,7 +146,8 @@ struct ModelPickerView: View {
         if let variant = ModelCatalog.variant(id: model.selectedModel) {
             return Self.shortLabel(for: variant.displayName)
         }
-        return model.availableModels.first(where: { $0.name == model.selectedModel })?.label ?? model.selectedModel
+        let installed = model.availableModels.first(where: { $0.name == model.selectedModel })?.label
+        return Self.capped(installed ?? model.selectedModel)
     }
 
     static func shortLabel(for displayName: String) -> String {
@@ -157,6 +158,13 @@ struct ModelPickerView: View {
             "Parakeet TDT 0.6B v2": "Parakeet v2",
             "Distil Whisper Large v3": "Distil Large",
         ]
-        return replacements[displayName] ?? displayName
+        return capped(replacements[displayName] ?? displayName)
+    }
+
+    /// The catalog's own names all fit; an uncurated model id would widen the capsule past what the toolbar can spare the search field.
+    static let labelCharacterCap = 24
+
+    static func capped(_ label: String) -> String {
+        label.count <= labelCharacterCap ? label : String(label.prefix(labelCharacterCap - 1)) + "…"
     }
 }
