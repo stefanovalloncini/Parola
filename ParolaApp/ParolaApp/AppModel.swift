@@ -651,7 +651,7 @@ final class AppModel {
         self.initialPrompt = defaults.string(forKey: "initialPrompt") ?? ""
         self.diarize = defaults.bool(forKey: "diarize")
         self.expectedSpeakersRaw = defaults.integer(forKey: "expectedSpeakersRaw")
-        self.generatesCardMetadata = readBool("generateCardMetadata", default: readBool("autoTitleEntries", default: true))
+        self.generatesCardMetadata = readBool("generateCardMetadata", default: true)
         self.showAITitles = readBool("showAITitles", default: true)
         self.showAISummaries = readBool("showAISummaries", default: true)
         self.customTitlePrompt = defaults.string(forKey: "customTitlePrompt") ?? ""
