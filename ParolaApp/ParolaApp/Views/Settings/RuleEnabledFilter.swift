@@ -35,7 +35,7 @@ struct RuleEnabledFilterChips: View {
                         .font(DS.Font.caption)
                         .padding(.horizontal, DS.Spacing.small)
                         .padding(.vertical, DS.Spacing.hair)
-                        .foregroundStyle(filter == option ? Color.white : Color.primary.opacity(0.85))
+                        .foregroundStyle(filter == option ? DS.Color.onAccent : Color.primary.opacity(0.85))
                         .background(
                             Capsule().fill(filter == option ? DS.Color.accent : Color.secondary.opacity(0.15))
                         )

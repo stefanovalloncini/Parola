@@ -80,7 +80,7 @@ struct LiveCaptionsView: View {
                 .font(DS.Font.mono.weight(.semibold))
                 .textCase(.uppercase)
         }
-        .foregroundStyle(translating ? Color.white : Color.white.opacity(0.7))
+        .foregroundStyle(translating ? DS.Color.onAccent : Color.white.opacity(0.7))
         .padding(.horizontal, Self.chipInset)
         .frame(height: 20)
         .background(Capsule().fill(chipFill(translating: translating)))

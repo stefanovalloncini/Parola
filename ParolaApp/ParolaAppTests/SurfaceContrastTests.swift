@@ -105,6 +105,28 @@ struct SurfaceContrastTests {
         }
     }
 
+    /// Every label set on the accent *fill* — pills, chips, selected rows, the rule filter, the captions mode chip.
+    @Test("a label on the accent fill never reads worse than a hard-coded white one",
+          arguments: ThemePreset.allCases)
+    func onAccentBeatsAHardCodedWhite(preset: ThemePreset) throws {
+        let white = RGBA(1, 1, 1)
+        let accent = try #require(Self.pair(preset.palette.accent))
+        for (scheme, fill) in [("light", accent.light), ("dark", accent.dark)] {
+            #expect(
+                fill.legibleForeground.contrast(against: fill) >= white.contrast(against: fill),
+                "\(preset.rawValue) \(scheme)"
+            )
+        }
+    }
+
+    /// Amber is the pale accent white collapses on: 1.6:1 against the near-black the token picks instead.
+    @Test("a pale accent takes a dark label")
+    func paleAccentTakesADarkLabel() throws {
+        let amber = try #require(Self.pair(ThemePreset.yellow.palette.accent)).light
+        #expect(amber.legibleForeground.relativeLuminance < amber.relativeLuminance)
+        #expect(amber.legibleForeground.contrast(against: amber) >= Self.minimum)
+    }
+
     @Test("the readout fill still carries accent rather than collapsing into the surface",
           arguments: ThemePreset.allCases)
     func accentWashStaysTinted(preset: ThemePreset) throws {

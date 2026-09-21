@@ -30,9 +30,7 @@ enum ThemeColor: Sendable, Codable, Equatable {
             case .dynamic(let light, let dark): isDark ? dark : light
             case .system(let semantic): RGBA(semantic.color)
             }
-            return base.relativeLuminance > RGBA.darkForegroundLuminance
-                ? NSColor(srgbRed: 0.08, green: 0.08, blue: 0.08, alpha: 1)
-                : .white
+            return base.legibleForeground.nsColor
         })
     }
 }
@@ -51,6 +49,11 @@ struct RGBA: Sendable, Codable, Equatable {
 
     /// Above this relative luminance a fill wants a dark foreground instead of a light one.
     static let darkForegroundLuminance = 0.55
+
+    /// White or near-black, whichever reads on this fill: what every label on an accent capsule is painted in.
+    var legibleForeground: RGBA {
+        relativeLuminance > Self.darkForegroundLuminance ? RGBA(0.08, 0.08, 0.08) : RGBA(1, 1, 1)
+    }
 
     /// WCAG relative luminance in [0, 1]; used to pick a legible foreground on a colored fill.
     var relativeLuminance: Double {
