@@ -45,6 +45,15 @@ struct FlowRowsTests {
         #expect(rows[1].width == 300)
     }
 
+    @Test("the cached sizes are the only thing the wrapping reads, so a re-measure changes the rows")
+    func cacheDrivesTheWrapping() {
+        var cache = FlowRows.Cache(sizes: [CGSize(width: 100, height: 20), CGSize(width: 100, height: 20)])
+        #expect(FlowRows.rows(sizes: cache.sizes, limit: 300, spacing: spacing).count == 1)
+
+        cache.sizes[1] = CGSize(width: 260, height: 20)
+        #expect(FlowRows.rows(sizes: cache.sizes, limit: 300, spacing: spacing).count == 2)
+    }
+
     @Test("stacked rows are as tall as their rows plus the gaps between them")
     func stackedRowsAddTheGaps() {
         let sizes = Array(repeating: CGSize(width: 300, height: 20), count: 3)

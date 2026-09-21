@@ -8,6 +8,11 @@ enum FlowRows {
         let height: CGFloat
     }
 
+    /// The subview sizes a flow layout measures once per pass, so sizing and placing don't measure them twice.
+    struct Cache {
+        var sizes: [CGSize]
+    }
+
     /// Which subviews share each row. Pure, so the wrapping rule can be checked without a host.
     static func rowIndices(widths: [CGFloat], limit: CGFloat, spacing: CGFloat) -> [[Int]] {
         var rows: [[Int]] = []
