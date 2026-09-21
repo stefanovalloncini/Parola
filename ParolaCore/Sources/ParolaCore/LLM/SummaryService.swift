@@ -83,7 +83,7 @@ public actor SummaryService {
         return Summary(
             text: reduced.text,
             chapters: SummaryService.mergeChapters(parts.flatMap(\.chapters)),
-            actionItems: reduced.actionItems
+            actionItems: SummaryService.mergeActionItems(parts.flatMap(\.actionItems) + reduced.actionItems)
         )
     }
 
@@ -108,7 +108,9 @@ public actor SummaryService {
             let session = LanguageModelSession(instructions: SummaryService.structuredInstructions(for: options))
             do {
                 let response = try await session.respond(to: prompt, generating: GenerableSummary.self)
-                return response.content.toSummary()
+                var summary = response.content.toSummary()
+                if !options.actionItems { summary.actionItems = [] }
+                return summary
             } catch {
                 ParolaLog.error(.ai, "on-device summary model failed", [.error: .error(error)])
                 throw FailureReason.modelError(error.localizedDescription)
@@ -118,17 +120,20 @@ public actor SummaryService {
     #endif
 
     static func line(for segment: TranscriptSegment, options: SummaryOptions) -> String? {
-        guard options.includeTimestamps else {
-            let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !body.isEmpty else { return nil }
-            guard options.includeSpeakers,
-                  let speaker = segment.speaker?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !speaker.isEmpty else {
-                return "\(body)\n"
-            }
-            return "\(speaker): \(body)\n"
+        let body = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty else { return nil }
+        let speakerPrefix: String
+        if options.includeSpeakers,
+           let speaker = segment.speaker?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !speaker.isEmpty {
+            speakerPrefix = "\(speaker): "
+        } else {
+            speakerPrefix = ""
         }
-        return TranscriptPromptContext.timestampedLine(for: segment)
+        guard options.includeTimestamps else {
+            return "\(speakerPrefix)\(body)\n"
+        }
+        return "\(Timecode.format(segment.start))  \(speakerPrefix)\(body)\n"
     }
 
     static func textInstructions(for options: SummaryOptions) -> String {
@@ -141,7 +146,12 @@ public actor SummaryService {
     }
 
     static func structuredInstructions(for options: SummaryOptions) -> String {
-        structuredInstructionsBase + optionSentences(for: options)
+        var out = structuredInstructionsBase
+        if !options.actionItems {
+            out += "\n\nLeave actionItems empty."
+        }
+        out += optionSentences(for: options)
+        return out
     }
 
     private static func optionSentences(for options: SummaryOptions) -> String {
@@ -244,6 +254,20 @@ public actor SummaryService {
                 continue
             }
             out.append(chapter)
+        }
+        return out
+    }
+
+    static func mergeActionItems(_ items: [String]) -> [String] {
+        var out: [String] = []
+        var seen: Set<String> = []
+        for raw in items {
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            let key = trimmed.lowercased()
+            guard !seen.contains(key) else { continue }
+            seen.insert(key)
+            out.append(trimmed)
         }
         return out
     }

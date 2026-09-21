@@ -69,7 +69,7 @@ public enum TranscriptChat {
                     transcript: transcript,
                     budgetTokens: budget,
                     makeDigest: digestProvider(for: transcript, budgetTokens: budget, summariseModel: {
-                        try await makeCloudModel(SummaryService.textInstructions(for: .default))
+                        try await makeCloudModel(SummaryService.textInstructions(for: SummaryOptions(actionItems: false)))
                     }),
                     makeModel: makeCloudModel
                 )

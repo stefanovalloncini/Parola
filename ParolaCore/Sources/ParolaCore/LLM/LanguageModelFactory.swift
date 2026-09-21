@@ -125,6 +125,7 @@ public enum LanguageModelFactory {
         clock: any Clock<Duration> = ContinuousClock()
     ) async throws -> any LanguageModel {
         if let mock = await MockLanguageModelStore.shared.resolve(for: .foundation) {
+            await MockLanguageModelStore.shared.recordInstructions(instructions, for: .foundation)
             return MockLanguageModel.make(response: mock, clock: clock)
         }
         if let reason = await onDeviceAvailability().reason {

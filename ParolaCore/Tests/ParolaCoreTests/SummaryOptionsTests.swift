@@ -24,14 +24,30 @@ struct SummaryOptionsTests {
         #expect(SummaryService.structuredInstructions(for: o).contains("Italian"))
     }
 
+    @Test("structuredInstructions tells the model to leave action items empty when the flag is off")
+    func structuredInstructionsDropsActionItems() {
+        var o = SummaryOptions.default
+        #expect(!SummaryService.structuredInstructions(for: o).contains("Leave actionItems empty."))
+        o.actionItems = false
+        #expect(SummaryService.structuredInstructions(for: o).contains("Leave actionItems empty."))
+    }
+
     @Test("segment lines honour timestamps and speakers")
     func lines() {
         let s = TranscriptSegment(id: 0, start: 65, end: 70, text: "Ciao a tutti", speaker: "Anna")
-        #expect(SummaryService.line(for: s, options: .default) == TranscriptPromptContext.timestampedLine(for: s))
-        var o = SummaryOptions.default; o.includeTimestamps = false; o.includeSpeakers = true
+        #expect(SummaryService.line(for: s, options: .default) == "\(Timecode.format(65))  Ciao a tutti\n")
+        var o = SummaryOptions.default; o.includeSpeakers = true
+        #expect(SummaryService.line(for: s, options: o) == "\(Timecode.format(65))  Anna: Ciao a tutti\n")
+        o.includeTimestamps = false
         #expect(SummaryService.line(for: s, options: o) == "Anna: Ciao a tutti\n")
         o.includeSpeakers = false
         #expect(SummaryService.line(for: s, options: o) == "Ciao a tutti\n")
+    }
+
+    @Test("mergeActionItems dedupes case-insensitively after trimming, keeping first-seen order")
+    func mergeActionItemsDedup() {
+        let merged = SummaryService.mergeActionItems(["Send the deck", "Book the room", "book the room", " Send the deck "])
+        #expect(merged == ["Send the deck", "Book the room"])
     }
 
     @Test("parse reads an ACTION ITEMS section and Summary decodes without it")
@@ -52,5 +68,7 @@ struct SummaryOptionsTests {
         var o = SummaryOptions.default; o.outputLanguage = "en"
         let s = try await SummaryService(features: FeatureSet(enabled: [.ai])).summarise(t, options: o)
         #expect(s.text == "Ok.")
+        let instructions = await MockLanguageModelStore.shared.lastInstructions(for: .foundation)
+        #expect(instructions?.contains("English") == true)
     }
 }

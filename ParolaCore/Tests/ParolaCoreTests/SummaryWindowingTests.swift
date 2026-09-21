@@ -133,6 +133,55 @@ struct SummaryWindowingTests {
         #expect(count == 2)
     }
 
+    @Test("windowed summarise merges action items across parts then appends the reduce step's own")
+    func actionItemsMergeAcrossWindows() async throws {
+        let transcript = longTranscript(segmentCount: 2)
+        let budget = 200
+        let windows = SummaryService.windows(for: transcript, budgetTokens: budget)
+        #expect(windows.count == 2)
+
+        let responses = [
+            """
+            SUMMARY:
+            Window 0 summary.
+
+            CHAPTERS:
+            00:00 Chapter 0
+
+            ACTION ITEMS:
+            - Send the deck
+            - Book the room
+            """,
+            """
+            SUMMARY:
+            Window 1 summary.
+
+            CHAPTERS:
+            05:00 Chapter 1
+
+            ACTION ITEMS:
+            - book the room
+            - Email the client
+            """,
+            """
+            SUMMARY:
+            Combined overview.
+
+            CHAPTERS:
+            00:00 Reduce chapters are ignored
+
+            ACTION ITEMS:
+            - Email the client
+            - Follow up next week
+            """,
+        ]
+        let model = MockLanguageModel(scriptedResponses: responses)
+
+        let summary = try await SummaryService(budgetTokens: budget).summarise(transcript, model: model)
+
+        #expect(summary.actionItems == ["Send the deck", "Book the room", "Email the client", "Follow up next week"])
+    }
+
     @Test("merged chapters drop consecutive duplicate titles but keep repeats apart")
     func chapterDedupe() {
         let merged = SummaryService.mergeChapters([
