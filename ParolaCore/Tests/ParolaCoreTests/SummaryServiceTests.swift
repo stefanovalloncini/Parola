@@ -41,6 +41,17 @@ struct SummaryServiceTests {
         #expect(await recorder.last?.contains("ACTION ITEMS:") == true)
     }
 
+    @Test("a summary saved before Parola could pick a model reads as the on-device one")
+    func legacySummaryDecodesOnDevice() throws {
+        let legacy = #"{"text":"Un riassunto","chapters":[]}"#
+        let decoded = try JSONDecoder().decode(Summary.self, from: Data(legacy.utf8))
+        #expect(decoded.provider == Summary.onDeviceProvider)
+
+        let stamped = Summary(text: "Un riassunto", provider: "Ollama · llama3.2:3b")
+        let roundTripped = try JSONDecoder().decode(Summary.self, from: try JSONEncoder().encode(stamped))
+        #expect(roundTripped.provider == "Ollama · llama3.2:3b")
+    }
+
     @Test("clock parsing handles MM:SS and H:MM:SS")
     func clock() {
         #expect(SummaryService.parseClock("01:30") == 90)

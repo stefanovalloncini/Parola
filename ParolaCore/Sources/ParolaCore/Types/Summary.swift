@@ -38,15 +38,26 @@ public struct Summary: Codable, Hashable, Sendable {
     public var text: String
     public var chapters: [Chapter]
     public var actionItems: [String]
+    /// What wrote this summary, for the line under the heading. Summaries saved before Parola could
+    /// pick a model read as the on-device one.
+    public var provider: String
 
-    public init(text: String, chapters: [Chapter] = [], actionItems: [String] = []) {
+    public static let onDeviceProvider = "Apple Intelligence"
+
+    public init(
+        text: String,
+        chapters: [Chapter] = [],
+        actionItems: [String] = [],
+        provider: String = Summary.onDeviceProvider
+    ) {
         self.text = text
         self.chapters = chapters
         self.actionItems = actionItems
+        self.provider = provider
     }
 
     private enum CodingKeys: String, CodingKey {
-        case text, chapters, actionItems
+        case text, chapters, actionItems, provider
     }
 
     public init(from decoder: Decoder) throws {
@@ -54,6 +65,7 @@ public struct Summary: Codable, Hashable, Sendable {
         text = try c.decode(String.self, forKey: .text)
         chapters = try c.decode([Chapter].self, forKey: .chapters)
         actionItems = try c.decodeIfPresent([String].self, forKey: .actionItems) ?? []
+        provider = try c.decodeIfPresent(String.self, forKey: .provider) ?? Summary.onDeviceProvider
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -61,5 +73,6 @@ public struct Summary: Codable, Hashable, Sendable {
         try c.encode(text, forKey: .text)
         try c.encode(chapters, forKey: .chapters)
         try c.encode(actionItems, forKey: .actionItems)
+        try c.encode(provider, forKey: .provider)
     }
 }

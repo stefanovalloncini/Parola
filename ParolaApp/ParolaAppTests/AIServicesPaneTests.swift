@@ -103,34 +103,53 @@ struct AIServicesPaneTests {
         #expect(reopened.remoteAIAcknowledged)
     }
 
+    /// Installs the mocks, runs the body, and clears the process-global store whether the body
+    /// returns or throws. A `defer { Task { … } }` would not be ordered against the next test.
+    private func withMocks<T>(
+        _ responses: [MockLanguageModelStore.Provider: String],
+        _ body: () async throws -> T
+    ) async throws -> T {
+        await MockLanguageModelStore.shared.clear()
+        for (provider, text) in responses {
+            await MockLanguageModelStore.shared.install(
+                provider: provider,
+                response: MockLanguageModelResponse(text: text)
+            )
+        }
+        do {
+            let value = try await body()
+            await MockLanguageModelStore.shared.clear()
+            return value
+        } catch {
+            await MockLanguageModelStore.shared.clear()
+            throw error
+        }
+    }
+
     @Test("Test asks the model and reports the reply")
     func testServiceReportsTheReply() async throws {
-        await MockLanguageModelStore.shared.clear()
-        await MockLanguageModelStore.shared.install(
-            provider: .openAI,
-            response: MockLanguageModelResponse(text: "OK")
-        )
-        let model = makeModel(defaults: temporaryDefaults())
-        let service = openAI()
-        model.setAIServices([service])
+        try await withMocks([.openAI: "OK"]) {
+            let model = makeModel(defaults: temporaryDefaults())
+            let service = openAI()
+            model.setAIServices([service])
 
-        let result = try #require(await model.testAIService(id: service.id))
-        #expect(result.ok)
-        #expect(result.message == "OK")
-
-        await MockLanguageModelStore.shared.clear()
+            let result = try #require(await model.testAIService(id: service.id))
+            #expect(result.ok)
+            #expect(result.message == "OK")
+        }
     }
 
     @Test("Test reports the failure instead of pretending it worked")
     func testServiceReportsFailure() async throws {
-        await MockLanguageModelStore.shared.clear()
-        let model = makeModel(defaults: temporaryDefaults())
-        let service = openAI()
-        model.setAIServices([service])
+        try await withMocks([:]) {
+            let model = makeModel(defaults: temporaryDefaults())
+            let service = openAI()
+            model.setAIServices([service])
 
-        let result = try #require(await model.testAIService(id: service.id))
-        #expect(result.ok == false)
-        #expect(!result.message.isEmpty)
+            let result = try #require(await model.testAIService(id: service.id))
+            #expect(result.ok == false)
+            #expect(!result.message.isEmpty)
+        }
     }
 
     @Test("managed policy hides the remote rows, tiles and picker options")
@@ -141,13 +160,18 @@ struct AIServicesPaneTests {
         )
         let cloud = openAI()
         let ollama = AIServiceConfig(kind: .ollama, name: "Ollama", endpoint: ollamaEndpoint, model: "llama3.2:3b")
-        model.setAIServices([cloud, ollama])
+        let offBoxOllama = AIServiceConfig(
+            kind: .ollama,
+            name: "Box",
+            endpoint: URL(string: "http://ai.example.com")!,
+            model: "llama3.2:3b"
+        )
+        model.setAIServices([cloud, ollama, offBoxOllama])
         model.setLanguageModel(cloud.choice, for: .chat)
 
         #expect(model.allowsRemoteAIServices == false)
         #expect(model.visibleAIServices.map(\.id) == [ollama.id])
         #expect(model.addableAIServiceKinds == [.ollama])
-        #expect(model.selectableAIServices.map(\.id) == [ollama.id])
         #expect(model.resolvedLanguageModelChoice(for: .chat) == .onDevice)
     }
 }

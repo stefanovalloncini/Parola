@@ -3289,6 +3289,7 @@ final class AppModel {
         let entryID = selectedEntryID
         let artifacts = derivedArtifactsGeneration
         let makeModel = summaryModelMaker()
+        let provider = languageModelLabel(for: .summary)
         let summarise = summariseOperation ?? { [features] transcript, options in
             guard let makeModel else {
                 return try await SummaryService(features: features).summarise(transcript, options: options)
@@ -3298,7 +3299,8 @@ final class AppModel {
         }
         Task { [weak self] in
             do {
-                let summary = try await summarise(snapshot, resolvedOptions)
+                var summary = try await summarise(snapshot, resolvedOptions)
+                summary.provider = provider
                 guard let self, generation == summaryGeneration else { return }
                 // A nil entry id means the transcript wasn't in the library yet: persistToLibrary
                 // selects it moments later, and that late selection owns this summary.

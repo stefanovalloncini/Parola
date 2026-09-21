@@ -12,36 +12,49 @@ struct TranscriptChatTests {
         )
     }
 
-    @Test("a session built on a given model asks that model")
-    func sessionOnGivenModel() async throws {
+    @Test("a session built through a model maker asks the model it built")
+    func sessionThroughMaker() async throws {
         let model = MockLanguageModel(scriptedResponses: ["From the chosen model"])
-        let chat = try TranscriptChat.makeSession(
+        let chat = try await TranscriptChat.makeSession(
             transcript: makeTranscript(),
             history: [],
             budgetTokens: 3500,
             features: .all,
-            model: model
+            makeModel: { _ in model }
         )
         let assistant = try await chat.ask("Who are you?")
         #expect(assistant.text == "From the chosen model")
     }
 
-    @Test("a transcript over the given budget is refused instead of sent whole")
-    func sessionRefusesOverBudget() async {
+    @Test("a transcript over the budget is condensed through the same maker, not refused")
+    func sessionCondensesOverBudget() async throws {
         let long = Transcript(
-            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: String(repeating: "parola ", count: 4000))],
+            segments: (0..<400).map {
+                TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "parola parola parola parola parola")
+            },
             language: "it",
             modelName: "tiny"
         )
-        #expect(throws: TranscriptChatSession.FailureReason.self) {
-            _ = try TranscriptChat.makeSession(
-                transcript: long,
-                history: [],
-                budgetTokens: 3500,
-                features: .all,
-                model: MockLanguageModel(scriptedResponses: ["never asked"])
-            )
-        }
+        let handedInstructions = InstructionLog()
+        // A fresh model per call: the digest is summarised window by window, each with its own maker call.
+        let chat = try await TranscriptChat.makeSession(
+            transcript: long,
+            history: [],
+            budgetTokens: 3500,
+            features: .all,
+            makeModel: { instructions in
+                await handedInstructions.record(instructions)
+                return instructions.contains("RELEVANT EXCERPTS:")
+                    ? MockLanguageModel(scriptedResponses: ["Answered from the condensed session"])
+                    : MockLanguageModel(scriptedResponses: ["SUMMARY:\nUn riassunto.\n"])
+            }
+        )
+        let assistant = try await chat.ask("Di cosa si parla?")
+
+        #expect(assistant.text == "Answered from the condensed session")
+        // The digest and the answer both come from the maker: the probe, the summary and the question.
+        #expect(await handedInstructions.count >= 3)
+        #expect(await handedInstructions.last?.contains("RELEVANT EXCERPTS:") == true)
     }
 
     @Test("the budget for a choice follows the model behind it")
@@ -49,6 +62,7 @@ struct TranscriptChatTests {
         #expect(TranscriptChat.budgetTokens(for: .onDevice) == TranscriptChat.defaultBudgetTokens)
         #expect(TranscriptChat.budgetTokens(for: .cloud(provider: .openAI, model: "gpt-4o-mini")) > 100_000)
         #expect(TranscriptChat.budgetTokens(for: .ollama(endpoint: URL(string: "http://127.0.0.1:11434")!, model: "llama3.2:3b")) >= TranscriptChat.defaultBudgetTokens)
+        #expect(TranscriptChat.budgetTokens(for: .custom(baseURL: URL(string: "http://10.0.0.2:8080/v1")!, model: "m")) == TranscriptChat.defaultBudgetTokens)
     }
 
     @Test("first ask records user and assistant messages")
@@ -195,4 +209,12 @@ struct TranscriptChatTests {
         #expect(instructions.contains("00:00"))
         #expect(instructions.contains("01:05"))
     }
+}
+
+/// What a model maker was handed, in order.
+private actor InstructionLog {
+    private(set) var all: [String] = []
+    var count: Int { all.count }
+    var last: String? { all.last }
+    func record(_ instructions: String) { all.append(instructions) }
 }

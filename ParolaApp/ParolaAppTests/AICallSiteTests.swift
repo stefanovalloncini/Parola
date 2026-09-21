@@ -29,18 +29,57 @@ struct AICallSiteTests {
     }
 
     /// Distinct text per provider, so a call site's answer names the model that produced it.
-    private func installMocks() async {
+    private func installMocks(_ extra: [MockLanguageModelStore.Provider: String] = [:]) async {
         await MockLanguageModelStore.shared.clear()
-        await MockLanguageModelStore.shared.install(provider: .foundation, response: MockLanguageModelResponse(text: "from apple"))
-        await MockLanguageModelStore.shared.install(provider: .openAI, response: MockLanguageModelResponse(text: "from openai"))
-        await MockLanguageModelStore.shared.install(provider: .ollama, response: MockLanguageModelResponse(text: "from ollama"))
-        await MockLanguageModelStore.shared.install(provider: .custom, response: MockLanguageModelResponse(text: "from custom"))
+        var responses: [MockLanguageModelStore.Provider: String] = [
+            .foundation: "from apple",
+            .openAI: "from openai",
+            .ollama: "from ollama",
+            .custom: "from custom",
+        ]
+        responses.merge(extra) { _, override in override }
+        for (provider, text) in responses {
+            await MockLanguageModelStore.shared.install(
+                provider: provider,
+                response: MockLanguageModelResponse(text: text)
+            )
+        }
+    }
+
+    /// Installs the mocks, runs the body, and clears the process-global store whether the body
+    /// returns or throws. A `defer { Task { … } }` would not be ordered against the next test.
+    private func withInstalledMocks<T>(
+        _ extra: [MockLanguageModelStore.Provider: String] = [:],
+        _ body: () async throws -> T
+    ) async throws -> T {
+        await installMocks(extra)
+        do {
+            let value = try await body()
+            await MockLanguageModelStore.shared.clear()
+            return value
+        } catch {
+            await MockLanguageModelStore.shared.clear()
+            throw error
+        }
     }
 
     private let ollamaEndpoint = URL(string: "http://127.0.0.1:11434")!
 
     private func openAI() -> AIServiceConfig {
         AIServiceConfig(kind: .openAI, name: "OpenAI", endpoint: nil, model: "gpt-4o-mini")
+    }
+
+    private func ollama() -> AIServiceConfig {
+        AIServiceConfig(kind: .ollama, name: "Ollama", endpoint: ollamaEndpoint, model: "llama3.2:3b")
+    }
+
+    private func custom() -> AIServiceConfig {
+        AIServiceConfig(
+            kind: .custom,
+            name: "My server",
+            endpoint: URL(string: "https://llm.example.com/v1")!,
+            model: "m"
+        )
     }
 
     @discardableResult
@@ -62,135 +101,147 @@ struct AICallSiteTests {
 
     @Test("a prompt runs on the model picked for prompts")
     func promptsUseTheirChoice() async throws {
-        await installMocks()
-        let model = makeModel()
-        pick(openAI(), for: .prompts, on: model)
+        try await withInstalledMocks {
+            let model = makeModel()
+            pick(openAI(), for: .prompts, on: model)
 
-        model.runPrompt(try #require(Prompt.builtIns.first))
-        #expect(await waitUntil { model.promptOutput != nil })
-        #expect(model.promptOutput?.text == "from openai")
-
-        await MockLanguageModelStore.shared.clear()
+            model.runPrompt(try #require(Prompt.builtIns.first))
+            #expect(await waitUntil { model.promptOutput != nil })
+            #expect(model.promptOutput?.text == "from openai")
+        }
     }
 
     @Test("action items run on the model picked for prompts")
     func actionItemsUseThePromptChoice() async throws {
-        await installMocks()
-        await MockLanguageModelStore.shared.install(
-            provider: .openAI,
-            response: MockLanguageModelResponse(text: "- from openai")
-        )
-        let model = makeModel()
-        pick(openAI(), for: .prompts, on: model)
+        try await withInstalledMocks([.openAI: "- from openai"]) {
+            let model = makeModel()
+            pick(openAI(), for: .prompts, on: model)
 
-        model.extractActionItems()
-        #expect(await waitUntil { !model.actionItems.isEmpty })
-        #expect(model.actionItems.map(\.task) == ["from openai"])
-
-        await MockLanguageModelStore.shared.clear()
+            model.extractActionItems()
+            #expect(await waitUntil { !model.actionItems.isEmpty })
+            #expect(model.actionItems.map(\.task) == ["from openai"])
+        }
     }
 
     @Test("YouTube chapters run on the model picked for summaries")
     func chaptersUseTheSummaryChoice() async throws {
-        await installMocks()
-        let model = makeModel()
-        pick(
-            AIServiceConfig(kind: .ollama, name: "Ollama", endpoint: ollamaEndpoint, model: "llama3.2:3b"),
-            for: .summary,
-            on: model
-        )
+        try await withInstalledMocks {
+            let model = makeModel()
+            pick(ollama(), for: .summary, on: model)
 
-        model.generateYouTubeChapters()
-        #expect(await waitUntil { model.promptOutput != nil })
-        #expect(model.promptOutput?.text == "from ollama")
-
-        await MockLanguageModelStore.shared.clear()
+            model.generateYouTubeChapters()
+            #expect(await waitUntil { model.promptOutput != nil })
+            #expect(model.promptOutput?.text == "from ollama")
+        }
     }
 
-    @Test("a summary runs on the model picked for summaries")
+    @Test("a summary runs on the model picked for summaries and is stamped with it")
     func summaryUsesItsChoice() async throws {
-        await installMocks()
-        await MockLanguageModelStore.shared.install(
-            provider: .custom,
-            response: MockLanguageModelResponse(text: "SUMMARY:\nfrom custom\n")
-        )
-        let model = makeModel()
-        pick(
-            AIServiceConfig(
-                kind: .custom,
-                name: "My server",
-                endpoint: URL(string: "https://llm.example.com/v1")!,
-                model: "m"
-            ),
-            for: .summary,
-            on: model
-        )
+        try await withInstalledMocks([.ollama: "SUMMARY:\nfrom ollama\n"]) {
+            let model = makeModel()
+            pick(ollama(), for: .summary, on: model)
 
-        model.summariseTranscript()
-        #expect(await waitUntil { model.transcript?.summary != nil })
-        #expect(model.transcript?.summary?.text == "from custom")
+            model.summariseTranscript()
+            #expect(await waitUntil { model.transcript?.summary != nil })
+            #expect(model.transcript?.summary?.text == "from ollama")
+            #expect(model.transcript?.summary?.provider == "Ollama · llama3.2:3b")
+        }
+    }
 
-        await MockLanguageModelStore.shared.clear()
+    @Test("a summary that stays on device keeps the on-device label")
+    func summaryOnDeviceKeepsItsLabel() async throws {
+        try await withInstalledMocks([.foundation: "SUMMARY:\nfrom apple\n"]) {
+            let model = makeModel()
+
+            model.summariseTranscript()
+            #expect(await waitUntil { model.transcript?.summary != nil })
+            #expect(model.transcript?.summary?.provider == Summary.onDeviceProvider)
+        }
     }
 
     @Test("dictation cleanup runs on the model picked for it")
     func dictationCleanupUsesItsChoice() async throws {
-        await installMocks()
-        let model = makeModel()
-        pick(openAI(), for: .dictationCleanup, on: model)
+        try await withInstalledMocks {
+            let model = makeModel()
+            pick(openAI(), for: .dictationCleanup, on: model)
 
-        let processor = PromptDictationProcessor(
-            defaultPrompt: try #require(Prompt.builtIns.first),
-            overrides: [:],
-            cleanupRunner: model.dictationCleanupRunner()
-        )
-        #expect(await processor.process("ciao") == "from openai")
-
-        await MockLanguageModelStore.shared.clear()
+            let processor = PromptDictationProcessor(
+                defaultPrompt: try #require(Prompt.builtIns.first),
+                overrides: [:],
+                cleanupRunner: model.dictationCleanupRunner()
+            )
+            let cleaned = await processor.process("ciao")
+            #expect(cleaned == "from openai")
+        }
     }
 
     @Test("chat runs on the model picked for chat")
     func chatUsesItsChoice() async throws {
-        await installMocks()
-        let model = makeModel()
-        pick(openAI(), for: .chat, on: model)
+        try await withInstalledMocks {
+            let model = makeModel()
+            pick(openAI(), for: .chat, on: model)
 
-        let session = try await model.makeChatSession(transcript: try #require(model.transcript), history: [])
-        #expect(try await session.ask("who answers?").text == "from openai")
+            let session = try await model.makeChatSession(transcript: try #require(model.transcript), history: [])
+            let reply = try await session.ask("who answers?")
+            #expect(reply.text == "from openai")
+        }
+    }
 
-        await MockLanguageModelStore.shared.clear()
+    @Test("an over-budget transcript is condensed through the picked model, not refused")
+    func chatCondensesOverBudget() async throws {
+        for service in [ollama(), custom()] {
+            try await withInstalledMocks([
+                .ollama: "SUMMARY:\nun riassunto\n",
+                .custom: "SUMMARY:\nun riassunto\n",
+            ]) {
+                let model = makeModel()
+                model.transcript = Transcript(
+                    segments: (0..<400).map {
+                        TranscriptSegment(id: $0, start: Double($0), end: Double($0) + 1, text: "parola parola parola parola parola")
+                    },
+                    language: "it",
+                    modelName: "stub"
+                )
+                pick(service, for: .chat, on: model)
+
+                let session = try await model.makeChatSession(
+                    transcript: try #require(model.transcript),
+                    history: []
+                )
+                let reply = try await session.ask("di cosa si parla?")
+                #expect(!reply.text.isEmpty)
+            }
+        }
     }
 
     @Test("with nothing picked every task stays on the on-device model")
     func defaultsStayOnDevice() async throws {
-        await installMocks()
-        let model = makeModel()
+        try await withInstalledMocks {
+            let model = makeModel()
 
-        for task in LanguageModelTask.allCases {
-            #expect(model.resolvedLanguageModelChoice(for: task) == .onDevice)
+            for task in LanguageModelTask.allCases {
+                #expect(model.resolvedLanguageModelChoice(for: task) == .onDevice)
+            }
+
+            model.runPrompt(try #require(Prompt.builtIns.first))
+            #expect(await waitUntil { model.promptOutput != nil })
+            #expect(model.promptOutput?.text == "from apple")
         }
-
-        model.runPrompt(try #require(Prompt.builtIns.first))
-        #expect(await waitUntil { model.promptOutput != nil })
-        #expect(model.promptOutput?.text == "from apple")
-
-        await MockLanguageModelStore.shared.clear()
     }
 
     @Test("a choice whose service is gone falls back to the on-device model")
     func staleChoiceResolvesOnDevice() async throws {
-        await installMocks()
-        let model = makeModel()
-        let service = pick(openAI(), for: .prompts, on: model)
-        #expect(model.resolvedLanguageModelChoice(for: .prompts) == service.choice)
+        try await withInstalledMocks {
+            let model = makeModel()
+            let service = pick(openAI(), for: .prompts, on: model)
+            #expect(model.resolvedLanguageModelChoice(for: .prompts) == service.choice)
 
-        model.setAIServices([])
-        #expect(model.resolvedLanguageModelChoice(for: .prompts) == .onDevice)
+            model.setAIServices([])
+            #expect(model.resolvedLanguageModelChoice(for: .prompts) == .onDevice)
 
-        model.runPrompt(try #require(Prompt.builtIns.first))
-        #expect(await waitUntil { model.promptOutput != nil })
-        #expect(model.promptOutput?.text == "from apple")
-
-        await MockLanguageModelStore.shared.clear()
+            model.runPrompt(try #require(Prompt.builtIns.first))
+            #expect(await waitUntil { model.promptOutput != nil })
+            #expect(model.promptOutput?.text == "from apple")
+        }
     }
 }

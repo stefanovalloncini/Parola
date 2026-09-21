@@ -43,15 +43,15 @@ struct SummaryPane: View {
     private func metadataStrip(summary: Summary) -> some View {
         let words = summary.text.split { $0.isWhitespace || $0.isNewline }.count
         let chars = summary.text.count
-        let modelName = model.transcript?.modelName ?? ""
+        let provider = summary.provider
 
         return HStack(spacing: 6) {
             metaLabel(Text("\(words) words"))
             dot
             metaLabel(Text("\(chars) chars"))
-            if !modelName.isEmpty {
+            if !provider.isEmpty {
                 dot
-                metaLabel(Text(verbatim: modelName))
+                metaLabel(Text(verbatim: provider))
                     .lineLimit(1)
                     .truncationMode(.middle)
             }

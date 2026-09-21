@@ -110,44 +110,72 @@ struct LanguageModelSelectionTests {
         return try await model.respond(to: "hello")
     }
 
+    /// Installs the given mocks, runs the body, and clears the process-global store whether the body
+    /// returns or throws. A `defer { Task { … } }` would not be ordered against the next test.
+    private func withMocks<T>(
+        _ responses: [MockLanguageModelStore.Provider: String],
+        _ body: () async throws -> T
+    ) async throws -> T {
+        await MockLanguageModelStore.shared.clear()
+        for (provider, text) in responses {
+            await MockLanguageModelStore.shared.install(
+                provider: provider,
+                response: MockLanguageModelResponse(text: text)
+            )
+        }
+        do {
+            let value = try await body()
+            await MockLanguageModelStore.shared.clear()
+            return value
+        } catch {
+            await MockLanguageModelStore.shared.clear()
+            throw error
+        }
+    }
+
     @Test("each choice routes to its own provider")
     func routesPerChoice() async throws {
-        await MockLanguageModelStore.shared.clear()
-        await MockLanguageModelStore.shared.install(provider: .foundation, response: MockLanguageModelResponse(text: "from apple"))
-        await MockLanguageModelStore.shared.install(provider: .openAI, response: MockLanguageModelResponse(text: "from openai"))
-        await MockLanguageModelStore.shared.install(provider: .ollama, response: MockLanguageModelResponse(text: "from ollama"))
-        await MockLanguageModelStore.shared.install(provider: .custom, response: MockLanguageModelResponse(text: "from custom"))
-
-        #expect(try await answer(.onDevice) == "from apple")
-        #expect(try await answer(.cloud(provider: .openAI, model: "gpt-4o-mini")) == "from openai")
-        #expect(try await answer(.ollama(endpoint: ollamaEndpoint, model: "llama3.2:3b")) == "from ollama")
-        #expect(try await answer(.custom(baseURL: URL(string: "https://llm.example.com/v1")!, model: "m")) == "from custom")
-
-        await MockLanguageModelStore.shared.clear()
+        try await withMocks([
+            .foundation: "from apple",
+            .openAI: "from openai",
+            .ollama: "from ollama",
+            .custom: "from custom",
+        ]) {
+            let onDevice = try await answer(.onDevice)
+            let cloud = try await answer(.cloud(provider: .openAI, model: "gpt-4o-mini"))
+            let ollama = try await answer(.ollama(endpoint: ollamaEndpoint, model: "llama3.2:3b"))
+            let custom = try await answer(.custom(baseURL: URL(string: "https://llm.example.com/v1")!, model: "m"))
+            #expect(onDevice == "from apple")
+            #expect(cloud == "from openai")
+            #expect(ollama == "from ollama")
+            #expect(custom == "from custom")
+        }
     }
 
     @Test("the chosen cloud model overrides the provider default")
     func cloudModelOverride() async throws {
-        await MockLanguageModelStore.shared.clear()
-        let keyStore = InMemoryAPIKeyStore(keys: [.openAI: "sk-test"])
-        let model = try await LanguageModelFactory.make(
-            for: .summary,
-            selection: selection(.cloud(provider: .openAI, model: "gpt-4.1-mini"), for: .summary),
-            instructions: "be brief",
-            keyStore: keyStore,
-            managed: ManagedConfiguration(storage: temporaryDefaults("parola-selection-"))
-        )
-        let cloud = try #require(model as? CloudLanguageModel)
-        let (request, _) = try cloud.buildRequest(prompt: "hi")
-        let body = try JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String: Any]
-        #expect(body?["model"] as? String == "gpt-4.1-mini")
+        try await withMocks([:]) {
+            let keyStore = InMemoryAPIKeyStore(keys: [.openAI: "sk-test"])
+            let model = try await LanguageModelFactory.make(
+                for: .summary,
+                selection: selection(.cloud(provider: .openAI, model: "gpt-4.1-mini"), for: .summary),
+                instructions: "be brief",
+                keyStore: keyStore,
+                managed: ManagedConfiguration(storage: temporaryDefaults("parola-selection-"))
+            )
+            let cloud = try #require(model as? CloudLanguageModel)
+            let (request, _) = try cloud.buildRequest(prompt: "hi")
+            let body = try JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String: Any]
+            #expect(body?["model"] as? String == "gpt-4.1-mini")
+        }
     }
 
     @Test("a cloud choice without a key fails instead of falling back")
-    func cloudWithoutKey() async {
-        await MockLanguageModelStore.shared.clear()
-        await #expect(throws: CloudLLMError.self) {
-            _ = try await answer(.cloud(provider: .openAI, model: "gpt-4o-mini"))
+    func cloudWithoutKey() async throws {
+        try await withMocks([:]) {
+            await #expect(throws: CloudLLMError.self) {
+                _ = try await answer(.cloud(provider: .openAI, model: "gpt-4o-mini"))
+            }
         }
     }
 
@@ -179,30 +207,32 @@ struct LanguageModelSelectionTests {
 
     @Test("policy refuses cloud, custom and off-box Ollama, and still allows loopback Ollama")
     func policyRefusesRemote() async throws {
-        await MockLanguageModelStore.shared.clear()
         let managed = managedWithoutCloud()
         let keyStore = InMemoryAPIKeyStore(keys: [.openAI: "sk-test", .custom: "sk-custom"])
 
-        await expectDisabledByPolicy {
-            _ = try await answer(.cloud(provider: .openAI, model: "gpt-4o-mini"), keyStore: keyStore, managed: managed)
-        }
-        await expectDisabledByPolicy {
-            _ = try await answer(.custom(baseURL: URL(string: "https://llm.example.com/v1")!, model: "m"), keyStore: keyStore, managed: managed)
-        }
-        await expectDisabledByPolicy {
-            _ = try await answer(.ollama(endpoint: URL(string: "http://ai.example.com")!, model: "m"), keyStore: keyStore, managed: managed)
+        try await withMocks([:]) {
+            await expectDisabledByPolicy {
+                _ = try await answer(.cloud(provider: .openAI, model: "gpt-4o-mini"), keyStore: keyStore, managed: managed)
+            }
+            await expectDisabledByPolicy {
+                _ = try await answer(.custom(baseURL: URL(string: "https://llm.example.com/v1")!, model: "m"), keyStore: keyStore, managed: managed)
+            }
+            await expectDisabledByPolicy {
+                _ = try await answer(.ollama(endpoint: URL(string: "http://ai.example.com")!, model: "m"), keyStore: keyStore, managed: managed)
+            }
         }
 
-        await MockLanguageModelStore.shared.install(provider: .ollama, response: MockLanguageModelResponse(text: "from ollama"))
-        #expect(try await answer(.ollama(endpoint: ollamaEndpoint, model: "llama3.2:3b"), keyStore: keyStore, managed: managed) == "from ollama")
-        await MockLanguageModelStore.shared.clear()
+        try await withMocks([.ollama: "from ollama"]) {
+            let loopback = try await answer(.ollama(endpoint: ollamaEndpoint, model: "llama3.2:3b"), keyStore: keyStore, managed: managed)
+            #expect(loopback == "from ollama")
+        }
     }
 
     // MARK: - Custom endpoint
 
     @Test("a custom endpoint speaks OpenAI chat completions under the base URL")
     func customEndpointRequest() async throws {
-        await MockLanguageModelStore.shared.clear()
+        try await withMocks([:]) {
         let keyStore = InMemoryAPIKeyStore(keys: [.custom: "sk-custom"])
         let model = try await LanguageModelFactory.make(
             for: .prompts,
@@ -220,11 +250,12 @@ struct LanguageModelSelectionTests {
         let messages = body?["messages"] as? [[String: String]]
         #expect(messages?.first?["role"] == "system")
         #expect(messages?.last?["content"] == "hi")
+        }
     }
 
     @Test("a keyless custom endpoint sends no authorization header")
     func customEndpointWithoutKey() async throws {
-        await MockLanguageModelStore.shared.clear()
+        try await withMocks([:]) {
         let model = try await LanguageModelFactory.make(
             for: .prompts,
             selection: selection(.custom(baseURL: URL(string: "http://10.0.0.2:8080/v1")!, model: "qwen"), for: .prompts),
@@ -235,11 +266,12 @@ struct LanguageModelSelectionTests {
         let cloud = try #require(model as? CloudLanguageModel)
         let (request, _) = try cloud.buildRequest(prompt: "hi")
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+        }
     }
 
     @Test("a custom endpoint decodes an OpenAI-shaped reply from a stubbed session")
     func customEndpointDecodesReply() async throws {
-        await MockLanguageModelStore.shared.clear()
+        try await withMocks([:]) {
         let payload = #"{"choices":[{"message":{"content":"OK"}}]}"#
         let session = StubURLProtocol.session(status: 200, body: Data(payload.utf8))
         let model = CloudLanguageModel(
@@ -249,8 +281,10 @@ struct LanguageModelSelectionTests {
             instructions: "be brief",
             session: session
         )
-        #expect(try await model.respond(to: "say ok") == "OK")
+        let reply = try await model.respond(to: "say ok")
+        #expect(reply == "OK")
         #expect(StubURLProtocol.lastURL()?.absoluteString == "http://10.0.0.2:8080/v1/chat/completions")
+        }
     }
 }
 

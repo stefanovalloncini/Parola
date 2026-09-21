@@ -115,9 +115,6 @@ extension AIServiceConfig.Kind {
     }
 
     var usesEndpoint: Bool { self == .ollama || self == .custom }
-
-    /// Cloud and custom rows go away under `disableCloudLLM`; Ollama on this Mac stays.
-    var isManagedAway: Bool { self != .ollama }
 }
 
 extension AppModel {
@@ -283,16 +280,15 @@ extension AppModel {
         guard choice != .onDevice else {
             return try TranscriptChat.makeSession(transcript: transcript, history: history, features: features)
         }
-        let model = try await makeLanguageModel(
-            for: .chat,
-            instructions: TranscriptChat.systemInstructions(for: transcript)
-        )
-        return try TranscriptChat.makeSession(
+        return try await TranscriptChat.makeSession(
             transcript: transcript,
             history: history,
             budgetTokens: TranscriptChat.budgetTokens(for: choice),
             features: features,
-            model: model
+            makeModel: { [weak self] instructions in
+                guard let self else { throw CancellationError() }
+                return try await self.makeLanguageModel(for: .chat, instructions: instructions)
+            }
         )
     }
 
@@ -332,18 +328,14 @@ extension AppModel {
 
     var allowsRemoteAIServices: Bool { !managedConfiguration.disableCloudLLM }
 
-    /// The rows the pane shows: under `disableCloudLLM` the cloud and custom ones are gone.
+    /// The rows the pane shows and the options its pickers offer: under `disableCloudLLM` everything
+    /// that would send text off this Mac is gone, an Ollama pointed at another host included.
     var visibleAIServices: [AIServiceConfig] {
-        allowsRemoteAIServices ? aiServices : aiServices.filter { !$0.kind.isManagedAway }
+        allowsRemoteAIServices ? aiServices : aiServices.filter { !$0.choice.isRemote }
     }
 
     var addableAIServiceKinds: [AIServiceConfig.Kind] {
         allowsRemoteAIServices ? AIServiceConfig.Kind.allCases : [.ollama]
-    }
-
-    /// What the per-task pickers offer. An Ollama pointed off this Mac counts as remote too.
-    var selectableAIServices: [AIServiceConfig] {
-        visibleAIServices.filter { allowsRemoteAIServices || !$0.choice.isRemote }
     }
 
     // MARK: - Saving a service
@@ -360,6 +352,7 @@ extension AppModel {
                     saved.hasKey = true
                 } catch {
                     ParolaLog.error(.ai, "API key could not be saved", [.error: .error(error)])
+                    saved.hasKey = false
                 }
             } else {
                 saved.hasKey = (try? await apiKeyStore.get(for: provider)).map { !$0.isEmpty } ?? false
@@ -399,22 +392,23 @@ extension AppModel {
             return InMemoryAPIKeyStore(keys: [provider: trimmedKey])
         }()
         let choice = service.choice
-        let started = ContinuousClock.now
-        let outcome = await AsyncTimeout.run(Self.aiTestTimeout, clock: clock) { [weak self] () -> AITestOutcome in
-            guard let self else { return .failed("") }
-            do {
-                let model = try await self.makeLanguageModel(
-                    choice: choice,
-                    task: .chat,
-                    instructions: LanguageModelFactory.defaultInstructions,
-                    keyStore: keyStore
-                )
-                return .answered(try await model.respond(to: AppModel.aiTestPrompt))
-            } catch {
-                return .failed(error.localizedDescription)
+        var outcome: AITestOutcome?
+        let elapsed = await clock.measure {
+            outcome = await AsyncTimeout.run(Self.aiTestTimeout, clock: clock) { [weak self] () -> AITestOutcome in
+                guard let self else { return .failed("") }
+                do {
+                    let model = try await self.makeLanguageModel(
+                        choice: choice,
+                        task: .chat,
+                        instructions: LanguageModelFactory.defaultInstructions,
+                        keyStore: keyStore
+                    )
+                    return .answered(try await model.respond(to: AppModel.aiTestPrompt))
+                } catch {
+                    return .failed(error.localizedDescription)
+                }
             }
         }
-        let elapsed = ContinuousClock.now - started
         let milliseconds = Int(elapsed.components.seconds * 1000
             + elapsed.components.attoseconds / 1_000_000_000_000_000)
         switch outcome {
@@ -440,9 +434,10 @@ extension AppModel {
 
     // MARK: - Diagnostics
 
-    /// One line per service, with the name and the endpoint left out: the report promises neither.
+    /// One line per service. The name, the endpoint and the model the user typed stay out: none of
+    /// them is structural.
     func aiServicesDiagnostics() -> [String] {
-        aiServices.map { "\($0.kind.rawValue) \($0.model) key=\($0.hasKey ? "yes" : "no")" }
+        aiServices.map { "\($0.kind.rawValue) key=\($0.hasKey ? "yes" : "no")" }
     }
 }
 
@@ -454,12 +449,16 @@ extension AppModel {
         resolvedLanguageModelChoice(for: task) != .onDevice || isAIAvailable
     }
 
-    /// What to call the model a task runs on, for a label next to its output.
+    /// What to call the model a task runs on, for a label next to its output: the service and the
+    /// model it answers with, or Apple Intelligence when the task stays on this Mac.
     func languageModelLabel(for task: LanguageModelTask) -> String {
-        let choice = resolvedLanguageModelChoice(for: task)
+        languageModelLabel(for: resolvedLanguageModelChoice(for: task))
+    }
+
+    func languageModelLabel(for choice: LanguageModelProviderChoice) -> String {
         guard choice != .onDevice, let service = aiService(for: choice) else {
-            return String(localized: "Apple Intelligence")
+            return Summary.onDeviceProvider
         }
-        return service.name
+        return service.model.isEmpty ? service.name : "\(service.name) · \(service.model)"
     }
 }

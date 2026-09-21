@@ -51,64 +51,63 @@ public enum TranscriptChat {
         case .onDevice:
             return try makeSession(transcript: transcript, history: history, budgetTokens: budgetTokens, features: features)
         case .cloud(let id):
-            let budget = budgetTokens ?? cloudBudgetTokens(for: id)
-            let makeCloudModel: @Sendable (String) async throws -> any LanguageModel = { instructions in
-                try await LanguageModelFactory.makeBYOKCloud(
-                    provider: id,
-                    instructions: instructions,
-                    keyStore: keyStore,
-                    managed: managed
-                )
-            }
-            let instructions = systemInstructions(for: transcript)
-            let model: any LanguageModel
-            if usesCondensedContext(instructions: instructions, budgetTokens: budget) {
-                // Probe key/policy now so an over-budget session fails at creation like the plain path.
-                _ = try await makeCloudModel("")
-                model = CondensedChatModel(
-                    transcript: transcript,
-                    budgetTokens: budget,
-                    makeDigest: digestProvider(for: transcript, budgetTokens: budget, summariseModel: {
-                        try await makeCloudModel(SummaryService.textInstructions(for: SummaryOptions(actionItems: false)))
-                    }),
-                    makeModel: makeCloudModel
-                )
-            } else {
-                model = try await makeCloudModel(instructions)
-            }
-            return TranscriptChatSession(transcript: transcript, history: history, model: model)
+            return try await makeSession(
+                transcript: transcript,
+                history: history,
+                budgetTokens: budgetTokens ?? cloudBudgetTokens(for: id),
+                features: features,
+                makeModel: { instructions in
+                    try await LanguageModelFactory.makeBYOKCloud(
+                        provider: id,
+                        instructions: instructions,
+                        keyStore: keyStore,
+                        managed: managed
+                    )
+                }
+            )
         }
     }
 
-    /// Chat against a model the caller already built for its own provider choice. The caller owns
-    /// the model's instructions, so a transcript over `budgetTokens` is refused here instead of
-    /// being condensed behind its back.
+    /// Chat through a model the caller builds for the instructions it is handed. A transcript over
+    /// `budgetTokens` is condensed the same way the on-device and cloud paths condense it.
     public static func makeSession(
         transcript: Transcript,
         history: [ChatMessage] = [],
         budgetTokens: Int? = nil,
         features: FeatureSet = .resolve(),
-        model: any LanguageModel
-    ) throws -> TranscriptChatSession {
+        makeModel: @escaping @Sendable (String) async throws -> any LanguageModel
+    ) async throws -> TranscriptChatSession {
         try features.require(.ai)
         let budget = budgetTokens ?? defaultBudgetTokens
-        guard !usesCondensedContext(for: transcript, budgetTokens: budget) else {
-            throw TranscriptChatSession.FailureReason.notAvailable(
-                "This transcript is too long for the chosen model."
+        let instructions = systemInstructions(for: transcript)
+        let model: any LanguageModel
+        if usesCondensedContext(instructions: instructions, budgetTokens: budget) {
+            // Probe key/policy now so an over-budget session fails at creation like the plain path.
+            _ = try await makeModel("")
+            model = CondensedChatModel(
+                transcript: transcript,
+                budgetTokens: budget,
+                makeDigest: digestProvider(for: transcript, budgetTokens: budget, summariseModel: {
+                    try await makeModel(SummaryService.textInstructions(for: SummaryOptions(actionItems: false)))
+                }),
+                makeModel: makeModel
             )
+        } else {
+            model = try await makeModel(instructions)
         }
         return TranscriptChatSession(transcript: transcript, history: history, model: model)
     }
 
     /// The prompt ceiling a chat on `choice` can take, so a caller can size the session it asks for.
-    /// Ollama and custom endpoints are sized from the context window Parola asks Ollama for.
+    /// Ollama is sized from the context window Parola asks it for; a custom endpoint's is unknown,
+    /// so it gets the same budget the on-device model does.
     public static func budgetTokens(for choice: LanguageModelProviderChoice) -> Int {
         switch choice {
-        case .onDevice:
+        case .onDevice, .custom:
             return defaultBudgetTokens
         case .cloud(let provider, _):
             return cloudBudgetTokens(for: provider)
-        case .ollama, .custom:
+        case .ollama:
             return max(defaultBudgetTokens, OllamaLanguageModel.defaultContextTokens - 4096)
         }
     }
