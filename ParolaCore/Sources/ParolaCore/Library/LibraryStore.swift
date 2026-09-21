@@ -547,8 +547,8 @@ public actor LibraryStore {
     static func searchAuxiliaryText(
         notes: [String: String],
         transcript: Transcript?,
-        aiTitle: String? = nil,
-        shortSummary: String? = nil
+        aiTitle: String?,
+        shortSummary: String?
     ) -> String {
         var parts: [String] = []
         if let aiTitle, !aiTitle.isEmpty { parts.append(aiTitle) }
