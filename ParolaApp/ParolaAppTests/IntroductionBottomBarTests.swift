@@ -1,7 +1,6 @@
 import Testing
 @testable import Parola
 
-@MainActor
 @Suite("Introduction bottom bar")
 struct IntroductionBottomBarTests {
     @Test("the last step is the only one that offers a file")

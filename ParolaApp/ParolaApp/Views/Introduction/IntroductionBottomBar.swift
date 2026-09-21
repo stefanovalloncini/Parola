@@ -7,7 +7,7 @@ struct IntroductionBottomBar: View {
 
     @Environment(AppModel.self) private var model
 
-    static func secondaryAction(for step: IntroductionStep) -> SecondaryAction? {
+    nonisolated static func secondaryAction(for step: IntroductionStep) -> SecondaryAction? {
         step == .ready ? .openFile : nil
     }
 
