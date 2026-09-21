@@ -47,7 +47,7 @@ public enum ModelCatalog {
         ModelVariant(
             id: "nvidia_parakeet-tdt-0.6b-v2",
             displayName: "Parakeet TDT 0.6B v2",
-            tagline: "Fastest English on Apple Silicon",
+            tagline: "English-only, the earlier Parakeet",
             engineID: .parakeet,
             sizeBytes: 600_000_000,
             downloadSource: ModelDownloadSource(
@@ -60,6 +60,23 @@ public enum ModelCatalog {
             qualityTier: .better,
             languageScope: .only(["en"]),
             badges: ["English", "Fastest"]
+        ),
+        ModelVariant(
+            id: "nvidia_parakeet-tdt-0.6b-v3",
+            displayName: "Parakeet TDT 0.6B v3",
+            tagline: "Fastest multilingual on Apple Silicon",
+            engineID: .parakeet,
+            sizeBytes: 1_240_000_000,
+            downloadSource: ModelDownloadSource(
+                huggingFaceRepo: "FluidInference/parakeet-tdt-0.6b-v3-coreml",
+                subpath: "",
+                installDirectory: "FluidInference/\(Repo.parakeetV3.folderName)"
+            ),
+            category: .fastest,
+            speedTier: .fastest,
+            qualityTier: .better,
+            languageScope: .only(ParakeetLanguages.v3),
+            badges: ["Multilingual", "Fastest"]
         ),
         ModelVariant(
             id: "openai_whisper-large-v3",
@@ -192,6 +209,16 @@ public enum ModelCatalog {
         all.first { $0.id == id }
     }
 
+    /// Entries kept for people who already downloaded them; the pickers list them only when installed.
+    public static let hiddenUnlessInstalled: Set<String> = ["nvidia_parakeet-tdt-0.6b-v2"]
+
+    public static func listedVariants(
+        configuration: ManagedConfiguration = .shared,
+        isInstalled: (String) -> Bool = { ModelStore.shared.isInstalled($0) }
+    ) -> [ModelVariant] {
+        configuration.filterAllowed(all).filter { !hiddenUnlessInstalled.contains($0.id) || isInstalled($0.id) }
+    }
+
     /// Best-effort suggestion for a mistyped or partial model id, e.g. the bare
     /// "parakeet-tdt-0.6b-v2" alias → "nvidia_parakeet-tdt-0.6b-v2". Nil when nothing is close,
     /// so ids for repos outside the catalog can still pass through untouched.
@@ -254,9 +281,10 @@ public enum ModelCatalog {
     }
 
     public static func groupedForPicker(
-        configuration: ManagedConfiguration = .shared
+        configuration: ManagedConfiguration = .shared,
+        isInstalled: (String) -> Bool = { ModelStore.shared.isInstalled($0) }
     ) -> [(ModelCategory, [ModelVariant])] {
-        let grouped = Dictionary(grouping: configuration.filterAllowed(all)) { $0.category }
+        let grouped = Dictionary(grouping: listedVariants(configuration: configuration, isInstalled: isInstalled)) { $0.category }
         return ModelCategory.allCases
             .compactMap { category in
                 guard let variants = grouped[category], !variants.isEmpty else { return nil }

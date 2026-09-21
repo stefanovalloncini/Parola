@@ -134,6 +134,30 @@ struct ModelCatalogTests {
         let caps = ModelCatalog.staticCapabilities(for: parakeet)
         #expect(caps?.supportedLanguages.isEnglishOnly == true)
     }
+
+    @Test("Parakeet v3 is the listed Fastest entry and speaks 25 languages including Italian")
+    func parakeetV3IsFastestMultilingual() throws {
+        let v3 = try #require(ModelCatalog.variant(id: "nvidia_parakeet-tdt-0.6b-v3"))
+        #expect(v3.category == .fastest)
+        #expect(v3.engineID == .parakeet)
+        #expect(v3.languageScope == .only(ParakeetLanguages.v3))
+        #expect(ParakeetLanguages.v3.count == 25)
+        #expect(ParakeetLanguages.v3.contains("it"))
+        #expect(ParakeetLanguages.v3.contains("en"))
+        #expect(v3.downloadSource.huggingFaceRepo == "FluidInference/parakeet-tdt-0.6b-v3-coreml")
+        #expect(v3.downloadSource.installDirectory == "FluidInference/parakeet-tdt-0.6b-v3")
+        #expect(v3.badges.contains("Multilingual"))
+    }
+
+    @Test("Parakeet v2 stays resolvable but is listed only when installed")
+    func parakeetV2HiddenUnlessInstalled() throws {
+        #expect(ModelCatalog.variant(id: "nvidia_parakeet-tdt-0.6b-v2") != nil)
+        let notInstalled = ModelCatalog.listedVariants(isInstalled: { _ in false }).map(\.id)
+        #expect(!notInstalled.contains("nvidia_parakeet-tdt-0.6b-v2"))
+        #expect(notInstalled.contains("nvidia_parakeet-tdt-0.6b-v3"))
+        let installed = ModelCatalog.listedVariants(isInstalled: { $0 == "nvidia_parakeet-tdt-0.6b-v2" }).map(\.id)
+        #expect(installed.contains("nvidia_parakeet-tdt-0.6b-v2"))
+    }
 }
 
 @Suite("Model catalog lookup")
@@ -222,8 +246,8 @@ struct ModelCatalogLookupTests {
     @Test("groupedForPicker filters by the engine allowlist")
     func groupedForPickerFilters() {
         let config = makeConfig(["allowedEngines": ["parakeet"]])
-        let groups = ModelCatalog.groupedForPicker(configuration: config)
+        let groups = ModelCatalog.groupedForPicker(configuration: config, isInstalled: { _ in false })
         let ids = groups.flatMap { $0.1.map(\.id) }
-        #expect(ids == ["nvidia_parakeet-tdt-0.6b-v2"])
+        #expect(ids == ["nvidia_parakeet-tdt-0.6b-v3"])
     }
 }
