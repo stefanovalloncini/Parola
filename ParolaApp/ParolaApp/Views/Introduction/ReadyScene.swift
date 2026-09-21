@@ -11,6 +11,7 @@ struct ReadyScene: View {
     }
 
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static func permissionRows(features: FeatureSet) -> [PermissionKind] {
         var rows: [PermissionKind] = []
@@ -41,7 +42,7 @@ struct ReadyScene: View {
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true)
-                .animation(DS.Motion.rowState, value: granted)
+                .animation(reduceMotion ? nil : DS.Motion.rowState, value: granted)
                 .padding(.top, DS.Spacing.small)
                 .sceneEntrance(order: 2)
             }

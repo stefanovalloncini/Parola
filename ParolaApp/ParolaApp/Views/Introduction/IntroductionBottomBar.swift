@@ -73,6 +73,8 @@ struct IntroductionStepDots: View {
     let index: Int
     let total: Int
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         HStack(spacing: DS.Spacing.snug) {
             ForEach(0..<total, id: \.self) { position in
@@ -81,7 +83,7 @@ struct IntroductionStepDots: View {
                     .frame(width: position == index ? 22 : 6, height: 6)
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: index)
+        .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.85), value: index)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Step \(index + 1) of \(total)"))
     }

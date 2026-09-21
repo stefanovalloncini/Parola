@@ -76,6 +76,8 @@ private struct EngineCard: View {
     let downloadProgress: Double?
     let choose: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         Button(action: choose) {
             VStack(alignment: .leading, spacing: DS.Spacing.small) {
@@ -105,7 +107,7 @@ private struct EngineCard: View {
             choose()
             return .handled
         }
-        .animation(DS.Motion.rowState, value: isSelected)
+        .animation(reduceMotion ? nil : DS.Motion.rowState, value: isSelected)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .axLeaf("Introduction.Button.Engine.\(variant.id)")
     }
