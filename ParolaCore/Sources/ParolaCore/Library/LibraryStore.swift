@@ -425,7 +425,7 @@ public actor LibraryStore {
                     category: category,
                     titleOverride: title,
                     sourceDigest: digest,
-                    source: source
+                    entrySource: source
                 )
                 didWriteBundle?()
             }

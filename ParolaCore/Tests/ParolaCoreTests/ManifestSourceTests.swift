@@ -34,7 +34,7 @@ struct ManifestSourceTests {
         defer { try? FileManager.default.removeItem(at: dir) }
 
         let url = try ParolaDocument.write(
-            transcript: transcript(), audioURL: nil, to: dir.appendingPathComponent("entry"), source: .web
+            transcript: transcript(), audioURL: nil, to: dir.appendingPathComponent("entry"), entrySource: .web
         )
 
         #expect(try ParolaDocument.read(at: url).manifest.source == .web)

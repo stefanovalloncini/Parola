@@ -179,7 +179,7 @@ public struct ParolaDocument: Sendable {
         deletedAt: Date? = nil,
         titleOverride: String? = nil,
         sourceDigest: String? = nil,
-        source entrySource: EntrySource? = nil
+        entrySource: EntrySource? = nil
     ) throws -> URL {
         let target = destination.pathExtension == "parola"
             ? destination
