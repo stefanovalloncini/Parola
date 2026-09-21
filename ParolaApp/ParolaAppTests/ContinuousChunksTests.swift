@@ -36,6 +36,8 @@ struct ContinuousChunksTests {
             segments: segments,
             useSpeakerColor: useSpeakerColor,
             primaryText: DS.Color.primaryText,
+            favoriteColor: DS.Color.accent,
+            favorites: [],
             softCap: softCap,
             hardCap: hardCap
         )
@@ -435,6 +437,8 @@ struct ContinuousChunksTests {
             segments: segments,
             useSpeakerColor: false,
             primaryText: DS.Color.primaryText,
+            favoriteColor: DS.Color.accent,
+            favorites: [],
             signature: signature
         ) { _, applied in box.record(applied) }
     }
@@ -442,7 +446,7 @@ struct ContinuousChunksTests {
     @Test("a cancelled off-main build never claims its signature")
     func cancelledOffMainBuildLeavesGateOpen() async {
         let segments = (0..<(ContinuousChunks.synchronousBuildCap + 40)).map { segment($0, "Sentence \($0).") }
-        let signature = ContinuousChunks.contentSignature(segments: segments, useSpeakerColor: false)
+        let signature = ContinuousChunks.contentSignature(segments: segments, useSpeakerColor: false, favoritesOnly: false, favorites: [])
         let box = GateBox()
 
         let cancelled = Task { await buildOffMain(segments, signature: signature, into: box) }

@@ -82,7 +82,9 @@ struct TranscriptParagraphTextTests {
         let rendered = ContinuousChunks.build(
             segments: segments,
             useSpeakerColor: true,
-            primaryText: DS.Color.primaryText
+            primaryText: DS.Color.primaryText,
+            favoriteColor: DS.Color.accent,
+            favorites: []
         ).map { String($0.text.characters) }
 
         #expect(rendered.joined(separator: "\n\n") == text(segments, labels: true))

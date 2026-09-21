@@ -186,7 +186,7 @@ struct SegmentsScroll: View {
     }
 
     nonisolated static func derive(
-        segments: [TranscriptSegment], speakerFilter: String?, favorites: Set<Int> = [], favoritesOnly: Bool = false
+        segments: [TranscriptSegment], speakerFilter: String?, favorites: Set<Int>, favoritesOnly: Bool
     ) -> Derived {
         var pauseByPrev: [Int: Double] = [:]
         for pause in SegmentPauses.detect(segments: segments, thresholdSeconds: 3.0) {
@@ -218,7 +218,7 @@ struct SegmentsScroll: View {
     }
 
     nonisolated static func visibleSegments(
-        from segments: [TranscriptSegment], speakerFilter: String?, favorites: Set<Int> = [], favoritesOnly: Bool = false
+        from segments: [TranscriptSegment], speakerFilter: String?, favorites: Set<Int>, favoritesOnly: Bool
     ) -> [TranscriptSegment] {
         segments.filter { segment in
             guard !segment.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }

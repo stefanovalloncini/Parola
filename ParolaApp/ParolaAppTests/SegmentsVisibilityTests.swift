@@ -13,14 +13,14 @@ struct SegmentsVisibilityTests {
     @Test("keeps every segment with real text when unfiltered")
     func keepsRealSegments() {
         let segments = [segment(0, "Hello."), segment(1, "World.")]
-        let visible = SegmentsScroll.visibleSegments(from: segments, speakerFilter: nil)
+        let visible = SegmentsScroll.visibleSegments(from: segments, speakerFilter: nil, favorites: [], favoritesOnly: false)
         #expect(visible.map(\.id) == [0, 1])
     }
 
     @Test("drops a whitespace-only segment so Segments mode matches Transcript mode")
     func dropsEmptySegment() {
         let segments = [segment(0, "Hello."), segment(1, "  \n\t "), segment(2, "World.")]
-        let visible = SegmentsScroll.visibleSegments(from: segments, speakerFilter: nil)
+        let visible = SegmentsScroll.visibleSegments(from: segments, speakerFilter: nil, favorites: [], favoritesOnly: false)
         #expect(visible.map(\.id) == [0, 2])
     }
 
@@ -31,7 +31,7 @@ struct SegmentsVisibilityTests {
             segment(1, "Yo.", speaker: "Bob"),
             segment(2, "Bye.", speaker: "Alice")
         ]
-        let visible = SegmentsScroll.visibleSegments(from: segments, speakerFilter: "Alice")
+        let visible = SegmentsScroll.visibleSegments(from: segments, speakerFilter: "Alice", favorites: [], favoritesOnly: false)
         #expect(visible.map(\.id) == [0, 2])
     }
 
@@ -42,7 +42,7 @@ struct SegmentsVisibilityTests {
             segment(1, "   ", speaker: "Alice"),
             segment(2, "Yo.", speaker: "Bob")
         ]
-        let visible = SegmentsScroll.visibleSegments(from: segments, speakerFilter: "Alice")
+        let visible = SegmentsScroll.visibleSegments(from: segments, speakerFilter: "Alice", favorites: [], favoritesOnly: false)
         #expect(visible.map(\.id) == [0])
     }
 
@@ -65,7 +65,7 @@ struct SegmentsVisibilityTests {
             scored(1, "Yo.", start: 8, end: 9, probability: 0.5)
         ]
 
-        let derived = SegmentsScroll.derive(segments: segments, speakerFilter: nil)
+        let derived = SegmentsScroll.derive(segments: segments, speakerFilter: nil, favorites: [], favoritesOnly: false)
 
         #expect(derived.pauseByPrev == [0: 7])
         #expect(derived.confidenceByID == [0: .high, 1: .low])
@@ -79,7 +79,7 @@ struct SegmentsVisibilityTests {
             TranscriptSegment(id: 1, start: 8, end: 9, text: "Yo.", speaker: "Bob")
         ]
 
-        let derived = SegmentsScroll.derive(segments: segments, speakerFilter: "Bob")
+        let derived = SegmentsScroll.derive(segments: segments, speakerFilter: "Bob", favorites: [], favoritesOnly: false)
 
         #expect(derived.visible.map(\.id) == [1])
         #expect(derived.pauseByPrev == [0: 7])
@@ -87,7 +87,7 @@ struct SegmentsVisibilityTests {
 
     @Test("derive on an empty transcript yields empty lists")
     func deriveEmpty() {
-        let derived = SegmentsScroll.derive(segments: [], speakerFilter: nil)
+        let derived = SegmentsScroll.derive(segments: [], speakerFilter: nil, favorites: [], favoritesOnly: false)
 
         #expect(derived.pauseByPrev.isEmpty)
         #expect(derived.confidenceByID.isEmpty)

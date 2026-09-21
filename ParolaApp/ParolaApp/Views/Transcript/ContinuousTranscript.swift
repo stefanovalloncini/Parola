@@ -153,8 +153,8 @@ struct ContinuousChunks: View {
         segments: [TranscriptSegment],
         useSpeakerColor: Bool,
         primaryText: Color,
-        favoriteColor: Color = .accentColor,
-        favorites: Set<Int> = [],
+        favoriteColor: Color,
+        favorites: Set<Int>,
         signature: Int,
         apply: ([Chunk], Int) -> Void
     ) async {
@@ -174,7 +174,7 @@ struct ContinuousChunks: View {
     }
 
     nonisolated static func contentSignature(
-        segments: [TranscriptSegment], useSpeakerColor: Bool, favoritesOnly: Bool = false, favorites: Set<Int> = []
+        segments: [TranscriptSegment], useSpeakerColor: Bool, favoritesOnly: Bool, favorites: Set<Int>
     ) -> Int {
         var hasher = Hasher()
         hasher.combine(useSpeakerColor)
@@ -217,8 +217,8 @@ struct ContinuousChunks: View {
         segments: [TranscriptSegment],
         useSpeakerColor: Bool,
         primaryText: Color,
-        favoriteColor: Color = .accentColor,
-        favorites: Set<Int> = [],
+        favoriteColor: Color,
+        favorites: Set<Int>,
         softCap: Int = ContinuousChunks.softSegmentCap,
         hardCap: Int = ContinuousChunks.hardSegmentCap,
         paragraphPause: TimeInterval = TranscriptDerive.paragraphPauseSeconds
