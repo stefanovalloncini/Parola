@@ -21,7 +21,7 @@ struct ToolbarCapsuleChrome: ViewModifier {
             .clipShape(ToolbarCapsule.shape)
             .overlay(
                 ToolbarCapsule.shape
-                    .stroke(
+                    .strokeBorder(
                         focused ? DS.Color.accent : DS.Color.separator.opacity(ToolbarCapsule.strokeOpacity),
                         lineWidth: focused ? 1 : 0.5
                     )
