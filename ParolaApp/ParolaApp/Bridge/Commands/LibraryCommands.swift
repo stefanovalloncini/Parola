@@ -269,10 +269,16 @@ extension ParolaAutomationServer {
                 handler: { args, ctx in
                     let segmentID = try args.int("segmentID")
                     let isFavorite = try args.bool("isFavorite")
-                    if ctx.model.isSegmentFavorite(segmentID) != isFavorite {
-                        ctx.model.toggleSegmentFavorite(segmentID)
+                    guard let entryID = ctx.model.selectedEntryID else {
+                        return .object(["applied": .bool(false), "reason": .string("no entry selected")])
                     }
-                    return .object(["segmentID": .int(segmentID), "isFavorite": .bool(isFavorite)])
+                    try await ctx.model.library.setSegmentFavorite(isFavorite, segmentID: segmentID, for: entryID)
+                    await ctx.model.refreshLibraryAndWait()
+                    return .object([
+                        "applied": .bool(true),
+                        "segmentID": .int(segmentID),
+                        "isFavorite": .bool(ctx.model.isSegmentFavorite(segmentID)),
+                    ])
                 }
             ),
 
