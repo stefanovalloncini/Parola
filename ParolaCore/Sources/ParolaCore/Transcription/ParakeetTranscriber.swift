@@ -59,10 +59,10 @@ actor ParakeetTranscriber: Transcriber {
             ParolaLog.fault(.engineParakeet, "transcribe called with no model loaded")
             throw ParolaError.transcriptionFailed("Parakeet model not loaded")
         }
-        if !Self.accepts(language: options.language, forModel: modelName) {
-            let lang = options.language ?? "auto"
+        if let lang = options.language, !Self.accepts(language: lang, forModel: modelName) {
             ParolaLog.notice(.engineParakeet, "rejected language \(LanguageToken(lang))")
-            throw ParolaError.unsupportedForEngine("\(modelName) does not support \"\(lang)\"")
+            let label = ModelCatalog.variant(id: modelName)?.displayName ?? modelName
+            throw ParolaError.unsupportedForEngine("\(label) does not support \"\(lang)\"")
         }
         if options.task == .translate {
             ParolaLog.notice(.engineParakeet, "rejected translate: unsupported")
