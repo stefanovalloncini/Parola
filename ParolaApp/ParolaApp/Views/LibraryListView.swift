@@ -196,7 +196,7 @@ enum LibraryListContent {
         return filtered.filter(\.pinned) + filtered.filter { !$0.pinned }
     }
 
-    /// Groups are content, not new lists: the `List` itself stays one view across category switches.
+    /// Search results run under one unheadered group; every other order the list shows breaks into days.
     static func groups(
         for rows: [LibraryRowDisplay],
         sortOrder: LibrarySortOrder,

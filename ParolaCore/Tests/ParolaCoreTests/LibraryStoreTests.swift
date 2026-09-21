@@ -111,8 +111,7 @@ struct LibraryStoreTests {
         #expect(entries.first?.id == entry.id)
     }
 
-    /// A bridged NSString id is hashed character by character through the bridge every time a
-    /// SwiftUI `ForEach` looks a row up; a native string hashes its own bytes.
+    /// A bridged id is Unicode-normalised through the bridge on every SwiftUI list-diff hash.
     @Test("a listed entry's id is a native Swift string, not a bridged NSString")
     func listedIDsAreNativeStrings() async throws {
         let dir = try makeTempLibraryDirectory()

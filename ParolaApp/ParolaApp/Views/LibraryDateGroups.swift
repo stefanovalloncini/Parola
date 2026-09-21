@@ -55,7 +55,7 @@ enum LibraryDateGroups {
         return groups
     }
 
-    /// The day itself, unformatted: building one `ISO8601DateFormatter` per group cost 199 µs apiece.
+    /// Never shown: a group id only has to be unique, and formatting a date for one costs 199 µs.
     private static func id(for day: Date) -> String {
         "day-\(Int(day.timeIntervalSinceReferenceDate))"
     }
