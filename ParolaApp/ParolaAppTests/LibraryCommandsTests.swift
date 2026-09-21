@@ -308,4 +308,77 @@ struct LibraryCommandsTests {
         #expect(fields["favoritesOnly"] == .bool(false))
         #expect(fields["favoriteSegments"] == .array([]))
     }
+
+    @Test("setSummaryOptions merges the given fields over the saved options and persists them")
+    func setSummaryOptionsMerges() async throws {
+        let (model, server, context, commands) = try makeRig()
+        var initial = SummaryOptions.default
+        initial.includeSpeakers = true
+        model.summaryOptions = initial
+        let command = try #require(commands["setSummaryOptions"])
+
+        let result = try await command.handler(
+            try command.validate(AutomationArgs(["options": .object(["bulletPoints": .bool(true)])])), context
+        )
+        withExtendedLifetime(server) {}
+
+        #expect(model.summaryOptions.bulletPoints == true)
+        #expect(model.summaryOptions.includeSpeakers == true, "a field not mentioned in the call stays as saved")
+
+        guard case .object(let fields) = result, case .object(let options) = fields["summaryOptions"] ?? .null else {
+            Issue.record("setSummaryOptions should return the merged options")
+            return
+        }
+        #expect(options["bulletPoints"] == .bool(true))
+        #expect(options["includeSpeakers"] == .bool(true))
+    }
+
+    @Test("setSummaryOptions rejects an options object that cannot decode as SummaryOptions")
+    func setSummaryOptionsRejectsMalformedInput() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let before = model.summaryOptions
+        let command = try #require(commands["setSummaryOptions"])
+
+        await #expect(throws: AutomationError.self) {
+            _ = try await command.handler(
+                try command.validate(AutomationArgs(["options": .object(["includeTimestamps": .string("not a bool")])])), context
+            )
+        }
+        withExtendedLifetime(server) {}
+        #expect(model.summaryOptions == before, "a rejected write leaves the saved options untouched")
+    }
+
+    @Test("getState reports summaryOptions and autostartSummary")
+    func getStateReportsSummaryOptionsAndAutostart() async throws {
+        let (model, server, _, _) = try makeRig()
+        model.autostartSummary = true
+        var options = SummaryOptions.default
+        options.keyPointsOnly = true
+        model.summaryOptions = options
+
+        guard case .object(let fields) = server.snapshotState() else {
+            Issue.record("getState should return an object")
+            return
+        }
+        #expect(fields["autostartSummary"] == .bool(true))
+        guard case .object(let summaryFields) = fields["summaryOptions"] ?? .null else {
+            Issue.record("summaryOptions should be an object")
+            return
+        }
+        #expect(summaryFields["keyPointsOnly"] == .bool(true))
+    }
+
+    @Test("summarizeLatestEntry rejects a malformed options object instead of answering started:true")
+    func summarizeLatestEntryRejectsMalformedOptions() async throws {
+        let (model, server, context, commands) = try makeRig()
+        _ = try await makeCardMetadataEntry(model)
+        let command = try #require(commands["summarizeLatestEntry"])
+
+        await #expect(throws: AutomationError.self) {
+            _ = try await command.handler(
+                try command.validate(AutomationArgs(["options": .object(["includeTimestamps": .string("not a bool")])])), context
+            )
+        }
+        withExtendedLifetime(server) {}
+    }
 }

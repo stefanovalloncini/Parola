@@ -47,9 +47,14 @@ struct ChatPane: View {
         }
         .background(DS.Color.surface)
         .task(id: sessionKey) { await rebuildSession() }
-        .task { userPrompts = await model.promptLibrary.userPrompts }
+        .task { await refreshUserPrompts() }
         .onAppear { isSearching = isSearchingPersisted }
         .onChange(of: isSearching) { _, value in isSearchingPersisted = value }
+        // Mirrors PromptsMenu's per-open refresh: a prompt added in Settings shows up next time this pane is visible.
+        .onChange(of: model.transcriptPaneMode) { _, mode in
+            guard mode == .chat else { return }
+            Task { await refreshUserPrompts() }
+        }
         .focusedSceneValue(\.focusChatComposer, FocusChatComposerAction { composerFocused = true })
         .axBranch("Chat")
     }
@@ -98,8 +103,11 @@ struct ChatPane: View {
 
     private func sendPreset(_ instructions: String) {
         guard !presetsDisabled else { return }
-        input = instructions
-        send()
+        send(text: instructions)
+    }
+
+    private func refreshUserPrompts() async {
+        userPrompts = await model.promptLibrary.userPrompts
     }
 
     static let excludedBuiltInIDs: Set<UUID> = [
@@ -108,8 +116,8 @@ struct ChatPane: View {
         UUID(uuidString: "00000000-0000-0000-0000-00000000000B")!, // Assistant
     ]
 
-    static func presets(builtIns: [Prompt] = Prompt.builtIns, userPrompts: [Prompt]) -> [Prompt] {
-        builtIns.filter { !excludedBuiltInIDs.contains($0.id) } + userPrompts
+    static func presets(userPrompts: [Prompt]) -> [Prompt] {
+        Prompt.builtIns.filter { !excludedBuiltInIDs.contains($0.id) } + userPrompts
     }
 
     private static func identifierSlug(_ name: String) -> String {
@@ -348,8 +356,15 @@ struct ChatPane: View {
 
     private func send() {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, let session, !isSending else { return }
+        guard !text.isEmpty, session != nil, !isSending else { return }
         input = ""
+        send(text: text)
+    }
+
+    /// Leaves the composer draft untouched — a preset send must not clobber what the user was typing.
+    private func send(text raw: String) {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, let session, !isSending else { return }
         isSending = true
         let entryID = model.selectedEntryID
         sendTask?.cancel()

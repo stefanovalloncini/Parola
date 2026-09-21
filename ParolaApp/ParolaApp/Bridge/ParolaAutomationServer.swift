@@ -495,7 +495,18 @@ final class ParolaAutomationServer {
             "favoriteSegments": .array(model.favoriteSegmentIDs.sorted().map { .int($0) }),
             "favoritesOnly": .bool(model.favoritesOnly),
             "transcriptPaneMode": .string(model.transcriptPaneMode.rawValue),
+            "summaryOptions": Self.encode(model.summaryOptions),
+            "autostartSummary": .bool(model.autostartSummary),
         ])
+    }
+
+    /// Round-trips a Codable value through JSON so it can travel as an `AutomationValue`.
+    static func encode<T: Encodable>(_ value: T) -> AutomationValue {
+        guard let data = try? JSONEncoder().encode(value),
+              let object = try? JSONSerialization.jsonObject(with: data) else {
+            return .null
+        }
+        return AutomationValue(object)
     }
 
     static func introductionState(_ introduction: IntroductionController, currentModel: String) -> AutomationValue {

@@ -290,11 +290,26 @@ extension ParolaAutomationServer {
                 ],
                 handler: { args, ctx in
                     try ctx.require(.ai)
-                    let options: SummaryOptions? = args.contains("options")
+                    let options: SummaryOptions? = try args.contains("options")
                         ? ctx.model.mergedSummaryOptions(overriding: try args.object("options"))
                         : nil
                     ctx.model.summarizeLatestEntry(options: options)
                     return .object(["started": .bool(true)])
+                }
+            ),
+
+            AutomationCommand(
+                name: "setSummaryOptions",
+                area: .library,
+                summary: "Merges the given fields over the saved summary options and persists the result.",
+                kind: .mutating,
+                args: [
+                    .init(name: "options", kind: .object, required: true, summary: "SummaryOptions fields to merge over the saved options"),
+                ],
+                handler: { args, ctx in
+                    let merged = try ctx.model.mergedSummaryOptions(overriding: try args.object("options"))
+                    ctx.model.summaryOptions = merged
+                    return .object(["summaryOptions": ParolaAutomationServer.encode(merged)])
                 }
             ),
 

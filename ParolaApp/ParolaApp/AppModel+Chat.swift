@@ -30,9 +30,9 @@ extension AppModel {
     }
 
     /// The saved summary options with the given fields overridden, for a bridge caller that sends only what changed.
-    func mergedSummaryOptions(overriding raw: [String: AutomationValue]) -> SummaryOptions {
+    func mergedSummaryOptions(overriding raw: [String: AutomationValue]) throws -> SummaryOptions {
         guard let base = try? JSONSerialization.jsonObject(with: JSONEncoder().encode(summaryOptions)) as? [String: Any] else {
-            return summaryOptions
+            throw AutomationError.invalidArgs(field: "options", reason: "could not encode the saved summary options")
         }
         var merged = base
         for (key, value) in raw {
@@ -44,7 +44,7 @@ extension AppModel {
         }
         guard let data = try? JSONSerialization.data(withJSONObject: merged),
               let decoded = try? JSONDecoder().decode(SummaryOptions.self, from: data) else {
-            return summaryOptions
+            throw AutomationError.invalidArgs(field: "options", reason: "could not decode SummaryOptions from the given fields")
         }
         return decoded
     }

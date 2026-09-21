@@ -394,6 +394,7 @@ extension AppModel {
         transcript = nil
         sourceFileURL = nil
         favoritesOnly = false
+        transcriptPaneMode = .transcript
         tearDownPlayer()
         if case .ready = phase { phase = .idle }
     }
@@ -587,6 +588,12 @@ extension AppModel {
 
     func openBatch() {
         openPage(.batch, keepingTranscript: true)
+    }
+
+    /// Opens the settings window on a specific pane — the one place a route is picked before the window opens.
+    func openSettings(route: SettingsRoute) {
+        settingsPane = route.rawValue
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 
     private func openPage(_ page: Route, keepingTranscript: Bool) {

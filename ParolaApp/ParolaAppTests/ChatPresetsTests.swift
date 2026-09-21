@@ -33,4 +33,31 @@ struct ChatPresetsTests {
         let presets = ChatPane.presets(userPrompts: [])
         #expect(presets.count == Prompt.builtIns.count - ChatPane.excludedBuiltInIDs.count)
     }
+
+    /// ChatPane.send(text:) is a private SwiftUI method with no seam, so this drives the same TranscriptChatSession.stream it calls.
+    @Test("sending a preset's instructions through the chat session produces an assistant reply in history")
+    func presetSendProducesAssistantReply() async throws {
+        let preset = try #require(ChatPane.presets(userPrompts: []).first { $0.name == "Cleanup" })
+        let transcript = Transcript(
+            segments: [TranscriptSegment(id: 0, start: 0, end: 1, text: "Um, hello, welcome, uh, to the meeting.")],
+            language: "en",
+            modelName: "stub"
+        )
+        let model = MockLanguageModel.make(
+            response: MockLanguageModelResponse(text: "Hello, welcome to the meeting."),
+            clock: ContinuousClock()
+        )
+        let session = TranscriptChatSession(transcript: transcript, model: model)
+
+        var collected = ""
+        for try await event in session.stream(preset.instructions) {
+            if case .delta(let delta) = event { collected += delta }
+        }
+
+        let history = await session.history
+        #expect(collected == "Hello, welcome to the meeting.")
+        #expect(history.map(\.role) == [.user, .assistant])
+        #expect(history.first?.text == preset.instructions)
+        #expect(history.last?.text == "Hello, welcome to the meeting.")
+    }
 }

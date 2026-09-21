@@ -171,13 +171,13 @@ struct ParolaApp: App {
                 @Bindable var model = model
                 Button("Show Transcript") { model.setTranscriptPaneMode(.transcript) }
                     .keyboardShortcut("1", modifiers: [.command])
-                    .disabled(!model.hasTranscript)
+                    .disabled(!model.canShow(.transcript))
                 Button("Show Summary") { model.setTranscriptPaneMode(.summary) }
                     .keyboardShortcut("2", modifiers: [.command])
-                    .disabled(!model.hasTranscript || !model.features.isEnabled(.ai))
+                    .disabled(!model.canShow(.summary))
                 Button("Show Chat") { model.setTranscriptPaneMode(.chat) }
                     .keyboardShortcut("3", modifiers: [.command])
-                    .disabled(!model.hasTranscript || !model.features.isEnabled(.ai))
+                    .disabled(!model.canShow(.chat))
                 Divider()
                 Button("Toggle Inspector") {
                     InspectorVisibility.toggle(in: DefaultsStore.current, isNarrow: model.transcriptPaneIsNarrow)

@@ -5,7 +5,7 @@ import ParolaCore
 import ParolaTestSupport
 
 @MainActor
-@Suite("Summary options settings")
+@Suite("Summary options settings", .serialized)
 struct SummaryOptionsSettingsTests {
     private func makeModel(_ defaults: UserDefaults = temporaryDefaults()) -> AppModel {
         AppModel(skipBootstrap: true, defaults: defaults, libraryURL: makeTempLibraryURL("summary-options"))
@@ -62,7 +62,7 @@ struct SummaryOptionsSettingsTests {
         model.transcript = makeTranscript(text: longText)
         model.persistToLibrary(makeTranscript(text: longText), audioSource: nil, source: .file, activate: true)
 
-        await waitUntil { model.transcript?.summary != nil }
+        await waitUntil(timeoutMs: 5000) { model.transcript?.summary != nil }
         #expect(await callCount.value == 1)
     }
 
@@ -95,6 +95,48 @@ struct SummaryOptionsSettingsTests {
 
         model.clearLoadedEntry()
         #expect(model.transcriptPaneMode == .transcript)
+    }
+
+    @Test("assigning selectedEntryID the same value it already holds does not reset the pane mode")
+    func sameValueSelectionKeepsPaneMode() {
+        let model = makeModel()
+        model.transcript = makeTranscript()
+        model.selectedEntryID = "entry-1"
+        model.setTranscriptPaneMode(.summary)
+        #expect(model.transcriptPaneMode == .summary)
+
+        model.selectedEntryID = "entry-1"
+        #expect(model.transcriptPaneMode == .summary, "re-assigning the same id (summarizeLatestEntry does this) must not bounce the user out of Summary")
+
+        model.selectedEntryID = "entry-2"
+        #expect(model.transcriptPaneMode == .transcript, "a real change of entry still resets the mode")
+    }
+
+    @Test("autostart skips when the user navigates away during the card-metadata wait")
+    func autostartSkipsOnNavigationAway() async {
+        await MockLanguageModelStore.shared.install(
+            provider: .foundation,
+            response: MockLanguageModelResponse(text: "Title\nOne line summary.", delayMs: 300)
+        )
+        defer { Task { await MockLanguageModelStore.shared.clear() } }
+
+        let model = makeModel()
+        model.autostartSummary = true
+        let callCount = CallCounter()
+        model.summariseOperation = { _, _ in
+            await callCount.increment()
+            return Summary(text: "auto summary")
+        }
+
+        let longText = String(repeating: "word ", count: 20)
+        model.transcript = makeTranscript(text: longText)
+        model.persistToLibrary(makeTranscript(text: longText), audioSource: nil, source: .file, activate: true)
+
+        await waitUntil(timeoutMs: 2000) { model.selectedEntryID != nil }
+        model.selectedEntryID = "somewhere-else"
+
+        try? await Task.sleep(for: .milliseconds(600))
+        #expect(await callCount.value == 0)
     }
 
     @Test("summariseTranscript passes the saved options to the operation")

@@ -940,6 +940,17 @@
         }
       }
     },
+    "Action items": {
+      "extractionState": "manual",
+      "localizations": {
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Azioni"
+          }
+        }
+      }
+    },
     "Action items:": {
       "extractionState": "manual",
       "localizations": {

@@ -136,16 +136,22 @@ struct TranscriptHeaderBar: View {
 
     private var paneModePicker: some View {
         Picker(selection: paneModeBinding) {
-            ForEach(AppModel.TranscriptPaneMode.allCases, id: \.self) { mode in
+            ForEach(availablePaneModes, id: \.self) { mode in
                 Text(Self.paneModeLabel(mode)).tag(mode)
             }
         } label: {
             Text(Self.paneModeLabel(model.transcriptPaneMode))
         }
+        .labelsHidden()
         .pickerStyle(.menu)
         .fixedSize()
         .help("Switch between Transcript, Summary and Chat")
         .axLeaf("HeaderBar.Picker.PaneMode")
+    }
+
+    /// Rows a menu Picker can't disable per-item, so an unreachable mode (no transcript, or AI off) is left out instead.
+    private var availablePaneModes: [AppModel.TranscriptPaneMode] {
+        AppModel.TranscriptPaneMode.allCases.filter { model.canShow($0) }
     }
 
     private var paneModeBinding: Binding<AppModel.TranscriptPaneMode> {
