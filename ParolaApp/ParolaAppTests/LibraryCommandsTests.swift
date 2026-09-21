@@ -281,4 +281,31 @@ struct LibraryCommandsTests {
         }
         #expect(fields["applied"] == .bool(false))
     }
+
+    @Test("setSegmentFavorite through the bridge turns off the filter when it empties the favorites")
+    func setSegmentFavoriteClearsFilterOnLastUnfavorite() async throws {
+        let (model, server, context, commands) = try makeRig()
+        let entry = try await makeCardMetadataEntry(model)
+        model.loadEntry(entry.id)
+        for _ in 0..<200 where model.selectedEntryID != entry.id {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let command = try #require(commands["setSegmentFavorite"])
+        _ = try await command.handler(
+            try command.validate(AutomationArgs(["segmentID": .int(0), "isFavorite": .bool(true)])), context
+        )
+        model.favoritesOnly = true
+
+        _ = try await command.handler(
+            try command.validate(AutomationArgs(["segmentID": .int(0), "isFavorite": .bool(false)])), context
+        )
+        withExtendedLifetime(server) {}
+
+        guard case .object(let fields) = server.snapshotState() else {
+            Issue.record("getState should return an object")
+            return
+        }
+        #expect(fields["favoritesOnly"] == .bool(false))
+        #expect(fields["favoriteSegments"] == .array([]))
+    }
 }

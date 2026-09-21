@@ -293,22 +293,33 @@ extension AppModel {
 
     func isSegmentFavorite(_ id: Int) -> Bool { favoriteSegmentIDs.contains(id) }
 
+    /// The single write path for a segment's favorite, shared by the UI toggle and the bridge; nil means no entry is selected.
+    @discardableResult
+    func setSegmentFavorite(_ id: Int, isFavorite: Bool) async throws -> Bool? {
+        guard let entryID = selectedEntryID else { return nil }
+        clearFavoritesOnlyIfEmptied(unfavoriting: id, isFavorite: isFavorite)
+        try await library.setSegmentFavorite(isFavorite, segmentID: id, for: entryID)
+        await refreshLibraryAndWait()
+        return isSegmentFavorite(id)
+    }
+
     func toggleSegmentFavorite(_ id: Int) {
-        guard let entryID = selectedEntryID else { return }
-        let current = favoriteSegmentIDs
-        let makeFavorite = !current.contains(id)
-        if !makeFavorite, favoritesOnly, current.subtracting([id]).isEmpty {
-            favoritesOnly = false
-        }
+        guard selectedEntryID != nil else { return }
+        let makeFavorite = !isSegmentFavorite(id)
+        clearFavoritesOnlyIfEmptied(unfavoriting: id, isFavorite: makeFavorite)
         Task { [weak self] in
             guard let self else { return }
             do {
-                try await library.setSegmentFavorite(makeFavorite, segmentID: id, for: entryID)
+                try await setSegmentFavorite(id, isFavorite: makeFavorite)
             } catch {
                 phase = .failed(message: error.localizedDescription)
             }
-            refreshLibrary()
         }
+    }
+
+    private func clearFavoritesOnlyIfEmptied(unfavoriting id: Int, isFavorite: Bool) {
+        guard !isFavorite, favoritesOnly, favoriteSegmentIDs.subtracting([id]).isEmpty else { return }
+        favoritesOnly = false
     }
 
     var focusedSegmentIDForCommands: Int? {
